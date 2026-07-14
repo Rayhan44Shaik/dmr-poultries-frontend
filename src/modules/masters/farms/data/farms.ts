@@ -1,0 +1,40 @@
+import type { Farm } from "../types/farm";
+
+export const initialFarms: Farm[] = [
+  {
+    id: 1,
+    farmNo: 1,
+    farmName: "Sneha Farm",
+    ownerName: "Sneha",
+    supervisorName: "Ravi",
+    phoneNumber: "9876543210",
+    village: "Tenali",
+    address: "Near Bus Stand",
+    capacity: 15000,
+    status: "Active",
+  },
+  {
+    id: 2,
+    farmNo: 2,
+    farmName: "Vencobb Farm",
+    ownerName: "Vencobb",
+    supervisorName: "Kumar",
+    phoneNumber: "9876543211",
+    village: "Guntur",
+    address: "Main Road",
+    capacity: 20000,
+    status: "Active",
+  },
+  {
+    id: 3,
+    farmNo: 3,
+    farmName: "Farmer Farm",
+    ownerName: "Farmer",
+    supervisorName: "Srinivas",
+    phoneNumber: "9876543212",
+    village: "Vijayawada",
+    address: "Highway",
+    capacity: 12000,
+    status: "Active",
+  },
+];
