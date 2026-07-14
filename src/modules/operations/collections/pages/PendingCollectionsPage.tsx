@@ -382,7 +382,6 @@ export default function PendingCollectionsPage() {
         >
           <FileText size={16} /> PDF
         </button>
-        {/* Reset Button – now in red */}
         <button
           onClick={resetFilters}
           className="inline-flex items-center gap-2 rounded-md border border-red-600 bg-white px-3 py-2 text-sm font-medium text-red-600 shadow-sm hover:bg-red-50"
@@ -393,7 +392,8 @@ export default function PendingCollectionsPage() {
 
       {/* Filter Bar */}
       <div className="mb-6 rounded-lg border border-green-200 bg-white p-4 shadow">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-3">
+          {/* As On Date */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">As On Date *</label>
             <input
@@ -403,6 +403,7 @@ export default function PendingCollectionsPage() {
               className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500"
             />
           </div>
+          {/* Shop Name */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Shop Name</label>
             <div className="relative">
@@ -433,19 +434,7 @@ export default function PendingCollectionsPage() {
               )}
             </div>
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Collector</label>
-            <select
-              value={collector}
-              onChange={(e) => setCollector(e.target.value)}
-              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500"
-            >
-              <option value="">All Collectors</option>
-              {collectors.map((name) => (
-                <option key={name} value={name}>{name}</option>
-              ))}
-            </select>
-          </div>
+          {/* Sort By */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Sort By</label>
             <select
@@ -480,48 +469,77 @@ export default function PendingCollectionsPage() {
         </div>
 
         {showMoreFilters && (
-          <div className="mt-4 grid grid-cols-1 gap-4 border-t border-green-200 pt-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">From Date</label>
-              <div className="relative">
-                <input
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="h-10 w-full rounded-md border border-slate-300 pl-3 pr-10 text-sm outline-none focus:border-green-500"
-                />
-                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500" size={18} />
+          <div className="mt-4 grid grid-cols-1 gap-4 border-t border-green-200 pt-4 lg:grid-cols-3">
+            {/* Left Column: From Date & To Date stacked vertically */}
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">From Date</label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="h-10 w-full rounded-md border border-slate-300 pl-3 pr-10 text-sm outline-none focus:border-green-500"
+                  />
+                  <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500" size={18} />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">To Date</label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="h-10 w-full rounded-md border border-slate-300 pl-3 pr-10 text-sm outline-none focus:border-green-500"
+                  />
+                  <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500" size={18} />
+                </div>
               </div>
             </div>
+
+            {/* Middle Column: Collector */}
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">To Date</label>
-              <div className="relative">
-                <input
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="h-10 w-full rounded-md border border-slate-300 pl-3 pr-10 text-sm outline-none focus:border-green-500"
-                />
-                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500" size={18} />
-              </div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Collector</label>
+              <select
+                value={collector}
+                onChange={(e) => setCollector(e.target.value)}
+                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500"
+              >
+                <option value="">All Collectors</option>
+                {collectors.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Recovery % ≥ {recoveryThreshold}%
-              </label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={recoveryThreshold}
-                  onChange={(e) => setRecoveryThreshold(Number(e.target.value))}
-                  className="h-2 w-full cursor-pointer rounded-lg bg-slate-200 accent-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-                <span className="min-w-[3rem] text-sm font-medium text-green-600">
+
+            {/* Right Column: Recovery card – unchanged */}
+            <div className="rounded-xl border border-green-200 bg-gradient-to-br from-white to-green-50 p-4 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700">
+                    Recovery %
+                  </label>
+                  <p className="text-xs text-slate-500">
+                    Show shops with at least this recovery percentage
+                  </p>
+                </div>
+                <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-bold text-green-700">
                   {recoveryThreshold}%
                 </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={recoveryThreshold}
+                onChange={(e) => setRecoveryThreshold(Number(e.target.value))}
+                className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-green-600"
+              />
+              <div className="mt-2 flex justify-between text-xs text-slate-500">
+                <span>0%</span>
+                <span>100%</span>
               </div>
             </div>
           </div>

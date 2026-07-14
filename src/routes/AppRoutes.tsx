@@ -21,6 +21,8 @@ import CollectionEntryPage from "../modules/operations/collections/pages/Collect
 import PendingCollectionsPage from "../modules/operations/collections/pages/PendingCollectionsPage";
 import CollectionReportPage from "../modules/operations/collections/pages/CollectionReportPage";
 
+import FuelExpensesPage from "../modules/operations/fuel-expenses/pages/FuelExpensesPage";
+
 import AccountsPage from "../modules/accounts/pages/AccountsPage";
 import VehicleManagementPage from "../modules/vehicles/pages/VehicleManagementPage";
 import StaffPage from "../modules/staff/pages/StaffPage";
@@ -88,6 +90,14 @@ function AppRoutes() {
             </DashboardLayout>
           }
         />
+        <Route
+  path="/operations/fuel-expenses"
+  element={
+    <DashboardLayout>
+      <FuelExpensesPage />
+    </DashboardLayout>
+  }
+/>
 
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/vehicles" element={<VehicleManagementPage />} />

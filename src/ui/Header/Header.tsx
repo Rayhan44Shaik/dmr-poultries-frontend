@@ -1,4 +1,5 @@
 import { useLocation, Link } from "react-router-dom";
+import { Fuel } from "lucide-react";
 import CollectionTabs from "../../modules/operations/collections/components/CollectionTabs";
 import VehicleTripTabs from "../../modules/operations/vehicle-trips/components/VehicleTripTabs";
 
@@ -27,8 +28,6 @@ function Header() {
   const isCollectionPage = currentPath.startsWith("/operations/collections");
   const isVehicleTripPage = currentPath.startsWith("/operations/vehicle-trips");
 
-  // Helper: check if a tab is active.
-  // For the base "/masters" page, we treat "Shops" as active.
   const isActive = (tabPath: string) => {
     if (currentPath === "/masters" && tabPath === "/masters/shops") return true;
     return currentPath === tabPath;
@@ -112,8 +111,19 @@ function Header() {
       "/reports": "Reports",
       "/settings": "Settings",
     };
-    const title = pageTitles[currentPath] || "";
-    leftContent = title ? <h2 className="text-xl font-semibold text-slate-800">{title}</h2> : null;
+
+    // ✅ Fuel Entry – moderate boldness
+    if (currentPath === "/operations/fuel-expenses") {
+      leftContent = (
+        <div className="flex items-center gap-2.5">
+          <Fuel size={20} className="text-blue-600" />
+          <h1 className="text-2xl font-bold text-slate-800">Fuel Entry</h1>
+        </div>
+      );
+    } else {
+      const title = pageTitles[currentPath] || "";
+      leftContent = title ? <h2 className="text-xl font-semibold text-slate-800">{title}</h2> : null;
+    }
   }
 
   return (

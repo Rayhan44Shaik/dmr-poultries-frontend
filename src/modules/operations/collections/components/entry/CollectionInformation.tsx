@@ -18,7 +18,6 @@ interface Props {
   onReset: () => void;
 }
 
-// Custom filter: only matches if option label starts with the search term (case‑insensitive)
 const startsWithFilter = (option: any, inputValue: string) => {
   if (!inputValue) return true;
   return option.label.toLowerCase().startsWith(inputValue.toLowerCase());
@@ -38,7 +37,6 @@ function CollectionInformation({
   onViewLedger,
   onReset,
 }: Props) {
-  // Options for react‑select
   const shopOptions = shops.map((shop) => ({ value: shop, label: shop }));
 
   const selectStyles = {
@@ -93,7 +91,7 @@ function CollectionInformation({
 
         <div>
           <label htmlFor="collector" className="mb-1 block text-sm font-medium text-slate-700">
-            Collector
+            Collector <span className="text-red-500">*</span>
           </label>
           <select
             id="collector"
@@ -118,7 +116,7 @@ function CollectionInformation({
 
         <div>
           <label htmlFor="paymentMode" className="mb-1 block text-sm font-medium text-slate-700">
-            Payment Mode
+            Payment Mode <span className="text-red-500">*</span>
           </label>
           <select
             id="paymentMode"
@@ -163,10 +161,10 @@ function CollectionInformation({
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Shop – searchable select with prefix filter */}
+        {/* Shop – searchable select with star */}
         <div className="sm:col-span-1 lg:col-span-2">
           <label htmlFor="shopName" className="mb-1 block text-sm font-medium text-slate-700">
-            Shop Name
+            Shop Name <span className="text-red-500">*</span>
           </label>
           <Select
             id="shopName"
@@ -174,10 +172,10 @@ function CollectionInformation({
             value={shopOptions.find((opt) => opt.value === entry.shopName) || null}
             onChange={(selected) => onShopChange(selected?.value || "")}
             isSearchable
-            filterOption={startsWithFilter} // ✅ only matches from the beginning
+            filterOption={startsWithFilter}
             placeholder="Select Shop"
             styles={selectStyles}
-            maxMenuHeight={200} // ✅ shows about 5 options, scrollable
+            maxMenuHeight={200}
           />
           {errors.shopName && (
             <p id="shopName-error" className="mt-1 text-xs text-red-600">

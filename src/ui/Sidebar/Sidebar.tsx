@@ -68,7 +68,8 @@ export default function Sidebar() {
       children: [
         { title: "Vehicle Trips", path: "/operations/vehicle-trips/entry" }, // ✅ changed to Entry
         { title: "Sales", path: "/operations/shop-sales" },
-        { title: "Collection", path: "/operations/collections/entry" }
+        { title: "Collection", path: "/operations/collections/entry" },
+        { title: "Fuel Expenses", path: "/operations/fuel-expenses" },
       ]
     },
     {

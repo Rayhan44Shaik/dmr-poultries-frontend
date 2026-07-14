@@ -70,8 +70,6 @@ export default function useCollectionEntry() {
     loadMasterData();
   }, []);
 
-  // ❌ REMOVED auto‑select useEffect – no automatic shop selection on load
-
   function findPendingShop(shopName: string): PendingCollection | null {
     return pendingCollections.find((shop) => shop.shopName === shopName) ?? null;
   }
@@ -106,10 +104,10 @@ export default function useCollectionEntry() {
     setEntry((prev) => ({
       ...prev,
       shopName,
-      amount: updatedShop?.currentPending ?? 0,
+      amount: 0, // ✅ empty until View Ledger
       remarks: ""
     }));
-    setShowSummary(false); // hide summary when shop changes
+    setShowSummary(false);
   }
 
   function changeShop(shopName: string) {
@@ -143,9 +141,54 @@ export default function useCollectionEntry() {
     const { totalSales, totalCollections, currentPending } = computeShopTotals(pendingShop.shopName);
     setPendingShop(prev => prev ? { ...prev, totalSales, totalCollections, currentPending } : null);
     setShowSummary(true);
+    // ✅ Fill the amount field with the pending amount so the user sees it
+    setEntry(prev => ({ ...prev, amount: currentPending }));
     console.log("Open Shop Ledger", pendingShop.shopName);
   }
 
+  // ---- WEEKLY RANGE & CALCULATIONS ----
+  const weekRange = useMemo(() => {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = day === 0 ? 6 : day - 1;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - diff);
+    monday.setHours(0, 0, 0, 0);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+    return { monday, sunday };
+  }, []);
+
+  const weekRangeFormatted = useMemo(() => {
+    const fmt = (d: Date) =>
+      d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+    return `${fmt(weekRange.monday)} to ${fmt(weekRange.sunday)}`;
+  }, [weekRange]);
+
+  const weeklySales = useMemo(() => {
+    if (!pendingShop) return 0;
+    const sales = getShopSales(pendingShop.shopName);
+    return sales
+      .filter((s: any) => {
+        const saleDate = new Date(s.tripDate);
+        return saleDate >= weekRange.monday && saleDate <= weekRange.sunday;
+      })
+      .reduce((sum: number, s: any) => sum + Number(s.amount), 0);
+  }, [pendingShop, weekRange]);
+
+  const weeklyCollections = useMemo(() => {
+    if (!pendingShop) return 0;
+    const collections = collectionService.getCollectionsForShop(pendingShop.shopName);
+    return collections
+      .filter((c: any) => {
+        const colDate = new Date(c.collectionDate);
+        return colDate >= weekRange.monday && colDate <= weekRange.sunday && c.status === "Approved";
+      })
+      .reduce((sum: number, c: any) => sum + Number(c.amount), 0);
+  }, [pendingShop, weekRange]);
+
+  // ---- existing memos ----
   const openingBalance = useMemo(() => pendingShop?.currentPending ?? 0, [pendingShop]);
   const totalSales = useMemo(() => pendingShop?.totalSales ?? 0, [pendingShop]);
   const totalCollections = useMemo(() => pendingShop?.totalCollections ?? 0, [pendingShop]);
@@ -487,7 +530,10 @@ export default function useCollectionEntry() {
     remainingBalance,
     collectionProgress,
     pageSummary,
-    showSummary, // ✅ exposed
+    showSummary,
+    weeklySales,
+    weeklyCollections,
+    weekRangeFormatted,
     recentCollections: paginatedCollections,
     selectedShopCollections,
     statusFilter,

@@ -33,10 +33,12 @@ export default function CollectionEntryPage() {
           <div className="col-span-4 min-w-0">
             <OutstandingSummary
               openingBalance={vm.openingBalance}
-              totalSales={vm.totalSales}
-              totalCollections={vm.totalCollections}
+              weeklySales={vm.weeklySales}          // ✅ changed
+              weeklyCollections={vm.weeklyCollections} // ✅ changed
               currentPending={vm.currentPending}
               showSummary={vm.showSummary}
+              shopName={vm.entry.shopName}
+              dateRange={vm.weekRangeFormatted}
             />
           </div>
           <div className="col-span-6 min-w-0">
@@ -47,7 +49,7 @@ export default function CollectionEntryPage() {
               receivedToday={vm.todayCollection}
               remainingBalance={vm.remainingBalance}
               showSummary={vm.showSummary}
-              amountError={vm.errors?.amount} // ✅ pass error
+              amountError={vm.errors?.amount}
               onAmountChange={vm.changeAmount}
               onRemarksChange={vm.changeRemarks}
               onSave={vm.saveCollection}
