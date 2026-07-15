@@ -1,15 +1,23 @@
-import { Fuel, IndianRupee, FileText, CheckCircle, Gauge } from "lucide-react";
+import { Fuel, IndianRupee, FileText, CheckCircle, TrendingUp } from "lucide-react";
 
 interface Props {
   totalLitres: number;
   totalAmount: number;
   pendingCount: number;
   approvedCount: number;
-  totalMileage: number; // ✅ new
+  avgMileage: number | null;
+  recentTripMileage: number | null;
 }
 
-export function FuelKPICards({ totalLitres, totalAmount, pendingCount, approvedCount, totalMileage }: Props) {
-  const cards = [
+export function FuelKPICards({
+  totalLitres,
+  totalAmount,
+  pendingCount,
+  approvedCount,
+  avgMileage,
+  recentTripMileage,
+}: Props) {
+  const baseCards = [
     {
       title: "Total Fuel (L)",
       value: totalLitres.toFixed(2),
@@ -39,17 +47,30 @@ export function FuelKPICards({ totalLitres, totalAmount, pendingCount, approvedC
       text: "text-emerald-700",
     },
     {
-      title: "Total Mileage (KM)",
-      value: totalMileage.toLocaleString(),
-      icon: <Gauge size={20} />,
-      bg: "bg-purple-50",
-      text: "text-purple-700",
+      title: "Avg Efficiency (KM/L)",
+      value: avgMileage !== null ? avgMileage.toFixed(2) : "—",
+      icon: <TrendingUp size={20} />,
+      bg: "bg-cyan-50",
+      text: "text-cyan-700",
     },
   ];
 
+  const extraCards = recentTripMileage !== null ? [
+    {
+      title: "Recent Trip Mileage (KM/L)",
+      value: recentTripMileage.toFixed(2),
+      icon: <TrendingUp size={20} />,
+      bg: "bg-indigo-50",
+      text: "text-indigo-700",
+    },
+  ] : [];
+
+  const allCards = [...baseCards, ...extraCards];
+  const gridCols = allCards.length === 5 ? "lg:grid-cols-5" : "lg:grid-cols-6";
+
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-      {cards.map((card) => (
+    <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${gridCols}`}>
+      {allCards.map((card) => (
         <div
           key={card.title}
           className={`flex items-center justify-between rounded-lg border border-slate-200 p-4 shadow-sm ${card.bg}`}

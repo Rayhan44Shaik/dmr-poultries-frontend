@@ -1,36 +1,41 @@
-import { Search, FileText, FileSpreadsheet } from "lucide-react";
+import { Search } from "lucide-react";
 import Select from "react-select";
+import { ModernDatePicker } from "./ModernDatePicker";
 
 interface Props {
   fromDate: string;
   toDate: string;
-  vehicle: string;
-  activeVehicles: string[]; // ✅ only active vehicle numbers
+  selectedVehicles: string[];
+  activeVehicles: string[];
   setFromDate: (v: string) => void;
   setToDate: (v: string) => void;
-  setVehicle: (v: string) => void;
+  setSelectedVehicles: (v: string[]) => void;
   onSearch: () => void;
   onReset: () => void;
-  onExportPDF: () => void;
-  onExportExcel: () => void;
-  hasFilters: boolean;
-  totalEntries: number;
 }
+
+// Helper to convert "yyyy-mm-dd" to Date
+const parseDate = (str: string) => (str ? new Date(str + "T00:00:00") : null);
+
+// Helper to convert Date to "yyyy-mm-dd"
+const formatDate = (date: Date | null) => {
+  if (!date) return "";
+  const d = new Date(date);
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${month}-${day}`;
+};
 
 export function FuelFilters({
   fromDate,
   toDate,
-  vehicle,
+  selectedVehicles,
   activeVehicles,
   setFromDate,
   setToDate,
-  setVehicle,
+  setSelectedVehicles,
   onSearch,
   onReset,
-  onExportPDF,
-  onExportExcel,
-  hasFilters,
-  totalEntries,
 }: Props) {
   const vehicleOptions = activeVehicles.map((v) => ({ value: v, label: v }));
 
@@ -40,87 +45,107 @@ export function FuelFilters({
       borderRadius: 8,
       borderColor: "#e2e8f0",
       boxShadow: "none",
-      minHeight: 38,
+      minHeight: 40,
       fontSize: "14px",
       "&:hover": { borderColor: "#94a3b8" },
-      "&:focus-within": { borderColor: "#3b82f6", boxShadow: "0 0 0 3px rgba(59, 130, 246, 0.15)" },
+      "&:focus-within": { borderColor: "#3b82f6", boxShadow: "0 0 0 2px rgba(59, 130, 246, 0.15)" },
     }),
     option: (base: any, { isFocused, isSelected }: any) => ({
       ...base,
       backgroundColor: isSelected ? "#2563eb" : isFocused ? "#eff6ff" : "white",
       color: isSelected ? "white" : "#1e293b",
+      fontSize: "14px",
     }),
     menu: (base: any) => ({ ...base, zIndex: 50 }),
-    placeholder: (base: any) => ({ ...base, color: "#94a3b8" }),
+    placeholder: (base: any) => ({ ...base, color: "#94a3b8", fontSize: "14px" }),
+    multiValue: (base: any) => ({
+      ...base,
+      backgroundColor: "#e0f2fe",
+      borderRadius: 4,
+    }),
+    multiValueLabel: (base: any) => ({
+      ...base,
+      color: "#0369a1",
+      fontSize: "12px",
+      fontWeight: 500,
+    }),
+    multiValueRemove: (base: any) => ({
+      ...base,
+      color: "#0369a1",
+      ":hover": { backgroundColor: "#bae6fd", color: "#0c4a6e" },
+    }),
+    indicatorsContainer: (base: any) => ({
+      ...base,
+      height: "auto",
+    }),
+    clearIndicator: (base: any) => ({
+      ...base,
+      padding: "0 4px",
+    }),
+    valueContainer: (base: any) => ({
+      ...base,
+      padding: "0 4px",
+      flexWrap: "nowrap",
+      overflow: "hidden",
+    }),
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+        {/* From Date – modern picker */}
         <div className="md:col-span-2">
           <label className="text-xs font-medium text-slate-500 block mb-1">From Date</label>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+          <ModernDatePicker
+            selected={parseDate(fromDate)}
+            onChange={(date) => setFromDate(formatDate(date))}
+            placeholder="dd-mm-yyyy"
+            className="w-48"
           />
         </div>
+
+        {/* To Date – modern picker */}
         <div className="md:col-span-2">
           <label className="text-xs font-medium text-slate-500 block mb-1">To Date</label>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+          <ModernDatePicker
+            selected={parseDate(toDate)}
+            onChange={(date) => setToDate(formatDate(date))}
+            placeholder="dd-mm-yyyy"
+            className="w-48"
           />
         </div>
-        <div className="md:col-span-3">
+
+        {/* Vehicle */}
+        <div className="md:col-span-5">
           <label className="text-xs font-medium text-slate-500 block mb-1">Vehicle</label>
           <Select
             options={vehicleOptions}
-            value={vehicleOptions.find((opt) => opt.value === vehicle) || null}
-            onChange={(selected) => setVehicle(selected?.value || "")}
+            value={vehicleOptions.filter((opt) => selectedVehicles.includes(opt.value))}
+            onChange={(selected) => {
+              setSelectedVehicles(selected ? selected.map((s: any) => s.value) : []);
+            }}
+            isMulti
             isSearchable
             placeholder="All Vehicles"
             styles={selectStyles}
             maxMenuHeight={180}
-            filterOption={(option, input) =>
-              option.label.toLowerCase().startsWith(input.toLowerCase()) ||
-              option.label.toLowerCase().includes(input.toLowerCase())
-            }
+            className="w-120"
           />
         </div>
-        <div className="md:col-span-5 flex items-end gap-2 justify-end">
+
+        {/* Actions */}
+        <div className="md:col-span-3 flex items-center gap-3 justify-end">
           <button
             onClick={onSearch}
-            className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all shadow-sm flex items-center gap-1.5 active:scale-95"
+            className="h-10 px-5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all shadow-sm flex items-center gap-1.5 active:scale-95"
           >
             <Search size={16} /> Search
           </button>
           <button
             onClick={onReset}
-            className="px-4 py-2 rounded-lg border border-red-500 bg-white text-red-600 text-sm font-medium transition-all hover:bg-red-50 active:scale-95"
+            className="h-10 px-5 rounded-lg border border-red-500 bg-white text-red-600 text-sm font-medium transition-all hover:bg-red-50 active:scale-95"
           >
             Reset
-          </button>
-          <button
-            onClick={onExportPDF}
-            disabled={!hasFilters || totalEntries === 0}
-            className={`px-4 py-2 rounded-lg border border-red-500 text-red-600 text-sm font-medium transition-all flex items-center gap-1.5 active:scale-95 ${
-              !hasFilters || totalEntries === 0 ? "opacity-50 cursor-not-allowed" : "hover:bg-red-50"
-            }`}
-          >
-            <FileText size={16} /> PDF
-          </button>
-          <button
-            onClick={onExportExcel}
-            disabled={!hasFilters || totalEntries === 0}
-            className={`px-4 py-2 rounded-lg border border-green-500 text-green-600 text-sm font-medium transition-all flex items-center gap-1.5 active:scale-95 ${
-              !hasFilters || totalEntries === 0 ? "opacity-50 cursor-not-allowed" : "hover:bg-green-50"
-            }`}
-          >
-            <FileSpreadsheet size={16} /> Excel
           </button>
         </div>
       </div>
