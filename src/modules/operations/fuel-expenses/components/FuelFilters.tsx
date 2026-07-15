@@ -97,6 +97,7 @@ export function FuelFilters({
         <div className="md:col-span-2">
           <label className="text-xs font-medium text-slate-500 block mb-1">From Date</label>
           <ModernDatePicker
+            id="from-date"
             selected={parseDate(fromDate)}
             onChange={(date) => setFromDate(formatDate(date))}
             placeholder="dd-mm-yyyy"
@@ -108,6 +109,7 @@ export function FuelFilters({
         <div className="md:col-span-2">
           <label className="text-xs font-medium text-slate-500 block mb-1">To Date</label>
           <ModernDatePicker
+            id="to-date"
             selected={parseDate(toDate)}
             onChange={(date) => setToDate(formatDate(date))}
             placeholder="dd-mm-yyyy"
