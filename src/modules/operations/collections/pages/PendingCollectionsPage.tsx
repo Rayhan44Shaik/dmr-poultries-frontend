@@ -99,7 +99,12 @@ export default function PendingCollectionsPage() {
       data = data.filter((shop) => {
         const shopCollections = allCollections
           .filter((c) => c.shopName === shop.shopName)
-          .sort((a, b) => b.collectionDate.localeCompare(a.collectionDate));
+          .sort((a, b) => {
+      // Use collectionDate as primary, fallback to createdDate
+      const dateA = a.collectionDate || a.createdDate || '';
+      const dateB = b.collectionDate || b.createdDate || '';
+      return dateB.localeCompare(dateA);
+    });
         if (shopCollections.length === 0) return false;
         return shopCollections[0].collectorName === collector;
       });
@@ -155,7 +160,12 @@ export default function PendingCollectionsPage() {
   const getLatestCollection = (shopName: string): Collection | null => {
     const shopCollections = allCollections
       .filter((c) => c.shopName === shopName)
-      .sort((a, b) => b.createdDate.localeCompare(a.createdDate));
+      .sort((a, b) => {
+      // Use collectionDate as primary, fallback to createdDate
+      const dateA = a.collectionDate || a.createdDate || '';
+      const dateB = b.collectionDate || b.createdDate || '';
+      return dateB.localeCompare(dateA);
+    });
     return shopCollections.length > 0 ? shopCollections[0] : null;
   };
 
@@ -312,7 +322,7 @@ export default function PendingCollectionsPage() {
       return;
     }
     setSelectedShop(shopName);
-    setEditMode(isCollectionEditable(latest.createdDate) ? "edit" : "view");
+    setEditMode(isCollectionEditable(latest.collectionDate) ? "edit" : "view");
     setIsEditModalOpen(true);
   };
 

@@ -107,7 +107,12 @@ function useShopSales() {
         data.sort((a, b) => a.shopName.localeCompare(b.shopName));
         break;
       default:
-        data.sort((a, b) => b.tripDate.localeCompare(a.tripDate));
+        data.sort((a, b) => {
+      // Use collectionDate as primary, fallback to createdDate
+      const dateA = a.tripDate || a.tripDate || '';
+      const dateB = b.tripDate || b.tripDate || '';
+      return dateB.localeCompare(dateA);
+    });
     }
 
     return data;

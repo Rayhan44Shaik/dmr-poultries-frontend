@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout/DashboardLayout";
 
 import LoginPage from "../modules/auth/LoginPage";
@@ -11,17 +11,16 @@ import EmployeesPage from "../modules/masters/employees/pages/EmployeesPage";
 import BanksPage from "../modules/masters/banks/pages/BanksPage";
 import BirdTypesPage from "../modules/masters/bird-types/pages/BirdTypesPage";
 
-import OperationsDashboard from "../modules/operations/pages/OperationsDashboard";
 import TripEntryPage from "../modules/operations/vehicle-trips/pages/TripEntryPage";
 import TripListPage from "../modules/operations/vehicle-trips/pages/TripListPage";
 import ShopSalesPage from "../modules/operations/shop-sales/pages/ShopSalesPage";
 import RatesEntryPage from "../modules/operations/shop-sales/pages/RatesEntryPage";
+import FuelExpensesPage from "../modules/operations/fuel-expenses/pages/FuelExpensesPage";
+import OperationsDashboardPage from "../modules/operations/dashboard/pages/OperationsDashboardPage";
 
 import CollectionEntryPage from "../modules/operations/collections/pages/CollectionEntryPage";
 import PendingCollectionsPage from "../modules/operations/collections/pages/PendingCollectionsPage";
 import CollectionReportPage from "../modules/operations/collections/pages/CollectionReportPage";
-
-import FuelExpensesPage from "../modules/operations/fuel-expenses/pages/FuelExpensesPage";
 
 import AccountsPage from "../modules/accounts/pages/AccountsPage";
 import VehicleManagementPage from "../modules/vehicles/pages/VehicleManagementPage";
@@ -44,7 +43,10 @@ function AppRoutes() {
         <Route path="/masters/banks" element={<BanksPage />} />
         <Route path="/masters/bird-types" element={<BirdTypesPage />} />
 
-        <Route path="/operations" element={<OperationsDashboard />} />
+        {/* ✅ Redirect /operations to /operations/overview */}
+        <Route path="/operations" element={<Navigate to="/operations/overview" replace />} />
+        <Route path="/operations/overview" element={<DashboardLayout><OperationsDashboardPage /></DashboardLayout>} />
+
         <Route path="/operations/vehicle-trips/entry" element={<TripEntryPage />} />
         <Route path="/operations/vehicle-trips/list" element={<TripListPage />} />
 
@@ -65,7 +67,6 @@ function AppRoutes() {
           }
         />
 
-        {/* ✅ Collection pages – now wrapped with DashboardLayout */}
         <Route
           path="/operations/collections/entry"
           element={
@@ -91,13 +92,13 @@ function AppRoutes() {
           }
         />
         <Route
-  path="/operations/fuel-expenses"
-  element={
-    <DashboardLayout>
-      <FuelExpensesPage />
-    </DashboardLayout>
-  }
-/>
+          path="/operations/fuel-expenses"
+          element={
+            <DashboardLayout>
+              <FuelExpensesPage />
+            </DashboardLayout>
+          }
+        />
 
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/vehicles" element={<VehicleManagementPage />} />

@@ -28,6 +28,14 @@ function Header() {
   const isCollectionPage = currentPath.startsWith("/operations/collections");
   const isVehicleTripPage = currentPath.startsWith("/operations/vehicle-trips");
 
+  // Dashboard detection – includes /operations/overview
+  const isDashboardPage =
+    currentPath === "/" ||
+    currentPath === "/dashboard" ||
+    currentPath.startsWith("/dashboard") ||
+    currentPath === "/operations/overview" ||
+    currentPath.startsWith("/operations/overview");
+
   const isActive = (tabPath: string) => {
     if (currentPath === "/masters" && tabPath === "/masters/shops") return true;
     return currentPath === tabPath;
@@ -75,6 +83,7 @@ function Header() {
 
   // ---- Other pages ----
   let leftContent = null;
+  let rightContent = null;
 
   if (isCollectionPage) {
     leftContent = <CollectionTabs />;
@@ -103,7 +112,7 @@ function Header() {
     );
   } else {
     const pageTitles: Record<string, string> = {
-      "/dashboard": "Dashboard",
+      "/operations/overview": "Operations Dashboard",
       "/operations": "Operations",
       "/accounts": "Accounts",
       "/vehicles": "Vehicle Management",
@@ -112,7 +121,7 @@ function Header() {
       "/settings": "Settings",
     };
 
-    // ✅ Fuel Entry – moderate boldness
+    // Fuel Entry
     if (currentPath === "/operations/fuel-expenses") {
       leftContent = (
         <div className="flex items-center gap-2.5">
@@ -121,8 +130,17 @@ function Header() {
         </div>
       );
     } else {
-      const title = pageTitles[currentPath] || "";
-      leftContent = title ? <h2 className="text-xl font-semibold text-slate-800">{title}</h2> : null;
+      let title = pageTitles[currentPath] || "";
+      // Fallback for any dashboard-like path
+      if (isDashboardPage && !title) {
+        title = "Operations Dashboard";
+      }
+
+      if (title) {
+        // 🔥 For dashboard, put title on the LEFT side (same as other pages)
+        leftContent = <h2 className="text-xl font-semibold text-slate-800">{title}</h2>;
+        // No rightContent for dashboard anymore
+      }
     }
   }
 
@@ -131,6 +149,7 @@ function Header() {
       <div className="flex-1 flex items-center gap-6">{leftContent}</div>
       <div className="flex items-center gap-6">
         <button className="text-slate-600 hover:text-green-700 text-xl">🔔</button>
+        {rightContent}
         {userProfile}
       </div>
     </header>

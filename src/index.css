@@ -1,2 +1,92 @@
 @import "tailwindcss";
 @import "react-datepicker/dist/react-datepicker.css";
+
+.react-datepicker__year-select {
+  max-height: 180px;
+  overflow-y: auto;
+}
+/* 🔥 Compact range picker – fixes stretching and bubble issues */
+.rdrDateRangePickerWrapper {
+  padding: 0 !important;
+  width: 100% !important;
+}
+
+.rdrCalendarWrapper {
+  background: white !important;
+  font-size: 0.7rem !important;
+  width: 100% !important;
+}
+
+.rdrMonth {
+  padding: 4px 0 !important;
+}
+
+.rdrMonthAndYearWrapper {
+  padding: 4px 0 !important;
+  height: 32px !important;
+}
+
+.rdrWeekDays {
+  padding: 0 4px !important;
+}
+
+.rdrWeekDay {
+  height: 24px !important;
+  width: 24px !important;
+  font-size: 0.6rem !important;
+  font-weight: 500 !important;
+}
+
+.rdrDay {
+  height: 28px !important;
+  width: 28px !important;
+}
+
+.rdrDayNumber {
+  font-size: 0.65rem !important;
+}
+
+/* 👇 Day numbers dark */
+.rdrDayNumber span {
+  color: #1a1a1a !important;
+  font-weight: 600 !important;
+}
+
+/* Selected range – white text on blue */
+.rdrDaySelected .rdrDayNumber span,
+.rdrDayInRange .rdrDayNumber span,
+.rdrDayStartEdge .rdrDayNumber span,
+.rdrDayEndEdge .rdrDayNumber span {
+  color: white !important;
+}
+
+/* Today – dark and bold */
+.rdrDayToday .rdrDayNumber span {
+  color: #1a1a1a !important;
+  font-weight: 700 !important;
+}
+
+/* Hide side panels */
+.rdrDefinedRangesWrapper,
+.rdrMonthName {
+  display: none !important;
+}
+
+/* Navigation arrows smaller */
+.rdrNextPrevButton,
+.rdrPprevButton,
+.rdrNextButton {
+  width: 24px !important;
+  height: 24px !important;
+}
+
+/* Rounded edges for selection */
+.rdrDayStartEdge,
+.rdrDayEndEdge,
+.rdrDayInRange {
+  border-radius: 4px !important;
+}
+
+.rdrDefinedRangesWrapper {
+  display: none !important;
+}

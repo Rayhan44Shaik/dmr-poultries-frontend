@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 
 import {
   LayoutDashboard,
@@ -66,6 +67,7 @@ export default function Sidebar() {
       title: "Operations",
       icon: <Truck size={18} />,
       children: [
+         { title: "Overview", path: "/operations/overview" },
         { title: "Vehicle Trips", path: "/operations/vehicle-trips/entry" }, // ✅ changed to Entry
         { title: "Sales", path: "/operations/shop-sales" },
         { title: "Collection", path: "/operations/collections/entry" },
