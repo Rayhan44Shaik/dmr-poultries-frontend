@@ -97,10 +97,10 @@ function TripViewModal({ open, trip, onClose }: Props) {
       styles: { fontSize: 9, cellPadding: 2 },
       columnStyles: {
         0: { halign: "center", cellWidth: 15 },
-        1: { cellWidth: 70 },
+        1: { halign: "left", cellWidth: 70 },   // ← Shop Name left-aligned in PDF
         2: { halign: "center", cellWidth: 20 },
         3: { halign: "center", cellWidth: 25 },
-        4: { cellWidth: 30 },
+        4: { halign: "center", cellWidth: 30 },
       },
       margin: { left: margin, right: margin },
     });
@@ -152,7 +152,8 @@ function TripViewModal({ open, trip, onClose }: Props) {
             <thead className="bg-slate-100">
               <tr>
                 <th className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-600">Box</th>
-                <th className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-600">Shop Name</th>
+                {/* ✅ Shop Name header – left-aligned */}
+                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-600">Shop Name</th>
                 <th className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-600">Birds</th>
                 <th className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-600">Weight (KG)</th>
                 <th className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-600">Remarks</th>
@@ -162,7 +163,8 @@ function TripViewModal({ open, trip, onClose }: Props) {
               {trip.deliveries.map((row, index) => (
                 <tr key={index} className="border-t hover:bg-slate-50">
                   <td className="px-4 py-2 text-center text-sm text-slate-700">{row.boxNo}</td>
-                  <td className="px-4 py-2 text-center text-sm text-slate-700">{row.shopName}</td>
+                  {/* ✅ Shop Name cell – left-aligned */}
+                  <td className="px-4 py-2 text-left text-sm text-slate-700">{row.shopName}</td>
                   <td className="px-4 py-2 text-center text-sm text-slate-700">{row.birds}</td>
                   <td className="px-4 py-2 text-center text-sm text-slate-700">{row.weight.toFixed(2)}</td>
                   <td className="px-4 py-2 text-center text-sm text-slate-700">{row.remarks || "--"}</td>

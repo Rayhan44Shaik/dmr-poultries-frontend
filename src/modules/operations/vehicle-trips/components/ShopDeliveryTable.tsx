@@ -15,11 +15,19 @@ function ShopDeliveryTable({ rows, setRows, shops, birdTypes }: Props) {
   const safeShops = shops ?? [];
   const safeBirdTypes = birdTypes ?? [];
 
+  // ✅ 1. New rows added at the TOP
+  // ✅ 5. Permanent serial numbers
   const addRow = useCallback(() => {
+    const maxSerial = safeRows.reduce(
+      (max, r) => Math.max(max, r.serialNo || 0),
+      0
+    );
+    const nextSerial = maxSerial + 1;
+
     setRows((prev) => [
-      ...prev,
       {
         id: Date.now(),
+        serialNo: nextSerial,
         shopId: 0,
         boxNo: 0,
         shopName: "",
@@ -32,8 +40,9 @@ function ShopDeliveryTable({ rows, setRows, shops, birdTypes }: Props) {
         amount: 0,
         remarks: "",
       },
+      ...prev,
     ]);
-  }, [setRows]);
+  }, [safeRows, setRows]);
 
   const updateRow = useCallback(
     (id: number, field: keyof ShopDelivery, value: any) => {
@@ -80,8 +89,23 @@ function ShopDeliveryTable({ rows, setRows, shops, birdTypes }: Props) {
     [safeBirdTypes, setRows]
   );
 
-  // Helper to show red border if value is invalid (on save we'll show errors)
-  // We'll just keep the UI clean; validation is done on save.
+  // ✅ 2. Prevent duplicate shops
+  const getSelectedShopIds = (currentRowId: number) => {
+    return safeRows
+      .filter((r) => r.id !== currentRowId && r.shopId && r.shopId > 0)
+      .map((r) => r.shopId);
+  };
+
+  // ✅ 4. Birds must be integer
+  const handleBirdInputChange = (rowId: number, value: string) => {
+    const num = parseFloat(value);
+    if (!isNaN(num)) {
+      const intVal = Math.floor(num);
+      updateRow(rowId, "birds", intVal);
+    } else {
+      updateRow(rowId, "birds", 0);
+    }
+  };
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mt-8">
@@ -103,8 +127,9 @@ function ShopDeliveryTable({ rows, setRows, shops, birdTypes }: Props) {
           <thead className="bg-slate-50">
             <tr className="text-slate-700">
               <th className="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wider">S.No</th>
+              {/* ✅ 3. Changed label */}
               <th className="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wider">
-                Box No <span className="text-red-500">*</span>
+                No. of Boxes <span className="text-red-500">*</span>
               </th>
               <th className="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wider">
                 Shop Name <span className="text-red-500">*</span>
@@ -130,85 +155,92 @@ function ShopDeliveryTable({ rows, setRows, shops, birdTypes }: Props) {
                 </td>
               </tr>
             )}
-            {safeRows.map((row, index) => (
-              <tr key={row.id} className="border-t hover:bg-slate-50 transition-colors">
-                <td className="px-3 py-2 text-center text-xs font-medium">{index + 1}</td>
-                <td className="px-3 py-2 text-center">
-                  <input
-                    type="number"
-                    value={row.boxNo || ""}
-                    onChange={(e) => updateRow(row.id, "boxNo", Number(e.target.value))}
-                    className="w-16 border rounded-lg px-2 py-1 text-center text-xs"
-                    required
-                  />
-                </td>
-                <td className="px-3 py-2 min-w-[280px]">
-                  <Select
-                    menuPortalTarget={document.body}
-                    menuPosition="fixed"
-                    value={row.shopId ? { value: row.shopId, label: row.shopName } : null}
-                    options={safeShops.map((shop: any) => ({ value: shop.id, label: shop.shopName }))}
-                    placeholder="Search Shop..."
-                    isSearchable
-                    className="min-w-[240px]"
-                    onChange={(selected) => handleShopChange(row.id, selected)}
-                    styles={{
-                      control: (base) => ({ ...base, minHeight: 32, borderRadius: 8, fontSize: 12 }),
-                      menu: (base) => ({ ...base, zIndex: 999 }),
-                    }}
-                  />
-                </td>
-                <td className="px-3 py-2 min-w-[180px]">
-                  <select
-                    value={row.birdTypeId || ""}
-                    className="w-full border rounded-lg px-2 py-1 text-xs"
-                    onChange={(e) => handleBirdChange(row.id, Number(e.target.value))}
-                    required
-                  >
-                    <option value="">Select Bird</option>
-                    {safeBirdTypes.map((bird: any) => (
-                      <option key={bird.id} value={bird.id}>
-                        {bird.birdType}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-3 py-2">
-                  <input
-                    type="number"
-                    value={row.birds || ""}
-                    className="w-full border rounded-lg px-2 py-1 text-center text-xs"
-                    onChange={(e) => updateRow(row.id, "birds", Number(e.target.value))}
-                    required
-                  />
-                </td>
-                <td className="px-3 py-2">
-                  <input
-                    type="number"
-                    value={row.weight || ""}
-                    className="w-full border rounded-lg px-2 py-1 text-center text-xs"
-                    onChange={(e) => updateRow(row.id, "weight", Number(e.target.value))}
-                    required
-                  />
-                </td>
-                <td className="px-3 py-2">
-                  <input
-                    value={row.remarks || ""}
-                    placeholder="Optional"
-                    className="w-full border rounded-lg px-2 py-1 text-xs"
-                    onChange={(e) => updateRow(row.id, "remarks", e.target.value)}
-                  />
-                </td>
-                <td className="text-center">
-                  <button
-                    onClick={() => deleteRow(row.id)}
-                    className="h-7 w-7 rounded-full bg-red-50 hover:bg-red-100 flex items-center justify-center mx-auto"
-                  >
-                    <Trash2 size={14} className="text-red-600" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {safeRows.map((row) => {
+              const selectedIds = getSelectedShopIds(row.id);
+
+              return (
+                <tr key={row.id} className="border-t hover:bg-slate-50 transition-colors">
+                  <td className="px-3 py-2 text-center text-xs font-medium">{row.serialNo}</td>
+                  <td className="px-3 py-2 text-center">
+                    <input
+                      type="number"
+                      value={row.boxNo || ""}
+                      onChange={(e) => updateRow(row.id, "boxNo", Number(e.target.value))}
+                      className="w-16 border rounded-lg px-2 py-1 text-center text-xs"
+                      required
+                    />
+                  </td>
+                  <td className="px-3 py-2 min-w-[280px]">
+                    <Select
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+                      value={row.shopId ? { value: row.shopId, label: row.shopName } : null}
+                      options={safeShops.map((shop: any) => ({ value: shop.id, label: shop.shopName }))}
+                      placeholder="Search Shop..."
+                      isSearchable
+                      className="min-w-[240px]"
+                      onChange={(selected) => handleShopChange(row.id, selected)}
+                      isOptionDisabled={(option) => selectedIds.includes(option.value)}
+                      styles={{
+                        control: (base) => ({ ...base, minHeight: 32, borderRadius: 8, fontSize: 12 }),
+                        menu: (base) => ({ ...base, zIndex: 999 }),
+                      }}
+                    />
+                  </td>
+                  <td className="px-3 py-2 min-w-[180px]">
+                    <select
+                      value={row.birdTypeId || ""}
+                      className="w-full border rounded-lg px-2 py-1 text-xs"
+                      onChange={(e) => handleBirdChange(row.id, Number(e.target.value))}
+                      required
+                    >
+                      <option value="">Select Bird</option>
+                      {safeBirdTypes.map((bird: any) => (
+                        <option key={bird.id} value={bird.id}>
+                          {bird.birdType}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={row.birds || ""}
+                      className="w-full border rounded-lg px-2 py-1 text-center text-xs"
+                      onChange={(e) => handleBirdInputChange(row.id, e.target.value)}
+                      required
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="number"
+                      value={row.weight || ""}
+                      className="w-full border rounded-lg px-2 py-1 text-center text-xs"
+                      onChange={(e) => updateRow(row.id, "weight", Number(e.target.value))}
+                      required
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      value={row.remarks || ""}
+                      placeholder="Optional"
+                      className="w-full border rounded-lg px-2 py-1 text-xs"
+                      onChange={(e) => updateRow(row.id, "remarks", e.target.value)}
+                    />
+                  </td>
+                  <td className="text-center">
+                    <button
+                      onClick={() => deleteRow(row.id)}
+                      className="h-7 w-7 rounded-full bg-red-50 hover:bg-red-100 flex items-center justify-center mx-auto"
+                    >
+                      <Trash2 size={14} className="text-red-600" />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

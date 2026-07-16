@@ -28,13 +28,40 @@ export function generateTripNo(existingTrips: Trip[], date: string): string {
   const dateStr = date.replace(/-/g, ""); // YYYYMMDD
   const tripsOnDate = existingTrips.filter((t) => t.tripDate === date);
   const count = tripsOnDate.length + 1;
-  // Safety fallback: if count exceeds 999 (very unlikely), use timestamp suffix
   if (count > 999) {
     const ts = Date.now().toString().slice(-4);
     return `TRP-${dateStr}-${ts}`;
   }
   const seq = String(count).padStart(3, "0");
   return `TRP-${dateStr}-${seq}`;
+}
+
+// ==========================
+// ✅ Renumber Pending Trips After Deletion (per date)
+// ==========================
+export function renumberPendingTripsForDate(date: string): Trip[] {
+  const allTrips: Trip[] = JSON.parse(localStorage.getItem("vehicleTrips") || "[]");
+  const dateStr = date.replace(/-/g, "");
+  
+  // Get pending trips for this date, sorted by current sequence number
+  const pendingTrips = allTrips
+    .filter((t) => t.tripDate === date && t.status === "Pending")
+    .sort((a, b) => {
+      const numA = parseInt(a.tripNo.split("-")[2] || "0", 10);
+      const numB = parseInt(b.tripNo.split("-")[2] || "0", 10);
+      return numA - numB;
+    });
+
+  // Renumber sequentially
+  pendingTrips.forEach((trip, index) => {
+    const newSeq = String(index + 1).padStart(3, "0");
+    const newTripNo = `TRP-${dateStr}-${newSeq}`;
+    trip.tripNo = newTripNo;
+  });
+
+  // Save back to localStorage
+  localStorage.setItem("vehicleTrips", JSON.stringify(allTrips));
+  return allTrips;
 }
 
 // ==========================

@@ -1,5 +1,3 @@
-// TripListPage.tsx – corrected
-
 import React, { useState, useEffect, useRef } from "react";
 import DashboardLayout from "../../../../layouts/DashboardLayout/DashboardLayout";
 
@@ -52,15 +50,19 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  const viewButtonRef = useRef<HTMLButtonElement>(null);   // ✅ new ref
 
+  // ✅ Updated click-outside handler – ignore clicks on the view button
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
       if (
-        tableContainerRef.current &&
-        !tableContainerRef.current.contains(event.target as Node)
+        tableContainerRef.current?.contains(target) ||
+        viewButtonRef.current?.contains(target)   // ✅ ignore button
       ) {
-        setSelectedRowId(null);
+        return;
       }
+      setSelectedRowId(null);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -72,7 +74,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     ...Array.from(new Set(masterVehicles.map((v) => v.vehicleNumber).filter(Boolean))),
   ];
 
-  // ✅ FIX: Use filteredTrips (full list) instead of trips (paginated)
   const safeTrips = (Array.isArray(filteredTrips) && filteredTrips.length > 0)
     ? filteredTrips
     : (Array.isArray(trips) ? trips : []);
@@ -99,7 +100,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const totalCompletedWeight = completedTrips.reduce((sum, t) => sum + t.totalWeight, 0);
   const totalCompletedMortality = completedTrips.reduce((sum, t) => sum + t.totalMortality, 0);
 
-  const pageSize = 15; // Show all trips on one page
+  const pageSize = 15;
   const totalPagesCompleted = Math.ceil(completedTrips.length / pageSize);
   const paginatedTrips = completedTrips.slice(
     (currentPage - 1) * pageSize,
@@ -210,6 +211,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         onViewSelected={handleViewSelected}
         showViewButton={selectedRowId !== null}
         hasFilters={hasFilters}
+        viewButtonRef={viewButtonRef}   // ✅ pass ref
       />
 
       {hasFilters && (

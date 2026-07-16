@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Trip } from "../types/trip";
 import { tripService } from "../services/tripService";
+import { renumberPendingTripsForDate } from "../services/tripFormService";
 
 type NotificationFn = (message: string, type?: "success" | "error" | "info") => void;
 
@@ -36,11 +37,30 @@ export default function useTrips(showNotification?: NotificationFn) {
     setCurrentPage(1);
   };
 
+  // ✅ UPDATED: Delete with renumbering for pending trips
   const deleteTrip = (id: number) => {
     try {
+      // 1. Get the trip before deleting
+      const allTrips = tripService.getAll() || [];
+      const tripToDelete = allTrips.find((t) => t.id === id);
+      if (!tripToDelete) {
+        notify("Trip not found.", "error");
+        return;
+      }
+
+      // 2. Delete the trip
       tripService.remove(id);
       refreshTrips();
-      notify("Trip deleted successfully!", "success");
+
+      // 3. If it was pending, renumber remaining pending trips for that date
+      if (tripToDelete.status === "Pending") {
+        const date = tripToDelete.tripDate;
+        renumberPendingTripsForDate(date);
+        refreshTrips(); // reload after renumbering
+        notify(`Trip deleted and remaining pending trips for ${date} renumbered.`, "success");
+      } else {
+        notify("Trip deleted successfully!", "success");
+      }
     } catch {
       notify("Failed to delete trip.", "error");
     }
@@ -110,7 +130,6 @@ export default function useTrips(showNotification?: NotificationFn) {
     currentPage * pageSize
   );
 
-  // ✅ Full list (for Trip Entry recent table)
   const allTrips = filteredTrips || [];
 
   const totalTrips = filteredTrips?.length || 0;

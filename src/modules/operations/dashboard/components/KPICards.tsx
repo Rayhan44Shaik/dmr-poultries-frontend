@@ -18,6 +18,8 @@ export interface DashboardMetrics {
   totalCollections?: number;
   pendingCollections?: number;
   totalExpenses?: number;
+  fuelExpense?: number;
+  tripExpense?: number;
 }
 
 export interface KPICardsProps {
@@ -32,7 +34,6 @@ const safeNumber = (value: unknown): number => {
   return isNaN(num) ? 0 : num;
 };
 
-// Format numbers >= 1 Lakh as X.XX Lakhs, >= 1 Crore as X.XX Crores
 const formatLargeNumber = (
   value: number
 ): { main: string; suffix: string } => {
@@ -112,6 +113,7 @@ interface KPICardProps {
   prevValue: number;
   unit?: "KG" | "₹";
   rangeDays?: number;
+  breakdown?: { fuel: number; trip: number };
 }
 
 const KPICard = memo(function KPICard({
@@ -120,16 +122,15 @@ const KPICard = memo(function KPICard({
   prevValue,
   unit,
   rangeDays,
+  breakdown,
 }: KPICardProps) {
   const config = cardConfig[label];
   const Icon = config.icon;
 
-  // Calculate change (0 if no previous data)
   const change = prevValue > 0 ? ((value - prevValue) / prevValue) * 100 : 0;
   const isUp = change > 0;
   const isDown = change < 0;
 
-  // Format display value
   let displayMain: string;
   let displaySuffix: string = "";
 
@@ -147,13 +148,11 @@ const KPICard = memo(function KPICard({
     displaySuffix = formatted.suffix;
   }
 
-  // Dynamic range label
   let rangeLabel = "vs Last Week";
   if (rangeDays && rangeDays > 0) {
     rangeLabel = `vs Last ${rangeDays} day${rangeDays === 1 ? "" : "s"}`;
   }
 
-  // Determine badge styles
   let badgeClasses =
     "mt-3 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ";
   let iconElement: React.ReactNode = null;
@@ -169,22 +168,19 @@ const KPICard = memo(function KPICard({
     iconElement = <span className="w-3" />;
   }
 
-  // ---- NEW: Reduce number size for Weight when >= 1 Lakh ----
   const isWeightLarge = label === "Total Weight (KG)" && value >= 100000;
   const numberSizeClass = isWeightLarge ? "text-xl" : "text-2xl";
 
-  return (
+  const showBreakdown = label === "Total Expenses" && breakdown;
+
+  const cardContent = (
     <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-      {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-slate-50 opacity-80" />
 
       <div className="relative flex justify-between items-start">
-        {/* Left Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span
-              className={`h-2 w-2 rounded-full flex-shrink-0 ${config.bg}`}
-            />
+            <span className={`h-2 w-2 rounded-full flex-shrink-0 ${config.bg}`} />
             <p
               className="text-xs font-medium text-slate-500 truncate whitespace-nowrap"
               title={label}
@@ -204,7 +200,6 @@ const KPICard = memo(function KPICard({
             )}
           </h2>
 
-          {/* Always show the trend badge */}
           <div className={badgeClasses}>
             {iconElement}
             {Math.abs(change).toFixed(1)}%
@@ -212,7 +207,6 @@ const KPICard = memo(function KPICard({
           </div>
         </div>
 
-        {/* Icon */}
         <div
           className={`
             ${config.bg}
@@ -226,6 +220,37 @@ const KPICard = memo(function KPICard({
       </div>
     </div>
   );
+
+  // ---- Expense breakdown tooltip (now BELOW the card) ----
+  if (showBreakdown) {
+    return (
+      <div className="relative cursor-help group">
+        {cardContent}
+        {/* Tooltip positioned below the card */}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+          <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-4 text-sm">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-2">
+              <span className="font-medium text-slate-600">Breakdown</span>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-600">Fuel Expense</span>
+                <span className="font-medium text-slate-800">₹{breakdown.fuel.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-600">Trip Expense</span>
+                <span className="font-medium text-slate-800">₹{breakdown.trip.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+          {/* Arrow pointing UP */}
+          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-l border-t border-slate-200 rotate-45"></div>
+        </div>
+      </div>
+    );
+  }
+
+  return cardContent;
 });
 
 // ---------- Main Component ----------
@@ -271,6 +296,10 @@ export default function KPICards({
         value: safeNumber(current.totalExpenses),
         prevValue: safeNumber(prev.totalExpenses),
         unit: "₹" as const,
+        breakdown: {
+          fuel: safeNumber(current.fuelExpense),
+          trip: safeNumber(current.tripExpense),
+        },
       },
     ];
   }, [current, previous]);

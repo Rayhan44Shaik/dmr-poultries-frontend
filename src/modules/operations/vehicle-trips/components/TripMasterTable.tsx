@@ -6,7 +6,7 @@ interface Props {
   trips: Trip[];
   selectedRowId?: number | null;
   onRowClick: (trip: Trip) => void;
-  startIndex?: number; // ✅ add this
+  startIndex?: number;
 }
 
 function TripMasterTable({ trips, selectedRowId, onRowClick, startIndex = 0 }: Props) {
@@ -95,7 +95,7 @@ function TripMasterTable({ trips, selectedRowId, onRowClick, startIndex = 0 }: P
             ) : (
               trips.map((trip, index) => {
                 const isSelected = trip.id === selectedRowId;
-                const serialNo = startIndex + index + 1; // ✅ global serial number
+                const serialNo = startIndex + index + 1;
                 return (
                   <tr
                     key={trip.id}

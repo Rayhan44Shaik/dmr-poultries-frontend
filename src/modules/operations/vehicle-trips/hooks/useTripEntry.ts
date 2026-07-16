@@ -27,7 +27,7 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     totalBirds: 0,
     totalWeight: 0,
     totalShops: 0,
-    totalMortality: 0,
+    totalMortality: 0,   // ← manual entry
     lastShop: "",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -39,17 +39,27 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     setTrip((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Update trip state with new deliveries and computed totals
+  // ✅ Helper to compute totals EXCLUDING mortality
+  const computeTotals = (rows: ShopDelivery[]) => {
+    const totalBirds = rows.reduce((sum, r) => sum + (Number(r.birds) || 0), 0);
+    const totalWeight = Number(rows.reduce((sum, r) => sum + (Number(r.weight) || 0), 0).toFixed(2));
+    const totalShops = rows.length;
+    const lastShop = rows.length > 0 ? rows[rows.length - 1].shopName : "";
+    return { totalBirds, totalWeight, totalShops, lastShop };
+  };
+
+  // ✅ Update deliveries – preserve manual totalMortality
   const updateDeliveries = (rows: ShopDelivery[]) => {
-    const totals = computeTotals(rows);
+    const { totalBirds, totalWeight, totalShops, lastShop } = computeTotals(rows);
     setTrip((prev) => ({
       ...prev,
       deliveries: rows,
-      totalBirds: totals.totalBirds,
-      totalWeight: totals.totalWeight,
-      totalShops: totals.totalShops,
-      totalMortality: totals.totalMortality,
-      lastShop: totals.lastShop,
+      totalBirds,
+      totalWeight,
+      totalShops,
+      // ✅ DO NOT overwrite totalMortality – keep manual value
+      totalMortality: prev.totalMortality,   // ← preserve existing manual entry
+      lastShop,
     }));
   };
 
@@ -57,20 +67,11 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     setTrip({
       ...tripToLoad,
       deliveries: tripToLoad.deliveries || [],
+      // totalMortality is already in tripToLoad
     });
   };
 
   const clearTrip = () => setTrip(emptyTrip());
-
-  // Helper to compute totals from rows
-  const computeTotals = (rows: ShopDelivery[]) => {
-    const totalBirds = rows.reduce((sum, r) => sum + (Number(r.birds) || 0), 0);
-    const totalWeight = Number(rows.reduce((sum, r) => sum + (Number(r.weight) || 0), 0).toFixed(2));
-    const totalShops = rows.length;
-    const totalMortality = rows.reduce((sum, r) => sum + (Number(r.mortality) || 0), 0);
-    const lastShop = rows.length > 0 ? rows[rows.length - 1].shopName : "";
-    return { totalBirds, totalWeight, totalShops, totalMortality, lastShop };
-  };
 
   const saveTrip = (rows: ShopDelivery[]): boolean => {
     // 1. Validate required fields
@@ -99,14 +100,14 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
       return false;
     }
 
-    // 2. Compute totals directly from rows
-    const { totalBirds, totalWeight, totalShops, totalMortality, lastShop } = computeTotals(rows);
+    // 2. Compute totals from rows (excluding mortality)
+    const { totalBirds, totalWeight, totalShops, lastShop } = computeTotals(rows);
 
     // 3. Read existing trips, generate new trip number
     const existingTrips = JSON.parse(localStorage.getItem("vehicleTrips") || "[]");
     const newTripNo = trip.tripNo || generateTripNo(existingTrips, trip.tripDate);
 
-    // 4. Build the new trip object – use computed totals, not trip state
+    // 4. Build the new trip object – use manual mortality from trip state
     const newTrip: Trip = {
       ...trip,
       id: Date.now(),
@@ -115,7 +116,7 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
       totalBirds,
       totalWeight,
       totalShops,
-      totalMortality,
+      totalMortality: trip.totalMortality,   // ✅ use manual value
       lastShop,
       status: "Pending",
       rateCompleted: false,
@@ -131,8 +132,7 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     clearTrip();
     showNotification?.("Trip saved successfully!", "success");
 
-    // ✅ Debug log – remove after testing
-    console.log("✅ Saved trip totals:", { totalBirds, totalWeight, totalShops, totalMortality });
+    console.log("✅ Saved trip – totalMortality (manual):", newTrip.totalMortality);
 
     return true;
   };
@@ -143,17 +143,17 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
       return false;
     }
 
-    // 1. Compute totals directly from rows
-    const { totalBirds, totalWeight, totalShops, totalMortality, lastShop } = computeTotals(rows);
+    // 1. Compute totals from rows (excluding mortality)
+    const { totalBirds, totalWeight, totalShops, lastShop } = computeTotals(rows);
 
-    // 2. Build updated trip with computed totals
+    // 2. Build updated trip with manual mortality
     const updatedTrip: Trip = {
       ...trip,
       deliveries: rows,
       totalBirds,
       totalWeight,
       totalShops,
-      totalMortality,
+      totalMortality: trip.totalMortality,   // ✅ use manual value
       lastShop,
       updatedAt: new Date().toISOString(),
     };
@@ -172,8 +172,7 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     clearTrip();
     showNotification?.("Trip updated successfully!", "success");
 
-    // ✅ Debug log – remove after testing
-    console.log("✅ Updated trip totals:", { totalBirds, totalWeight, totalShops, totalMortality });
+    console.log("✅ Updated trip – totalMortality (manual):", updatedTrip.totalMortality);
 
     return true;
   };

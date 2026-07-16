@@ -24,7 +24,8 @@ interface Props {
   onExportExcel?: () => void;
   onViewSelected?: () => void;
   showViewButton?: boolean;
-  hasFilters?: boolean; // <-- new
+  hasFilters?: boolean;
+  viewButtonRef?: React.Ref<HTMLButtonElement>;   // ✅ fixed type
 }
 
 const containsFilter = (option: any, inputValue: string) => {
@@ -55,6 +56,7 @@ function TripFilters({
   onViewSelected,
   showViewButton = false,
   hasFilters = false,
+  viewButtonRef,
 }: Props) {
   const vehicleOptions = (vehicles || []).map((v) => ({ value: v, label: v }));
   const supervisorOptions = (supervisors || []).map((v) => ({ value: v, label: v }));
@@ -157,9 +159,9 @@ function TripFilters({
           </div>
         </div>
         <div className="md:col-span-6 flex items-center gap-2 justify-end flex-wrap">
-          {/* View Selected – appears first when visible */}
           {showViewButton && onViewSelected && (
             <button
+              ref={viewButtonRef}   // ✅ ref attached
               onClick={onViewSelected}
               className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-all shadow-sm flex items-center gap-1.5"
             >
@@ -167,7 +169,6 @@ function TripFilters({
               View Selected
             </button>
           )}
-          {/* Search */}
           <button
             onClick={onSearch}
             className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all shadow-sm flex items-center gap-1.5"
@@ -175,14 +176,12 @@ function TripFilters({
             <Search size={16} />
             Search
           </button>
-          {/* Reset */}
           <button
             onClick={onReset}
             className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 text-sm font-medium transition-all"
           >
             Reset
           </button>
-          {/* PDF – disabled when no filters */}
           {onExportPDF && (
             <button
               onClick={onExportPDF}
@@ -197,7 +196,6 @@ function TripFilters({
               PDF
             </button>
           )}
-          {/* Excel – disabled when no filters */}
           {onExportExcel && (
             <button
               onClick={onExportExcel}

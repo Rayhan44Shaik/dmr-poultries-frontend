@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import DashboardLayout from "../../../../layouts/DashboardLayout/DashboardLayout";
 
 import TripInformation from "../components/TripInformation";
@@ -89,15 +89,19 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setIsEditing(true);
     setEditOpen(false);
   };
-
+  const lastGeneratedDate = useRef<string | null>(null);
   // ---- Generate sequential trip number when date changes (only for new trips) ----
-  useEffect(() => {
-    if (!isEditing && trip.tripDate && !trip.tripNo) {
+useEffect(() => {
+  // Only for new trips, and only if the date has actually changed
+  if (!isEditing && trip.tripDate) {
+    if (lastGeneratedDate.current !== trip.tripDate) {
       const newTripNo = generateTripNo(trips, trip.tripDate);
       if (trip.tripNo !== newTripNo) {
         setTrip((prev) => ({ ...prev, tripNo: newTripNo }));
+        lastGeneratedDate.current = trip.tripDate;
       }
     }
+  }
   }, [trip.tripDate, trips, isEditing, setTrip, trip.tripNo]);
 
   // ---- Save or Update ----

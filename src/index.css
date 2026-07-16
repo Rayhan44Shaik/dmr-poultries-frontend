@@ -31,15 +31,17 @@
 }
 
 .rdrWeekDay {
-  height: 24px !important;
-  width: 24px !important;
+  height: 28px !important;
+  flex-basis: 14.2857% !important;
+  width: auto !important;
   font-size: 0.6rem !important;
   font-weight: 500 !important;
 }
 
 .rdrDay {
   height: 28px !important;
-  width: 28px !important;
+  flex-basis: 14.2857% !important;
+  width: auto !important;
 }
 
 .rdrDayNumber {
@@ -60,9 +62,18 @@
   color: white !important;
 }
 
-/* Today – dark and bold */
+/* Today – dark and bold, but only when NOT part of the selected range */
 .rdrDayToday .rdrDayNumber span {
   color: #1a1a1a !important;
+  font-weight: 700 !important;
+}
+
+/* Today that is ALSO selected/start/end/in-range — force white to win */
+.rdrDayToday.rdrDaySelected .rdrDayNumber span,
+.rdrDayToday.rdrDayStartEdge .rdrDayNumber span,
+.rdrDayToday.rdrDayEndEdge .rdrDayNumber span,
+.rdrDayToday.rdrDayInRange .rdrDayNumber span {
+  color: white !important;
   font-weight: 700 !important;
 }
 
@@ -81,10 +92,25 @@
 }
 
 /* Rounded edges for selection */
+/* Rounded edges for selection */
 .rdrDayStartEdge,
 .rdrDayEndEdge,
 .rdrDayInRange {
   border-radius: 4px !important;
+}
+
+/* Start & End dates – solid dark blue */
+.rdrDayStartEdge,
+.rdrDayEndEdge,
+.rdrStartEdge,
+.rdrEndEdge {
+  background: #1e40af !important;
+}
+
+/* In-between range days – light blue fill */
+.rdrDayInRange,
+.rdrInRange {
+  background: rgba(59, 130, 246, 0.3) !important;
 }
 
 .rdrDefinedRangesWrapper {

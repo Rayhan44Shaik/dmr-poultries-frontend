@@ -2,12 +2,10 @@ import { useState, useRef, useEffect } from "react";
 import { useDashboardData } from "../hooks/useDashboardData";
 import KPICards from "../components/KPICards";
 import TrendChart from "../components/TrendChart";
-import TopShopsChart from "../components/TopShopsChart";
 import CollectionsPie from "../components/CollectionsPie";
-import ExpensesPie from "../components/ExpensesPie";
-import MortalityChart from "../components/MortalityChart";
 import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
+import PendingCollectionsByShop from "../components/PendingCollectionsByShop"; // ✅ New component
 import { DateRangePicker } from "react-date-range";
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
@@ -16,8 +14,7 @@ import { Calendar } from "lucide-react";
 // Helper to get previous Monday–Sunday
 const getPreviousWeekRange = () => {
   const today = new Date();
-  const day = today.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-  // Days to subtract to reach previous Monday
+  const day = today.getDay();
   const diffToMonday = (day === 0 ? 6 : day - 1) + 7;
   const prevMonday = new Date(today);
   prevMonday.setDate(today.getDate() - diffToMonday);
@@ -27,7 +24,6 @@ const getPreviousWeekRange = () => {
 };
 
 function OperationsDashboardPage() {
-  // ─── Default range set to previous Monday–Sunday ───
   const initialRange = getPreviousWeekRange();
   const [selectionRange, setSelectionRange] = useState<{
     startDate: Date | undefined;
@@ -82,7 +78,7 @@ function OperationsDashboardPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Filter row – right aligned */}
+      {/* ── Filter row – unchanged ── */}
       <div className="flex justify-end">
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2 relative" ref={calendarRef}>
@@ -148,31 +144,41 @@ function OperationsDashboardPage() {
         <div className="p-8 text-center text-slate-500">Loading dashboard...</div>
       ) : (
         <>
+          {/* ── KPI Cards (unchanged) ── */}
           <KPICards current={data} previous={previousData} rangeDays={rangeDays} />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <TrendChart data={data.trendData} />
-            <TopShopsChart data={data.topShops} />
+
+          {/* ── 1st Row: Trend Chart – Full width ── */}
+          {/* ── 1st Row: Trend Chart (60%) + Collections Pie (40%) ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-[6fr_4fr] gap-6">
+            <div className="w-full min-w-0">
+              <TrendChart data={data.trendData} />
+            </div>
+            <div className="w-full min-w-0">
+              <CollectionsPie data={data.collectionsByMode} />
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <CollectionsPie data={data.collectionsByMode} />
-            <ExpensesPie data={data.expensesByCategory} />
-            <MortalityChart data={data.mortalityData} />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
+
+          {/* ── 2nd Row: Pending Collections by Shop – Full width ── */}
+           {/* ── 2nd Row: Pending Collections (40%) + Recent Trips (60%) ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-[4fr_6fr] gap-6">
+            <div className="w-full min-w-0">
+              <PendingCollectionsByShop data={data.pendingCollectionsByShop} />
+            </div>
+            <div className="w-full min-w-0">
               <RecentTripsTable trips={data.recentTrips} />
             </div>
-            <div>
-              <ActiveCounts
-                vehicles={data.activeVehicles}
-                drivers={data.activeDrivers}
-                helpers={data.activeHelpers}
-                shops={data.totalShops}
-                farms={data.totalFarms}
-              />
-            </div>
           </div>
-        </>
+
+          {/* ── 3rd Row: Active Counts – Full width ── */}
+          <div className="grid grid-cols-1 gap-6">
+            <ActiveCounts
+              vehicles={data.activeVehicles}
+              drivers={data.activeDrivers}
+              helpers={data.activeHelpers}
+              shops={data.totalShops}
+              farms={data.totalFarms}
+            />
+          </div>        </>
       )}
     </div>
   );
