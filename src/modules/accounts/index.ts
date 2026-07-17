@@ -1,0 +1,1 @@
+export { accountsRoutes } from './routes';

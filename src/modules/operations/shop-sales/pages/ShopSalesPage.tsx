@@ -18,7 +18,7 @@ function ShopSalesPage() {
     summary,
     filter,
     setFilter,
-    shopNames,          // <-- available from hook
+    shopNames,
     currentPage,
     setCurrentPage,
     totalPages,
@@ -104,7 +104,8 @@ function ShopSalesPage() {
   }, [filteredSales, showNotification]);
 
   return (
-    <div className="px-6 py-6 space-y-6">
+    // ✅ Reduced horizontal padding: px-6 → px-3 (top padding unchanged py-0)
+    <div className="px-3 py-0 space-y-6">
       <ShopSalesFilters
         fromDate={filter.fromDate}
         toDate={filter.toDate}
@@ -135,7 +136,6 @@ function ShopSalesPage() {
         isLoading={isLoading}
       />
 
-      {/* ✅ Pass shopNames to the table */}
       <ShopSalesTable
         sales={paginatedSales}
         isLoading={isLoading}

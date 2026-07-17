@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import DashboardLayout from "../../../../layouts/DashboardLayout/DashboardLayout";
-
 import useTrips from "../hooks/useTrips";
 import TripFilters from "../components/TripFilters";
 import TripKPICards from "../components/TripKPICards";
@@ -50,15 +48,14 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const viewButtonRef = useRef<HTMLButtonElement>(null);   // ✅ new ref
+  const viewButtonRef = useRef<HTMLButtonElement>(null);
 
-  // ✅ Updated click-outside handler – ignore clicks on the view button
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       if (
         tableContainerRef.current?.contains(target) ||
-        viewButtonRef.current?.contains(target)   // ✅ ignore button
+        viewButtonRef.current?.contains(target)
       ) {
         return;
       }
@@ -186,8 +183,9 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     exportToExcel("Trip List", headers, rows, filename);
   };
 
+  // ─── Content with ZERO top/side padding ───
   const content = (
-    <div className="px-6 py-6 space-y-6">
+    <div className="space-y-4">
       <TripFilters
         fromDate={fromDate}
         toDate={toDate}
@@ -211,7 +209,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         onViewSelected={handleViewSelected}
         showViewButton={selectedRowId !== null}
         hasFilters={hasFilters}
-        viewButtonRef={viewButtonRef}   // ✅ pass ref
+        viewButtonRef={viewButtonRef}
       />
 
       {hasFilters && (
@@ -250,8 +248,9 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     </div>
   );
 
+  // ─── Return ───
   if (embedded) return content;
-  return <DashboardLayout>{content}</DashboardLayout>;
+  return <div className="p-2">{content}</div>;
 }
 
 export default React.memo(TripListPage);

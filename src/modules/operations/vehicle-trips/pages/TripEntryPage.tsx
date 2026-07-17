@@ -1,6 +1,4 @@
 import React, { useEffect, useState, useRef } from "react";
-import DashboardLayout from "../../../../layouts/DashboardLayout/DashboardLayout";
-
 import TripInformation from "../components/TripInformation";
 import ShopDeliveryTable from "../components/ShopDeliveryTable";
 import TripTotals from "../components/TripTotals";
@@ -26,20 +24,17 @@ type TripEntryPageProps = {
 };
 
 function TripEntryPage({ embedded = false }: TripEntryPageProps) {
-  // Masters data
   const { vehicles } = useVehicles();
   const { employees } = useEmployees();
   const { farms } = useFarms();
   const { shops } = useShops();
   const { birdTypes } = useBirdTypes();
 
-  // Safe notification
   const { showNotification } = useSafeNotification();
 
-  // Pass notification to both hooks
   const { 
     trips, 
-    allTrips,           // full list
+    allTrips,
     refreshTrips, 
     changeStatus, 
     deleteTrip 
@@ -56,18 +51,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     clearTrip,
   } = useTripEntry(showNotification);
 
-  // Employees filters
   const drivers = employees.filter((x: any) => x.department === "Driver");
   const supervisors = employees.filter((x: any) => x.department === "Supervisor");
 
-  // Delivery rows
   const [rows, setRows] = useState<ShopDelivery[]>([]);
-
-  // View modal
   const [viewTrip, setViewTrip] = useState<Trip | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
-
-  // Edit modal
   const [editTrip, setEditTrip] = useState<Trip | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -89,22 +78,21 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setIsEditing(true);
     setEditOpen(false);
   };
+
   const lastGeneratedDate = useRef<string | null>(null);
-  // ---- Generate sequential trip number when date changes (only for new trips) ----
-useEffect(() => {
-  // Only for new trips, and only if the date has actually changed
-  if (!isEditing && trip.tripDate) {
-    if (lastGeneratedDate.current !== trip.tripDate) {
-      const newTripNo = generateTripNo(trips, trip.tripDate);
-      if (trip.tripNo !== newTripNo) {
-        setTrip((prev) => ({ ...prev, tripNo: newTripNo }));
-        lastGeneratedDate.current = trip.tripDate;
+
+  useEffect(() => {
+    if (!isEditing && trip.tripDate) {
+      if (lastGeneratedDate.current !== trip.tripDate) {
+        const newTripNo = generateTripNo(trips, trip.tripDate);
+        if (trip.tripNo !== newTripNo) {
+          setTrip((prev) => ({ ...prev, tripNo: newTripNo }));
+          lastGeneratedDate.current = trip.tripDate;
+        }
       }
     }
-  }
   }, [trip.tripDate, trips, isEditing, setTrip, trip.tripNo]);
 
-  // ---- Save or Update ----
   const handleSave = () => {
     updateDeliveries(rows);
     let success: boolean;
@@ -140,15 +128,14 @@ useEffect(() => {
     refreshTrips();
   };
 
-  // ---- When editing, load delivery rows ----
   useEffect(() => {
     if (!isEditing) return;
     setRows(trip.deliveries);
   }, [trip, isEditing]);
 
-  // ---- Content (shared) ----
+  // ─── Content with ZERO top padding ───
   const content = (
-    <div className="px-6 py-6 space-y-8">
+    <div className="space-y-4">   {/* only spacing between children, no top padding */}
       <TripInformation
         trip={trip}
         setTrip={setTrip}
@@ -204,11 +191,13 @@ useEffect(() => {
     </div>
   );
 
+  // ─── Return ───
   if (embedded) {
-    return content;
+    return content;  // No wrapper, no padding, no margin
   }
 
-  return <DashboardLayout>{content}</DashboardLayout>;
+  // Standalone mode: minimal padding only (p-2) to avoid edge touching
+  return <div className="p-2">{content}</div>;
 }
 
 export default React.memo(TripEntryPage);

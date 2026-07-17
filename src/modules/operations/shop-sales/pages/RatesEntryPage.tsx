@@ -29,7 +29,7 @@ export default function RatesEntryPage({ embedded = false }: Props) {
     modalOpen,
     selectedTrip,
     openRateEntry,
-    openModifyRate, // new
+    openModifyRate,
     closeRateEntry,
     saveTrip,
   } = useCompletedTrips();
@@ -107,7 +107,8 @@ export default function RatesEntryPage({ embedded = false }: Props) {
   };
 
   const content = (
-    <div className="px-6 py-6 space-y-6">
+    // ✅ Reduced padding: px-6 → px-3, py-6 → py-3
+    <div className="px-3 py-0 space-y-6">
       <CompletedTripsFilters
         fromDate={filter.fromDate}
         toDate={filter.toDate}
@@ -142,7 +143,7 @@ export default function RatesEntryPage({ embedded = false }: Props) {
       <CompletedTripsTable
         trips={paginatedTrips}
         onEnterRate={openRateEntry}
-        onModifyRate={openModifyRate} // new
+        onModifyRate={openModifyRate}
       />
 
       <TripPagination
