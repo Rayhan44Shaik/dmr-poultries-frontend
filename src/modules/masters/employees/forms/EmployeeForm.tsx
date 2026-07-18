@@ -1,6 +1,19 @@
 import { useEffect, useState } from "react";
 import type { Employee } from "../types/employee";
 import { useNotification } from "../../../../context/NotificationContext";
+import {
+  User,
+  Building2,
+  Briefcase,
+  Phone,
+  Mail,
+  Calendar,
+  IndianRupee,
+  CreditCard,
+  Key,
+  Home,
+  Users,
+} from "lucide-react";
 
 type EmployeeFormProps = {
   employee?: Employee | null;
@@ -35,6 +48,8 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
   const [salary, setSalary] = useState<number | "">("");
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
 
+  const isEditing = !!employee;
+
   useEffect(() => {
     if (employee) {
       setEmployeeName(employee.employeeName);
@@ -63,8 +78,17 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
     }
   }, [employee]);
 
+  // Format Aadhar with spaces every 4 digits
+  const formatAadhar = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    const parts = digits.match(/.{1,4}/g);
+    if (parts) {
+      return parts.join(" ");
+    }
+    return digits;
+  };
+
   const handleSubmit = () => {
-    // Required fields
     if (!employeeName || !department || !role || !phoneNumber || !email || salary === "") {
       showNotification("Please fill all required fields.", "error");
       return;
@@ -82,18 +106,17 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
       return;
     }
 
-    // License validation: required for Driver and Collection
     if ((department === "Driver" || department === "Collection") && !licenseNumber?.trim()) {
       showNotification("License Number is required for Driver and Collection departments.", "error");
       return;
     }
 
-    // Aadhar: optional, but if provided, must be 12 digits
+    // ✅ Aadhar validation: exactly 12 digits if provided
     if (aadharNumber && !/^[0-9]{12}$/.test(aadharNumber)) {
       showNotification("Aadhar Number must be exactly 12 digits.", "error");
       return;
     }
-    // License: if provided, allow any non-empty string (flexible)
+
     if (licenseNumber && licenseNumber.trim().length < 3) {
       showNotification("License Number must be at least 3 characters.", "error");
       return;
@@ -114,164 +137,257 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
     });
   };
 
+  const inputClass = (hasError = false) =>
+    `w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition ${
+      hasError ? "border-red-300 focus:border-red-500" : "border-slate-200"
+    } bg-white`;
+
+  const iconWrapperClass = "absolute left-3 top-1/2 -translate-y-1/2 text-slate-400";
+
+  const title = isEditing ? "Edit Employee" : "Add Employee";
+  const subtitle = isEditing ? "Update details" : "Fill in the details";
+
+  const toggleStatus = () => {
+    setStatus(status === "Active" ? "Inactive" : "Active");
+  };
+
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block mb-1 text-sm font-medium text-slate-700">
-            Employee Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            value={employeeName}
-            onChange={(e) => setEmployeeName(e.target.value)}
-            placeholder="Full name"
-            className="w-full border rounded-lg p-2.5"
-          />
+    <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+      {/* Header with icon, title, and status toggle */}
+      <div className="bg-gradient-to-r from-slate-100 to-slate-200/80 px-6 py-5 flex items-center justify-between border-b border-slate-200/60">
+        <div className="flex items-center gap-3">
+          <div className="bg-blue-100 p-2.5 rounded-xl">
+            <Users className="h-6 w-6 text-blue-600" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-800 tracking-tight">{title}</h2>
+            <p className="text-sm text-slate-500 font-medium">{subtitle}</p>
+          </div>
         </div>
-        <div>
-          <label className="block mb-1 text-sm font-medium text-slate-700">
-            Department <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={department}
-            onChange={(e) => setDepartment(e.target.value)}
-            className="w-full border rounded-lg p-2.5"
-          >
-            <option value="">Select Department</option>
-            {DEPARTMENTS.map((dept) => (
-              <option key={dept} value={dept}>{dept}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block mb-1 text-sm font-medium text-slate-700">
-            Role <span className="text-red-500">*</span>
-          </label>
-          <input
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            placeholder="e.g., Manager, Staff, Collector"
-            className="w-full border rounded-lg p-2.5"
-          />
-        </div>
-        <div>
-          <label className="block mb-1 text-sm font-medium text-slate-700">
-            Phone Number <span className="text-red-500">*</span>
-          </label>
-          <input
-            value={phoneNumber}
-            maxLength={10}
-            onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
-            placeholder="10-digit mobile number"
-            className="w-full border rounded-lg p-2.5"
-          />
-        </div>
-        <div>
-          <label className="block mb-1 text-sm font-medium text-slate-700">
-            Email <span className="text-red-500">*</span>
-          </label>
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="name@example.com"
-            className="w-full border rounded-lg p-2.5"
-          />
-        </div>
-        <div>
-          <label className="block mb-1 text-sm font-medium text-slate-700">
-            Joining Date
-          </label>
-          <input
-            type="date"
-            value={joiningDate}
-            onChange={(e) => setJoiningDate(e.target.value)}
-            className="w-full border rounded-lg p-2.5"
-          />
-        </div>
-        <div>
-          <label className="block mb-1 text-sm font-medium text-slate-700">
-            Salary <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="number"
-            value={salary}
-            onChange={(e) => setSalary(e.target.value === "" ? "" : Number(e.target.value))}
-            placeholder="Monthly salary"
-            className="w-full border rounded-lg p-2.5"
-          />
-        </div>
-        <div>
-          <label className="block mb-1 text-sm font-medium text-slate-700">
-            Aadhar Number
-          </label>
-          <input
-            value={aadharNumber}
-            maxLength={12}
-            onChange={(e) => setAadharNumber(e.target.value.replace(/\D/g, ""))}
-            placeholder="12-digit Aadhar"
-            className="w-full border rounded-lg p-2.5"
-          />
-        </div>
-        <div>
-          <label className="block mb-1 text-sm font-medium text-slate-700">
-            License Number
-            <span className="text-xs text-slate-400 ml-1">
-              {department === "Driver" || department === "Collection" ? "(Required)" : "(Optional)"}
-            </span>
-          </label>
-          <input
-            value={licenseNumber}
-            onChange={(e) => setLicenseNumber(e.target.value)}
-            placeholder="License number"
-            className={`w-full border rounded-lg p-2.5 ${
-              (department === "Driver" || department === "Collection") && !licenseNumber
-                ? "border-red-300 focus:border-red-500"
-                : ""
+
+        {/* Status toggle switch */}
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-slate-600">Status</span>
+          <button
+            type="button"
+            onClick={toggleStatus}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-200 ${
+              status === "Active" ? "bg-emerald-500" : "bg-slate-300"
             }`}
-          />
-        </div>
-        <div className="md:col-span-2">
-          <label className="block mb-1 text-sm font-medium text-slate-700">
-            Address
-          </label>
-          <textarea
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="Enter address"
-            rows={2}
-            className="w-full border rounded-lg p-2.5"
-          />
-        </div>
-        <div>
-          <label className="block mb-1 text-sm font-medium text-slate-700">
-            Status <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as "Active" | "Inactive")}
-            className="w-full border rounded-lg p-2.5"
           >
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
-          </select>
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                status === "Active" ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+          <span
+            className={`text-sm font-medium ${
+              status === "Active" ? "text-emerald-600" : "text-slate-500"
+            }`}
+          >
+            {status}
+          </span>
         </div>
       </div>
 
-      <div className="flex justify-end gap-3 pt-3 border-t">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-6 py-2 border rounded-lg hover:bg-slate-50"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-        >
-          {employee ? "Update Employee" : "Save Employee"}
-        </button>
+      {/* Form Body – 2 columns */}
+      <div className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Employee Name */}
+          <div className="relative">
+            <label className="block mb-1.5 text-sm font-medium text-slate-700">
+              Employee Name <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <User className={iconWrapperClass} size={18} />
+              <input
+                value={employeeName}
+                onChange={(e) => setEmployeeName(e.target.value)}
+                placeholder="Full name"
+                className={inputClass()}
+              />
+            </div>
+          </div>
+
+          {/* Department */}
+          <div className="relative">
+            <label className="block mb-1.5 text-sm font-medium text-slate-700">
+              Department <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Building2 className={iconWrapperClass} size={18} />
+              <select
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition border-slate-200 bg-white appearance-none"
+              >
+                <option value="">Select Department</option>
+                {DEPARTMENTS.map((dept) => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Role */}
+          <div className="relative">
+            <label className="block mb-1.5 text-sm font-medium text-slate-700">
+              Role <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Briefcase className={iconWrapperClass} size={18} />
+              <input
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                placeholder="e.g., Manager, Staff, Collector"
+                className={inputClass()}
+              />
+            </div>
+          </div>
+
+          {/* Phone Number */}
+          <div className="relative">
+            <label className="block mb-1.5 text-sm font-medium text-slate-700">
+              Phone Number <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Phone className={iconWrapperClass} size={18} />
+              <input
+                value={phoneNumber}
+                maxLength={10}
+                onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
+                placeholder="10-digit mobile number"
+                className={inputClass()}
+              />
+            </div>
+          </div>
+
+          {/* Email */}
+          <div className="relative">
+            <label className="block mb-1.5 text-sm font-medium text-slate-700">
+              Email <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Mail className={iconWrapperClass} size={18} />
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@example.com"
+                className={inputClass()}
+              />
+            </div>
+          </div>
+
+          {/* Joining Date */}
+          <div className="relative">
+            <label className="block mb-1.5 text-sm font-medium text-slate-700">
+              Joining Date
+            </label>
+            <div className="relative">
+              <Calendar className={iconWrapperClass} size={18} />
+              <input
+                type="date"
+                value={joiningDate}
+                onChange={(e) => setJoiningDate(e.target.value)}
+                className={`${inputClass()} [&::-webkit-calendar-picker-indicator]:opacity-60 [&::-webkit-calendar-picker-indicator]:hover:opacity-100`}
+              />
+            </div>
+          </div>
+
+          {/* Salary – with Rupee symbol */}
+          <div className="relative">
+            <label className="block mb-1.5 text-sm font-medium text-slate-700">
+              Salary <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <IndianRupee className={iconWrapperClass} size={18} />
+              <input
+                type="number"
+                value={salary}
+                onChange={(e) => setSalary(e.target.value === "" ? "" : Number(e.target.value))}
+                placeholder="Monthly salary"
+                className={`${inputClass()} [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+              />
+            </div>
+          </div>
+
+          {/* Aadhar Number – with space formatting */}
+          <div className="relative">
+            <label className="block mb-1.5 text-sm font-medium text-slate-700">
+              Aadhar Number
+            </label>
+            <div className="relative">
+              <CreditCard className={iconWrapperClass} size={18} />
+              <input
+                value={formatAadhar(aadharNumber)}
+                maxLength={14} // 12 digits + 2 spaces
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\s/g, "");
+                  setAadharNumber(raw);
+                }}
+                placeholder="3044 6064 2044"
+                className={inputClass()}
+              />
+            </div>
+          </div>
+
+          {/* License Number */}
+          <div className="relative">
+            <label className="block mb-1.5 text-sm font-medium text-slate-700">
+              License Number
+              <span className="text-xs text-slate-400 ml-1">
+                {(department === "Driver" || department === "Collection") ? "(Required)" : "(Optional)"}
+              </span>
+            </label>
+            <div className="relative">
+              <Key className={iconWrapperClass} size={18} />
+              <input
+                value={licenseNumber}
+                onChange={(e) => setLicenseNumber(e.target.value)}
+                placeholder="License number"
+                className={inputClass(
+                  (department === "Driver" || department === "Collection") && !licenseNumber
+                )}
+              />
+            </div>
+          </div>
+
+          {/* Address – full width */}
+          <div className="relative md:col-span-2">
+            <label className="block mb-1.5 text-sm font-medium text-slate-700">
+              Address
+            </label>
+            <div className="relative">
+              <Home className="absolute left-3 top-3 text-slate-400" size={18} />
+              <textarea
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Enter address"
+                rows={2}
+                className="w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition border-slate-200 bg-white resize-y"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex justify-end gap-4 mt-6 pt-5 border-t border-slate-200">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-6 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition font-medium text-sm text-slate-700"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition shadow-sm hover:shadow font-medium text-sm"
+          >
+            {isEditing ? "Update Employee" : "Save Employee"}
+          </button>
+        </div>
       </div>
     </div>
   );

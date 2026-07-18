@@ -1,16 +1,7 @@
 import { useLocation, Link } from "react-router-dom";
-import { Fuel } from "lucide-react";
+import { Fuel, Database, LayoutDashboard } from "lucide-react";
 import CollectionTabs from "../../modules/operations/collections/components/CollectionTabs";
 import VehicleTripTabs from "../../modules/operations/vehicle-trips/components/VehicleTripTabs";
-
-const masterTabs = [
-  { label: "Shops", path: "/masters/shops" },
-  { label: "Farms", path: "/masters/farms" },
-  { label: "Vehicles", path: "/masters/vehicles" },
-  { label: "Employees", path: "/masters/employees" },
-  { label: "Banks", path: "/masters/banks" },
-  { label: "Bird Types", path: "/masters/bird-types" },
-];
 
 const shopSalesTabs = [
   { label: "Shop Sales", path: "/operations/shop-sales" },
@@ -28,18 +19,12 @@ function Header() {
   const isCollectionPage = currentPath.startsWith("/operations/collections");
   const isVehicleTripPage = currentPath.startsWith("/operations/vehicle-trips");
 
-  // Dashboard detection – includes /operations/overview
   const isDashboardPage =
     currentPath === "/" ||
     currentPath === "/dashboard" ||
     currentPath.startsWith("/dashboard") ||
     currentPath === "/operations/overview" ||
     currentPath.startsWith("/operations/overview");
-
-  const isActive = (tabPath: string) => {
-    if (currentPath === "/masters" && tabPath === "/masters/shops") return true;
-    return currentPath === tabPath;
-  };
 
   const userProfile = (
     <div className="flex items-center gap-3">
@@ -51,27 +36,13 @@ function Header() {
     </div>
   );
 
-  // ---- Masters Page ----
+  // ---- Masters Page: show "Master" logo + title ----
   if (isMastersPage) {
     return (
       <header className="h-16 bg-white border-b border-slate-200 shadow-sm flex items-center justify-between px-6">
-        <div className="flex items-center gap-6 overflow-x-auto">
-          {masterTabs.map((tab) => (
-            <Link
-              key={tab.path}
-              to={tab.path}
-              className={`relative py-2 text-sm font-medium transition-colors duration-200 whitespace-nowrap ${
-                isActive(tab.path) ? "text-blue-600" : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              {tab.label}
-              <span
-                className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-blue-600 transition-all duration-200 ${
-                  isActive(tab.path) ? "scale-x-100" : "scale-x-0"
-                }`}
-              />
-            </Link>
-          ))}
+        <div className="flex items-center gap-3">
+          <Database size={24} className="text-blue-600" />
+          <h1 className="text-xl font-bold text-slate-800">Master</h1>
         </div>
         <div className="flex items-center gap-6">
           <button className="text-slate-600 hover:text-green-700 text-xl">🔔</button>
@@ -83,7 +54,6 @@ function Header() {
 
   // ---- Other pages ----
   let leftContent = null;
-  let rightContent = null;
 
   if (isCollectionPage) {
     leftContent = <CollectionTabs />;
@@ -111,16 +81,6 @@ function Header() {
       </div>
     );
   } else {
-    const pageTitles: Record<string, string> = {
-      "/operations/overview": "Operations Dashboard",
-      "/operations": "Operations",
-      "/accounts": "Accounts",
-      "/vehicles": "Vehicle Management",
-      "/staff": "Staff",
-      "/reports": "Reports",
-      "/settings": "Settings",
-    };
-
     // Fuel Entry
     if (currentPath === "/operations/fuel-expenses") {
       leftContent = (
@@ -130,16 +90,28 @@ function Header() {
         </div>
       );
     } else {
-      let title = pageTitles[currentPath] || "";
-      // Fallback for any dashboard-like path
-      if (isDashboardPage && !title) {
-        title = "Operations Dashboard";
-      }
-
-      if (title) {
-        // 🔥 For dashboard, put title on the LEFT side (same as other pages)
-        leftContent = <h2 className="text-xl font-semibold text-slate-800">{title}</h2>;
-        // No rightContent for dashboard anymore
+      // Dashboard: show a home icon + title
+      if (isDashboardPage) {
+        leftContent = (
+          <div className="flex items-center gap-2.5">
+            <LayoutDashboard size={22} className="text-indigo-600" />
+            <h2 className="text-xl font-semibold text-slate-800">Operations Dashboard</h2>
+          </div>
+        );
+      } else {
+        // Fallback for other pages (Accounts, Reports, etc.) – just title
+        const pageTitles: Record<string, string> = {
+          "/operations": "Operations",
+          "/accounts": "Accounts",
+          "/vehicles": "Vehicle Management",
+          "/staff": "Staff",
+          "/reports": "Reports",
+          "/settings": "Settings",
+        };
+        const title = pageTitles[currentPath] || "";
+        if (title) {
+          leftContent = <h2 className="text-xl font-semibold text-slate-800">{title}</h2>;
+        }
       }
     }
   }
@@ -149,7 +121,6 @@ function Header() {
       <div className="flex-1 flex items-center gap-6">{leftContent}</div>
       <div className="flex items-center gap-6">
         <button className="text-slate-600 hover:text-green-700 text-xl">🔔</button>
-        {rightContent}
         {userProfile}
       </div>
     </header>

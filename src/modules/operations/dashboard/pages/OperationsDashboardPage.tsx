@@ -33,20 +33,19 @@ const getPreviousWeekRange = () => {
   return { startDate: prevMonday, endDate: prevSunday };
 };
 
-// Tab configuration – "overview" removed from tabs
+// Tab configuration – with icon components and distinct colours
 const tabs = [
-  { id: "trip-entry", label: "Trip Entry", icon: <Truck className="w-4 h-4" /> },
-  { id: "trip-list", label: "Trip List", icon: <List className="w-4 h-4" /> },
-  { id: "shop-sales", label: "Shop Sales", icon: <ShoppingBag className="w-4 h-4" /> },
-  { id: "rate-entry", label: "Rate Entry", icon: <DollarSign className="w-4 h-4" /> },
-  { id: "collection", label: "Collection", icon: <CreditCard className="w-4 h-4" /> },
-  { id: "pending-collections", label: "Pending Collections", icon: <Clock className="w-4 h-4" /> },
-  { id: "collection-report", label: "Collection Report", icon: <FileText className="w-4 h-4" /> },
-  { id: "fuel-expenses", label: "Fuel Expenses", icon: <Fuel className="w-4 h-4" /> },
+  { id: "trip-entry", label: "Trip Entry", icon: Truck, iconColor: "text-blue-500" },
+  { id: "trip-list", label: "Trip List", icon: List, iconColor: "text-green-500" },
+  { id: "shop-sales", label: "Shop Sales", icon: ShoppingBag, iconColor: "text-purple-500" },
+  { id: "rate-entry", label: "Rate Entry", icon: DollarSign, iconColor: "text-amber-500" },
+  { id: "collection", label: "Collection", icon: CreditCard, iconColor: "text-emerald-500" },
+  { id: "pending-collections", label: "Pending Collections", icon: Clock, iconColor: "text-orange-500" },
+  { id: "collection-report", label: "Collection Report", icon: FileText, iconColor: "text-rose-500" },
+  { id: "fuel-expenses", label: "Fuel Expenses", icon: Fuel, iconColor: "text-cyan-500" },
 ];
 
 function OperationsDashboardPage() {
-  // Default active tab is "overview" – not in tabs, so it shows dashboard
   const [activeTab, setActiveTab] = useState("overview");
 
   const initialRange = getPreviousWeekRange();
@@ -151,10 +150,7 @@ function OperationsDashboardPage() {
 
     return (
       <>
-        {/* ── KPI Cards ── */}
         <KPICards current={data} previous={previousData} rangeDays={rangeDays} />
-
-        {/* ── 1st Row: Trend Chart (60%) + Collections Pie (40%) ── */}
         <div className="grid grid-cols-1 lg:grid-cols-[6fr_4fr] gap-6">
           <div className="w-full min-w-0">
             <TrendChart data={data.trendData} />
@@ -163,8 +159,6 @@ function OperationsDashboardPage() {
             <CollectionsPie data={data.collectionsByMode} />
           </div>
         </div>
-
-        {/* ── 2nd Row: Pending Collections (40%) + Recent Trips (60%) ── */}
         <div className="grid grid-cols-1 lg:grid-cols-[4fr_6fr] gap-6">
           <div className="w-full min-w-0">
             <PendingCollectionsByShop data={data.pendingCollectionsByShop} />
@@ -173,8 +167,6 @@ function OperationsDashboardPage() {
             <RecentTripsTable trips={data.recentTrips} />
           </div>
         </div>
-
-        {/* ── 3rd Row: Active Counts – Full width ── */}
         <div className="grid grid-cols-1 gap-6">
           <ActiveCounts
             vehicles={data.activeVehicles || 0}
@@ -190,29 +182,35 @@ function OperationsDashboardPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* ── Tab Navigation ── */}
+      {/* Tab Navigation */}
       <div className="bg-white border-b border-slate-200 rounded-t-xl -mt-6 -mx-6 px-6">
         <div className="flex items-center gap-1 overflow-x-auto py-2 scrollbar-hide">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`
-                flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200
-                ${activeTab === tab.id
-                  ? "bg-blue-50 text-blue-700 border-b-2 border-blue-600"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                }
-              `}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`
+                  flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200
+                  ${isActive
+                    ? "bg-blue-50 text-blue-700 border-b-2 border-blue-600"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                  }
+                `}
+              >
+                <Icon
+                  className={`w-4 h-4 ${isActive ? "text-blue-700" : tab.iconColor}`}
+                />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* ── Filter row (only for Overview tab) ── */}
+      {/* Filter row (only for Overview tab) */}
       {activeTab === "overview" && (
         <div className="flex justify-end">
           <div className="flex items-center gap-4 flex-wrap">
@@ -266,7 +264,7 @@ function OperationsDashboardPage() {
         </div>
       )}
 
-      {/* ── Content ── */}
+      {/* Content */}
       {renderContent()}
     </div>
   );

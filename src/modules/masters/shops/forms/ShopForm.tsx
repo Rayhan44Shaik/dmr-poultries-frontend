@@ -1,9 +1,15 @@
 import { useEffect, useState } from "react";
 import type { Shop } from "../types/shop";
+import {
+  Store,
+  User,
+  Phone,
+  MapPin,
+  Home,
+} from "lucide-react";
 
 type ShopFormProps = {
   shop?: Shop | null;
-
   onSave: (shop: {
     shopName: string;
     ownerName: string;
@@ -12,23 +18,16 @@ type ShopFormProps = {
     address: string;
     status: "Active" | "Inactive";
   }) => void;
-
   onCancel: () => void;
 };
 
-function ShopForm({
-  shop,
-  onSave,
-  onCancel,
-}: ShopFormProps) {
-
+function ShopForm({ shop, onSave, onCancel }: ShopFormProps) {
   const [shopName, setShopName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [village, setVillage] = useState("");
   const [address, setAddress] = useState("");
-  const [status, setStatus] =
-    useState<"Active" | "Inactive">("Active");
+  const [status, setStatus] = useState<"Active" | "Inactive">("Active");
 
   const [errors, setErrors] = useState({
     shopName: "",
@@ -37,39 +36,33 @@ function ShopForm({
     village: "",
   });
 
+  const isEditing = !!shop;
+
   useEffect(() => {
-
     if (shop) {
-
       setShopName(shop.shopName);
       setOwnerName(shop.ownerName);
       setPhoneNumber(shop.phoneNumber);
       setVillage(shop.village);
       setAddress(shop.address ?? "");
       setStatus(shop.status);
-
     } else {
-
       setShopName("");
       setOwnerName("");
       setPhoneNumber("");
       setVillage("");
       setAddress("");
       setStatus("Active");
-
     }
-
     setErrors({
       shopName: "",
       ownerName: "",
       phoneNumber: "",
       village: "",
     });
-
   }, [shop]);
 
   const handleSubmit = () => {
-
     const newErrors = {
       shopName: "",
       ownerName: "",
@@ -78,20 +71,14 @@ function ShopForm({
     };
 
     if (shopName.trim().length < 3) {
-      newErrors.shopName =
-        "Shop Name must contain at least 3 characters.";
+      newErrors.shopName = "Shop Name must contain at least 3 characters.";
     }
-
     if (ownerName.trim().length < 3) {
-      newErrors.ownerName =
-        "Owner Name must contain at least 3 characters.";
+      newErrors.ownerName = "Owner Name must contain at least 3 characters.";
     }
-
     if (!/^[0-9]{10}$/.test(phoneNumber)) {
-      newErrors.phoneNumber =
-        "Mobile Number must be exactly 10 digits.";
+      newErrors.phoneNumber = "Mobile Number must be exactly 10 digits.";
     }
-
     if (village.trim() === "") {
       newErrors.village = "Village is required.";
     }
@@ -115,160 +102,188 @@ function ShopForm({
       address,
       status,
     });
+  };
 
+  const inputClass = (hasError = false) =>
+    `w-full pl-12 pr-4 py-3.5 text-base border-2 rounded-xl focus:ring-4 focus:ring-blue-100/60 focus:border-blue-500 transition-all duration-200 ${
+      hasError ? "border-red-500" : "border-slate-200"
+    } bg-white/90 hover:shadow-md focus:shadow-lg appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`;
+
+  const iconWrapperClass =
+    "absolute left-3 top-1/2 -translate-y-1/2 bg-blue-50 p-2 rounded-full text-blue-600";
+
+  // ✅ Title changed to "Edit Shop" when editing
+  const title = isEditing ? "Edit Shop" : "Add Shop";
+  // ✅ Subtitle changed to "Update details" when editing
+  const subtitle = isEditing ? "Update details" : "Fill in the information";
+
+  const toggleStatus = () => {
+    setStatus(status === "Active" ? "Inactive" : "Active");
   };
 
   return (
+    <div className="bg-white rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-slate-100 to-slate-200/80 px-8 py-6 flex items-center justify-between border-b border-slate-200/60">
+        <div className="flex items-center gap-4">
+          <div className="bg-blue-100 p-3 rounded-2xl">
+            <Store className="h-7 w-7 text-blue-600" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">{title}</h2>
+            <p className="text-sm text-slate-500 font-medium">{subtitle}</p>
+          </div>
+        </div>
 
-    <div className="space-y-5">
-
-      <div>
-
-        <label className="block mb-2 text-sm font-medium text-slate-700">
-          Shop Name <span className="text-red-500">*</span>
-        </label>
-
-        <input
-          value={shopName}
-          onChange={(e) => setShopName(e.target.value)}
-          placeholder="Enter Shop Name"
-          className="w-full border rounded-lg p-3"
-        />
-
-        {errors.shopName && (
-          <p className="text-red-600 text-sm mt-1">
-            {errors.shopName}
-          </p>
-        )}
-
+        {/* Status toggle switch */}
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-slate-600">Status</span>
+          <button
+            type="button"
+            onClick={toggleStatus}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-200 ${
+              status === "Active" ? "bg-emerald-500" : "bg-slate-300"
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                status === "Active" ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+          <span
+            className={`text-sm font-medium ${
+              status === "Active" ? "text-emerald-600" : "text-slate-500"
+            }`}
+          >
+            {status}
+          </span>
+        </div>
       </div>
 
-      <div>
+      {/* Form body */}
+      <div className="p-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="relative">
+            <label className="block mb-2 text-sm font-semibold text-slate-700">
+              Shop Name <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <div className={iconWrapperClass}>
+                <Store size={18} />
+              </div>
+              <input
+                value={shopName}
+                onChange={(e) => setShopName(e.target.value)}
+                placeholder="Enter Shop Name"
+                className={inputClass(!!errors.shopName)}
+              />
+            </div>
+            {errors.shopName && (
+              <p className="text-red-600 text-sm mt-1">{errors.shopName}</p>
+            )}
+          </div>
 
-        <label className="block mb-2 text-sm font-medium text-slate-700">
-          Owner Name <span className="text-red-500">*</span>
-        </label>
+          <div className="relative">
+            <label className="block mb-2 text-sm font-semibold text-slate-700">
+              Owner Name <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <div className={iconWrapperClass}>
+                <User size={18} />
+              </div>
+              <input
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+                placeholder="Enter Owner Name"
+                className={inputClass(!!errors.ownerName)}
+              />
+            </div>
+            {errors.ownerName && (
+              <p className="text-red-600 text-sm mt-1">{errors.ownerName}</p>
+            )}
+          </div>
 
-        <input
-          value={ownerName}
-          onChange={(e) => setOwnerName(e.target.value)}
-          placeholder="Enter Owner Name"
-          className="w-full border rounded-lg p-3"
-        />
+          <div className="relative">
+            <label className="block mb-2 text-sm font-semibold text-slate-700">
+              Mobile Number <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <div className={iconWrapperClass}>
+                <Phone size={18} />
+              </div>
+              <input
+                value={phoneNumber}
+                maxLength={10}
+                onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
+                placeholder="Enter Mobile Number"
+                className={inputClass(!!errors.phoneNumber)}
+              />
+            </div>
+            {errors.phoneNumber && (
+              <p className="text-red-600 text-sm mt-1">{errors.phoneNumber}</p>
+            )}
+          </div>
 
-        {errors.ownerName && (
-          <p className="text-red-600 text-sm mt-1">
-            {errors.ownerName}
-          </p>
-        )}
+          <div className="relative">
+            <label className="block mb-2 text-sm font-semibold text-slate-700">
+              Village <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <div className={iconWrapperClass}>
+                <MapPin size={18} />
+              </div>
+              <input
+                value={village}
+                onChange={(e) => setVillage(e.target.value)}
+                placeholder="Enter Village"
+                className={inputClass(!!errors.village)}
+              />
+            </div>
+            {errors.village && (
+              <p className="text-red-600 text-sm mt-1">{errors.village}</p>
+            )}
+          </div>
 
+          <div className="relative md:col-span-2">
+            <label className="block mb-2 text-sm font-semibold text-slate-700">
+              Address
+            </label>
+            <div className="relative">
+              <div className="absolute left-3 top-3.5 bg-blue-50 p-2 rounded-full text-blue-600">
+                <Home size={18} />
+              </div>
+              <textarea
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Enter Address"
+                rows={2}
+                className="w-full pl-12 pr-4 py-3 text-base border-2 rounded-xl focus:ring-4 focus:ring-blue-100/60 focus:border-blue-500 transition-all duration-200 border-slate-200 bg-white/90 hover:shadow-md focus:shadow-lg resize-y"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex justify-end gap-4 mt-6 pt-5 border-t border-slate-200/80">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-6 py-2.5 border-2 border-slate-300 rounded-xl hover:bg-slate-50/80 font-semibold text-base text-slate-700 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-base transition-colors"
+          >
+            {isEditing ? "Update Shop" : "Save Shop"}
+          </button>
+        </div>
       </div>
-
-      <div>
-
-        <label className="block mb-2 text-sm font-medium text-slate-700">
-          Mobile Number <span className="text-red-500">*</span>
-        </label>
-
-        <input
-          value={phoneNumber}
-          maxLength={10}
-          onChange={(e) =>
-            setPhoneNumber(
-              e.target.value.replace(/\D/g, "")
-            )
-          }
-          placeholder="Enter Mobile Number"
-          className="w-full border rounded-lg p-3"
-        />
-
-        {errors.phoneNumber && (
-          <p className="text-red-600 text-sm mt-1">
-            {errors.phoneNumber}
-          </p>
-        )}
-
-      </div>
-
-      <div>
-
-        <label className="block mb-2 text-sm font-medium text-slate-700">
-          Village <span className="text-red-500">*</span>
-        </label>
-
-        <input
-          value={village}
-          onChange={(e) => setVillage(e.target.value)}
-          placeholder="Enter Village"
-          className="w-full border rounded-lg p-3"
-        />
-
-        {errors.village && (
-          <p className="text-red-600 text-sm mt-1">
-            {errors.village}
-          </p>
-        )}
-
-      </div>
-
-      <div>
-
-        <label className="block mb-2 text-sm font-medium text-slate-700">
-          Address
-        </label>
-
-        <textarea
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          placeholder="Enter Address"
-          className="w-full border rounded-lg p-3"
-        />
-
-      </div>
-
-      <div>
-
-        <label className="block mb-2 text-sm font-medium text-slate-700">
-          Shop Status
-        </label>
-
-        <select
-          value={status}
-          onChange={(e) =>
-            setStatus(e.target.value as "Active" | "Inactive")
-          }
-          className="w-full border rounded-lg p-3"
-        >
-          <option value="Active">Active</option>
-          <option value="Inactive">Inactive</option>
-        </select>
-
-      </div>
-
-      <div className="flex justify-end gap-3 pt-3">
-
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-6 py-2 border rounded-lg hover:bg-gray-100"
-        >
-          Cancel
-        </button>
-
-        <button
-          type="button"
-          onClick={handleSubmit}
-          className="px-6 py-2 bg-green-700 hover:bg-green-800 text-white rounded-lg"
-        >
-          {shop ? "Update Shop" : "Save Shop"}
-        </button>
-
-      </div>
-
     </div>
-
   );
-
 }
 
 export default ShopForm;

@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import type { BirdType } from "../types/birdType";
 import { useNotification } from "../../../../context/NotificationContext";
+import {
+  Bird,
+  Weight,
+  FileText,
+} from "lucide-react";
 
 type BirdTypeFormProps = {
   birdType?: BirdType | null;
@@ -15,6 +20,8 @@ function BirdTypeForm({ birdType, onSave, onCancel }: BirdTypeFormProps) {
   const [averageWeight, setAverageWeight] = useState<number | "">("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
+
+  const isEditing = !!birdType;
 
   useEffect(() => {
     if (birdType) {
@@ -44,76 +51,133 @@ function BirdTypeForm({ birdType, onSave, onCancel }: BirdTypeFormProps) {
     });
   };
 
+  const inputClass = (hasError = false) =>
+    `w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition ${
+      hasError ? "border-red-300 focus:border-red-500" : "border-slate-200"
+    } bg-white`;
+
+  const iconWrapperClass = "absolute left-3 top-1/2 -translate-y-1/2 text-slate-400";
+
+  const title = isEditing ? "Edit Bird Type" : "Add Bird Type";
+  const subtitle = isEditing ? "Update details" : "Fill in the details";
+
+  const toggleStatus = () => {
+    setStatus(status === "Active" ? "Inactive" : "Active");
+  };
+
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block mb-1 text-sm font-medium text-slate-700">
-            Bird Type <span className="text-red-500">*</span>
-          </label>
-          <input
-            value={birdTypeName}
-            onChange={(e) => setBirdTypeName(e.target.value)}
-            placeholder="e.g., Broiler, Layer"
-            className="w-full border rounded-lg p-2.5"
-          />
+    <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+      {/* Header with icon, title, and status toggle */}
+      <div className="bg-gradient-to-r from-slate-100 to-slate-200/80 px-6 py-5 flex items-center justify-between border-b border-slate-200/60">
+        <div className="flex items-center gap-3">
+          <div className="bg-blue-100 p-2.5 rounded-xl">
+            <Bird className="h-6 w-6 text-blue-600" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-800 tracking-tight">{title}</h2>
+            <p className="text-sm text-slate-500 font-medium">{subtitle}</p>
+          </div>
         </div>
-        <div>
-          <label className="block mb-1 text-sm font-medium text-slate-700">
-            Average Weight (kg) <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            min="0.01"
-            value={averageWeight}
-            onChange={(e) => setAverageWeight(e.target.value === "" ? "" : Number(e.target.value))}
-            placeholder="e.g., 1.5"
-            className="w-full border rounded-lg p-2.5"
-          />
-        </div>
-        <div className="md:col-span-2">
-          <label className="block mb-1 text-sm font-medium text-slate-700">
-            Description
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Brief description"
-            rows={2}
-            className="w-full border rounded-lg p-2.5"
-          />
-        </div>
-        <div>
-          <label className="block mb-1 text-sm font-medium text-slate-700">
-            Status <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as "Active" | "Inactive")}
-            className="w-full border rounded-lg p-2.5"
+
+        {/* Status toggle switch */}
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-slate-600">Status</span>
+          <button
+            type="button"
+            onClick={toggleStatus}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-200 ${
+              status === "Active" ? "bg-emerald-500" : "bg-slate-300"
+            }`}
           >
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
-          </select>
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                status === "Active" ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+          <span
+            className={`text-sm font-medium ${
+              status === "Active" ? "text-emerald-600" : "text-slate-500"
+            }`}
+          >
+            {status}
+          </span>
         </div>
       </div>
 
-      <div className="flex justify-end gap-3 pt-3 border-t">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-6 py-2 border rounded-lg hover:bg-slate-50"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-        >
-          {birdType ? "Update Bird Type" : "Save Bird Type"}
-        </button>
+      {/* Form Body – 2 columns */}
+      <div className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Bird Type */}
+          <div className="relative">
+            <label className="block mb-1.5 text-sm font-medium text-slate-700">
+              Bird Type <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Bird className={iconWrapperClass} size={18} />
+              <input
+                value={birdTypeName}
+                onChange={(e) => setBirdTypeName(e.target.value)}
+                placeholder="e.g., Broiler, Layer"
+                className={inputClass()}
+              />
+            </div>
+          </div>
+
+          {/* Average Weight */}
+          <div className="relative">
+            <label className="block mb-1.5 text-sm font-medium text-slate-700">
+              Average Weight (kg) <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Weight className={iconWrapperClass} size={18} />
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={averageWeight}
+                onChange={(e) => setAverageWeight(e.target.value === "" ? "" : Number(e.target.value))}
+                placeholder="e.g., 1.5"
+                className={`${inputClass()} [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+              />
+            </div>
+          </div>
+
+          {/* Description – full width */}
+          <div className="relative md:col-span-2">
+            <label className="block mb-1.5 text-sm font-medium text-slate-700">
+              Description
+            </label>
+            <div className="relative">
+              <FileText className="absolute left-3 top-3 text-slate-400" size={18} />
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Brief description"
+                rows={2}
+                className="w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition border-slate-200 bg-white resize-y"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex justify-end gap-4 mt-6 pt-5 border-t border-slate-200">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-6 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition font-medium text-sm text-slate-700"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition shadow-sm hover:shadow font-medium text-sm"
+          >
+            {isEditing ? "Update Bird Type" : "Save Bird Type"}
+          </button>
+        </div>
       </div>
     </div>
   );
