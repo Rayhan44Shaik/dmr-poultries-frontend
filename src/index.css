@@ -116,3 +116,24 @@
 .rdrDefinedRangesWrapper {
   display: none !important;
 }
+
+  /* Animate all buttons that have common classes */
+button,
+button[class*="px-"][class*="py-"] {
+  transition: all 0.2s ease-in-out;
+}
+
+button:hover {
+  transform: scale(1.03);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+/* If you want a subtle pulse on click */
+button:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}

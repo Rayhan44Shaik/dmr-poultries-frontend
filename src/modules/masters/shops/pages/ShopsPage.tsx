@@ -114,35 +114,52 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   };
 
   const content = (
-    <div className="space-y-6 pt-6">
-      <ShopToolbar
-        search={search}
-        onSearchChange={setSearch}
-        onAddShop={() => {
-          setEditingShop(null);
-          setShowDialog(true);
-        }}
-        onExportPDF={handleExportPDF}
-        onExportExcel={handleExportExcel}
-      />
-      <p className="text-sm text-slate-500">
-        Showing {filteredShops.length} of {shops.length} Shops
-      </p>
-      <ShopTable
-        shops={filteredShops}
-        onEdit={handleEditShop}
-        onDelete={handleDeleteShop}
-      />
-      <ShopDialog
-        open={showDialog}
-        onClose={() => {
-          setEditingShop(null);
-          setShowDialog(false);
-        }}
-        onSave={handleSaveShop}
-        shop={editingShop}
-      />
-    </div>
+    <>
+      <style>{`
+        .shop-page-container button,
+        [role="dialog"] button {
+          transition: all 0.2s ease-in-out;
+        }
+        .shop-page-container button:hover,
+        [role="dialog"] button:hover {
+          transform: scale(1.05);
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .shop-page-container button:active,
+        [role="dialog"] button:active {
+          transform: scale(0.95);
+        }
+      `}</style>
+      <div className="space-y-6 pt-6 shop-page-container">
+        <ShopToolbar
+          search={search}
+          onSearchChange={setSearch}
+          onAddShop={() => {
+            setEditingShop(null);
+            setShowDialog(true);
+          }}
+          onExportPDF={handleExportPDF}
+          onExportExcel={handleExportExcel}
+        />
+        <p className="text-sm text-slate-500">
+          Showing {filteredShops.length} of {shops.length} Shops
+        </p>
+        <ShopTable
+          shops={filteredShops}
+          onEdit={handleEditShop}
+          onDelete={handleDeleteShop}
+        />
+        <ShopDialog
+          open={showDialog}
+          onClose={() => {
+            setEditingShop(null);
+            setShowDialog(false);
+          }}
+          onSave={handleSaveShop}
+          shop={editingShop}
+        />
+      </div>
+    </>
   );
 
   if (embedded) {
