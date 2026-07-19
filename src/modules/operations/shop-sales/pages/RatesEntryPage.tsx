@@ -46,7 +46,12 @@ export default function RatesEntryPage({ embedded = false }: Props) {
   const totalBirds = filteredTrips.reduce((sum, trip) => sum + trip.totalBirds, 0);
   const totalWeight = filteredTrips.reduce((sum, trip) => sum + trip.totalWeight, 0);
 
-  // ---- PDF Export ----
+  // ---- Handlers ----
+  const handleResetFilters = () => {
+    resetFilters();
+    showNotification("Filters have been reset.", "info");
+  };
+
   const handleExportPDF = () => {
     if (filteredTrips.length === 0) {
       showNotification("No data to export.", "error");
@@ -74,9 +79,9 @@ export default function RatesEntryPage({ embedded = false }: Props) {
     ]);
     const filename = `Rates_${new Date().toISOString().split("T")[0]}`;
     exportToPDF("Rates Entry Report", headers, rows, filename);
+    showNotification("PDF exported successfully!", "success");
   };
 
-  // ---- Excel Export ----
   const handleExportExcel = () => {
     if (filteredTrips.length === 0) {
       showNotification("No data to export.", "error");
@@ -104,10 +109,10 @@ export default function RatesEntryPage({ embedded = false }: Props) {
     ]);
     const filename = `Rates_${new Date().toISOString().split("T")[0]}`;
     exportToExcel("Rates Entry Report", headers, rows, filename);
+    showNotification("Excel exported successfully!", "success");
   };
 
   const content = (
-    // ✅ Reduced padding: px-6 → px-3, py-6 → py-3
     <div className="px-3 py-0 space-y-6">
       <CompletedTripsFilters
         fromDate={filter.fromDate}
@@ -123,7 +128,7 @@ export default function RatesEntryPage({ embedded = false }: Props) {
         setVehicle={(value) => setFilter({ ...filter, vehicle: value })}
         setSupervisor={(value) => setFilter({ ...filter, supervisor: value })}
         onSearch={() => setCurrentPage(1)}
-        onReset={resetFilters}
+        onReset={handleResetFilters}
         pendingTrips={filteredTrips.length}
         hasFilters={hasFilters}
         onExportPDF={handleExportPDF}

@@ -102,9 +102,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       success = saveTrip(rows);
     }
     if (success) {
+      showNotification("Trip saved successfully!", "success");
       refreshTrips();
       setIsEditing(false);
       setRows([]);
+    } else {
+      showNotification("Failed to save trip. Please check the form.", "error");
     }
   };
 
@@ -112,9 +115,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     updateDeliveries(rows);
     const success = saveTrip(rows);
     if (success) {
+      showNotification("Trip saved successfully! You can start a new trip.", "success");
       refreshTrips();
       setRows([]);
       setIsEditing(false);
+    } else {
+      showNotification("Failed to save trip. Please check the form.", "error");
     }
   };
 
@@ -122,10 +128,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     clearTrip();
     setRows([]);
     setIsEditing(false);
+    showNotification("Trip form cleared.", "info");
   };
 
   const handleRefresh = () => {
     refreshTrips();
+    showNotification("Trip list refreshed.", "info");
   };
 
   useEffect(() => {

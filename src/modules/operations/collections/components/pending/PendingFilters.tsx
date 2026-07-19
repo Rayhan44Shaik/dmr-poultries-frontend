@@ -1,5 +1,6 @@
 import { X, Filter } from "lucide-react";
 import { useShopSearch } from "../../../../../core/hooks/useShopSearch";
+import { DatePicker } from "../../../../../components/common/DatePicker"; // adjust if needed
 
 interface FilterState {
   shopName: string;
@@ -118,35 +119,29 @@ export function PendingFilters({
             </div>
           </div>
 
-          {/* From Date */}
+          {/* From Date – replaced with DatePicker */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700">
               From Date
             </label>
-
-            <input
-              type="date"
+            <DatePicker
               value={filters.fromDate}
-              onChange={(e) =>
-                handleDateChange("fromDate", e.target.value)
-              }
-              className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              onChange={(value) => handleDateChange("fromDate", value)}
+              placeholder="Select start"
+              className="w-full"
             />
           </div>
 
-          {/* To Date */}
+          {/* To Date – replaced with DatePicker */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700">
               To Date
             </label>
-
-            <input
-              type="date"
+            <DatePicker
               value={filters.toDate}
-              onChange={(e) =>
-                handleDateChange("toDate", e.target.value)
-              }
-              className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              onChange={(value) => handleDateChange("toDate", value)}
+              placeholder="Select end"
+              className="w-full"
             />
           </div>
 

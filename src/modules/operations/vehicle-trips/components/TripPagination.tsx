@@ -11,14 +11,14 @@ function TripPagination({ currentPage, totalPages, onPageChange }: Props) {
 
   // Show a window of up to 5 pages around the current page
   const getPageNumbers = () => {
-    const pages = [];
-    const maxVisible = 3; // number of page buttons to show
+    const maxVisible = 5;
     const half = Math.floor(maxVisible / 2);
     let start = Math.max(1, currentPage - half);
     let end = Math.min(totalPages, start + maxVisible - 1);
     if (end - start < maxVisible - 1) {
       start = Math.max(1, end - maxVisible + 1);
     }
+    const pages = [];
     for (let i = start; i <= end; i++) {
       pages.push(i);
     }
@@ -30,63 +30,67 @@ function TripPagination({ currentPage, totalPages, onPageChange }: Props) {
   const showLastEllipsis = visiblePages[visiblePages.length - 1] < totalPages;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
-      <div className="flex justify-between items-center">
+    <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      {/* Page info */}
+      <div className="text-sm text-slate-600">
+        Page {currentPage} of {totalPages}
+      </div>
+
+      {/* Navigation buttons */}
+      <div className="flex items-center gap-1">
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="px-5 py-2 rounded-xl border disabled:opacity-40 hover:bg-slate-100"
+          className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Previous
         </button>
 
-        <div className="flex items-center gap-2">
-          {/* First page + ellipsis */}
-          {showFirstEllipsis && (
-            <>
-              <button
-                onClick={() => onPageChange(1)}
-                className="h-10 w-10 rounded-xl border hover:bg-slate-100 font-semibold transition"
-              >
-                1
-              </button>
-              <span className="px-1 text-slate-400">…</span>
-            </>
-          )}
-
-          {/* Visible pages */}
-          {visiblePages.map((page) => (
+        {/* First page + ellipsis */}
+        {showFirstEllipsis && (
+          <>
             <button
-              key={page}
-              onClick={() => onPageChange(page)}
-              className={`h-10 w-10 rounded-xl font-semibold transition ${
-                page === currentPage
-                  ? "bg-green-700 text-white"
-                  : "border hover:bg-slate-100"
-              }`}
+              onClick={() => onPageChange(1)}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-sm font-medium text-slate-700 transition hover:bg-slate-100"
             >
-              {page}
+              1
             </button>
-          ))}
+            <span className="px-1 text-slate-400">…</span>
+          </>
+        )}
 
-          {/* Last ellipsis + last page */}
-          {showLastEllipsis && (
-            <>
-              <span className="px-1 text-slate-400">…</span>
-              <button
-                onClick={() => onPageChange(totalPages)}
-                className="h-10 w-10 rounded-xl border hover:bg-slate-100 font-semibold transition"
-              >
-                {totalPages}
-              </button>
-            </>
-          )}
-        </div>
+        {/* Visible pages */}
+        {visiblePages.map((page) => (
+          <button
+            key={page}
+            onClick={() => onPageChange(page)}
+            className={`flex h-8 w-8 items-center justify-center rounded-md text-sm font-medium transition ${
+              page === currentPage
+                ? "bg-green-700 text-white"
+                : "text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+            {page}
+          </button>
+        ))}
+
+        {/* Last ellipsis + last page */}
+        {showLastEllipsis && (
+          <>
+            <span className="px-1 text-slate-400">…</span>
+            <button
+              onClick={() => onPageChange(totalPages)}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+            >
+              {totalPages}
+            </button>
+          </>
+        )}
 
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="px-5 py-2 rounded-xl border disabled:opacity-40 hover:bg-slate-100"
+          className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Next
         </button>

@@ -1,3 +1,4 @@
+// src/routes/AppRoutes.tsx
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout/DashboardLayout";
 
@@ -11,18 +12,18 @@ import EmployeesPage from "../modules/masters/employees/pages/EmployeesPage";
 import BanksPage from "../modules/masters/banks/pages/BanksPage";
 import BirdTypesPage from "../modules/masters/bird-types/pages/BirdTypesPage";
 
+// Operations Pages
+import OperationsDashboardPage from "../modules/operations/dashboard/pages/OperationsDashboardPage";
 import TripEntryPage from "../modules/operations/vehicle-trips/pages/TripEntryPage";
 import TripListPage from "../modules/operations/vehicle-trips/pages/TripListPage";
 import ShopSalesPage from "../modules/operations/shop-sales/pages/ShopSalesPage";
 import RatesEntryPage from "../modules/operations/shop-sales/pages/RatesEntryPage";
-import FuelExpensesPage from "../modules/operations/fuel-expenses/pages/FuelExpensesPage";
-import OperationsDashboardPage from "../modules/operations/dashboard/pages/OperationsDashboardPage";
-
 import CollectionEntryPage from "../modules/operations/collections/pages/CollectionEntryPage";
 import PendingCollectionsPage from "../modules/operations/collections/pages/PendingCollectionsPage";
 import CollectionReportPage from "../modules/operations/collections/pages/CollectionReportPage";
+import FuelExpensesPage from "../modules/operations/fuel-expenses/pages/FuelExpensesPage";
 
-// Accounts Module Imports
+// Accounts, Fleet, Staff, Reports, Settings...
 import AccountsDashboardPage from "../modules/accounts/pages/AccountsDashboardPage";
 import FarmerPaymentsPage from "../modules/accounts/pages/FarmerPaymentsPage";
 import CashBookPage from "../modules/accounts/pages/CashBookPage";
@@ -31,7 +32,6 @@ import VehicleEMIPage from "../modules/accounts/pages/VehicleEMIPage";
 import OutstandingSummaryPage from "../modules/accounts/pages/OutstandingSummaryPage";
 import ProfitLossPage from "../modules/accounts/pages/ProfitLossPage";
 
-// Fleet Module Imports
 import FleetDashboardPage from "../modules/fleet-operations/pages/FleetDashboardPage";
 import MaintenanceEntryPage from "../modules/fleet-operations/pages/MaintenanceEntryPage";
 import MaintenanceHistoryPage from "../modules/fleet-operations/pages/MaintenanceHistoryPage";
@@ -42,10 +42,7 @@ import VehicleAnalyticsPage from "../modules/fleet-operations/pages/VehicleAnaly
 import VehicleReportsPage from "../modules/fleet-operations/pages/VehicleReportsPage";
 import VehicleExpenseReportPage from "../modules/fleet-operations/pages/VehicleExpenseReportPage";
 
-// ✅ Staff Module – Master Page with Tabs
 import StaffMasterPage from "../modules/staff/pages/StaffMasterPage";
-
-// Other Modules
 import ReportsDashboardPage from "../modules/reports/pages/ReportsDashboardPage";
 import SettingsPage from "../modules/settings/pages/SettingsPage";
 
@@ -66,17 +63,31 @@ function AppRoutes() {
         <Route path="/masters/banks" element={<BanksPage />} />
         <Route path="/masters/bird-types" element={<BirdTypesPage />} />
 
-        {/* Operations Module */}
-        <Route path="/operations" element={<Navigate to="/operations/overview" replace />} />
-        <Route path="/operations/overview" element={<DashboardLayout><OperationsDashboardPage /></DashboardLayout>} />
-        <Route path="/operations/vehicle-trips/entry" element={<TripEntryPage />} />
-        <Route path="/operations/vehicle-trips/list" element={<TripListPage />} />
-        <Route path="/operations/shop-sales" element={<DashboardLayout><ShopSalesPage /></DashboardLayout>} />
-        <Route path="/operations/shop-sales/rate-entry" element={<DashboardLayout><RatesEntryPage embedded={true} /></DashboardLayout>} />
-        <Route path="/operations/collections/entry" element={<DashboardLayout><CollectionEntryPage /></DashboardLayout>} />
-        <Route path="/operations/collections/pending" element={<DashboardLayout><PendingCollectionsPage /></DashboardLayout>} />
-        <Route path="/operations/collections/report" element={<DashboardLayout><CollectionReportPage /></DashboardLayout>} />
-        <Route path="/operations/fuel-expenses" element={<DashboardLayout><FuelExpensesPage /></DashboardLayout>} />
+        {/* ✅ Operations – parent layout with sidebar + header */}
+        <Route
+          path="/operations"
+          element={
+            <DashboardLayout>
+              <OperationsDashboardPage />
+            </DashboardLayout>
+          }
+        >
+          {/* Redirect from /operations to /operations/overview */}
+          <Route index element={<Navigate to="/operations/overview" replace />} />
+
+          {/* Overview – handled by the parent component itself (element is null) */}
+          <Route path="overview" element={null} />
+
+          {/* Child routes – these will be rendered inside <Outlet /> in OperationsDashboard */}
+          <Route path="vehicle-trips/entry" element={<TripEntryPage />} />
+          <Route path="vehicle-trips/list" element={<TripListPage />} />
+          <Route path="shop-sales" element={<ShopSalesPage />} />
+          <Route path="shop-sales/rate-entry" element={<RatesEntryPage embedded={true} />} />
+          <Route path="collections/entry" element={<CollectionEntryPage />} />
+          <Route path="collections/pending" element={<PendingCollectionsPage />} />
+          <Route path="collections/report" element={<CollectionReportPage />} />
+          <Route path="fuel-expenses" element={<FuelExpensesPage />} />
+        </Route>
 
         {/* Accounts Module */}
         <Route path="/accounts" element={<Navigate to="/accounts/dashboard" replace />} />
@@ -100,23 +111,9 @@ function AppRoutes() {
         <Route path="/fleet/reports" element={<DashboardLayout><VehicleReportsPage /></DashboardLayout>} />
         <Route path="/fleet/expense-report" element={<DashboardLayout><VehicleExpenseReportPage /></DashboardLayout>} />
 
-        {/* ✅ Staff Module – Fully Integrated with Tabs */}
-        <Route
-          path="/staff"
-          element={
-            <DashboardLayout>
-              <StaffMasterPage />
-            </DashboardLayout>
-          }
-        />
-        <Route
-          path="/staff/*"
-          element={
-            <DashboardLayout>
-              <StaffMasterPage />
-            </DashboardLayout>
-          }
-        />
+        {/* Staff Module */}
+        <Route path="/staff" element={<DashboardLayout><StaffMasterPage /></DashboardLayout>} />
+        <Route path="/staff/*" element={<DashboardLayout><StaffMasterPage /></DashboardLayout>} />
 
         {/* Reports */}
         <Route path="/reports" element={<DashboardLayout><ReportsDashboardPage /></DashboardLayout>} />

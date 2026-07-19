@@ -1,5 +1,7 @@
 import Select from "react-select";
-import { Search, Calendar, FileText, FileSpreadsheet } from "lucide-react";
+import { Search, FileText, FileSpreadsheet } from "lucide-react";
+import { DatePicker } from "../../../../components/common/DatePicker"; // adjust path as needed
+import { useSafeNotification } from "../../../../hooks/useSafeNotification"; // imported but unused here
 
 interface Props {
   fromDate: string;
@@ -36,6 +38,9 @@ function ShopSalesFilters({
   onExportExcel,
   hasFilters,
 }: Props) {
+  // If you need notifications inside this component, uncomment and use:
+  // const { showNotification } = useSafeNotification();
+
   const shopOptions = [
     { value: "", label: "All Shops" },
     ...shopNames.map((shop) => ({ value: shop, label: shop })),
@@ -71,30 +76,28 @@ function ShopSalesFilters({
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+        {/* From Date – now using DatePicker */}
         <div className="md:col-span-2">
           <label className="text-xs font-medium text-slate-500 block mb-1">From Date</label>
-          <div className="relative">
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
-            />
-            <Calendar size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          </div>
+          <DatePicker
+            value={fromDate}
+            onChange={setFromDate}
+            placeholder="Select date"
+            className="w-full"
+          />
         </div>
+
+        {/* To Date – now using DatePicker */}
         <div className="md:col-span-2">
           <label className="text-xs font-medium text-slate-500 block mb-1">To Date</label>
-          <div className="relative">
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
-            />
-            <Calendar size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          </div>
+          <DatePicker
+            value={toDate}
+            onChange={setToDate}
+            placeholder="Select date"
+            className="w-full"
+          />
         </div>
+
         <div className="md:col-span-4">
           <label className="text-xs font-medium text-slate-500 block mb-1">Shop Name</label>
           <Select

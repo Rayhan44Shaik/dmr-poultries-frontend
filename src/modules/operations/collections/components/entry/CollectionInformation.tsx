@@ -2,6 +2,7 @@ import React from "react";
 import { RotateCcw, BookOpen, Wallet } from "lucide-react";
 import Select from "react-select";
 import type { CollectionEntry, CollectionErrors, PaymentMode } from "../../types/collection";
+import { DatePicker } from "../../../../../components/common/DatePicker"; // adjust path as needed
 
 interface Props {
   entry: CollectionEntry;
@@ -65,11 +66,14 @@ function CollectionInformation({
     }),
   };
 
-  const isCollectorSelected = entry.collectorName.trim().length > 0;
+  const isLedgerEnabled =
+    entry.shopName.trim().length > 0 &&
+    entry.collectorName.trim().length > 0 &&
+    entry.paymentModeName.trim().length > 0;
 
   return (
     <div>
-      {/* ✅ Header with green icon and larger bottom margin */}
+      {/* Header with green icon and larger bottom margin */}
       <div className="border-b border-slate-200 pb-3 mb-5 flex items-center gap-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100 text-green-700">
           <Wallet size={16} />
@@ -79,17 +83,16 @@ function CollectionInformation({
 
       <div className="space-y-5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Collection Date – now using DatePicker */}
           <div>
             <label htmlFor="collectionDate" className="mb-1 block text-sm font-medium text-slate-700">
               Collection Date
             </label>
-            <input
-              id="collectionDate"
-              type="date"
+            <DatePicker
               value={entry.collectionDate}
-              onChange={(e) => onDateChange(e.target.value)}
-              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              aria-describedby={errors.collectionDate ? "collectionDate-error" : undefined}
+              onChange={onDateChange}
+              placeholder="Select date"
+              className="w-full"
             />
             {errors.collectionDate && (
               <p id="collectionDate-error" className="mt-1 text-xs text-red-600">
@@ -161,7 +164,6 @@ function CollectionInformation({
               className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100 disabled:text-slate-400"
               aria-describedby={errors.referenceNo ? "referenceNo-error" : undefined}
             />
-            {/* Reference error is now never shown because validation was removed */}
             {errors.referenceNo && (
               <p id="referenceNo-error" className="mt-1 text-xs text-red-600">
                 {errors.referenceNo}
@@ -197,10 +199,10 @@ function CollectionInformation({
             <button
               type="button"
               onClick={onViewLedger}
-              disabled={!isCollectorSelected}
-              title={!isCollectorSelected ? "Please select a collector first" : ""}
+              disabled={!isLedgerEnabled}
+              title={!isLedgerEnabled ? "Please select Shop, Collector, and Payment Mode" : ""}
               className={`inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-semibold text-white shadow-sm transition ${
-                isCollectorSelected
+                isLedgerEnabled
                   ? "bg-green-700 hover:bg-green-800 active:scale-95"
                   : "cursor-not-allowed bg-slate-400"
               }`}

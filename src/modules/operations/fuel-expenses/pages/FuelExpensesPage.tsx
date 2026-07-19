@@ -1,15 +1,24 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useFuelExpenses } from "../hooks/useFuelExpenses";
 import { FuelKPICards } from "../components/FuelKPICards";
-import { FuelFilters } from "../components/FuelFilters";
 import { FuelEntryForm } from "../components/FuelEntryForm";
 import { FuelBillTable } from "../components/FuelBillTable";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { useVehicles } from "../../../masters/vehicles/hooks/useVehicles";
 import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
-import { Eye, Pencil, Trash2, CheckCircle, X, Plus, FileText, FileSpreadsheet } from "lucide-react";
+import {
+  Eye,
+  Pencil,
+  Trash2,
+  CheckCircle,
+  X,
+  Plus,
+  FileText,
+  FileSpreadsheet,
+} from "lucide-react";
 import type { FuelExpense } from "../types/fuelExpense";
+import { DatePicker } from "../../../../components/common/DatePicker"; // <-- modern picker
 
 function FuelExpensesPage() {
   const { showNotification } = useSafeNotification();
@@ -219,6 +228,12 @@ function FuelExpensesPage() {
     exportToExcel("Fuel Bills Report", headers, rows, filename);
   }, [filteredData, showNotification]);
 
+  const handleResetFilters = () => {
+    resetFilters();
+    setCurrentPage(1);
+    showNotification("Filters reset.", "info");
+  };
+
   // Memoize KPICards to avoid re-render when only filters change
   const KpiCards = useMemo(
     () =>
@@ -236,8 +251,10 @@ function FuelExpensesPage() {
   );
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    // Reduced padding from p-6 to p-2 (same as TripEntryPage)
+    <div className="p-2 space-y-4">
+      {/* Action Buttons */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <button
           onClick={() => setShowForm(!showForm)}
           className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium shadow-sm transition flex items-center gap-1.5"
@@ -271,20 +288,88 @@ function FuelExpensesPage() {
         </div>
       </div>
 
+      {/* KPI Cards (only when filters active) */}
       {KpiCards}
 
-      <FuelFilters
-        fromDate={fromDate}
-        toDate={toDate}
-        selectedVehicles={selectedVehicles}
-        activeVehicles={activeVehicles}
-        setFromDate={setFromDate}
-        setToDate={setToDate}
-        setSelectedVehicles={setSelectedVehicles}
-        onSearch={() => setCurrentPage(1)}
-        onReset={resetFilters}
-      />
+      {/* Filter Bar – now using DatePicker */}
+      <div className="rounded-lg border border-green-200 bg-white p-4 shadow-sm">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* From Date */}
+          <DatePicker
+            value={fromDate}
+            onChange={setFromDate}
+            label="From Date"
+            placeholder="Select start"
+            className="w-full"
+          />
 
+          {/* To Date */}
+          <DatePicker
+            value={toDate}
+            onChange={setToDate}
+            label="To Date"
+            placeholder="Select end"
+            className="w-full"
+          />
+
+          {/* Vehicle Multi-select */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Vehicles</label>
+            <select
+              multiple
+              value={selectedVehicles}
+              onChange={(e) => {
+                const values = Array.from(e.target.selectedOptions, (opt) => opt.value);
+                setSelectedVehicles(values);
+                setCurrentPage(1);
+              }}
+              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500"
+              size={1}
+              style={{ height: "auto", minHeight: "2.5rem" }}
+            >
+              <option value="">All Vehicles</option>
+              {activeVehicles.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+            {selectedVehicles.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {selectedVehicles.map((v) => (
+                  <span
+                    key={v}
+                    className="inline-flex items-center gap-1 rounded bg-green-100 px-2 py-0.5 text-xs text-green-800"
+                  >
+                    {v}
+                    <button
+                      onClick={() => {
+                        setSelectedVehicles(selectedVehicles.filter((x) => x !== v));
+                        setCurrentPage(1);
+                      }}
+                      className="hover:text-red-600"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Reset Button */}
+          <div className="flex items-end">
+            <button
+              onClick={handleResetFilters}
+              className="h-10 w-full rounded-md border border-red-300 bg-white px-4 text-sm font-medium text-red-600 hover:bg-red-50 transition"
+            >
+              Reset Filters
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Fuel Entry Form */}
       {showForm && (
         <FuelEntryForm
           onSave={saveExpense}
@@ -298,6 +383,7 @@ function FuelExpensesPage() {
         />
       )}
 
+      {/* Table with selection actions */}
       <div ref={tableContainerRef} className="space-y-3">
         {selectedBill && (
           <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200 flex-wrap">
@@ -352,6 +438,7 @@ function FuelExpensesPage() {
         />
       </div>
 
+      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between border-t border-slate-200 pt-4">
           <div className="text-xs text-slate-500">
@@ -379,6 +466,7 @@ function FuelExpensesPage() {
         </div>
       )}
 
+      {/* View Modal */}
       {viewModalOpen && viewingBill && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -388,7 +476,56 @@ function FuelExpensesPage() {
                 <X size={20} />
               </button>
             </div>
-            {/* ... rest of modal ... */}
+            <div className="p-4 space-y-2">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="font-medium text-slate-600">Bill No</div>
+                <div>{viewingBill.billNo}</div>
+                <div className="font-medium text-slate-600">Date</div>
+                <div>{formatDate(viewingBill.date)}</div>
+                <div className="font-medium text-slate-600">Vehicle</div>
+                <div>{viewingBill.vehicleNo}</div>
+                <div className="font-medium text-slate-600">Driver</div>
+                <div>{viewingBill.driverName}</div>
+                <div className="font-medium text-slate-600">Supervisor</div>
+                <div>{viewingBill.supervisorName}</div>
+                <div className="font-medium text-slate-600">Meter Reading</div>
+                <div>{viewingBill.meterReading}</div>
+                <div className="font-medium text-slate-600">Amount</div>
+                <div>₹{viewingBill.amount.toFixed(2)}</div>
+                <div className="font-medium text-slate-600">Rate / Litre</div>
+                <div>₹{viewingBill.rate.toFixed(2)}</div>
+                <div className="font-medium text-slate-600">Litres</div>
+                <div>{viewingBill.litres.toFixed(2)}</div>
+                <div className="font-medium text-slate-600">Petrol Bunk</div>
+                <div>{viewingBill.petrolBunk}</div>
+                <div className="font-medium text-slate-600">Status</div>
+                <div>
+                  <span
+                    className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+                      viewingBill.status === "Approved"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {viewingBill.status}
+                  </span>
+                </div>
+                {viewingBill.remarks && (
+                  <>
+                    <div className="font-medium text-slate-600">Remarks</div>
+                    <div>{viewingBill.remarks}</div>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end p-4 border-t border-slate-200">
+              <button
+                onClick={closeViewModal}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-md text-sm font-medium"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

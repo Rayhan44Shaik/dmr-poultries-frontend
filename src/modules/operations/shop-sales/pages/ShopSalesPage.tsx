@@ -30,11 +30,17 @@ function ShopSalesPage() {
 
   useEffect(() => {
     refreshSales();
+    // Silent load – no notification
   }, [refreshSales]);
 
   const handleSearch = useCallback(() => {
     setCurrentPage(1);
   }, [setCurrentPage]);
+
+  const handleResetFilters = useCallback(() => {
+    resetFilters();
+    showNotification("Filters have been reset.", "info");
+  }, [resetFilters, showNotification]);
 
   const handleUpdateSale = useCallback(async (updatedSale: ShopSale) => {
     try {
@@ -72,6 +78,7 @@ function ShopSalesPage() {
     ]);
     const filename = `ShopSales_${new Date().toISOString().split("T")[0]}`;
     exportToPDF("Shop Sales Report", headers, rows, filename);
+    showNotification("PDF exported successfully!", "success");
   }, [filteredSales, showNotification]);
 
   const handleExportExcel = useCallback(() => {
@@ -101,10 +108,10 @@ function ShopSalesPage() {
     ]);
     const filename = `ShopSales_${new Date().toISOString().split("T")[0]}`;
     exportToExcel("Shop Sales Report", headers, rows, filename);
+    showNotification("Excel exported successfully!", "success");
   }, [filteredSales, showNotification]);
 
   return (
-    // ✅ Reduced horizontal padding: px-6 → px-3 (top padding unchanged py-0)
     <div className="px-3 py-0 space-y-6">
       <ShopSalesFilters
         fromDate={filter.fromDate}
@@ -118,7 +125,7 @@ function ShopSalesPage() {
         setShopName={(v) => setFilter({ ...filter, shopName: v })}
         setSortBy={(v) => setFilter({ ...filter, sortBy: v })}
         onSearch={handleSearch}
-        onReset={resetFilters}
+        onReset={handleResetFilters}
         onExportPDF={handleExportPDF}
         onExportExcel={handleExportExcel}
         hasFilters={

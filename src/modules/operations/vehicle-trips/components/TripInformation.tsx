@@ -2,6 +2,7 @@ import React, { useCallback, useMemo } from "react";
 import { FileText } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
+import { DatePicker } from "../../../../components/common/DatePicker"; // adjust path as needed
 
 interface Props {
   trip: Trip;
@@ -38,7 +39,6 @@ function TripInformation({
     [vehicles]
   );
 
-  // ✅ Use employeeName as value instead of ID
   const driverOptions = useMemo(
     () => drivers.map((d) => ({ value: d.employeeName, label: d.employeeName })),
     [drivers]
@@ -64,7 +64,6 @@ function TripInformation({
   };
 
   const handleDriverSelect = (selected: any) => {
-    // ✅ Set driverName directly from selected label
     setTrip((prev) => ({
       ...prev,
       driverName: selected?.value || "",
@@ -72,7 +71,6 @@ function TripInformation({
   };
 
   const handleSupervisorSelect = (selected: any) => {
-    // ✅ Set supervisorName directly
     setTrip((prev) => ({
       ...prev,
       supervisorName: selected?.value || "",
@@ -180,15 +178,17 @@ function TripInformation({
               className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm font-semibold cursor-not-allowed focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
             />
           </div>
+
+          {/* Trip Date – now using DatePicker */}
           <div>
             <label className="text-xs font-medium text-slate-600">
               Trip Date <span className="text-red-500">*</span>
             </label>
-            <input
-              type="date"
+            <DatePicker
               value={trip.tripDate}
-              onChange={(e) => updateField("tripDate", e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+              onChange={(value) => updateField("tripDate", value)}
+              placeholder="Select date"
+              className="w-full mt-1"
             />
           </div>
 
@@ -208,7 +208,7 @@ function TripInformation({
             />
           </div>
 
-          {/* Driver – using name as value */}
+          {/* Driver */}
           <div>
             <label className="text-xs font-medium text-slate-600">
               Driver <span className="text-red-500">*</span>
@@ -224,7 +224,7 @@ function TripInformation({
             />
           </div>
 
-          {/* Supervisor – using name as value */}
+          {/* Supervisor */}
           <div>
             <label className="text-xs font-medium text-slate-600">
               Supervisor <span className="text-red-500">*</span>

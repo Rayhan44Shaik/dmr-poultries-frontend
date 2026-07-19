@@ -4,20 +4,25 @@ import type {
   CollectionErrors,
   PendingCollection,
   RecentCollection,
-  PaymentMode
+  PaymentMode,
+  Collection,
 } from "../types/collection";
 import { collectionService } from "../services/collectionService";
 import { shopService } from "../../../masters/shops/services/shopService";
 import { getEmployees } from "../../../masters/employees/services/employeeService";
 import { getBanks } from "../../../masters/banks/services/bankService";
+import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
 export default function useCollectionEntry() {
+  const { showNotification } = useSafeNotification();
+
   // ---- All useState hooks ----
   const [shops, setShops] = useState<string[]>([]);
   const [collectors, setCollectors] = useState<string[]>([]);
   const [paymentModes, setPaymentModes] = useState<PaymentMode[]>([]);
   const [pendingCollections, setPendingCollections] = useState<PendingCollection[]>([]);
   const [recentCollections, setRecentCollections] = useState<RecentCollection[]>([]);
+  const [allCollections, setAllCollections] = useState<Collection[]>([]); // new
   const [pendingShop, setPendingShop] = useState<PendingCollection | null>(null);
   const [showSummary, setShowSummary] = useState(false);
 
@@ -59,8 +64,9 @@ export default function useCollectionEntry() {
       setPaymentModes(modes);
       setPendingCollections(collectionService.getPendingCollections());
       setRecentCollections(collectionService.getRecentCollections("Pending"));
+      setAllCollections(collectionService.getCollections()); // ← load all
     } catch (error) {
-      console.error("Failed to load master data:", error);
+      showNotification("Failed to load master data.", "error");
     } finally {
       setLoading(false);
     }
@@ -90,16 +96,24 @@ export default function useCollectionEntry() {
     const totalSales = sales.reduce((sum: number, s: any) => sum + (Number(s.amount) || 0), 0);
     const collections = collectionService.getCollectionsForShop(shopName);
     const totalCollections = collections.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
-    const currentPending = Math.max(0, totalSales - totalCollections);
+    const currentPending = totalSales - totalCollections;
     return { totalSales, totalCollections, currentPending };
   }
 
   function selectShop(shopName: string) {
     const shop = findPendingShop(shopName);
     const { totalSales, totalCollections, currentPending } = computeShopTotals(shopName);
-    const updatedShop = shop
-      ? { ...shop, totalSales, totalCollections, currentPending: Math.max(0, currentPending) }
-      : null;
+    const updatedShop: PendingCollection = shop
+      ? { ...shop, totalSales, totalCollections, currentPending }
+      : {
+          shopName,
+          totalSales,
+          totalCollections,
+          currentPending,
+          openingBalance: currentPending,
+          overdueDays: 0,
+          lastCollectionDate: new Date().toISOString().split('T')[0],
+        };
     setPendingShop(updatedShop);
     setEntry((prev) => ({
       ...prev,
@@ -134,13 +148,13 @@ export default function useCollectionEntry() {
 
   function viewLedger() {
     if (!pendingShop) {
-      alert("Please select a shop first.");
+      showNotification("Please select a shop first.", "error");
       return;
     }
     const { totalSales, totalCollections, currentPending } = computeShopTotals(pendingShop.shopName);
     setPendingShop(prev => prev ? { ...prev, totalSales, totalCollections, currentPending } : null);
     setShowSummary(true);
-    setEntry(prev => ({ ...prev, amount: currentPending }));
+    setEntry(prev => ({ ...prev, amount: Math.max(0, currentPending) }));
   }
 
   // ---- WEEKLY RANGE & CALCULATIONS ----
@@ -185,7 +199,6 @@ export default function useCollectionEntry() {
       .reduce((sum: number, c: any) => sum + Number(c.amount), 0);
   }, [pendingShop, weekRange]);
 
-  // ✅ NEW: Pending Approval collections for the week
   const weeklyPending = useMemo(() => {
     if (!pendingShop) return 0;
     const collections = collectionService.getCollectionsForShop(pendingShop.shopName);
@@ -203,9 +216,9 @@ export default function useCollectionEntry() {
   const currentPending = useMemo(() => pendingShop?.currentPending ?? 0, [pendingShop]);
 
   const todayCollection = useMemo(() => Number(entry.amount || 0), [entry.amount]);
+
   const remainingBalance = useMemo(() => {
-    const bal = currentPending - todayCollection;
-    return bal < 0 ? 0 : bal;
+    return currentPending - todayCollection;
   }, [currentPending, todayCollection]);
 
   const collectionProgress = useMemo(() => {
@@ -226,7 +239,7 @@ export default function useCollectionEntry() {
       pendingAmount: dashboard.totalPendingAmount,
       pendingApproval: dashboard.pendingApproval,
       approvedCollections: dashboard.approvedCollections,
-      weeklyPending, // optional, but can be added
+      weeklyPending,
     }),
     [
       openingBalance,
@@ -247,9 +260,8 @@ export default function useCollectionEntry() {
     if (!entry.collectorName) return true;
     if (!entry.paymentModeName) return true;
     if (Number(entry.amount) <= 0) return true;
-    if (Number(entry.amount) > currentPending) return true;
     return false;
-  }, [pendingShop, entry, currentPending]);
+  }, [pendingShop, entry]);
 
   function updateEntry<K extends keyof CollectionEntry>(field: K, value: CollectionEntry[K]) {
     setEntry((prev) => ({ ...prev, [field]: value }));
@@ -290,9 +302,6 @@ export default function useCollectionEntry() {
     if (Number(entry.amount) <= 0) {
       validation.amount = "Collection amount should be greater than zero.";
     }
-    if (Number(entry.amount) > currentPending) {
-      validation.amount = "Collection amount cannot exceed pending amount.";
-    }
 
     setErrors(validation);
     return Object.keys(validation).length === 0;
@@ -303,43 +312,22 @@ export default function useCollectionEntry() {
     try {
       setIsSaving(true);
       const success = collectionService.saveCollection(entry);
-      if (!success) return;
+      if (!success) {
+        showNotification("Failed to save collection.", "error");
+        return;
+      }
+      showNotification("Collection saved successfully!", "success");
 
       const pending = collectionService.getPendingCollections();
       setPendingCollections(pending);
       setRecentCollections(collectionService.getRecentCollections(statusFilter));
+      setAllCollections(collectionService.getCollections()); // ← refresh all
 
-      setEntry({
-        collectionId: "",
-        collectionNo: "",
-        collectionDate: new Date().toISOString().split("T")[0],
-        shopName: entry.shopName,
-        collectorName: entry.collectorName,
-        paymentModeName: entry.paymentModeName,
-        referenceNo: "",
-        amount: 0,
-        remarks: ""
-      });
-
-      if (pendingShop) {
-        const { totalSales, totalCollections, currentPending } = computeShopTotals(pendingShop.shopName);
-        const updatedShop = {
-          ...pendingShop,
-          totalSales,
-          totalCollections,
-          currentPending,
-        };
-        setPendingShop(updatedShop);
-        setShowSummary(true);
-      } else {
-        setPendingShop(null);
-        setShowSummary(false);
-      }
-
+      resetEntry();
       setErrors({});
       setIsEditing(false);
     } catch (error) {
-      console.error("Failed to save collection.", error);
+      showNotification("Failed to save collection.", "error");
     } finally {
       setIsSaving(false);
     }
@@ -357,31 +345,43 @@ export default function useCollectionEntry() {
 
   function approveCollection(id: string) {
     const success = collectionService.approveCollection(id, "Admin");
-    if (!success) return;
-    refreshPage();
+    if (success) {
+      showNotification("Collection approved successfully!", "success");
+      refreshPage();
+    } else {
+      showNotification("Failed to approve collection.", "error");
+    }
   }
 
   function deleteCollection(id: string) {
     const success = collectionService.deleteCollection(id);
-    if (!success) {
-      alert("This collection can no longer be deleted.");
-      return;
+    if (success) {
+      showNotification("Collection deleted successfully!", "success");
+      refreshPage();
+    } else {
+      showNotification("This collection can no longer be deleted.", "error");
     }
-    refreshPage();
   }
 
+  // ✅ REFRESH – now updates allCollections
   function refreshPage() {
     const pending = collectionService.getPendingCollections();
+    const all = collectionService.getCollections();
     setPendingCollections(pending);
     setRecentCollections(collectionService.getRecentCollections(statusFilter));
+    setAllCollections(all); // ← key fix
     if (pending.length > 0) {
       const selected = pending.find((shop) => shop.shopName === entry.shopName);
-      if (selected) setPendingShop(selected);
+      if (selected) {
+        const { totalSales, totalCollections, currentPending } = computeShopTotals(selected.shopName);
+        setPendingShop({ ...selected, totalSales, totalCollections, currentPending });
+      }
     }
   }
 
   function reloadCollections() {
     loadMasterData();
+    showNotification("Collections reloaded.", "info");
   }
 
   function editCollection(collection: RecentCollection) {
@@ -435,9 +435,10 @@ export default function useCollectionEntry() {
       remarks: entry.remarks
     });
     if (!success) {
-      alert("Edit is allowed only within 10 days.");
+      showNotification("Edit is allowed only within 10 days.", "error");
       return;
     }
+    showNotification("Collection updated successfully!", "success");
     refreshPage();
     resetEntry();
     setIsEditing(false);
@@ -477,7 +478,11 @@ export default function useCollectionEntry() {
 
   const formStatus = useMemo(() => {
     if (!pendingShop) return { title: "No Shop Selected", message: "Select a pending shop.", status: "empty" };
-    if (remainingBalance === 0) {
+    const rem = remainingBalance;
+    if (rem < 0) {
+      return { title: "Overpaid", message: "Shop has paid more than outstanding.", status: "overpaid" };
+    }
+    if (rem === 0) {
       return { title: "Collection Complete", message: "Outstanding amount fully collected.", status: "completed" };
     }
     return { title: "Pending Collection", message: "Outstanding balance available.", status: "pending" };
@@ -585,7 +590,7 @@ export default function useCollectionEntry() {
     showSummary,
     weeklySales,
     weeklyCollections,
-    weeklyPending,        // ✅ new
+    weeklyPending,
     weekRangeFormatted,
     recentCollections: paginatedCollections,
     selectedShopCollections,
@@ -617,6 +622,7 @@ export default function useCollectionEntry() {
     hasRecentCollections,
     noPendingShops,
     noRecentCollections,
-    actions
+    actions,
+    allCollections, // ← exposed
   };
 }

@@ -6,30 +6,22 @@ import type { PendingCollection, Collection } from "../types/collection";
 import { EditCollectionModal } from "../components/pending/EditCollectionModal";
 import { useShopSearch } from "../../../../core/hooks/useShopSearch";
 import {
-  Store,
-  IndianRupee,
-  Clock,
-  TrendingUp,
-  Eye,
-  Pencil,
-  Trash2,
   FileSpreadsheet,
   FileText,
   X,
   Filter,
   RotateCcw,
-  Calendar,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-  }).format(amount);
+import OutstandingSummary from "../components/entry/OutstandingSummary";
+import { PendingKPICards } from "../components/pending/PendingKPICards";
+import { PendingTable } from "../components/pending/PendingTable";
+import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import { DatePicker } from "../../../../components/common/DatePicker"; // <-- imported DatePicker
 
 const formatDate = (dateStr: string) => {
   if (!dateStr || dateStr === "-") return "-";
@@ -37,14 +29,40 @@ const formatDate = (dateStr: string) => {
   return d.toLocaleDateString("en-IN");
 };
 
+const getAllShopSales = () => {
+  try {
+    const raw = localStorage.getItem("shopSales");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const getCurrentWeekRange = () => {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? 6 : day - 1;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - diff);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  return { monday, sunday };
+};
+
+const PAGE_SIZE = 15;
+
 export default function PendingCollectionsPage() {
+  const { showNotification } = useSafeNotification();
+
   const [pendingData, setPendingData] = useState<PendingCollection[]>([]);
   const [allCollections, setAllCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const { shops } = useShops();
   const allShopNames = shops.map((s) => s.shopName).sort();
 
-  const tableRef = useRef<HTMLTableElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const { employees } = useEmployees();
   const collectors = useMemo(
@@ -66,23 +84,55 @@ export default function PendingCollectionsPage() {
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [recoveryThreshold, setRecoveryThreshold] = useState(0);
 
-  // Modal state
+  // ---- Selection state for table toolbar ----
+  const [selectedShopName, setSelectedShopName] = useState<string | null>(null);
+
+  // ---- Pagination ----
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // ---- Modal state ----
   const [selectedShop, setSelectedShop] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editMode, setEditMode] = useState<"view" | "edit">("view");
 
+  const [summary, setSummary] = useState({
+    openingBalance: 0,
+    weeklySales: 0,
+    weeklyCollections: 0,
+    currentPending: 0,
+    shopName: "",
+    dateRange: "",
+    showSummary: false,
+  });
+
   // Load data
   useEffect(() => {
     const loadData = () => {
-      const pending = collectionService.getPendingCollections();
-      const all = collectionService.getCollections();
-      setPendingData(pending);
-      setAllCollections(all);
-      setLoading(false);
+      try {
+        const pending = collectionService.getPendingCollections();
+        const all = collectionService.getCollections();
+        setPendingData(pending);
+        setAllCollections(all);
+        setLoading(false);
+      } catch (error) {
+        showNotification("Failed to load data", "error");
+        setLoading(false);
+      }
     };
     loadData();
     window.addEventListener("storage", loadData);
     return () => window.removeEventListener("storage", loadData);
+  }, [showNotification]);
+
+  // ---- Click outside to deselect ----
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tableRef.current && !tableRef.current.contains(event.target as Node)) {
+        setSelectedShopName(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // ---- Filtered & sorted data ----
@@ -100,11 +150,10 @@ export default function PendingCollectionsPage() {
         const shopCollections = allCollections
           .filter((c) => c.shopName === shop.shopName)
           .sort((a, b) => {
-      // Use collectionDate as primary, fallback to createdDate
-      const dateA = a.collectionDate || a.createdDate || '';
-      const dateB = b.collectionDate || b.createdDate || '';
-      return dateB.localeCompare(dateA);
-    });
+            const dateA = a.collectionDate || a.createdDate || '';
+            const dateB = b.collectionDate || b.createdDate || '';
+            return dateB.localeCompare(dateA);
+          });
         if (shopCollections.length === 0) return false;
         return shopCollections[0].collectorName === collector;
       });
@@ -148,33 +197,160 @@ export default function PendingCollectionsPage() {
     return data;
   }, [pendingData, shopName, collector, fromDate, toDate, asOnDate, sortBy, allCollections, recoveryThreshold]);
 
-  // ---- Summary stats ----
-  const totalShops = filteredData.length;
-  const totalPending = filteredData.reduce((sum, s) => sum + s.currentPending, 0);
-  const overdueShops = filteredData.filter((s) => s.overdueDays > 0).length;
-  const totalSales = filteredData.reduce((sum, s) => sum + s.totalSales, 0);
-  const totalCollections = filteredData.reduce((sum, s) => sum + s.totalCollections, 0);
-  const overallRecovery = totalSales > 0 ? (totalCollections / totalSales) * 100 : 0;
+  // ---- Pagination ----
+  const totalItems = filteredData.length;
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE) || 1;
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredData.slice(start, start + PAGE_SIZE);
+  }, [filteredData, currentPage]);
 
-  // ---- Helper: Get latest collection for a shop ----
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [shopName, collector, fromDate, toDate, asOnDate, sortBy, recoveryThreshold]);
+
+  // ---- Summary stats ----
+  const totalPending = filteredData.reduce((sum, s) => sum + s.currentPending, 0);
+
+  // ---- Weekly Stats for KPI ----
+  const weeklyStats = useMemo(() => {
+    const { monday, sunday } = getCurrentWeekRange();
+
+    const sales = getAllShopSales();
+    let weeklySales = 0;
+    const shopSet = new Set<string>();
+    sales.forEach((s: any) => {
+      const saleDate = new Date(s.tripDate);
+      if (saleDate >= monday && saleDate <= sunday) {
+        weeklySales += Number(s.amount) || 0;
+        shopSet.add(s.shopName);
+      }
+    });
+
+    let weeklyCollections = 0;
+    allCollections.forEach((c) => {
+      const colDate = new Date(c.collectionDate);
+      if (colDate >= monday && colDate <= sunday && c.status === "Approved") {
+        weeklyCollections += Number(c.amount) || 0;
+      }
+    });
+
+    let weeklyPending = 0;
+    pendingData.forEach(shop => {
+      if (shopSet.has(shop.shopName)) {
+        weeklyPending += shop.currentPending;
+      }
+    });
+
+    return { weeklySales, weeklyCollections, weeklyPending };
+  }, [pendingData, allCollections]);
+
+  const weeklyRecovery = weeklyStats.weeklySales > 0
+    ? (weeklyStats.weeklyCollections / weeklyStats.weeklySales) * 100
+    : 0;
+
+  // ---- Weekly maps for table ----
+  const weeklySalesMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    const { monday, sunday } = getCurrentWeekRange();
+    const sales = getAllShopSales();
+    sales.forEach((s: any) => {
+      const saleDate = new Date(s.tripDate);
+      if (saleDate >= monday && saleDate <= sunday) {
+        map[s.shopName] = (map[s.shopName] || 0) + Number(s.amount);
+      }
+    });
+    return map;
+  }, []);
+
+  const weeklyCollectionsMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    const { monday, sunday } = getCurrentWeekRange();
+    allCollections.forEach((c) => {
+      const colDate = new Date(c.collectionDate);
+      if (colDate >= monday && colDate <= sunday && c.status === "Approved") {
+        map[c.shopName] = (map[c.shopName] || 0) + Number(c.amount);
+      }
+    });
+    return map;
+  }, [allCollections]);
+
+  // ---- Grand totals for footer (across all filtered data) ----
+  const grandTotalPending = filteredData.reduce((sum, s) => sum + s.currentPending, 0);
+  const grandTotalWeeklySales = filteredData.reduce(
+    (sum, s) => sum + (weeklySalesMap[s.shopName] || 0),
+    0
+  );
+  const grandTotalWeeklyCollections = filteredData.reduce(
+    (sum, s) => sum + (weeklyCollectionsMap[s.shopName] || 0),
+    0
+  );
+
+  // ---- Period maps for Recovery % ----
+  const periodSalesMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    const from = fromDate ? new Date(fromDate) : null;
+    const to = toDate ? new Date(toDate) : null;
+    const sales = getAllShopSales();
+    sales.forEach((s: any) => {
+      const saleDate = new Date(s.tripDate);
+      if (from && saleDate < from) return;
+      if (to && saleDate > to) return;
+      map[s.shopName] = (map[s.shopName] || 0) + Number(s.amount);
+    });
+    return map;
+  }, [fromDate, toDate]);
+
+  const periodCollectionsMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    const from = fromDate ? new Date(fromDate) : null;
+    const to = toDate ? new Date(toDate) : null;
+    allCollections.forEach((c) => {
+      const colDate = new Date(c.collectionDate);
+      if (from && colDate < from) return;
+      if (to && colDate > to) return;
+      if (c.status === "Approved") {
+        map[c.shopName] = (map[c.shopName] || 0) + Number(c.amount);
+      }
+    });
+    return map;
+  }, [allCollections, fromDate, toDate]);
+
+  // ---- Helpers ----
   const getLatestCollection = (shopName: string): Collection | null => {
     const shopCollections = allCollections
       .filter((c) => c.shopName === shopName)
       .sort((a, b) => {
-      // Use collectionDate as primary, fallback to createdDate
-      const dateA = a.collectionDate || a.createdDate || '';
-      const dateB = b.collectionDate || b.createdDate || '';
-      return dateB.localeCompare(dateA);
-    });
+        const dateA = a.collectionDate || a.createdDate || '';
+        const dateB = b.collectionDate || b.createdDate || '';
+        return dateB.localeCompare(dateA);
+      });
     return shopCollections.length > 0 ? shopCollections[0] : null;
   };
 
-  // ---- Helper: Check if collection is editable (within 10 days) ----
   const isCollectionEditable = (createdDate: string): boolean => {
     const now = new Date();
     const created = new Date(createdDate);
     const diffDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
     return diffDays <= 10;
+  };
+
+  const updateSummaryForShop = (shopName: string) => {
+    const shopData = pendingData.find((s) => s.shopName === shopName);
+    if (!shopData) {
+      setSummary((prev) => ({ ...prev, showSummary: false }));
+      return;
+    }
+    setSummary({
+      openingBalance: shopData.totalSales,
+      weeklySales: shopData.totalSales,
+      weeklyCollections: shopData.totalCollections,
+      currentPending: shopData.currentPending,
+      shopName: shopData.shopName,
+      dateRange: `As on ${asOnDate}`,
+      showSummary: true,
+    });
   };
 
   // ---- Export helpers ----
@@ -190,7 +366,7 @@ export default function PendingCollectionsPage() {
 
   const exportExcel = () => {
     if (filteredData.length === 0) {
-      alert("No data to export.");
+      showNotification("No data to export.", "info");
       return;
     }
 
@@ -227,11 +403,12 @@ export default function PendingCollectionsPage() {
     ];
     XLSX.utils.book_append_sheet(wb, ws, "Pending Collections");
     XLSX.writeFile(wb, getExportFileName("xlsx"));
+    showNotification("Excel exported successfully!", "success");
   };
 
   const exportPDF = () => {
     if (filteredData.length === 0) {
-      alert("No data to export.");
+      showNotification("No data to export.", "info");
       return;
     }
 
@@ -306,6 +483,7 @@ export default function PendingCollectionsPage() {
     });
 
     doc.save(getExportFileName("pdf"));
+    showNotification("PDF exported successfully!", "success");
   };
 
   // ---- CRUD Handlers ----
@@ -313,38 +491,43 @@ export default function PendingCollectionsPage() {
     setSelectedShop(shopName);
     setEditMode("view");
     setIsEditModalOpen(true);
+    updateSummaryForShop(shopName);
   };
 
   const handleEdit = (shopName: string) => {
     const latest = getLatestCollection(shopName);
     if (!latest) {
-      alert("No collection to edit.");
+      showNotification("No collection to edit.", "error");
       return;
     }
     setSelectedShop(shopName);
     setEditMode(isCollectionEditable(latest.collectionDate) ? "edit" : "view");
     setIsEditModalOpen(true);
+    updateSummaryForShop(shopName);
   };
 
   const handleDelete = (shopName: string) => {
     const latest = getLatestCollection(shopName);
     if (!latest) {
-      alert("No collection to delete.");
+      showNotification("No collection to delete.", "error");
       return;
     }
     const now = new Date();
     const created = new Date(latest.createdDate);
     const diffDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays > 10) {
-      alert("Cannot delete – collection is older than 10 days.");
+      showNotification("Cannot delete – collection is older than 10 days.", "error");
       return;
     }
     if (window.confirm(`Delete collection for ${shopName}?`)) {
       const success = collectionService.deleteCollection(latest.id);
       if (success) {
         refreshData();
+        setSummary((prev) => ({ ...prev, showSummary: false }));
+        setSelectedShopName(null);
+        showNotification("Collection deleted successfully.", "success");
       } else {
-        alert("Delete failed.");
+        showNotification("Delete failed.", "error");
       }
     }
   };
@@ -352,13 +535,21 @@ export default function PendingCollectionsPage() {
   const closeModal = () => {
     setIsEditModalOpen(false);
     setSelectedShop(null);
+    setSummary((prev) => ({ ...prev, showSummary: false }));
   };
 
   const refreshData = () => {
-    const pending = collectionService.getPendingCollections();
-    const all = collectionService.getCollections();
-    setPendingData(pending);
-    setAllCollections(all);
+    try {
+      const pending = collectionService.getPendingCollections();
+      const all = collectionService.getCollections();
+      setPendingData(pending);
+      setAllCollections(all);
+      if (selectedShop) {
+        updateSummaryForShop(selectedShop);
+      }
+    } catch (error) {
+      showNotification("Failed to refresh data.", "error");
+    }
   };
 
   const resetFilters = () => {
@@ -370,16 +561,39 @@ export default function PendingCollectionsPage() {
     setSortBy("highestBalance");
     setRecoveryThreshold(0);
     shopSearch.setQuery("");
+    setSummary((prev) => ({ ...prev, showSummary: false }));
+    setSelectedShopName(null);
+    setCurrentPage(1);
   };
 
   const shopSearch = useShopSearch(allShopNames, shopName, setShopName);
 
   if (loading) return <div className="p-8 text-center text-slate-500">Loading...</div>;
 
+  const goToPreviousPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
+
   return (
-    <div className="p-6">
+    <div className="p-2 space-y-4">
+      {summary.showSummary && (
+        <OutstandingSummary
+          openingBalance={summary.openingBalance}
+          weeklySales={summary.weeklySales}
+          weeklyCollections={summary.weeklyCollections}
+          currentPending={summary.currentPending}
+          shopName={summary.shopName}
+          dateRange={summary.dateRange}
+          showSummary={summary.showSummary}
+        />
+      )}
+
       {/* Action Buttons */}
-      <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <button
           onClick={exportExcel}
           className="inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700"
@@ -401,19 +615,17 @@ export default function PendingCollectionsPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="mb-6 rounded-lg border border-green-200 bg-white p-4 shadow">
+      <div className="rounded-lg border border-green-200 bg-white p-4 shadow">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-3">
-          {/* As On Date */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">As On Date *</label>
-            <input
-              type="date"
+            <DatePicker
               value={asOnDate}
-              onChange={(e) => setAsOnDate(e.target.value)}
-              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500"
+              onChange={(value) => setAsOnDate(value)}
+              placeholder="Select date"
+              className="w-full"
             />
           </div>
-          {/* Shop Name */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Shop Name</label>
             <div className="relative">
@@ -444,7 +656,6 @@ export default function PendingCollectionsPage() {
               )}
             </div>
           </div>
-          {/* Sort By */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Sort By</label>
             <select
@@ -480,35 +691,27 @@ export default function PendingCollectionsPage() {
 
         {showMoreFilters && (
           <div className="mt-4 grid grid-cols-1 gap-4 border-t border-green-200 pt-4 lg:grid-cols-3">
-            {/* Left Column: From Date & To Date stacked vertically */}
             <div className="space-y-4">
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">From Date</label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="h-10 w-full rounded-md border border-slate-300 pl-3 pr-10 text-sm outline-none focus:border-green-500"
-                  />
-                  <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500" size={18} />
-                </div>
+                <DatePicker
+                  value={fromDate}
+                  onChange={(value) => setFromDate(value)}
+                  placeholder="From date"
+                  className="w-full"
+                />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">To Date</label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="h-10 w-full rounded-md border border-slate-300 pl-3 pr-10 text-sm outline-none focus:border-green-500"
-                  />
-                  <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500" size={18} />
-                </div>
+                <DatePicker
+                  value={toDate}
+                  onChange={(value) => setToDate(value)}
+                  placeholder="To date"
+                  className="w-full"
+                />
               </div>
             </div>
 
-            {/* Middle Column: Collector */}
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Collector</label>
               <select
@@ -523,7 +726,6 @@ export default function PendingCollectionsPage() {
               </select>
             </div>
 
-            {/* Right Column: Recovery card – unchanged */}
             <div className="rounded-xl border border-green-200 bg-gradient-to-br from-white to-green-50 p-4 shadow-sm">
               <div className="mb-4 flex items-center justify-between">
                 <div>
@@ -556,140 +758,68 @@ export default function PendingCollectionsPage() {
         )}
       </div>
 
-      {/* Summary Cards */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="flex items-center gap-4 rounded-lg border border-green-200 bg-white p-4 shadow">
-          <div className="rounded-full bg-green-100 p-3 text-green-600">
-            <Store size={24} />
-          </div>
-          <div>
-            <div className="text-sm font-medium text-slate-500">Total Shops</div>
-            <div className="text-2xl font-bold text-slate-800">{totalShops}</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 rounded-lg border border-green-200 bg-white p-4 shadow">
-          <div className="rounded-full bg-green-100 p-3 text-green-600">
-            <IndianRupee size={24} />
-          </div>
-          <div>
-            <div className="text-sm font-medium text-slate-500">Total Pending</div>
-            <div className="text-2xl font-bold text-red-600">{formatCurrency(totalPending)}</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 rounded-lg border border-green-200 bg-white p-4 shadow">
-          <div className="rounded-full bg-green-100 p-3 text-green-600">
-            <Clock size={24} />
-          </div>
-          <div>
-            <div className="text-sm font-medium text-slate-500">Shops Overdue</div>
-            <div className="text-2xl font-bold text-orange-600">{overdueShops}</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 rounded-lg border border-green-200 bg-white p-4 shadow">
-          <div className="rounded-full bg-green-100 p-3 text-green-600">
-            <TrendingUp size={24} />
-          </div>
-          <div>
-            <div className="text-sm font-medium text-slate-500">Recovery %</div>
-            <div className="text-2xl font-bold text-green-600">{overallRecovery.toFixed(2)}%</div>
-          </div>
-        </div>
-      </div>
+      {/* KPI Cards */}
+      <PendingKPICards
+        totalPending={totalPending}
+        weeklySales={weeklyStats.weeklySales}
+        weeklyCollections={weeklyStats.weeklyCollections}
+        weeklyRecovery={weeklyRecovery}
+      />
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-green-200 bg-white shadow">
-        <table ref={tableRef} id="pending-table" className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-green-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-600">#</th>
-              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-600">Shop Name</th>
-              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-600">Last Collection</th>
-              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-600">Total Sales</th>
-              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-600">Total Collections</th>
-              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-600">Pending</th>
-              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-600">Recovery %</th>
-              <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-slate-600">Overdue (Days)</th>
-              <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-slate-600">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200 bg-white">
-            {filteredData.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
-                  No pending collections found.
-                </td>
-              </tr>
-            ) : (
-              filteredData.map((shop, idx) => {
-                const recovery = shop.totalSales > 0
-                  ? (shop.totalCollections / shop.totalSales) * 100
-                  : 0;
-                const latest = getLatestCollection(shop.shopName);
-                const hasCollection = latest !== null;
-                const isEditable = hasCollection && isCollectionEditable(latest!.createdDate);
+      {/* Table with toolbar and selection */}
+      <div ref={tableRef}>
+        <PendingTable
+          data={paginatedData}
+          selectedShopName={selectedShopName}
+          onSelectShop={setSelectedShopName}
+          weeklySalesMap={weeklySalesMap}
+          weeklyCollectionsMap={weeklyCollectionsMap}
+          periodSalesMap={periodSalesMap}
+          periodCollectionsMap={periodCollectionsMap}
+          onView={handleView}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          grandTotalPending={grandTotalPending}
+          grandTotalWeeklySales={grandTotalWeeklySales}
+          grandTotalWeeklyCollections={grandTotalWeeklyCollections}
+        />
 
-                return (
-                  <tr key={shop.shopName} className="hover:bg-green-50">
-                    <td className="px-4 py-3 text-sm text-slate-600">{idx + 1}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-slate-800">{shop.shopName}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{formatDate(shop.lastCollectionDate)}</td>
-                    <td className="px-4 py-3 text-right text-sm text-slate-600">{formatCurrency(shop.totalSales)}</td>
-                    <td className="px-4 py-3 text-right text-sm text-slate-600">{formatCurrency(shop.totalCollections)}</td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-red-600">{formatCurrency(shop.currentPending)}</td>
-                    <td className="px-4 py-3 text-right text-sm text-slate-600">{recovery.toFixed(2)}%</td>
-                    <td className="px-4 py-3 text-center text-sm">
-                      <span
-                        className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                          shop.overdueDays > 7
-                            ? "bg-red-100 text-red-700"
-                            : shop.overdueDays > 3
-                            ? "bg-orange-100 text-orange-700"
-                            : "bg-green-100 text-green-700"
-                        }`}
-                      >
-                        {shop.overdueDays}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {hasCollection && (
-                          <button
-                            onClick={() => handleView(shop.shopName)}
-                            className="rounded p-1 text-blue-600 hover:bg-blue-50"
-                            title="View"
-                          >
-                            <Eye size={16} />
-                          </button>
-                        )}
-                        {hasCollection && isEditable && (
-                          <button
-                            onClick={() => handleEdit(shop.shopName)}
-                            className="rounded p-1 text-green-600 hover:bg-green-50"
-                            title="Edit"
-                          >
-                            <Pencil size={16} />
-                          </button>
-                        )}
-                        {hasCollection && isEditable && (
-                          <button
-                            onClick={() => handleDelete(shop.shopName)}
-                            className="rounded p-1 text-red-600 hover:bg-red-50"
-                            title="Delete"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        )}
-                        {!hasCollection && (
-                          <span className="text-xs text-slate-400">No collection</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+        {/* Pagination Controls */}
+        {totalItems > 0 && (
+          <div className="flex items-center justify-between rounded-b-lg border border-t-0 border-green-200 bg-white px-4 py-3">
+            <div className="text-sm text-slate-600">
+              Showing {((currentPage - 1) * PAGE_SIZE) + 1} to{" "}
+              {Math.min(currentPage * PAGE_SIZE, totalItems)} of {totalItems} entries
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={goToPreviousPage}
+                disabled={currentPage === 1}
+                className={`rounded-md p-2 transition ${
+                  currentPage === 1
+                    ? "cursor-not-allowed text-slate-300"
+                    : "text-slate-700 hover:bg-green-50"
+                }`}
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <span className="text-sm font-medium text-slate-700">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages}
+                className={`rounded-md p-2 transition ${
+                  currentPage === totalPages
+                    ? "cursor-not-allowed text-slate-300"
+                    : "text-slate-700 hover:bg-green-50"
+                }`}
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {selectedShop && (

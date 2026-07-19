@@ -14,6 +14,7 @@ import {
   Home,
   Users,
 } from "lucide-react";
+import { DatePicker } from "../../../../components/common/DatePicker"; // ✅ added import
 
 type EmployeeFormProps = {
   employee?: Employee | null;
@@ -111,7 +112,6 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
       return;
     }
 
-    // ✅ Aadhar validation: exactly 12 digits if provided
     if (aadharNumber && !/^[0-9]{12}$/.test(aadharNumber)) {
       showNotification("Aadhar Number must be exactly 12 digits.", "error");
       return;
@@ -279,18 +279,18 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
             </div>
           </div>
 
-          {/* Joining Date */}
+          {/* ✅ Joining Date – now using DatePicker */}
           <div className="relative">
             <label className="block mb-1.5 text-sm font-medium text-slate-700">
               Joining Date
             </label>
             <div className="relative">
               <Calendar className={iconWrapperClass} size={18} />
-              <input
-                type="date"
+              <DatePicker
                 value={joiningDate}
-                onChange={(e) => setJoiningDate(e.target.value)}
-                className={`${inputClass()} [&::-webkit-calendar-picker-indicator]:opacity-60 [&::-webkit-calendar-picker-indicator]:hover:opacity-100`}
+                onChange={setJoiningDate}
+                placeholder="Select joining date"
+                className="w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition border-slate-200 bg-white"
               />
             </div>
           </div>

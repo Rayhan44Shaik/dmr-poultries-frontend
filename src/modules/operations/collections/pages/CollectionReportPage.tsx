@@ -7,7 +7,6 @@ import {
   FileSpreadsheet,
   FileText,
   RotateCcw,
-  Calendar,
   Wallet,
   Users,
   X,
@@ -16,6 +15,8 @@ import {
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import { DatePicker } from "../../../../components/common/DatePicker"; // <-- imported
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -33,7 +34,23 @@ const getBarColor = (percentage: number) => {
 
 const KNOWN_MODES = ["Cash", "Union Bank", "HDFC Bank"];
 
+// Helper to get current week's Monday and Sunday
+const getCurrentWeekRange = () => {
+  const now = new Date();
+  const day = now.getDay(); // 0 = Sunday, 1 = Monday ...
+  const diff = (day === 0 ? 6 : day - 1); // Monday offset
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - diff);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  return { monday, sunday };
+};
+
 export default function CollectionReportPage() {
+  const { showNotification } = useSafeNotification();
+
   const [allCollections, setAllCollections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { shops } = useShops();
@@ -49,9 +66,13 @@ export default function CollectionReportPage() {
     [employees]
   );
 
-  // Filter state
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  // ---- Filter state ----
+  const { monday, sunday } = getCurrentWeekRange();
+  const defaultFromDate = monday.toISOString().split("T")[0];
+  const defaultToDate = sunday.toISOString().split("T")[0];
+
+  const [fromDate, setFromDate] = useState(defaultFromDate);
+  const [toDate, setToDate] = useState(defaultToDate);
   const [shopName, setShopName] = useState("");
   const [collector, setCollector] = useState("");
   const [paymentMode, setPaymentMode] = useState("");
@@ -59,14 +80,19 @@ export default function CollectionReportPage() {
   // Load data
   useEffect(() => {
     const loadData = () => {
-      const all = collectionService.getCollections();
-      setAllCollections(all);
-      setLoading(false);
+      try {
+        const all = collectionService.getCollections();
+        setAllCollections(all);
+        setLoading(false);
+      } catch (error) {
+        showNotification("Failed to load collection data.", "error");
+        setLoading(false);
+      }
     };
     loadData();
     window.addEventListener("storage", loadData);
     return () => window.removeEventListener("storage", loadData);
-  }, []);
+  }, [showNotification]);
 
   // ---- Filtered data (only Approved) ----
   const filteredData = useMemo(() => {
@@ -231,104 +257,115 @@ export default function CollectionReportPage() {
 
   const exportExcel = () => {
     if (filteredData.length === 0) {
-      alert("No data to export.");
+      showNotification("No data to export.", "error");
       return;
     }
-    const wb = XLSX.utils.book_new();
+    try {
+      const wb = XLSX.utils.book_new();
 
-    const pmData = paymentModeSummary.map((row) => ({
-      "Payment Mode": row.mode,
-      "No. of Collections": row.count,
-      "Amount Received": row.amount,
-      "Percentage (%)": row.percentage.toFixed(2),
-    }));
-    const ws1 = XLSX.utils.json_to_sheet(pmData);
-    XLSX.utils.book_append_sheet(wb, ws1, "Payment Mode Summary");
+      const pmData = paymentModeSummary.map((row) => ({
+        "Payment Mode": row.mode,
+        "No. of Collections": row.count,
+        "Amount Received": row.amount,
+        "Percentage (%)": row.percentage.toFixed(2),
+      }));
+      const ws1 = XLSX.utils.json_to_sheet(pmData);
+      XLSX.utils.book_append_sheet(wb, ws1, "Payment Mode Summary");
 
-    const collectorRows = collectorSummary.rows.map((row: any) => {
-      const obj: any = { Collector: row.collector };
-      collectorSummary.paymentModes.forEach((mode: string) => {
-        obj[mode] = row[mode] || 0;
+      const collectorRows = collectorSummary.rows.map((row: any) => {
+        const obj: any = { Collector: row.collector };
+        collectorSummary.paymentModes.forEach((mode: string) => {
+          obj[mode] = row[mode] || 0;
+        });
+        obj["Total"] = row.total;
+        return obj;
       });
-      obj["Total"] = row.total;
-      return obj;
-    });
-    const ws2 = XLSX.utils.json_to_sheet(collectorRows);
-    XLSX.utils.book_append_sheet(wb, ws2, "Collector Summary");
+      const ws2 = XLSX.utils.json_to_sheet(collectorRows);
+      XLSX.utils.book_append_sheet(wb, ws2, "Collector Summary");
 
-    XLSX.writeFile(wb, getExportFileName("xlsx"));
+      XLSX.writeFile(wb, getExportFileName("xlsx"));
+      showNotification("Excel exported successfully!", "success");
+    } catch (error) {
+      showNotification("Failed to export Excel.", "error");
+    }
   };
 
   const exportPDF = () => {
     if (filteredData.length === 0) {
-      alert("No data to export.");
+      showNotification("No data to export.", "error");
       return;
     }
-    const doc = new jsPDF("p", "mm", "a4");
-    const margin = 14;
-    let y = 20;
+    try {
+      const doc = new jsPDF("p", "mm", "a4");
+      const margin = 14;
+      let y = 20;
 
-    doc.setFontSize(16);
-    doc.setTextColor(30, 58, 138);
-    doc.text("Collection Report", margin, y);
-    y += 10;
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    doc.text(`Period: ${fromDate || "N/A"} to ${toDate || "N/A"}`, margin, y);
-    y += 10;
+      doc.setFontSize(16);
+      doc.setTextColor(30, 58, 138);
+      doc.text("Collection Report", margin, y);
+      y += 10;
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Period: ${fromDate || "N/A"} to ${toDate || "N/A"}`, margin, y);
+      y += 10;
 
-    doc.setFontSize(12);
-    doc.setTextColor(30, 58, 138);
-    doc.text("Collection Summary by Payment Mode", margin, y);
-    y += 5;
-    const pmData = paymentModeSummary.map((row) => [
-      row.mode,
-      row.count.toString(),
-      row.amount.toFixed(2),
-      row.percentage.toFixed(2) + "%",
-    ]);
-    autoTable(doc, {
-      head: [["Payment Mode", "No. of Collections", "Amount Received", "Percentage (%)"]],
-      body: pmData,
-      startY: y,
-      theme: "striped",
-      headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: "bold" },
-      styles: { fontSize: 8 },
-    });
-    y = (doc as any).lastAutoTable.finalY + 10;
-
-    doc.setFontSize(12);
-    doc.setTextColor(30, 58, 138);
-    doc.text("Collection Summary by Collector", margin, y);
-    y += 5;
-    const header = ["Collector", ...collectorSummary.paymentModes, "Total"];
-    const body = collectorSummary.rows.map((row: any) => {
-      const rowData: any[] = [row.collector];
-      collectorSummary.paymentModes.forEach((mode: string) => {
-        rowData.push(row[mode] ? row[mode].toFixed(2) : "0.00");
+      doc.setFontSize(12);
+      doc.setTextColor(30, 58, 138);
+      doc.text("Collection Summary by Payment Mode", margin, y);
+      y += 5;
+      const pmData = paymentModeSummary.map((row) => [
+        row.mode,
+        row.count.toString(),
+        row.amount.toFixed(2),
+        row.percentage.toFixed(2) + "%",
+      ]);
+      autoTable(doc, {
+        head: [["Payment Mode", "No. of Collections", "Amount Received", "Percentage (%)"]],
+        body: pmData,
+        startY: y,
+        theme: "striped",
+        headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: "bold" },
+        styles: { fontSize: 8 },
       });
-      rowData.push(row.total.toFixed(2));
-      return rowData;
-    });
-    autoTable(doc, {
-      head: [header],
-      body: body,
-      startY: y,
-      theme: "striped",
-      headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: "bold" },
-      styles: { fontSize: 8 },
-    });
+      y = (doc as any).lastAutoTable.finalY + 10;
 
-    doc.save(getExportFileName("pdf"));
+      doc.setFontSize(12);
+      doc.setTextColor(30, 58, 138);
+      doc.text("Collection Summary by Collector", margin, y);
+      y += 5;
+      const header = ["Collector", ...collectorSummary.paymentModes, "Total"];
+      const body = collectorSummary.rows.map((row: any) => {
+        const rowData: any[] = [row.collector];
+        collectorSummary.paymentModes.forEach((mode: string) => {
+          rowData.push(row[mode] ? row[mode].toFixed(2) : "0.00");
+        });
+        rowData.push(row.total.toFixed(2));
+        return rowData;
+      });
+      autoTable(doc, {
+        head: [header],
+        body: body,
+        startY: y,
+        theme: "striped",
+        headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: "bold" },
+        styles: { fontSize: 8 },
+      });
+
+      doc.save(getExportFileName("pdf"));
+      showNotification("PDF exported successfully!", "success");
+    } catch (error) {
+      showNotification("Failed to export PDF.", "error");
+    }
   };
 
   const resetFilters = () => {
-    setFromDate("");
-    setToDate("");
+    setFromDate(defaultFromDate);
+    setToDate(defaultToDate);
     setShopName("");
     setCollector("");
     setPaymentMode("");
     shopSearch.setQuery("");
+    showNotification("Filters reset to default (current week).", "info");
   };
 
   const shopSearch = useShopSearch(allShopNames, shopName, setShopName);
@@ -336,9 +373,9 @@ export default function CollectionReportPage() {
   if (loading) return <div className="p-8 text-center text-slate-500">Loading...</div>;
 
   return (
-    <div className="p-6 pb-10">
+    <div className="p-2 space-y-4">
       {/* Action Buttons */}
-      <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <button
           onClick={exportExcel}
           className="inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700"
@@ -360,32 +397,33 @@ export default function CollectionReportPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="mb-6 rounded-lg border border-green-200 bg-white p-4 shadow">
+      <div className="rounded-lg border border-green-200 bg-white p-4 shadow">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* From Date - using DatePicker */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">From Date *</label>
-            <div className="relative">
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="h-10 w-full rounded-md border border-slate-300 pl-3 pr-10 text-sm outline-none focus:border-green-500"
-              />
-              <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500" size={18} />
-            </div>
+            <DatePicker
+              value={fromDate}
+              onChange={setFromDate}
+              label="From Date *"
+              className="w-full"
+              placeholder="Select date"
+              required
+            />
           </div>
+
+          {/* To Date - using DatePicker */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">To Date *</label>
-            <div className="relative">
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="h-10 w-full rounded-md border border-slate-300 pl-3 pr-10 text-sm outline-none focus:border-green-500"
-              />
-              <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500" size={18} />
-            </div>
+            <DatePicker
+              value={toDate}
+              onChange={setToDate}
+              label="To Date *"
+              className="w-full"
+              placeholder="Select date"
+              required
+            />
           </div>
+
+          {/* Shop Name */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Shop Name</label>
             <div className="relative">
@@ -444,6 +482,8 @@ export default function CollectionReportPage() {
               )}
             </div>
           </div>
+
+          {/* Collector */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Collector</label>
             <select
@@ -457,6 +497,8 @@ export default function CollectionReportPage() {
               ))}
             </select>
           </div>
+
+          {/* Payment Mode */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Payment Mode</label>
             <select
@@ -475,7 +517,7 @@ export default function CollectionReportPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-green-200 bg-white p-4 shadow">
           <div className="flex items-center gap-3">
             <div className="rounded-full bg-blue-100 p-2 text-blue-600">
@@ -508,8 +550,8 @@ export default function CollectionReportPage() {
         </div>
       </div>
 
-      {/* Tables */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 mb-6">
+      {/* Tables Grid */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Payment Mode Summary Table */}
         <div className="overflow-x-auto rounded-lg border border-green-200 bg-white shadow">
           <div className="px-4 py-2 border-b border-slate-200">

@@ -43,12 +43,12 @@ const formatLargeNumber = (
   if (abs >= 10000000) {
     return {
       main: (value / 10000000).toFixed(2),
-      suffix: "Crores",
+      suffix: "Cr",
     };
   } else if (abs >= 100000) {
     return {
       main: (value / 100000).toFixed(2),
-      suffix: "Lakhs",
+      suffix: "L",
     };
   } else {
     return {
@@ -150,74 +150,81 @@ const KPICard = memo(function KPICard({
     displaySuffix = formatted.suffix;
   }
 
-  let rangeLabel = "vs Last Week";
+  // Shortened comparison label
+  let rangeLabel = "vs 7d";
   if (rangeDays && rangeDays > 0) {
-    rangeLabel = `vs Last ${rangeDays} day${rangeDays === 1 ? "" : "s"}`;
+    rangeLabel = `vs ${rangeDays}d`;
   }
 
   let badgeClasses =
-    "mt-3 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ";
+    "mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ";
   let iconElement: React.ReactNode = null;
 
   if (isUp) {
     badgeClasses += "bg-green-50 text-green-600";
-    iconElement = <TrendingUp size={12} />;
+    iconElement = <TrendingUp size={10} />;
   } else if (isDown) {
     badgeClasses += "bg-red-50 text-red-500";
-    iconElement = <TrendingDown size={12} />;
+    iconElement = <TrendingDown size={10} />;
   } else {
     badgeClasses += "bg-slate-100 text-slate-500";
     iconElement = <span className="w-3" />;
   }
 
-  const isWeightLarge = label === "Total Weight (KG)" && value >= 100000;
-  const numberSizeClass = isWeightLarge ? "text-xl" : "text-2xl";
+  // ✅ Uniform number size for all cards (no conditional)
+  const numberSizeClass = "text-2xl";
 
   const showBreakdown = label === "Total Expenses" && breakdown;
 
+  // Left content – vertically centered
+  const leftContent = (
+    <div className="flex flex-col justify-center flex-1 min-w-0">
+      <div className="flex items-center gap-1.5">
+        <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${config.bg}`} />
+        <p
+          className="text-xs font-medium text-slate-500 truncate whitespace-nowrap"
+          title={label}
+        >
+          {label}
+        </p>
+      </div>
+
+      <h2
+        className={`mt-0.5 ${numberSizeClass} font-bold leading-none tracking-tight ${config.text}`}
+      >
+        {displayMain}
+        {displaySuffix && (
+          <span className="ml-0.5 text-xs font-medium text-slate-400">
+            {displaySuffix}
+          </span>
+        )}
+      </h2>
+
+      <div className={badgeClasses}>
+        {iconElement}
+        {Math.abs(change).toFixed(1)}%
+        <span className="text-slate-400 font-medium">{rangeLabel}</span>
+      </div>
+    </div>
+  );
+
+  // Card content – smaller icon
   const cardContent = (
-    <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+    <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
       <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-slate-50 opacity-80" />
 
-      <div className="relative flex justify-between items-start">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className={`h-2 w-2 rounded-full flex-shrink-0 ${config.bg}`} />
-            <p
-              className="text-xs font-medium text-slate-500 truncate whitespace-nowrap"
-              title={label}
-            >
-              {label}
-            </p>
-          </div>
-
-          <h2
-            className={`mt-2 ${numberSizeClass} font-bold leading-none tracking-tight ${config.text}`}
-          >
-            {displayMain}
-            {displaySuffix && (
-              <span className="ml-0.5 text-xs font-medium text-slate-400">
-                {displaySuffix}
-              </span>
-            )}
-          </h2>
-
-          <div className={badgeClasses}>
-            {iconElement}
-            {Math.abs(change).toFixed(1)}%
-            <span className="text-slate-400 font-medium">{rangeLabel}</span>
-          </div>
-        </div>
+      <div className="relative flex items-center gap-3">
+        {leftContent}
 
         <div
           className={`
             ${config.bg}
-            h-11 w-11 rounded-xl shadow-md
+            h-9 w-9 rounded-xl shadow-md
             flex items-center justify-center flex-shrink-0
             transition-transform duration-300 group-hover:scale-110
           `}
         >
-          <Icon className="text-white" size={22} />
+          <Icon className="text-white" size={18} />
         </div>
       </div>
     </div>
@@ -228,7 +235,6 @@ const KPICard = memo(function KPICard({
     return (
       <div className="relative cursor-help group">
         {cardContent}
-        {/* Tooltip positioned below the card */}
         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
           <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-4 text-sm">
             <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-2">
@@ -245,7 +251,6 @@ const KPICard = memo(function KPICard({
               </div>
             </div>
           </div>
-          {/* Arrow pointing UP */}
           <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-l border-t border-slate-200 rotate-45"></div>
         </div>
       </div>

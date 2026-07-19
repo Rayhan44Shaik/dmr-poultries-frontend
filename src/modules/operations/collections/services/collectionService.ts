@@ -55,7 +55,8 @@ function getPendingCollections(): PendingCollection[] {
     }
   });
 
-  return Array.from(shopMap.values()).filter(shop => shop.currentPending > 0).sort((a, b) => b.currentPending - a.currentPending);
+  // ✅ REMOVED the filter that excluded zero/negative balances
+  return Array.from(shopMap.values()).sort((a, b) => b.currentPending - a.currentPending);
 }
 
 // --- CRUD Operations ---
@@ -63,7 +64,7 @@ function saveCollection(entry: CollectionEntry): boolean {
   try {
     const collections = getCollections();
     const collection: Collection = {
-      id: Date.now().toString(), // ✅ reliable ID generation (no crypto dependency)
+      id: Date.now().toString(),
       collectionNo: getNextCollectionNumber(),
       collectionDate: entry.collectionDate,
       shopName: entry.shopName,

@@ -1,5 +1,6 @@
 import { Search, FileText, FileSpreadsheet } from "lucide-react";
 import Select from "react-select";
+import { DatePicker } from "../../../../components/common/DatePicker"; // adjust path as needed
 
 interface Props {
   fromDate: string;
@@ -65,24 +66,28 @@ export default function CompletedTripsFilters({
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+        {/* From Date */}
         <div className="md:col-span-2">
           <label className="text-xs font-medium text-slate-500 block mb-1">From Date</label>
-          <input
-            type="date"
+          <DatePicker
             value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+            onChange={setFromDate}
+            placeholder="Select date"
+            className="w-full"
           />
         </div>
+
+        {/* To Date */}
         <div className="md:col-span-2">
           <label className="text-xs font-medium text-slate-500 block mb-1">To Date</label>
-          <input
-            type="date"
+          <DatePicker
             value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+            onChange={setToDate}
+            placeholder="Select date"
+            className="w-full"
           />
         </div>
+
         <div className="md:col-span-3">
           <label className="text-xs font-medium text-slate-500 block mb-1">Vehicle</label>
           <Select

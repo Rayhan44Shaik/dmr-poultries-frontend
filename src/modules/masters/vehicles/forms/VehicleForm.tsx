@@ -12,6 +12,7 @@ import {
   Cpu,
   Calendar,
 } from "lucide-react";
+import { DatePicker } from "../../../../components/common/DatePicker"; // adjust path
 
 type VehicleFormProps = {
   vehicle?: Vehicle | null;
@@ -100,7 +101,6 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
 
   const iconWrapperClass = "absolute left-4 top-1/2 -translate-y-1/2 text-slate-400";
 
-  // ✅ Title now says "Edit Vehicle" when editing
   const title = isEditing ? "Edit Vehicle" : "Add Vehicle";
   const subtitle = isEditing ? "Update information" : "Fill in the information";
 
@@ -110,7 +110,7 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
 
   return (
     <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-      {/* Light header */}
+      {/* Header */}
       <div className="bg-gradient-to-r from-slate-100 to-slate-200/80 px-8 py-5 flex items-center justify-between border-b border-slate-200/60">
         <div className="flex items-center gap-4">
           <div className="bg-blue-100 p-3 rounded-2xl">
@@ -122,7 +122,7 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
           </div>
         </div>
 
-        {/* Status toggle switch */}
+        {/* Status toggle */}
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-slate-600">Status</span>
           <button
@@ -148,7 +148,7 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
         </div>
       </div>
 
-      {/* Form Body – 3 columns (unchanged) */}
+      {/* Form Body – 3 columns */}
       <div className="p-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Vehicle Number */}
@@ -298,56 +298,59 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
             </div>
           </div>
 
-          {/* Insurance Expiry */}
+          {/* Insurance Expiry – with placement="top" */}
           <div className="relative">
             <label className="block mb-2 text-base font-medium text-slate-700">
               Insurance Expiry
             </label>
             <div className="relative">
               <Calendar className={iconWrapperClass} size={20} />
-              <input
-                type="date"
+              <DatePicker
                 value={insuranceExpiry}
-                onChange={(e) => setInsuranceExpiry(e.target.value)}
-                className={`${inputClass()} [&::-webkit-calendar-picker-indicator]:opacity-60 [&::-webkit-calendar-picker-indicator]:hover:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer`}
+                onChange={setInsuranceExpiry}
+                placeholder="Select date"
+                placement="top"
+                className="w-full pl-12 pr-4 py-4 text-base border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition border-slate-200 bg-white appearance-none"
               />
             </div>
           </div>
 
-          {/* Permit Expiry */}
+          {/* Permit Expiry – with placement="top" */}
           <div className="relative">
             <label className="block mb-2 text-base font-medium text-slate-700">
               Permit Expiry
             </label>
             <div className="relative">
               <Calendar className={iconWrapperClass} size={20} />
-              <input
-                type="date"
+              <DatePicker
                 value={permitExpiry}
-                onChange={(e) => setPermitExpiry(e.target.value)}
-                className={`${inputClass()} [&::-webkit-calendar-picker-indicator]:opacity-60 [&::-webkit-calendar-picker-indicator]:hover:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer`}
+                onChange={setPermitExpiry}
+                placeholder="Select date"
+                placement="top"
+                className="w-full pl-12 pr-4 py-4 text-base border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition border-slate-200 bg-white appearance-none"
               />
             </div>
           </div>
 
-          {/* Fitness Expiry */}
+          {/* Fitness Expiry – with placement="top" */}
           <div className="relative">
             <label className="block mb-2 text-base font-medium text-slate-700">
               Fitness Expiry
             </label>
             <div className="relative">
               <Calendar className={iconWrapperClass} size={20} />
-              <input
-                type="date"
+              <DatePicker
                 value={fitnessExpiry}
-                onChange={(e) => setFitnessExpiry(e.target.value)}
-                className={`${inputClass()} [&::-webkit-calendar-picker-indicator]:opacity-60 [&::-webkit-calendar-picker-indicator]:hover:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer`}
+                onChange={setFitnessExpiry}
+                placeholder="Select date"
+                placement="top"
+                className="w-full pl-12 pr-4 py-4 text-base border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition border-slate-200 bg-white appearance-none"
               />
             </div>
           </div>
         </div>
 
-        {/* Action Buttons – simple */}
+        {/* Action Buttons */}
         <div className="flex justify-end gap-4 mt-8 pt-6 border-t border-slate-200">
           <button
             type="button"

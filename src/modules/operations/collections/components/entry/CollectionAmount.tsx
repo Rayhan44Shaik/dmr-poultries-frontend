@@ -6,7 +6,7 @@ interface Props {
   remarks: string;
   previousBalance: number;
   receivedToday: number;
-  remainingBalance: number;
+  remainingBalance: number; // can be negative
   showSummary: boolean;
   amountError?: string;
   onAmountChange: (value: number) => void;
@@ -23,6 +23,22 @@ const inr = (n: number) =>
     maximumFractionDigits: 2,
   });
 
+// Format number with Indian comma separators (e.g., 100000 -> 1,00,000.00)
+const formatWithCommas = (num: number): string => {
+  if (isNaN(num)) return "0.00";
+  const parts = num.toFixed(2).split(".");
+  const integerPart = parts[0];
+  const decimalPart = parts[1] || "00";
+  // Indian numbering: group last 3 digits, then groups of 2
+  const lastThree = integerPart.slice(-3);
+  const otherNumbers = integerPart.slice(0, -3);
+  const formattedInteger =
+    otherNumbers !== ""
+      ? otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + lastThree
+      : lastThree;
+  return formattedInteger + "." + decimalPart;
+};
+
 export default function CollectionAmount({
   amount,
   remarks,
@@ -38,50 +54,87 @@ export default function CollectionAmount({
   isSaving,
   disableSave,
 }: Props) {
-  // Local input value as string to allow raw typing
-  const [inputValue, setInputValue] = useState<string>(amount ? amount.toFixed(2) : "");
+  // Local input state – stores the raw number string (without commas) while editing
+  const [inputValue, setInputValue] = useState<string>(
+    amount ? amount.toFixed(2) : ""
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   const isFocusedRef = useRef(false);
 
-  // Sync with external `amount` when it changes (e.g., after edit load)
+  // Sync with external `amount` when it changes (e.g., after reset)
   useEffect(() => {
     if (!isFocusedRef.current) {
-      setInputValue(amount ? amount.toFixed(2) : "");
+      // When not focused, show formatted value with commas
+      setInputValue(amount ? formatWithCommas(amount) : "");
     }
   }, [amount]);
 
   const handleFocus = () => {
     isFocusedRef.current = true;
+    // On focus, convert formatted string back to raw number for easy typing
+    const raw = parseFloat(inputValue.replace(/,/g, ""));
+    if (!isNaN(raw)) {
+      setInputValue(raw.toFixed(2));
+    } else {
+      setInputValue("");
+    }
   };
 
   const handleBlur = () => {
     isFocusedRef.current = false;
-    // Parse and round to two decimals
-    const raw = parseFloat(inputValue);
+    const raw = parseFloat(inputValue.replace(/,/g, ""));
     if (!isNaN(raw)) {
       const rounded = Math.round(raw * 100) / 100;
       onAmountChange(rounded);
-      setInputValue(rounded.toFixed(2));
+      // Show formatted with commas
+      setInputValue(formatWithCommas(rounded));
     } else {
-      // If invalid, reset to 0
       onAmountChange(0);
       setInputValue("0.00");
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    // Allow only digits and a single decimal point
-    const sanitized = val.replace(/[^0-9.]/g, "");
-    // Prevent multiple dots
-    const parts = sanitized.split(".");
-    const final = parts.length > 2 ? parts[0] + "." + parts.slice(1).join("") : sanitized;
-    setInputValue(final);
+    // Allow only digits, decimal point, and minus sign (for negative)
+    let val = e.target.value.replace(/[^0-9.-]/g, "");
+    // Allow only one decimal point
+    const parts = val.split(".");
+    if (parts.length > 2) {
+      val = parts[0] + "." + parts.slice(1).join("");
+    }
+    // Allow only one minus sign at the start
+    if (val.startsWith("-")) {
+      val = "-" + val.slice(1).replace(/-/g, "");
+    } else {
+      val = val.replace(/-/g, "");
+    }
+    setInputValue(val);
   };
 
+  // Determine status and display
   const displayPrevious = showSummary ? previousBalance : 0;
   const displayReceived = showSummary ? receivedToday : 0;
   const displayRemaining = showSummary ? remainingBalance : 0;
+
+  let statusText = "";
+  let statusClass = "";
+  if (!showSummary) {
+    statusText = "N/A";
+    statusClass = "bg-gray-200 text-gray-700";
+  } else if (displayRemaining < 0) {
+    statusText = "Overpaid";
+    statusClass = "bg-blue-200 text-blue-800";
+  } else if (displayRemaining === 0) {
+    statusText = "Completed";
+    statusClass = "bg-green-200 text-green-800";
+  } else {
+    statusText = "Pending";
+    statusClass = "bg-yellow-200 text-yellow-800";
+  }
+
+  const formattedRemaining = displayRemaining < 0
+    ? `- ${inr(Math.abs(displayRemaining))}`
+    : inr(displayRemaining);
 
   return (
     <div className="flex h-full w-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -93,7 +146,7 @@ export default function CollectionAmount({
         <h2 className="text-lg font-semibold text-green-800">Collection Amount</h2>
       </div>
 
-      {/* Amount Received – inline */}
+      {/* Amount Input */}
       <div className="flex items-center gap-4">
         <label htmlFor="amount" className="whitespace-nowrap text-sm font-medium text-slate-700">
           Amount Received <span className="text-red-500">*</span>
@@ -117,7 +170,7 @@ export default function CollectionAmount({
       {amountError && <p className="mt-1 text-xs text-red-500">{amountError}</p>}
       <p className="mt-1 text-xs text-slate-400">Enter the amount received from the selected shop.</p>
 
-      {/* Remarks – inline */}
+      {/* Remarks */}
       <div className="mt-4 flex items-center gap-4">
         <label htmlFor="remarks" className="whitespace-nowrap text-sm font-medium text-slate-700">
           Remarks (Optional)
@@ -132,7 +185,7 @@ export default function CollectionAmount({
         />
       </div>
 
-      {/* After Collection */}
+      {/* After Collection Summary */}
       <div className="mt-5 flex-1 rounded-xl border border-green-200 bg-green-50 p-4">
         <h3 className="mb-3 text-base font-bold text-green-800">After Collection</h3>
         <div className="space-y-2">
@@ -146,17 +199,15 @@ export default function CollectionAmount({
           </div>
           <div className="flex items-center justify-between border-t border-dashed border-slate-200 pt-2">
             <span className="text-sm font-semibold text-slate-700">Remaining Balance</span>
-            <span className={`text-base font-extrabold ${displayRemaining === 0 ? "text-green-700" : "text-red-600"}`}>
-              {inr(displayRemaining)}
+            <span className={`text-base font-extrabold ${
+              displayRemaining < 0 ? "text-blue-600" : displayRemaining === 0 ? "text-green-700" : "text-red-600"
+            }`}>
+              {formattedRemaining}
             </span>
           </div>
           <div className="pt-1">
-            <span
-              className={`inline-block rounded-full px-3 py-0.5 text-xs font-medium ${
-                displayRemaining === 0 ? "bg-green-200 text-green-800" : "bg-yellow-200 text-yellow-800"
-              }`}
-            >
-              {displayRemaining === 0 ? "Completed" : "Pending"}
+            <span className={`inline-block rounded-full px-3 py-0.5 text-xs font-medium ${statusClass}`}>
+              {statusText}
             </span>
           </div>
         </div>

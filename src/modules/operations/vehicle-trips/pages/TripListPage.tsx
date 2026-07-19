@@ -42,6 +42,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
 
   useEffect(() => {
     refreshTrips();
+    // No notification on page load
   }, []);
 
   const [viewOpen, setViewOpen] = useState(false);
@@ -116,7 +117,11 @@ function TripListPage({ embedded = false }: TripListPageProps) {
 
   const handleViewSelected = () => {
     const trip = completedTrips.find((t) => t.id === selectedRowId);
-    if (trip) openView(trip);
+    if (trip) {
+      openView(trip);
+    } else {
+      showNotification("No trip selected or trip not found.", "info");
+    }
   };
 
   const handleExportPDF = () => {
@@ -149,6 +154,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     ]);
     const filename = `Trips_${new Date().toISOString().split("T")[0]}`;
     exportToPDF("Trip List", headers, rows, filename);
+    showNotification("PDF exported successfully!", "success");
   };
 
   const handleExportExcel = () => {
@@ -181,9 +187,15 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     ]);
     const filename = `Trips_${new Date().toISOString().split("T")[0]}`;
     exportToExcel("Trip List", headers, rows, filename);
+    showNotification("Excel exported successfully!", "success");
   };
 
-  // ─── Content with ZERO top/side padding ───
+  const handleResetFilters = () => {
+    resetFilters();
+    showNotification("Filters have been reset.", "info");
+  };
+
+  // ─── Content ───
   const content = (
     <div className="space-y-4">
       <TripFilters
@@ -200,7 +212,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         setFarm={setFarm}
         setSearch={setSearch}
         onSearch={() => {}}
-        onReset={resetFilters}
+        onReset={handleResetFilters}
         vehicles={vehicleOptions}
         supervisors={supervisors}
         farms={farms}
