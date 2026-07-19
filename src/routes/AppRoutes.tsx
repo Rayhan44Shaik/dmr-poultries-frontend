@@ -42,7 +42,10 @@ import VehicleAnalyticsPage from "../modules/fleet-operations/pages/VehicleAnaly
 import VehicleReportsPage from "../modules/fleet-operations/pages/VehicleReportsPage";
 import VehicleExpenseReportPage from "../modules/fleet-operations/pages/VehicleExpenseReportPage";
 
-import StaffPage from "../modules/staff/pages/StaffPage";
+// ✅ Staff Module – Master Page with Tabs
+import StaffMasterPage from "../modules/staff/pages/StaffMasterPage";
+
+// Other Modules
 import ReportsDashboardPage from "../modules/reports/pages/ReportsDashboardPage";
 import SettingsPage from "../modules/settings/pages/SettingsPage";
 
@@ -66,225 +69,62 @@ function AppRoutes() {
         {/* Operations Module */}
         <Route path="/operations" element={<Navigate to="/operations/overview" replace />} />
         <Route path="/operations/overview" element={<DashboardLayout><OperationsDashboardPage /></DashboardLayout>} />
-
         <Route path="/operations/vehicle-trips/entry" element={<TripEntryPage />} />
         <Route path="/operations/vehicle-trips/list" element={<TripListPage />} />
+        <Route path="/operations/shop-sales" element={<DashboardLayout><ShopSalesPage /></DashboardLayout>} />
+        <Route path="/operations/shop-sales/rate-entry" element={<DashboardLayout><RatesEntryPage embedded={true} /></DashboardLayout>} />
+        <Route path="/operations/collections/entry" element={<DashboardLayout><CollectionEntryPage /></DashboardLayout>} />
+        <Route path="/operations/collections/pending" element={<DashboardLayout><PendingCollectionsPage /></DashboardLayout>} />
+        <Route path="/operations/collections/report" element={<DashboardLayout><CollectionReportPage /></DashboardLayout>} />
+        <Route path="/operations/fuel-expenses" element={<DashboardLayout><FuelExpensesPage /></DashboardLayout>} />
 
-        <Route
-          path="/operations/shop-sales"
-          element={
-            <DashboardLayout>
-              <ShopSalesPage />
-            </DashboardLayout>
-          }
-        />
-        <Route
-          path="/operations/shop-sales/rate-entry"
-          element={
-            <DashboardLayout>
-              <RatesEntryPage embedded={true} />
-            </DashboardLayout>
-          }
-        />
-
-        <Route
-          path="/operations/collections/entry"
-          element={
-            <DashboardLayout>
-              <CollectionEntryPage />
-            </DashboardLayout>
-          }
-        />
-        <Route
-          path="/operations/collections/pending"
-          element={
-            <DashboardLayout>
-              <PendingCollectionsPage />
-            </DashboardLayout>
-          }
-        />
-        <Route
-          path="/operations/collections/report"
-          element={
-            <DashboardLayout>
-              <CollectionReportPage />
-            </DashboardLayout>
-          }
-        />
-        <Route
-          path="/operations/fuel-expenses"
-          element={
-            <DashboardLayout>
-              <FuelExpensesPage />
-            </DashboardLayout>
-          }
-        />
-
-        {/* Accounts Module - Main Routes */}
+        {/* Accounts Module */}
         <Route path="/accounts" element={<Navigate to="/accounts/dashboard" replace />} />
-        <Route
-          path="/accounts/dashboard"
-          element={
-            <DashboardLayout>
-              <AccountsDashboardPage />
-            </DashboardLayout>
-          }
-        />
-        <Route
-          path="/accounts/farmer-payments"
-          element={
-            <DashboardLayout>
-              <FarmerPaymentsPage />
-            </DashboardLayout>
-          }
-        />
-        <Route
-          path="/accounts/cash-book"
-          element={
-            <DashboardLayout>
-              <CashBookPage />
-            </DashboardLayout>
-          }
-        />
-        <Route
-          path="/accounts/bank-book"
-          element={
-            <DashboardLayout>
-              <BankBookPage />
-            </DashboardLayout>
-          }
-        />
-        <Route
-          path="/accounts/vehicle-emi"
-          element={
-            <DashboardLayout>
-              <VehicleEMIPage />
-            </DashboardLayout>
-          }
-        />
-        <Route
-          path="/accounts/outstanding-summary"
-          element={
-            <DashboardLayout>
-              <OutstandingSummaryPage />
-            </DashboardLayout>
-          }
-        />
-        <Route
-          path="/accounts/profit-loss"
-          element={
-            <DashboardLayout>
-              <ProfitLossPage />
-            </DashboardLayout>
-          }
-        />
+        <Route path="/accounts/dashboard" element={<DashboardLayout><AccountsDashboardPage /></DashboardLayout>} />
+        <Route path="/accounts/farmer-payments" element={<DashboardLayout><FarmerPaymentsPage /></DashboardLayout>} />
+        <Route path="/accounts/cash-book" element={<DashboardLayout><CashBookPage /></DashboardLayout>} />
+        <Route path="/accounts/bank-book" element={<DashboardLayout><BankBookPage /></DashboardLayout>} />
+        <Route path="/accounts/vehicle-emi" element={<DashboardLayout><VehicleEMIPage /></DashboardLayout>} />
+        <Route path="/accounts/outstanding-summary" element={<DashboardLayout><OutstandingSummaryPage /></DashboardLayout>} />
+        <Route path="/accounts/profit-loss" element={<DashboardLayout><ProfitLossPage /></DashboardLayout>} />
 
-        {/* ═══════════════════════════════════════ */}
-        {/* FLEET OPERATIONS MODULE - 9 PAGES */}
-        {/* ═══════════════════════════════════════ */}
-        
+        {/* Fleet Module */}
         <Route path="/fleet" element={<Navigate to="/fleet/dashboard" replace />} />
-        
+        <Route path="/fleet/dashboard" element={<DashboardLayout><FleetDashboardPage /></DashboardLayout>} />
+        <Route path="/fleet/maintenance/entry" element={<DashboardLayout><MaintenanceEntryPage /></DashboardLayout>} />
+        <Route path="/fleet/maintenance/history" element={<DashboardLayout><MaintenanceHistoryPage /></DashboardLayout>} />
+        <Route path="/fleet/documents" element={<DashboardLayout><DocumentsExpiryPage /></DashboardLayout>} />
+        <Route path="/fleet/fastag" element={<DashboardLayout><FastagDashboardPage /></DashboardLayout>} />
+        <Route path="/fleet/emi" element={<DashboardLayout><EmiLoansPage /></DashboardLayout>} />
+        <Route path="/fleet/analytics" element={<DashboardLayout><VehicleAnalyticsPage /></DashboardLayout>} />
+        <Route path="/fleet/reports" element={<DashboardLayout><VehicleReportsPage /></DashboardLayout>} />
+        <Route path="/fleet/expense-report" element={<DashboardLayout><VehicleExpenseReportPage /></DashboardLayout>} />
+
+        {/* ✅ Staff Module – Fully Integrated with Tabs */}
         <Route
-          path="/fleet/dashboard"
+          path="/staff"
           element={
             <DashboardLayout>
-              <FleetDashboardPage />
+              <StaffMasterPage />
             </DashboardLayout>
           }
         />
-        
         <Route
-          path="/fleet/maintenance/entry"
+          path="/staff/*"
           element={
             <DashboardLayout>
-              <MaintenanceEntryPage />
-            </DashboardLayout>
-          }
-        />
-        
-        <Route
-          path="/fleet/maintenance/history"
-          element={
-            <DashboardLayout>
-              <MaintenanceHistoryPage />
-            </DashboardLayout>
-          }
-        />
-        
-        <Route
-          path="/fleet/documents"
-          element={
-            <DashboardLayout>
-              <DocumentsExpiryPage />
-            </DashboardLayout>
-          }
-        />
-        
-        <Route
-          path="/fleet/fastag"
-          element={
-            <DashboardLayout>
-              <FastagDashboardPage />
-            </DashboardLayout>
-          }
-        />
-        
-        <Route
-          path="/fleet/emi"
-          element={
-            <DashboardLayout>
-              <EmiLoansPage />
-            </DashboardLayout>
-          }
-        />
-        
-        <Route
-          path="/fleet/analytics"
-          element={
-            <DashboardLayout>
-              <VehicleAnalyticsPage />
-            </DashboardLayout>
-          }
-        />
-        
-        <Route
-          path="/fleet/reports"
-          element={
-            <DashboardLayout>
-              <VehicleReportsPage />
-            </DashboardLayout>
-          }
-        />
-        
-        <Route
-          path="/fleet/expense-report"
-          element={
-            <DashboardLayout>
-              <VehicleExpenseReportPage />
+              <StaffMasterPage />
             </DashboardLayout>
           }
         />
 
-        {/* ═══════════════════════════════════════ */}
-        {/* OTHER MODULES */}
-        {/* ═══════════════════════════════════════ */}
-        <Route path="/vehicles" element={<Navigate to="/fleet/dashboard" replace />} />
-        <Route path="/staff" element={<StaffPage />} />
-        
-        {/* ✅ Reports Dashboard – WITH SIDEBAR */}
-        <Route
-          path="/reports"
-          element={
-            <DashboardLayout>
-              <ReportsDashboardPage />
-            </DashboardLayout>
-          }
-        />
-        
+        {/* Reports */}
+        <Route path="/reports" element={<DashboardLayout><ReportsDashboardPage /></DashboardLayout>} />
+
+        {/* Settings */}
         <Route path="/settings" element={<SettingsPage />} />
 
-        {/* 404 Not Found */}
+        {/* 404 */}
         <Route path="*" element={<div className="p-8 text-center text-slate-500">Page not found</div>} />
       </Routes>
     </BrowserRouter>
