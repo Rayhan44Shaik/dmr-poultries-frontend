@@ -104,7 +104,7 @@ export default function useCollectionEntry() {
     setEntry((prev) => ({
       ...prev,
       shopName,
-      amount: 0, // ✅ empty until View Ledger
+      amount: 0,
       remarks: ""
     }));
     setShowSummary(false);
@@ -137,13 +137,10 @@ export default function useCollectionEntry() {
       alert("Please select a shop first.");
       return;
     }
-    // Recompute totals to get fresh data
     const { totalSales, totalCollections, currentPending } = computeShopTotals(pendingShop.shopName);
     setPendingShop(prev => prev ? { ...prev, totalSales, totalCollections, currentPending } : null);
     setShowSummary(true);
-    // ✅ Fill the amount field with the pending amount so the user sees it
     setEntry(prev => ({ ...prev, amount: currentPending }));
-    console.log("Open Shop Ledger", pendingShop.shopName);
   }
 
   // ---- WEEKLY RANGE & CALCULATIONS ----
@@ -188,7 +185,18 @@ export default function useCollectionEntry() {
       .reduce((sum: number, c: any) => sum + Number(c.amount), 0);
   }, [pendingShop, weekRange]);
 
-  // ---- existing memos ----
+  // ✅ NEW: Pending Approval collections for the week
+  const weeklyPending = useMemo(() => {
+    if (!pendingShop) return 0;
+    const collections = collectionService.getCollectionsForShop(pendingShop.shopName);
+    return collections
+      .filter((c: any) => {
+        const colDate = new Date(c.collectionDate);
+        return colDate >= weekRange.monday && colDate <= weekRange.sunday && c.status === "Pending";
+      })
+      .reduce((sum: number, c: any) => sum + Number(c.amount), 0);
+  }, [pendingShop, weekRange]);
+
   const openingBalance = useMemo(() => pendingShop?.currentPending ?? 0, [pendingShop]);
   const totalSales = useMemo(() => pendingShop?.totalSales ?? 0, [pendingShop]);
   const totalCollections = useMemo(() => pendingShop?.totalCollections ?? 0, [pendingShop]);
@@ -217,7 +225,8 @@ export default function useCollectionEntry() {
       pendingShops: dashboard.totalPendingShops,
       pendingAmount: dashboard.totalPendingAmount,
       pendingApproval: dashboard.pendingApproval,
-      approvedCollections: dashboard.approvedCollections
+      approvedCollections: dashboard.approvedCollections,
+      weeklyPending, // optional, but can be added
     }),
     [
       openingBalance,
@@ -227,7 +236,8 @@ export default function useCollectionEntry() {
       todayCollection,
       remainingBalance,
       collectionProgress,
-      dashboard
+      dashboard,
+      weeklyPending,
     ]
   );
 
@@ -283,9 +293,7 @@ export default function useCollectionEntry() {
     if (Number(entry.amount) > currentPending) {
       validation.amount = "Collection amount cannot exceed pending amount.";
     }
-    if (requiresReference && !entry.referenceNo.trim()) {
-      validation.referenceNo = "Reference number is required.";
-    }
+
     setErrors(validation);
     return Object.keys(validation).length === 0;
   }
@@ -296,12 +304,40 @@ export default function useCollectionEntry() {
       setIsSaving(true);
       const success = collectionService.saveCollection(entry);
       if (!success) return;
+
       const pending = collectionService.getPendingCollections();
       setPendingCollections(pending);
       setRecentCollections(collectionService.getRecentCollections(statusFilter));
-      resetEntry();
-      if (pending.length > 0) selectShop(pending[0].shopName);
-      else setPendingShop(null);
+
+      setEntry({
+        collectionId: "",
+        collectionNo: "",
+        collectionDate: new Date().toISOString().split("T")[0],
+        shopName: entry.shopName,
+        collectorName: entry.collectorName,
+        paymentModeName: entry.paymentModeName,
+        referenceNo: "",
+        amount: 0,
+        remarks: ""
+      });
+
+      if (pendingShop) {
+        const { totalSales, totalCollections, currentPending } = computeShopTotals(pendingShop.shopName);
+        const updatedShop = {
+          ...pendingShop,
+          totalSales,
+          totalCollections,
+          currentPending,
+        };
+        setPendingShop(updatedShop);
+        setShowSummary(true);
+      } else {
+        setPendingShop(null);
+        setShowSummary(false);
+      }
+
+      setErrors({});
+      setIsEditing(false);
     } catch (error) {
       console.error("Failed to save collection.", error);
     } finally {
@@ -311,7 +347,6 @@ export default function useCollectionEntry() {
 
   function cancelCollection() {
     resetEntry();
-    if (pendingCollections.length > 0) selectShop(pendingCollections[0].shopName);
   }
 
   function changeStatusFilter(status: "Pending" | "Approved" | "All") {
@@ -350,8 +385,23 @@ export default function useCollectionEntry() {
   }
 
   function editCollection(collection: RecentCollection) {
-    const shop = findPendingShop(collection.shopName);
-    setPendingShop(shop);
+    const { totalSales, totalCollections, currentPending } = computeShopTotals(collection.shopName);
+
+    const existingShop = findPendingShop(collection.shopName);
+    const updatedShop: PendingCollection = existingShop
+      ? { ...existingShop, totalSales, totalCollections, currentPending }
+      : {
+          shopName: collection.shopName,
+          totalSales,
+          totalCollections,
+          currentPending,
+          openingBalance: currentPending,
+          overdueDays: 0,
+          lastCollectionDate: collection.collectionDate || new Date().toISOString().split('T')[0],
+        };
+
+    setPendingShop(updatedShop);
+
     setEntry({
       collectionId: collection.id,
       collectionNo: collection.collectionNo,
@@ -361,10 +411,12 @@ export default function useCollectionEntry() {
       paymentModeName: collection.paymentModeName,
       referenceNo: collection.referenceNo,
       amount: Number(collection.amount),
-      remarks: collection.remarks
+      remarks: collection.remarks,
     });
+
     setErrors({});
     setIsEditing(true);
+    setShowSummary(true);
   }
 
   async function updateExistingCollection() {
@@ -533,6 +585,7 @@ export default function useCollectionEntry() {
     showSummary,
     weeklySales,
     weeklyCollections,
+    weeklyPending,        // ✅ new
     weekRangeFormatted,
     recentCollections: paginatedCollections,
     selectedShopCollections,

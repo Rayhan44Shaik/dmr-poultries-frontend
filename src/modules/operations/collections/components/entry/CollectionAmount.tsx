@@ -1,4 +1,5 @@
 import { Calculator } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 
 interface Props {
   amount: number;
@@ -7,7 +8,7 @@ interface Props {
   receivedToday: number;
   remainingBalance: number;
   showSummary: boolean;
-  amountError?: string; // ✅ new
+  amountError?: string;
   onAmountChange: (value: number) => void;
   onRemarksChange: (value: string) => void;
   onSave: () => void;
@@ -37,6 +38,47 @@ export default function CollectionAmount({
   isSaving,
   disableSave,
 }: Props) {
+  // Local input value as string to allow raw typing
+  const [inputValue, setInputValue] = useState<string>(amount ? amount.toFixed(2) : "");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isFocusedRef = useRef(false);
+
+  // Sync with external `amount` when it changes (e.g., after edit load)
+  useEffect(() => {
+    if (!isFocusedRef.current) {
+      setInputValue(amount ? amount.toFixed(2) : "");
+    }
+  }, [amount]);
+
+  const handleFocus = () => {
+    isFocusedRef.current = true;
+  };
+
+  const handleBlur = () => {
+    isFocusedRef.current = false;
+    // Parse and round to two decimals
+    const raw = parseFloat(inputValue);
+    if (!isNaN(raw)) {
+      const rounded = Math.round(raw * 100) / 100;
+      onAmountChange(rounded);
+      setInputValue(rounded.toFixed(2));
+    } else {
+      // If invalid, reset to 0
+      onAmountChange(0);
+      setInputValue("0.00");
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    // Allow only digits and a single decimal point
+    const sanitized = val.replace(/[^0-9.]/g, "");
+    // Prevent multiple dots
+    const parts = sanitized.split(".");
+    const final = parts.length > 2 ? parts[0] + "." + parts.slice(1).join("") : sanitized;
+    setInputValue(final);
+  };
+
   const displayPrevious = showSummary ? previousBalance : 0;
   const displayReceived = showSummary ? receivedToday : 0;
   const displayRemaining = showSummary ? remainingBalance : 0;
@@ -59,13 +101,15 @@ export default function CollectionAmount({
         <div className="relative flex-1">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">₹</span>
           <input
+            ref={inputRef}
             id="amount"
-            type="number"
-            min="0"
-            step="0.01"
-            value={amount || ""}
-            onChange={(e) => onAmountChange(Number(e.target.value))}
-            className={`h-10 w-full rounded-md border ${amountError ? 'border-red-500' : 'border-slate-300'} pl-8 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200`}
+            type="text"
+            inputMode="decimal"
+            value={inputValue}
+            onChange={handleChange}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            className={`h-10 w-full rounded-md border ${amountError ? "border-red-500" : "border-slate-300"} pl-8 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
             placeholder="0.00"
           />
         </div>
