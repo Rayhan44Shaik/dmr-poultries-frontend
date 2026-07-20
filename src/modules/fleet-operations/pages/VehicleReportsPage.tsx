@@ -41,8 +41,9 @@ const VehicleReportsPage = () => {
 
   return (
     <ErrorBoundary>
-      <div className="p-4 md:p-6 space-y-6">
-        <h1 className="text-2xl font-bold text-gray-900">Vehicle Reports</h1>
+      {/* 👇 Updated container with reduced horizontal padding and increased top spacing */}
+      <div className="px-1 md:px-3 py-6 md:py-8 space-y-6 max-w-7xl mx-auto bg-slate-50 min-h-screen">
+        {/* Heading removed */}
 
         {/* Filters */}
         <ReportFilters

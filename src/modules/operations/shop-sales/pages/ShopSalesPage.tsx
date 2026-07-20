@@ -112,7 +112,8 @@ function ShopSalesPage() {
   }, [filteredSales, showNotification]);
 
   return (
-    <div className="px-3 py-0 space-y-6">
+    // 👇 Updated container with increased side padding and consistent styling
+    <div className="px-4 md:px-5 py-6 md:py-8 space-y-6 max-w-7xl mx-auto bg-slate-50 min-h-screen">
       <ShopSalesFilters
         fromDate={filter.fromDate}
         toDate={filter.toDate}

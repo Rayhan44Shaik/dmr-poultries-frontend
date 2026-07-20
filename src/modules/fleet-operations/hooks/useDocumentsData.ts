@@ -1,19 +1,28 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { addDays, isBefore, isAfter } from 'date-fns';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
 import { getDocuments } from '../services/storage';
 import { DocumentTypeEnum } from '../types';
 
 export function useDocumentsData() {
+  // --- State for refreshing data ---
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // --- Vehicles from master hook ---
   const { vehicles } = useVehicles();
-  const documents = useMemo(() => getDocuments(), []);
+
+  // --- Documents: re‑computed when refreshKey changes ---
+  const documents = useMemo(() => getDocuments(), [refreshKey]);
+
+  // --- Filter state (preserved) ---
   const [filterType, setFilterType] = useState<string>('all');
 
+  // --- Date helpers ---
   const now = new Date();
   const thirtyDaysLater = addDays(now, 30);
   const sixtyDaysLater = addDays(now, 60);
 
-  // Expiring counts by document type
+  // --- Expiring counts ---
   const expiringCounts = useMemo(() => {
     const counts: Record<string, number> = { insurance: 0, fitness: 0, permit: 0, puc: 0, rc: 0 };
     documents.forEach((d: any) => {
@@ -25,7 +34,7 @@ export function useDocumentsData() {
     return counts;
   }, [documents, now, thirtyDaysLater]);
 
-  // Document matrix: one row per vehicle, columns for each document type
+  // --- Document matrix (one row per vehicle) ---
   const matrix = useMemo(() => {
     return vehicles.map((vehicle: any) => {
       const docMap: Record<string, any> = {};
@@ -37,7 +46,7 @@ export function useDocumentsData() {
     });
   }, [vehicles, documents]);
 
-  // Get status color based on expiry date
+  // --- Status color helper ---
   const getStatusColor = (expiryDate?: string): string => {
     if (!expiryDate) return 'text-gray-400';
     const d = new Date(expiryDate);
@@ -47,12 +56,19 @@ export function useDocumentsData() {
     return 'bg-green-100 text-green-800';
   };
 
+  // --- Refetch function (force data refresh) ---
+  const refetch = useCallback(() => {
+    setRefreshKey((prev) => prev + 1);
+  }, []);
+
+  // --- Return all values (including filterType and setFilterType) ---
   return {
     documents,
     expiringCounts,
     matrix,
-    filterType,
-    setFilterType,
+    filterType,       // ✅ defined
+    setFilterType,    // ✅ defined
     getStatusColor,
+    refetch,          // ✅ new function
   };
 }

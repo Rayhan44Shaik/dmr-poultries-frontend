@@ -1,4 +1,4 @@
-import { memo, useState, useMemo, useRef, useEffect } from 'react';
+import { memo, useState, useMemo, useEffect, useRef } from 'react';
 import { Eye, Edit, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon, Search } from 'lucide-react';
 import type { MaintenanceEvent } from '../../types';
 
@@ -25,21 +25,13 @@ const LatestMaintenanceTable = ({
   onPageChange,
   pageSize = 5,
 }: LatestMaintenanceTableProps) => {
-  const validRecords = records.filter((r): r is MaintenanceEvent & { id: string } => !!r.id);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Click‑outside handler to deselect row
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setSelectedId(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  // Ref for the table container to detect outside clicks
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const validRecords = records.filter((r): r is MaintenanceEvent & { id: string } => !!r.id);
 
   const filteredRecords = useMemo(() => {
     if (!searchTerm.trim()) return validRecords;
@@ -70,104 +62,112 @@ const LatestMaintenanceTable = ({
 
   const selectedRecord = filteredRecords.find(r => r.id === selectedId) || null;
 
+  // Outside click handler: deselect if click outside the table container
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tableRef.current && !tableRef.current.contains(event.target as Node)) {
+        setSelectedId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   return (
-    <div ref={containerRef} className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-      {/* Header – compact layout */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-slate-50 gap-2 flex-wrap">
+    <div ref={tableRef} className="bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 bg-slate-50/60 border-b border-slate-200/60">
         <div className="flex items-center gap-2">
-          <h4 className="text-sm font-semibold text-slate-700 whitespace-nowrap">
-            Last Maintenance Record
+          <h4 className="text-sm font-bold text-slate-700 tracking-wide">
+            Latest Maintenance Records
           </h4>
-          <span className="text-xs text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full font-medium">
+          <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-200 rounded-full">
             {totalRecords}
           </span>
         </div>
 
-        {/* Compact search – small box beside the title */}
-        <div className="relative flex items-center">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setSelectedId(null);
-              onPageChange(1);
-            }}
-            placeholder="Search vehicle..."
-            className="w-40 pl-7 pr-2 py-1 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-          />
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-        </div>
-
-        {/* Action icons */}
-        <div className="flex items-center gap-0.5 ml-auto">
-          <button
-            onClick={() => selectedRecord && onView(selectedRecord)}
-            disabled={!selectedRecord}
-            className={`p-1.5 rounded-md transition-colors ${
-              selectedRecord
-                ? 'text-blue-600 hover:bg-blue-50'
-                : 'text-slate-300 cursor-not-allowed'
-            }`}
-            title="View selected record"
-          >
-            <Eye className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => selectedRecord && onEdit(selectedRecord)}
-            disabled={!selectedRecord || !isEditable(selectedRecord.createdAt)}
-            className={`p-1.5 rounded-md transition-colors ${
-              selectedRecord && isEditable(selectedRecord.createdAt)
-                ? 'text-green-600 hover:bg-green-50'
-                : 'text-slate-300 cursor-not-allowed'
-            }`}
-            title="Edit selected record (within 10 days)"
-          >
-            <Edit className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => selectedRecord && onDelete(selectedRecord)}
-            disabled={!selectedRecord || !isEditable(selectedRecord.createdAt)}
-            className={`p-1.5 rounded-md transition-colors ${
-              selectedRecord && isEditable(selectedRecord.createdAt)
-                ? 'text-red-600 hover:bg-red-50'
-                : 'text-slate-300 cursor-not-allowed'
-            }`}
-            title="Delete selected record (within 10 days)"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-          {actualTotalPages > 1 && (
-            <span className="text-xs text-slate-500 ml-2">
-              Page {currentPage} of {actualTotalPages}
-            </span>
+        {/* Action buttons – shown only when a record is selected */}
+        <div className="flex items-center gap-2">
+          {selectedRecord && (
+            <div className="flex items-center gap-0.5 mr-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); onView(selectedRecord); }}
+                className="p-1.5 rounded-md text-blue-500 hover:bg-blue-50 hover:text-blue-700 transition"
+                title="View"
+              >
+                <Eye size={16} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onEdit(selectedRecord); }}
+                disabled={!isEditable(selectedRecord.createdAt)}
+                className={`p-1.5 rounded-md transition ${
+                  isEditable(selectedRecord.createdAt)
+                    ? 'text-green-500 hover:bg-green-50 hover:text-green-700'
+                    : 'text-slate-300 cursor-not-allowed'
+                }`}
+                title={isEditable(selectedRecord.createdAt) ? 'Edit' : 'Edit disabled (older than 10 days)'}
+              >
+                <Edit size={16} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(selectedRecord); }}
+                disabled={!isEditable(selectedRecord.createdAt)}
+                className={`p-1.5 rounded-md transition ${
+                  isEditable(selectedRecord.createdAt)
+                    ? 'text-red-400 hover:bg-red-50 hover:text-red-600'
+                    : 'text-slate-300 cursor-not-allowed'
+                }`}
+                title={isEditable(selectedRecord.createdAt) ? 'Delete' : 'Delete disabled (older than 10 days)'}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
           )}
+
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setSelectedId(null);
+                onPageChange(1);
+              }}
+              placeholder="Search vehicle..."
+              className="w-44 pl-8 pr-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
+            />
+          </div>
         </div>
       </div>
 
+      {/* Table */}
       {totalRecords === 0 ? (
-        <div className="text-center py-8 text-slate-400 text-sm">
-          {searchTerm ? 'No matching vehicles found.' : 'No maintenance records found.'}
+        <div className="text-center py-10 text-slate-400 text-sm">
+          {searchTerm ? 'No matching vehicles found.' : 'No maintenance records yet.'}
         </div>
       ) : (
         <>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50">
+              <thead className="bg-slate-50/80">
                 <tr>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">#</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Vehicle No</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Date</th>
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">Current KM</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Maintenance Type</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Garage</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Mechanic</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Driver</th>
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">Next Service KM</th>
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">Total Cost</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">#</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Vehicle</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Date</th>
+                  <th className="px-3 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-slate-500">Current KM</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Maintenance</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Garage</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Mechanic</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Driver</th>
+                  <th className="px-3 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-slate-500">Next Service</th>
+                  <th className="px-3 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-slate-500">Total Cost</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
+              <tbody className="divide-y divide-slate-100 bg-white">
                 {paginatedRecords.map((rec, idx) => {
                   const vehicle = vehicles.find((v: any) => v.id === rec.vehicleId);
                   const isSelected = selectedId === rec.id;
@@ -175,21 +175,39 @@ const LatestMaintenanceTable = ({
                   return (
                     <tr
                       key={rec.id}
-                      className={`hover:bg-slate-50 transition-colors cursor-pointer ${
+                      className={`group hover:bg-slate-50/60 transition-colors cursor-pointer ${
                         isSelected ? 'bg-blue-50 border-l-4 border-blue-500' : ''
                       }`}
                       onClick={() => handleRowClick(rec.id)}
                     >
-                      <td className="px-3 py-2.5 text-sm text-slate-600">{startIndex + idx}</td>
-                      <td className="px-3 py-2.5 text-sm font-medium text-slate-800">{vehicle?.vehicleNumber || 'Unknown'}</td>
-                      <td className="px-3 py-2.5 text-sm text-slate-600">{new Date(rec.date).toLocaleDateString()}</td>
-                      <td className="px-3 py-2.5 text-sm text-slate-600 text-right">{rec.currentKM}</td>
-                      <td className="px-3 py-2.5 text-sm text-slate-600">{rec.maintenanceType}</td>
-                      <td className="px-3 py-2.5 text-sm text-slate-600">{rec.garage || '-'}</td>
-                      <td className="px-3 py-2.5 text-sm text-slate-600">{rec.mechanic || '-'}</td>
-                      <td className="px-3 py-2.5 text-sm text-slate-600">{rec.driverName || '-'}</td>
-                      <td className="px-3 py-2.5 text-sm text-slate-600 text-right">{rec.nextServiceKM || '-'}</td>
-                      <td className="px-3 py-2.5 text-sm font-medium text-blue-600 text-right">₹{rec.totalCost?.toFixed(2) || '0.00'}</td>
+                      <td className="px-3 py-2.5 text-sm text-slate-500">{startIndex + idx}</td>
+                      <td className="px-3 py-2.5 text-sm font-medium text-slate-800">
+                        <span>{vehicle?.vehicleNumber || 'Unknown'}</span>
+                      </td>
+                      <td className="px-3 py-2.5 text-sm text-slate-600">
+                        {new Date(rec.date).toLocaleDateString('en-GB')}
+                      </td>
+                      <td className="px-3 py-2.5 text-sm text-slate-600 text-right">
+                        {rec.currentKM.toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2.5 text-sm text-slate-600">
+                        {rec.maintenanceType}
+                      </td>
+                      <td className="px-3 py-2.5 text-sm text-slate-600">
+                        {rec.garage || '-'}
+                      </td>
+                      <td className="px-3 py-2.5 text-sm text-slate-600">
+                        {rec.mechanic || '-'}
+                      </td>
+                      <td className="px-3 py-2.5 text-sm text-slate-600">
+                        {rec.driverName || '-'}
+                      </td>
+                      <td className="px-3 py-2.5 text-sm text-slate-600 text-right">
+                        {rec.nextServiceKM?.toLocaleString() || '-'}
+                      </td>
+                      <td className="px-3 py-2.5 text-sm font-bold text-blue-600 text-right">
+                        ₹{rec.totalCost?.toFixed(2) || '0.00'}
+                      </td>
                     </tr>
                   );
                 })}
@@ -197,27 +215,33 @@ const LatestMaintenanceTable = ({
             </table>
           </div>
 
+          {/* Pagination */}
           {actualTotalPages > 1 && (
-            <div className="flex items-center justify-end gap-2 px-4 py-2 border-t border-slate-200 bg-slate-50">
-              <button
-                onClick={() => onPageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="inline-flex items-center gap-1 px-3 py-1 text-sm border border-slate-300 rounded-md hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span>Previous</span>
-              </button>
-              <span className="text-sm text-slate-600">
-                {currentPage} / {actualTotalPages}
+            <div className="flex items-center justify-between px-5 py-3 border-t border-slate-200/60 bg-slate-50/60">
+              <span className="text-xs text-slate-500">
+                Showing {startIndex}–{Math.min(startIndex + pageSize - 1, totalRecords)} of {totalRecords}
               </span>
-              <button
-                onClick={() => onPageChange(currentPage + 1)}
-                disabled={currentPage === actualTotalPages}
-                className="inline-flex items-center gap-1 px-3 py-1 text-sm border border-slate-300 rounded-md hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <span>Next</span>
-                <ChevronRightIcon className="w-3.5 h-3.5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setSelectedId(null); onPageChange(currentPage - 1); }}
+                  disabled={currentPage === 1}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium border border-slate-300 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  <ChevronLeft size={15} />
+                  <span>Previous</span>
+                </button>
+                <span className="text-sm font-semibold text-slate-700">
+                  {currentPage} / {actualTotalPages}
+                </span>
+                <button
+                  onClick={() => { setSelectedId(null); onPageChange(currentPage + 1); }}
+                  disabled={currentPage === actualTotalPages}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium border border-slate-300 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  <span>Next</span>
+                  <ChevronRightIcon size={15} />
+                </button>
+              </div>
             </div>
           )}
         </>

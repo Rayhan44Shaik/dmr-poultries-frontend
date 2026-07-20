@@ -37,3 +37,29 @@ export function canEditItem(createdDate: string): boolean {
 export function canDeleteItem(createdDate: string): boolean {
   return canEditItem(createdDate); // same rule
 }
+
+// ============================================================
+// SAFE DATE PARSING & FORMATTING (ADDED)
+// ============================================================
+
+/**
+ * Safely parse a value into a Date object.
+ * Returns `new Date()` if the value is invalid or missing.
+ */
+export function safeDate(value?: string | number): Date {
+  if (!value) return new Date();
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? new Date() : d;
+}
+
+/**
+ * Format a Date object to YYYY-MM-DD string.
+ * Returns empty string if the date is invalid.
+ */
+export function formatDateToYYYYMMDD(date: Date): string {
+  if (!date || isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}

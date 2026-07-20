@@ -1,5 +1,5 @@
 // src/components/Sidebar.tsx
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import {
@@ -14,7 +14,6 @@ import {
   ChevronDown,
   ChevronRight,
   Building2,
-  Gauge,
   Wrench,
   History,
   FileSpreadsheet,
@@ -28,17 +27,38 @@ import {
   Landmark,
   Receipt,
   TrendingUp,
+  Clock,
+  ShoppingCart,
+  HandCoins,
+  Fuel,
+  File,
+  Gauge,
 } from "lucide-react";
 
 export default function Sidebar() {
   const location = useLocation();
 
+  const [openOperations, setOpenOperations] = useState(
+    location.pathname.startsWith("/operations")
+  );
   const [openFleet, setOpenFleet] = useState(
     location.pathname.startsWith("/fleet")
   );
   const [openAccounts, setOpenAccounts] = useState(
     location.pathname.startsWith("/accounts")
   );
+
+  const operationsChildren = [
+    { title: "Overview", path: "/operations/overview", icon: <Gauge size={14} /> },
+    { title: "Trip Entry", path: "/operations/vehicle-trips/entry", icon: <Truck size={14} /> },
+    { title: "Trip List", path: "/operations/vehicle-trips/list", icon: <FileText size={14} /> },
+    { title: "Shop Sales", path: "/operations/shop-sales", icon: <ShoppingCart size={14} /> },
+    { title: "Rate Entry", path: "/operations/shop-sales/rate-entry", icon: <File size={14} /> },
+    { title: "Collection", path: "/operations/collections/entry", icon: <HandCoins size={14} /> },
+    { title: "Pending Collections", path: "/operations/collections/pending", icon: <Clock size={14} /> },
+    { title: "Collection Report", path: "/operations/collections/report", icon: <FileSpreadsheet size={14} /> },
+    { title: "Fuel Expenses", path: "/operations/fuel-expenses", icon: <Fuel size={14} /> },
+  ];
 
   const accountsChildren = [
     { title: "Dashboard", path: "/accounts/dashboard", icon: <LayoutDashboard size={14} /> },
@@ -92,20 +112,39 @@ export default function Sidebar() {
           Masters
         </Link>
 
-        {/* Operations – highlighted for any /operations/* path */}
-        <Link
-          to="/operations/overview"
-          className={`mb-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-            isActiveParent("/operations")
-              ? "bg-blue-600 text-white"
-              : "text-slate-700 hover:bg-slate-100"
-          }`}
+        {/* Operations – Dropdown */}
+        <button
+          type="button"
+          onClick={() => setOpenOperations(!openOperations)}
+          className="mb-1 mt-3 flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
         >
-          <Truck size={18} />
-          Operations
-        </Link>
+          <div className="flex items-center gap-3">
+            <Truck size={18} />
+            Operations
+          </div>
+          {openOperations ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        </button>
 
-        {/* Fleet */}
+        {openOperations && (
+          <div className="ml-5 border-l border-slate-200 pl-3">
+            {operationsChildren.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`mb-1 flex items-center gap-2 rounded-md px-3 py-2 text-sm transition ${
+                  location.pathname === item.path
+                    ? "bg-blue-50 font-semibold text-blue-700"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                {item.icon}
+                {item.title}
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {/* Fleet – Dropdown */}
         <button
           type="button"
           onClick={() => setOpenFleet(!openFleet)}
@@ -121,15 +160,14 @@ export default function Sidebar() {
         {openFleet && (
           <div className="ml-5 border-l border-slate-200 pl-3">
             {[
-              { title: "Dashboard", path: "/fleet/dashboard", icon: <Gauge size={14} /> },
-              { title: "Maintenance Entry", path: "/fleet/maintenance/entry", icon: <Wrench size={14} /> },
-              { title: "Maintenance History", path: "/fleet/maintenance/history", icon: <History size={14} /> },
-              { title: "Documents & Expiry", path: "/fleet/documents", icon: <FileSpreadsheet size={14} /> },
-              { title: "FASTag Dashboard", path: "/fleet/fastag", icon: <CreditCard size={14} /> },
-              { title: "EMI & Loans", path: "/fleet/emi", icon: <DollarSign size={14} /> },
-              { title: "Vehicle Analytics", path: "/fleet/analytics", icon: <BarChart3 size={14} /> },
-              { title: "Vehicle Reports", path: "/fleet/reports", icon: <FileText size={14} /> },
-              { title: "Expense Report", path: "/fleet/expense-report", icon: <ClipboardList size={14} /> },
+              { title: "History", path: "/fleet/history", icon: <History size={14} /> },
+              { title: "Entry", path: "/fleet/entry", icon: <Wrench size={14} /> },
+              { title: "Permits", path: "/fleet/permits", icon: <FileSpreadsheet size={14} /> },
+              { title: "EMI", path: "/fleet/emi", icon: <DollarSign size={14} /> },
+              { title: "Analytics", path: "/fleet/analytics", icon: <BarChart3 size={14} /> },
+              { title: "Reports", path: "/fleet/reports", icon: <FileText size={14} /> },
+              { title: "FASTag", path: "/fleet/fastag", icon: <CreditCard size={14} /> },
+              { title: "Expenses", path: "/fleet/expenses", icon: <ClipboardList size={14} /> },
             ].map((item) => (
               <Link
                 key={item.path}
@@ -147,7 +185,7 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* Accounts */}
+        {/* Accounts – Dropdown */}
         <button
           type="button"
           onClick={() => setOpenAccounts(!openAccounts)}

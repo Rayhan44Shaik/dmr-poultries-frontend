@@ -18,7 +18,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import type { FuelExpense } from "../types/fuelExpense";
-import { DatePicker } from "../../../../components/common/DatePicker"; // <-- modern picker
+import { DatePicker } from "../../../../components/common/DatePicker";
 
 function FuelExpensesPage() {
   const { showNotification } = useSafeNotification();
@@ -234,7 +234,6 @@ function FuelExpensesPage() {
     showNotification("Filters reset.", "info");
   };
 
-  // Memoize KPICards to avoid re-render when only filters change
   const KpiCards = useMemo(
     () =>
       hasFilters ? (
@@ -251,8 +250,8 @@ function FuelExpensesPage() {
   );
 
   return (
-    // Reduced padding from p-6 to p-2 (same as TripEntryPage)
-    <div className="p-2 space-y-4">
+    // 👇 Updated container with more side padding, consistent background & centering
+    <div className="px-4 md:px-5 py-6 md:py-8 space-y-4 max-w-7xl mx-auto bg-slate-50 min-h-screen">
       {/* Action Buttons */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button
@@ -288,13 +287,11 @@ function FuelExpensesPage() {
         </div>
       </div>
 
-      {/* KPI Cards (only when filters active) */}
       {KpiCards}
 
-      {/* Filter Bar – now using DatePicker */}
+      {/* Filter Bar */}
       <div className="rounded-lg border border-green-200 bg-white p-4 shadow-sm">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* From Date */}
           <DatePicker
             value={fromDate}
             onChange={setFromDate}
@@ -302,8 +299,6 @@ function FuelExpensesPage() {
             placeholder="Select start"
             className="w-full"
           />
-
-          {/* To Date */}
           <DatePicker
             value={toDate}
             onChange={setToDate}
@@ -311,8 +306,6 @@ function FuelExpensesPage() {
             placeholder="Select end"
             className="w-full"
           />
-
-          {/* Vehicle Multi-select */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Vehicles</label>
             <select
@@ -356,8 +349,6 @@ function FuelExpensesPage() {
               </div>
             )}
           </div>
-
-          {/* Reset Button */}
           <div className="flex items-end">
             <button
               onClick={handleResetFilters}

@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Eye, Edit, RefreshCw } from 'lucide-react';
+import { Edit } from 'lucide-react';
 
 interface DocumentMatrixProps {
   matrix: Array<{
@@ -9,15 +9,18 @@ interface DocumentMatrixProps {
   docTypes: string[];
   docLabels: Record<string, string>;
   getStatusColor: (expiryDate?: string) => string;
+  onEdit: (vehicle: any, docMap: any) => void;
 }
 
-const DocumentMatrix = ({ matrix, docTypes, docLabels, getStatusColor }: DocumentMatrixProps) => {
+const DocumentMatrix = ({
+  matrix,
+  docTypes,
+  docLabels,
+  getStatusColor,
+  onEdit,
+}: DocumentMatrixProps) => {
   if (!matrix || matrix.length === 0) {
-    return (
-      <div className="text-center py-8 text-gray-400 text-sm">
-        No vehicles found.
-      </div>
-    );
+    return <div className="text-center py-8 text-gray-400 text-sm">No vehicles found.</div>;
   }
 
   return (
@@ -40,8 +43,8 @@ const DocumentMatrix = ({ matrix, docTypes, docLabels, getStatusColor }: Documen
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {matrix.map((row) => (
-            <tr key={row.vehicle.id} className="hover:bg-gray-50">
-              <td className="px-4 py-3 font-medium text-gray-900">
+            <tr key={row.vehicle.id} className="hover:bg-gray-50 transition-colors">
+              <td className="px-4 py-3 text-gray-900">
                 {row.vehicle.vehicleNumber}
               </td>
               {docTypes.map((type) => {
@@ -49,7 +52,9 @@ const DocumentMatrix = ({ matrix, docTypes, docLabels, getStatusColor }: Documen
                 return (
                   <td key={type} className="px-4 py-3">
                     {doc ? (
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(doc.expiryDate)}`}>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(doc.expiryDate)}`}
+                      >
                         {new Date(doc.expiryDate).toLocaleDateString()}
                       </span>
                     ) : (
@@ -59,17 +64,13 @@ const DocumentMatrix = ({ matrix, docTypes, docLabels, getStatusColor }: Documen
                 );
               })}
               <td className="px-4 py-3">
-                <div className="flex gap-2">
-                  <button className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="View">
-                    <Eye className="w-4 h-4" />
-                  </button>
-                  <button className="p-1 text-green-600 hover:bg-green-50 rounded" title="Edit">
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button className="p-1 text-amber-600 hover:bg-amber-50 rounded" title="Renew">
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
-                </div>
+                <button
+                  onClick={() => onEdit(row.vehicle, row.docMap)}
+                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                  title="Edit Documents"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
               </td>
             </tr>
           ))}

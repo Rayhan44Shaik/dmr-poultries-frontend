@@ -1,3 +1,5 @@
+
+
 import React, { useState, useRef, useEffect } from "react";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, X } from "lucide-react";
 import { format, isValid, parse, startOfWeek } from "date-fns";
@@ -88,7 +90,7 @@ interface DatePickerProps {
   error?: string;
   required?: boolean;
   icon?: React.ReactNode;
-  /** Controls where the calendar popup appears relative to the input */
+  // Controls where the calendar popup appears relative to the input 
   placement?: "top" | "bottom"; // default "bottom"
 }
 
@@ -262,7 +264,7 @@ export function DatePicker({
 
       {isOpen && !disabled && (
         <div
-          className={`absolute left-0 z-50 w-full min-w-[280px] max-w-sm rounded-xl border border-slate-200 bg-white p-3 shadow-xl select-none text-slate-900 ${dropdownPositionClass}
+          className={`absolute left-0 z-50 w-80 rounded-xl border border-slate-200 bg-white p-3 shadow-xl select-none text-slate-900 ${dropdownPositionClass}
             [&_table]:w-full [&_table]:border-collapse [&_tr]:h-auto [&_td]:p-0 [&_th]:p-0 [&_th]:pb-2`}
         >
           <DayPicker

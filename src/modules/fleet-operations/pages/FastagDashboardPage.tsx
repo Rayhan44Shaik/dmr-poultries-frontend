@@ -1,3 +1,4 @@
+/*
 import { memo } from 'react';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
 import { useFleetData } from '../hooks/useFleetData';
@@ -24,7 +25,7 @@ const FastagDashboardPage = () => {
           </button>
         </div>
 
-        {/* Summary Tiles */}
+        {// Summary Tiles }
         <FastagSummaryTiles
           totalFastags={stats.totalFastags}
           lowBalanceCount={stats.lowBalanceCount}
@@ -33,7 +34,7 @@ const FastagDashboardPage = () => {
           avgDailyToll={stats.avgDailyToll}
         />
 
-        {/* Balance & Transactions */}
+        {// Balance & Transactions }
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">FASTag Balance Overview</h3>
@@ -47,6 +48,32 @@ const FastagDashboardPage = () => {
               vehicles={vehicles}
             />
           </div>
+        </div>
+      </div>
+    </ErrorBoundary>
+  );
+};
+
+export default memo(FastagDashboardPage);*/
+
+import { memo } from 'react';
+import ErrorBoundary from '../components/common/ErrorBoundary';
+import { CreditCard, MessageSquare } from 'lucide-react';
+
+const FastagDashboardPage = () => {
+  return (
+    <ErrorBoundary>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center">
+        <div className="p-4 bg-blue-50 rounded-full mb-6">
+          <CreditCard className="w-12 h-12 text-blue-500" />
+        </div>
+        <h2 className="text-2xl font-semibold text-gray-800 mb-3">FASTag Dashboard</h2>
+        <p className="text-gray-500 max-w-md">
+          We're currently designing this module based on your feedback.
+        </p>
+        <div className="mt-4 flex items-center gap-2 text-sm text-gray-400">
+          <MessageSquare className="w-4 h-4" />
+          <span>Coming soon – stay tuned!</span>
         </div>
       </div>
     </ErrorBoundary>

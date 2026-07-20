@@ -16,7 +16,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
-import { DatePicker } from "../../../../components/common/DatePicker"; // <-- imported
+import { DatePicker } from "../../../../components/common/DatePicker";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -34,11 +34,10 @@ const getBarColor = (percentage: number) => {
 
 const KNOWN_MODES = ["Cash", "Union Bank", "HDFC Bank"];
 
-// Helper to get current week's Monday and Sunday
 const getCurrentWeekRange = () => {
   const now = new Date();
-  const day = now.getDay(); // 0 = Sunday, 1 = Monday ...
-  const diff = (day === 0 ? 6 : day - 1); // Monday offset
+  const day = now.getDay();
+  const diff = (day === 0 ? 6 : day - 1);
   const monday = new Date(now);
   monday.setDate(now.getDate() - diff);
   monday.setHours(0, 0, 0, 0);
@@ -66,7 +65,6 @@ export default function CollectionReportPage() {
     [employees]
   );
 
-  // ---- Filter state ----
   const { monday, sunday } = getCurrentWeekRange();
   const defaultFromDate = monday.toISOString().split("T")[0];
   const defaultToDate = sunday.toISOString().split("T")[0];
@@ -77,7 +75,6 @@ export default function CollectionReportPage() {
   const [collector, setCollector] = useState("");
   const [paymentMode, setPaymentMode] = useState("");
 
-  // Load data
   useEffect(() => {
     const loadData = () => {
       try {
@@ -94,7 +91,6 @@ export default function CollectionReportPage() {
     return () => window.removeEventListener("storage", loadData);
   }, [showNotification]);
 
-  // ---- Filtered data (only Approved) ----
   const filteredData = useMemo(() => {
     let data = allCollections.filter((c) => c.status === "Approved");
 
@@ -120,11 +116,9 @@ export default function CollectionReportPage() {
     return data;
   }, [allCollections, fromDate, toDate, shopName, collector, paymentMode]);
 
-  // ---- Summary Cards ----
   const totalCollections = filteredData.reduce((sum, c) => sum + c.amount, 0);
   const totalCollectorsCount = new Set(filteredData.map((c) => c.collectorName)).size;
 
-  // ---- Collector counts per payment mode ----
   const collectorCountsByMode = useMemo(() => {
     const map = new Map<string, Set<string>>();
     filteredData.forEach((c) => {
@@ -155,7 +149,6 @@ export default function CollectionReportPage() {
     return filteredResult;
   }, [filteredData]);
 
-  // ---- Payment Mode Summary Table ----
   const paymentModeSummary = useMemo(() => {
     const map = new Map<string, { count: number; amount: number }>();
     filteredData.forEach((c) => {
@@ -183,7 +176,6 @@ export default function CollectionReportPage() {
     return result;
   }, [filteredData]);
 
-  // ---- Collector Summary Table ----
   const collectorSummary = useMemo(() => {
     const paymentModes = Array.from(
       new Set(filteredData.map((c) => c.paymentModeName))
@@ -249,7 +241,6 @@ export default function CollectionReportPage() {
     return { rows, paymentModes };
   }, [filteredData]);
 
-  // ---- Export Helpers ----
   const getExportFileName = (ext: "xlsx" | "pdf") => {
     const dateStr = fromDate && toDate ? `${fromDate}_to_${toDate}` : "report";
     return `Collection_Report_${dateStr}.${ext}`;
@@ -373,7 +364,7 @@ export default function CollectionReportPage() {
   if (loading) return <div className="p-8 text-center text-slate-500">Loading...</div>;
 
   return (
-    <div className="p-2 space-y-4">
+    <div className="px-4 md:px-5 py-6 md:py-8 space-y-4 max-w-7xl mx-auto bg-slate-50 min-h-screen">
       {/* Action Buttons */}
       <div className="flex flex-wrap items-center justify-end gap-3">
         <button
@@ -399,31 +390,22 @@ export default function CollectionReportPage() {
       {/* Filter Bar */}
       <div className="rounded-lg border border-green-200 bg-white p-4 shadow">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {/* From Date - using DatePicker */}
-          <div>
-            <DatePicker
-              value={fromDate}
-              onChange={setFromDate}
-              label="From Date *"
-              className="w-full"
-              placeholder="Select date"
-              required
-            />
-          </div>
-
-          {/* To Date - using DatePicker */}
-          <div>
-            <DatePicker
-              value={toDate}
-              onChange={setToDate}
-              label="To Date *"
-              className="w-full"
-              placeholder="Select date"
-              required
-            />
-          </div>
-
-          {/* Shop Name */}
+          <DatePicker
+            value={fromDate}
+            onChange={setFromDate}
+            label="From Date *"
+            className="w-full"
+            placeholder="Select date"
+            required
+          />
+          <DatePicker
+            value={toDate}
+            onChange={setToDate}
+            label="To Date *"
+            className="w-full"
+            placeholder="Select date"
+            required
+          />
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Shop Name</label>
             <div className="relative">
@@ -482,8 +464,6 @@ export default function CollectionReportPage() {
               )}
             </div>
           </div>
-
-          {/* Collector */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Collector</label>
             <select
@@ -497,8 +477,6 @@ export default function CollectionReportPage() {
               ))}
             </select>
           </div>
-
-          {/* Payment Mode */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Payment Mode</label>
             <select
@@ -552,7 +530,6 @@ export default function CollectionReportPage() {
 
       {/* Tables Grid */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Payment Mode Summary Table */}
         <div className="overflow-x-auto rounded-lg border border-green-200 bg-white shadow">
           <div className="px-4 py-2 border-b border-slate-200">
             <h4 className="text-sm font-semibold text-slate-700">Payment Mode Summary</h4>
@@ -594,7 +571,6 @@ export default function CollectionReportPage() {
           </table>
         </div>
 
-        {/* Collector Summary Table */}
         <div className="overflow-x-auto rounded-lg border border-green-200 bg-white shadow">
           <div className="px-4 py-2 border-b border-slate-200">
             <h4 className="text-sm font-semibold text-slate-700">Collector Summary</h4>

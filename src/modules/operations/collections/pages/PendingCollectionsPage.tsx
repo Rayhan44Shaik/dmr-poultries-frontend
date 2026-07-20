@@ -21,7 +21,7 @@ import OutstandingSummary from "../components/entry/OutstandingSummary";
 import { PendingKPICards } from "../components/pending/PendingKPICards";
 import { PendingTable } from "../components/pending/PendingTable";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
-import { DatePicker } from "../../../../components/common/DatePicker"; // <-- imported DatePicker
+import { DatePicker } from "../../../../components/common/DatePicker";
 
 const formatDate = (dateStr: string) => {
   if (!dateStr || dateStr === "-") return "-";
@@ -579,7 +579,7 @@ export default function PendingCollectionsPage() {
   };
 
   return (
-    <div className="p-2 space-y-4">
+    <div className="px-4 md:px-5 py-6 md:py-8 space-y-4 max-w-7xl mx-auto bg-slate-50 min-h-screen">
       {summary.showSummary && (
         <OutstandingSummary
           openingBalance={summary.openingBalance}

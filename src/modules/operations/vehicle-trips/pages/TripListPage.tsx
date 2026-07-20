@@ -262,7 +262,13 @@ function TripListPage({ embedded = false }: TripListPageProps) {
 
   // ─── Return ───
   if (embedded) return content;
-  return <div className="p-2">{content}</div>;
+  
+  // Standalone container with increased side padding
+  return (
+    <div className="px-4 md:px-5 py-6 md:py-8 max-w-7xl mx-auto bg-slate-50 min-h-screen">
+      {content}
+    </div>
+  );
 }
 
 export default React.memo(TripListPage);

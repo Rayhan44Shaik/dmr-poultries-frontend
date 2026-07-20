@@ -1,4 +1,3 @@
-import DashboardLayout from "../../../../layouts/DashboardLayout/DashboardLayout";
 import useCompletedTrips from "../hooks/useCompletedTrips";
 import CompletedTripsFilters from "../components/CompletedTripsFilters";
 import CompletedTripsTable from "../components/CompletedTripsTable";
@@ -46,7 +45,6 @@ export default function RatesEntryPage({ embedded = false }: Props) {
   const totalBirds = filteredTrips.reduce((sum, trip) => sum + trip.totalBirds, 0);
   const totalWeight = filteredTrips.reduce((sum, trip) => sum + trip.totalWeight, 0);
 
-  // ---- Handlers ----
   const handleResetFilters = () => {
     resetFilters();
     showNotification("Filters have been reset.", "info");
@@ -112,8 +110,9 @@ export default function RatesEntryPage({ embedded = false }: Props) {
     showNotification("Excel exported successfully!", "success");
   };
 
+  // ─── Content with only vertical spacing ───
   const content = (
-    <div className="px-3 py-0 space-y-6">
+    <div className="space-y-6">
       <CompletedTripsFilters
         fromDate={filter.fromDate}
         toDate={filter.toDate}
@@ -166,6 +165,6 @@ export default function RatesEntryPage({ embedded = false }: Props) {
     </div>
   );
 
-  if (embedded) return content;
-  return <DashboardLayout>{content}</DashboardLayout>;
+  // No standalone wrapper – the parent container supplies padding.
+  return content;
 }

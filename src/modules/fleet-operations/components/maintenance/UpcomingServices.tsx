@@ -1,13 +1,13 @@
 import { memo } from 'react';
-import { AlertCircle, CheckCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, ShieldCheck } from 'lucide-react';
 
-// Define the type inline to match what's returned from the hook
 interface UpcomingService {
   vehicle: any;
   lastMaint: any;
   nextKM: number;
   dueKM: number;
   isDue: boolean;
+  liveCurrentKM: number;
 }
 
 interface UpcomingServicesProps {
@@ -17,58 +17,95 @@ interface UpcomingServicesProps {
 const UpcomingServices = ({ services }: UpcomingServicesProps) => {
   if (!services || services.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-400 text-sm">
-        <CheckCircle className="w-8 h-8 mx-auto mb-2 text-green-500" />
-        All vehicles are up to date with maintenance.
+      <div className="text-center py-12 text-slate-400 text-sm flex flex-col items-center justify-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 p-6">
+        <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-full mb-3 text-emerald-500 shadow-sm animate-pulse">
+          <CheckCircle2 className="w-6 h-6" />
+        </div>
+        <p className="font-bold text-slate-700 text-base">Perfect Condition</p>
+        <p className="text-xs text-slate-400 mt-1 max-w-[200px] leading-relaxed">
+          All commercial fleet lines active and updated.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {services.map((item) => (
-        <div
-          key={item.vehicle.id}
-          className={`border rounded-lg p-3 ${
-            item.isDue ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'
-          }`}
-        >
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-900">{item.vehicle.vehicleNumber}</span>
-                {item.isDue ? (
-                  <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    Overdue
+    <div className="space-y-3 max-h-[440px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+      {services.map((item) => {
+        const hasPassed = item.dueKM <= 0;
+        
+        return (
+          <div
+            key={item.vehicle.id}
+            className={`border rounded-2xl p-4 transition-all duration-300 hover:shadow-md ${
+              item.isDue 
+                ? 'border-rose-100 bg-gradient-to-br from-rose-50/30 to-rose-50/70 hover:border-rose-200' 
+                : 'border-slate-100 bg-white hover:border-slate-200'
+            }`}
+          >
+            <div className="space-y-3">
+              {/* Top Row Header Metadata */}
+              <div className="flex justify-between items-center gap-3">
+                <span className="font-bold text-slate-800 tracking-wide text-sm bg-slate-100/80 px-2.5 py-1 rounded-lg border border-slate-200/40">
+                  {item.vehicle.vehicleNumber}
+                </span>
+                
+                {hasPassed ? (
+                  <span className="px-2 py-1 bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider rounded-md flex items-center gap-1 shadow-sm shadow-rose-600/20">
+                    <AlertTriangle className="w-3 h-3" /> Overdue
+                  </span>
+                ) : item.isDue ? (
+                  <span className="px-2 py-1 bg-amber-500 text-white text-[10px] font-bold uppercase tracking-wider rounded-md flex items-center gap-1 shadow-sm shadow-amber-500/20">
+                    <Clock className="w-3 h-3" /> Due Soon
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
-                    Due Soon
+                  <span className="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold uppercase tracking-wider rounded-md flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" /> Safe
                   </span>
                 )}
               </div>
-              <div className="mt-1 text-sm text-gray-600">
-                {item.lastMaint ? (
-                  <>
-                    Last service: {new Date(item.lastMaint.date).toLocaleDateString()}
-                    <span className="mx-2">•</span>
-                    {item.dueKM > 0 ? `${item.dueKM} KM remaining` : 'Service overdue'}
-                  </>
-                ) : (
-                  'No maintenance record'
-                )}
-              </div>
-              {item.nextKM > 0 && (
-                <div className="mt-1 text-xs text-gray-500">
-                  Next service at {item.nextKM} KM
-                  {item.vehicle.currentKM && ` • Current: ${item.vehicle.currentKM} KM`}
+              
+              {/* Odometer Tracking Comparison */}
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 bg-slate-50/60 p-2 rounded-xl border border-slate-100">
+                <div>
+                  <span className="block text-slate-400 font-medium">Odometer Reading</span>
+                  <span className="font-bold text-slate-700 text-xs">
+                    {item.liveCurrentKM.toLocaleString()} KM
+                  </span>
                 </div>
-              )}
+                <div className="border-l border-slate-200/80 pl-3">
+                  <span className="block text-slate-400 font-medium">Target Service</span>
+                  <span className="font-bold text-slate-700 text-xs">
+                    {item.nextKM.toLocaleString()} KM
+                  </span>
+                </div>
+              </div>
+
+              {/* Dynamic Status String Footer */}
+              <div className="text-xs pt-0.5 flex justify-between items-center border-t border-slate-100/60">
+                <span className="text-slate-400 text-[11px]">
+                  {item.lastMaint 
+                    ? `Last: ${new Date(item.lastMaint.date).toLocaleDateString('en-GB')}` 
+                    : 'No previous service records'}
+                </span>
+                
+                <span className={`font-bold ${
+                  hasPassed 
+                    ? 'text-rose-600 animate-pulse' 
+                    : item.isDue 
+                      ? 'text-amber-600' 
+                      : 'text-emerald-600'
+                }`}>
+                  {hasPassed 
+                    ? `${Math.abs(item.dueKM).toLocaleString()} KM Overdue` 
+                    : `${item.dueKM.toLocaleString()} KM left`}
+                </span>
+              </div>
+              
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

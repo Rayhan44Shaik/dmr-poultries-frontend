@@ -1,3 +1,4 @@
+/*
 import { memo } from 'react';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
 import { useExpenseReportData } from '../hooks/useExpenseReportData';
@@ -74,7 +75,7 @@ const VehicleExpenseReportPage = () => {
           </div>
         </div>
 
-        {/* Filters */}
+        {// Filters }
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
@@ -111,7 +112,7 @@ const VehicleExpenseReportPage = () => {
           </div>
         </div>
 
-        {/* Expense Table */}
+        {// Expense Table }
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -190,7 +191,7 @@ const VehicleExpenseReportPage = () => {
           </div>
         </div>
 
-        {/* Summary Tiles - Only render if there is data */}
+        {// Summary Tiles - Only render if there is data }
         {filtered.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {summaryTiles.map((tile, idx) => (
@@ -208,4 +209,33 @@ const VehicleExpenseReportPage = () => {
   );
 };
 
-export default memo(VehicleExpenseReportPage);
+export default memo(VehicleExpenseReportPage);*/
+
+import { memo } from 'react';
+import ErrorBoundary from '../components/common/ErrorBoundary';
+import { FileText, MessageSquare } from 'lucide-react';
+
+const VehicleReportsPage = () => {
+  return (
+    <ErrorBoundary>
+      {/* 👇 Updated container with reduced horizontal padding and increased top spacing */}
+      <div className="px-1 md:px-3 py-6 md:py-8 space-y-6 max-w-7xl mx-auto bg-slate-50 min-h-screen">
+        <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center">
+          <div className="p-4 bg-purple-50 rounded-full mb-6">
+            <FileText className="w-12 h-12 text-purple-500" />
+          </div>
+          {/* Heading removed */}
+          <p className="text-gray-500 max-w-md">
+            We're currently designing this module based on your feedback.
+          </p>
+          <div className="mt-4 flex items-center gap-2 text-sm text-gray-400">
+            <MessageSquare className="w-4 h-4" />
+            <span>Coming soon – stay tuned!</span>
+          </div>
+        </div>
+      </div>
+    </ErrorBoundary>
+  );
+};
+
+export default memo(VehicleReportsPage);

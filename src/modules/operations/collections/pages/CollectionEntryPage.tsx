@@ -1,4 +1,4 @@
-// CollectionEntryPage.tsx (unchanged)
+// CollectionEntryPage.tsx
 import { useState } from "react";
 import useCollectionEntry from "../hooks/useCollectionEntry";
 import CollectionInformation from "../components/entry/CollectionInformation";
@@ -103,5 +103,10 @@ export default function CollectionEntryPage() {
     </div>
   );
 
-  return <div className="p-2">{content}</div>;
+  // Standalone container with increased side padding and consistent styling
+  return (
+    <div className="px-4 md:px-5 py-6 md:py-8 max-w-7xl mx-auto bg-slate-50 min-h-screen">
+      {content}
+    </div>
+  );
 }

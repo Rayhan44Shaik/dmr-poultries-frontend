@@ -143,7 +143,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   // ─── Content with ZERO top padding ───
   const content = (
-    <div className="space-y-4">   {/* only spacing between children, no top padding */}
+    <div className="space-y-4">
       <TripInformation
         trip={trip}
         setTrip={setTrip}
@@ -204,8 +204,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     return content;  // No wrapper, no padding, no margin
   }
 
-  // Standalone mode: minimal padding only (p-2) to avoid edge touching
-  return <div className="p-2">{content}</div>;
+  // Standalone mode: updated container with reduced horizontal padding and increased top spacing
+ return (
+  <div className="px-4 md:px-5 py-6 md:py-8 max-w-7xl mx-auto bg-slate-50 min-h-screen">
+    {content}
+  </div>
+);
 }
 
 export default React.memo(TripEntryPage);
