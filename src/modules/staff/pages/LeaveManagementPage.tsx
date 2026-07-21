@@ -1,10 +1,8 @@
 // src/modules/staff/pages/LeaveManagementPage.tsx
 
 import { useState, useCallback } from 'react';
-import { useLeaveManagement } from '../hooks/useLeaveManagement'; // ✅ named import
+import { useLeaveManagement } from '../hooks/useLeaveManagement';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
-import LeaveStats from '../components/leave/LeaveStats';
-import LeaveBalanceSummary from '../components/leave/LeaveBalanceSummary';
 import LeaveFilters from '../components/leave/LeaveFilters';
 import LeaveRequestForm from '../components/leave/LeaveRequestForm';
 import LeaveTable from '../components/leave/LeaveTable';
@@ -18,8 +16,6 @@ function LeaveManagementPage({ embedded = false }: LeaveManagementPageProps) {
 
   const {
     leaves,
-    stats,
-    totalBalances,
     filter,
     setFilter,
     search,
@@ -59,11 +55,7 @@ function LeaveManagementPage({ embedded = false }: LeaveManagementPageProps) {
 
   const content = (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Leave Management</h1>
-          <p className="text-sm text-slate-500">Manage employee leave requests and balances</p>
-        </div>
+      <div className="flex justify-end">
         <button
           onClick={() => setShowForm(!showForm)}
           className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium shadow-sm transition active:scale-95"
@@ -72,9 +64,6 @@ function LeaveManagementPage({ embedded = false }: LeaveManagementPageProps) {
           {showForm ? 'Hide Form' : 'New Request'}
         </button>
       </div>
-
-      <LeaveStats stats={stats} />
-      <LeaveBalanceSummary balances={totalBalances} />
 
       <LeaveFilters
         filter={filter}
@@ -86,7 +75,7 @@ function LeaveManagementPage({ embedded = false }: LeaveManagementPageProps) {
 
       {showForm && (
         <LeaveRequestForm
-          employees={employees.map((e: any) => ({ id: e.id, name: e.employeeName }))}
+          employees={employees} // ✅ Pass full employees list directly matching Employee[]
           onSubmit={handleAddLeave}
           onCancel={() => setShowForm(false)}
         />
