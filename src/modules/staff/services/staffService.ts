@@ -1,5 +1,3 @@
-// src/modules/staff/services/staffService.ts
-
 import type {
   Employee,
   Trip,
@@ -23,7 +21,7 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
-export function getCache<T>(key: string): T | null {
+function getCache<T>(key: string): T | null {
   const raw = localStorage.getItem(key);
   if (!raw) return null;
   try {
@@ -38,12 +36,12 @@ export function getCache<T>(key: string): T | null {
   }
 }
 
-export function setCache<T>(key: string, data: T): void {
+function setCache<T>(key: string, data: T): void {
   const entry: CacheEntry<T> = { data, timestamp: Date.now() };
   localStorage.setItem(key, JSON.stringify(entry));
 }
 
-export function clearCache(prefix: string): void {
+function clearCache(prefix: string): void {
   const keys = Object.keys(localStorage);
   keys.forEach((key) => {
     if (key.startsWith(prefix)) {
@@ -272,12 +270,7 @@ export function getStaffDashboardData(
 }
 
 export function clearStaffDashboardCache(): void {
-  const keys = Object.keys(localStorage);
-  keys.forEach((key) => {
-    if (key.startsWith(DASHBOARD_CACHE_KEY)) {
-      localStorage.removeItem(key);
-    }
-  });
+  clearCache(DASHBOARD_CACHE_KEY);
 }
 
 // ============================================================
@@ -328,7 +321,7 @@ export function getLeaveBalance(employeeId: number): LeaveBalance | null {
 export function getAllLeaveBalances(): LeaveBalance[] {
   const employees = loadEmployees();
   return employees
-    .map((e: Employee) => getLeaveBalance(e.id))
+    .map((e) => getLeaveBalance(e.id))
     .filter((b): b is LeaveBalance => b !== null);
 }
 
@@ -347,26 +340,51 @@ export function getShiftConfigs(): ShiftConfig[] {
   ];
 }
 
-export function getDutyPlannerData(weekStart: string, department: string, role: string): {
+/**
+ * Get duty planner data for a given week and list of roles.
+ * Department filter is removed – we only filter by roles.
+ * Returns all distinct roles from the entire employee pool for the dropdown.
+ */
+export function getDutyPlannerData(
+  weekStart: string,
+  roles: string[]
+): {
   employees: Employee[];
   assignments: DutyAssignment[];
   weekDays: string[];
+  allRoles: string[];
 } {
-  const employees = loadEmployees();
-  let filtered = employees;
-  if (department) filtered = filtered.filter(e => e.department === department);
-  if (role) filtered = filtered.filter(e => e.role === role);
+  const allEmployees = loadEmployees();
 
-  const allAssignments = loadDutyAssignments();
+  // Compute all distinct roles (for the multi‑select dropdown)
+  const allRoles = Array.from(new Set(allEmployees.map(e => e.role).filter(Boolean)));
+
+  // Filter employees by roles (if any selected)
+  let filtered = allEmployees;
+  if (roles && roles.length > 0) {
+    filtered = filtered.filter(e => roles.includes(e.role));
+  }
+
+  // Generate week days (Monday to Sunday)
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart);
     d.setDate(d.getDate() + i);
     return d.toISOString().split('T')[0];
   });
 
-  const assignments = allAssignments.filter(a => weekDays.includes(a.date));
+  // Load all assignments and filter to only those for filtered employees and week days
+  const allAssignments = loadDutyAssignments();
+  const employeeIds = new Set(filtered.map(e => e.id));
+  const assignments = allAssignments.filter(
+    a => employeeIds.has(a.employeeId) && weekDays.includes(a.date)
+  );
 
-  return { employees: filtered, assignments, weekDays };
+  return {
+    employees: filtered,
+    assignments,
+    weekDays,
+    allRoles,
+  };
 }
 
 // ============================================================
@@ -379,8 +397,7 @@ export function getAttendanceMonthMatrix(_month: string, department: string): At
   if (department) filtered = filtered.filter(e => e.department === department);
 
   const allRecords = loadAttendanceRecords();
-  // TODO: Filter records by _month when the data model includes a month field.
-  // For now, return all records that match the employee list.
+  // TODO: Filter by _month when data model includes a month field.
   const monthRecords = allRecords;
 
   if (monthRecords.length === 0) {

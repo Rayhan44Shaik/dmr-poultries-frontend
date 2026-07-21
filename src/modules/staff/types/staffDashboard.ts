@@ -88,10 +88,9 @@ export interface DutyAssignment {
 
 export interface DutyPlannerFilters {
   department: string;
-  role: string;
-  weekStart: string; // Monday date
+  role: string[];          // changed from string to array
+  weekStart: string;       // Monday date
 }
-
 export interface ShiftConfig {
   type: 'Driver' | 'Delivery' | 'Rest' | 'Repair' | 'Office' | 'WeeklyOff';
   label: string;

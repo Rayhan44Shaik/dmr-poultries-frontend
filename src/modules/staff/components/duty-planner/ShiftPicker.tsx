@@ -10,25 +10,35 @@ interface ShiftPickerProps {
   onSelect: (dutyType: string) => void;
   currentDuty?: string;
   date: string;
+  employeeName?: string;
+  employeeRole?: string;
 }
 
-function ShiftPicker({ isOpen, onClose, onSelect, currentDuty, date }: ShiftPickerProps) {
+function ShiftPicker({ isOpen, onClose, onSelect, currentDuty, date, employeeName, employeeRole }: ShiftPickerProps) {
   if (!isOpen) return null;
 
   const shifts = getShiftConfigs();
   const dateObj = new Date(date);
   const isSaturday = dateObj.getDay() === 6;
 
+  const formattedDate = !isNaN(dateObj.getTime()) 
+    ? dateObj.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' }) 
+    : date;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 animate-fadeIn">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-slate-800">Select Duty</h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg transition">
-            <X size={20} className="text-slate-500" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 animate-fadeIn border border-slate-100">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-base font-bold text-slate-800">
+            Select Duty for <span className="text-green-600 font-normal">{employeeName || 'Employee'}{employeeRole ? ` (${employeeRole})` : ''}</span>
+          </h3>
+          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg transition shrink-0 ml-2">
+            <X size={18} className="text-slate-500" />
           </button>
         </div>
-        <p className="text-sm text-slate-500 mb-3">{date}</p>
+
+        <p className="text-xs font-medium text-slate-400 mb-4">{formattedDate}</p>
+
         <div className="grid grid-cols-2 gap-2">
           {shifts.map((shift) => {
             const disabled = isSaturday && (shift.type === 'Rest' || shift.type === 'WeeklyOff');
@@ -40,20 +50,21 @@ function ShiftPicker({ isOpen, onClose, onSelect, currentDuty, date }: ShiftPick
                   onSelect(shift.type);
                 }}
                 disabled={disabled}
-                className={`py-2 px-3 rounded-lg border text-sm font-medium transition hover:shadow-md active:scale-95 ${
+                className={`py-2.5 px-3 rounded-xl border text-sm font-semibold transition hover:shadow-md active:scale-95 ${
                   currentDuty === shift.type ? 'ring-2 ring-blue-500 ring-offset-2' : ''
                 } ${shift.bgColor} ${shift.textColor} ${shift.borderColor} ${
                   disabled ? 'opacity-40 cursor-not-allowed' : ''
                 }`}
               >
                 {shift.label}
-                {disabled && <span className="block text-[10px] text-rose-500">(Saturday)</span>}
+                {disabled && <span className="block text-[10px] text-rose-500 font-normal">(Saturday)</span>}
               </button>
             );
           })}
         </div>
+
         <div className="mt-4 text-xs text-slate-400 text-center">
-          {isSaturday && <span className="text-rose-500">Saturday: Compulsory duty (cannot be Rest or Weekly Off)</span>}
+          {isSaturday && <span className="text-rose-500 font-medium">Saturday: Compulsory duty (cannot be Rest or Weekly Off)</span>}
         </div>
       </div>
     </div>

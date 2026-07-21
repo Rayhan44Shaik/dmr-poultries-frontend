@@ -2,9 +2,11 @@
 
 import { memo } from 'react';
 import { getShiftConfigs } from '../../services/staffService';
+import { isDateLocked } from '../../hooks/useDutyPlanner';
+import type { Employee } from '../../types/staffDashboard';
 
 interface DutyPlannerGridProps {
-  employees: any[];
+  employees: Employee[];
   weekDays: string[];
   getAssignment: (employeeId: number, date: string) => any;
   onCellClick: (employeeId: number, date: string) => void;
@@ -60,14 +62,27 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
                   const dutyType = assignment?.dutyType || '';
                   const { bg, text, border } = getShiftStyle(dutyType);
                   const isSaturday = new Date(day).getDay() === 6;
+                  const locked = isDateLocked(day);
+
                   return (
                     <td key={idx} className="px-1 py-1 text-center">
                       <button
                         onClick={() => onCellClick(emp.id, day)}
-                        className={`w-full min-w-[60px] py-1.5 rounded-lg text-xs font-medium border transition hover:shadow-md active:scale-95 ${bg} ${text} ${border} ${
+                        disabled={locked}
+                        className={`w-full min-w-[60px] py-1.5 rounded-lg text-xs font-medium border transition ${
+                          locked 
+                            ? 'bg-slate-100 text-slate-400 border-slate-200 opacity-75 cursor-not-allowed' 
+                            : `${bg} ${text} ${border} hover:shadow-md active:scale-95`
+                        } ${
                           isSaturday && (dutyType === 'Rest' || dutyType === 'WeeklyOff') ? 'opacity-50 line-through' : ''
                         }`}
-                        title={isSaturday ? 'Saturday – compulsory duty' : ''}
+                        title={
+                          locked 
+                            ? 'Past week locked (cannot edit)' 
+                            : isSaturday 
+                            ? 'Saturday – compulsory duty' 
+                            : ''
+                        }
                       >
                         {dutyType || '—'}
                       </button>
