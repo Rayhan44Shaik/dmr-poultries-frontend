@@ -53,8 +53,8 @@ function LeaveManagementPage({ embedded = false }: LeaveManagementPageProps) {
     setSearch('');
   };
 
-  const content = (
-    <div className="pt-3 px-5 space-y-4 w-full bg-gradient-to-b from-slate-50/50 to-white min-h-screen">
+  return (
+    <div className={embedded ? "space-y-4 w-full" : "pt-3 px-5 space-y-4 w-full bg-gradient-to-b from-slate-50/50 to-white min-h-screen"}>
       <div className="flex justify-end">
         <button
           onClick={() => setShowForm(!showForm)}
@@ -75,7 +75,7 @@ function LeaveManagementPage({ embedded = false }: LeaveManagementPageProps) {
 
       {showForm && (
         <LeaveRequestForm
-          employees={employees} // ✅ Pass full employees list directly matching Employee[]
+          employees={employees}
           onSubmit={handleAddLeave}
           onCancel={() => setShowForm(false)}
         />
@@ -95,9 +95,6 @@ function LeaveManagementPage({ embedded = false }: LeaveManagementPageProps) {
       )}
     </div>
   );
-
-  if (embedded) return content;
-  return content;
 }
 
 export default LeaveManagementPage;

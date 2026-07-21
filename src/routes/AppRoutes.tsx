@@ -1,3 +1,5 @@
+// src/routes/AppRoutes.tsx
+
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout/DashboardLayout";
 
@@ -150,7 +152,7 @@ function AppRoutes() {
           }
         />
 
-        {/* Fleet – with layout (sidebar is rendered via DashboardLayout) */}
+        {/* Fleet */}
         <Route
           path="/fleet"
           element={

@@ -11,7 +11,7 @@ type SalaryTableProps = {
   isSelectDropdownOpen: boolean;
   setIsSelectDropdownOpen: (open: boolean) => void;
   dropdownRef: React.RefObject<HTMLDivElement | null>;
-  formatCurrency: (amount: number) => string;
+  formatCurrency?: (amount: number) => string;
   currentPage: number;
   setCurrentPage: (page: number) => void;
   itemsPerPage: number;
@@ -35,6 +35,15 @@ export function SalaryTable({
   onClearSelection,
 }: SalaryTableProps) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  // Fallback formatter if parent component didn't pass formatCurrency prop
+  const formatVal = formatCurrency || ((amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+    }).format(amount || 0);
+  });
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -192,19 +201,19 @@ export function SalaryTable({
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-right font-semibold text-slate-700">
-                    {formatCurrency(record.baseSalary || record.grossSalary || 0)}
+                    {formatVal(record.baseSalary || record.grossSalary || 0)}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-rose-600">
-                    {formatCurrency(record.totalDeductions || record.leaveDeduction || 0)}
+                    {formatVal(record.totalDeductions || record.leaveDeduction || 0)}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-amber-600">
-                    {formatCurrency(record.latePenalty || 0)}
+                    {formatVal(record.latePenalty || 0)}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-blue-600">
-                    {formatCurrency(record.advanceRecovery || 0)}
+                    {formatVal(record.advanceRecovery || 0)}
                   </td>
                   <td className={`px-4 py-3 text-sm text-right font-bold ${isPaid ? 'text-emerald-600' : 'text-amber-600'}`}>
-                    {formatCurrency(record.netSalary)}
+                    {formatVal(record.netSalary)}
                   </td>
                 </tr>
               );

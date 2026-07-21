@@ -669,7 +669,7 @@ function SalaryRegisterPage({ embedded = false }: SalaryRegisterPageProps) {
             </div>
           </div>
 
-          {/* Action Buttons wrapped with an alignment spacer label */}
+          {/* Action Buttons */}
           <div>
             <div className="block text-xs font-semibold text-transparent uppercase tracking-wider mb-1 select-none pointer-events-none" aria-hidden="true">Action</div>
             <div className="flex items-center gap-2">
@@ -788,62 +788,48 @@ function SalaryRegisterPage({ embedded = false }: SalaryRegisterPageProps) {
             selectedIds={selectedIds}
             toggleSelectOne={toggleSelectOne}
             toggleSelectAll={toggleSelectAll}
-            isSelectDropdownOpen={isSelectDropdownOpen}
-            setIsSelectDropdownOpen={(val: boolean | ((prev: boolean) => boolean)) => {
-              const nextVal = typeof val === 'function' ? val(isSelectDropdownOpen) : val;
-              setIsSelectDropdownOpen(nextVal);
-              if (nextVal) {
-                setIsMonthPickerOpen(false);
-              }
-            }}
-            dropdownRef={dropdownRef}
-            formatCurrency={formatCurrency}
             currentPage={currentPage}
-            setCurrentPage={setCurrentPage}
             itemsPerPage={itemsPerPage}
-            currentMonth={month}
-            onClearSelection={() => setSelectedIds([])}
+            onView={(record: any) => setSelectedRecordForView(record)}
+            onEdit={(record: any) => setSelectedRecordForEdit(record)}
+            onMarkPaid={handleMarkPaid}
           />
         </div>
       )}
 
+      {/* Modals */}
       {selectedRecordForView && (
         <SalaryView
           record={selectedRecordForView}
-          month={month}
           onClose={() => setSelectedRecordForView(null)}
-          onMarkPaid={handleMarkPaid}
-          formatCurrency={formatCurrency}
         />
       )}
 
       {selectedRecordForEdit && (
         <SalaryEdit
           record={selectedRecordForEdit}
-          isOpen={!!selectedRecordForEdit}
           onClose={() => setSelectedRecordForEdit(null)}
           onSave={handleSaveEdit}
-          formatCurrency={formatCurrency}
         />
       )}
 
       {confirmConfig?.isOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xl max-w-md w-full p-5 space-y-3 animate-in fade-in zoom-in-95 duration-150">
-            <h3 className="text-base font-bold text-slate-800">{confirmConfig.title}</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl border border-slate-200 space-y-4">
+            <h3 className="text-base font-bold text-slate-900">{confirmConfig.title}</h3>
             <p className="text-xs text-slate-600">{confirmConfig.message}</p>
-            <div className="flex items-center justify-end gap-2.5 pt-2">
+            <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setConfirmConfig(null)}
-                className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirmConfig.onConfirm}
-                className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition shadow-sm"
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition shadow-sm"
               >
                 Confirm
               </button>
@@ -854,7 +840,6 @@ function SalaryRegisterPage({ embedded = false }: SalaryRegisterPageProps) {
     </div>
   );
 
-  if (embedded) return content;
   return content;
 }
 
