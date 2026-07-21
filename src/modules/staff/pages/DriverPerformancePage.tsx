@@ -9,6 +9,7 @@ import DutyTypeDonutChart from '../components/performance/DutyTypeDonutChart';
 import PerformanceExportButtons from '../components/performance/PerformanceExportButtons';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { exportToPDF, exportToExcel } from '../../../utils/exportUtils';
+import { getEmployees } from '../../masters/employees/services/employeeService';
 
 type DriverPerformancePageProps = {
   embedded?: boolean;
@@ -25,21 +26,69 @@ function DriverPerformancePage({ embedded = false }: DriverPerformancePageProps)
   const [fromDate, setFromDate] = useState(defaultFromDate);
   const [toDate, setToDate] = useState(today);
   const [selectedDriverId, setSelectedDriverId] = useState<number | null>(null);
+  const [syncedDrivers, setSyncedDrivers] = useState<any[]>([]);
 
-  // ✅ Removed unused 'refresh'
   const { performance, loading, error, availableDrivers, trendData } =
     useDriverPerformance(selectedDriverId, fromDate, toDate);
 
+  // Robustly sync and map drivers from employee service with fallback to availableDrivers
   useEffect(() => {
-    if (availableDrivers.length > 0 && selectedDriverId === null) {
-      setSelectedDriverId(availableDrivers[0].id);
+    let isMounted = true;
+    try {
+      const result = getEmployees() as any;
+      const processEmployees = (data: any) => {
+        if (!Array.isArray(data)) {
+          if (isMounted) setSyncedDrivers(availableDrivers);
+          return;
+        }
+        const mapped = data.map((emp: any) => ({
+          id: emp.id || emp.employeeId,
+          name: emp.name || emp.employeeName || emp.fullName || `Driver ${emp.id || ''}`,
+          department: emp.department || emp.dept || emp.departmentName || '',
+          role: emp.role || emp.designation || emp.jobTitle || ''
+        }));
+
+        // Filter for drivers/transport or use all employees if none specifically marked
+        const filtered = mapped.filter((emp: any) => {
+          const text = `${emp.department} ${emp.role} ${emp.name}`.toLowerCase();
+          return text.includes('driver') || text.includes('transport') || text.includes('logistics');
+        });
+
+        const finalDrivers = filtered.length > 0 ? filtered : (mapped.length > 0 ? mapped : availableDrivers);
+        if (isMounted) {
+          setSyncedDrivers(finalDrivers);
+        }
+      };
+
+      if (result && typeof result.then === 'function') {
+        result.then(processEmployees).catch(() => {
+          if (isMounted) setSyncedDrivers(availableDrivers);
+        });
+      } else if (Array.isArray(result)) {
+        processEmployees(result);
+      } else {
+        if (isMounted) setSyncedDrivers(availableDrivers);
+      }
+    } catch {
+      if (isMounted) setSyncedDrivers(availableDrivers);
     }
-  }, [availableDrivers, selectedDriverId]);
+    return () => {
+      isMounted = false;
+    };
+  }, [availableDrivers]);
+
+  const activeDriverList = syncedDrivers.length > 0 ? syncedDrivers : availableDrivers;
+
+  useEffect(() => {
+    if (activeDriverList.length > 0 && (selectedDriverId === null || !activeDriverList.some((d: any) => d.id === selectedDriverId))) {
+      setSelectedDriverId(activeDriverList[0].id);
+    }
+  }, [activeDriverList, selectedDriverId]);
 
   const handleReset = () => {
     setFromDate(defaultFromDate);
     setToDate(today);
-    setSelectedDriverId(availableDrivers.length > 0 ? availableDrivers[0].id : null);
+    setSelectedDriverId(activeDriverList.length > 0 ? activeDriverList[0].id : null);
   };
 
   const handleExportPDF = () => {
@@ -47,7 +96,7 @@ function DriverPerformancePage({ embedded = false }: DriverPerformancePageProps)
       showNotification('No data to export.', 'error');
       return;
     }
-    const driver = availableDrivers.find((d) => d.id === selectedDriverId);
+    const driver = activeDriverList.find((d: any) => d.id === selectedDriverId);
     const headers = ['Metric', 'Value'];
     const rows = [
       ['Total Trips', performance.totalTrips.toString()],
@@ -70,7 +119,7 @@ function DriverPerformancePage({ embedded = false }: DriverPerformancePageProps)
       showNotification('No data to export.', 'error');
       return;
     }
-    const driver = availableDrivers.find((d) => d.id === selectedDriverId);
+    const driver = activeDriverList.find((d: any) => d.id === selectedDriverId);
     const headers = ['Metric', 'Value'];
     const rows = [
       ['Total Trips', performance.totalTrips],
@@ -118,12 +167,8 @@ function DriverPerformancePage({ embedded = false }: DriverPerformancePageProps)
     : [];
 
   const content = (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Driver Performance Report</h1>
-          <p className="text-sm text-slate-500">Track driver logistics efficiency and performance metrics</p>
-        </div>
+    <div className="pt-3 px-7 pb-6 space-y-4 w-full bg-gradient-to-b from-slate-50/50 to-white min-h-screen">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3">
         <PerformanceExportButtons
           onExportPDF={handleExportPDF}
           onExportExcel={handleExportExcel}
@@ -135,7 +180,7 @@ function DriverPerformancePage({ embedded = false }: DriverPerformancePageProps)
         fromDate={fromDate}
         toDate={toDate}
         selectedId={selectedDriverId}
-        availableList={availableDrivers}
+        availableList={activeDriverList}
         label="Driver"
         setFromDate={setFromDate}
         setToDate={setToDate}

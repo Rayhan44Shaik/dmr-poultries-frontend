@@ -1,3 +1,5 @@
+// src/modules/staff/pages/StaffReportsPage.tsx
+
 import { useCallback } from 'react';
 import { useStaffReports } from '../hooks/useStaffReports';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
@@ -26,7 +28,7 @@ function StaffReportsPage({ embedded = false }: StaffReportsPageProps) {
       return;
     }
     const headers = Object.keys(data[0]);
-    const rows = data.map(row => headers.map(h => String(row[h] ?? '-')));
+    const rows = data.map(row => headers.map(h => String((row as Record<string, any>)[h] ?? '-')));
     const title = getReportTitle(filters.reportType);
     const filename = `${title.replace(/\s/g, '_')}_${new Date().toISOString().split('T')[0]}`;
     exportToPDF(title, headers, rows, filename);
@@ -39,7 +41,7 @@ function StaffReportsPage({ embedded = false }: StaffReportsPageProps) {
       return;
     }
     const headers = Object.keys(data[0]);
-    const rows = data.map(row => headers.map(h => row[h] ?? '-'));
+    const rows = data.map(row => headers.map(h => (row as Record<string, any>)[h] ?? '-'));
     const title = getReportTitle(filters.reportType);
     const filename = `${title.replace(/\s/g, '_')}_${new Date().toISOString().split('T')[0]}`;
     exportToExcel(title, headers, rows, filename);
@@ -52,11 +54,6 @@ function StaffReportsPage({ embedded = false }: StaffReportsPageProps) {
 
   const content = (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">Staff Reports</h1>
-        <p className="text-sm text-slate-500">Generate and export reports for all staff modules</p>
-      </div>
-
       <ReportTiles
         reportType={filters.reportType}
         onSelect={(type) => updateFilters({ reportType: type as any })}

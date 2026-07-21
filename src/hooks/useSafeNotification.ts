@@ -1,3 +1,5 @@
+// src/hooks/useSafeNotification.ts
+
 import { useNotification } from "../context/NotificationContext";
 
 export function useSafeNotification() {
@@ -5,7 +7,8 @@ export function useSafeNotification() {
     return useNotification();
   } catch {
     return {
-      showNotification: (msg: string, _type?: "success" | "error" | "info") => {
+      showNotification: (msg: string, type?: "success" | "error" | "info") => {
+        console.log(`[${type?.toUpperCase() || 'INFO'}] ${msg}`);
         alert(msg);
       },
       hideNotification: () => {},
