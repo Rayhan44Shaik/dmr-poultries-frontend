@@ -1,6 +1,6 @@
 // src/hooks/useSafeNotification.ts
 
-import { useNotification } from "../context/NotificationContext";
+import { useNotification } from "../providers/NotificationProvider";
 
 export function useSafeNotification() {
   try {
