@@ -52,8 +52,9 @@ export default function Sidebar() {
     { title: "Overview", path: "/operations/overview", icon: <Gauge size={14} /> },
     { title: "Trip Entry", path: "/operations/vehicle-trips/entry", icon: <Truck size={14} /> },
     { title: "Trip List", path: "/operations/vehicle-trips/list", icon: <FileText size={14} /> },
-    { title: "Shop Sales", path: "/operations/shop-sales", icon: <ShoppingCart size={14} /> },
-    { title: "Rate Entry", path: "/operations/shop-sales/rate-entry", icon: <File size={14} /> },
+    // Shop routes under /operations/shop/
+    { title: "Shop Sales", path: "/operations/shop/shop-sales", icon: <ShoppingCart size={14} /> },
+    { title: "Rate Entry", path: "/operations/shop/rate-entry", icon: <File size={14} /> },
     { title: "Collection", path: "/operations/collections/entry", icon: <HandCoins size={14} /> },
     { title: "Pending Collections", path: "/operations/collections/pending", icon: <Clock size={14} /> },
     { title: "Collection Report", path: "/operations/collections/report", icon: <FileSpreadsheet size={14} /> },
@@ -70,7 +71,12 @@ export default function Sidebar() {
     { title: "Profit & Loss", path: "/accounts/profit-loss", icon: <TrendingUp size={14} /> },
   ];
 
-  const isActiveParent = (path: string) => location.pathname.startsWith(path);
+  // Better matching logic for parent items
+  const isActiveParent = (path: string) => {
+    if (location.pathname === path) return true;
+    return location.pathname.startsWith(path + "/");
+  };
+
   const isActiveExact = (path: string) => location.pathname === path;
 
   return (

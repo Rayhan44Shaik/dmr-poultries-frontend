@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { collectionService } from "../services/collectionService";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
@@ -75,21 +75,27 @@ export default function CollectionReportPage() {
   const [collector, setCollector] = useState("");
   const [paymentMode, setPaymentMode] = useState("");
 
+  const shopSearch = useShopSearch(allShopNames, shopName, setShopName);
+
+  // FIX: loadData without useCallback to prevent dependency issues
+  const loadData = () => {
+    try {
+      const all = collectionService.getCollections();
+      setAllCollections(all);
+      setLoading(false);
+    } catch (error) {
+      console.error("Failed to load collection data:", error);
+      setLoading(false);
+    }
+  };
+
+  // FIX: useEffect with empty dependency array - runs only once
   useEffect(() => {
-    const loadData = () => {
-      try {
-        const all = collectionService.getCollections();
-        setAllCollections(all);
-        setLoading(false);
-      } catch (error) {
-        showNotification("Failed to load collection data.", "error");
-        setLoading(false);
-      }
-    };
     loadData();
-    window.addEventListener("storage", loadData);
-    return () => window.removeEventListener("storage", loadData);
-  }, [showNotification]);
+    const handleStorage = () => loadData();
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []); // EMPTY DEPENDENCY ARRAY - runs only once
 
   const filteredData = useMemo(() => {
     let data = allCollections.filter((c) => c.status === "Approved");
@@ -246,7 +252,7 @@ export default function CollectionReportPage() {
     return `Collection_Report_${dateStr}.${ext}`;
   };
 
-  const exportExcel = () => {
+  const exportExcel = useCallback(() => {
     if (filteredData.length === 0) {
       showNotification("No data to export.", "error");
       return;
@@ -279,9 +285,9 @@ export default function CollectionReportPage() {
     } catch (error) {
       showNotification("Failed to export Excel.", "error");
     }
-  };
+  }, [filteredData, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate]);
 
-  const exportPDF = () => {
+  const exportPDF = useCallback(() => {
     if (filteredData.length === 0) {
       showNotification("No data to export.", "error");
       return;
@@ -347,9 +353,9 @@ export default function CollectionReportPage() {
     } catch (error) {
       showNotification("Failed to export PDF.", "error");
     }
-  };
+  }, [filteredData, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate]);
 
-  const resetFilters = () => {
+  const resetFilters = useCallback(() => {
     setFromDate(defaultFromDate);
     setToDate(defaultToDate);
     setShopName("");
@@ -357,9 +363,7 @@ export default function CollectionReportPage() {
     setPaymentMode("");
     shopSearch.setQuery("");
     showNotification("Filters reset to default (current week).", "info");
-  };
-
-  const shopSearch = useShopSearch(allShopNames, shopName, setShopName);
+  }, [defaultFromDate, defaultToDate, shopSearch, showNotification]);
 
   if (loading) return <div className="p-8 text-center text-slate-500">Loading...</div>;
 

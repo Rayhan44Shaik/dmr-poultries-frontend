@@ -1,5 +1,6 @@
 // src/modules/operations/routes/operationsRoutes.tsx
-import { Navigate, type RouteObject } from "react-router-dom";
+
+import { Navigate, Outlet, type RouteObject } from "react-router-dom";
 import DashboardLayout from "../../../layouts/DashboardLayout/DashboardLayout";
 import OperationsDashboard from "../pages/OperationsDashboard";
 import TripEntryPage from "../vehicle-trips/pages/TripEntryPage";
@@ -16,21 +17,18 @@ const operationsRoutes: RouteObject[] = [
     path: "/operations",
     element: (
       <DashboardLayout>
-        <OperationsDashboard />
+        <Outlet />
       </DashboardLayout>
     ),
     children: [
-      // Redirect from /operations to /operations/overview (so dashboard shows)
       {
         index: true,
         element: <Navigate to="/operations/overview" replace />,
       },
-      // Overview – no separate element, handled by parent
       {
         path: "overview",
-        element: null,
+        element: <OperationsDashboard />,
       },
-      // Functional modules
       {
         path: "vehicle-trips/entry",
         element: <TripEntryPage />,
@@ -39,12 +37,13 @@ const operationsRoutes: RouteObject[] = [
         path: "vehicle-trips/list",
         element: <TripListPage />,
       },
+      // Shop routes under /operations/shop/
       {
-        path: "shop-sales",
+        path: "shop/shop-sales",
         element: <ShopSalesPage />,
       },
       {
-        path: "shop-sales/rate-entry",
+        path: "shop/rate-entry",
         element: <RatesEntryPage embedded={true} />,
       },
       {

@@ -63,3 +63,16 @@ export function formatDateToYYYYMMDD(date: Date): string {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+export const formatDate = (date: Date | string, locale = 'en-IN') => {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return d.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+export const formatCurrency = (amount: number, currency = 'INR') => {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+  }).format(amount);
+};

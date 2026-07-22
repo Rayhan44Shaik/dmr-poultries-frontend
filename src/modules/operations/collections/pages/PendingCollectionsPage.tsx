@@ -105,24 +105,27 @@ export default function PendingCollectionsPage() {
     showSummary: false,
   });
 
-  // Load data
+  // FIX: Load data function - no useCallback needed
+  const loadData = () => {
+    try {
+      const pending = collectionService.getPendingCollections();
+      const all = collectionService.getCollections();
+      setPendingData(pending);
+      setAllCollections(all);
+      setLoading(false);
+    } catch (error) {
+      console.error("Failed to load data:", error);
+      setLoading(false);
+    }
+  };
+
+  // FIX: useEffect with EMPTY dependency array - runs only once
   useEffect(() => {
-    const loadData = () => {
-      try {
-        const pending = collectionService.getPendingCollections();
-        const all = collectionService.getCollections();
-        setPendingData(pending);
-        setAllCollections(all);
-        setLoading(false);
-      } catch (error) {
-        showNotification("Failed to load data", "error");
-        setLoading(false);
-      }
-    };
     loadData();
-    window.addEventListener("storage", loadData);
-    return () => window.removeEventListener("storage", loadData);
-  }, [showNotification]);
+    const handleStorage = () => loadData();
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []); // <-- EMPTY ARRAY = runs once on mount
 
   // ---- Click outside to deselect ----
   useEffect(() => {

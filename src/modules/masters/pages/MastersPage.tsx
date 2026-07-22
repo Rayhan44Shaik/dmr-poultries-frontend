@@ -1,6 +1,7 @@
+// src/modules/masters/pages/MastersPage.tsx
+
 import React, { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import DashboardLayout from "../../../layouts/DashboardLayout/DashboardLayout";
 import {
   Store,
   Sprout,
@@ -49,43 +50,41 @@ function MastersPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="px-4 sm:px-6 lg:px-8 pt-0 pb-6">
-        {/* Tab Bar – Operations style with coloured icons */}
-        <div className="bg-white border-b border-slate-200 rounded-t-xl -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-1 overflow-x-auto py-2 scrollbar-hide">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => handleTabChange(tab.key)}
-                  className={`
-                    flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200
-                    ${isActive
-                      ? "bg-blue-50 text-blue-700 border-b-2 border-blue-600"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                    }
-                  `}
-                >
-                  <Icon
-                    size={18}
-                    className={isActive ? "text-blue-700" : tab.color}
-                  />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Content Area */}
-        <div className="mt-6 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <ActiveComponent embedded={true} />
+    <div className="space-y-6">
+      {/* Tab Bar – Operations style with coloured icons */}
+      <div className="bg-white border-b border-slate-200 rounded-t-xl -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-1 overflow-x-auto py-2 scrollbar-hide">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => handleTabChange(tab.key)}
+                className={`
+                  flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200
+                  ${isActive
+                    ? "bg-blue-50 text-blue-700 border-b-2 border-blue-600"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                  }
+                `}
+              >
+                <Icon
+                  size={18}
+                  className={isActive ? "text-blue-700" : tab.color}
+                />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
-    </DashboardLayout>
+
+      {/* Content Area */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <ActiveComponent embedded={true} />
+      </div>
+    </div>
   );
 }
 
