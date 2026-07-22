@@ -2,15 +2,21 @@
 
 import { X, FileText, CheckCircle2, Layers, ShieldAlert, Receipt } from 'lucide-react';
 
-type SalaryViewProps = {
+export type SalaryViewProps = {
   record: any;
-  month: string;
+  month?: string;
   onClose: () => void;
-  onMarkPaid: (id: string) => void;
-  formatCurrency: (amount: number) => string;
+  onMarkPaid?: (id: string) => void;
+  formatCurrency?: (amount: number) => string;
 };
 
-export function SalaryView({ record, month, onClose, onMarkPaid, formatCurrency }: SalaryViewProps) {
+export function SalaryView({ 
+  record, 
+  month = 'Current Month', 
+  onClose, 
+  onMarkPaid, 
+  formatCurrency = (amt) => `$${amt.toLocaleString()}` 
+}: SalaryViewProps) {
   if (!record) return null;
 
   const roleStr = record.role || '';
@@ -119,7 +125,7 @@ export function SalaryView({ record, month, onClose, onMarkPaid, formatCurrency 
             <span className="text-xs text-emerald-700 font-medium block">Net Salary Payable</span>
             <span className="text-xl font-extrabold text-emerald-800">{formatCurrency(record.netSalary)}</span>
           </div>
-          {record.status === 'Pending' && (
+          {record.status === 'Pending' && onMarkPaid && (
             <button
               type="button"
               onClick={() => {

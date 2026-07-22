@@ -18,55 +18,58 @@ import {
 
 function DashboardPage() {
   return (
-    <div className="space-y-6">
+    /* Locked Spacing Layout Container */
+    <div className="w-full pt-4 pb-6 px-6 sm:px-8 lg:px-12 space-y-5">
       <WelcomeCard />
 
-      <SectionTitle title="Business Overview" />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          title="Total Shops"
-          value="24"
-          icon={<Store size={28} />}
-        />
-        <StatCard
-          title="Farms"
-          value="8"
-          icon={<Warehouse size={28} />}
-        />
-        <StatCard
-          title="Vehicles"
-          value="12"
-          icon={<Truck size={28} />}
-        />
-        <StatCard
-          title="Employees"
-          value="61"
-          icon={<Users size={28} />}
-        />
+      <div>
+        <SectionTitle title="Business Overview" />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mt-3">
+          <StatCard
+            title="Total Shops"
+            value="24"
+            icon={<Store size={28} />}
+          />
+          <StatCard
+            title="Farms"
+            value="8"
+            icon={<Warehouse size={28} />}
+          />
+          <StatCard
+            title="Vehicles"
+            value="12"
+            icon={<Truck size={28} />}
+          />
+          <StatCard
+            title="Employees"
+            value="61"
+            icon={<Users size={28} />}
+          />
+        </div>
       </div>
 
-      <SectionTitle title="Today's Business" />
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatCard
-          title="Collections"
-          value="₹2.35L"
-          icon={<IndianRupee size={28} />}
-          color="bg-blue-600"
-        />
-        <StatCard
-          title="Deliveries"
-          value="18"
-          icon={<Package size={28} />}
-          color="bg-orange-500"
-        />
-        <StatCard
-          title="Bird Count"
-          value="94,600"
-          icon={<Egg size={28} />}
-          color="bg-green-600"
-        />
+      <div>
+        <SectionTitle title="Today's Business" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-3">
+          <StatCard
+            title="Collections"
+            value="₹2.35L"
+            icon={<IndianRupee size={28} />}
+            color="bg-blue-600"
+          />
+          <StatCard
+            title="Deliveries"
+            value="18"
+            icon={<Package size={28} />}
+            color="bg-orange-500"
+          />
+          <StatCard
+            title="Bird Count"
+            value="94,600"
+            icon={<Egg size={28} />}
+            color="bg-green-600"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

@@ -5,7 +5,11 @@ import MaintenanceTimeline from '../components/maintenance/MaintenanceTimeline';
 import UpcomingServices from '../components/maintenance/UpcomingServices';
 import { Wrench, IndianRupee, Milestone, Calendar, AlertCircle, CheckCircle2, ChevronDown, Search } from 'lucide-react';
 
-const MaintenanceHistoryPage = () => {
+interface MaintenanceHistoryPageProps {
+  embedded?: boolean;
+}
+
+const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProps) => {
   const { 
     vehicles,
     filtered, 
@@ -73,8 +77,10 @@ const MaintenanceHistoryPage = () => {
 
   return (
     <ErrorBoundary>
-      {/* 👇 Updated container with reduced horizontal padding and increased top spacing */}
-      <div className="px-1 md:px-3 py-6 md:py-8 space-y-6 max-w-7xl mx-auto bg-slate-50 min-h-screen animate-in fade-in duration-500">
+      {/* Container adapts padding and layout based on whether embedded inside FleetPages layout */}
+      <div className={`space-y-6 max-w-7xl mx-auto animate-in fade-in duration-500 ${
+        embedded ? 'px-0 py-2' : 'px-1 md:px-3 py-6 md:py-8 bg-slate-50 min-h-screen'
+      }`}>
         
         {/* Streamlined Toolbar Row */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/60 shadow-sm">

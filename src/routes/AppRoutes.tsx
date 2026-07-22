@@ -18,16 +18,8 @@ import EmployeesPage from "../modules/masters/employees/pages/EmployeesPage";
 import BanksPage from "../modules/masters/banks/pages/BanksPage";
 import BirdTypesPage from "../modules/masters/bird-types/pages/BirdTypesPage";
 
-// Operations Module
-import OperationsDashboardPage from "../modules/operations/dashboard/pages/OperationsDashboardPage";
-import TripEntryPage from "../modules/operations/vehicle-trips/pages/TripEntryPage";
-import TripListPage from "../modules/operations/vehicle-trips/pages/TripListPage";
-import ShopSalesPage from "../modules/operations/shop-sales/pages/ShopSalesPage";
-import RatesEntryPage from "../modules/operations/shop-sales/pages/RatesEntryPage";
-import CollectionEntryPage from "../modules/operations/collections/pages/CollectionEntryPage";
-import PendingCollectionsPage from "../modules/operations/collections/pages/PendingCollectionsPage";
-import CollectionReportPage from "../modules/operations/collections/pages/CollectionReportPage";
-import FuelExpensesPage from "../modules/operations/fuel-expenses/pages/FuelExpensesPage";
+// Operations Module (Updated to Main Tab Container)
+import OperationsPages from "../modules/operations/pages/OperationsPages";
 
 // Accounts Module
 import AccountsDashboardPage from "../modules/accounts/pages/AccountsDashboardPage";
@@ -39,18 +31,10 @@ import OutstandingSummaryPage from "../modules/accounts/pages/OutstandingSummary
 import ProfitLossPage from "../modules/accounts/pages/ProfitLossPage";
 
 // Fleet Module
-import FleetLayout from "../modules/fleet-operations/pages/FleetLayout";
-import MaintenanceEntryPage from "../modules/fleet-operations/pages/MaintenanceEntryPage";
-import MaintenanceHistoryPage from "../modules/fleet-operations/pages/MaintenanceHistoryPage";
-import DocumentsExpiryPage from "../modules/fleet-operations/pages/DocumentsExpiryPage";
-import FastagDashboardPage from "../modules/fleet-operations/pages/FastagDashboardPage";
-import EmiLoansPage from "../modules/fleet-operations/pages/EmiLoansPage";
-import VehicleAnalyticsPage from "../modules/fleet-operations/pages/VehicleAnalyticsPage";
-import VehicleReportsPage from "../modules/fleet-operations/pages/VehicleReportsPage";
-import VehicleExpenseReportPage from "../modules/fleet-operations/pages/VehicleExpenseReportPage";
+import FleetPages from "../modules/fleet-operations/pages/FleetPages";
 
 // Staff, Reports, Settings
-import StaffMasterPage from "../modules/staff/pages/StaffMasterPage";
+import StaffPages from "../modules/staff/pages/StaffPages";
 import ReportsDashboardPage from "../modules/reports/pages/ReportsDashboardPage";
 import SettingsPage from "../modules/settings/pages/SettingsPage";
 
@@ -133,79 +117,15 @@ function AppRoutes() {
         path="/operations" 
         element={
           <DashboardLayout>
-            <OperationsDashboardPage />
+            <OperationsPages />
           </DashboardLayout>
         } 
       />
       <Route 
-        path="/operations/overview" 
+        path="/operations/*" 
         element={
           <DashboardLayout>
-            <OperationsDashboardPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/operations/vehicle-trips/entry" 
-        element={
-          <DashboardLayout>
-            <TripEntryPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/operations/vehicle-trips/list" 
-        element={
-          <DashboardLayout>
-            <TripListPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/operations/shop/shop-sales" 
-        element={
-          <DashboardLayout>
-            <ShopSalesPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/operations/shop/rate-entry" 
-        element={
-          <DashboardLayout>
-            <RatesEntryPage embedded={true} />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/operations/collections/entry" 
-        element={
-          <DashboardLayout>
-            <CollectionEntryPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/operations/collections/pending" 
-        element={
-          <DashboardLayout>
-            <PendingCollectionsPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/operations/collections/report" 
-        element={
-          <DashboardLayout>
-            <CollectionReportPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/operations/fuel-expenses" 
-        element={
-          <DashboardLayout>
-            <FuelExpensesPage />
+            <OperationsPages />
           </DashboardLayout>
         } 
       />
@@ -269,76 +189,20 @@ function AppRoutes() {
         } 
       />
 
-      {/* ============ FLEET - With Layout ============ */}
+      {/* ============ FLEET - With Layout (Unified Container) ============ */}
       <Route 
         path="/fleet" 
         element={
           <DashboardLayout>
-            <FleetLayout />
+            <FleetPages />
           </DashboardLayout>
         } 
       />
       <Route 
-        path="/fleet/history" 
+        path="/fleet/*" 
         element={
           <DashboardLayout>
-            <MaintenanceHistoryPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/fleet/entry" 
-        element={
-          <DashboardLayout>
-            <MaintenanceEntryPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/fleet/permits" 
-        element={
-          <DashboardLayout>
-            <DocumentsExpiryPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/fleet/emi" 
-        element={
-          <DashboardLayout>
-            <EmiLoansPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/fleet/analytics" 
-        element={
-          <DashboardLayout>
-            <VehicleAnalyticsPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/fleet/reports" 
-        element={
-          <DashboardLayout>
-            <VehicleReportsPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/fleet/fastag" 
-        element={
-          <DashboardLayout>
-            <FastagDashboardPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/fleet/expenses" 
-        element={
-          <DashboardLayout>
-            <VehicleExpenseReportPage />
+            <FleetPages />
           </DashboardLayout>
         } 
       />
@@ -348,7 +212,7 @@ function AppRoutes() {
         path="/staff" 
         element={
           <DashboardLayout>
-            <StaffMasterPage />
+            <StaffPages />
           </DashboardLayout>
         } 
       />
@@ -356,7 +220,7 @@ function AppRoutes() {
         path="/staff/*" 
         element={
           <DashboardLayout>
-            <StaffMasterPage />
+            <StaffPages />
           </DashboardLayout>
         } 
       />

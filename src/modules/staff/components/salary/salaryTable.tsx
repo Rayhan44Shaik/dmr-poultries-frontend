@@ -1,22 +1,25 @@
 // src/modules/staff/components/salary/salaryTable.tsx
 
-import { ChevronDown } from 'lucide-react';
 import React, { useMemo, useRef, useEffect } from 'react';
+import { ChevronDown } from 'lucide-react';
 
 type SalaryTableProps = {
   records: any[];
   selectedIds: string[];
   toggleSelectOne: (id: string) => void;
   toggleSelectAll: () => void;
-  isSelectDropdownOpen: boolean;
-  setIsSelectDropdownOpen: (open: boolean) => void;
-  dropdownRef: React.RefObject<HTMLDivElement | null>;
+  isSelectDropdownOpen?: boolean;
+  setIsSelectDropdownOpen?: (open: boolean) => void;
+  dropdownRef?: React.RefObject<HTMLDivElement | null>;
   formatCurrency?: (amount: number) => string;
   currentPage: number;
-  setCurrentPage: (page: number) => void;
+  setCurrentPage?: (page: number) => void;
   itemsPerPage: number;
-  currentMonth: string;
+  currentMonth?: string;
   onClearSelection?: () => void;
+  onView?: (record: any) => void;
+  onEdit?: (record: any) => void;
+  onMarkPaid?: (id: string) => void;
 };
 
 export function SalaryTable({
@@ -24,19 +27,19 @@ export function SalaryTable({
   selectedIds,
   toggleSelectOne,
   toggleSelectAll,
-  isSelectDropdownOpen,
-  setIsSelectDropdownOpen,
+  isSelectDropdownOpen = false,
+  setIsSelectDropdownOpen = () => {},
   dropdownRef,
   formatCurrency,
   currentPage,
-  setCurrentPage,
+  setCurrentPage = () => {},
   itemsPerPage,
-  currentMonth,
+  currentMonth = '',
   onClearSelection,
 }: SalaryTableProps) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  // Fallback formatter if parent component didn't pass formatCurrency prop
+  // Fallback currency formatter
   const formatVal = formatCurrency || ((amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -91,13 +94,15 @@ export function SalaryTable({
       if (scoreA !== scoreB) {
         return scoreA - scoreB;
       }
-      return (a.employeeName || '').localeCompare(b.employeeName || '');
+      return (a.employeeName || a.name || '').localeCompare(b.employeeName || b.name || '');
     });
   }, [records]);
 
   const totalPages = Math.ceil(sortedRecords.length / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentRecords = sortedRecords.slice(startIndex, startIndex + itemsPerPage);
+
+  const isAllSortedSelected = sortedRecords.length > 0 && selectedIds.length >= sortedRecords.length;
 
   return (
     <div ref={tableContainerRef} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -109,7 +114,10 @@ export function SalaryTable({
                 <div className="inline-block" ref={dropdownRef}>
                   <button
                     type="button"
-                    onClick={() => setIsSelectDropdownOpen(!isSelectDropdownOpen)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsSelectDropdownOpen(!isSelectDropdownOpen);
+                    }}
                     className="flex items-center gap-1.5 px-2 py-1 bg-white border border-slate-300 rounded-md text-xs font-bold text-slate-700 hover:bg-slate-100 transition shadow-2xs"
                   >
                     <span>#</span>
@@ -122,24 +130,27 @@ export function SalaryTable({
                   </button>
 
                   {isSelectDropdownOpen && (
-                    <div className="absolute left-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                    <div 
+                      onClick={(e) => e.stopPropagation()} 
+                      className="absolute left-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150"
+                    >
                       <div className="flex items-center justify-between px-2 py-1.5 border-b border-slate-100 mb-1">
                         <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Select Records</span>
                         <button
                           type="button"
-                          onClick={toggleSelectAll}
+                          onClick={() => toggleSelectAll()}
                           className="text-[11px] text-blue-600 hover:underline font-semibold"
                         >
-                          {selectedIds.length === sortedRecords.length ? 'Deselect All' : 'Select All'}
+                          {isAllSortedSelected ? 'Deselect All' : `Select All (${sortedRecords.length})`}
                         </button>
                       </div>
-                      <div className="max-h-48 overflow-y-auto space-y-0.5">
+                      <div className="max-h-60 overflow-y-auto space-y-0.5">
                         {sortedRecords.map((record: any, idx: number) => {
                           const isChecked = selectedIds.includes(record.id);
                           return (
                             <label
                               key={record.id}
-                              className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs text-slate-700"
+                              className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs text-slate-700 select-none"
                             >
                               <input
                                 type="checkbox"
@@ -147,8 +158,8 @@ export function SalaryTable({
                                 onChange={() => toggleSelectOne(record.id)}
                                 className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                               />
-                              <span className="font-semibold text-slate-500">#{idx + 1}</span>
-                              <span className="truncate">{record.employeeName}</span>
+                              <span className="font-semibold text-slate-500 w-6">#{idx + 1}</span>
+                              <span className="truncate flex-1 font-medium">{record.employeeName || record.name}</span>
                             </label>
                           );
                         })}
@@ -190,9 +201,9 @@ export function SalaryTable({
                       {absoluteIndex}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm font-semibold text-slate-800">{record.employeeName}</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-slate-800">{record.employeeName || record.name}</td>
                   <td className="px-4 py-3 text-sm text-slate-600">
-                    <div className="font-medium text-slate-800">{record.department}</div>
+                    <div className="font-medium text-slate-800">{record.department || record.role}</div>
                     <div className="text-xs text-slate-400">{record.role}</div>
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-600 font-medium">
@@ -204,13 +215,13 @@ export function SalaryTable({
                     {formatVal(record.baseSalary || record.grossSalary || 0)}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-rose-600">
-                    {formatVal(record.totalDeductions || record.leaveDeduction || 0)}
+                    {formatVal(record.totalDeductions || record.leaveDeduction || record.deduction || 0)}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-amber-600">
-                    {formatVal(record.latePenalty || 0)}
+                    {formatVal(record.latePenalty || record.penalty || 0)}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-blue-600">
-                    {formatVal(record.advanceRecovery || 0)}
+                    {formatVal(record.advanceRecovery || record.advanceGiven || 0)}
                   </td>
                   <td className={`px-4 py-3 text-sm text-right font-bold ${isPaid ? 'text-emerald-600' : 'text-amber-600'}`}>
                     {formatVal(record.netSalary)}

@@ -8,9 +8,7 @@ import LeaveRequestForm from '../components/leave/LeaveRequestForm';
 import LeaveTable from '../components/leave/LeaveTable';
 import { Plus } from 'lucide-react';
 
-type LeaveManagementPageProps = { embedded?: boolean };
-
-function LeaveManagementPage({ embedded = false }: LeaveManagementPageProps) {
+function LeaveManagementPage() {
   const { showNotification } = useSafeNotification();
   const [showForm, setShowForm] = useState(false);
 
@@ -54,11 +52,11 @@ function LeaveManagementPage({ embedded = false }: LeaveManagementPageProps) {
   };
 
   return (
-    <div className={embedded ? "space-y-4 w-full" : "pt-3 px-5 space-y-4 w-full bg-gradient-to-b from-slate-50/50 to-white min-h-screen"}>
+    <>
       <div className="flex justify-end">
         <button
           onClick={() => setShowForm(!showForm)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium shadow-sm transition active:scale-95"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium shadow-2xs transition active:scale-95 cursor-pointer"
         >
           <Plus size={16} />
           {showForm ? 'Hide Form' : 'New Request'}
@@ -93,7 +91,7 @@ function LeaveManagementPage({ embedded = false }: LeaveManagementPageProps) {
           onDelete={handleDelete}
         />
       )}
-    </div>
+    </>
   );
 }
 

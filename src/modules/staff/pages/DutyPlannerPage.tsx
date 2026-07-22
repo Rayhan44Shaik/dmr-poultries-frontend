@@ -6,13 +6,10 @@ import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import DutyPlannerFilters from '../components/duty-planner/DutyPlannerFilters';
 import DutyPlannerGrid from '../components/duty-planner/DutyPlannerGrid';
 import ShiftPicker from '../components/duty-planner/ShiftPicker';
-import PageLayout from '../../../components/common/PageLayout';
 import { Info, Lock } from 'lucide-react';
 import type { DutyPlannerFilters as DutyPlannerFiltersType, Employee } from '../types/staffDashboard';
 
-type DutyPlannerPageProps = { embedded?: boolean };
-
-function DutyPlannerPage({ embedded = false }: DutyPlannerPageProps) {
+function DutyPlannerPage() {
   const { showNotification } = useSafeNotification();
 
   const {
@@ -75,11 +72,10 @@ function DutyPlannerPage({ embedded = false }: DutyPlannerPageProps) {
     setSearchQuery('');
   }, [resetFilters]);
 
-  // Main content without PageLayout wrapper (for embedded mode)
-  const content = (
+  return (
     <>
       {/* Filter Section Card */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 py-3 px-5 sm:py-4 sm:px-6 shadow-sm space-y-3 backdrop-blur-xs">
+      <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs">
         <DutyPlannerFilters
           weekStart={filters.weekStart}
           role={filters.role}
@@ -98,7 +94,7 @@ function DutyPlannerPage({ embedded = false }: DutyPlannerPageProps) {
       </div>
 
       {/* Grid Section Card */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs overflow-hidden">
         <DutyPlannerGrid
           employees={filteredEmployees}
           weekDays={weekDays}
@@ -120,19 +116,20 @@ function DutyPlannerPage({ embedded = false }: DutyPlannerPageProps) {
         />
       )}
 
-      <div className="space-y-3 pb-8">
-        <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-4 text-xs text-amber-800 flex items-start sm:items-center gap-3 shadow-2xs">
-          <div className="bg-amber-100/70 p-1.5 rounded-xl shrink-0 text-amber-600">
-            <Info size={16} />
+      {/* Rules Section */}
+      <div className="space-y-2">
+        <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3 text-xs text-amber-800 flex items-center gap-3">
+          <div className="bg-amber-100/70 p-1 rounded-lg shrink-0 text-amber-600">
+            <Info size={15} />
           </div>
           <span className="leading-relaxed">
             <strong className="font-semibold text-amber-900">Important Rule:</strong> Saturday is compulsory duty. Rest and Weekly Off cannot be assigned on Saturday.
           </span>
         </div>
 
-        <div className="bg-blue-50/80 border border-blue-200/80 rounded-2xl p-4 text-xs text-blue-800 flex items-start sm:items-center gap-3 shadow-2xs">
-          <div className="bg-blue-100/70 p-1.5 rounded-xl shrink-0 text-blue-600">
-            <Lock size={16} />
+        <div className="bg-blue-50/80 border border-blue-200/80 rounded-xl p-3 text-xs text-blue-800 flex items-center gap-3">
+          <div className="bg-blue-100/70 p-1 rounded-lg shrink-0 text-blue-600">
+            <Lock size={15} />
           </div>
           <span className="leading-relaxed">
             <strong className="font-semibold text-blue-900">Week Lock Policy:</strong> Duties can be edited throughout the current week up until Sunday. Once a new week begins on Monday, previous weeks are automatically locked and read-only.
@@ -141,14 +138,6 @@ function DutyPlannerPage({ embedded = false }: DutyPlannerPageProps) {
       </div>
     </>
   );
-
-  // If embedded in a tab container, render without PageLayout (staff master handles spacing)
-  if (embedded) {
-    return <div className="space-y-6 w-full">{content}</div>;
-  }
-
-  // Standalone mode: wrap with PageLayout
-  return <PageLayout>{content}</PageLayout>;
 }
 
 export default DutyPlannerPage;

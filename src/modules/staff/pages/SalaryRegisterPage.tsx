@@ -519,7 +519,7 @@ function SalaryRegisterPage({ embedded = false }: SalaryRegisterPageProps) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
             
-            {/* Custom Modern Month & Year Picker Component */}
+            {/* Custom Month Picker */}
             <div className="relative" ref={monthPickerRef}>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Select Month</label>
               <button
@@ -541,7 +541,6 @@ function SalaryRegisterPage({ embedded = false }: SalaryRegisterPageProps) {
 
               {isMonthPickerOpen && (
                 <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200/80 p-4 z-50 animate-in fade-in zoom-in-95 duration-150 space-y-4">
-                  {/* Year Header Navigator */}
                   <div className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/60">
                     <button
                       type="button"
@@ -560,7 +559,6 @@ function SalaryRegisterPage({ embedded = false }: SalaryRegisterPageProps) {
                     </button>
                   </div>
 
-                  {/* Clean 4x3 Months Grid with Click Animation */}
                   <div className="grid grid-cols-4 gap-2">
                     {monthsList.map((mObj) => {
                       const isSelected = month === `${pickerYear}-${mObj.value}`;
@@ -584,7 +582,6 @@ function SalaryRegisterPage({ embedded = false }: SalaryRegisterPageProps) {
                     })}
                   </div>
 
-                  {/* Footer Quick Action */}
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                     <button
                       type="button"
@@ -625,7 +622,7 @@ function SalaryRegisterPage({ embedded = false }: SalaryRegisterPageProps) {
               </select>
             </div>
 
-            {/* Modern Segmented Pill Status Control */}
+            {/* Segmented Status Pill Control */}
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Status</label>
               <div className="inline-flex bg-slate-100/80 p-0.5 rounded-xl border border-slate-200/80 shadow-2xs h-9 items-center">
@@ -788,8 +785,14 @@ function SalaryRegisterPage({ embedded = false }: SalaryRegisterPageProps) {
             selectedIds={selectedIds}
             toggleSelectOne={toggleSelectOne}
             toggleSelectAll={toggleSelectAll}
+            isSelectDropdownOpen={isSelectDropdownOpen}
+            setIsSelectDropdownOpen={setIsSelectDropdownOpen}
+            dropdownRef={dropdownRef}
             currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
             itemsPerPage={itemsPerPage}
+            currentMonth={month}
+            onClearSelection={() => setSelectedIds([])}
             onView={(record: any) => setSelectedRecordForView(record)}
             onEdit={(record: any) => setSelectedRecordForEdit(record)}
             onMarkPaid={handleMarkPaid}

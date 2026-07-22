@@ -3,15 +3,21 @@
 import React, { useState, useEffect } from 'react';
 import { X, Pencil, Save } from 'lucide-react';
 
-type SalaryEditProps = {
+export type SalaryEditProps = {
   record: any;
-  isOpen: boolean;
+  isOpen?: boolean;
   onClose: () => void;
   onSave: (updatedRecord: any) => void;
-  formatCurrency: (amount: number) => string;
+  formatCurrency?: (amount: number) => string;
 };
 
-export function SalaryEdit({ record, isOpen, onClose, onSave, formatCurrency }: SalaryEditProps) {
+export function SalaryEdit({ 
+  record, 
+  isOpen = true, 
+  onClose, 
+  onSave, 
+  formatCurrency = (amt) => `$${amt.toLocaleString()}` 
+}: SalaryEditProps) {
   if (!isOpen || !record) return null;
 
   const [formData, setFormData] = useState({
@@ -22,6 +28,20 @@ export function SalaryEdit({ record, isOpen, onClose, onSave, formatCurrency }: 
     netSalary: record.netSalary || 0,
     status: record.status || 'Pending',
   });
+
+  // Keep form data updated when the active record changes
+  useEffect(() => {
+    if (record) {
+      setFormData({
+        baseSalary: record.baseSalary || record.grossSalary || 0,
+        leaveDeduction: record.leaveDeduction || record.totalDeductions || 0,
+        latePenalty: record.latePenalty || 0,
+        advanceRecovery: record.advanceRecovery || 0,
+        netSalary: record.netSalary || 0,
+        status: record.status || 'Pending',
+      });
+    }
+  }, [record]);
 
   // Auto-calculate net salary whenever components change
   useEffect(() => {

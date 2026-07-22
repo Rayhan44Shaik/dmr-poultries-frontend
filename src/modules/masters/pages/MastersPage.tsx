@@ -50,10 +50,10 @@ function MastersPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Tab Bar – Operations style with coloured icons */}
-      <div className="bg-white border-b border-slate-200 rounded-t-xl -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-1 overflow-x-auto py-2 scrollbar-hide">
+    <div className="w-full pt-4 pb-6 space-y-5">
+      {/* Full-width Tab Bar Container touching left & right edges */}
+      <div className="bg-white border-y sm:border border-slate-200/90 sm:rounded-xl shadow-sm px-4 sm:px-6 py-1.5 w-full">
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
@@ -62,9 +62,9 @@ function MastersPage() {
                 key={tab.key}
                 onClick={() => handleTabChange(tab.key)}
                 className={`
-                  flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200
+                  flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200
                   ${isActive
-                    ? "bg-blue-50 text-blue-700 border-b-2 border-blue-600"
+                    ? "bg-blue-50 text-blue-700 font-semibold"
                     : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }
                 `}
@@ -80,8 +80,8 @@ function MastersPage() {
         </div>
       </div>
 
-      {/* Content Area */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+      {/* Content Area with side padding preserved */}
+      <div className="w-full px-4 sm:px-6 lg:px-8">
         <ActiveComponent embedded={true} />
       </div>
     </div>

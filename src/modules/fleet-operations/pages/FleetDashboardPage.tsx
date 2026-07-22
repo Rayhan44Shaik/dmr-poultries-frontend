@@ -1,4 +1,4 @@
-import { memo, Suspense } from 'react';
+import { memo, useMemo, Suspense } from 'react';
 import { useFleetDashboardData } from '../hooks/useFleetDashboardData';
 import KpiCard from '../components/common/KpiCard';
 import LoadingSkeleton from '../components/common/LoadingSkeleton';
@@ -10,29 +10,62 @@ import TopMaintenanceBar from '../components/dashboard/TopMaintenanceBar';
 import DailyStatTiles from '../components/dashboard/DailyStatTiles';
 import { Truck, Activity, Wrench, Fuel, MapPin } from 'lucide-react';
 
-const FleetDashboardPage = () => {
+interface FleetDashboardPageProps {
+  embedded?: boolean;
+}
+
+const FleetDashboardPage = ({ embedded = false }: FleetDashboardPageProps) => {
   const data = useFleetDashboardData();
 
-  // Render icons as JSX elements instead of passing components directly
-  const kpis = [
-    { label: 'Total Vehicles', value: data.totalVehicles, icon: <Truck className="w-5 h-5" /> },
-    { label: 'Active Vehicles', value: data.activeVehicles, icon: <Activity className="w-5 h-5" /> },
-    { label: 'Under Maintenance', value: data.underMaintenance, icon: <Wrench className="w-5 h-5" /> },
-    { label: 'Fuel Cost (This Month)', value: data.fuelCostThisMonth, icon: <Fuel className="w-5 h-5" />, format: 'currency' as const },
-    { label: 'Total KM (This Month)', value: data.totalKMThisMonth, icon: <MapPin className="w-5 h-5" />, format: 'number' as const },
-  ];
+  // Memoize KPI config array to prevent re-instantiating JSX on every render
+  const kpis = useMemo(
+    () => [
+      {
+        label: 'Total Vehicles',
+        value: data?.totalVehicles ?? 0,
+        icon: <Truck className="w-5 h-5" />,
+      },
+      {
+        label: 'Active Vehicles',
+        value: data?.activeVehicles ?? 0,
+        icon: <Activity className="w-5 h-5" />,
+      },
+      {
+        label: 'Under Maintenance',
+        value: data?.underMaintenance ?? 0,
+        icon: <Wrench className="w-5 h-5" />,
+      },
+      {
+        label: 'Fuel Cost (This Month)',
+        value: data?.fuelCostThisMonth ?? 0,
+        icon: <Fuel className="w-5 h-5" />,
+        format: 'currency' as const,
+      },
+      {
+        label: 'Total KM (This Month)',
+        value: data?.totalKMThisMonth ?? 0,
+        icon: <MapPin className="w-5 h-5" />,
+        format: 'number' as const,
+      },
+    ],
+    [data]
+  );
 
-  const alerts = [
-    { label: 'Service Due', count: data.serviceDue, color: 'bg-amber-100 text-amber-800' },
-    { label: 'Insurance Expiring', count: data.insuranceExpiring, color: 'bg-red-100 text-red-800' },
-    { label: 'Fitness Expiring', count: data.fitnessExpiring, color: 'bg-red-100 text-red-800' },
-    { label: 'Permit Expiring', count: data.permitExpiring, color: 'bg-red-100 text-red-800' },
-    { label: 'FASTag Low Balance', count: data.fastagLowBalance, color: 'bg-amber-100 text-amber-800' },
-  ];
+  // Memoize alerts array
+  const alerts = useMemo(
+    () => [
+      { label: 'Service Due', count: data?.serviceDue ?? 0, color: 'bg-amber-100 text-amber-800' },
+      { label: 'Insurance Expiring', count: data?.insuranceExpiring ?? 0, color: 'bg-red-100 text-red-800' },
+      { label: 'Fitness Expiring', count: data?.fitnessExpiring ?? 0, color: 'bg-red-100 text-red-800' },
+      { label: 'Permit Expiring', count: data?.permitExpiring ?? 0, color: 'bg-red-100 text-red-800' },
+      { label: 'FASTag Low Balance', count: data?.fastagLowBalance ?? 0, color: 'bg-amber-100 text-amber-800' },
+    ],
+    [data]
+  );
 
   return (
     <ErrorBoundary>
-      <div className="p-4 md:p-6 space-y-6">
+      <div className={embedded ? 'space-y-6' : 'p-4 md:p-6 space-y-6'}>
         <Suspense fallback={<LoadingSkeleton count={5} />}>
           {/* KPI Strip */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -52,18 +85,18 @@ const FleetDashboardPage = () => {
 
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <MonthlyFuelTrend data={data.monthlyFuelTrend} />
-            <VehicleStatusDonut data={data.vehicleStatusDonut} />
-            <TopMaintenanceBar data={data.topMaintenanceCost} />
+            <MonthlyFuelTrend data={data?.monthlyFuelTrend} />
+            <VehicleStatusDonut data={data?.vehicleStatusDonut} />
+            <TopMaintenanceBar data={data?.topMaintenanceCost} />
           </div>
 
           {/* Daily Stat Tiles */}
           <DailyStatTiles
-            kmToday={data.kmToday}
-            fuelToday={data.fuelToday}
-            tollToday={data.tollToday}
-            documentsExpiring={data.documentsExpiring}
-            avgFuelEfficiency={data.avgFuelEfficiency}
+            kmToday={data?.kmToday ?? 0}
+            fuelToday={data?.fuelToday ?? 0}
+            tollToday={data?.tollToday ?? 0}
+            documentsExpiring={data?.documentsExpiring ?? 0}
+            avgFuelEfficiency={data?.avgFuelEfficiency ?? 0}
           />
         </Suspense>
       </div>
