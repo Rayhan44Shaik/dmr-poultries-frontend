@@ -1,3 +1,5 @@
+// D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\masters\vehicles\components\VehicleTable.tsx
+
 import { Pencil, Trash2 } from "lucide-react";
 import type { Vehicle } from "../types/vehicle";
 
@@ -13,7 +15,7 @@ function VehicleTable({ vehicles, onEdit, onDelete }: VehicleTableProps) {
       <table className="min-w-full divide-y divide-slate-200">
         <thead className="bg-slate-50">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Vehicle No</th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">S.No</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Vehicle Number</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Type</th>
             <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">Boxes</th>
@@ -23,9 +25,9 @@ function VehicleTable({ vehicles, onEdit, onDelete }: VehicleTableProps) {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200 bg-white">
-          {vehicles.map((vehicle) => (
+          {vehicles.map((vehicle, index) => (
             <tr key={vehicle.id} className="hover:bg-slate-50 transition-colors">
-              <td className="px-4 py-3 text-sm text-slate-600">{vehicle.vehicleNo}</td>
+              <td className="px-4 py-3 text-sm text-slate-600">{index + 1}</td>
               <td className="px-4 py-3 text-sm font-medium text-slate-800">{vehicle.vehicleNumber}</td>
               <td className="px-4 py-3 text-sm text-slate-600">{vehicle.vehicleType}</td>
               <td className="px-4 py-3 text-right text-sm text-slate-600">{vehicle.noOfBoxes}</td>
