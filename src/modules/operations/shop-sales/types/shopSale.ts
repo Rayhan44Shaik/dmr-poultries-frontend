@@ -4,7 +4,7 @@ export interface ShopSale {
 
   tripId: string;
 
-  tripNo: string;
+  tripNo: string | number;
 
   tripDate: string;
 

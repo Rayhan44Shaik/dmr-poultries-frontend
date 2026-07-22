@@ -1,3 +1,5 @@
+// src/modules/operations/shop-sales/components/ShopSalesTable.tsx
+
 import React, { useState } from "react";
 import {
   Hash,
@@ -11,6 +13,7 @@ import {
   FileText,
   Check,
   X,
+  Edit2,
 } from "lucide-react";
 import type { ShopSale } from "../types/shopSale";
 
@@ -25,7 +28,8 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<ShopSale>>({});
 
-  const startEditing = (sale: ShopSale) => {
+  const startEditing = (sale: ShopSale, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (editingId === sale.id) return;
     setEditingId(sale.id);
     setEditData({
@@ -33,15 +37,18 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
       totalBirds: sale.totalBirds,
       totalWeight: sale.totalWeight,
       rate: sale.rate,
+      remark: sale.remark,
     });
   };
 
-  const cancelEditing = () => {
+  const cancelEditing = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setEditingId(null);
     setEditData({});
   };
 
-  const saveEditing = () => {
+  const saveEditing = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!onUpdateSale || !editingId) return;
     const originalSale = sales.find((s) => s.id === editingId);
     if (!originalSale) return;
@@ -50,6 +57,7 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
     const newBirds = editData.totalBirds ?? originalSale.totalBirds ?? 0;
     const newWeight = editData.totalWeight ?? originalSale.totalWeight ?? 0;
     const newRate = editData.rate ?? originalSale.rate ?? 0;
+    const newRemark = editData.remark !== undefined ? editData.remark : originalSale.remark;
 
     const updatedSale: ShopSale = {
       ...originalSale,
@@ -58,6 +66,7 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
       totalWeight: newWeight,
       rate: newRate,
       amount: newWeight * newRate,
+      remark: newRemark,
     };
     onUpdateSale(updatedSale);
     setEditingId(null);
@@ -79,32 +88,16 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
     );
   }
 
-  const editedSale = editingId ? sales.find((s) => s.id === editingId) : null;
-
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      {/* Header – matches Rate Entry style */}
+      {/* Header */}
       <div className="px-4 py-3 border-b bg-slate-50 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-700">Shop Sales</h3>
         <div className="flex items-center gap-2">
-          {editingId && editedSale ? (
-            <>
-              <span className="text-xs text-blue-600 font-medium mr-1">Editing row</span>
-              <button
-                onClick={saveEditing}
-                className="p-1.5 rounded-lg bg-green-100 hover:bg-green-200 text-green-700 transition-colors flex items-center gap-1 text-xs font-medium"
-              >
-                <Check size={14} /> Save
-              </button>
-              <button
-                onClick={cancelEditing}
-                className="p-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition-colors flex items-center gap-1 text-xs font-medium"
-              >
-                <X size={14} /> Cancel
-              </button>
-            </>
+          {editingId ? (
+            <span className="text-xs text-blue-600 font-medium mr-1">Editing row</span>
           ) : (
-            <span className="text-xs text-slate-400">Click a row to edit</span>
+            <span className="text-xs text-slate-400">Click the edit button on a row to edit</span>
           )}
         </div>
       </div>
@@ -167,12 +160,15 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
                   Remark
                 </div>
               </th>
+              <th className="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wider">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
             {sales.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-10 text-center text-slate-400 text-sm">
+                <td colSpan={10} className="py-10 text-center text-slate-400 text-sm">
                   No shop sales found.
                 </td>
               </tr>
@@ -183,26 +179,31 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
                 const currentBirds = isEditing ? (editData.totalBirds ?? sale.totalBirds) : sale.totalBirds;
                 const currentWeight = isEditing ? (editData.totalWeight ?? sale.totalWeight) : sale.totalWeight;
                 const currentRate = isEditing ? (editData.rate ?? sale.rate) : sale.rate;
+                const currentRemark = isEditing ? (editData.remark ?? sale.remark) : sale.remark;
+                
+                // Calculate live amount when editing
+                const displayAmount = isEditing
+                  ? (Number(currentWeight) || 0) * (Number(currentRate) || 0)
+                  : sale.amount;
 
                 return (
                   <tr
                     key={sale.id}
-                    className={`border-t hover:bg-blue-50 transition-colors cursor-pointer ${
-                      isEditing ? "bg-blue-100" : ""
+                    className={`border-t transition-colors ${
+                      isEditing ? "bg-blue-50" : "hover:bg-slate-50/60"
                     }`}
-                    onClick={() => startEditing(sale)}
                   >
                     <td className="px-3 py-2 text-center text-xs text-slate-600">{index + 1}</td>
                     <td className="px-3 py-2 font-semibold text-green-700 text-xs">{sale.tripNo}</td>
                     <td className="px-3 py-2 text-xs">{sale.tripDate}</td>
 
-                    {/* Shop Name – dropdown when editing */}
+                    {/* Shop Name */}
                     <td className="px-3 py-2 text-xs font-medium text-slate-700">
                       {isEditing ? (
                         <select
                           value={currentShopName}
                           onChange={(e) => handleInputChange("shopName", e.target.value)}
-                          className="w-full border border-blue-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full border border-blue-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                         >
                           {shopNames.map((name) => (
                             <option key={name} value={name}>
@@ -224,7 +225,7 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
                           onChange={(e) =>
                             handleInputChange("totalBirds", parseFloat(e.target.value) || 0)
                           }
-                          className="w-20 text-center border border-blue-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-20 text-center border border-blue-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                           min="0"
                           step="1"
                         />
@@ -244,7 +245,7 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
                           onChange={(e) =>
                             handleInputChange("totalWeight", parseFloat(e.target.value) || 0)
                           }
-                          className="w-24 text-center border border-blue-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-24 text-center border border-blue-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                           min="0"
                           step="0.01"
                         />
@@ -264,7 +265,7 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
                           onChange={(e) =>
                             handleInputChange("rate", parseFloat(e.target.value) || 0)
                           }
-                          className="w-24 text-center border border-blue-300 rounded-md px-2 py-1 text-xs font-bold text-violet-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-24 text-center border border-blue-300 rounded-md px-2 py-1 text-xs font-bold text-violet-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                           min="0"
                           step="0.01"
                         />
@@ -277,10 +278,56 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
 
                     {/* Amount */}
                     <td className="px-3 py-2 text-center text-xs font-bold text-green-700">
-                      ₹ {sale.amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                      ₹ {displayAmount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
                     </td>
 
-                    <td className="px-3 py-2 text-xs">{sale.remark?.trim() || "-"}</td>
+                    {/* Remark */}
+                    <td className="px-3 py-2 text-xs">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={currentRemark ?? ""}
+                          onChange={(e) => handleInputChange("remark", e.target.value)}
+                          placeholder="Add remark..."
+                          className="w-full border border-blue-300 rounded-md px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        />
+                      ) : (
+                        <span>{sale.remark?.trim() || "-"}</span>
+                      )}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-3 py-2 text-center whitespace-nowrap">
+                      {isEditing ? (
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={saveEditing}
+                            className="p-1.5 rounded-lg bg-green-100 hover:bg-green-200 text-green-700 transition-colors flex items-center gap-1 text-xs font-medium"
+                            title="Save"
+                          >
+                            <Check size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEditing}
+                            className="p-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition-colors flex items-center gap-1 text-xs font-medium"
+                            title="Cancel"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => startEditing(sale, e)}
+                          className="p-1.5 rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition shadow-sm inline-flex items-center justify-center"
+                          title="Edit row"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })

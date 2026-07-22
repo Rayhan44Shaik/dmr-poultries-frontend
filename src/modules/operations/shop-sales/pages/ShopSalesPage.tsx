@@ -1,15 +1,23 @@
+// src/pages/sales/shop-sales/ShopSalesPage.tsx
+
 import { useEffect, useCallback } from "react";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 
 import useShopSales from "../hooks/useShopSales";
+import { useShops } from "../../../masters/shops/hooks/useShops";
 import ShopSalesFilters from "../components/ShopSalesFilters";
 import ShopSalesSummary from "../components/ShopSalesSummary";
 import ShopSalesTable from "../components/ShopSalesTable";
 import ShopSalesPagination from "../components/ShopSalesPagination";
 import type { ShopSale } from "../types/shopSale";
+import type { Trip } from "../../vehicle-trips/types/trip.ts"; // Import Trip type if needed
 
-function ShopSalesPage() {
+interface ShopSalesPageProps {
+  initialTrip?: Trip | null; // Optional trip passed right after saving rates & locking
+}
+
+function ShopSalesPage({ initialTrip }: ShopSalesPageProps) {
   const { showNotification } = useSafeNotification();
 
   const {
@@ -18,7 +26,7 @@ function ShopSalesPage() {
     summary,
     filter,
     setFilter,
-    shopNames,
+    shopNames: salesShopNames,
     currentPage,
     setCurrentPage,
     totalPages,
@@ -28,10 +36,32 @@ function ShopSalesPage() {
     updateSale,
   } = useShopSales();
 
+  // Fetch master shops to ensure dropdown is fully populated
+  const { shops, refreshShops } = useShops();
+
   useEffect(() => {
     refreshSales();
-    // Silent load – no notification
-  }, [refreshSales]);
+    refreshShops();
+  }, [refreshSales, refreshShops]);
+
+  // If an initialTrip is passed from the modal, auto-filter the sales list by that trip number
+  useEffect(() => {
+    if (initialTrip && initialTrip.tripNo) {
+      setFilter((prev) => ({
+        ...prev,
+        searchQuery: initialTrip.tripNo, // Adjust this field depending on your filter hook structure
+      }));
+      showNotification(`Loaded sales for Trip #${initialTrip.tripNo}`, "success");
+    }
+  }, [initialTrip, setFilter, showNotification]);
+
+  // Combine/fallback shop names from master shops and sales data
+  const shopNames = Array.from(
+    new Set([
+      ...(salesShopNames || []),
+      ...shops.map((s) => s.shopName),
+    ])
+  ).filter(Boolean);
 
   const handleSearch = useCallback(() => {
     setCurrentPage(1);
@@ -112,7 +142,6 @@ function ShopSalesPage() {
   }, [filteredSales, showNotification]);
 
   return (
-    // 👇 Updated container with increased side padding and consistent styling
     <div className="px-4 md:px-5 py-6 md:py-8 space-y-6 max-w-7xl mx-auto bg-slate-50 min-h-screen">
       <ShopSalesFilters
         fromDate={filter.fromDate}
@@ -121,8 +150,14 @@ function ShopSalesPage() {
         sortBy={filter.sortBy}
         shopNames={shopNames}
         totalEntries={filteredSales.length}
-        setFromDate={(v) => setFilter({ ...filter, fromDate: v })}
-        setToDate={(v) => setFilter({ ...filter, toDate: v })}
+        setFromDate={(v) => {
+          setFilter({ ...filter, fromDate: v });
+          if (v) showNotification(`From date set to ${v}`, "info");
+        }}
+        setToDate={(v) => {
+          setFilter({ ...filter, toDate: v });
+          if (v) showNotification(`To date set to ${v}`, "info");
+        }}
         setShopName={(v) => setFilter({ ...filter, shopName: v })}
         setSortBy={(v) => setFilter({ ...filter, sortBy: v })}
         onSearch={handleSearch}

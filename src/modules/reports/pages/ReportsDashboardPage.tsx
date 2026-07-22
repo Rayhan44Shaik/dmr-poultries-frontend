@@ -1,5 +1,8 @@
+// src/modules/reports/pages/ReportsDashboardPage.tsx
+
 import React, { useState, useMemo, useCallback } from 'react';
 import { format, subDays } from 'date-fns';
+import { TrendingUp, Truck, ShoppingBag, CreditCard, BookOpen, FileText } from 'lucide-react';
 import type { ReportFilters, ReportType } from '../types/reportTypes';
 import { getReportData } from '../services/reportService';
 import ReportFiltersComponent from '../components/ReportFilters';
@@ -12,7 +15,16 @@ import { useEmployees } from '../../masters/employees/hooks/useEmployees';
 import { useShops } from '../../masters/shops/hooks/useShops';
 import { exportToPDF, exportToExcel } from '../../../utils/exportUtils';
 
-// ========== REPORT CONFIGURATIONS ==========
+// ========== REPORT CONFIGURATIONS & ICONS ==========
+const tabs = [
+  { key: 'weekly', label: 'Weekly Report', icon: TrendingUp, color: 'text-amber-500' },
+  { key: 'vehicle', label: 'Vehicle Report', icon: Truck, color: 'text-blue-500' },
+  { key: 'shopSales', label: 'Shop Sales', icon: ShoppingBag, color: 'text-emerald-500' },
+  { key: 'collection', label: 'Collection Report', icon: CreditCard, color: 'text-teal-500' },
+  { key: 'shopLedger', label: 'Shop Ledger', icon: BookOpen, color: 'text-purple-500' },
+  { key: 'expenses', label: 'Expenses Report', icon: FileText, color: 'text-rose-500' },
+] as const;
+
 const REPORT_LABELS: Record<ReportType, string> = {
   weekly: 'Weekly Report',
   vehicle: 'Vehicle Report',
@@ -205,46 +217,59 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
   );
 
   const content = (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">Reports Dashboard</h1>
-        <p className="text-sm text-slate-500">Access and download important business reports</p>
+    <div className="w-full pt-3 pb-6 space-y-4">
+      {/* Tab Navigation Container (Identical layout to StaffPages & OperationsPages) */}
+      <div className="bg-white border-y sm:border border-slate-200/90 sm:rounded-xl shadow-sm px-3 py-1.5 w-full">
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none [ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = selectedReport === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => handleTabChange(tab.key as ReportType)}
+                className={`
+                  flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 shrink-0 cursor-pointer
+                  ${
+                    isActive
+                      ? "bg-blue-50 text-blue-700 font-semibold"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                  }
+                `}
+              >
+                <Icon
+                  size={18}
+                  className={isActive ? "text-blue-700" : tab.color}
+                />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
-        {(Object.keys(REPORT_LABELS) as ReportType[]).map((type) => (
-          <button
-            key={type}
-            onClick={() => handleTabChange(type)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-              selectedReport === type
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            {REPORT_LABELS[type]}
-          </button>
-        ))}
+      {/* Main Content View Container */}
+      <div className="w-full px-4 sm:px-6 lg:px-8 space-y-6">
+        <ReportFiltersComponent
+          reportType={selectedReport}
+          filters={filters}
+          setFilters={setFilters}
+          vehicleOptions={vehicleOptions}
+          driverOptions={driverOptions}
+          shopOptions={shopOptions}
+          collectorOptions={collectorOptions}
+        />
+
+        <ReportCard
+          title={REPORT_LABELS[selectedReport]}
+          description={REPORT_DESCRIPTIONS[selectedReport]}
+          includeList={REPORT_INCLUDES[selectedReport]}
+          onDownloadPDF={() => handleExport('PDF')}
+          onDownloadExcel={() => handleExport('Excel')}
+          isDataAvailable={isDataAvailable}
+        />
       </div>
-
-      <ReportFiltersComponent
-        reportType={selectedReport}
-        filters={filters}
-        setFilters={setFilters}
-        vehicleOptions={vehicleOptions}
-        driverOptions={driverOptions}
-        shopOptions={shopOptions}
-        collectorOptions={collectorOptions}
-      />
-
-      <ReportCard
-        title={REPORT_LABELS[selectedReport]}
-        description={REPORT_DESCRIPTIONS[selectedReport]}
-        includeList={REPORT_INCLUDES[selectedReport]}
-        onDownloadPDF={() => handleExport('PDF')}
-        onDownloadExcel={() => handleExport('Excel')}
-        isDataAvailable={isDataAvailable}
-      />
     </div>
   );
 
