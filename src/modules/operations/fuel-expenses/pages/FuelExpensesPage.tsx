@@ -1,3 +1,5 @@
+// src/modules/fuel/pages/FuelExpensesPage.tsx
+
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useFuelExpenses } from "../hooks/useFuelExpenses";
 import { FuelKPICards } from "../components/FuelKPICards";
@@ -16,6 +18,7 @@ import {
   Plus,
   FileText,
   FileSpreadsheet,
+  RotateCcw,
 } from "lucide-react";
 import type { FuelExpense } from "../types/fuelExpense";
 import { DatePicker } from "../../../../components/common/DatePicker";
@@ -250,13 +253,12 @@ function FuelExpensesPage() {
   );
 
   return (
-    // 👇 Updated container with more side padding, consistent background & centering
-    <div className="px-4 md:px-5 py-6 md:py-8 space-y-4 max-w-7xl mx-auto bg-slate-50 min-h-screen">
+    <div className="space-y-6">
       {/* Action Buttons */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button
           onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium shadow-sm transition flex items-center gap-1.5"
+          className="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 cursor-pointer transition"
         >
           <Plus size={16} />
           {showForm ? "Hide Form" : "Add Fuel Bill"}
@@ -265,10 +267,10 @@ function FuelExpensesPage() {
           <button
             onClick={handleExportPDF}
             disabled={!hasFilters || filteredData.length === 0}
-            className={`px-4 py-2 rounded-lg border border-red-500 text-red-600 text-sm font-medium transition-all flex items-center gap-1.5 ${
+            className={`inline-flex items-center gap-2 rounded-md border border-red-600 bg-white px-3 py-2 text-sm font-medium text-red-600 shadow-sm transition-all ${
               !hasFilters || filteredData.length === 0
                 ? "opacity-50 cursor-not-allowed"
-                : "hover:bg-red-50"
+                : "hover:bg-red-50 cursor-pointer"
             }`}
           >
             <FileText size={16} /> PDF
@@ -276,10 +278,10 @@ function FuelExpensesPage() {
           <button
             onClick={handleExportExcel}
             disabled={!hasFilters || filteredData.length === 0}
-            className={`px-4 py-2 rounded-lg border border-green-500 text-green-600 text-sm font-medium transition-all flex items-center gap-1.5 ${
+            className={`inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition-all ${
               !hasFilters || filteredData.length === 0
                 ? "opacity-50 cursor-not-allowed"
-                : "hover:bg-green-50"
+                : "hover:bg-green-700 cursor-pointer"
             }`}
           >
             <FileSpreadsheet size={16} /> Excel
@@ -289,22 +291,22 @@ function FuelExpensesPage() {
 
       {KpiCards}
 
-      {/* Filter Bar */}
-      <div className="rounded-lg border border-green-200 bg-white p-4 shadow-sm">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Filter Bar Card */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DatePicker
             value={fromDate}
             onChange={setFromDate}
             label="From Date"
-            placeholder="Select start"
             className="w-full"
+            placeholder="Select start"
           />
           <DatePicker
             value={toDate}
             onChange={setToDate}
             label="To Date"
-            placeholder="Select end"
             className="w-full"
+            placeholder="Select end"
           />
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Vehicles</label>
@@ -316,7 +318,7 @@ function FuelExpensesPage() {
                 setSelectedVehicles(values);
                 setCurrentPage(1);
               }}
-              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500"
+              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500 bg-white"
               size={1}
               style={{ height: "auto", minHeight: "2.5rem" }}
             >
@@ -340,7 +342,7 @@ function FuelExpensesPage() {
                         setSelectedVehicles(selectedVehicles.filter((x) => x !== v));
                         setCurrentPage(1);
                       }}
-                      className="hover:text-red-600"
+                      className="hover:text-red-600 cursor-pointer"
                     >
                       <X size={12} />
                     </button>
@@ -349,14 +351,15 @@ function FuelExpensesPage() {
               </div>
             )}
           </div>
-          <div className="flex items-end">
-            <button
-              onClick={handleResetFilters}
-              className="h-10 w-full rounded-md border border-red-300 bg-white px-4 text-sm font-medium text-red-600 hover:bg-red-50 transition"
-            >
-              Reset Filters
-            </button>
-          </div>
+        </div>
+
+        <div className="mt-4 flex justify-end pt-4 border-t border-slate-100">
+          <button
+            onClick={handleResetFilters}
+            className="inline-flex items-center gap-2 rounded-md border border-red-600 bg-white px-3 py-2 text-sm font-medium text-red-600 shadow-sm hover:bg-red-50 cursor-pointer"
+          >
+            <RotateCcw size={16} /> Reset Filters
+          </button>
         </div>
       </div>
 
@@ -374,25 +377,25 @@ function FuelExpensesPage() {
         />
       )}
 
-      {/* Table with selection actions */}
-      <div ref={tableContainerRef} className="space-y-3">
+      {/* Table Card Container */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden" ref={tableContainerRef}>
         {selectedBill && (
-          <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200 flex-wrap">
+          <div className="flex items-center gap-3 bg-slate-50 px-6 py-3 border-b border-slate-200 flex-wrap">
             <span className="text-sm font-medium text-slate-700 mr-2">
               Selected: {selectedBill.billNo}
             </span>
             <button
               onClick={handleView}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-medium flex items-center gap-1.5 transition"
+              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 cursor-pointer transition"
             >
               <Eye size={14} /> View
             </button>
             <button
               onClick={handleEdit}
               disabled={!canEditDelete(selectedBill)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition ${
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
                 canEditDelete(selectedBill)
-                  ? "bg-green-600 hover:bg-green-700 text-white"
+                  ? "bg-green-600 hover:bg-green-700 text-white cursor-pointer"
                   : "bg-slate-300 text-slate-500 cursor-not-allowed"
               }`}
               title={!canEditDelete(selectedBill) ? "Older than 10 days" : ""}
@@ -402,9 +405,9 @@ function FuelExpensesPage() {
             <button
               onClick={handleDelete}
               disabled={!canEditDelete(selectedBill)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition ${
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
                 canEditDelete(selectedBill)
-                  ? "bg-red-600 hover:bg-red-700 text-white"
+                  ? "bg-red-600 hover:bg-red-700 text-white cursor-pointer"
                   : "bg-slate-300 text-slate-500 cursor-not-allowed"
               }`}
               title={!canEditDelete(selectedBill) ? "Older than 10 days" : ""}
@@ -414,7 +417,7 @@ function FuelExpensesPage() {
             {selectedBill.status === "Pending" && (
               <button
                 onClick={handleApprove}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-medium flex items-center gap-1.5 transition"
+                className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 cursor-pointer transition"
               >
                 <CheckCircle size={14} /> Approve
               </button>
@@ -427,48 +430,56 @@ function FuelExpensesPage() {
           selectedId={selectedId}
           onSelect={setSelectedId}
         />
-      </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-slate-200 pt-4">
-          <div className="text-xs text-slate-500">
-            Showing {paginatedData.length} of {filteredData.length} entries
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
+            <div className="text-sm text-slate-600">
+              Showing {paginatedData.length} of {filteredData.length} entries
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => p - 1)}
+                className={`rounded-md p-2 transition cursor-pointer ${
+                  currentPage === 1
+                    ? "cursor-not-allowed text-slate-300"
+                    : "text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                Previous
+              </button>
+              <span className="text-sm font-medium text-slate-700">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => p + 1)}
+                className={`rounded-md p-2 transition cursor-pointer ${
+                  currentPage === totalPages
+                    ? "cursor-not-allowed text-slate-300"
+                    : "text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                Next
+              </button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => p - 1)}
-              className="px-3 py-1 rounded border text-xs disabled:opacity-40 hover:bg-slate-100"
-            >
-              Previous
-            </button>
-            <span className="px-3 py-1 text-xs">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((p) => p + 1)}
-              className="px-3 py-1 rounded border text-xs disabled:opacity-40 hover:bg-slate-100"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* View Modal */}
       {viewModalOpen && viewingBill && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200">
               <h3 className="text-lg font-semibold text-slate-800">Fuel Bill Details</h3>
-              <button onClick={closeViewModal} className="p-1 hover:bg-slate-100 rounded">
+              <button onClick={closeViewModal} className="p-1 hover:bg-slate-100 rounded cursor-pointer">
                 <X size={20} />
               </button>
             </div>
-            <div className="p-4 space-y-2">
-              <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="p-6 space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="font-medium text-slate-600">Bill No</div>
                 <div>{viewingBill.billNo}</div>
                 <div className="font-medium text-slate-600">Date</div>
@@ -509,10 +520,10 @@ function FuelExpensesPage() {
                 )}
               </div>
             </div>
-            <div className="flex justify-end p-4 border-t border-slate-200">
+            <div className="flex justify-end p-6 border-t border-slate-200">
               <button
                 onClick={closeViewModal}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-md text-sm font-medium"
+                className="rounded-md bg-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-300 cursor-pointer"
               >
                 Close
               </button>

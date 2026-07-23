@@ -60,6 +60,7 @@ export interface Trip {
   closingMeter: number;
   totalKm: number;
 
+  dcWeight : number;
   // Expenses
   fuel: number;
   expense: number;
@@ -88,5 +89,8 @@ export interface Trip {
   // Audit
   createdAt?: string;
   updatedAt?: string;
+
+  deleted?: boolean;
+  deletedReason?: string;
 
 }

@@ -1,5 +1,5 @@
 import React from "react";
-import { X } from "lucide-react";
+import { X, FileText, Download, CheckCircle2, AlertCircle, Calendar, Truck, User, Building2, Gauge, Fuel, DollarSign, MapPin, Hash, ShoppingCart, Layers, Scale, MessageSquare } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Trip } from "../types/trip";
@@ -22,7 +22,7 @@ function TripViewModal({ open, trip, onClose }: Props) {
 
     // Title
     doc.setFontSize(18);
-    doc.setTextColor(30, 58, 138);
+    doc.setTextColor(5, 150, 105);
     doc.text("Trip Details", margin, y);
     y += 8;
 
@@ -37,7 +37,7 @@ function TripViewModal({ open, trip, onClose }: Props) {
     doc.text(`Generated on: ${dateStr}`, margin, y);
     y += 6;
 
-    // Two‑column summary
+    // Two-column summary (including DC Weight & Total Birds if needed in text summary structure)
     const summaryData = [
       ["Trip No", trip.tripNo, "Vehicle", trip.vehicleNo],
       ["Trip Date", trip.tripDate, "Driver", trip.driverName],
@@ -45,6 +45,7 @@ function TripViewModal({ open, trip, onClose }: Props) {
       ["Opening KM", trip.openingMeter.toString(), "Closing KM", trip.closingMeter.toString()],
       ["Total KM", totalKm.toString(), "Fuel (Ltrs)", trip.fuel.toString()],
       ["Expense", `₹ ${trip.expense}`, "Status", trip.status],
+      ["DC Weight", `${(trip as any).dcWeight || 0} KG`, "Total Birds", `${trip.totalBirds || 0}`],
     ];
 
     autoTable(doc, {
@@ -72,9 +73,10 @@ function TripViewModal({ open, trip, onClose }: Props) {
     doc.text(trip.remarks || "--", margin, y);
     y += 8;
 
-    // Delivery table
-    const tableHeaders = ["Box", "Shop Name", "Birds", "Weight (KG)", "Remarks"];
-    const tableRows = trip.deliveries.map((row) => [
+    // Delivery table with S.No
+    const tableHeaders = ["S.No", "Box", "Shop Name", "Birds", "Weight (KG)", "Remarks"];
+    const tableRows = trip.deliveries.map((row, index) => [
+      (index + 1).toString(),
       row.boxNo.toString(),
       row.shopName,
       row.birds.toString(),
@@ -88,19 +90,20 @@ function TripViewModal({ open, trip, onClose }: Props) {
       startY: y,
       theme: "striped",
       headStyles: {
-        fillColor: [30, 58, 138],
+        fillColor: [5, 150, 105],
         textColor: 255,
         fontStyle: "bold",
         halign: "center",
       },
-      alternateRowStyles: { fillColor: [245, 247, 250] },
+      alternateRowStyles: { fillColor: [240, 253, 244] },
       styles: { fontSize: 9, cellPadding: 2 },
       columnStyles: {
-        0: { halign: "center", cellWidth: 15 },
-        1: { halign: "left", cellWidth: 70 },   // ← Shop Name left-aligned in PDF
-        2: { halign: "center", cellWidth: 20 },
-        3: { halign: "center", cellWidth: 25 },
-        4: { halign: "center", cellWidth: 30 },
+        0: { halign: "center", cellWidth: 12 },
+        1: { halign: "center", cellWidth: 15 },
+        2: { halign: "left", cellWidth: 63 },
+        3: { halign: "center", cellWidth: 20 },
+        4: { halign: "center", cellWidth: 25 },
+        5: { halign: "center", cellWidth: 25 },
       },
       margin: { left: margin, right: margin },
     });
@@ -118,82 +121,294 @@ function TripViewModal({ open, trip, onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-slate-800">Trip Details</h2>
-          <button onClick={onClose} className="h-10 w-10 rounded-full hover:bg-slate-100 flex items-center justify-center">
-            <X size={24} />
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto animate-fade-in">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col">
+        
+        {/* Modern Header Section (Green Theme) */}
+        <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80">
+          <div className="flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white">
+              <FileText className="w-7 h-7" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Trip Details</h2>
+              <p className="text-xs font-medium text-slate-400 mt-0.5">Comprehensive overview and unloading records</p>
+            </div>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="h-10 w-10 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-all shadow-xs"
+          >
+            <X size={20} />
           </button>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6 bg-slate-50 p-4 rounded-xl">
-          <div><p className="text-xs font-medium text-slate-500">Trip No</p><p className="text-sm font-semibold text-slate-800">{trip.tripNo}</p></div>
-          <div><p className="text-xs font-medium text-slate-500">Trip Date</p><p className="text-sm font-semibold text-slate-800">{trip.tripDate}</p></div>
-          <div><p className="text-xs font-medium text-slate-500">Vehicle</p><p className="text-sm font-semibold text-slate-800">{trip.vehicleNo}</p></div>
-          <div><p className="text-xs font-medium text-slate-500">Driver</p><p className="text-sm font-semibold text-slate-800">{trip.driverName}</p></div>
-          <div><p className="text-xs font-medium text-slate-500">Supervisor</p><p className="text-sm font-semibold text-slate-800">{trip.supervisorName}</p></div>
-          <div><p className="text-xs font-medium text-slate-500">Source Farm</p><p className="text-sm font-semibold text-slate-800">{trip.sourceFarm}</p></div>
-          <div><p className="text-xs font-medium text-slate-500">Opening KM</p><p className="text-sm font-semibold text-slate-800">{trip.openingMeter}</p></div>
-          <div><p className="text-xs font-medium text-slate-500">Closing KM</p><p className="text-sm font-semibold text-slate-800">{trip.closingMeter}</p></div>
-          <div><p className="text-xs font-medium text-slate-500">Total KM</p><p className="text-sm font-semibold text-slate-800">{totalKm}</p></div>
-          <div><p className="text-xs font-medium text-slate-500">Fuel (Ltrs)</p><p className="text-sm font-semibold text-slate-800">{trip.fuel}</p></div>
-          <div><p className="text-xs font-medium text-slate-500">Expense</p><p className="text-sm font-semibold text-slate-800">₹ {trip.expense}</p></div>
-          <div><p className="text-xs font-medium text-slate-500">Status</p><p className={`text-sm font-semibold ${trip.status === "Completed" ? "text-green-600" : "text-yellow-600"}`}>{trip.status}</p></div>
+        {/* Scrollable Body Content */}
+        <div className="p-8 overflow-y-auto space-y-6 flex-1">
+          
+          {/* Information Grid Cards (Including DC Weight & Total Birds) */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            
+            <div className="bg-gradient-to-br from-slate-50 to-emerald-50/30 p-4 rounded-2xl border border-slate-100 shadow-xs flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-100/70 text-emerald-600 mt-0.5">
+                <Hash size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Trip No</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.tripNo}</p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-slate-50 to-emerald-50/30 p-4 rounded-2xl border border-slate-100 shadow-xs flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-100/70 text-emerald-600 mt-0.5">
+                <Calendar size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Trip Date</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.tripDate}</p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-slate-50 to-emerald-50/30 p-4 rounded-2xl border border-slate-100 shadow-xs flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-100/70 text-emerald-600 mt-0.5">
+                <Truck size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Vehicle</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.vehicleNo}</p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-slate-50 to-emerald-50/30 p-4 rounded-2xl border border-slate-100 shadow-xs flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-100/70 text-emerald-600 mt-0.5">
+                <User size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Driver</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.driverName}</p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-slate-50 to-emerald-50/30 p-4 rounded-2xl border border-slate-100 shadow-xs flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-100/70 text-emerald-600 mt-0.5">
+                <User size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Supervisor</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.supervisorName}</p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-slate-50 to-emerald-50/30 p-4 rounded-2xl border border-slate-100 shadow-xs flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-100/70 text-emerald-600 mt-0.5">
+                <Building2 size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Source Farm</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.sourceFarm}</p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-slate-50 to-emerald-50/30 p-4 rounded-2xl border border-slate-100 shadow-xs flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-100/70 text-emerald-600 mt-0.5">
+                <Gauge size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Opening KM</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.openingMeter}</p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-slate-50 to-emerald-50/30 p-4 rounded-2xl border border-slate-100 shadow-xs flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-100/70 text-emerald-600 mt-0.5">
+                <Gauge size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Closing KM</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.closingMeter}</p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-slate-50 to-emerald-50/30 p-4 rounded-2xl border border-slate-100 shadow-xs flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-100/70 text-emerald-600 mt-0.5">
+                <MapPin size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total KM</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{totalKm}</p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-slate-50 to-emerald-50/30 p-4 rounded-2xl border border-slate-100 shadow-xs flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-100/70 text-emerald-600 mt-0.5">
+                <Fuel size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Fuel (Ltrs)</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.fuel}</p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-slate-50 to-emerald-50/30 p-4 rounded-2xl border border-slate-100 shadow-xs flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-100/70 text-emerald-600 mt-0.5">
+                <DollarSign size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Expense</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">₹ {trip.expense}</p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-slate-50 to-emerald-50/30 p-4 rounded-2xl border border-slate-100 shadow-xs flex items-start gap-3">
+              <div className={`p-2.5 rounded-xl mt-0.5 ${trip.status === "Completed" ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-600"}`}>
+                {trip.status === "Completed" ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</p>
+                <p className={`text-sm font-bold mt-0.5 ${trip.status === "Completed" ? "text-emerald-600" : "text-amber-600"}`}>
+                  {trip.status}
+                </p>
+              </div>
+            </div>
+
+            {/* Added DC Weight */}
+            <div className="bg-gradient-to-br from-slate-50 to-emerald-50/30 p-4 rounded-2xl border border-slate-100 shadow-xs flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-100/70 text-emerald-600 mt-0.5">
+                <Scale size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">DC Weight</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{(trip as any).dcWeight || 0} KG</p>
+              </div>
+            </div>
+
+            {/* Added Total Birds */}
+            <div className="bg-gradient-to-br from-slate-50 to-emerald-50/30 p-4 rounded-2xl border border-slate-100 shadow-xs flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-100/70 text-emerald-600 mt-0.5">
+                <Layers size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Birds</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{trip.totalBirds || 0}</p>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Remarks Section */}
+          <div className="bg-slate-50 border border-slate-100 p-5 rounded-2xl shadow-xs">
+            <div className="flex items-center gap-2 text-slate-400 mb-1.5">
+              <MessageSquare size={16} />
+              <p className="text-xs font-semibold uppercase tracking-wider">Remarks</p>
+            </div>
+            <p className="text-sm font-medium text-slate-700">{trip.remarks || "--"}</p>
+          </div>
+
+          {/* Deliveries Table Section */}
+          <div className="border border-slate-100 rounded-3xl overflow-hidden bg-white shadow-sm">
+            <div className="px-6 py-4 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Unloading Records</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100 text-slate-500">
+                    <th className="px-5 py-3.5 text-center text-xs font-semibold tracking-wider w-16">S.No</th>
+                    <th className="px-5 py-3.5 text-center text-xs font-semibold tracking-wider">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Hash className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Box</span>
+                      </div>
+                    </th>
+                    <th className="px-5 py-3.5 text-left text-xs font-semibold tracking-wider">
+                      <div className="flex items-center gap-1.5">
+                        <ShoppingCart className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Shop Name</span>
+                      </div>
+                    </th>
+                    <th className="px-5 py-3.5 text-center text-xs font-semibold tracking-wider">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Birds</span>
+                      </div>
+                    </th>
+                    <th className="px-5 py-3.5 text-center text-xs font-semibold tracking-wider">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Scale className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Weight (KG)</span>
+                      </div>
+                    </th>
+                    <th className="px-5 py-3.5 text-center text-xs font-semibold tracking-wider">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Remarks</span>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {trip.deliveries.map((row, index) => (
+                    <tr key={index} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="px-5 py-3.5 text-center text-xs font-bold text-slate-600">
+                        <span className="inline-flex items-center justify-center h-6 w-6 rounded-lg bg-slate-100 text-slate-600">
+                          {index + 1}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-center text-xs font-semibold text-slate-700">{row.boxNo}</td>
+                      <td className="px-5 py-3.5 text-left text-xs font-semibold text-slate-800">{row.shopName}</td>
+                      <td className="px-5 py-3.5 text-center text-xs font-semibold text-slate-700">{row.birds}</td>
+                      <td className="px-5 py-3.5 text-center text-xs font-semibold text-slate-700">{row.weight.toFixed(2)}</td>
+                      <td className="px-5 py-3.5 text-center text-xs font-medium text-slate-500">{row.remarks || "--"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-slate-50/80 border-t border-slate-100">
+                    <td colSpan={6} className="px-6 py-4">
+                      <div className="flex flex-wrap items-center justify-center gap-8 text-xs font-semibold text-slate-700">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400">Total Shops:</span>
+                          <span className="text-slate-900 bg-white px-2.5 py-1 rounded-lg border border-slate-200/60 shadow-2xs">{trip.totalShops}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400">Birds:</span>
+                          <span className="text-slate-900 bg-white px-2.5 py-1 rounded-lg border border-slate-200/60 shadow-2xs">{trip.totalBirds}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400">Weight:</span>
+                          <span className="text-slate-900 bg-white px-2.5 py-1 rounded-lg border border-slate-200/60 shadow-2xs">{trip.totalWeight.toFixed(2)} KG</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400">Mortality:</span>
+                          <span className="text-slate-900 bg-white px-2.5 py-1 rounded-lg border border-slate-200/60 shadow-2xs">{trip.totalMortality}</span>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
         </div>
 
-        <div className="border rounded-xl p-4 bg-slate-50 mb-6">
-          <p className="text-xs font-medium text-slate-500">Remarks</p>
-          <p className="text-sm text-slate-700">{trip.remarks || "--"}</p>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-full border text-sm">
-            <thead className="bg-slate-100">
-              <tr>
-                <th className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-600">Box</th>
-                {/* ✅ Shop Name header – left-aligned */}
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-600">Shop Name</th>
-                <th className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-600">Birds</th>
-                <th className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-600">Weight (KG)</th>
-                <th className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-600">Remarks</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trip.deliveries.map((row, index) => (
-                <tr key={index} className="border-t hover:bg-slate-50">
-                  <td className="px-4 py-2 text-center text-sm text-slate-700">{row.boxNo}</td>
-                  {/* ✅ Shop Name cell – left-aligned */}
-                  <td className="px-4 py-2 text-left text-sm text-slate-700">{row.shopName}</td>
-                  <td className="px-4 py-2 text-center text-sm text-slate-700">{row.birds}</td>
-                  <td className="px-4 py-2 text-center text-sm text-slate-700">{row.weight.toFixed(2)}</td>
-                  <td className="px-4 py-2 text-center text-sm text-slate-700">{row.remarks || "--"}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="bg-slate-50 font-semibold">
-              <tr>
-                <td colSpan={5} className="px-4 py-3 text-center">
-                  <div className="flex flex-wrap justify-center gap-4 text-sm">
-                    <span>Total Shops : <b>{trip.totalShops}</b></span>
-                    <span>Birds : <b>{trip.totalBirds}</b></span>
-                    <span>Weight : <b>{trip.totalWeight.toFixed(2)} KG</b></span>
-                    <span>Mortality : <b>{trip.totalMortality}</b></span>
-                  </div>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-
-        <div className="mt-6 flex justify-end gap-3">
-          <button onClick={downloadPDF} className="px-6 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-colors">
+        {/* Footer Actions */}
+        <div className="px-8 py-5 border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 flex items-center justify-end gap-3">
+          <button 
+            onClick={downloadPDF} 
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-xs shadow-md shadow-emerald-500/20 transition-all active:scale-95"
+          >
+            <Download size={15} />
             Download PDF
           </button>
-          <button onClick={onClose} className="px-6 py-2 rounded-xl bg-green-700 hover:bg-green-800 text-white shadow-md transition-colors">
+          <button 
+            onClick={onClose} 
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-all active:scale-95"
+          >
             Close
           </button>
         </div>
+
       </div>
     </div>
   );

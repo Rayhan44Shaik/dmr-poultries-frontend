@@ -1,3 +1,5 @@
+// src/modules/collections/pages/PendingCollectionsPage.tsx
+
 import { useState, useEffect, useMemo, useRef } from "react";
 import { collectionService } from "../services/collectionService";
 import { useShops } from "../../../masters/shops/hooks/useShops";
@@ -13,6 +15,7 @@ import {
   RotateCcw,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -105,7 +108,6 @@ export default function PendingCollectionsPage() {
     showSummary: false,
   });
 
-  // FIX: Load data function - no useCallback needed
   const loadData = () => {
     try {
       const pending = collectionService.getPendingCollections();
@@ -119,15 +121,13 @@ export default function PendingCollectionsPage() {
     }
   };
 
-  // FIX: useEffect with EMPTY dependency array - runs only once
   useEffect(() => {
     loadData();
     const handleStorage = () => loadData();
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
-  }, []); // <-- EMPTY ARRAY = runs once on mount
+  }, []);
 
-  // ---- Click outside to deselect ----
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (tableRef.current && !tableRef.current.contains(event.target as Node)) {
@@ -138,7 +138,6 @@ export default function PendingCollectionsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ---- Filtered & sorted data ----
   const filteredData = useMemo(() => {
     let data = [...pendingData];
 
@@ -153,8 +152,8 @@ export default function PendingCollectionsPage() {
         const shopCollections = allCollections
           .filter((c) => c.shopName === shop.shopName)
           .sort((a, b) => {
-            const dateA = a.collectionDate || a.createdDate || '';
-            const dateB = b.collectionDate || b.createdDate || '';
+            const dateA = a.collectionDate || a.createdDate || "";
+            const dateB = b.collectionDate || b.createdDate || "";
             return dateB.localeCompare(dateA);
           });
         if (shopCollections.length === 0) return false;
@@ -174,9 +173,8 @@ export default function PendingCollectionsPage() {
 
     if (recoveryThreshold > 0) {
       data = data.filter((shop) => {
-        const recovery = shop.totalSales > 0
-          ? (shop.totalCollections / shop.totalSales) * 100
-          : 0;
+        const recovery =
+          shop.totalSales > 0 ? (shop.totalCollections / shop.totalSales) * 100 : 0;
         return recovery >= recoveryThreshold;
       });
     }
@@ -198,9 +196,18 @@ export default function PendingCollectionsPage() {
         break;
     }
     return data;
-  }, [pendingData, shopName, collector, fromDate, toDate, asOnDate, sortBy, allCollections, recoveryThreshold]);
+  }, [
+    pendingData,
+    shopName,
+    collector,
+    fromDate,
+    toDate,
+    asOnDate,
+    sortBy,
+    allCollections,
+    recoveryThreshold,
+  ]);
 
-  // ---- Pagination ----
   const totalItems = filteredData.length;
   const totalPages = Math.ceil(totalItems / PAGE_SIZE) || 1;
   const paginatedData = useMemo(() => {
@@ -208,15 +215,12 @@ export default function PendingCollectionsPage() {
     return filteredData.slice(start, start + PAGE_SIZE);
   }, [filteredData, currentPage]);
 
-  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [shopName, collector, fromDate, toDate, asOnDate, sortBy, recoveryThreshold]);
 
-  // ---- Summary stats ----
   const totalPending = filteredData.reduce((sum, s) => sum + s.currentPending, 0);
 
-  // ---- Weekly Stats for KPI ----
   const weeklyStats = useMemo(() => {
     const { monday, sunday } = getCurrentWeekRange();
 
@@ -239,21 +243,14 @@ export default function PendingCollectionsPage() {
       }
     });
 
-    let weeklyPending = 0;
-    pendingData.forEach(shop => {
-      if (shopSet.has(shop.shopName)) {
-        weeklyPending += shop.currentPending;
-      }
-    });
+    return { weeklySales, weeklyCollections };
+  }, [allCollections]);
 
-    return { weeklySales, weeklyCollections, weeklyPending };
-  }, [pendingData, allCollections]);
+  const weeklyRecovery =
+    weeklyStats.weeklySales > 0
+      ? (weeklyStats.weeklyCollections / weeklyStats.weeklySales) * 100
+      : 0;
 
-  const weeklyRecovery = weeklyStats.weeklySales > 0
-    ? (weeklyStats.weeklyCollections / weeklyStats.weeklySales) * 100
-    : 0;
-
-  // ---- Weekly maps for table ----
   const weeklySalesMap = useMemo(() => {
     const map: Record<string, number> = {};
     const { monday, sunday } = getCurrentWeekRange();
@@ -279,7 +276,6 @@ export default function PendingCollectionsPage() {
     return map;
   }, [allCollections]);
 
-  // ---- Grand totals for footer (across all filtered data) ----
   const grandTotalPending = filteredData.reduce((sum, s) => sum + s.currentPending, 0);
   const grandTotalWeeklySales = filteredData.reduce(
     (sum, s) => sum + (weeklySalesMap[s.shopName] || 0),
@@ -290,7 +286,6 @@ export default function PendingCollectionsPage() {
     0
   );
 
-  // ---- Period maps for Recovery % ----
   const periodSalesMap = useMemo(() => {
     const map: Record<string, number> = {};
     const from = fromDate ? new Date(fromDate) : null;
@@ -320,13 +315,12 @@ export default function PendingCollectionsPage() {
     return map;
   }, [allCollections, fromDate, toDate]);
 
-  // ---- Helpers ----
   const getLatestCollection = (shopName: string): Collection | null => {
     const shopCollections = allCollections
       .filter((c) => c.shopName === shopName)
       .sort((a, b) => {
-        const dateA = a.collectionDate || a.createdDate || '';
-        const dateB = b.collectionDate || b.createdDate || '';
+        const dateA = a.collectionDate || a.createdDate || "";
+        const dateB = b.collectionDate || b.createdDate || "";
         return dateB.localeCompare(dateA);
       });
     return shopCollections.length > 0 ? shopCollections[0] : null;
@@ -335,7 +329,9 @@ export default function PendingCollectionsPage() {
   const isCollectionEditable = (createdDate: string): boolean => {
     const now = new Date();
     const created = new Date(createdDate);
-    const diffDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.floor(
+      (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)
+    );
     return diffDays <= 10;
   };
 
@@ -356,7 +352,6 @@ export default function PendingCollectionsPage() {
     });
   };
 
-  // ---- Export helpers ----
   const getExportFileName = (ext: "xlsx" | "pdf") => {
     const dateStr = asOnDate.replace(/-/g, "");
     let name = `Pending_Collections_${dateStr}`;
@@ -380,9 +375,10 @@ export default function PendingCollectionsPage() {
       "Total Sales": shop.totalSales,
       "Total Collections": shop.totalCollections,
       Pending: shop.currentPending,
-      "Recovery %": shop.totalSales > 0
-        ? Number(((shop.totalCollections / shop.totalSales) * 100).toFixed(2))
-        : 0,
+      "Recovery %":
+        shop.totalSales > 0
+          ? Number(((shop.totalCollections / shop.totalSales) * 100).toFixed(2))
+          : 0,
       "Overdue (Days)": shop.overdueDays,
     }));
 
@@ -401,8 +397,14 @@ export default function PendingCollectionsPage() {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(tableData);
     ws["!cols"] = [
-      { wch: 6 }, { wch: 30 }, { wch: 18 }, { wch: 15 },
-      { wch: 18 }, { wch: 15 }, { wch: 12 }, { wch: 15 }
+      { wch: 6 },
+      { wch: 30 },
+      { wch: 18 },
+      { wch: 15 },
+      { wch: 18 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 15 },
     ];
     XLSX.utils.book_append_sheet(wb, ws, "Pending Collections");
     XLSX.writeFile(wb, getExportFileName("xlsx"));
@@ -418,7 +420,9 @@ export default function PendingCollectionsPage() {
     const doc = new jsPDF("l", "mm", "a4");
     const margin = 14;
 
-    const title = `Pending Collections - As On ${asOnDate}${shopName ? ` (${shopName})` : ""}`;
+    const title = `Pending Collections - As On ${asOnDate}${
+      shopName ? ` (${shopName})` : ""
+    }`;
     doc.setFontSize(16);
     doc.setTextColor(30, 58, 138);
     doc.text(title, margin, 18);
@@ -430,14 +434,22 @@ export default function PendingCollectionsPage() {
       shop.totalSales.toFixed(2),
       shop.totalCollections.toFixed(2),
       shop.currentPending.toFixed(2),
-      (shop.totalSales > 0 ? ((shop.totalCollections / shop.totalSales) * 100).toFixed(2) : "0.00"),
+      shop.totalSales > 0
+        ? ((shop.totalCollections / shop.totalSales) * 100).toFixed(2)
+        : "0.00",
       shop.overdueDays.toString(),
     ]);
 
     const totalSalesSum = filteredData.reduce((sum, s) => sum + s.totalSales, 0);
-    const totalCollectionsSum = filteredData.reduce((sum, s) => sum + s.totalCollections, 0);
+    const totalCollectionsSum = filteredData.reduce(
+      (sum, s) => sum + s.totalCollections,
+      0
+    );
     const totalPendingSum = filteredData.reduce((sum, s) => sum + s.currentPending, 0);
-    const totalRecovery = totalSalesSum > 0 ? ((totalCollectionsSum / totalSalesSum) * 100).toFixed(2) : "0.00";
+    const totalRecovery =
+      totalSalesSum > 0
+        ? ((totalCollectionsSum / totalSalesSum) * 100).toFixed(2)
+        : "0.00";
 
     rows.push([
       "",
@@ -451,15 +463,38 @@ export default function PendingCollectionsPage() {
     ]);
 
     const colWidths = {
-      0: 12, 1: 55, 2: 28, 3: 28, 4: 28, 5: 28, 6: 22, 7: 20
+      0: 12,
+      1: 55,
+      2: 28,
+      3: 28,
+      4: 28,
+      5: 28,
+      6: 22,
+      7: 20,
     };
 
     autoTable(doc, {
-      head: [["#", "Shop Name", "Last Collection", "Total Sales", "Total Collections", "Pending", "Recovery %", "Overdue Days"]],
+      head: [
+        [
+          "#",
+          "Shop Name",
+          "Last Collection",
+          "Total Sales",
+          "Total Collections",
+          "Pending",
+          "Recovery %",
+          "Overdue Days",
+        ],
+      ],
       body: rows,
       startY: 25,
       theme: "striped",
-      headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: "bold", halign: "center" },
+      headStyles: {
+        fillColor: [30, 58, 138],
+        textColor: 255,
+        fontStyle: "bold",
+        halign: "center",
+      },
       alternateRowStyles: { fillColor: [240, 242, 245] },
       styles: { fontSize: 9, cellPadding: 2 },
       columnStyles: {
@@ -472,7 +507,7 @@ export default function PendingCollectionsPage() {
         6: { cellWidth: colWidths[6] },
         7: { cellWidth: colWidths[7], halign: "center" },
       },
-      tableWidth: 'auto',
+      tableWidth: "auto",
       margin: { left: margin, right: margin },
       didParseCell: function (data) {
         if (data.section === "body" && data.row.index === rows.length - 1) {
@@ -489,7 +524,6 @@ export default function PendingCollectionsPage() {
     showNotification("PDF exported successfully!", "success");
   };
 
-  // ---- CRUD Handlers ----
   const handleView = (shopName: string) => {
     setSelectedShop(shopName);
     setEditMode("view");
@@ -517,7 +551,9 @@ export default function PendingCollectionsPage() {
     }
     const now = new Date();
     const created = new Date(latest.createdDate);
-    const diffDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.floor(
+      (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)
+    );
     if (diffDays > 10) {
       showNotification("Cannot delete – collection is older than 10 days.", "error");
       return;
@@ -567,6 +603,7 @@ export default function PendingCollectionsPage() {
     setSummary((prev) => ({ ...prev, showSummary: false }));
     setSelectedShopName(null);
     setCurrentPage(1);
+    showNotification("Filters reset successfully.", "info");
   };
 
   const shopSearch = useShopSearch(allShopNames, shopName, setShopName);
@@ -582,7 +619,7 @@ export default function PendingCollectionsPage() {
   };
 
   return (
-    <div className="px-4 md:px-5 py-6 md:py-8 space-y-4 max-w-7xl mx-auto bg-slate-50 min-h-screen">
+    <div className="space-y-6">
       {summary.showSummary && (
         <OutstandingSummary
           openingBalance={summary.openingBalance}
@@ -599,36 +636,35 @@ export default function PendingCollectionsPage() {
       <div className="flex flex-wrap items-center justify-end gap-3">
         <button
           onClick={exportExcel}
-          className="inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700"
+          className="inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 cursor-pointer"
         >
           <FileSpreadsheet size={16} /> Excel
         </button>
         <button
           onClick={exportPDF}
-          className="inline-flex items-center gap-2 rounded-md border border-green-600 bg-white px-3 py-2 text-sm font-medium text-green-600 shadow-sm hover:bg-green-50"
+          className="inline-flex items-center gap-2 rounded-md border border-green-600 bg-white px-3 py-2 text-sm font-medium text-green-600 shadow-sm hover:bg-green-50 cursor-pointer"
         >
           <FileText size={16} /> PDF
         </button>
         <button
           onClick={resetFilters}
-          className="inline-flex items-center gap-2 rounded-md border border-red-600 bg-white px-3 py-2 text-sm font-medium text-red-600 shadow-sm hover:bg-red-50"
+          className="inline-flex items-center gap-2 rounded-md border border-red-600 bg-white px-3 py-2 text-sm font-medium text-red-600 shadow-sm hover:bg-red-50 cursor-pointer"
         >
           <RotateCcw size={16} /> Reset
         </button>
       </div>
 
-      {/* Filter Bar */}
-      <div className="rounded-lg border border-green-200 bg-white p-4 shadow">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">As On Date *</label>
-            <DatePicker
-              value={asOnDate}
-              onChange={(value) => setAsOnDate(value)}
-              placeholder="Select date"
-              className="w-full"
-            />
-          </div>
+      {/* Filter Bar Card */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <DatePicker
+            value={asOnDate}
+            onChange={(value) => setAsOnDate(value)}
+            label="As On Date *"
+            className="w-full"
+            placeholder="Select date"
+            required
+          />
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Shop Name</label>
             <div className="relative">
@@ -637,17 +673,46 @@ export default function PendingCollectionsPage() {
                 value={shopSearch.query}
                 onChange={(e) => shopSearch.handleInputChange(e.target.value)}
                 onFocus={() => shopSearch.setIsOpen(true)}
-                placeholder="Search shop..."
-                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500"
+                onBlur={() => setTimeout(() => shopSearch.setIsOpen(false), 200)}
+                placeholder="All Shops"
+                className="h-10 w-full rounded-md border border-slate-300 pl-3 pr-8 text-sm outline-none focus:border-green-500"
               />
+              {shopSearch.query && (
+                <button
+                  type="button"
+                  className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  onClick={() => {
+                    shopSearch.setQuery("");
+                    setShopName("");
+                    shopSearch.setIsOpen(false);
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              )}
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
               {shopSearch.isOpen && (
                 <ul className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border border-slate-300 bg-white py-1 text-sm shadow-lg">
+                  <li
+                    className="cursor-pointer px-3 py-2 hover:bg-green-50 text-blue-600 font-medium"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      shopSearch.setQuery("");
+                      setShopName("");
+                      shopSearch.setIsOpen(false);
+                    }}
+                  >
+                    All Shops
+                  </li>
                   {shopSearch.filteredShops.length > 0 ? (
                     shopSearch.filteredShops.slice(0, 5).map((shop) => (
                       <li
                         key={shop}
                         className="cursor-pointer px-3 py-2 hover:bg-green-50"
-                        onClick={() => shopSearch.handleSelect(shop)}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          shopSearch.handleSelect(shop);
+                        }}
                       >
                         {shop}
                       </li>
@@ -664,7 +729,7 @@ export default function PendingCollectionsPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500"
+              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500 bg-white"
             >
               <option value="highestBalance">Highest Balance</option>
               <option value="lowestBalance">Lowest Balance</option>
@@ -674,45 +739,46 @@ export default function PendingCollectionsPage() {
           </div>
         </div>
 
-        <div className="mt-3 flex items-center gap-4">
+        <div className="mt-4 flex items-center gap-4 pt-4 border-t border-slate-100">
           <button
             onClick={() => setShowMoreFilters(!showMoreFilters)}
-            className="inline-flex items-center gap-1 text-sm font-medium text-green-600 hover:text-green-800"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 hover:text-green-800 cursor-pointer"
           >
             <Filter size={16} />
             {showMoreFilters ? "Hide" : "More"} Filters
           </button>
           {showMoreFilters && (
             <button
-              onClick={resetFilters}
-              className="inline-flex items-center gap-1 text-sm font-medium text-red-500 hover:text-red-700"
+              onClick={() => {
+                setFromDate("");
+                setToDate("");
+                setCollector("");
+                setRecoveryThreshold(0);
+              }}
+              className="inline-flex items-center gap-1 text-sm font-medium text-red-500 hover:text-red-700 cursor-pointer"
             >
-              <X size={16} /> Clear All
+              <X size={16} /> Clear More Filters
             </button>
           )}
         </div>
 
         {showMoreFilters && (
-          <div className="mt-4 grid grid-cols-1 gap-4 border-t border-green-200 pt-4 lg:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-4 border-t border-slate-100 pt-4 lg:grid-cols-3">
             <div className="space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">From Date</label>
-                <DatePicker
-                  value={fromDate}
-                  onChange={(value) => setFromDate(value)}
-                  placeholder="From date"
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">To Date</label>
-                <DatePicker
-                  value={toDate}
-                  onChange={(value) => setToDate(value)}
-                  placeholder="To date"
-                  className="w-full"
-                />
-              </div>
+              <DatePicker
+                value={fromDate}
+                onChange={setFromDate}
+                label="From Date"
+                className="w-full"
+                placeholder="From date"
+              />
+              <DatePicker
+                value={toDate}
+                onChange={setToDate}
+                label="To Date"
+                className="w-full"
+                placeholder="To date"
+              />
             </div>
 
             <div>
@@ -720,7 +786,7 @@ export default function PendingCollectionsPage() {
               <select
                 value={collector}
                 onChange={(e) => setCollector(e.target.value)}
-                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500"
+                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500 bg-white"
               >
                 <option value="">All Collectors</option>
                 {collectors.map((name) => (
@@ -729,15 +795,11 @@ export default function PendingCollectionsPage() {
               </select>
             </div>
 
-            <div className="rounded-xl border border-green-200 bg-gradient-to-br from-white to-green-50 p-4 shadow-sm">
+            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 shadow-sm">
               <div className="mb-4 flex items-center justify-between">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700">
-                    Recovery %
-                  </label>
-                  <p className="text-xs text-slate-500">
-                    Show shops with at least this recovery percentage
-                  </p>
+                  <label className="block text-sm font-semibold text-slate-700">Recovery %</label>
+                  <p className="text-xs text-slate-500">Show shops with at least this recovery percentage</p>
                 </div>
                 <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-bold text-green-700">
                   {recoveryThreshold}%
@@ -769,8 +831,8 @@ export default function PendingCollectionsPage() {
         weeklyRecovery={weeklyRecovery}
       />
 
-      {/* Table with toolbar and selection */}
-      <div ref={tableRef}>
+      {/* Table Card Container */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden" ref={tableRef}>
         <PendingTable
           data={paginatedData}
           selectedShopName={selectedShopName}
@@ -789,7 +851,7 @@ export default function PendingCollectionsPage() {
 
         {/* Pagination Controls */}
         {totalItems > 0 && (
-          <div className="flex items-center justify-between rounded-b-lg border border-t-0 border-green-200 bg-white px-4 py-3">
+          <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
             <div className="text-sm text-slate-600">
               Showing {((currentPage - 1) * PAGE_SIZE) + 1} to{" "}
               {Math.min(currentPage * PAGE_SIZE, totalItems)} of {totalItems} entries
@@ -798,10 +860,10 @@ export default function PendingCollectionsPage() {
               <button
                 onClick={goToPreviousPage}
                 disabled={currentPage === 1}
-                className={`rounded-md p-2 transition ${
+                className={`rounded-md p-2 transition cursor-pointer ${
                   currentPage === 1
                     ? "cursor-not-allowed text-slate-300"
-                    : "text-slate-700 hover:bg-green-50"
+                    : "text-slate-700 hover:bg-slate-100"
                 }`}
               >
                 <ChevronLeft size={18} />
@@ -812,10 +874,10 @@ export default function PendingCollectionsPage() {
               <button
                 onClick={goToNextPage}
                 disabled={currentPage === totalPages}
-                className={`rounded-md p-2 transition ${
+                className={`rounded-md p-2 transition cursor-pointer ${
                   currentPage === totalPages
                     ? "cursor-not-allowed text-slate-300"
-                    : "text-slate-700 hover:bg-green-50"
+                    : "text-slate-700 hover:bg-slate-100"
                 }`}
               >
                 <ChevronRight size={18} />

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Vehicle } from "../types/vehicle";
-import { useNotification } from "../../../../context/NotificationContext";
+import { useSafeNotification } from "../../../../hooks/useSafeNotification"; // 👈 new import
 import {
   Truck,
   Package,
@@ -21,7 +21,7 @@ type VehicleFormProps = {
 };
 
 function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
-  const { showNotification } = useNotification();
+  const { showNotification } = useSafeNotification(); // 👈 use safe version
 
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [vehicleType, setVehicleType] = useState("");
@@ -298,7 +298,7 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
             </div>
           </div>
 
-          {/* Insurance Expiry – with placement="top" */}
+          {/* Insurance Expiry */}
           <div className="relative">
             <label className="block mb-2 text-base font-medium text-slate-700">
               Insurance Expiry
@@ -315,7 +315,7 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
             </div>
           </div>
 
-          {/* Permit Expiry – with placement="top" */}
+          {/* Permit Expiry */}
           <div className="relative">
             <label className="block mb-2 text-base font-medium text-slate-700">
               Permit Expiry
@@ -332,7 +332,7 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
             </div>
           </div>
 
-          {/* Fitness Expiry – with placement="top" */}
+          {/* Fitness Expiry */}
           <div className="relative">
             <label className="block mb-2 text-base font-medium text-slate-700">
               Fitness Expiry

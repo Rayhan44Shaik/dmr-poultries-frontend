@@ -1,7 +1,7 @@
 import React from "react";
 import Select from "react-select";
-import { FileText, FileSpreadsheet, Search, Eye } from "lucide-react";
-import { DatePicker } from "../../../../components/common/DatePicker"; // adjust path as needed
+import { FileText, FileSpreadsheet, Search, Eye, Calendar, Truck, UserCog, Warehouse, RotateCcw } from "lucide-react";
+import { DatePicker } from "../../../../components/common/DatePicker";
 
 interface Props {
   fromDate: string;
@@ -27,6 +27,7 @@ interface Props {
   showViewButton?: boolean;
   hasFilters?: boolean;
   viewButtonRef?: React.Ref<HTMLButtonElement>;
+  totalCount?: number;
 }
 
 const containsFilter = (option: any, inputValue: string) => {
@@ -59,58 +60,81 @@ function TripFilters({
   hasFilters = false,
   viewButtonRef,
 }: Props) {
-  // If you need to show notifications inside this component, uncomment and use:
-  // const { showNotification } = useSafeNotification();
-
   const vehicleOptions = (vehicles || []).map((v) => ({ value: v, label: v }));
   const supervisorOptions = (supervisors || []).map((v) => ({ value: v, label: v }));
   const farmOptions = (farms || []).map((v) => ({ value: v, label: v }));
 
   const selectStyles = {
-    control: (base: any) => ({
+    control: (base: any, state: any) => ({
       ...base,
-      borderRadius: 8,
-      borderColor: "#e2e8f0",
-      boxShadow: "none",
-      minHeight: 38,
-      fontSize: "14px",
-      "&:hover": { borderColor: "#94a3b8" },
+      borderRadius: "0.75rem",
+      borderColor: state.isFocused ? "#3b82f6" : "#e2e8f0",
+      boxShadow: state.isFocused ? "0 0 0 2px rgba(59, 130, 246, 0.15)" : "none",
+      minHeight: "42px",
+      fontSize: "13px",
+      fontWeight: 500,
+      backgroundColor: "#ffffff",
+      "&:hover": { borderColor: "#cbd5e1" },
     }),
     option: (base: any, { isFocused, isSelected }: any) => ({
       ...base,
-      backgroundColor: isSelected ? "#2563eb" : isFocused ? "#eff6ff" : "white",
-      color: isSelected ? "white" : "#1e293b",
+      backgroundColor: isSelected ? "#2563eb" : isFocused ? "#f8fafc" : "transparent",
+      color: isSelected ? "#ffffff" : "#334155",
+      fontSize: "13px",
+      fontWeight: isSelected ? 600 : 500,
+      padding: "8px 12px",
+      cursor: "pointer",
     }),
-    menu: (base: any) => ({ ...base, zIndex: 50 }),
+    menu: (base: any) => ({
+      ...base,
+      borderRadius: "0.75rem",
+      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+      border: "1px solid #e2e8f0",
+      overflow: "hidden",
+      zIndex: 50,
+    }),
+    indicatorSeparator: () => ({ display: "none" }),
+    dropdownIndicator: (base: any) => ({
+      ...base,
+      color: "#94a3b8",
+      "&:hover": { color: "#64748b" },
+    }),
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-        {/* From Date – now using DatePicker */}
-        <div className="md:col-span-2">
-          <label className="text-xs font-medium text-slate-500 block mb-1">From Date</label>
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        <div>
+          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
+            <Calendar size={13} className="text-blue-500 flex-shrink-0" />
+            <span>From Date</span>
+          </label>
           <DatePicker
             value={fromDate}
             onChange={setFromDate}
             placeholder="Select date"
-            className="w-full"
+            className="w-full text-xs font-medium"
           />
         </div>
 
-        {/* To Date – now using DatePicker */}
-        <div className="md:col-span-2">
-          <label className="text-xs font-medium text-slate-500 block mb-1">To Date</label>
+        <div>
+          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
+            <Calendar size={13} className="text-blue-500 flex-shrink-0" />
+            <span>To Date</span>
+          </label>
           <DatePicker
             value={toDate}
             onChange={setToDate}
             placeholder="Select date"
-            className="w-full"
+            className="w-full text-xs font-medium"
           />
         </div>
 
-        <div className="md:col-span-3">
-          <label className="text-xs font-medium text-slate-500 block mb-1">Vehicle</label>
+        <div>
+          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
+            <Truck size={13} className="text-indigo-500 flex-shrink-0" />
+            <span>Vehicle</span>
+          </label>
           <Select
             options={vehicleOptions}
             value={vehicleOptions.find((x) => x.value === vehicle)}
@@ -121,8 +145,12 @@ function TripFilters({
             styles={selectStyles}
           />
         </div>
-        <div className="md:col-span-3">
-          <label className="text-xs font-medium text-slate-500 block mb-1">Supervisor</label>
+
+        <div>
+          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
+            <UserCog size={13} className="text-purple-500 flex-shrink-0" />
+            <span>Supervisor</span>
+          </label>
           <Select
             options={supervisorOptions}
             value={supervisorOptions.find((x) => x.value === supervisor)}
@@ -133,8 +161,12 @@ function TripFilters({
             styles={selectStyles}
           />
         </div>
-        <div className="md:col-span-2">
-          <label className="text-xs font-medium text-slate-500 block mb-1">Source Farm</label>
+
+        <div>
+          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
+            <Warehouse size={13} className="text-amber-500 flex-shrink-0" />
+            <span>Source Farm</span>
+          </label>
           <Select
             options={farmOptions}
             value={farmOptions.find((x) => x.value === farm)}
@@ -147,54 +179,59 @@ function TripFilters({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-        <div className="md:col-span-6">
-          <label className="text-xs font-medium text-slate-500 block mb-1">Search</label>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
+        <div className="lg:col-span-5">
+          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
+            <Search size={13} className="text-slate-400 flex-shrink-0" />
+            <span>Search</span>
+          </label>
           <div className="relative">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by Trip No, Vehicle, Supervisor, or Farm..."
-              className="w-full rounded-lg border border-slate-200 px-4 py-2 pl-10 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 pl-10 text-xs font-medium text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white"
             />
           </div>
         </div>
-        <div className="md:col-span-6 flex items-center gap-2 justify-end flex-wrap">
+
+        <div className="lg:col-span-7 flex items-center gap-2 justify-end flex-wrap">
           {showViewButton && onViewSelected && (
             <button
               ref={viewButtonRef}
               onClick={onViewSelected}
-              className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-all shadow-sm flex items-center gap-1.5"
+              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5"
             >
-              <Eye size={16} />
+              <Eye size={15} />
               View Selected
             </button>
           )}
           <button
             onClick={onSearch}
-            className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all shadow-sm flex items-center gap-1.5"
+            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5"
           >
-            <Search size={16} />
+            <Search size={15} />
             Search
           </button>
           <button
             onClick={onReset}
-            className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 text-sm font-medium transition-all"
+            className="px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-all flex items-center gap-1.5"
           >
+            <RotateCcw size={14} className="text-slate-400" />
             Reset
           </button>
           {onExportPDF && (
             <button
               onClick={onExportPDF}
               disabled={!hasFilters}
-              className={`px-4 py-2 rounded-lg border border-red-500 text-red-600 text-sm font-medium transition-all flex items-center gap-1.5 ${
+              className={`px-3.5 py-2.5 rounded-xl border border-rose-200 text-rose-600 text-xs font-semibold transition-all flex items-center gap-1.5 ${
                 !hasFilters
-                  ? "opacity-50 cursor-not-allowed"
-                  : "hover:bg-red-50"
+                  ? "opacity-40 cursor-not-allowed bg-slate-50/50"
+                  : "hover:bg-rose-50"
               }`}
             >
-              <FileText size={16} />
+              <FileText size={15} />
               PDF
             </button>
           )}
@@ -202,13 +239,13 @@ function TripFilters({
             <button
               onClick={onExportExcel}
               disabled={!hasFilters}
-              className={`px-4 py-2 rounded-lg border border-green-500 text-green-600 text-sm font-medium transition-all flex items-center gap-1.5 ${
+              className={`px-3.5 py-2.5 rounded-xl border border-emerald-200 text-emerald-600 text-xs font-semibold transition-all flex items-center gap-1.5 ${
                 !hasFilters
-                  ? "opacity-50 cursor-not-allowed"
-                  : "hover:bg-green-50"
+                  ? "opacity-40 cursor-not-allowed bg-slate-50/50"
+                  : "hover:bg-emerald-50"
               }`}
             >
-              <FileSpreadsheet size={16} />
+              <FileSpreadsheet size={15} />
               Excel
             </button>
           )}

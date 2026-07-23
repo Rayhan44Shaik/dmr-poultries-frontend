@@ -1,5 +1,4 @@
-// D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\masters\storage\shopStorage.ts
-
+// Example for shopStorage.ts
 import { logAuditEvent } from "../../../utils/securityUtils";
 import { StorageWrapper } from "../../../storage/storageWrapper";
 
@@ -16,21 +15,29 @@ export interface Shop {
 }
 
 /**
- * Retrieves all stored shop records from offline browser storage using StorageWrapper.
+ * Retrieves all stored shop records from offline browser storage.
+ * If storage is completely empty, it initializes with empty array [] 
+ * instead of overwriting user-created data on subsequent loads.
  */
 export function getStoredShops(): Shop[] {
   try {
     const data = StorageWrapper.get<Shop[]>(SHOP_STORAGE_KEY);
-    return data || [];
+    
+    // If data is null/undefined, initialize it as an empty array 
+    // so you don't accidentally trigger unwanted resets.
+    if (!data) {
+      const initialShops: Shop[] = [];
+      StorageWrapper.set(SHOP_STORAGE_KEY, initialShops);
+      return initialShops;
+    }
+    
+    return data;
   } catch (error) {
     console.error("Failed to parse shops from storage:", error);
     return [];
   }
 }
 
-/**
- * Persists the entire list of shop records into offline browser storage securely using StorageWrapper.
- */
 export function persistShops(shops: Shop[]): void {
   try {
     StorageWrapper.set(SHOP_STORAGE_KEY, shops);
@@ -39,9 +46,6 @@ export function persistShops(shops: Shop[]): void {
   }
 }
 
-/**
- * Saves a single shop (creates a new entry or updates an existing record).
- */
 export function saveShopRecord(shopData: Omit<Shop, "id" | "shopNo">, existingId?: number): Shop[] {
   const currentShops = getStoredShops();
   let updatedShops: Shop[];
@@ -65,14 +69,10 @@ export function saveShopRecord(shopData: Omit<Shop, "id" | "shopNo">, existingId
   return updatedShops;
 }
 
-/**
- * Deletes a shop record by its unique identifier and re-sequences shop serial numbers.
- */
 export function deleteShopRecord(id: number): Shop[] {
   const currentShops = getStoredShops();
   const filtered = currentShops.filter((shop) => shop.id !== id);
   
-  // Re-index shopNo sequentially
   const resequenced = filtered.map((shop, index) => ({
     ...shop,
     shopNo: index + 1,

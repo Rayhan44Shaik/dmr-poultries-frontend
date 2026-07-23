@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
+import { X, Save, Plus } from "lucide-react";
 import TripInformation from "../components/TripInformation";
-import ShopDeliveryTable from "../components/ShopDeliveryTable";
+import UnLoadingTable from "../components/UnLoadingTable";
 import TripTotals from "../components/TripTotals";
-import TripFooter from "../components/TripFooter";
 import TripRecentTable from "../components/TripRecentTable";
 import TripViewModal from "../components/TripViewModal";
 import TripEditModal from "../components/TripEditModal";
@@ -23,6 +23,13 @@ type TripEntryPageProps = {
   embedded?: boolean;
 };
 
+// ─── Helper: Get yesterday's date in YYYY-MM-DD format ───
+const getYesterday = () => {
+  const date = new Date();
+  date.setDate(date.getDate() - 1);
+  return date.toISOString().split("T")[0];
+};
+
 function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const { vehicles } = useVehicles();
   const { employees } = useEmployees();
@@ -32,12 +39,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   const { showNotification } = useSafeNotification();
 
-  const { 
-    trips, 
+  const {
+    trips,
     allTrips,
-    refreshTrips, 
-    changeStatus, 
-    deleteTrip 
+    refreshTrips,
+    changeStatus,
+    deleteTrip,
   } = useTrips(showNotification);
 
   const {
@@ -80,20 +87,77 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   };
 
   const lastGeneratedDate = useRef<string | null>(null);
+  const isInitialMount = useRef(true);
 
+  // ─── Set default trip date to YESTERDAY on initial mount ───
   useEffect(() => {
-    if (!isEditing && trip.tripDate) {
-      if (lastGeneratedDate.current !== trip.tripDate) {
-        const newTripNo = generateTripNo(trips, trip.tripDate);
-        if (trip.tripNo !== newTripNo) {
-          setTrip((prev) => ({ ...prev, tripNo: newTripNo }));
-          lastGeneratedDate.current = trip.tripDate;
-        }
+    if (isInitialMount.current && !isEditing) {
+      const yesterday = getYesterday();
+      if (!trip.tripDate) {
+        setTrip((prev) => ({ ...prev, tripDate: yesterday }));
       }
+      isInitialMount.current = false;
     }
-  }, [trip.tripDate, trips, isEditing, setTrip, trip.tripNo]);
+  }, []);
+
+  // ─── Generate Trip No using ALL trips ───
+  useEffect(() => {
+    if (isEditing) return;
+    if (!trip.tripDate) return;
+
+    const currentDate = trip.tripDate;
+
+    const shouldGenerate =
+      lastGeneratedDate.current !== currentDate ||
+      !trip.tripNo ||
+      !trip.tripNo.startsWith(`TRP-${currentDate.replace(/-/g, '')}`);
+
+    if (shouldGenerate) {
+      const newTripNo = generateTripNo(allTrips, currentDate);
+      setTrip((prev) => ({ ...prev, tripNo: newTripNo }));
+      lastGeneratedDate.current = currentDate;
+    }
+  }, [trip.tripDate, allTrips, isEditing, setTrip, trip.tripNo]);
+
+  // ─── Reset lastGeneratedDate when form is cleared ───
+  const handleClear = () => {
+    console.log(`[${new Date().toISOString()}] 🔹 CLEAR FORM triggered`);
+    clearTrip();
+    setRows([]);
+    setIsEditing(false);
+    lastGeneratedDate.current = null;
+    setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
+    showNotification("✨ Trip form has been securely cleared and reset.", "info");
+  };
+
+  // ─── Validation: Total Birds = Delivered Birds + Mortality ───
+  const validateBirdCount = (): string | null => {
+    const totalBirdsFromTrip = trip.totalBirds || 0;
+    const totalBirdsDelivered = rows.reduce(
+      (sum, row) => sum + (row.birds || 0),
+      0
+    );
+    const totalMortalityFromTrip = trip.totalMortality || 0;
+    const expected = totalBirdsDelivered + totalMortalityFromTrip;
+
+    if (totalBirdsFromTrip !== expected) {
+      return `⚠️ Discrepancy Detected: Total Birds (${totalBirdsFromTrip}) must equal Delivered (${totalBirdsDelivered}) + Mortality (${totalMortalityFromTrip}) = ${expected}`;
+    }
+    return null;
+  };
+
+  // ─── HANDLERS ───
 
   const handleSave = () => {
+    console.log(`[${new Date().toISOString()}] 🔹 SAVE TRIP triggered`);
+
+    const validationError = validateBirdCount();
+    if (validationError) {
+      console.error(`[${new Date().toISOString()}] ❌ VALIDATION FAILED: ${validationError}`);
+      showNotification(validationError, "error");
+      return;
+    }
+
     updateDeliveries(rows);
     let success: boolean;
     if (isEditing) {
@@ -102,38 +166,49 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       success = saveTrip(rows);
     }
     if (success) {
-      showNotification("Trip saved successfully!", "success");
+      console.log(`[${new Date().toISOString()}] ✅ TRIP SAVED successfully`);
+      showNotification("🚀 Success! Trip details have been successfully saved to the logistics ledger.", "success");
       refreshTrips();
       setIsEditing(false);
       setRows([]);
+      lastGeneratedDate.current = null;
+      setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
     } else {
-      showNotification("Failed to save trip. Please check the form.", "error");
+      console.error(`[${new Date().toISOString()}] ❌ FAILED to save trip`);
+      showNotification("❌ Action Failed: Unable to save trip. Please review all mandatory fields.", "error");
     }
   };
 
   const handleSaveNew = () => {
+    console.log(`[${new Date().toISOString()}] 🔹 SAVE & NEW triggered`);
+
+    const validationError = validateBirdCount();
+    if (validationError) {
+      console.error(`[${new Date().toISOString()}] ❌ VALIDATION FAILED: ${validationError}`);
+      showNotification(validationError, "error");
+      return;
+    }
+
     updateDeliveries(rows);
     const success = saveTrip(rows);
     if (success) {
-      showNotification("Trip saved successfully! You can start a new trip.", "success");
+      console.log(`[${new Date().toISOString()}] ✅ TRIP SAVED, clearing form for new entry`);
+      showNotification("🌟 Trip saved successfully! Initialized a clean form for your next entry.", "success");
       refreshTrips();
       setRows([]);
       setIsEditing(false);
+      lastGeneratedDate.current = null;
+      setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
     } else {
-      showNotification("Failed to save trip. Please check the form.", "error");
+      console.error(`[${new Date().toISOString()}] ❌ FAILED to save trip (Save & New)`);
+      showNotification("❌ Action Failed: Unable to save trip. Please check your data inputs.", "error");
     }
   };
 
-  const handleClear = () => {
-    clearTrip();
-    setRows([]);
-    setIsEditing(false);
-    showNotification("Trip form cleared.", "info");
-  };
-
   const handleRefresh = () => {
+    console.log(`[${new Date().toISOString()}] 🔄 REFRESH trip list triggered`);
     refreshTrips();
-    showNotification("Trip list refreshed.", "info");
+    showNotification("🔄 Trip dispatch pipeline list has been fully refreshed.", "info");
   };
 
   useEffect(() => {
@@ -141,41 +216,70 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setRows(trip.deliveries);
   }, [trip, isEditing]);
 
-  // ─── Content with ZERO top padding ───
+  // ─── Modern Enhanced Action Buttons Toolbar ───
+  const actionButtons = (
+    <div className="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-slate-200/60 mt-4">
+      <button
+        onClick={handleClear}
+        className="inline-flex items-center gap-2 rounded-xl bg-white hover:bg-rose-50 px-5 py-2.5 text-xs font-bold text-slate-700 hover:text-rose-700 border border-slate-200 hover:border-rose-200 transition-all shadow-sm active:scale-95 group"
+      >
+        <X size={15} className="text-slate-400 group-hover:text-rose-500 transition-colors" />
+        Clear Form
+      </button>
+      <button
+        onClick={handleSave}
+        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-6 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-200 hover:shadow-lg hover:shadow-blue-300 transition-all active:scale-95"
+      >
+        <Save size={15} />
+        Save Trip Record
+      </button>
+      <button
+        onClick={handleSaveNew}
+        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 px-6 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-200 hover:shadow-lg hover:shadow-emerald-300 transition-all active:scale-95"
+      >
+        <Plus size={15} />
+        Save & Add New
+      </button>
+    </div>
+  );
+
+  // ─── Content ───
   const content = (
-    <div className="space-y-4">
-      <TripInformation
-        trip={trip}
-        setTrip={setTrip}
-        updateField={updateField}
-        vehicles={vehicles}
-        drivers={drivers}
-        supervisors={supervisors}
-        farms={farms}
-      />
+    <div className="space-y-6">
+      {/* ── Main Form Components container with Clean Card Styling ── */}
+      <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/80 shadow-xl shadow-slate-100/70 space-y-6">
+        <TripInformation
+          trip={trip}
+          setTrip={setTrip}
+          updateField={updateField}
+          vehicles={vehicles}
+          drivers={drivers}
+          supervisors={supervisors}
+          farms={farms}
+        />
 
-      <ShopDeliveryTable
-        rows={rows}
-        setRows={setRows}
-        shops={shops}
-        birdTypes={birdTypes}
-      />
+        <div className="pt-2">
+          <UnLoadingTable
+            rows={rows}
+            setRows={setRows}
+            shops={shops}
+            birdTypes={birdTypes}
+            actions={actionButtons}
+          />
+        </div>
 
-      <TripTotals rows={rows} />
+        <TripTotals rows={rows} />
+      </div>
 
+      {/* ── Recent Table Component ── */}
       <TripRecentTable
         trips={allTrips}
         onRefresh={handleRefresh}
         onView={handleView}
         onEdit={handleEdit}
-        onDelete={(trip) => deleteTrip(trip.id)}
+        // ✅ FIX: pass the deletion reason from the modal
+        onDelete={(trip, reason) => deleteTrip(trip.id, reason)}
         onStatusChange={changeStatus}
-      />
-
-      <TripFooter
-        onClear={handleClear}
-        onSave={handleSave}
-        onSaveNew={handleSaveNew}
       />
 
       <TripViewModal
@@ -199,17 +303,15 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     </div>
   );
 
-  // ─── Return ───
   if (embedded) {
-    return content;  // No wrapper, no padding, no margin
+    return content;
   }
 
-  // Standalone mode: updated container with reduced horizontal padding and increased top spacing
- return (
-  <div className="px-4 md:px-5 py-6 md:py-8 max-w-7xl mx-auto bg-slate-50 min-h-screen">
-    {content}
-  </div>
-);
+  return (
+    <div className="px-4 md:px-8 py-8 max-w-7xl mx-auto bg-slate-50/50 min-h-screen">
+      {content}
+    </div>
+  );
 }
 
 export default React.memo(TripEntryPage);

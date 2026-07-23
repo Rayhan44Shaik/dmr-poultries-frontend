@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { BirdType } from "../types/birdType";
-import { useNotification } from "../../../../context/NotificationContext";
+import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import {
   Bird,
   Weight,
@@ -14,8 +14,7 @@ type BirdTypeFormProps = {
 };
 
 function BirdTypeForm({ birdType, onSave, onCancel }: BirdTypeFormProps) {
-  const { showNotification } = useNotification();
-
+const { showNotification } = useSafeNotification();
   const [birdTypeName, setBirdTypeName] = useState("");
   const [averageWeight, setAverageWeight] = useState<number | "">("");
   const [description, setDescription] = useState("");

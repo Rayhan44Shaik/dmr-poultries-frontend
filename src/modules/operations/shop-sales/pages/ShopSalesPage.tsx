@@ -11,13 +11,14 @@ import ShopSalesSummary from "../components/ShopSalesSummary";
 import ShopSalesTable from "../components/ShopSalesTable";
 import ShopSalesPagination from "../components/ShopSalesPagination";
 import type { ShopSale } from "../types/shopSale";
-import type { Trip } from "../../vehicle-trips/types/trip.ts"; // Import Trip type if needed
+import type { Trip } from "../../vehicle-trips/types/trip.ts";
 
 interface ShopSalesPageProps {
-  initialTrip?: Trip | null; // Optional trip passed right after saving rates & locking
+  initialTrip?: Trip | null;
+  embedded?: boolean;
 }
 
-function ShopSalesPage({ initialTrip }: ShopSalesPageProps) {
+function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
   const { showNotification } = useSafeNotification();
 
   const {
@@ -36,7 +37,6 @@ function ShopSalesPage({ initialTrip }: ShopSalesPageProps) {
     updateSale,
   } = useShopSales();
 
-  // Fetch master shops to ensure dropdown is fully populated
   const { shops, refreshShops } = useShops();
 
   useEffect(() => {
@@ -44,18 +44,16 @@ function ShopSalesPage({ initialTrip }: ShopSalesPageProps) {
     refreshShops();
   }, [refreshSales, refreshShops]);
 
-  // If an initialTrip is passed from the modal, auto-filter the sales list by that trip number
   useEffect(() => {
     if (initialTrip && initialTrip.tripNo) {
       setFilter((prev) => ({
         ...prev,
-        searchQuery: initialTrip.tripNo, // Adjust this field depending on your filter hook structure
+        searchQuery: initialTrip.tripNo,
       }));
       showNotification(`Loaded sales for Trip #${initialTrip.tripNo}`, "success");
     }
   }, [initialTrip, setFilter, showNotification]);
 
-  // Combine/fallback shop names from master shops and sales data
   const shopNames = Array.from(
     new Set([
       ...(salesShopNames || []),
@@ -76,7 +74,7 @@ function ShopSalesPage({ initialTrip }: ShopSalesPageProps) {
     try {
       await updateSale(updatedSale);
       showNotification("Sale updated successfully", "success");
-    } catch (error) {
+    } catch {
       showNotification("Failed to update sale", "error");
     }
   }, [updateSale, showNotification]);
@@ -141,56 +139,68 @@ function ShopSalesPage({ initialTrip }: ShopSalesPageProps) {
     showNotification("Excel exported successfully!", "success");
   }, [filteredSales, showNotification]);
 
+  const content = (
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl p-4 md:p-6 border border-slate-200/85 shadow-sm space-y-4 text-slate-800">
+        <ShopSalesFilters
+          fromDate={filter.fromDate}
+          toDate={filter.toDate}
+          shopName={filter.shopName}
+          sortBy={filter.sortBy}
+          shopNames={shopNames}
+          totalEntries={filteredSales.length}
+          setFromDate={(v) => {
+            setFilter({ ...filter, fromDate: v });
+            if (v) showNotification(`From date set to ${v}`, "info");
+          }}
+          setToDate={(v) => {
+            setFilter({ ...filter, toDate: v });
+            if (v) showNotification(`To date set to ${v}`, "info");
+          }}
+          setShopName={(v) => setFilter({ ...filter, shopName: v })}
+          setSortBy={(v) => setFilter({ ...filter, sortBy: v })}
+          onSearch={handleSearch}
+          onReset={handleResetFilters}
+          onExportPDF={handleExportPDF}
+          onExportExcel={handleExportExcel}
+          hasFilters={
+            filter.fromDate !== "" ||
+            filter.toDate !== "" ||
+            filter.shopName.trim() !== ""
+          }
+        />
+
+        <ShopSalesSummary
+          summary={summary}
+          fromDate={filter.fromDate}
+          toDate={filter.toDate}
+          shopName={filter.shopName}
+          isLoading={isLoading}
+        />
+
+        <div className="rounded-2xl border border-slate-200/70 overflow-hidden bg-white shadow-sm text-xs md:text-sm">
+          <ShopSalesTable
+            sales={paginatedSales}
+            isLoading={isLoading}
+            shopNames={shopNames}
+            onUpdateSale={handleUpdateSale}
+          />
+        </div>
+
+        <ShopSalesPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
+      </div>
+    </div>
+  );
+
+  if (embedded) return content;
+
   return (
-    <div className="px-4 md:px-5 py-6 md:py-8 space-y-6 max-w-7xl mx-auto bg-slate-50 min-h-screen">
-      <ShopSalesFilters
-        fromDate={filter.fromDate}
-        toDate={filter.toDate}
-        shopName={filter.shopName}
-        sortBy={filter.sortBy}
-        shopNames={shopNames}
-        totalEntries={filteredSales.length}
-        setFromDate={(v) => {
-          setFilter({ ...filter, fromDate: v });
-          if (v) showNotification(`From date set to ${v}`, "info");
-        }}
-        setToDate={(v) => {
-          setFilter({ ...filter, toDate: v });
-          if (v) showNotification(`To date set to ${v}`, "info");
-        }}
-        setShopName={(v) => setFilter({ ...filter, shopName: v })}
-        setSortBy={(v) => setFilter({ ...filter, sortBy: v })}
-        onSearch={handleSearch}
-        onReset={handleResetFilters}
-        onExportPDF={handleExportPDF}
-        onExportExcel={handleExportExcel}
-        hasFilters={
-          filter.fromDate !== "" ||
-          filter.toDate !== "" ||
-          filter.shopName.trim() !== ""
-        }
-      />
-
-      <ShopSalesSummary
-        summary={summary}
-        fromDate={filter.fromDate}
-        toDate={filter.toDate}
-        shopName={filter.shopName}
-        isLoading={isLoading}
-      />
-
-      <ShopSalesTable
-        sales={paginatedSales}
-        isLoading={isLoading}
-        shopNames={shopNames}
-        onUpdateSale={handleUpdateSale}
-      />
-
-      <ShopSalesPagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-      />
+    <div className="px-3 md:px-6 py-4 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen text-slate-800">
+      {content}
     </div>
   );
 }

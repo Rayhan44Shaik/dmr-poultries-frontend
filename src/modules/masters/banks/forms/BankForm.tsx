@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Bank } from "../types/bank";
-import { useNotification } from "../../../../context/NotificationContext";
-
+import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 type BankFormProps = {
   bank?: Bank | null;
   onSave: (bank: any) => void;
@@ -9,8 +8,7 @@ type BankFormProps = {
 };
 
 function BankForm({ bank, onSave, onCancel }: BankFormProps) {
-  const { showNotification } = useNotification();
-
+const { showNotification } = useSafeNotification();
   const [bankName, setBankName] = useState("");
   const [branch, setBranch] = useState("");
   const [accountNumber, setAccountNumber] = useState("");

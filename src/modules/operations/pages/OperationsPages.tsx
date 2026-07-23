@@ -1,6 +1,6 @@
 // src/modules/operations/pages/OperationsPages.tsx
 
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Sparkles,
@@ -40,6 +40,7 @@ const tabs = [
 function OperationsPages() {
   const location = useLocation();
   const navigate = useNavigate();
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
 
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
 
@@ -68,6 +69,20 @@ function OperationsPages() {
     }
   }, [location.pathname, searchParams, navigate]);
 
+  // Automatically scroll active tab into view when it changes
+  useEffect(() => {
+    if (tabsContainerRef.current) {
+      const activeElement = tabsContainerRef.current.querySelector(`[data-tab-key="${activeTab}"]`);
+      if (activeElement) {
+        activeElement.scrollIntoView({
+          behavior: "smooth",
+          inline: "nearest",
+          block: "nearest",
+        });
+      }
+    }
+  }, [activeTab]);
+
   const ActiveComponent = useMemo(() => {
     const found = tabs.find((tab) => tab.key === activeTab);
     return found ? found.component : OperationsDashboardPage;
@@ -79,33 +94,39 @@ function OperationsPages() {
 
   return (
     <div className="w-full pt-3 pb-6 space-y-4">
-      {/* Tab Navigation Container (Scrollbar hidden via cross-browser Tailwind utility) */}
-      <div className="bg-white border-y sm:border border-slate-200/90 sm:rounded-xl shadow-sm px-3 py-1.5 w-full">
-        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none [ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => handleTabChange(tab.key)}
-                className={`
-                  flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 shrink-0
-                  ${isActive
-                    ? "bg-blue-50 text-blue-700 font-semibold"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                  }
-                `}
-              >
-                <Icon
-                  size={18}
-                  className={isActive ? "text-blue-700" : tab.color}
-                />
-                {tab.label}
-              </button>
-            );
-          })}
+      {/* Sticky Tab Navigation Bar */}
+      <div className="sticky top-0 z-30 bg-slate-50/90 backdrop-blur-md pt-1 pb-2 w-full">
+        <div className="bg-white border-y sm:border border-slate-200/90 sm:rounded-xl shadow-sm p-1.5 w-full">
+          <div
+            ref={tabsContainerRef}
+            className="flex items-center gap-2 overflow-x-auto scrollbar-none [ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden w-full scroll-smooth"
+          >
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  data-tab-key={tab.key}
+                  type="button"
+                  onClick={() => handleTabChange(tab.key)}
+                  className={`
+                    flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 shrink-0
+                    ${isActive
+                      ? "bg-blue-50 text-blue-700 font-semibold shadow-xs"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                    }
+                  `}
+                >
+                  <Icon
+                    size={18}
+                    className={isActive ? "text-blue-700" : tab.color}
+                  />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 

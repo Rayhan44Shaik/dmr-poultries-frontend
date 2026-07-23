@@ -5,7 +5,6 @@ import { renumberPendingTripsForDate } from "../services/tripFormService";
 
 type NotificationFn = (message: string, type?: "success" | "error" | "info") => void;
 
-// ✅ DEFINITIVE DEFAULT EXPORT
 export default function useTrips(showNotification?: NotificationFn) {
   const notify = showNotification || ((msg: string) => alert(msg));
 
@@ -37,27 +36,34 @@ export default function useTrips(showNotification?: NotificationFn) {
     setCurrentPage(1);
   };
 
-  // ✅ UPDATED: Delete with renumbering for pending trips
-  const deleteTrip = (id: number) => {
+  // ✅ Soft‑delete with reason and renumbering
+  const deleteTrip = (id: number, reason?: string) => {
     try {
-      // 1. Get the trip before deleting
       const allTrips = tripService.getAll() || [];
-      const tripToDelete = allTrips.find((t) => t.id === id);
-      if (!tripToDelete) {
+      const tripIndex = allTrips.findIndex((t) => t.id === id);
+      if (tripIndex === -1) {
         notify("Trip not found.", "error");
         return;
       }
 
-      // 2. Delete the trip
-      tripService.remove(id);
+      const tripToDelete = allTrips[tripIndex];
+      const wasPending = tripToDelete.status === "Pending";
+      const tripDate = tripToDelete.tripDate;
+
+      // 1. Mark as deleted and store reason
+      const updatedTrip: Trip = {
+        ...tripToDelete,
+        deleted: true,
+        deletedReason: reason || "No reason provided",
+      };
+      tripService.update(updatedTrip);
       refreshTrips();
 
-      // 3. If it was pending, renumber remaining pending trips for that date
-      if (tripToDelete.status === "Pending") {
-        const date = tripToDelete.tripDate;
-        renumberPendingTripsForDate(date);
+      // 2. If it was pending, renumber remaining pending trips for that date
+      if (wasPending) {
+        renumberPendingTripsForDate(tripDate);
         refreshTrips(); // reload after renumbering
-        notify(`Trip deleted and remaining pending trips for ${date} renumbered.`, "success");
+        notify(`Trip deleted and remaining pending trips for ${tripDate} renumbered.`, "success");
       } else {
         notify("Trip deleted successfully!", "success");
       }
@@ -84,6 +90,7 @@ export default function useTrips(showNotification?: NotificationFn) {
 
   const filteredTrips = useMemo(() => {
     return (trips || []).filter((trip) => {
+      // 🔹 Exclude deleted trips from default views (they are shown only in "Deleted" filter)
       const text = search.toLowerCase();
       const searchMatched =
         text === "" ||
@@ -109,7 +116,8 @@ export default function useTrips(showNotification?: NotificationFn) {
         supervisorMatched &&
         farmMatched &&
         fromMatched &&
-        toMatched
+        toMatched &&
+        !trip.deleted  // ⬅️ Exclude deleted trips from default lists
       );
     });
   }, [
@@ -130,7 +138,8 @@ export default function useTrips(showNotification?: NotificationFn) {
     currentPage * pageSize
   );
 
-  const allTrips = filteredTrips || [];
+  // 👇 Expose all trips including deleted ones for the Recent Table
+  const allTrips = trips || [];
 
   const totalTrips = filteredTrips?.length || 0;
   const totalShops = filteredTrips?.reduce((sum, t) => sum + t.totalShops, 0) || 0;

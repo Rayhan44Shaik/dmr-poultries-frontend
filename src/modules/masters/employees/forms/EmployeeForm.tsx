@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Employee } from "../types/employee";
-import { useNotification } from "../../../../context/NotificationContext";
+import { useSafeNotification } from "../../../../hooks/useSafeNotification"; // 👈 new import
 import {
   User,
   Building2,
@@ -14,7 +14,7 @@ import {
   Home,
   Users,
 } from "lucide-react";
-import { DatePicker } from "../../../../components/common/DatePicker"; // ✅ added import
+import { DatePicker } from "../../../../components/common/DatePicker";
 
 type EmployeeFormProps = {
   employee?: Employee | null;
@@ -35,7 +35,7 @@ const DEPARTMENTS = [
 ];
 
 function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
-  const { showNotification } = useNotification();
+  const { showNotification } = useSafeNotification(); // 👈 use safe version
 
   const [employeeName, setEmployeeName] = useState("");
   const [department, setDepartment] = useState("");
@@ -279,7 +279,7 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
             </div>
           </div>
 
-          {/* ✅ Joining Date – now using DatePicker */}
+          {/* Joining Date – using DatePicker */}
           <div className="relative">
             <label className="block mb-1.5 text-sm font-medium text-slate-700">
               Joining Date

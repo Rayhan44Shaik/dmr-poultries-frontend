@@ -234,17 +234,17 @@ const MaintenanceEntryPage = () => {
   const handleMaintenanceChange = (selected: any) => { setForm({ ...form, maintenanceType: selected ? selected.value : '' }); };
 
   const renderDatePickerHeader = ({ date, changeYear, changeMonth, decreaseMonth, increaseMonth, prevMonthButtonDisabled, nextMonthButtonDisabled }: any) => (
-    <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-300">
-      <button onClick={decreaseMonth} disabled={prevMonthButtonDisabled} className="px-2 py-1 text-sm hover:bg-gray-100 rounded disabled:opacity-50">◀</button>
+    <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-b border-slate-200">
+      <button onClick={decreaseMonth} disabled={prevMonthButtonDisabled} className="px-2 py-1 text-sm hover:bg-slate-100 rounded disabled:opacity-50">◀</button>
       <div className="flex items-center gap-2">
-        <select value={date.getFullYear()} onChange={({ target: { value } }) => changeYear(parseInt(value))} className="text-sm border border-gray-300 rounded px-1 py-0.5">
+        <select value={date.getFullYear()} onChange={({ target: { value } }) => changeYear(parseInt(value))} className="text-sm border border-slate-200 rounded px-1 py-0.5 bg-white">
           {Array.from({ length: 20 }, (_, i) => new Date().getFullYear() - 10 + i).map(year => <option key={year} value={year}>{year}</option>)}
         </select>
-        <select value={date.getMonth()} onChange={({ target: { value } }) => changeMonth(parseInt(value))} className="text-sm border border-gray-300 rounded px-1 py-0.5">
+        <select value={date.getMonth()} onChange={({ target: { value } }) => changeMonth(parseInt(value))} className="text-sm border border-slate-200 rounded px-1 py-0.5 bg-white">
           {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((month, i) => <option key={month} value={i}>{month}</option>)}
         </select>
       </div>
-      <button onClick={increaseMonth} disabled={nextMonthButtonDisabled} className="px-2 py-1 text-sm hover:bg-gray-100 rounded disabled:opacity-50">▶</button>
+      <button onClick={increaseMonth} disabled={nextMonthButtonDisabled} className="px-2 py-1 text-sm hover:bg-slate-100 rounded disabled:opacity-50">▶</button>
     </div>
   );
 
@@ -252,71 +252,71 @@ const MaintenanceEntryPage = () => {
     if (!viewRecord) return null;
     const vehicle = vehicles.find((v: any) => v.id === viewRecord.vehicleId);
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-        <div className="bg-white rounded-lg border border-gray-300 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="px-5 py-3 border-b border-gray-300 flex items-center justify-between">
-            <h3 className="text-sm uppercase tracking-wider text-black">Maintenance Record</h3>
-            <button onClick={() => setViewModalOpen(false)} className="text-black hover:text-gray-600">Close</button>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+            <h3 className="text-sm uppercase tracking-wider font-bold text-slate-800">Maintenance Record</h3>
+            <button onClick={() => setViewModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-sm font-semibold">Close</button>
           </div>
-          <div className="p-5 space-y-6">
-            <div className="grid grid-cols-2 gap-x-8 gap-y-3 bg-gray-50 p-4 rounded border border-gray-300">
-              <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="text-sm text-gray-500">Vehicle</span>
-                <span className="text-sm text-black">{vehicle?.vehicleNumber || viewRecord.vehicleId}</span>
+          <div className="p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 bg-slate-50/50 p-4 rounded-xl border border-slate-200">
+              <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                <span className="text-sm text-slate-500">Vehicle</span>
+                <span className="text-sm font-medium text-slate-800">{vehicle?.vehicleNumber || viewRecord.vehicleId}</span>
               </div>
-              <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="text-sm text-gray-500">Date</span>
-                <span className="text-sm text-black">{new Date(viewRecord.date).toLocaleDateString('en-GB')}</span>
+              <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                <span className="text-sm text-slate-500">Date</span>
+                <span className="text-sm font-medium text-slate-800">{new Date(viewRecord.date).toLocaleDateString('en-GB')}</span>
               </div>
-              <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="text-sm text-gray-500">Current KM</span>
-                <span className="text-sm text-black">{viewRecord.currentKM.toLocaleString()}</span>
+              <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                <span className="text-sm text-slate-500">Current KM</span>
+                <span className="text-sm font-medium text-slate-800">{viewRecord.currentKM.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="text-sm text-gray-500">Maintenance Type</span>
-                <span className="text-sm text-black">{viewRecord.maintenanceType}</span>
+              <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                <span className="text-sm text-slate-500">Maintenance Type</span>
+                <span className="text-sm font-medium text-slate-800">{viewRecord.maintenanceType}</span>
               </div>
-              <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="text-sm text-gray-500">Service Type</span>
-                <span className="text-sm text-black">{viewRecord.serviceType}</span>
+              <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                <span className="text-sm text-slate-500">Service Type</span>
+                <span className="text-sm font-medium text-slate-800">{viewRecord.serviceType}</span>
               </div>
-              <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="text-sm text-gray-500">Garage</span>
-                <span className="text-sm text-black">{viewRecord.garage || '-'}</span>
+              <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                <span className="text-sm text-slate-500">Garage</span>
+                <span className="text-sm font-medium text-slate-800">{viewRecord.garage || '-'}</span>
               </div>
-              <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="text-sm text-gray-500">Mechanic</span>
-                <span className="text-sm text-black">{viewRecord.mechanic || '-'}</span>
+              <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                <span className="text-sm text-slate-500">Mechanic</span>
+                <span className="text-sm font-medium text-slate-800">{viewRecord.mechanic || '-'}</span>
               </div>
-              <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="text-sm text-gray-500">Driver</span>
-                <span className="text-sm text-black">{viewRecord.driverName || '-'}</span>
+              <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                <span className="text-sm text-slate-500">Driver</span>
+                <span className="text-sm font-medium text-slate-800">{viewRecord.driverName || '-'}</span>
               </div>
             </div>
             {viewRecord.parts && viewRecord.parts.length > 0 && (
-              <div className="border border-gray-300 rounded">
-                <table className="min-w-full divide-y divide-gray-300">
-                  <thead className="bg-gray-50">
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs text-gray-500 uppercase">Item</th>
-                      <th className="px-4 py-2 text-center text-xs text-gray-500 uppercase">Qty</th>
-                      <th className="px-4 py-2 text-right text-xs text-gray-500 uppercase">Amount</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Item</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase">Qty</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Amount</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-300">
+                  <tbody className="divide-y divide-slate-200 bg-white">
                     {viewRecord.parts.map((p, i) => (
                       <tr key={i}>
-                        <td className="px-4 py-2 text-sm text-black">{p.name}</td>
-                        <td className="px-4 py-2 text-sm text-black text-center">{p.quantity}</td>
-                        <td className="px-4 py-2 text-sm text-black text-right">₹{p.amount.toFixed(2)}</td>
+                        <td className="px-4 py-2.5 text-sm text-slate-800">{p.name}</td>
+                        <td className="px-4 py-2.5 text-sm text-slate-800 text-center">{p.quantity}</td>
+                        <td className="px-4 py-2.5 text-sm text-slate-800 text-right">₹{p.amount.toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
-            <div className="flex justify-end pt-4">
-              <button onClick={() => setViewModalOpen(false)} className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">Close</button>
+            <div className="flex justify-end pt-2">
+              <button onClick={() => setViewModalOpen(false)} className="px-4 py-2 text-sm font-semibold border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 transition">Close</button>
             </div>
           </div>
         </div>
@@ -326,25 +326,24 @@ const MaintenanceEntryPage = () => {
 
   return (
     <ErrorBoundary>
-      {/* 👇 Outer container – padding now reduced further to px-2 md:px-4 */}
-      <div className="px-1 md:px-3 py-6 md:py-8 space-y-6 max-w-7xl mx-auto bg-slate-50 min-h-screen">
+      <div className="max-w-7xl mx-auto space-y-6 pb-12">
         {/* Main Form Card */}
-        <div className="bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
           {/* Header */}
-          <div className="px-6 py-4 border-b border-slate-200/60 bg-slate-50/40 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-50 rounded-xl border border-blue-100 text-blue-600">
                 <Wrench size={18} />
               </div>
               <div>
                 <h2 className="text-base font-bold text-slate-800">Vehicle Maintenance Entry</h2>
-                <p className="text-xs text-slate-400">Record maintenance details and parts used</p>
+                <p className="text-xs text-slate-500">Record maintenance details and parts used</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleReset}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold text-slate-700 border border-slate-300 rounded-xl hover:bg-slate-50 transition shadow-xs"
               >
                 <RotateCcw size={14} />
                 Reset
@@ -352,7 +351,7 @@ const MaintenanceEntryPage = () => {
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md hover:shadow-lg disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition shadow-sm hover:shadow disabled:opacity-50"
               >
                 <Save size={14} />
                 {loading ? 'Saving...' : (form.id ? 'Update' : 'Save')}
@@ -361,15 +360,15 @@ const MaintenanceEntryPage = () => {
           </div>
 
           {/* Form Body */}
-          <div className="p-6 space-y-6">
+          <div className="p-6 space-y-5">
             {/* First Row: Vehicle, Date, Current KM, Driver */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
                   Vehicle <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
                     <Car size={16} className="text-slate-400" />
                   </div>
                   <Select
@@ -385,9 +384,10 @@ const MaintenanceEntryPage = () => {
                         ...base,
                         minHeight: '40px',
                         paddingLeft: '28px',
-                        borderColor: '#d1d5db',
+                        borderColor: '#cbd5e1',
                         boxShadow: 'none',
-                        borderRadius: '0.5rem',
+                        borderRadius: '0.75rem',
+                        '&:hover': { borderColor: '#94a3b8' }
                       }),
                       placeholder: (base) => ({ ...base, color: '#9ca3af' }),
                     }}
@@ -396,7 +396,7 @@ const MaintenanceEntryPage = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
                   Date <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -408,7 +408,7 @@ const MaintenanceEntryPage = () => {
                     selected={form.date}
                     onChange={(date: Date | null) => setForm({ ...form, date: date || new Date() })}
                     dateFormat="dd/MM/yyyy"
-                    className="w-full h-10 pl-10 pr-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                    className="w-full h-10 pl-10 pr-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition bg-white"
                     renderCustomHeader={renderDatePickerHeader}
                     placeholderText="Select date"
                   />
@@ -416,7 +416,7 @@ const MaintenanceEntryPage = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
                   Current KM <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -428,17 +428,17 @@ const MaintenanceEntryPage = () => {
                     value={form.currentKM}
                     onChange={(e) => setForm({ ...form, currentKM: e.target.value })}
                     placeholder="e.g. 45000"
-                    className="w-full h-10 pl-10 pr-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                    className="w-full h-10 pl-10 pr-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition bg-white"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
                   Driver
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
                     <User size={16} className="text-slate-400" />
                   </div>
                   <Select
@@ -454,9 +454,10 @@ const MaintenanceEntryPage = () => {
                         ...base,
                         minHeight: '40px',
                         paddingLeft: '28px',
-                        borderColor: '#d1d5db',
+                        borderColor: '#cbd5e1',
                         boxShadow: 'none',
-                        borderRadius: '0.5rem',
+                        borderRadius: '0.75rem',
+                        '&:hover': { borderColor: '#94a3b8' }
                       }),
                       placeholder: (base) => ({ ...base, color: '#9ca3af' }),
                     }}
@@ -468,11 +469,11 @@ const MaintenanceEntryPage = () => {
             {/* Second Row: Maintenance Type, Service Type, Next Service KM, Garage */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
                   Maintenance Type <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
                     <Cog size={16} className="text-slate-400" />
                   </div>
                   <Select
@@ -488,9 +489,10 @@ const MaintenanceEntryPage = () => {
                         ...base,
                         minHeight: '40px',
                         paddingLeft: '28px',
-                        borderColor: '#d1d5db',
+                        borderColor: '#cbd5e1',
                         boxShadow: 'none',
-                        borderRadius: '0.5rem',
+                        borderRadius: '0.75rem',
+                        '&:hover': { borderColor: '#94a3b8' }
                       }),
                       placeholder: (base) => ({ ...base, color: '#9ca3af' }),
                     }}
@@ -499,7 +501,7 @@ const MaintenanceEntryPage = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
                   Service Type <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -511,13 +513,13 @@ const MaintenanceEntryPage = () => {
                     value={form.serviceType}
                     onChange={(e) => setForm({ ...form, serviceType: e.target.value })}
                     placeholder="e.g. Oil Change"
-                    className="w-full h-10 pl-10 pr-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                    className="w-full h-10 pl-10 pr-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition bg-white"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
                   Next Service KM
                 </label>
                 <div className="relative">
@@ -529,13 +531,13 @@ const MaintenanceEntryPage = () => {
                     value={form.nextServiceKM}
                     onChange={(e) => setForm({ ...form, nextServiceKM: e.target.value })}
                     placeholder="e.g. 50000"
-                    className="w-full h-10 pl-10 pr-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                    className="w-full h-10 pl-10 pr-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition bg-white"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
                   Garage
                 </label>
                 <div className="relative">
@@ -547,16 +549,16 @@ const MaintenanceEntryPage = () => {
                     value={form.garage}
                     onChange={(e) => setForm({ ...form, garage: e.target.value })}
                     placeholder="Garage name"
-                    className="w-full h-10 pl-10 pr-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                    className="w-full h-10 pl-10 pr-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition bg-white"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Third Row: Mechanic, Remarks (full width) */}
+            {/* Third Row: Mechanic, Remarks */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
                   Mechanic
                 </label>
                 <div className="relative">
@@ -568,12 +570,12 @@ const MaintenanceEntryPage = () => {
                     value={form.mechanic}
                     onChange={(e) => setForm({ ...form, mechanic: e.target.value })}
                     placeholder="Mechanic name"
-                    className="w-full h-10 pl-10 pr-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                    className="w-full h-10 pl-10 pr-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition bg-white"
                   />
                 </div>
               </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
                   Remarks
                 </label>
                 <div className="relative">
@@ -585,7 +587,7 @@ const MaintenanceEntryPage = () => {
                     onChange={(e) => setForm({ ...form, remarks: e.target.value })}
                     rows={1}
                     placeholder="Any additional notes..."
-                    className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition resize-y"
+                    className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition resize-y bg-white"
                   />
                 </div>
               </div>
@@ -593,13 +595,13 @@ const MaintenanceEntryPage = () => {
           </div>
 
           {/* Parts Table Section */}
-          <div className="border-t border-slate-200/60 p-6 bg-slate-50/20">
+          <div className="border-t border-slate-200 p-6 bg-slate-50/35">
             <PartsTable parts={parts} setParts={setParts} />
           </div>
         </div>
 
         {/* Latest Maintenance Records Table */}
-        <div className="bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden p-5">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden p-5">
           <LatestMaintenanceTable
             records={paginatedRecords}
             vehicles={vehicles}

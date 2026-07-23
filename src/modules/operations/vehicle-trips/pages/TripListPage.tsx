@@ -42,7 +42,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
 
   useEffect(() => {
     refreshTrips();
-    // No notification on page load
   }, []);
 
   const [viewOpen, setViewOpen] = useState(false);
@@ -104,6 +103,9 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
+
+  const startEntry = totalCompletedTrips === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endEntry = Math.min(currentPage * pageSize, totalCompletedTrips);
 
   const openView = (trip: Trip) => {
     setSelectedTrip(trip);
@@ -195,59 +197,96 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     showNotification("Filters have been reset.", "info");
   };
 
-  // ─── Content ───
   const content = (
     <div className="space-y-4">
-      <TripFilters
-        fromDate={fromDate}
-        toDate={toDate}
-        vehicle={vehicle}
-        supervisor={supervisor}
-        farm={farm}
-        search={search}
-        setFromDate={setFromDate}
-        setToDate={setToDate}
-        setVehicle={setVehicle}
-        setSupervisor={setSupervisor}
-        setFarm={setFarm}
-        setSearch={setSearch}
-        onSearch={() => {}}
-        onReset={handleResetFilters}
-        vehicles={vehicleOptions}
-        supervisors={supervisors}
-        farms={farms}
-        onExportPDF={handleExportPDF}
-        onExportExcel={handleExportExcel}
-        onViewSelected={handleViewSelected}
-        showViewButton={selectedRowId !== null}
-        hasFilters={hasFilters}
-        viewButtonRef={viewButtonRef}
-      />
+      <div className="bg-white rounded-2xl p-4 md:p-6 border border-slate-200/85 shadow-sm space-y-4 text-slate-800">
+        
+        <div>
+          <TripFilters
+            fromDate={fromDate}
+            toDate={toDate}
+            vehicle={vehicle}
+            supervisor={supervisor}
+            farm={farm}
+            search={search}
+            setFromDate={setFromDate}
+            setToDate={setToDate}
+            setVehicle={setVehicle}
+            setSupervisor={setSupervisor}
+            setFarm={setFarm}
+            setSearch={setSearch}
+            onSearch={() => {}}
+            onReset={handleResetFilters}
+            vehicles={vehicleOptions}
+            supervisors={supervisors}
+            farms={farms}
+            onExportPDF={handleExportPDF}
+            onExportExcel={handleExportExcel}
+            onViewSelected={handleViewSelected}
+            showViewButton={selectedRowId !== null}
+            hasFilters={hasFilters}
+            viewButtonRef={viewButtonRef}
+          />
+        </div>
 
-      {hasFilters && (
-        <TripKPICards
-          totalTrips={totalCompletedTrips}
-          totalBirds={totalCompletedBirds}
-          totalWeight={totalCompletedWeight}
-          totalMortality={totalCompletedMortality}
-          totalShops={totalCompletedShops}
-        />
-      )}
+        {hasFilters && (
+          <div>
+            <TripKPICards
+              totalTrips={totalCompletedTrips}
+              totalBirds={totalCompletedBirds}
+              totalWeight={totalCompletedWeight}
+              totalMortality={totalCompletedMortality}
+              totalShops={totalCompletedShops}
+            />
+          </div>
+        )}
 
-      <div ref={tableContainerRef}>
-        <TripMasterTable
-          trips={paginatedTrips}
-          selectedRowId={selectedRowId}
-          onRowClick={handleRowClick}
-          startIndex={(currentPage - 1) * pageSize}
-        />
+        <div ref={tableContainerRef} className="rounded-2xl border border-slate-200/70 overflow-hidden bg-white shadow-sm text-xs md:text-sm">
+          <TripMasterTable
+            trips={paginatedTrips}
+            selectedRowId={selectedRowId}
+            onRowClick={handleRowClick}
+            startIndex={(currentPage - 1) * pageSize}
+          />
+        </div>
+
+        <div className="pt-2 border-t border-slate-200/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-500">
+          <div>
+            <div>
+              Showing <span className="font-bold text-slate-700">{startEntry}&ndash;{endEntry}</span> of <span className="font-bold text-slate-700">{totalCompletedTrips}</span> entries
+            </div>
+          </div>
+          <div className="inline-flex items-center gap-1 bg-white border border-slate-200/80 rounded-xl px-2 py-1.5 shadow-2xs">
+            <button
+              onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Previous
+            </button>
+            {Array.from({ length: totalPagesCompleted }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                  currentPage === page
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+            <button
+              onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPagesCompleted))}
+              disabled={currentPage === totalPagesCompleted || totalPagesCompleted === 0}
+              className="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
       </div>
-
-      <TripPagination
-        currentPage={currentPage}
-        totalPages={totalPagesCompleted}
-        onPageChange={setCurrentPage}
-      />
 
       <TripViewModal
         open={viewOpen}
@@ -260,12 +299,10 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     </div>
   );
 
-  // ─── Return ───
   if (embedded) return content;
   
-  // Standalone container with increased side padding
   return (
-    <div className="px-4 md:px-5 py-6 md:py-8 max-w-7xl mx-auto bg-slate-50 min-h-screen">
+    <div className="px-3 md:px-6 py-4 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen text-slate-800">
       {content}
     </div>
   );

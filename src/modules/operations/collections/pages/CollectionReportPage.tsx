@@ -1,3 +1,5 @@
+// src/modules/collections/pages/CollectionReportPage.tsx
+
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { collectionService } from "../services/collectionService";
 import { useShops } from "../../../masters/shops/hooks/useShops";
@@ -47,7 +49,11 @@ const getCurrentWeekRange = () => {
   return { monday, sunday };
 };
 
-export default function CollectionReportPage() {
+type Props = {
+  embedded?: boolean;
+};
+
+export default function CollectionReportPage({ embedded = false }: Props) {
   const { showNotification } = useSafeNotification();
 
   const [allCollections, setAllCollections] = useState<any[]>([]);
@@ -77,7 +83,6 @@ export default function CollectionReportPage() {
 
   const shopSearch = useShopSearch(allShopNames, shopName, setShopName);
 
-  // FIX: loadData without useCallback to prevent dependency issues
   const loadData = () => {
     try {
       const all = collectionService.getCollections();
@@ -89,13 +94,12 @@ export default function CollectionReportPage() {
     }
   };
 
-  // FIX: useEffect with empty dependency array - runs only once
   useEffect(() => {
     loadData();
     const handleStorage = () => loadData();
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
-  }, []); // EMPTY DEPENDENCY ARRAY - runs only once
+  }, []);
 
   const filteredData = useMemo(() => {
     let data = allCollections.filter((c) => c.status === "Approved");
@@ -367,32 +371,33 @@ export default function CollectionReportPage() {
 
   if (loading) return <div className="p-8 text-center text-slate-500">Loading...</div>;
 
-  return (
-    <div className="px-4 md:px-5 py-6 md:py-8 space-y-4 max-w-7xl mx-auto bg-slate-50 min-h-screen">
+  // Content matching the precise structural layout and spacing of RatesEntryPage
+  const content = (
+    <div className="space-y-6">
       {/* Action Buttons */}
       <div className="flex flex-wrap items-center justify-end gap-3">
         <button
           onClick={exportExcel}
-          className="inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700"
+          className="inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 cursor-pointer"
         >
           <FileSpreadsheet size={16} /> Excel
         </button>
         <button
           onClick={exportPDF}
-          className="inline-flex items-center gap-2 rounded-md border border-green-600 bg-white px-3 py-2 text-sm font-medium text-green-600 shadow-sm hover:bg-green-50"
+          className="inline-flex items-center gap-2 rounded-md border border-green-600 bg-white px-3 py-2 text-sm font-medium text-green-600 shadow-sm hover:bg-green-50 cursor-pointer"
         >
           <FileText size={16} /> PDF
         </button>
         <button
           onClick={resetFilters}
-          className="inline-flex items-center gap-2 rounded-md border border-red-600 bg-white px-3 py-2 text-sm font-medium text-red-600 shadow-sm hover:bg-red-50"
+          className="inline-flex items-center gap-2 rounded-md border border-red-600 bg-white px-3 py-2 text-sm font-medium text-red-600 shadow-sm hover:bg-red-50 cursor-pointer"
         >
           <RotateCcw size={16} /> Reset
         </button>
       </div>
 
-      {/* Filter Bar */}
-      <div className="rounded-lg border border-green-200 bg-white p-4 shadow">
+      {/* Filter Bar Card */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DatePicker
             value={fromDate}
@@ -424,7 +429,8 @@ export default function CollectionReportPage() {
               />
               {shopSearch.query && (
                 <button
-                  className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  type="button"
+                  className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                   onClick={() => {
                     shopSearch.setQuery("");
                     setShopName("");
@@ -473,7 +479,7 @@ export default function CollectionReportPage() {
             <select
               value={collector}
               onChange={(e) => setCollector(e.target.value)}
-              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500"
+              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500 bg-white"
             >
               <option value="">All Collectors</option>
               {collectors.map((name) => (
@@ -486,7 +492,7 @@ export default function CollectionReportPage() {
             <select
               value={paymentMode}
               onChange={(e) => setPaymentMode(e.target.value)}
-              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500"
+              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500 bg-white"
             >
               <option value="">All Modes</option>
               <option value="Cash">Cash</option>
@@ -500,20 +506,18 @@ export default function CollectionReportPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-green-200 bg-white p-4 shadow">
-          <div className="flex items-center gap-3">
-            <div className="rounded-full bg-blue-100 p-2 text-blue-600">
-              <Wallet size={24} />
-            </div>
-            <div>
-              <div className="text-sm font-medium text-slate-500">Total Collections</div>
-              <div className="text-2xl font-bold text-slate-800">{formatCurrency(totalCollections)}</div>
-            </div>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6 flex items-center gap-4">
+          <div className="rounded-2xl bg-blue-50 p-3 text-blue-600">
+            <Wallet size={24} />
+          </div>
+          <div>
+            <div className="text-sm font-medium text-slate-500">Total Collections</div>
+            <div className="text-2xl font-bold text-slate-800">{formatCurrency(totalCollections)}</div>
           </div>
         </div>
-        <div className="rounded-lg border border-green-200 bg-white p-4 shadow">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="rounded-full bg-indigo-100 p-2 text-indigo-600">
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6">
+          <div className="flex items-center gap-4 mb-3">
+            <div className="rounded-2xl bg-indigo-50 p-3 text-indigo-600">
               <Users size={24} />
             </div>
             <div>
@@ -521,9 +525,9 @@ export default function CollectionReportPage() {
               <div className="text-2xl font-bold text-slate-800">{totalCollectorsCount}</div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="grid grid-cols-2 gap-2 text-sm pt-2 border-t border-slate-100">
             {collectorCountsByMode.map(({ mode, count }) => (
-              <div key={mode} className="flex justify-between border-b border-slate-100 py-1">
+              <div key={mode} className="flex justify-between py-1">
                 <span className="text-slate-600">{mode}</span>
                 <span className="font-medium text-slate-800">{count}</span>
               </div>
@@ -532,89 +536,95 @@ export default function CollectionReportPage() {
         </div>
       </div>
 
-      {/* Tables Grid */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="overflow-x-auto rounded-lg border border-green-200 bg-white shadow">
-          <div className="px-4 py-2 border-b border-slate-200">
-            <h4 className="text-sm font-semibold text-slate-700">Payment Mode Summary</h4>
+      {/* Tables Grid Card Containers */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h4 className="text-sm font-semibold text-slate-800">Payment Mode Summary</h4>
           </div>
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-green-50">
-              <tr>
-                <th className="px-3 py-1.5 text-left text-[9px] font-bold uppercase tracking-wider text-slate-600">Payment Mode</th>
-                <th className="px-3 py-1.5 text-right text-[9px] font-bold uppercase tracking-wider text-slate-600">No.</th>
-                <th className="px-3 py-1.5 text-right text-[9px] font-bold uppercase tracking-wider text-slate-600">Amount</th>
-                <th className="px-3 py-1.5 text-center text-[9px] font-bold uppercase tracking-wider text-slate-600">%</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
-              {paymentModeSummary.map((row) => (
-                <tr
-                  key={row.mode}
-                  className={row.mode === "Total" ? "bg-yellow-50 font-semibold" : "hover:bg-green-50"}
-                >
-                  <td className="px-3 py-1.5 text-[10px] text-slate-800">{row.mode}</td>
-                  <td className="px-3 py-1.5 text-right text-[10px] text-slate-600">{row.count}</td>
-                  <td className="px-3 py-1.5 text-right text-[10px] text-slate-600">{formatCurrency(row.amount)}</td>
-                  <td className="px-3 py-1.5 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <span className="text-[9px] font-medium text-slate-700">
-                        {row.percentage.toFixed(1)}%
-                      </span>
-                      <div className="w-8 h-1.5 rounded-full bg-slate-200 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${getBarColor(row.percentage)} transition-all duration-500`}
-                          style={{ width: `${row.percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-100">
+              <thead className="bg-slate-50/75">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Payment Mode</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">No.</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">Amount</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-600">%</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="overflow-x-auto rounded-lg border border-green-200 bg-white shadow">
-          <div className="px-4 py-2 border-b border-slate-200">
-            <h4 className="text-sm font-semibold text-slate-700">Collector Summary</h4>
-          </div>
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-green-50">
-              <tr>
-                <th className="px-3 py-1.5 text-left text-[9px] font-bold uppercase tracking-wider text-slate-600">Collector</th>
-                {collectorSummary.paymentModes.map((mode: string) => (
-                  <th key={mode} className="px-3 py-1.5 text-right text-[9px] font-bold uppercase tracking-wider text-slate-600">
-                    {mode}
-                  </th>
-                ))}
-                <th className="px-3 py-1.5 text-right text-[9px] font-bold uppercase tracking-wider text-slate-600">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
-              {collectorSummary.rows.map((row: any, idx: number) => {
-                const isTotal = row.collector === "Total";
-                return (
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {paymentModeSummary.map((row) => (
                   <tr
-                    key={idx}
-                    className={isTotal ? "bg-yellow-50 font-semibold" : "hover:bg-green-50"}
+                    key={row.mode}
+                    className={row.mode === "Total" ? "bg-amber-50/60 font-semibold" : "hover:bg-slate-50/50"}
                   >
-                    <td className="px-3 py-1.5 text-[10px] text-slate-800">{row.collector}</td>
-                    {collectorSummary.paymentModes.map((mode: string) => (
-                      <td key={mode} className="px-3 py-1.5 text-right text-[10px] text-slate-600">
-                        {formatCurrency(row[mode] || 0)}
-                      </td>
-                    ))}
-                    <td className="px-3 py-1.5 text-right text-[10px] font-semibold text-slate-800">
-                      {formatCurrency(row.total)}
+                    <td className="px-4 py-3 text-xs text-slate-800">{row.mode}</td>
+                    <td className="px-4 py-3 text-right text-xs text-slate-600">{row.count}</td>
+                    <td className="px-4 py-3 text-right text-xs text-slate-600">{formatCurrency(row.amount)}</td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-xs font-medium text-slate-700 w-10 text-right">
+                          {row.percentage.toFixed(1)}%
+                        </span>
+                        <div className="w-12 h-2 rounded-full bg-slate-100 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${getBarColor(row.percentage)} transition-all duration-500`}
+                            style={{ width: `${row.percentage}%` }}
+                          />
+                        </div>
+                      </div>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h4 className="text-sm font-semibold text-slate-800">Collector Summary</h4>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-100">
+              <thead className="bg-slate-50/75">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Collector</th>
+                  {collectorSummary.paymentModes.map((mode: string) => (
+                    <th key={mode} className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
+                      {mode}
+                    </th>
+                  ))}
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {collectorSummary.rows.map((row: any, idx: number) => {
+                  const isTotal = row.collector === "Total";
+                  return (
+                    <tr
+                      key={idx}
+                      className={isTotal ? "bg-amber-50/60 font-semibold" : "hover:bg-slate-50/50"}
+                    >
+                      <td className="px-4 py-3 text-xs text-slate-800">{row.collector}</td>
+                      {collectorSummary.paymentModes.map((mode: string) => (
+                        <td key={mode} className="px-4 py-3 text-right text-xs text-slate-600">
+                          {formatCurrency(row[mode] || 0)}
+                        </td>
+                      ))}
+                      <td className="px-4 py-3 text-right text-xs font-semibold text-slate-800">
+                        {formatCurrency(row.total)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
   );
+
+  return embedded ? content : content;
 }
