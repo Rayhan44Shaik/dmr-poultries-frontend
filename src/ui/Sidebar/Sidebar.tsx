@@ -1,4 +1,5 @@
 // src/components/Sidebar.tsx
+
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
@@ -14,12 +15,8 @@ import {
   ChevronDown,
   ChevronRight,
   Building2,
-  PiggyBank,
-  Wallet,
-  Banknote,
-  Landmark,
   Receipt,
-  TrendingUp,
+  HandCoins, // added for Farm Payment
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -29,14 +26,10 @@ export default function Sidebar() {
     location.pathname.startsWith("/accounts")
   );
 
+  // Accounts children
   const accountsChildren = [
-    { title: "Dashboard", path: "/accounts/dashboard", icon: <LayoutDashboard size={14} /> },
-    { title: "Farmer Payments", path: "/accounts/farmer-payments", icon: <PiggyBank size={14} /> },
-    { title: "Cash Book", path: "/accounts/cash-book", icon: <Wallet size={14} /> },
-    { title: "Bank Book", path: "/accounts/bank-book", icon: <Landmark size={14} /> },
-    { title: "Vehicle EMI", path: "/accounts/vehicle-emi", icon: <Banknote size={14} /> },
-    { title: "Outstanding Summary", path: "/accounts/outstanding-summary", icon: <Receipt size={14} /> },
-    { title: "Profit & Loss", path: "/accounts/profit-loss", icon: <TrendingUp size={14} /> },
+    { title: "Payment Book", path: "/accounts/payment-book", icon: <Receipt size={14} /> },
+    { title: "Farm Payment", path: "/accounts/farm-payment", icon: <HandCoins size={14} /> },
   ];
 
   // Better matching logic for parent items

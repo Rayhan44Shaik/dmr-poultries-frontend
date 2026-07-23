@@ -273,15 +273,17 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     allLedgers.forEach(({ shop, data }, index) => {
       if (index > 0) doc.addPage();
 
-      // Header
+      // Header (Clean Monochrome Styling)
+      doc.setFont("helvetica", "bold");
       doc.setFontSize(14);
-      doc.setTextColor(30, 41, 59);
-      doc.text(`Shop Ledger – ${shop}`, 10, 12);
+      doc.setTextColor(17, 24, 39);
+      doc.text(`${shop}`, 14, 15);
 
+      doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`Statement Period: ${dateFrom} to ${dateTo}`, 10, 18);
-      doc.text(`Generated On: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, doc.internal.pageSize.getWidth() - 10, 18, { align: "right" });
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Period: ${dateFrom} to ${dateTo}`, 14, 21);
+      doc.text(`Generated: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, doc.internal.pageSize.getWidth() - 14, 21, { align: "right" });
 
       // Build rows
       const rows = data.map((t) => [
@@ -290,8 +292,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         t.type === "sale" ? String(t.birds) : "-",
         t.type === "sale" ? t.weight.toFixed(2) : "-",
         t.type === "sale" ? t.rate.toFixed(2) : "-",
-        t.debit.toFixed(2),
-        t.credit.toFixed(2),
+        t.debit > 0 ? t.debit.toFixed(2) : "-",
+        t.credit > 0 ? t.credit.toFixed(2) : "-",
         t.balance.toFixed(2),
         t.paymentMode || "-",
       ]);
@@ -321,26 +323,55 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         body: rows,
         startY: 26,
         margin: { top: 26, bottom: 15, left: 10, right: 10 },
-        headStyles: { fillColor: [51, 65, 85], textColor: 255, fontStyle: "bold", halign: "center" },
-        bodyStyles: { valign: "middle", fontSize: 8.5 },
+        theme: "grid",
+        headStyles: { 
+          fillColor: [243, 244, 246], 
+          textColor: [17, 24, 39], 
+          fontStyle: "bold", 
+          halign: "center",
+          fontSize: 8,
+          lineWidth: 0.1,
+          cellPadding: 4,
+          lineColor: [209, 213, 219]
+        },
+        bodyStyles: { 
+          valign: "middle", 
+          fontSize: 8,
+          textColor: [55, 65, 81],
+          lineWidth: 0.1,
+          lineColor: [229, 231, 235],
+          cellPadding: 3.5,
+          fontStyle: "normal"
+        },
+        didParseCell: (hookData) => {
+          hookData.cell.styles.fontStyle = "normal";
+          
+          // Apply background to total row
+          if (hookData.row.index === rows.length - 1) {
+            hookData.cell.styles.fillColor = [249, 250, 251];
+            hookData.cell.styles.textColor = [17, 24, 39];
+            hookData.cell.styles.fontStyle = "bold";
+          }
+        },
         columnStyles: {
-          0: { cellWidth: 22, halign: "center" },
-          1: { cellWidth: 38, halign: "left" },
-          2: { cellWidth: 14, halign: "center" },
+          0: { cellWidth: 21, halign: "center" },
+          1: { cellWidth: 35, halign: "left" },
+          2: { cellWidth: 12, halign: "center" },
           3: { cellWidth: 18, halign: "right" },
           4: { cellWidth: 16, halign: "right" },
-          5: { cellWidth: 20, halign: "right" },
+          5: { cellWidth: 23, halign: "right" },
           6: { cellWidth: 20, halign: "right" },
-          7: { cellWidth: 22, halign: "right" },
-          8: { cellWidth: 20, halign: "center" },
+          7: { cellWidth: 24, halign: "right" },
+          8: { cellWidth: 22, halign: "center" },
         },
         didDrawPage: (data) => {
           const docInstance = data.doc;
           const pageWidth = docInstance.internal.pageSize.getWidth();
           const pageHeight = docInstance.internal.pageSize.getHeight();
+          docInstance.setFont("helvetica", "normal");
           docInstance.setFontSize(8);
-          docInstance.setTextColor(150, 150, 150);
-          docInstance.text(`Page ${data.pageNumber}`, pageWidth - 10, pageHeight - 8, { align: "right" });
+          docInstance.setTextColor(156, 163, 175);
+          docInstance.text(`Page ${data.pageNumber}`, pageWidth - 14, pageHeight - 10, { align: "right" });
         },
       });
     });
@@ -445,7 +476,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     showNotification("Excel downloaded successfully.", "success");
   }, [selectedShop, dateFrom, dateTo, showNotification]);
 
-  // ─── React‑Select styles (unchanged) ───
+  // ─── React-Select styles (original) ───
   const selectStyles = {
     control: (base: any) => ({
       ...base,
@@ -485,7 +516,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     }),
   };
 
-  // ─── UI (unchanged) ──────────────────────────────────────
+  // ─── UI (Original Colors) ──────────────────────────────────
   const content = (
     <div className="bg-white rounded-2xl p-4 md:p-6 border border-slate-200/85 shadow-sm space-y-4 text-slate-800">
       <div className="flex items-center justify-between">

@@ -1,5 +1,3 @@
-// src/routes/AppRoutes.tsx
-
 import { Routes, Route, Navigate } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout/DashboardLayout";
 
@@ -18,17 +16,12 @@ import EmployeesPage from "../modules/masters/employees/pages/EmployeesPage";
 import BanksPage from "../modules/masters/banks/pages/BanksPage";
 import BirdTypesPage from "../modules/masters/bird-types/pages/BirdTypesPage";
 
-// Operations Module (Updated to Main Tab Container)
+// Operations Module
 import OperationsPages from "../modules/operations/pages/OperationsPages";
 
-// Accounts Module
-import AccountsDashboardPage from "../modules/accounts/pages/AccountsDashboardPage";
-import FarmerPaymentsPage from "../modules/accounts/pages/FarmerPaymentsPage";
-import CashBookPage from "../modules/accounts/pages/CashBookPage";
-import BankBookPage from "../modules/accounts/pages/BankBookPage";
-import VehicleEMIPage from "../modules/accounts/pages/VehicleEMIPage";
-import OutstandingSummaryPage from "../modules/accounts/pages/OutstandingSummaryPage";
-import ProfitLossPage from "../modules/accounts/pages/ProfitLossPage";
+// Accounts Module – Payment Book & Farmer Payment
+import { PaymentBookPage } from "../modules/accounts/pages/PaymentBookPage";
+import { FarmerPaymentPage } from "../modules/accounts/pages/FarmPaymentPage"; // ✅ file is FarmPaymentPage.tsx, export is FarmerPaymentPage
 
 // Fleet Module
 import FleetPages from "../modules/fleet-operations/pages/FleetPages";
@@ -130,66 +123,27 @@ function AppRoutes() {
         } 
       />
 
-      {/* ============ ACCOUNTS - With Layout ============ */}
-      <Route path="/accounts" element={<Navigate to="/accounts/dashboard" replace />} />
+      {/* ============ ACCOUNTS - Payment Book & Farmer Payment ============ */}
+      <Route path="/accounts" element={<Navigate to="/accounts/payment-book" replace />} />
       <Route 
-        path="/accounts/dashboard" 
+        path="/accounts/payment-book" 
         element={
           <DashboardLayout>
-            <AccountsDashboardPage />
+            <PaymentBookPage />
           </DashboardLayout>
         } 
       />
+      {/* Farmer Payment route */}
       <Route 
-        path="/accounts/farmer-payments" 
+        path="/accounts/farm-payment" 
         element={
           <DashboardLayout>
-            <FarmerPaymentsPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/accounts/cash-book" 
-        element={
-          <DashboardLayout>
-            <CashBookPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/accounts/bank-book" 
-        element={
-          <DashboardLayout>
-            <BankBookPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/accounts/vehicle-emi" 
-        element={
-          <DashboardLayout>
-            <VehicleEMIPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/accounts/outstanding-summary" 
-        element={
-          <DashboardLayout>
-            <OutstandingSummaryPage />
-          </DashboardLayout>
-        } 
-      />
-      <Route 
-        path="/accounts/profit-loss" 
-        element={
-          <DashboardLayout>
-            <ProfitLossPage />
+            <FarmerPaymentPage />
           </DashboardLayout>
         } 
       />
 
-      {/* ============ FLEET - With Layout (Unified Container) ============ */}
+      {/* ============ FLEET - With Layout ============ */}
       <Route 
         path="/fleet" 
         element={

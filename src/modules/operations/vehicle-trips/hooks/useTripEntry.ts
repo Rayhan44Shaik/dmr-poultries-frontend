@@ -19,6 +19,7 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     closingMeter: 0,
     totalKm: 0,
     fuel: 0,
+    dcWeight: 0.00,
     expense: 0,
     remarks: "",
     status: "Pending",
