@@ -1,5 +1,3 @@
-// src/modules/reports/pages/ReportsDashboardPage.tsx
-
 import React, { useState, useMemo, useCallback } from 'react';
 import { format, subDays } from 'date-fns';
 import { TrendingUp, Truck, ShoppingBag, CreditCard, BookOpen, FileText } from 'lucide-react';
@@ -7,8 +5,9 @@ import type { ReportFilters, ReportType } from '../types/reportTypes';
 import { getReportData } from '../services/reportService';
 import ReportFiltersComponent from '../components/ReportFilters';
 import ReportCard from '../components/ReportCard';
+import ShopLedgerPage from './ShopLedgerPage';
 
-// ========== ✅ CORRECT RELATIVE IMPORTS ==========
+// ========== IMPORTS ==========
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
 import { useEmployees } from '../../masters/employees/hooks/useEmployees';
@@ -17,12 +16,13 @@ import { exportToPDF, exportToExcel } from '../../../utils/exportUtils';
 
 // ========== REPORT CONFIGURATIONS & ICONS ==========
 const tabs = [
-  { key: 'weekly', label: 'Weekly Report', icon: TrendingUp, color: 'text-amber-500' },
-  { key: 'vehicle', label: 'Vehicle Report', icon: Truck, color: 'text-blue-500' },
-  { key: 'shopSales', label: 'Shop Sales', icon: ShoppingBag, color: 'text-emerald-500' },
-  { key: 'collection', label: 'Collection Report', icon: CreditCard, color: 'text-teal-500' },
   { key: 'shopLedger', label: 'Shop Ledger', icon: BookOpen, color: 'text-purple-500' },
-  { key: 'expenses', label: 'Expenses Report', icon: FileText, color: 'text-rose-500' },
+  // other tabs can be uncommented if needed
+  //{ key: 'weekly', label: 'Weekly Report', icon: TrendingUp, color: 'text-amber-500' },
+  //{ key: 'vehicle', label: 'Vehicle Report', icon: Truck, color: 'text-blue-500' },
+  //{ key: 'shopSales', label: 'Shop Sales', icon: ShoppingBag, color: 'text-emerald-500' },
+  //{ key: 'collection', label: 'Collection Report', icon: CreditCard, color: 'text-teal-500' },
+  //{ key: 'expenses', label: 'Expenses Report', icon: FileText, color: 'text-rose-500' },
 ] as const;
 
 const REPORT_LABELS: Record<ReportType, string> = {
@@ -44,48 +44,12 @@ const REPORT_DESCRIPTIONS: Record<ReportType, string> = {
 };
 
 const REPORT_INCLUDES: Record<ReportType, string[]> = {
-  weekly: [
-    'Sales, Collections & Outstanding Summary',
-    'Trips, Birds, Mortality Summary',
-    'Expense Summary (Fuel, Maintenance, Fastag, Office)',
-    'Profit & Loss Summary',
-  ],
-  vehicle: [
-    'Trip Summary (Vehicle Wise)',
-    'KM Summary & Distance',
-    'Fuel Consumption & Expense',
-    'Maintenance, Fastag, Insurance & Permit',
-    'Vehicle Availability & Status',
-  ],
-  shopSales: [
-    'Shop Wise Sales Summary',
-    'Daily Sales Breakdown',
-    'Birds, Weight, Boxes, Amount',
-    'Sales Comparison',
-    'Top Performing Shops',
-  ],
-  collection: [
-    'Collection Register',
-    'Shop Wise Collection Summary',
-    'Collector Wise Collection',
-    'Payment Mode Wise Collection',
-    'Pending vs Collected Summary',
-  ],
-  shopLedger: [
-    'Opening Balance',
-    'Sales (Debit)',
-    'Collections (Credit)',
-    'Running Balance',
-    'Closing Balance & Outstanding',
-  ],
-  expenses: [
-    'Fuel Expense',
-    'Vehicle Maintenance Expense',
-    'Fastag Expense',
-    'Office Expense',
-    'Insurance & Permit Expense',
-    'Total Expense Summary',
-  ],
+  weekly: ['Sales, Collections & Outstanding Summary', 'Trips, Birds, Mortality Summary', 'Expense Summary (Fuel, Maintenance, Fastag, Office)', 'Profit & Loss Summary'],
+  vehicle: ['Trip Summary (Vehicle Wise)', 'KM Summary & Distance', 'Fuel Consumption & Expense', 'Maintenance, Fastag, Insurance & Permit', 'Vehicle Availability & Status'],
+  shopSales: ['Shop Wise Sales Summary', 'Daily Sales Breakdown', 'Birds, Weight, Boxes, Amount', 'Sales Comparison', 'Top Performing Shops'],
+  collection: ['Collection Register', 'Shop Wise Collection Summary', 'Collector Wise Collection', 'Payment Mode Wise Collection', 'Pending vs Collected Summary'],
+  shopLedger: ['Opening Balance', 'Sales (Debit)', 'Collections (Credit)', 'Running Balance', 'Closing Balance & Outstanding'],
+  expenses: ['Fuel Expense', 'Vehicle Maintenance Expense', 'Fastag Expense', 'Office Expense', 'Insurance & Permit Expense', 'Total Expense Summary'],
 };
 
 // ========== DEFAULT FILTERS ==========
@@ -126,8 +90,9 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
   const { employees } = useEmployees();
   const { shops } = useShops();
 
-  const [selectedReport, setSelectedReport] = useState<ReportType>('weekly');
-  const [filters, setFilters] = useState<ReportFilters>(getDefaultFilters('weekly'));
+  // ✅ Set default to 'shopLedger'
+  const [selectedReport, setSelectedReport] = useState<ReportType>('shopLedger');
+  const [filters, setFilters] = useState<ReportFilters>(getDefaultFilters('shopLedger'));
 
   const vehicleOptions = useMemo(
     () => [
@@ -171,6 +136,8 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
   }, []);
 
   const reportData = useMemo(() => {
+    // Skip fetching for shopLedger because we use custom component
+    if (selectedReport === 'shopLedger') return null;
     try {
       return getReportData(selectedReport, filters);
     } catch (error) {
@@ -218,7 +185,7 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
 
   const content = (
     <div className="w-full pt-3 pb-6 space-y-4">
-      {/* Tab Navigation Container (Identical layout to StaffPages & OperationsPages) */}
+      {/* Tab Navigation */}
       <div className="bg-white border-y sm:border border-slate-200/90 sm:rounded-xl shadow-sm px-3 py-1.5 w-full">
         <div className="flex items-center gap-1 overflow-x-auto scrollbar-none [ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {tabs.map((tab) => {
@@ -238,10 +205,7 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
                   }
                 `}
               >
-                <Icon
-                  size={18}
-                  className={isActive ? "text-blue-700" : tab.color}
-                />
+                <Icon size={18} className={isActive ? "text-blue-700" : tab.color} />
                 {tab.label}
               </button>
             );
@@ -249,26 +213,31 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
         </div>
       </div>
 
-      {/* Main Content View Container */}
+      {/* Main Content */}
       <div className="w-full px-4 sm:px-6 lg:px-8 space-y-6">
-        <ReportFiltersComponent
-          reportType={selectedReport}
-          filters={filters}
-          setFilters={setFilters}
-          vehicleOptions={vehicleOptions}
-          driverOptions={driverOptions}
-          shopOptions={shopOptions}
-          collectorOptions={collectorOptions}
-        />
-
-        <ReportCard
-          title={REPORT_LABELS[selectedReport]}
-          description={REPORT_DESCRIPTIONS[selectedReport]}
-          includeList={REPORT_INCLUDES[selectedReport]}
-          onDownloadPDF={() => handleExport('PDF')}
-          onDownloadExcel={() => handleExport('Excel')}
-          isDataAvailable={isDataAvailable}
-        />
+        {selectedReport === 'shopLedger' ? (
+          <ShopLedgerPage embedded={true} />
+        ) : (
+          <>
+            <ReportFiltersComponent
+              reportType={selectedReport}
+              filters={filters}
+              setFilters={setFilters}
+              vehicleOptions={vehicleOptions}
+              driverOptions={driverOptions}
+              shopOptions={shopOptions}
+              collectorOptions={collectorOptions}
+            />
+            <ReportCard
+              title={REPORT_LABELS[selectedReport]}
+              description={REPORT_DESCRIPTIONS[selectedReport]}
+              includeList={REPORT_INCLUDES[selectedReport]}
+              onDownloadPDF={() => handleExport('PDF')}
+              onDownloadExcel={() => handleExport('Excel')}
+              isDataAvailable={isDataAvailable}
+            />
+          </>
+        )}
       </div>
     </div>
   );
