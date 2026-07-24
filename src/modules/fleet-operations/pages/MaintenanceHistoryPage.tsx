@@ -47,6 +47,9 @@ const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProp
   );
 
   const currentSelectedLabel = vehicleOptions.find(opt => opt.value === selectedVehicle)?.label || 'All Vehicles';
+  
+  // Determine if a specific vehicle is selected (not 'all')
+  const isSpecificVehicleSelected = selectedVehicle !== 'all' && selectedVehicle !== null && selectedVehicle !== '';
 
   const kpis = [
     { 
@@ -158,30 +161,32 @@ const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProp
           </div>
         </div>
 
-        {/* Inline Modernized KPI Cards Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          {kpis.map((kpi) => (
-            <div 
-              key={kpi.label} 
-              className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300/80 group"
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div className="space-y-1.5 min-w-0">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest select-none truncate">
-                    {kpi.label}
-                  </p>
-                  <h3 className="text-2xl font-bold text-slate-800 tracking-tight transition-colors group-hover:text-slate-950 truncate">
-                    {kpi.value}
-                  </h3>
-                </div>
+        {/* Inline Modernized KPI Cards Grid - Only show when a specific vehicle is selected */}
+        {isSpecificVehicleSelected && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 animate-in fade-in duration-300">
+            {kpis.map((kpi) => (
+              <div 
+                key={kpi.label} 
+                className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300/80 group"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1.5 min-w-0">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest select-none truncate">
+                      {kpi.label}
+                    </p>
+                    <h3 className="text-2xl font-bold text-slate-800 tracking-tight transition-colors group-hover:text-slate-950 truncate">
+                      {kpi.value}
+                    </h3>
+                  </div>
 
-                <div className={`w-12 h-12 rounded-xl border ${kpi.bg} ${kpi.border} ${kpi.text} flex items-center justify-center shrink-0 shadow-inner transition-transform duration-300 group-hover:scale-105`}>
-                  {kpi.icon}
+                  <div className={`w-12 h-12 rounded-xl border ${kpi.bg} ${kpi.border} ${kpi.text} flex items-center justify-center shrink-0 shadow-inner transition-transform duration-300 group-hover:scale-105`}>
+                    {kpi.icon}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Dashboard Panels Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">

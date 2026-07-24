@@ -1,3 +1,5 @@
+// src/modules/accounts/pages/FarmerPaymentPage.tsx
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { FarmPaymentTable } from '../components/farm-payment/FarmPaymentTable';
@@ -15,6 +17,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   // ----- state -----
   const [allTrips, setAllTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Filter states
   const [dateFrom, setDateFrom] = useState('');
@@ -45,7 +48,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   useEffect(() => {
     loadCompletedTrips();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refreshKey]);
 
   // Reset page when filters change
   useEffect(() => {
@@ -119,11 +122,13 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
 
   // ----- handlers -----
   const handlePaymentSaved = () => {
-    loadCompletedTrips();
+    // Force reload trips with a new refresh key
+    setRefreshKey(prev => prev + 1);
+    showNotification('Payments saved successfully!', 'success');
   };
 
   const handleRefresh = () => {
-    loadCompletedTrips();
+    setRefreshKey(prev => prev + 1);
     showNotification('Refreshed', 'info');
   };
 
@@ -145,8 +150,6 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   // ----- render -----
   const content = (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto bg-slate-50 min-h-screen">
-      {/* Header removed - only filters and table remain */}
-      
       {/* Filters */}
       <FarmerPaymentFilters
         dateFrom={dateFrom}

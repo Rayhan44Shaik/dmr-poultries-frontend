@@ -26,6 +26,10 @@ export const FarmPaymentService = {
     return loadPayments().find((p) => p.tripId === tripId);
   },
 
+  getPaymentById(id: string): FarmPayment | undefined {
+    return loadPayments().find((p) => p.id === id);
+  },
+
   save(payment: Omit<FarmPayment, 'id' | 'createdAt' | 'updatedAt'>): FarmPayment {
     const existing = this.getByTripId(payment.tripId);
     const now = new Date().toISOString();
@@ -53,6 +57,17 @@ export const FarmPaymentService = {
 
     savePayments(payments);
     return newPayment;
+  },
+
+  markPaymentsAsPaid(paymentIds: string[]): void {
+    const payments = loadPayments();
+    const updated = payments.map((p) => {
+      if (paymentIds.includes(p.id) && p.status !== 'Paid') {
+        return { ...p, status: 'Paid' as const, updatedAt: new Date().toISOString() };
+      }
+      return p;
+    });
+    savePayments(updated);
   },
 
   delete(id: string): void {

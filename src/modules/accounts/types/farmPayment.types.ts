@@ -6,12 +6,13 @@ export interface FarmPayment {
   tripNo: string;
   tripDate: string;
   vehicleNo: string;
-  dcWeight: number;          // ← DC weight from trip (not total delivery weight)
-  totalBirds: number;        // total birds from trip
-  rate: number;              // rate per kg
-  amount: number;            // dcWeight * rate
-  remarks: string;
-  status: 'Pending' | 'Paid' | 'Approved';
+  farmName: string;
+  dcWeight: number;
+  totalBirds: number;
+  rate: number;
+  amount: number;
+  remarks?: string;
+  status: 'Unpaid' | 'Paid';
   createdAt: string;
   updatedAt: string;
 }

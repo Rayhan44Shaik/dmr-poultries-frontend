@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+// src/modules/accounts/components/farm-payment/FarmPaymentTable.tsx
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { Trip } from '../../../operations/vehicle-trips/types/trip';
 import { FarmPayment } from '../../types/farmPayment.types';
 import { FarmPaymentService } from '../../services/FarmPaymentService';
@@ -21,10 +23,14 @@ export function FarmPaymentTable({
   const [remarkValues, setRemarkValues] = useState<Record<number, string>>({});
   const [savingStates, setSavingStates] = useState<Record<number, boolean>>({});
   const [isSavingAll, setIsSavingAll] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
 
+  // Load rates and remarks from FarmPaymentService whenever trips change
   useEffect(() => {
-    if (trips.length === 0) return;
+    if (trips.length === 0) {
+      setRateValues({});
+      setRemarkValues({});
+      return;
+    }
 
     const rates: Record<number, number> = {};
     const remarks: Record<number, string> = {};
@@ -40,46 +46,44 @@ export function FarmPaymentTable({
       }
     });
 
-    if (!isInitialized) {
-      setRateValues(rates);
-      setRemarkValues(remarks);
-      setIsInitialized(true);
-    } else {
-      const newTripIds = trips.filter(trip => !(trip.id in rateValues));
-      if (newTripIds.length > 0) {
-        const newRates = { ...rateValues };
-        const newRemarks = { ...remarkValues };
-        newTripIds.forEach(trip => {
-          newRates[trip.id] = 0;
-          newRemarks[trip.id] = '';
-        });
-        setRateValues(newRates);
-        setRemarkValues(newRemarks);
-      }
-    }
+    setRateValues(rates);
+    setRemarkValues(remarks);
   }, [trips]);
 
-  const handleRateChange = (tripId: number, value: number) => {
+  const handleRateChange = useCallback((tripId: number, value: number) => {
     const payment = FarmPaymentService.getByTripId(tripId);
-    if (payment?.status === 'Paid') {
+    // If paid, don't allow changes
+    if (payment && payment.status === 'Paid') {
       showNotification?.('Cannot edit rate – payment is already marked as Paid.', 'error');
       return;
     }
     setRateValues((prev) => ({ ...prev, [tripId]: value }));
-  };
+  }, [showNotification]);
 
-  const handleRemarkChange = (tripId: number, value: string) => {
+  const handleRemarkChange = useCallback((tripId: number, value: string) => {
+    const payment = FarmPaymentService.getByTripId(tripId);
+    // If paid, don't allow changes
+    if (payment && payment.status === 'Paid') {
+      showNotification?.('Cannot edit remarks – payment is already marked as Paid.', 'error');
+      return;
+    }
     setRemarkValues((prev) => ({ ...prev, [tripId]: value }));
-  };
+  }, [showNotification]);
 
-  const handleSaveAll = async () => {
+  const handleSaveAll = useCallback(async () => {
+    // Debug: Log current rate values
+    console.log('Current rate values:', rateValues);
+    console.log('Trips:', trips);
+
     const tripsToSave = trips.filter((trip) => {
       const rate = rateValues[trip.id] || 0;
-      return rate > 0;
+      const hasValidRate = rate >= 1;
+      console.log(`Trip ${trip.id} - ${trip.tripNo}: rate=${rate}, valid=${hasValidRate}`);
+      return hasValidRate;
     });
 
     if (tripsToSave.length === 0) {
-      showNotification?.('No rows with valid rate to save.', 'error');
+      showNotification?.('No rows with valid rate to save. Please enter a rate >= 1.', 'error');
       return;
     }
 
@@ -91,7 +95,14 @@ export function FarmPaymentTable({
       const remarks = remarkValues[trip.id] || '';
       
       const existingPayment = FarmPaymentService.getByTripId(trip.id);
-      const status = existingPayment?.status || 'Pending';
+      
+      // If already paid, skip saving
+      if (existingPayment && existingPayment.status === 'Paid') {
+        continue;
+      }
+      
+      // Set status to Unpaid
+      const status: 'Unpaid' | 'Paid' = 'Unpaid';
 
       setSavingStates((prev) => ({ ...prev, [trip.id]: true }));
 
@@ -102,6 +113,7 @@ export function FarmPaymentTable({
         tripNo: trip.tripNo,
         tripDate: trip.tripDate,
         vehicleNo: trip.vehicleNo,
+        farmName: trip.sourceFarm || '',
         dcWeight: trip.dcWeight || 0,
         totalBirds: totalBirdsIncludingMortality,
         rate: rate,
@@ -113,6 +125,7 @@ export function FarmPaymentTable({
       try {
         FarmPaymentService.save(paymentData);
         savedCount++;
+        console.log(`Saved trip ${trip.tripNo} with rate ${rate}`);
       } catch (error) {
         console.error(`Failed to save trip ${trip.tripNo}:`, error);
         showNotification?.(`Failed to save trip ${trip.tripNo}`, 'error');
@@ -123,12 +136,30 @@ export function FarmPaymentTable({
 
     setIsSavingAll(false);
     if (savedCount > 0) {
+      // Refresh the data after saving
+      const updatedRates: Record<number, number> = {};
+      const updatedRemarks: Record<number, string> = {};
+      
+      trips.forEach((trip) => {
+        const payment = FarmPaymentService.getByTripId(trip.id);
+        if (payment) {
+          updatedRates[trip.id] = payment.rate;
+          updatedRemarks[trip.id] = payment.remarks || '';
+        } else {
+          updatedRates[trip.id] = 0;
+          updatedRemarks[trip.id] = '';
+        }
+      });
+      
+      setRateValues(updatedRates);
+      setRemarkValues(updatedRemarks);
+      
       onPaymentSaved();
       showNotification?.(`${savedCount} payment(s) saved successfully.`, 'success');
     } else {
       showNotification?.('No payments were saved.', 'error');
     }
-  };
+  }, [trips, rateValues, remarkValues, showNotification, onPaymentSaved]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -149,11 +180,10 @@ export function FarmPaymentTable({
   };
 
   // Get payment status for a trip
-  const getPaymentStatus = (tripId: number): { status: string; isPaid: boolean } => {
+  const getPaymentStatus = (tripId: number): { isPaid: boolean } => {
     const payment = FarmPaymentService.getByTripId(tripId);
     return {
-      status: payment?.status || 'Pending',
-      isPaid: payment?.status === 'Paid',
+      isPaid: payment?.status === 'Paid' || false,
     };
   };
 
@@ -220,6 +250,28 @@ export function FarmPaymentTable({
                 const amount = rate * dcWeight;
                 const totalBirdsIncludingMortality = trip.totalBirds + trip.totalMortality;
                 const { isPaid } = getPaymentStatus(trip.id);
+                const isRateDisabled = isPaid;
+
+                let statusDisplay = null;
+                if (isPaid) {
+                  statusDisplay = (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                      Paid
+                    </span>
+                  );
+                } else if (rate >= 1) {
+                  statusDisplay = (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                      Unpaid
+                    </span>
+                  );
+                } else {
+                  statusDisplay = (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+                      -
+                    </span>
+                  );
+                }
 
                 return (
                   <tr key={trip.id} className="hover:bg-slate-50 transition-colors">
@@ -248,35 +300,30 @@ export function FarmPaymentTable({
                         step="0.01"
                         value={rate || ''}
                         onChange={(e) => handleRateChange(trip.id, parseFloat(e.target.value) || 0)}
-                        disabled={isPaid}
+                        disabled={isRateDisabled}
                         className={`w-24 px-2 py-1 rounded-lg border border-slate-300 text-sm text-right focus:ring-2 focus:ring-blue-400 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                          isPaid ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white'
+                          isRateDisabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white'
                         }`}
                         placeholder="0.00"
                       />
                     </td>
                     <td className="px-3 py-3 text-sm text-right font-bold text-emerald-600 whitespace-nowrap min-w-[160px]">
-                      {rate > 0 ? formatCurrency(amount) : '-'}
+                      {rate >= 1 ? formatCurrency(amount) : '-'}
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap min-w-[140px]">
                       <input
                         type="text"
                         value={remarkValues[trip.id] || ''}
                         onChange={(e) => handleRemarkChange(trip.id, e.target.value)}
-                        className="w-full min-w-[120px] px-2 py-1 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white"
+                        disabled={isRateDisabled}
+                        className={`w-full min-w-[120px] px-2 py-1 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-400 outline-none ${
+                          isRateDisabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white'
+                        }`}
                         placeholder="Remarks"
                       />
                     </td>
                     <td className="px-3 py-3 text-center whitespace-nowrap">
-                      {isPaid ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-                          Paid
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                          Pending
-                        </span>
-                      )}
+                      {statusDisplay}
                     </td>
                   </tr>
                 );

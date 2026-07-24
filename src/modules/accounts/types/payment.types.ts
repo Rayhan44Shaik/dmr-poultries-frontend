@@ -1,38 +1,38 @@
-// src/modules/accounts/payment-book/payment.types.ts
+// src/modules/accounts/types/payment.types.ts
+
+export interface Payment {
+  id: string;
+  paymentNo: string;
+  paymentDate: string;
+  paymentType: string;
+  paymentMode: string;
+  paidTo: string;
+  amount: number;
+  referenceNo: string;
+  category: string;
+  remarks?: string;
+  status: 'Draft' | 'Approved' | 'Paid' | 'Cancelled';
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  attachments: PaymentAttachment[];
+  paymentIds?: string[]; // References to FarmPayment IDs
+}
 
 export interface PaymentAttachment {
   id: string;
   paymentId: string;
   fileName: string;
-  filePath: string; // base64 or URL
-  fileSize: number;
+  fileUrl: string;
   uploadedAt: string;
 }
 
 export interface PaymentAudit {
   id: string;
   paymentId: string;
-  action: string;
-  oldValue?: string;
-  newValue?: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'PAY' | 'CANCEL';
+  oldValue: string;
+  newValue: string;
   performedBy: string;
   performedAt: string;
-}
-
-export interface Payment {
-  id: string;
-  paymentNo: string;           // e.g. PAY-20260720-001
-  paymentDate: string;         // YYYY-MM-DD
-  paymentType: string;         // Farmer Payment, Fuel Payment, etc.
-  paymentMode: string;         // Cash, Bank Transfer, UPI, etc.
-  paidTo: string;
-  amount: number;
-  referenceNo: string;         // unique
-  category: string;            // Farmer, Fuel, Maintenance, etc.
-  remarks?: string;
-  status: 'Draft' | 'Approved' | 'Paid' | 'Cancelled';
-  createdBy: string;
-  createdAt: string;
-  updatedAt?: string;
-  attachments?: PaymentAttachment[];
 }
