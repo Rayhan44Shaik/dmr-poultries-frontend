@@ -1,8 +1,10 @@
-import React, { useCallback, useMemo, useEffect } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { FileText, Truck, User, ShieldAlert, MapPin, Calendar, Gauge, DollarSign, MessageSquare } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { DatePicker } from "../../../../components/common/DatePicker";
+import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import { useFuelKMValidator } from "../../../operations/fuel-expenses/hooks/useFuelKMValidator";
 
 interface Props {
   trip: Trip;
@@ -32,7 +34,12 @@ function TripInformation({
   drivers,
   supervisors,
   farms,
-}: Props) {;
+}: Props) {
+  const { showNotification } = useSafeNotification();
+  const [openingKmError, setOpeningKmError] = useState<string | null>(null);
+  const [closingKmError, setClosingKmError] = useState<string | null>(null);
+
+  const validator = useFuelKMValidator(trip.vehicleNo);
 
   // ---- Options ----
   const vehicleOptions = useMemo(
@@ -109,18 +116,29 @@ function TripInformation({
           openingMeter: 0,
           totalKm: prev.closingMeter - 0,
         }));
+        setOpeningKmError(null);
         return;
       }
       const num = parseFloat(val);
       if (isNaN(num)) return;
       const rounded = Math.round(num * 100) / 100;
+      
+      // Always update the field value
       setTrip((prev) => ({
         ...prev,
         openingMeter: rounded,
         totalKm: Math.round((prev.closingMeter - rounded) * 100) / 100,
       }));
+      
+      // Validate and show error if needed
+      const { valid, message } = validator.validateKM(rounded);
+      if (!valid) {
+        setOpeningKmError(message || "Invalid KM");
+      } else {
+        setOpeningKmError(null);
+      }
     },
-    [setTrip]
+    [setTrip, validator]
   );
 
   const handleClosingMeterChange = useCallback(
@@ -132,18 +150,29 @@ function TripInformation({
           closingMeter: 0,
           totalKm: 0 - prev.openingMeter,
         }));
+        setClosingKmError(null);
         return;
       }
       const num = parseFloat(val);
       if (isNaN(num)) return;
       const rounded = Math.round(num * 100) / 100;
+      
+      // Always update the field value
       setTrip((prev) => ({
         ...prev,
         closingMeter: rounded,
         totalKm: Math.round((rounded - prev.openingMeter) * 100) / 100,
       }));
+      
+      // Validate and show error if needed
+      const { valid, message } = validator.validateKM(rounded);
+      if (!valid) {
+        setClosingKmError(message || "Invalid KM");
+      } else {
+        setClosingKmError(null);
+      }
     },
-    [setTrip]
+    [setTrip, validator]
   );
 
   const handleDcWeightChange = useCallback(
@@ -404,14 +433,17 @@ function TripInformation({
                 <Gauge className="w-3.5 h-3.5 text-slate-400" />
                 Opening KM
               </label>
-              <input
-                type="number"
-                step="0.01"
-                value={displayValue(trip.openingMeter)}
-                onChange={handleOpeningMeterChange}
-                placeholder="0.00"
-                className="no-spinner w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-xs"
-              />
+              <div>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={displayValue(trip.openingMeter)}
+                  onChange={handleOpeningMeterChange}
+                  placeholder="0.00"
+                  className={`no-spinner w-full rounded-xl border ${openingKmError ? 'border-red-500' : 'border-slate-200'} bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-xs`}
+                />
+                {openingKmError && <p className="mt-1 text-xs text-red-500">{openingKmError}</p>}
+              </div>
             </div>
 
             {/* 11. Closing KM */}
@@ -420,14 +452,17 @@ function TripInformation({
                 <Gauge className="w-3.5 h-3.5 text-slate-400" />
                 Closing KM
               </label>
-              <input
-                type="number"
-                step="0.01"
-                value={displayValue(trip.closingMeter)}
-                onChange={handleClosingMeterChange}
-                placeholder="0.00"
-                className="no-spinner w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-xs"
-              />
+              <div>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={displayValue(trip.closingMeter)}
+                  onChange={handleClosingMeterChange}
+                  placeholder="0.00"
+                  className={`no-spinner w-full rounded-xl border ${closingKmError ? 'border-red-500' : 'border-slate-200'} bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-xs`}
+                />
+                {closingKmError && <p className="mt-1 text-xs text-red-500">{closingKmError}</p>}
+              </div>
             </div>
 
             {/* 12. Total KM */}

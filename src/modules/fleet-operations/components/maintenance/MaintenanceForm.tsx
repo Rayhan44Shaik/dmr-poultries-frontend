@@ -1,9 +1,11 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useMemo } from 'react';
 import Select from 'react-select';
 import { DatePicker } from '../../../../components/common/DatePicker';
 import { Car, User, Gauge, Wrench, Cog, Building2, UserCog, FileText, Hash } from 'lucide-react';
 import PartsTable from './PartsTable';
 import type { PartItem } from '../../types';
+import { useFuelKMValidator } from "../../../operations/fuel-expenses/hooks/useFuelKMValidator";
+import { useSafeNotification } from '../../../../hooks/useSafeNotification';
 
 interface MaintenanceFormProps {
   form: {
@@ -46,8 +48,49 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
   setFormField,
   selectKey,
 }) => {
+  const { showNotification } = useSafeNotification();
+  const [kmError, setKmError] = useState<string | null>(null);
+
+  // Get vehicle number from selected vehicle option
+  const selectedVehicleOption = useMemo(
+    () => vehicleOptions.find(opt => opt.value === form.vehicleId),
+    [vehicleOptions, form.vehicleId]
+  );
+  const vehicleNumber = selectedVehicleOption?.label || '';
+
+  const validator = useFuelKMValidator(vehicleNumber);
+  const pendingWarning = validator.getPendingWarning();
+
   const inputClass =
     'w-full h-10 pl-10 pr-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition bg-white';
+
+  const handleCurrentKMChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    
+    // Allow empty value
+    if (val === '') {
+      setFormField('currentKM', '');
+      setKmError(null);
+      return;
+    }
+    
+    const num = parseFloat(val);
+    if (isNaN(num)) {
+      setKmError('Please enter a valid number');
+      return;
+    }
+    
+    // Always update the form field with the raw value
+    setFormField('currentKM', val);
+    
+    // Validate the value
+    const { valid, message } = validator.validateKM(num);
+    if (!valid) {
+      setKmError(message || 'Invalid KM');
+    } else {
+      setKmError(null);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -164,11 +207,12 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
             <input
               type="number"
               value={form.currentKM}
-              onChange={(e) => setFormField('currentKM', e.target.value)}
+              onChange={handleCurrentKMChange}
               placeholder="e.g. 45000"
-              className={`${inputClass} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+              className={`${inputClass} ${kmError ? 'border-red-500' : ''} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
             />
           </div>
+          {kmError && <p className="mt-1 text-xs text-red-500">{kmError}</p>}
         </div>
 
         {/* 6. Next Service KM */}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { X, Save, Plus } from "lucide-react";
+import { X, Save, Plus, AlertCircle } from "lucide-react";
 import TripInformation from "../components/TripInformation";
 import UnLoadingTable from "../components/UnLoadingTable";
 import TripTotals from "../components/TripTotals";
@@ -16,6 +16,7 @@ import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useBirdTypes } from "../../../masters/bird-types/hooks/useBirdTypes";
 import { generateTripNo } from "../services/tripFormService";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import { useFuelKMValidator } from "../../../operations/fuel-expenses/hooks/useFuelKMValidator";
 
 import type { Trip, ShopDelivery } from "../types/trip";
 
@@ -57,6 +58,10 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     loadTrip,
     clearTrip,
   } = useTripEntry(showNotification);
+
+  // ── Fuel KM Validator ──
+  const validator = useFuelKMValidator(trip.vehicleNo);
+  const pendingWarning = validator.getPendingWarning();
 
   const drivers = employees.filter((x: any) => x.department === "Driver");
   const supervisors = employees.filter((x: any) => x.department === "Supervisor");
@@ -146,10 +151,57 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     return null;
   };
 
+  // ─── Check if there's a pending fuel bill ───
+  const validatePendingFuel = (): string | null => {
+    if (pendingWarning) {
+      return `❌ Cannot save trip: ${pendingWarning}`;
+    }
+    return null;
+  };
+
+  // ─── Validate KM against approved fuel reading ───
+  const validateKM = (): string | null => {
+    if (!trip.vehicleNo) return null;
+    
+    // Check opening meter (if greater than 0)
+    if (trip.openingMeter > 0) {
+      const { valid, message } = validator.validateKM(trip.openingMeter);
+      if (!valid) {
+        return message || 'Invalid Opening KM';
+      }
+    }
+    
+    // Check closing meter (if greater than 0)
+    if (trip.closingMeter > 0) {
+      const { valid, message } = validator.validateKM(trip.closingMeter);
+      if (!valid) {
+        return message || 'Invalid Closing KM';
+      }
+    }
+    
+    return null;
+  };
+
   // ─── HANDLERS ───
 
   const handleSave = () => {
     console.log(`[${new Date().toISOString()}] 🔹 SAVE TRIP triggered`);
+
+    // Check for pending fuel bill first
+    const pendingFuelError = validatePendingFuel();
+    if (pendingFuelError) {
+      console.error(`[${new Date().toISOString()}] ❌ PENDING FUEL BLOCKED: ${pendingFuelError}`);
+      showNotification(pendingFuelError, "error");
+      return;
+    }
+
+    // Check KM validation
+    const kmError = validateKM();
+    if (kmError) {
+      console.error(`[${new Date().toISOString()}] ❌ KM VALIDATION FAILED: ${kmError}`);
+      showNotification(kmError, "error");
+      return;
+    }
 
     const validationError = validateBirdCount();
     if (validationError) {
@@ -181,6 +233,22 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   const handleSaveNew = () => {
     console.log(`[${new Date().toISOString()}] 🔹 SAVE & NEW triggered`);
+
+    // Check for pending fuel bill first
+    const pendingFuelError = validatePendingFuel();
+    if (pendingFuelError) {
+      console.error(`[${new Date().toISOString()}] ❌ PENDING FUEL BLOCKED: ${pendingFuelError}`);
+      showNotification(pendingFuelError, "error");
+      return;
+    }
+
+    // Check KM validation
+    const kmError = validateKM();
+    if (kmError) {
+      console.error(`[${new Date().toISOString()}] ❌ KM VALIDATION FAILED: ${kmError}`);
+      showNotification(kmError, "error");
+      return;
+    }
 
     const validationError = validateBirdCount();
     if (validationError) {
@@ -248,6 +316,14 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     <div className="space-y-6">
       {/* ── Main Form Components container with Clean Card Styling ── */}
       <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/80 shadow-xl shadow-slate-100/70 space-y-6">
+        {/* Pending Fuel Warning Banner */}
+        {pendingWarning && (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+            <span>{pendingWarning}</span>
+          </div>
+        )}
+
         <TripInformation
           trip={trip}
           setTrip={setTrip}
@@ -277,7 +353,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         onRefresh={handleRefresh}
         onView={handleView}
         onEdit={handleEdit}
-        // ✅ FIX: pass the deletion reason from the modal
         onDelete={(trip, reason) => deleteTrip(trip.id, reason)}
         onStatusChange={changeStatus}
       />

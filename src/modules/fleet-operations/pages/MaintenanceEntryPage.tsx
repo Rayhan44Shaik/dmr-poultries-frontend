@@ -5,13 +5,14 @@ import { useMaintenanceForm } from '../hooks/useMaintenanceForm';
 import { isEditable, safeDate } from '../utils/maintenanceHelpers';
 import { softDeleteMaintenance, getDeletedMaintenance } from '../services/storage';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
+import { useFuelKMValidator } from "../../operations/fuel-expenses/hooks/useFuelKMValidator";
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import MaintenanceForm from '../components/maintenance/MaintenanceForm';
 import LatestMaintenanceTable from '../components/maintenance/LatestMaintenanceTable';
 import ViewModal from '../components/maintenance/ViewModal';
 import { MAINTENANCE_TYPES } from '../utils/constants';
 import type { MaintenanceEvent } from '../types';
-import { RotateCcw, Save, Wrench, AlertTriangle, X } from 'lucide-react';
+import { RotateCcw, Save, Wrench, AlertTriangle, X, AlertCircle } from 'lucide-react';
 
 const MaintenanceEntryPage = () => {
   const { employees } = useEmployees();
@@ -45,16 +46,6 @@ const MaintenanceEntryPage = () => {
     };
   }, []);
 
-  // --- Active records: ONLY UNPAID (no grouping, no paid) ---
-  const activeUnpaid = useMemo(() => {
-    // filter all records where paymentStatus is NOT 'paid'
-    const unpaid = maintenance.filter(rec => rec.paymentStatus !== 'paid');
-    // sort by date descending (newest first)
-    return unpaid.sort((a, b) =>
-      safeDate(b.date).getTime() - safeDate(a.date).getTime()
-    );
-  }, [maintenance]);
-
   // --- Deleted records (unchanged) ---
   const [deletedRecords, setDeletedRecords] = useState<MaintenanceEvent[]>([]);
   const refreshDeleted = useCallback(() => {
@@ -68,20 +59,7 @@ const MaintenanceEntryPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
 
-  const displayRecords = useMemo(() => {
-    return viewMode === 'active' ? activeUnpaid : deletedRecords;
-  }, [viewMode, activeUnpaid, deletedRecords]);
-
-  const paginatedRecords = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return displayRecords.slice(start, start + pageSize);
-  }, [displayRecords, currentPage, pageSize]);
-
-  // --- View modal ---
-  const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [viewRecord, setViewRecord] = useState<MaintenanceEvent | null>(null);
-
-  // --- Form hook ---
+  // --- Form hook - MOVED UP before validator ---
   const {
     form,
     setFormData,
@@ -109,6 +87,41 @@ const MaintenanceEntryPage = () => {
     },
     vehicles,
   });
+
+  // --- Get vehicle number for validator (NOW AFTER form is defined) ---
+  const selectedVehicle = useMemo(
+    () => vehicles.find((v: any) => String(v.id) === String(form.vehicleId)),
+    [vehicles, form.vehicleId]
+  );
+  const vehicleNumber = selectedVehicle?.vehicleNumber || '';
+
+  // --- Fuel KM Validator ---
+  const validator = useFuelKMValidator(vehicleNumber);
+  const pendingWarning = validator.getPendingWarning();
+  const latestApprovedKM = validator.latestApprovedKM;
+
+  // --- Active records: ONLY UNPAID (no grouping, no paid) ---
+  const activeUnpaid = useMemo(() => {
+    // filter all records where paymentStatus is NOT 'paid'
+    const unpaid = maintenance.filter(rec => rec.paymentStatus !== 'paid');
+    // sort by date descending (newest first)
+    return unpaid.sort((a, b) =>
+      safeDate(b.date).getTime() - safeDate(a.date).getTime()
+    );
+  }, [maintenance]);
+
+  const displayRecords = useMemo(() => {
+    return viewMode === 'active' ? activeUnpaid : deletedRecords;
+  }, [viewMode, activeUnpaid, deletedRecords]);
+
+  const paginatedRecords = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return displayRecords.slice(start, start + pageSize);
+  }, [displayRecords, currentPage, pageSize]);
+
+  // --- View modal ---
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewRecord, setViewRecord] = useState<MaintenanceEvent | null>(null);
 
   // --- Options ---
   const vehicleOptions = useMemo(() => {
@@ -268,7 +281,46 @@ const MaintenanceEntryPage = () => {
     showNotification('Deletion cancelled.', 'info');
   };
 
+  // ===== Validate KM against approved fuel reading =====
+  const validateKM = (): string | null => {
+    if (!vehicleNumber) return null;
+    if (!form.currentKM) return null;
+    
+    const km = parseFloat(form.currentKM);
+    if (isNaN(km)) return null;
+    
+    const { valid, message } = validator.validateKM(km);
+    if (!valid) {
+      return message || 'Invalid KM';
+    }
+    return null;
+  };
+
+  // ===== Validate pending fuel before save =====
+  const validatePendingFuel = (): string | null => {
+    // Only block if there's a pending warning AND vehicle is selected
+    if (pendingWarning && vehicleNumber) {
+      return `Cannot save maintenance: ${pendingWarning}`;
+    }
+    return null;
+  };
+
+  // ===== Override onSave to check all validations =====
   const onSave = async () => {
+    // Check for pending fuel bill first
+    const pendingFuelError = validatePendingFuel();
+    if (pendingFuelError) {
+      showNotification(pendingFuelError, 'error');
+      return;
+    }
+
+    // Check KM validation
+    const kmError = validateKM();
+    if (kmError) {
+      showNotification(kmError, 'error');
+      return;
+    }
+
     setLoading(true);
     await submitForm();
     setLoading(false);
@@ -310,6 +362,14 @@ const MaintenanceEntryPage = () => {
               </button>
             </div>
           </div>
+
+          {/* Pending Fuel Warning Banner */}
+          {pendingWarning && vehicleNumber && (
+            <div className="mx-6 mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+              <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+              <span>{pendingWarning}</span>
+            </div>
+          )}
 
           <div className="p-6">
             <MaintenanceForm
