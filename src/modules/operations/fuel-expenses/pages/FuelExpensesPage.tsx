@@ -1,10 +1,10 @@
-// src/modules/fuel/pages/FuelExpensesPage.tsx
-
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import Select from "react-select";
 import { useFuelExpenses } from "../hooks/useFuelExpenses";
 import { FuelKPICards } from "../components/FuelKPICards";
 import { FuelEntryForm } from "../components/FuelEntryForm";
 import { FuelBillTable } from "../components/FuelBillTable";
+import { FuelViewModal } from "../components/FuelViewModal"; // <-- NEW IMPORT
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { useVehicles } from "../../../masters/vehicles/hooks/useVehicles";
 import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
@@ -35,6 +35,11 @@ function FuelExpensesPage() {
         .map((v) => v.vehicleNumber)
         .sort(),
     [vehicles]
+  );
+
+  const vehicleOptions = useMemo(
+    () => activeVehicles.map((v) => ({ value: v, label: v })),
+    [activeVehicles]
   );
 
   const drivers = useMemo(
@@ -156,10 +161,7 @@ function FuelExpensesPage() {
     setViewingBill(null);
   }, []);
 
-  const formatDate = useCallback((d: string) => {
-    const date = new Date(d);
-    return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
-  }, []);
+  // formatDate is no longer needed here – it's inside FuelViewModal
 
   const handleExportPDF = useCallback(() => {
     if (filteredData.length === 0) {
@@ -252,6 +254,41 @@ function FuelExpensesPage() {
     [hasFilters, filteredSummary]
   );
 
+  const selectStyles = {
+    control: (base: any) => ({
+      ...base,
+      borderRadius: '0.375rem',
+      borderColor: '#cbd5e1',
+      minHeight: '40px',
+      boxShadow: 'none',
+      '&:hover': { borderColor: '#94a3b8' },
+      '&:focus-within': { borderColor: '#22c55e', boxShadow: '0 0 0 1px #22c55e' },
+    }),
+    option: (base: any, { isFocused, isSelected }: any) => ({
+      ...base,
+      backgroundColor: isSelected ? '#16a34a' : isFocused ? '#dcfce7' : 'white',
+      color: isSelected ? 'white' : '#1e293b',
+      padding: '8px 12px',
+      fontSize: '14px',
+    }),
+    menu: (base: any) => ({ ...base, zIndex: 50 }),
+    multiValue: (base: any) => ({
+      ...base,
+      backgroundColor: '#dcfce7',
+      borderRadius: '4px',
+    }),
+    multiValueLabel: (base: any) => ({
+      ...base,
+      color: '#166534',
+      fontSize: '12px',
+    }),
+    multiValueRemove: (base: any) => ({
+      ...base,
+      color: '#166534',
+      ':hover': { backgroundColor: '#bbf7d0', color: '#dc2626' },
+    }),
+  };
+
   return (
     <div className="space-y-6">
       {/* Action Buttons */}
@@ -293,66 +330,43 @@ function FuelExpensesPage() {
 
       {/* Filter Bar Card */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <DatePicker
-            value={fromDate}
-            onChange={setFromDate}
-            label="From Date"
-            className="w-full"
-            placeholder="Select start"
-          />
-          <DatePicker
-            value={toDate}
-            onChange={setToDate}
-            label="To Date"
-            className="w-full"
-            placeholder="Select end"
-          />
-          <div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+          <div className="md:col-span-1">
+            <DatePicker
+              value={fromDate}
+              onChange={setFromDate}
+              label="From Date"
+              className="w-full"
+              placeholder="Select start"
+            />
+          </div>
+          <div className="md:col-span-1">
+            <DatePicker
+              value={toDate}
+              onChange={setToDate}
+              label="To Date"
+              className="w-full"
+              placeholder="Select end"
+            />
+          </div>
+          <div className="md:col-span-2">
             <label className="mb-1 block text-sm font-medium text-slate-700">Vehicles</label>
-            <select
-              multiple
-              value={selectedVehicles}
-              onChange={(e) => {
-                const values = Array.from(e.target.selectedOptions, (opt) => opt.value);
-                setSelectedVehicles(values);
+            <Select
+              isMulti
+              isSearchable
+              options={vehicleOptions}
+              value={vehicleOptions.filter((opt) => selectedVehicles.includes(opt.value))}
+              onChange={(selected) => {
+                setSelectedVehicles(selected ? selected.map((s: any) => s.value) : []);
                 setCurrentPage(1);
               }}
-              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500 bg-white"
-              size={1}
-              style={{ height: "auto", minHeight: "2.5rem" }}
-            >
-              <option value="">All Vehicles</option>
-              {activeVehicles.map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
-            {selectedVehicles.length > 0 && (
-              <div className="mt-1 flex flex-wrap gap-1">
-                {selectedVehicles.map((v) => (
-                  <span
-                    key={v}
-                    className="inline-flex items-center gap-1 rounded bg-green-100 px-2 py-0.5 text-xs text-green-800"
-                  >
-                    {v}
-                    <button
-                      onClick={() => {
-                        setSelectedVehicles(selectedVehicles.filter((x) => x !== v));
-                        setCurrentPage(1);
-                      }}
-                      className="hover:text-red-600 cursor-pointer"
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
+              placeholder="Search & select vehicles..."
+              styles={selectStyles}
+              maxMenuHeight={190}
+              className="w-full text-sm"
+            />
           </div>
         </div>
-
         <div className="mt-4 flex justify-end pt-4 border-t border-slate-100">
           <button
             onClick={handleResetFilters}
@@ -377,54 +391,72 @@ function FuelExpensesPage() {
         />
       )}
 
-      {/* Table Card Container */}
+      {/* ======== TABLE CARD ======== */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden" ref={tableContainerRef}>
-        {selectedBill && (
-          <div className="flex items-center gap-3 bg-slate-50 px-6 py-3 border-b border-slate-200 flex-wrap">
-            <span className="text-sm font-medium text-slate-700 mr-2">
-              Selected: {selectedBill.billNo}
-            </span>
-            <button
-              onClick={handleView}
-              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 cursor-pointer transition"
-            >
-              <Eye size={14} /> View
-            </button>
-            <button
-              onClick={handleEdit}
-              disabled={!canEditDelete(selectedBill)}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                canEditDelete(selectedBill)
-                  ? "bg-green-600 hover:bg-green-700 text-white cursor-pointer"
-                  : "bg-slate-300 text-slate-500 cursor-not-allowed"
-              }`}
-              title={!canEditDelete(selectedBill) ? "Older than 10 days" : ""}
-            >
-              <Pencil size={14} /> Edit
-            </button>
-            <button
-              onClick={handleDelete}
-              disabled={!canEditDelete(selectedBill)}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                canEditDelete(selectedBill)
-                  ? "bg-red-600 hover:bg-red-700 text-white cursor-pointer"
-                  : "bg-slate-300 text-slate-500 cursor-not-allowed"
-              }`}
-              title={!canEditDelete(selectedBill) ? "Older than 10 days" : ""}
-            >
-              <Trash2 size={14} /> Delete
-            </button>
-            {selectedBill.status === "Pending" && (
-              <button
-                onClick={handleApprove}
-                className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 cursor-pointer transition"
-              >
-                <CheckCircle size={14} /> Approve
-              </button>
+        {/* Table Header with Title + Icon Actions */}
+        <div className="px-6 py-3 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <h3 className="text-sm font-semibold text-slate-700">Fuel Bill Table</h3>
+            <span className="text-xs text-slate-500">{filteredData.length} bills</span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {selectedBill ? (
+              <>
+                <span className="text-sm font-medium text-slate-700 mr-1">
+                  Selected: {selectedBill.billNo}
+                </span>
+                {/* View Icon */}
+                <button
+                  onClick={handleView}
+                  className="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition"
+                  title="View"
+                >
+                  <Eye size={16} />
+                </button>
+                {/* Edit Icon */}
+                <button
+                  onClick={handleEdit}
+                  disabled={!canEditDelete(selectedBill)}
+                  className={`p-1.5 rounded-md transition ${
+                    canEditDelete(selectedBill)
+                      ? "text-green-600 hover:bg-green-50 hover:text-green-700 cursor-pointer"
+                      : "text-slate-300 cursor-not-allowed"
+                  }`}
+                  title={canEditDelete(selectedBill) ? "Edit" : "Edit disabled (older than 10 days)"}
+                >
+                  <Pencil size={16} />
+                </button>
+                {/* Delete Icon */}
+                <button
+                  onClick={handleDelete}
+                  disabled={!canEditDelete(selectedBill)}
+                  className={`p-1.5 rounded-md transition ${
+                    canEditDelete(selectedBill)
+                      ? "text-red-500 hover:bg-red-50 hover:text-red-600 cursor-pointer"
+                      : "text-slate-300 cursor-not-allowed"
+                  }`}
+                  title={canEditDelete(selectedBill) ? "Delete" : "Delete disabled (older than 10 days)"}
+                >
+                  <Trash2 size={16} />
+                </button>
+                {/* Approve Icon (only if pending) */}
+                {selectedBill.status === "Pending" && (
+                  <button
+                    onClick={handleApprove}
+                    className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 transition"
+                    title="Approve"
+                  >
+                    <CheckCircle size={16} />
+                  </button>
+                )}
+              </>
+            ) : (
+              <span className="text-xs text-slate-400">Select a row to view actions</span>
             )}
           </div>
-        )}
+        </div>
 
+        {/* Table */}
         <FuelBillTable
           bills={paginatedData}
           selectedId={selectedId}
@@ -468,69 +500,12 @@ function FuelExpensesPage() {
         )}
       </div>
 
-      {/* View Modal */}
-      {viewModalOpen && viewingBill && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-slate-200">
-              <h3 className="text-lg font-semibold text-slate-800">Fuel Bill Details</h3>
-              <button onClick={closeViewModal} className="p-1 hover:bg-slate-100 rounded cursor-pointer">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6 space-y-3">
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="font-medium text-slate-600">Bill No</div>
-                <div>{viewingBill.billNo}</div>
-                <div className="font-medium text-slate-600">Date</div>
-                <div>{formatDate(viewingBill.date)}</div>
-                <div className="font-medium text-slate-600">Vehicle</div>
-                <div>{viewingBill.vehicleNo}</div>
-                <div className="font-medium text-slate-600">Driver</div>
-                <div>{viewingBill.driverName}</div>
-                <div className="font-medium text-slate-600">Supervisor</div>
-                <div>{viewingBill.supervisorName}</div>
-                <div className="font-medium text-slate-600">Meter Reading</div>
-                <div>{viewingBill.meterReading}</div>
-                <div className="font-medium text-slate-600">Amount</div>
-                <div>₹{viewingBill.amount.toFixed(2)}</div>
-                <div className="font-medium text-slate-600">Rate / Litre</div>
-                <div>₹{viewingBill.rate.toFixed(2)}</div>
-                <div className="font-medium text-slate-600">Litres</div>
-                <div>{viewingBill.litres.toFixed(2)}</div>
-                <div className="font-medium text-slate-600">Petrol Bunk</div>
-                <div>{viewingBill.petrolBunk}</div>
-                <div className="font-medium text-slate-600">Status</div>
-                <div>
-                  <span
-                    className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                      viewingBill.status === "Approved"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {viewingBill.status}
-                  </span>
-                </div>
-                {viewingBill.remarks && (
-                  <>
-                    <div className="font-medium text-slate-600">Remarks</div>
-                    <div>{viewingBill.remarks}</div>
-                  </>
-                )}
-              </div>
-            </div>
-            <div className="flex justify-end p-6 border-t border-slate-200">
-              <button
-                onClick={closeViewModal}
-                className="rounded-md bg-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-300 cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ======== VIEW MODAL (now imported) ======== */}
+      <FuelViewModal
+        isOpen={viewModalOpen}
+        bill={viewingBill}
+        onClose={closeViewModal}
+      />
     </div>
   );
 }

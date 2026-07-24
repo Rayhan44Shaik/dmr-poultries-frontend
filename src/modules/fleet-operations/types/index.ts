@@ -36,8 +36,10 @@ export const MaintenanceEventSchema = z.object({
   id: z.string().optional(),
   vehicleId: z.string().min(1, 'Vehicle required'),
   date: z.string().datetime(),
+  billNumber: z.string().optional(),
   currentKM: z.number().nonnegative(),
-  maintenanceType: z.enum(MaintenanceTypeEnum),
+  // CHANGED: from z.enum(MaintenanceTypeEnum) to z.string()
+  maintenanceType: z.string().min(1, 'Maintenance type required'),
   serviceType: z.string().min(1, 'Service type required'),
   garage: z.string().optional(),
   mechanic: z.string().optional(),
@@ -48,6 +50,9 @@ export const MaintenanceEventSchema = z.object({
   createdAt: z.string().optional(),
   driverId: z.string().optional(),
   driverName: z.string().optional(),
+  deletedAt: z.string().datetime().optional(), // <-- ADDED: timestamp when record was 
+  paymentStatus: z.enum(['pending', 'paid']).default('pending').optional(),
+
 });
 
 export const VehicleDocumentSchema = z.object({

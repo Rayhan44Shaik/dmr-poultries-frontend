@@ -5,9 +5,10 @@ import type { PartItem } from '../../types';
 interface PartsTableProps {
   parts: PartItem[];
   setParts: (parts: PartItem[]) => void;
+  hideSubline?: boolean; // Added optional property
 }
 
-const PartsTable = ({ parts, setParts }: PartsTableProps) => {
+const PartsTable = ({ parts, setParts, hideSubline = false }: PartsTableProps) => {
   const updatePart = (index: number, field: keyof PartItem, value: any) => {
     const newParts = [...parts];
     newParts[index] = { ...newParts[index], [field]: value };
@@ -81,7 +82,9 @@ const PartsTable = ({ parts, setParts }: PartsTableProps) => {
             <h4 className="text-sm font-semibold text-gray-800 tracking-wide">
               Parts / Items Used <span className="text-red-500">*</span>
             </h4>
-            <p className="text-[10px] text-gray-400 font-medium -mt-0.5">Track inventory and repair costs</p>
+            {!hideSubline && (
+              <p className="text-[10px] text-gray-400 font-medium -mt-0.5">Track inventory and repair costs</p>
+            )}
           </div>
         </div>
         <button
