@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Lock, Scale, Bird, Box, Gauge, Clock, Pencil, X } from "lucide-react";
+import { Lock, Scale, Bird, Box, Gauge, Clock, Pencil, X, CheckCircle } from "lucide-react";
 import type { Trip } from "../types/trip";
 
 interface Props {
@@ -78,7 +78,7 @@ export default function StepPickup({
       <div className="bg-white border border-slate-200/80 shadow-sm rounded-2xl p-6 space-y-6">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3"><span className="bg-blue-700 text-white w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold">3</span><h2 className="text-lg font-bold text-slate-800 tracking-tight">PICKUP KPI SUMMARY</h2></div>
-          {(editable || isLocalEditing) && <span className="text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full border border-blue-200">✏️ Editable View</span>}
+          {((editable && trip.pickupStepSubmitted) || isLocalEditing) && <span className="text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full border border-blue-200">✏️ Editable View</span>}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -86,24 +86,25 @@ export default function StepPickup({
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5"><Clock size={14} className="text-slate-400" /> Auto Time Capture</label>
             <div className="mt-1.5 bg-slate-50/70 rounded-xl border border-slate-100 flex items-center px-4 py-2.5 h-[38px]">
               <Clock size={16} className="text-slate-400 mr-2" />
-              <span className="text-sm font-medium text-slate-700">—</span>
+              {/* 🟢 FIXED: Now shows the captured time if it exists, or — */}
+              <span className="text-sm font-medium text-slate-700">{trip.pickupLoadTime || '—'}</span>
             </div>
             <p className="text-[11px] text-slate-400 mt-1.5">Auto captured on submit</p>
           </div>
 
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5"><Scale size={14} className="text-slate-400" /> Total DC Weight (Kg) <span className="text-red-500">*</span></label>
-            <div><input type="number" step="0.01" value={trip.dcWeight || ""} onChange={(e) => updateTrip({ dcWeight: parseFloat(e.target.value) || 0 })} className="hide-spinner w-full mt-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-2.5 h-[38px] text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-sm" placeholder="0.00" /><p className="text-[11px] text-slate-400 mt-1.5">Farm exp: 9,100 Kg</p></div>
+            <div><input type="number" step="0.01" min="0" onWheel={(e) => e.currentTarget.blur()} value={trip.dcWeight || ""} onChange={(e) => updateTrip({ dcWeight: parseFloat(e.target.value) || 0 })} className="hide-spinner w-full mt-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-2.5 h-[38px] text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-sm" placeholder="0.00" /><p className="text-[11px] text-slate-400 mt-1.5">Farm exp: 9,100 Kg</p></div>
           </div>
 
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5"><Bird size={14} className="text-slate-400" /> Total Birds (Nos) <span className="text-red-500">*</span></label>
-            <div><input type="number" step="1" value={trip.totalBirds || ""} onChange={(e) => updateTrip({ totalBirds: parseInt(e.target.value) || 0 })} className="hide-spinner w-full mt-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-2.5 h-[38px] text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-sm" placeholder="0" /><p className="text-[11px] text-slate-400 mt-1.5">Farm exp: 7,400</p></div>
+            <div><input type="number" step="1" min="0" onWheel={(e) => e.currentTarget.blur()} value={trip.totalBirds || ""} onChange={(e) => updateTrip({ totalBirds: parseInt(e.target.value) || 0 })} className="hide-spinner w-full mt-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-2.5 h-[38px] text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-sm" placeholder="0" /><p className="text-[11px] text-slate-400 mt-1.5">Farm exp: 7,400</p></div>
           </div>
 
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5"><Box size={14} className="text-slate-400" /> Loaded Boxes</label>
-            <div><input type="number" step="1" min="0" value={trip.boxes || ""} onChange={(e) => updateTrip({ boxes: parseInt(e.target.value) || 0 })} className="hide-spinner w-full mt-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-2.5 h-[38px] text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-sm" placeholder="0" /></div>
+            <div><input type="number" step="1" min="0" onWheel={(e) => e.currentTarget.blur()} value={trip.boxes || ""} onChange={(e) => updateTrip({ boxes: parseInt(e.target.value) || 0 })} className="hide-spinner w-full mt-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-2.5 h-[38px] text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-sm" placeholder="0" /></div>
           </div>
 
           <div>
@@ -112,7 +113,6 @@ export default function StepPickup({
           </div>
         </div>
 
-        {/* 🔹 UPDATED: Fixed button layout to match Step 2 beautifully */}
         <div className="flex items-center justify-center gap-4 pt-4 border-t border-slate-100 mt-6">
           {(editable || isLocalEditing) && (
             <button onClick={() => {
@@ -122,23 +122,13 @@ export default function StepPickup({
               <X size={15} /> Close
             </button>
           )}
-          
           {!trip.pickupStepSubmitted && !editable && clearForm && (
             <button onClick={clearForm} className="px-6 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-sm active:scale-95">
               Clear Form
             </button>
           )}
-
-          {/* 🔹 Changed from w-full to px-8 py-2.5, and removed py-3.5 */}
-          <button 
-            onClick={handleSubmit} 
-            disabled={isSubmitting || !trip.dcWeight || !trip.totalBirds} 
-            className={`px-8 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-all active:scale-[0.98] ${
-              isSubmitting || !trip.dcWeight || !trip.totalBirds 
-                ? "bg-blue-400/60 cursor-not-allowed shadow-none" 
-                : "bg-blue-700 hover:bg-blue-800 shadow-blue-200"
-            }`}
-          >
+          <button onClick={handleSubmit} disabled={isSubmitting || !trip.dcWeight || !trip.totalBirds} className={`px-8 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-all active:scale-[0.98] flex items-center gap-1.5 ${isSubmitting || !trip.dcWeight || !trip.totalBirds ? "bg-blue-400/60 cursor-not-allowed shadow-none" : "bg-blue-700 hover:bg-blue-800 shadow-blue-200"}`}>
+            <CheckCircle size={15} />
             {isSubmitting ? "Submitting..." : (trip.pickupStepSubmitted ? "Update Pickup" : "Submit Pickup")}
           </button>
         </div>

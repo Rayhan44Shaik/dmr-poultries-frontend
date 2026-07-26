@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useEffect, useMemo } from "react";
-import { Plus, Trash2, ShoppingCart, Layers, Hash, Scale, MessageSquare, AlertCircle } from "lucide-react";
+import { Plus, Trash2, Save, ShoppingCart, Layers, Hash, Scale, MessageSquare, AlertCircle } from "lucide-react";
 import Select from "react-select";
 import type { ShopDelivery } from "../types/trip";
 import TripPagination from "./TripPagination";
@@ -11,15 +11,15 @@ interface Props {
   birdTypes: any[];
   actions?: React.ReactNode;
   readOnly?: boolean;
+  onSaveRow?: (row: ShopDelivery) => void; // ✅ Added this missing prop!
 }
 
-function UnLoadingTable({ rows, setRows, shops, birdTypes, actions, readOnly = false }: Props) {
+function UnLoadingTable({ rows, setRows, shops, birdTypes, actions, readOnly = false, onSaveRow }: Props) {
   const safeRows = rows ?? [];
   const safeShops = shops ?? [];
   const safeBirdTypes = birdTypes ?? [];
 
   const [currentPage, setCurrentPage] = useState(1);
-  // 🔹 UPDATED: Reduced to 5 items per page
   const itemsPerPage = 5;
 
   const totalPages = useMemo(
@@ -219,7 +219,7 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions, readOnly = f
                   <span>Remarks</span>
                 </div>
               </th>
-              <th className="px-4 py-3.5 text-center text-xs font-semibold tracking-wider w-20 whitespace-nowrap">Action</th>
+              <th className="px-4 py-3.5 text-center text-xs font-semibold tracking-wider min-w-[100px] whitespace-nowrap">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -255,6 +255,8 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions, readOnly = f
                       onChange={(e) => updateRow(row.id, "boxNo", Number(e.target.value))}
                       disabled={readOnly}
                       placeholder="0"
+                      min="0"
+                      onWheel={(e) => e.currentTarget.blur()}
                       className="w-20 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-center text-xs font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all no-spinner shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
                       required
                     />
@@ -346,6 +348,7 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions, readOnly = f
                       value={row.birds || ""}
                       placeholder="0"
                       disabled={readOnly}
+                      onWheel={(e) => e.currentTarget.blur()}
                       className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-center text-xs font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all no-spinner shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
                       onChange={(e) => handleBirdInputChange(row.id, e.target.value)}
                       required
@@ -360,6 +363,7 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions, readOnly = f
                       value={row.weight || ""}
                       placeholder="0.00"
                       disabled={readOnly}
+                      onWheel={(e) => e.currentTarget.blur()}
                       className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-center text-xs font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all no-spinner shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
                       onChange={(e) => updateRow(row.id, "weight", Number(e.target.value))}
                       required
@@ -372,6 +376,8 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions, readOnly = f
                       value={row.mortality || ""}
                       placeholder="0"
                       disabled={readOnly}
+                      min="0"
+                      onWheel={(e) => e.currentTarget.blur()}
                       className="w-20 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-center text-xs font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all no-spinner shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
                       onChange={(e) => updateRow(row.id, "mortality", Number(e.target.value))}
                     />
@@ -388,7 +394,18 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions, readOnly = f
                       onChange={(e) => updateRow(row.id, "remarks", e.target.value)}
                     />
                   </td>
-                  <td className="text-center px-4 py-3">
+                  <td className="text-center px-4 py-3 flex flex-col items-center justify-center gap-2">
+                    {/* 🔹 Save Row Button */}
+                    {!readOnly && onSaveRow && (
+                      <button
+                        onClick={() => onSaveRow(row)}
+                        className="h-8 w-8 rounded-xl bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center mx-auto transition-colors group-hover:scale-105 text-emerald-600"
+                        title="Save this Shop"
+                      >
+                        <Save size={14} />
+                      </button>
+                    )}
+                    {/* 🔹 Delete Row Button */}
                     {!readOnly && (
                       <button
                         onClick={() => deleteRow(row.id)}

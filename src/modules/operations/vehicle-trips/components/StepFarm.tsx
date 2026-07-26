@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Clock, MapPin, Gauge, Lock, MessageSquare, Store, Ticket, Pencil, X } from "lucide-react";
+import { Clock, MapPin, Gauge, Lock, MessageSquare, Store, Ticket, Pencil, X, CheckCircle } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 
@@ -86,25 +86,25 @@ export default function StepFarm({
             </span>
           </div>
         </div>
-
+        
         <div className="space-y-6 pt-2">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="md:col-span-1 bg-white border border-slate-100 rounded-xl p-4 shadow-sm flex flex-col gap-1.5">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5"><Store size={14} className="text-indigo-500" /> Farm</span>
-              <span className="text-sm font-medium text-slate-800 truncate">{trip.sourceFarm || '--'}</span>
-            </div>
-            <div className="md:col-span-3 bg-white border border-slate-100 rounded-xl p-4 shadow-sm flex flex-col gap-1.5">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5"><MapPin size={14} className="text-indigo-500" /> Farm Address Details</span>
-              <span className="text-sm font-medium text-slate-800 truncate">{farmAddress || '--'}</span>
-            </div>
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm flex flex-col gap-1.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5"><Clock size={14} className="text-indigo-500" /> Reached Time</span>
               <span className="text-sm font-medium text-slate-800">{trip.reachedTime || '--'}</span>
             </div>
             <div className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm flex flex-col gap-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5"><Store size={14} className="text-indigo-500" /> Farm</span>
+              <span className="text-sm font-medium text-slate-800 truncate">{trip.sourceFarm || '--'}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="md:col-span-3 bg-white border border-slate-100 rounded-xl p-4 shadow-sm flex flex-col gap-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5"><MapPin size={14} className="text-indigo-500" /> Farm Address</span>
+              <span className="text-sm font-medium text-slate-800 truncate">{farmAddress || '--'}</span>
+            </div>
+            <div className="md:col-span-1 bg-white border border-slate-100 rounded-xl p-4 shadow-sm flex flex-col gap-1.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5"><Gauge size={14} className="text-indigo-500" /> Dest. Meter (KM)</span>
               <span className="text-sm font-medium text-slate-800">{trip.destMeter} KM</span>
             </div>
@@ -126,7 +126,7 @@ export default function StepFarm({
     );
   }
 
-  // EDIT STATE
+  // EDIT / ACTIVE STATE
   return (
     <>
       <style>{`.hide-spinner::-webkit-inner-spin-button,.hide-spinner::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.hide-spinner{-moz-appearance:textfield;appearance:none}`}</style>
@@ -136,45 +136,51 @@ export default function StepFarm({
             <span className="bg-blue-700 text-white w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold">2</span>
             <h2 className="text-lg font-bold text-slate-800 tracking-tight">REACHED FARM / DESTINATION</h2>
           </div>
-          {(editable || isLocalEditing) && <span className="text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full border border-blue-200">✏️ Editable View</span>}
+          {((editable && trip.farmStepSubmitted) || isLocalEditing) && <span className="text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full border border-blue-200">✏️ Editable View</span>}
         </div>
 
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="md:col-span-1">
+          {/* ROW 1: 50% Time / 50% Farm */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5"><Clock size={14} className="text-slate-400" /> Reached Time</label>
+              {/* 🔹 FIXED: Now shows existing time on Edit, instead of hardcoded '—' */}
+              <div className="mt-1.5 h-[38px] bg-slate-50/80 border border-slate-200 rounded-xl px-4 py-2.5 flex items-center text-sm font-medium text-slate-700">
+                <Clock size={16} className="text-slate-400 mr-2" />
+                <span>{trip.reachedTime || '—'}</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1.5">Auto captured on submit</p>
+            </div>
+
+            <div>
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5"><Store size={14} className="text-slate-400" /> Farm <span className="text-red-500">*</span></label>
               <Select<{ value: number; label: string }, false> options={farmOptions} getOptionLabel={(e) => e?.label || ""} getOptionValue={(e) => e?.value.toString() || ""} value={farmOptions.find((o) => o.value === trip.sourceFarmId) || null} onChange={(e) => setTrip((prev) => ({ ...prev, sourceFarmId: e?.value || 0, sourceFarm: e?.label || "" }))} className="mt-1.5 text-sm w-full" placeholder="Select" isSearchable styles={selectStyles} menuPortalTarget={document.body} />
             </div>
+          </div>
+
+          {/* ROW 2: 75% Address / 25% Dest. Meter */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="md:col-span-3">
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5"><MapPin size={14} className="text-slate-400" /> Detailed Farm Address</label>
               <input type="text" value={farmAddress} onChange={(e) => setFarmAddress(e.target.value)} className="w-full mt-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all" placeholder="Enter farm address details..." />
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5"><Clock size={14} className="text-slate-400" /> Reached Time</label>
-              <div className="mt-1.5 bg-slate-50/70 p-3 rounded-xl border border-slate-100 flex items-center gap-2">
-                <Clock size={16} className="text-slate-400" />
-                <span className="text-sm font-medium text-slate-700">—</span>
-              </div>
-              <p className="text-[11px] text-slate-400 mt-1.5">Auto captured on submit</p>
-            </div>
-            <div>
+            <div className="md:col-span-1">
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5"><Gauge size={14} className="text-slate-400" /> Dest. Meter (KM) <span className="text-red-500">*</span></label>
               <div>
-                <input type="number" step="0.01" value={trip.destMeter || ""} onChange={(e) => handleDestMeterChange(e.target.value)} className={`hide-spinner w-full mt-1.5 rounded-xl border ${destMeterError ? "border-red-500" : "border-slate-200"} bg-slate-50/80 px-4 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all`} placeholder="Enter destination meter reading..." />
+                <input type="number" step="0.01" min="0" onWheel={(e) => e.currentTarget.blur()} value={trip.destMeter || ""} onChange={(e) => handleDestMeterChange(e.target.value)} className={`hide-spinner w-full mt-1.5 rounded-xl border ${destMeterError ? "border-red-500" : "border-slate-200"} bg-slate-50/80 px-4 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all`} placeholder="Enter destination meter reading..." />
                 <p className="text-[11px] text-slate-400 mt-1.5">Start: <span className="font-medium text-slate-600">{trip.openingMeter.toLocaleString()}</span></p>
                 {destMeterError && <p className="mt-1 text-xs text-red-600 font-medium flex items-center gap-1"><span className="block w-1 h-1 rounded-full bg-red-600" /> {destMeterError}</p>}
               </div>
             </div>
           </div>
 
+          {/* ROW 3: 25% Toll Gates / 75% Remarks */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="md:col-span-1">
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5"><Ticket size={14} className="text-slate-400" /> Toll Gates <span className="text-red-500">*</span></label>
               <div className="mt-1.5">
-                <input type="number" value={trip.pickupTolls || ""} onChange={(e) => updateTrip({ pickupTolls: Number(e.target.value) })} className="hide-spinner w-full rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all" placeholder="0" />
+                <input type="number" min="0" onWheel={(e) => e.currentTarget.blur()} value={trip.pickupTolls || ""} onChange={(e) => updateTrip({ pickupTolls: Number(e.target.value) })} className="hide-spinner w-full rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all" placeholder="0" />
                 <p className="text-[11px] text-slate-400 mt-1.5">Tolls covered on pickup</p>
               </div>
             </div>
@@ -186,6 +192,11 @@ export default function StepFarm({
         </div>
 
         <div className="flex items-center justify-center gap-4 pt-4 border-t border-slate-100 mt-6">
+          {!trip.farmStepSubmitted && !editable && (
+            <button onClick={handleClear} className="px-6 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-sm active:scale-95">
+              Clear Form
+            </button>
+          )}
           {(editable || isLocalEditing) && (
             <button onClick={() => {
               if (editable && onCancel) onCancel();
@@ -194,12 +205,8 @@ export default function StepFarm({
               <X size={15} /> Close
             </button>
           )}
-          {!trip.farmStepSubmitted && !editable && (
-            <button onClick={handleClear} className="px-6 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-sm active:scale-95">
-              Clear Form
-            </button>
-          )}
-          <button onClick={handleSubmit} disabled={isSubmitting || !!destMeterError || !trip.sourceFarmId} className={`px-8 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-all active:scale-[0.98] ${isSubmitting || !!destMeterError || !trip.sourceFarmId ? "bg-blue-400/60 cursor-not-allowed shadow-none" : "bg-blue-700 hover:bg-blue-800 shadow-blue-200"}`}>
+          <button onClick={handleSubmit} disabled={isSubmitting || !!destMeterError || !trip.sourceFarmId} className={`px-8 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-all active:scale-[0.98] flex items-center gap-1.5 ${isSubmitting || !!destMeterError || !trip.sourceFarmId ? "bg-blue-400/60 cursor-not-allowed shadow-none" : "bg-blue-700 hover:bg-blue-800 shadow-blue-200"}`}>
+            <CheckCircle size={15} />
             {isSubmitting ? "Saving..." : (trip.farmStepSubmitted ? "Update Destination" : "Submit Destination")}
           </button>
         </div>

@@ -115,8 +115,11 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     return true;
   };
 
+  // 🔹 FIXED: Added success notification for Step 2
   const submitFarmStep = (data: Partial<Trip>): boolean => {
-    const updatedData = { ...trip, ...data, reachedTime: new Date().toLocaleString() };
+    const reachedTime = trip.farmStepSubmitted ? trip.reachedTime : new Date().toLocaleString();
+    const updatedData = { ...trip, ...data, reachedTime };
+    
     const validation = validateFarmStep(updatedData as Trip);
     if (!validation.valid) {
       showNotification?.(validation.errors[0], "error");
@@ -124,9 +127,13 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     }
     const savedTrip = tripService.update({ ...updatedData, farmStepSubmitted: true });
     setTrip(savedTrip);
+    
+    // 🟢 NOTIFICATION ADDED HERE
+    showNotification?.(isEditing ? `✅ Step 2 updated successfully.` : `✅ Step 2 completed successfully. Moving to Step 3...`, "success");
     return true;
   };
 
+  // 🔹 FIXED: Added success notification for Step 3
   const submitPickupStep = (data: Partial<Trip>): boolean => {
     const updatedData = { ...trip, ...data };
     const validation = validatePickupStep(updatedData as Trip);
@@ -142,6 +149,9 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
       pickupStepSubmitted: true 
     });
     setTrip(savedTrip);
+    
+    // 🟢 NOTIFICATION ADDED HERE
+    showNotification?.(isEditing ? `✅ Step 3 updated successfully.` : `✅ Step 3 completed successfully. Moving to Step 4...`, "success");
     return true;
   };
 
@@ -158,7 +168,6 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
 
   const updateTrip = (updates: Partial<Trip>) => setTrip(prev => ({ ...prev, ...updates }));
 
-  // 🔹 UPDATED: Added persistToStorage parameter to allow live KPI updates without saving to localStorage.
   const updateDeliveries = (rows: ShopDelivery[], persistToStorage: boolean = true) => {
     const totalMortalityCount = rows.reduce((sum, r) => sum + (r.mortality || 0), 0);
     const kpis = calculateDeliveryKPIs(
@@ -184,8 +193,6 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
       totalMortality: totalMortalityCount
     };
 
-    // If persistToStorage is true (on Lock), save to localStorage.
-    // If false (Live typing), just update the React state to refresh KPI cards without saving.
     if (persistToStorage) {
       const savedTrip = tripService.update(updatedTrip);
       setTrip(savedTrip);

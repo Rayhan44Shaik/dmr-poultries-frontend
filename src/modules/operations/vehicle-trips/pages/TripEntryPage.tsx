@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, FileText, Plus } from "lucide-react";
 
 // --- Components ---
 import UnLoadingTable from "../components/UnLoadingTable";
@@ -71,6 +71,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const [viewOpen, setViewOpen] = useState(false);
   const [viewStepIndex, setViewStepIndex] = useState(0);
 
+  const [showEntryPrompt, setShowEntryPrompt] = useState(true);
   const isManualSelect = useRef(false);
 
   const handleView = (selectedTrip: Trip) => { 
@@ -79,6 +80,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   };
   
   const handleEdit = (selectedTrip: Trip) => { 
+    setShowEntryPrompt(false);
+    setViewStepIndex(0);
     loadTrip(selectedTrip); 
     setRows(selectedTrip.deliveries); 
     showNotification(`✏️ Trip ${selectedTrip.tripNo} loaded. Proceed to edit.`, "info"); 
@@ -111,11 +114,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const clearForm = () => { 
     clearTrip(); 
     setRows([]); 
+    setShowEntryPrompt(true);
+    setViewStepIndex(0);
     setTrip((prev) => ({ ...prev, tripDate: getYesterday() })); 
     showNotification("✨ Cleared.", "info"); 
   };
 
-  // ─── STEP STATE FLAGS & PERMISSIONS ───
   const isStartCompleted = trip.startStepSubmitted;
   const isFarmCompleted = trip.farmStepSubmitted;
   const isPickupCompleted = trip.pickupStepSubmitted;
@@ -129,33 +133,16 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const vehicleOpts = vehicles.map((v: any) => ({ id: v.id, vehicleNumber: v.vehicleNumber }));
   const employeeOpts = employees.map((e: any) => ({ id: e.id, employeeName: e.employeeName, department: e.department }));
 
-  // 🔹 TRACK PREVIOUS STEP STATE TO DETECT FRESH SUBMISSIONS
-  const prevStepFlags = useRef({ start: false, farm: false, pickup: false, delivery: false });
-  
-  // 🔹 ROBUST AUTO-ADVANCE: Forces the view to the next step when a step is successfully submitted for the first time.
   useEffect(() => {
-    const flags = {
-      start: isStartCompleted,
-      farm: isFarmCompleted,
-      pickup: isPickupCompleted,
-      delivery: isDeliveryCompleted
-    };
-    
-    // Only auto-advance if it's a brand new submission (not an edit)
-    if (!isGlobalEditMode) {
-      if (flags.start && !prevStepFlags.current.start) { isManualSelect.current = false; setViewStepIndex(1); }
-      if (flags.farm && !prevStepFlags.current.farm) { isManualSelect.current = false; setViewStepIndex(2); }
-      if (flags.pickup && !prevStepFlags.current.pickup) { isManualSelect.current = false; setViewStepIndex(3); }
-      if (flags.delivery && !prevStepFlags.current.delivery) { isManualSelect.current = false; setViewStepIndex(4); }
+    if (currentStep > viewStepIndex && !isManualSelect.current) {
+      setViewStepIndex(currentStep);
     }
-    prevStepFlags.current = flags;
-  }, [isStartCompleted, isFarmCompleted, isPickupCompleted, isDeliveryCompleted, isGlobalEditMode]);
+  }, [currentStep, viewStepIndex]);
 
   useEffect(() => {
     isManualSelect.current = false;
   }, [trip.id]);
 
-  // 🔹 RENDER SELECTED STEP LOGIC
   const renderSelectedStep = () => {
     const isViewingActiveStep = !isTripEnded && viewStepIndex === currentStep;
     const onCancelEdit = () => setIsEditing(false);
@@ -188,34 +175,54 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         return <StepDeliveries rows={rows} setRows={setRows} shops={shops} birdTypes={birdTypes} trip={trip} updateDeliveries={updateDeliveries} submitDeliveriesStep={submitDeliveriesStep} readOnly={!isGlobalEditMode} editable={isGlobalEditMode} canEdit={canEditTrip} onCancel={onCancelEdit} clearForm={clearForm} />;
       }
     }
+    
     if (viewStepIndex === 4) {
-      if (isTripEnded) {
-        return <div className="mt-8 bg-emerald-50 border border-emerald-200 rounded-2xl p-8 text-center"><h2 className="text-2xl font-bold text-emerald-700">🎉 Trip Completed Successfully</h2></div>;
-      } else if (isViewingActiveStep && isDeliveryCompleted) {
-        return <StepEnd trip={trip} setTrip={setTrip} updateTrip={updateTrip} submitEndTrip={submitEndTrip} editable={isGlobalEditMode} canEdit={canEditTrip} onCancel={onCancelEdit} />;
-      }
+      return <StepEnd trip={trip} setTrip={setTrip} updateTrip={updateTrip} submitEndTrip={submitEndTrip} editable={isGlobalEditMode} canEdit={canEditTrip} onCancel={onCancelEdit} />;
     }
+    
     return <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">👈 Select a completed step or the current step to view it here.</div>;
   };
 
-  // 🔹 CONTENT UI (Final Return)
   const content = (
     <div className="space-y-6">
       <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/80 shadow-xl shadow-slate-100/70 space-y-6">
         {pendingWarning && ( <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700"><AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" /><span>{pendingWarning}</span></div> )}
         
-        <TripWizardStepper 
-          steps={["Start", "Farm", "Pickup", "Deliveries", "End"]} 
-          currentStep={currentStep} 
-          completedMask={{ start: isStartCompleted, farm: isFarmCompleted, pickup: isPickupCompleted, delivery: isDeliveryCompleted }} 
-          onStepClick={(idx) => { 
-            setViewStepIndex(idx); 
-            isManualSelect.current = true; 
-          }} 
-        />
-        
-        <div className="mt-6">{renderSelectedStep()}</div>
-        {isStartCompleted && <TripFinalKPI trip={trip} />}
+        {showEntryPrompt ? (
+          <div className="flex flex-col items-center justify-center text-center py-16 space-y-6">
+            <div className="h-20 w-20 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shadow-inner">
+              <FileText size={36} />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Ready for a New Trip?</h2>
+              <p className="text-slate-500 max-w-md mx-auto">
+                Start a new unloading trip by creating an entry, or view your recent trip activity below.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowEntryPrompt(false)}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"
+            >
+              <Plus size={18} />
+              Create New Trip
+            </button>
+          </div>
+        ) : (
+          <>
+            <TripWizardStepper 
+              steps={["Start", "Farm", "Pickup", "Deliveries", "End"]} 
+              currentStep={currentStep} 
+              completedMask={{ start: isStartCompleted, farm: isFarmCompleted, pickup: isPickupCompleted, delivery: isDeliveryCompleted }} 
+              onStepClick={(idx) => { 
+                setViewStepIndex(idx); 
+                isManualSelect.current = true; 
+              }} 
+            />
+            
+            <div className="mt-6">{renderSelectedStep()}</div>
+            {isStartCompleted && <TripFinalKPI trip={trip} />}
+          </>
+        )}
       </div>
 
       <TripRecentTable trips={allTrips} onRefresh={handleRefresh} onView={handleView} onEdit={handleEdit} onDelete={(trip, reason) => deleteTrip(trip.id, reason)} />

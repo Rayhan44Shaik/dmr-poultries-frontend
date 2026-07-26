@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { CheckCircle, Pencil, X, Lock } from "lucide-react"; // ✅ Added Lock
+import React, { useState, useMemo } from "react";
+import { CheckCircle, Pencil, X, Lock } from "lucide-react";
 import UnLoadingTable from "./UnLoadingTable";
 import TripTotals from "./TripTotals";
 import type { ShopDelivery, Trip } from "../types/trip";
@@ -11,9 +11,9 @@ interface Props {
   shops: any[];
   birdTypes: any[];
   trip: Trip;
-  updateDeliveries: (rows: ShopDelivery[]) => void;
+  updateDeliveries: (rows: ShopDelivery[], persistToStorage?: boolean) => void;
   submitDeliveriesStep: () => boolean;
-  clearForm: () => void; // ✅ Required
+  clearForm: () => void;
   readOnly?: boolean;
   editable?: boolean;
   canEdit?: boolean;
@@ -39,40 +39,44 @@ export default function StepDeliveries({
 
   const isReadOnly = readOnly || !editable;
 
-  const handleLockDeliveries = () => {
-    if (rows.length === 0) {
-      showNotification?.("❌ Please add at least one Shop Delivery before locking.", "error");
-      return;
-    }
-    updateDeliveries(rows);
+  const handleSaveRow = (updatedRow: ShopDelivery) => {
+    const rowIndex = rows.findIndex((r) => r.id === updatedRow.id);
+    if (rowIndex === -1) return;
+    const updatedRows = [...rows];
+    updatedRows[rowIndex] = updatedRow;
+    setRows(updatedRows);
+    updateDeliveries(updatedRows, true);
+    showNotification?.(`✅ Shop "${updatedRow.shopName}" saved successfully.`, "success");
+  };
+
+  // 🔹 LIVE VALIDATION ENGINE (Disables the Lock button until ALL matches)
+  const canLock = useMemo(() => {
+    if (rows.length === 0) return false;
+    if (trip.dcWeight <= 0) return false;
+    if (!trip.destMeter || trip.destMeter <= trip.openingMeter) return false;
 
     const totalMortalityCount = rows.reduce((sum, r) => sum + (r.mortality || 0), 0);
     const totalDelBirds = rows.reduce((sum, r) => sum + (r.birds || 0), 0);
     const totalDelWeight = rows.reduce((sum, r) => sum + (r.weight || 0), 0);
     const mortalityWeight = totalMortalityCount * (trip.avgWeight || 0);
-
-    if (trip.dcWeight <= 0) {
-      showNotification?.("❌ Invalid DC Weight. Please go back to Step 3.", "error");
-      return;
-    }
     const totalOutWeight = totalDelWeight + mortalityWeight;
-    if (totalOutWeight > trip.dcWeight) {
-      showNotification?.(`❌ Weight Mismatch: Delivered (${totalDelWeight.toFixed(2)}) + Mortality (${mortalityWeight.toFixed(2)}) = ${totalOutWeight.toFixed(2)} exceeds DC Weight (${trip.dcWeight}).`, "error");
+
+    // Validation 1: Pickup Birds must equal Delivered Birds + Mortality Birds
+    if (trip.totalBirds !== (totalDelBirds + totalMortalityCount)) return false;
+
+    // Validation 2: DC Weight must be greater than or equal to (Delivered Weight + Mortality Weight)
+    if (totalOutWeight > trip.dcWeight) return false;
+
+    return true;
+  }, [rows, trip.dcWeight, trip.totalBirds, trip.avgWeight, trip.destMeter, trip.openingMeter]);
+
+  const handleLockDeliveries = () => {
+    // Double-check guard
+    if (!canLock) {
+      showNotification?.("❌ Validation checks failed. Please fix all mismatches before locking.", "error");
       return;
     }
-    if (trip.totalBirds <= 0) {
-      showNotification?.("❌ Invalid Total Birds. Please go back to Step 3.", "error");
-      return;
-    }
-    const expectedBirds = totalDelBirds + totalMortalityCount;
-    if (trip.totalBirds !== expectedBirds) {
-      showNotification?.(`❌ Bird Count Mismatch: Pickup (${trip.totalBirds}) must equal Delivered (${totalDelBirds}) + Mortality (${totalMortalityCount}) = ${expectedBirds}.`, "error");
-      return;
-    }
-    if (!trip.destMeter || trip.destMeter <= trip.openingMeter) {
-      showNotification?.("❌ Meter Mismatch: Destination Meter reading is invalid. Please verify Step 2.", "error");
-      return;
-    }
+    updateDeliveries(rows, true);
     submitDeliveriesStep();
   };
 
@@ -104,20 +108,6 @@ export default function StepDeliveries({
   }
 
   // EDIT STATE
-  const deliveryActions = isReadOnly ? null : (
-    <div className="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-slate-200/60 mt-4 w-full">
-      {!trip.deliveryStepSubmitted && !editable && clearForm && (
-        <button onClick={clearForm} className="inline-flex items-center gap-2 rounded-xl bg-white hover:bg-rose-50 px-5 py-2.5 text-xs font-bold text-slate-700 hover:text-rose-700 border border-slate-200 hover:border-rose-200 transition-all shadow-sm active:scale-95">
-          Clear Form
-        </button>
-      )}
-      <button onClick={handleLockDeliveries} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-6 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95">
-        <CheckCircle size={15} />
-        Complete & Lock Deliveries
-      </button>
-    </div>
-  );
-
   return (
     <div className="space-y-4">
       <div className="bg-white border border-slate-200/80 shadow-sm rounded-2xl p-6 space-y-6">
@@ -126,19 +116,49 @@ export default function StepDeliveries({
             <span className="bg-blue-700 text-white w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold">4</span>
             <h2 className="text-lg font-bold text-slate-800 tracking-tight">SHOP DELIVERIES</h2>
           </div>
-          {(editable || isLocalEditing) && <span className="text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full border border-blue-200">✏️ Editable View</span>}
+          {((editable && trip.deliveryStepSubmitted) || isLocalEditing) && <span className="text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full border border-blue-200">✏️ Editable View</span>}
         </div>
 
-        <UnLoadingTable rows={rows} setRows={setRows} shops={shops} birdTypes={birdTypes} actions={deliveryActions} readOnly={isReadOnly} />
+        <UnLoadingTable 
+          rows={rows} 
+          setRows={setRows} 
+          shops={shops} 
+          birdTypes={birdTypes} 
+          readOnly={isReadOnly} 
+          onSaveRow={handleSaveRow} 
+        />
+        
         <TripTotals rows={rows} />
 
         <div className="flex items-center justify-center gap-4 pt-4 border-t border-slate-100 mt-6">
+          {!trip.deliveryStepSubmitted && !editable && clearForm && (
+            <button onClick={clearForm} className="px-6 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-sm active:scale-95">
+              Clear Form
+            </button>
+          )}
+          
           {(editable || isLocalEditing) && (
             <button onClick={() => {
               if (editable && onCancel) onCancel();
               else setIsLocalEditing(false);
             }} className="px-6 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-sm active:scale-95 flex items-center gap-2">
               <X size={15} /> Close
+            </button>
+          )}
+
+          {/* 🔹 LOCK BUTTON: Disabled until canLock is true */}
+          {!isReadOnly && (
+            <button 
+              onClick={handleLockDeliveries} 
+              disabled={!canLock}
+              className={`px-8 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-all active:scale-[0.98] flex items-center gap-1.5 ${
+                canLock 
+                  ? "bg-blue-700 hover:bg-blue-800 shadow-blue-200" 
+                  : "bg-blue-400/60 cursor-not-allowed shadow-none"
+              }`}
+            >
+              <CheckCircle size={15} />
+              Complete & Lock Deliveries
             </button>
           )}
         </div>

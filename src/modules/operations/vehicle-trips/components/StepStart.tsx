@@ -14,7 +14,7 @@ interface Props {
   editable?: boolean;
   canEdit?: boolean; // 10-day rule
   onCancel?: () => void; // Global Edit Close
-  clearForm?: () => void; // ✅ Added
+  clearForm?: () => void;
 }
 
 export default function StepStart({
@@ -124,7 +124,7 @@ export default function StepStart({
             <span className="bg-blue-700 text-white w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold">1</span>
             <h2 className="text-lg font-bold text-slate-800 tracking-tight">TRIP START (AT OFFICE)</h2>
           </div>
-          {(editable || isLocalEditing) && <span className="text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full border border-blue-200">✏️ Editable View</span>}
+          {((editable && trip.startStepSubmitted) || isLocalEditing) && <span className="text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full border border-blue-200">✏️ Editable View</span>}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -169,19 +169,14 @@ export default function StepStart({
         </div>
 
         <div className="flex items-center justify-center gap-4 pt-4 border-t border-slate-100 mt-6">
-          {/* Close button for Edit modes */}
           {(editable || isLocalEditing) && (
             <button onClick={() => {
-              if (editable && onCancel) {
-                onCancel(); // Global Edit Mode
-              } else {
-                setIsLocalEditing(false); // Local Edit Mode
-              }
+              if (editable && onCancel) onCancel();
+              else setIsLocalEditing(false);
             }} className="px-6 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-sm active:scale-95 flex items-center gap-2">
               <X size={15} /> Close
             </button>
           )}
-          {/* Clear button for Brand New Trips ONLY */}
           {!trip.startStepSubmitted && !editable && clearForm && (
             <button onClick={clearForm} className="px-6 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-sm active:scale-95">
               Clear Form
