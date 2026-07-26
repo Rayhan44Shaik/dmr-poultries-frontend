@@ -1,7 +1,6 @@
 export interface ShopDelivery {
-
   id: number;
-   serialNo?: number; 
+  serialNo?: number;
   // Manual Box No (Duplicates Allowed)
   boxNo: number;
 
@@ -24,73 +23,77 @@ export interface ShopDelivery {
 
   // Remarks
   remarks: string;
-
 }
 
-export type TripStatus =
-  | "Pending"
-  | "Completed";
+export type TripStatus = "Pending" | "Completed";
 
 export interface Trip {
-
   id: number;
-
-  // Trip
+  // --- General ---
   tripNo: string;
-  tripDate: string;
+  tripDate: string; // YYYY-MM-DD
 
-  // Vehicle
+  // --- STEP 1: TRIP START ---
+  startTime: string;
   vehicleId: number;
   vehicleNo: string;
-
-  // Driver
   driverId: number;
   driverName: string;
-
-  // Supervisor
   supervisorId: number;
   supervisorName: string;
+  helpers: string[];
+  openingMeter: number;
+  startStepSubmitted: boolean; // 🔹 NEW
 
-  // Farm
+  // --- STEP 2: REACH FARM ---
   sourceFarmId: number;
   sourceFarm: string;
+  reachedTime: string;
+  destMeter: number;
+  pickupTolls: number;
+  farmStepSubmitted: boolean; // 🔹 NEW
 
-  // KM Details
-  openingMeter: number;
-  closingMeter: number;
-  totalKm: number;
-
-  dcWeight : number;
-  // Expenses
-  fuel: number;
-  expense: number;
-
-  // Remarks
-  remarks: string;
-
-  // Summary
-  totalShops: number;
+  // --- STEP 3: PICKUP KPI ---
+  dcWeight: number;
   totalBirds: number;
-  totalWeight: number;
-  totalMortality: number;
+  boxes: number;
+  avgWeight: number;
+  pickupLoadTime: string;
+  pickupStepSubmitted: boolean; // 🔹 NEW
 
-  // Last Delivered Shop
+  // --- STEP 4: SHOP DELIVERIES ---
+  deliveries: ShopDelivery[];
+  deliveryStepSubmitted: boolean; // 🔹 NEW
+
+  // --- STEP 5: END TRIP ---
+  closingMeter: number;
+  endTime: string;
+  deliveryTolls: number;
+
+  // --- ADVANCED KPI FIELDS (Calculated) ---
+  totalKm: number;
+  totalShops: number;
+  totalWeight: number; // Legacy
+  totalDeliveredWeight: number; // 🔹 NEW
+  totalBirdsDelivered: number; // 🔹 NEW
+  totalMortality: number; // Legacy
+  totalMortalityCount: number; // 🔹 NEW
+  totalMortalityWeight: number; // 🔹 NEW
+  weightLoss: number; // 🔹 NEW
+  survivalRate: number; // 🔹 NEW
+
   lastShop: string;
 
-  // Status
+  // --- Legacy & Meta ---
+  fuel: number;
+  expense: number;
+  remarks: string;
   status: TripStatus;
-
-  // Rate Entry Status
   rateCompleted?: boolean;
-
-  // Delivery Details
-  deliveries: ShopDelivery[];
-
+  
   // Audit
   createdAt?: string;
   updatedAt?: string;
-
   deleted?: boolean;
   deletedReason?: string;
-
 }

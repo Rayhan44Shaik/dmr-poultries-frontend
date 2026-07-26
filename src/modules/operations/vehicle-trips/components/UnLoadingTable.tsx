@@ -10,15 +10,17 @@ interface Props {
   shops: any[];
   birdTypes: any[];
   actions?: React.ReactNode;
+  readOnly?: boolean;
 }
 
-function UnLoadingTable({ rows, setRows, shops, birdTypes, actions }: Props) {
+function UnLoadingTable({ rows, setRows, shops, birdTypes, actions, readOnly = false }: Props) {
   const safeRows = rows ?? [];
   const safeShops = shops ?? [];
   const safeBirdTypes = birdTypes ?? [];
 
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  // 🔹 UPDATED: Reduced to 5 items per page
+  const itemsPerPage = 5;
 
   const totalPages = useMemo(
     () => Math.ceil(safeRows.length / itemsPerPage),
@@ -39,10 +41,8 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions }: Props) {
   }, [totalPages, currentPage]);
 
   const addRow = useCallback(() => {
-    const maxSerial = safeRows.reduce(
-      (max, r) => Math.max(max, r.serialNo || 0),
-      0
-    );
+    if (readOnly) return;
+    const maxSerial = safeRows.reduce((max, r) => Math.max(max, r.serialNo || 0), 0);
     const nextSerial = maxSerial + 1;
 
     setRows((prev) => [
@@ -64,61 +64,48 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions }: Props) {
       ...prev,
     ]);
     setCurrentPage(1);
-  }, [safeRows, setRows]);
+  }, [safeRows, setRows, readOnly]);
 
   const updateRow = useCallback(
     (id: number, field: keyof ShopDelivery, value: any) => {
-      setRows((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
-      );
+      if (readOnly) return;
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
     },
-    [setRows]
+    [setRows, readOnly]
   );
 
   const deleteRow = useCallback(
     (id: number) => {
+      if (readOnly) return;
       setRows((prev) => prev.filter((x) => x.id !== id));
     },
-    [setRows]
+    [setRows, readOnly]
   );
 
   const handleShopChange = useCallback(
     (rowId: number, selected: any) => {
-      if (!selected) return;
+      if (readOnly || !selected) return;
       setRows((prev) =>
-        prev.map((r) =>
-          r.id === rowId
-            ? { ...r, shopId: selected.value, shopName: selected.label }
-            : r
-        )
+        prev.map((r) => (r.id === rowId ? { ...r, shopId: selected.value, shopName: selected.label } : r))
       );
     },
-    [setRows]
+    [setRows, readOnly]
   );
 
   const handleBirdChange = useCallback(
     (rowId: number, selected: any) => {
+      if (readOnly) return;
       if (!selected) {
-        setRows((prev) =>
-          prev.map((r) =>
-            r.id === rowId
-              ? { ...r, birdTypeId: 0, birdType: "" }
-              : r
-          )
-        );
+        setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, birdTypeId: 0, birdType: "" } : r)));
         return;
       }
       const bird = safeBirdTypes.find((b: any) => b.id === selected.value);
       if (!bird) return;
       setRows((prev) =>
-        prev.map((r) =>
-          r.id === rowId
-            ? { ...r, birdTypeId: bird.id, birdType: bird.birdType }
-            : r
-        )
+        prev.map((r) => (r.id === rowId ? { ...r, birdTypeId: bird.id, birdType: bird.birdType } : r))
       );
     },
-    [safeBirdTypes, setRows]
+    [safeBirdTypes, setRows, readOnly]
   );
 
   const getSelectedShopIds = (currentRowId: number) => {
@@ -128,6 +115,7 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions }: Props) {
   };
 
   const handleBirdInputChange = (rowId: number, value: string) => {
+    if (readOnly) return;
     const num = parseFloat(value);
     if (!isNaN(num)) {
       const intVal = Math.floor(num);
@@ -137,7 +125,6 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions }: Props) {
     }
   };
 
-  // ─── Get available shops for a specific row (excluding already selected) ───
   const getAvailableShops = useCallback(
     (currentRowId: number) => {
       const selectedIds = getSelectedShopIds(currentRowId);
@@ -148,12 +135,8 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions }: Props) {
     [safeShops, getSelectedShopIds]
   );
 
-  // ─── Bird options ───
   const birdOptions = useMemo(
-    () => safeBirdTypes.map((bird: any) => ({
-      value: bird.id,
-      label: bird.birdType,
-    })),
+    () => safeBirdTypes.map((bird: any) => ({ value: bird.id, label: bird.birdType })),
     [safeBirdTypes]
   );
 
@@ -170,67 +153,79 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions }: Props) {
         }
       `}</style>
 
-      {/* Header Section */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80">
-        <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
-          Unloading
-        </span>
-        <button
-          onClick={addRow}
-          className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-600/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95"
-        >
-          <Plus size={15} />
-          Add Row
-        </button>
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 gap-4">
+        <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">UNLOADING</span>
+        {!readOnly && (
+          <button
+            onClick={addRow}
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-600/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95"
+          >
+            <Plus size={15} />
+            Add Row
+          </button>
+        )}
       </div>
 
+      {/* ── Table (Responsive Horizontal Scroll) ── */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="bg-slate-50/70 border-b border-slate-100 text-slate-500">
-              <th className="px-4 py-3.5 text-center text-xs font-semibold tracking-wider w-16">S.No</th>
-              <th className="px-4 py-3.5 text-center text-xs font-semibold tracking-wider">
+              <th className="px-4 py-3.5 text-center text-xs font-semibold tracking-wider w-16 whitespace-nowrap">S.No</th>
+              <th className="px-4 py-3.5 text-center text-xs font-semibold tracking-wider min-w-[100px] whitespace-nowrap">
                 <div className="flex items-center justify-center gap-1.5">
                   <Hash className="w-3.5 h-3.5 text-slate-400" />
                   <span>No. of Boxes</span> <span className="text-rose-500">*</span>
                 </div>
               </th>
-              <th className="px-4 py-3.5 text-left text-xs font-semibold tracking-wider">
+              <th className="px-4 py-3.5 text-left text-xs font-semibold tracking-wider min-w-[200px] whitespace-nowrap">
                 <div className="flex items-center gap-1.5">
                   <ShoppingCart className="w-3.5 h-3.5 text-slate-400" />
                   <span>Shop Name</span> <span className="text-rose-500">*</span>
                 </div>
               </th>
-              <th className="px-4 py-3.5 text-left text-xs font-semibold tracking-wider">
+              <th className="px-4 py-3.5 text-left text-xs font-semibold tracking-wider min-w-[150px] whitespace-nowrap">
                 <div className="flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5 text-slate-400" />
                   <span>Bird Type</span> <span className="text-rose-500">*</span>
                 </div>
               </th>
-              <th className="px-4 py-3.5 text-center text-xs font-semibold tracking-wider">
+              <th className="px-4 py-3.5 text-center text-xs font-semibold tracking-wider min-w-[80px] whitespace-nowrap">
                 <div className="flex items-center justify-center gap-1.5">
                   <span>Birds</span> <span className="text-rose-500">*</span>
                 </div>
               </th>
-              <th className="px-4 py-3.5 text-center text-xs font-semibold tracking-wider">
+              <th className="px-4 py-3.5 text-center text-xs font-semibold tracking-wider min-w-[80px] whitespace-nowrap">
                 <div className="flex items-center justify-center gap-1.5">
                   <Scale className="w-3.5 h-3.5 text-slate-400" />
                   <span>Kg's</span> <span className="text-rose-500">*</span>
                 </div>
               </th>
-              <th className="px-4 py-3.5 text-left text-xs font-semibold tracking-wider">
+              <th className="px-4 py-3.5 text-center text-xs font-semibold tracking-wider min-w-[80px] whitespace-nowrap">
+                <div className="flex items-center justify-center gap-1.5">
+                  <span>Mortality</span>
+                </div>
+              </th>
+              <th className="px-4 py-3.5 text-center text-xs font-semibold tracking-wider min-w-[80px] whitespace-nowrap">
+                <div className="flex items-center justify-center gap-1.5">
+                  <Scale className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Mort. Kg's</span>
+                </div>
+              </th>
+              <th className="px-4 py-3.5 text-left text-xs font-semibold tracking-wider min-w-[150px] whitespace-nowrap">
                 <div className="flex items-center gap-1.5">
                   <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
                   <span>Remarks</span>
                 </div>
               </th>
-              <th className="px-4 py-3.5 text-center text-xs font-semibold tracking-wider w-20">Action</th>
+              <th className="px-4 py-3.5 text-center text-xs font-semibold tracking-wider w-20 whitespace-nowrap">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {currentRows.length === 0 && (
               <tr>
-                <td colSpan={8} className="text-center py-12 text-slate-400 text-sm">
+                <td colSpan={10} className="text-center py-12 text-slate-400 text-sm">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                       <AlertCircle className="w-6 h-6" />
@@ -242,8 +237,9 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions }: Props) {
               </tr>
             )}
             {currentRows.map((row) => {
-              // ─── Get available shops (already selected ones are REMOVED from list) ───
               const availableShopOptions = getAvailableShops(row.id);
+              const avgPerBird = row.birds > 0 ? row.weight / row.birds : 0;
+              const mortWeight = row.mortality > 0 ? row.mortality * avgPerBird : 0;
 
               return (
                 <tr key={row.id} className="hover:bg-slate-50/60 transition-colors group">
@@ -257,8 +253,9 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions }: Props) {
                       type="number"
                       value={row.boxNo || ""}
                       onChange={(e) => updateRow(row.id, "boxNo", Number(e.target.value))}
+                      disabled={readOnly}
                       placeholder="0"
-                      className="w-20 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-center text-xs font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all no-spinner shadow-xs"
+                      className="w-20 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-center text-xs font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all no-spinner shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
                       required
                     />
                   </td>
@@ -266,14 +263,11 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions }: Props) {
                     <Select
                       menuPortalTarget={document.body}
                       menuPosition="fixed"
-                      value={
-                        row.shopId
-                          ? { value: row.shopId, label: row.shopName }
-                          : null
-                      }
+                      value={row.shopId ? { value: row.shopId, label: row.shopName } : null}
                       options={availableShopOptions}
                       placeholder="Search Shop..."
                       isSearchable
+                      isDisabled={readOnly}
                       className="text-xs"
                       onChange={(selected) => handleShopChange(row.id, selected)}
                       styles={{
@@ -308,14 +302,11 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions }: Props) {
                     <Select
                       menuPortalTarget={document.body}
                       menuPosition="fixed"
-                      value={
-                        row.birdTypeId
-                          ? { value: row.birdTypeId, label: row.birdType }
-                          : null
-                      }
+                      value={row.birdTypeId ? { value: row.birdTypeId, label: row.birdType } : null}
                       options={birdOptions}
                       placeholder="Select Bird..."
                       isSearchable
+                      isDisabled={readOnly}
                       className="text-xs"
                       onChange={(selected) => handleBirdChange(row.id, selected)}
                       styles={{
@@ -354,7 +345,8 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions }: Props) {
                       inputMode="numeric"
                       value={row.birds || ""}
                       placeholder="0"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-center text-xs font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all no-spinner shadow-xs"
+                      disabled={readOnly}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-center text-xs font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all no-spinner shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
                       onChange={(e) => handleBirdInputChange(row.id, e.target.value)}
                       required
                     />
@@ -367,27 +359,45 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions }: Props) {
                       inputMode="decimal"
                       value={row.weight || ""}
                       placeholder="0.00"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-center text-xs font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all no-spinner shadow-xs"
+                      disabled={readOnly}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-center text-xs font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all no-spinner shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
                       onChange={(e) => updateRow(row.id, "weight", Number(e.target.value))}
                       required
                     />
                   </td>
                   <td className="px-4 py-3">
                     <input
+                      type="number"
+                      step="1"
+                      value={row.mortality || ""}
+                      placeholder="0"
+                      disabled={readOnly}
+                      className="w-20 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-center text-xs font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all no-spinner shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                      onChange={(e) => updateRow(row.id, "mortality", Number(e.target.value))}
+                    />
+                  </td>
+                  <td className="px-4 py-3 text-center text-xs font-medium text-slate-600">
+                    {mortWeight > 0 ? mortWeight.toFixed(2) : "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <input
                       value={row.remarks || ""}
                       placeholder="Optional notes..."
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-xs"
+                      disabled={readOnly}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
                       onChange={(e) => updateRow(row.id, "remarks", e.target.value)}
                     />
                   </td>
                   <td className="text-center px-4 py-3">
-                    <button
-                      onClick={() => deleteRow(row.id)}
-                      className="h-8 w-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center mx-auto transition-colors group-hover:scale-105"
-                      title="Delete Row"
-                    >
-                      <Trash2 size={14} className="text-rose-600" />
-                    </button>
+                    {!readOnly && (
+                      <button
+                        onClick={() => deleteRow(row.id)}
+                        className="h-8 w-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center mx-auto transition-colors group-hover:scale-105"
+                        title="Delete Row"
+                      >
+                        <Trash2 size={14} className="text-rose-600" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               );
@@ -396,20 +406,13 @@ function UnLoadingTable({ rows, setRows, shops, birdTypes, actions }: Props) {
         </table>
       </div>
 
-      {/* FOOTER – Three columns */}
+      {/* ── Footer ── */}
       <div className="border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 px-6 py-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Left: Page info */}
           <div className="text-xs font-medium text-slate-500">
             Page <span className="font-bold text-slate-700">{currentPage}</span> of <span className="font-bold text-slate-700">{Math.max(totalPages, 1)}</span>
           </div>
-
-          {/* Center: Action buttons */}
-          <div className="flex flex-wrap items-center gap-4">
-            {actions}
-          </div>
-
-          {/* Right: Pagination controls */}
+          <div className="flex flex-wrap items-center gap-4">{actions}</div>
           <TripPagination
             key={totalPages}
             currentPage={currentPage}
