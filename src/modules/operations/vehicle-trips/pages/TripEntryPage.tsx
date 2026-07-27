@@ -45,7 +45,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const { birdTypes } = useBirdTypes();
   
   const { showNotification } = useSafeNotification();
-  const { trips, allTrips, refreshTrips, deleteTrip } = useTrips(showNotification);
+  const { trips, allTrips, refreshTrips, deleteTrip, changeStatus } = useTrips(showNotification);
 
   const { 
     trip, 
@@ -54,6 +54,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setIsEditing,
     updateTrip, 
     updateDeliveries, 
+    updateBoxDetails,          // ✅ destructure the new function
     submitStartStep, 
     submitFarmStep, 
     submitPickupStep, 
@@ -81,7 +82,14 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   
   const handleEdit = (selectedTrip: Trip) => { 
     setShowEntryPrompt(false);
-    setViewStepIndex(0);
+    let targetStep = 0;
+    if (selectedTrip.status === "Completed") targetStep = 4;
+    else if (selectedTrip.deliveryStepSubmitted) targetStep = 4;
+    else if (selectedTrip.pickupStepSubmitted) targetStep = 3;
+    else if (selectedTrip.farmStepSubmitted) targetStep = 2;
+    else if (selectedTrip.startStepSubmitted) targetStep = 1;
+
+    setViewStepIndex(targetStep);
     loadTrip(selectedTrip); 
     setRows(selectedTrip.deliveries); 
     showNotification(`✏️ Trip ${selectedTrip.tripNo} loaded. Proceed to edit.`, "info"); 
@@ -110,6 +118,10 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     if (!trip.deliveries) return;
     setRows(trip.deliveries);
   }, [trip.deliveries, isEditing, trip.startStepSubmitted]);
+
+  useEffect(() => {
+    refreshTrips();
+  }, [trip]);
 
   const clearForm = () => { 
     clearTrip(); 
@@ -163,9 +175,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     }
     if (viewStepIndex === 2) {
       if (isViewingActiveStep && isFarmCompleted && !isPickupCompleted) {
-        return <StepPickup trip={trip} setTrip={setTrip} updateTrip={updateTrip} submitPickupStep={submitPickupStep} editable={isGlobalEditMode} canEdit={canEditTrip} onCancel={onCancelEdit} clearForm={clearForm} />;
+        return <StepPickup trip={trip} setTrip={setTrip} updateTrip={updateTrip} submitPickupStep={submitPickupStep} updateBoxDetails={updateBoxDetails} editable={isGlobalEditMode} canEdit={canEditTrip} onCancel={onCancelEdit} clearForm={clearForm} />;
       } else if (isPickupCompleted) {
-        return <StepPickup trip={trip} setTrip={setTrip} updateTrip={updateTrip} submitPickupStep={submitPickupStep} editable={isGlobalEditMode} canEdit={canEditTrip} onCancel={onCancelEdit} clearForm={clearForm} />;
+        return <StepPickup trip={trip} setTrip={setTrip} updateTrip={updateTrip} submitPickupStep={submitPickupStep} updateBoxDetails={updateBoxDetails} editable={isGlobalEditMode} canEdit={canEditTrip} onCancel={onCancelEdit} clearForm={clearForm} />;
       }
     }
     if (viewStepIndex === 3) {
@@ -225,7 +237,14 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         )}
       </div>
 
-      <TripRecentTable trips={allTrips} onRefresh={handleRefresh} onView={handleView} onEdit={handleEdit} onDelete={(trip, reason) => deleteTrip(trip.id, reason)} />
+      <TripRecentTable 
+        trips={allTrips} 
+        onRefresh={handleRefresh} 
+        onView={handleView} 
+        onEdit={handleEdit} 
+        onDelete={(trip, reason) => deleteTrip(trip.id, reason)} 
+        onStatusChange={changeStatus} 
+      />
       
       <TripViewModal trip={viewTrip} open={viewOpen} onClose={() => { setViewOpen(false); setViewTrip(null); }} shops={shops} birdTypes={birdTypes} onEdit={(selectedTrip) => { handleEdit(selectedTrip); setViewOpen(false); }} />
     </div>

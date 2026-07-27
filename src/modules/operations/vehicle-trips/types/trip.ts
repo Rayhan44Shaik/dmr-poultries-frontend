@@ -41,6 +41,7 @@ export interface Trip {
   driverName: string;
   supervisorId: number;
   supervisorName: string;
+  advanceAmount: number; 
   helpers: string[];
   openingMeter: number;
   startStepSubmitted: boolean; // 🔹 NEW
@@ -59,7 +60,13 @@ export interface Trip {
   boxes: number;
   avgWeight: number;
   pickupLoadTime: string;
-  pickupStepSubmitted: boolean; // 🔹 NEW
+  pickupStepSubmitted: boolean; 
+  boxNo: number;
+  birds: number;
+  weight: number; 
+  boxDetails: BoxDetail[];// 🔹 NEW
+
+  
 
   // --- STEP 4: SHOP DELIVERIES ---
   deliveries: ShopDelivery[];
@@ -96,4 +103,10 @@ export interface Trip {
   updatedAt?: string;
   deleted?: boolean;
   deletedReason?: string;
+}
+
+export interface BoxDetail {
+  boxNo: number;
+  birds: number;
+  weight: number;
 }

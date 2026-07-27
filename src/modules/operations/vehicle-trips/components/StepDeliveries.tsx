@@ -71,7 +71,6 @@ export default function StepDeliveries({
   }, [rows, trip.dcWeight, trip.totalBirds, trip.avgWeight, trip.destMeter, trip.openingMeter]);
 
   const handleLockDeliveries = () => {
-    // Double-check guard
     if (!canLock) {
       showNotification?.("❌ Validation checks failed. Please fix all mismatches before locking.", "error");
       return;
@@ -146,7 +145,6 @@ export default function StepDeliveries({
             </button>
           )}
 
-          {/* 🔹 LOCK BUTTON: Disabled until canLock is true */}
           {!isReadOnly && (
             <button 
               onClick={handleLockDeliveries} 

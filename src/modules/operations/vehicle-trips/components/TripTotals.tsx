@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Store, Bird, Scale } from "lucide-react";
+import { Store, Bird, Scale, HeartPulse } from "lucide-react";
 import type { ShopDelivery } from "../types/trip";
 
 interface Props {
@@ -7,54 +7,67 @@ interface Props {
 }
 
 function TripTotals({ rows }: Props) {
-  // Safety: ensure rows is an array
   const safeRows = rows ?? [];
 
   const totals = useMemo(() => {
     const totalShops = safeRows.length;
     const totalBirds = safeRows.reduce((sum, row) => sum + Number(row.birds || 0), 0);
     const totalWeight = safeRows.reduce((sum, row) => sum + Number(row.weight || 0), 0);
-    return { totalShops, totalBirds, totalWeight };
+    const totalMortality = safeRows.reduce((sum, row) => sum + Number(row.mortality || 0), 0);
+    return { totalShops, totalBirds, totalWeight, totalMortality };
   }, [safeRows]);
 
   const cards = [
     {
-      title: "Total Shops",
+      label: "Total Shops",
       value: totals.totalShops,
-      icon: <Store size={20} />,
+      icon: <Store size={18} />,
       bg: "bg-blue-50",
-      text: "text-blue-700",
+      textColor: "text-blue-700",
+      border: "border-blue-200"
     },
     {
-      title: "Total Birds",
-      value: totals.totalBirds,
-      icon: <Bird size={20} />,
+      label: "Total Birds",
+      value: totals.totalBirds.toLocaleString(),
+      icon: <Bird size={18} />,
       bg: "bg-green-50",
-      text: "text-green-700",
+      textColor: "text-green-700",
+      border: "border-green-200"
     },
     {
-      title: "Total Weight (Kg)",
-      value: totals.totalWeight.toFixed(2),
-      icon: <Scale size={20} />,
+      label: "Total Weight",
+      value: `${totals.totalWeight.toFixed(2)} Kg`,
+      icon: <Scale size={18} />,
       bg: "bg-orange-50",
-      text: "text-orange-700",
+      textColor: "text-orange-700",
+      border: "border-orange-200"
+    },
+    {
+      label: "Total Mortality",
+      value: totals.totalMortality,
+      icon: <HeartPulse size={18} />,
+      bg: "bg-red-50",
+      textColor: "text-red-600",
+      border: "border-red-200"
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6">
+    <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
       {cards.map((card) => (
         <div
-          key={card.title}
-          className={`${card.bg} rounded-xl border border-slate-200 px-4 py-3 flex items-center justify-between hover:shadow-sm transition-all`}
+          key={card.label}
+          className={`${card.bg} border ${card.border} rounded-xl px-4 py-4 flex flex-col justify-between hover:shadow-sm transition-all`}
         >
-          <div>
-            <p className="text-xs font-medium text-slate-500">{card.title}</p>
-            <p className={`text-xl font-bold mt-1 ${card.text}`}>{card.value}</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+              {card.label}
+            </p>
+            <div className={`p-1.5 rounded-full bg-white/70 shadow-sm text-slate-500 ${card.textColor}`}>
+              {card.icon}
+            </div>
           </div>
-          <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${card.bg} ${card.text}`}>
-            {card.icon}
-          </div>
+          <p className={`text-xl font-bold ${card.textColor}`}>{card.value}</p>
         </div>
       ))}
     </div>

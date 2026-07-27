@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Trip, ShopDelivery, TripStatus } from "../types/trip";
+import type { Trip, ShopDelivery, BoxDetail, TripStatus } from "../types/trip";
 import { tripService } from "../services/tripService";
 import {
   generateTripNo,
@@ -12,7 +12,7 @@ import {
 } from "../services/tripFormService";
 
 export function useTripEntry(showNotification?: (msg: string, type?: "success" | "error" | "info") => void) {
-  
+
   const emptyTrip = (): Trip => ({
     id: 0,
     tripNo: "",
@@ -26,6 +26,7 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     supervisorName: "",
     helpers: [],
     openingMeter: 0,
+    advanceAmount: 0,
     startStepSubmitted: false,
     sourceFarmId: 0,
     sourceFarm: "",
@@ -36,6 +37,7 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     dcWeight: 0,
     totalBirds: 0,
     boxes: 0,
+    boxDetails: [],
     avgWeight: 0,
     pickupLoadTime: "",
     pickupStepSubmitted: false,
@@ -61,17 +63,21 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     remarks: "",
     rateCompleted: false,
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    // ✅ Legacy fields – now included
+    boxNo: 0,
+    birds: 0,
+    weight: 0
   });
 
   const [trip, setTrip] = useState<Trip>(emptyTrip());
   const [isEditing, setIsEditing] = useState(false);
 
   const calculateDeliveryKPIs = (
-    deliveries: ShopDelivery[], 
-    birds: number, 
-    dcWeight: number, 
-    avgWeight: number, 
+    deliveries: ShopDelivery[],
+    birds: number,
+    dcWeight: number,
+    avgWeight: number,
     mortalityCount: number
   ) => {
     const totalDelBirds = deliveries.reduce((s, r) => s + r.birds, 0);
@@ -115,11 +121,10 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     return true;
   };
 
-  // 🔹 FIXED: Added success notification for Step 2
   const submitFarmStep = (data: Partial<Trip>): boolean => {
     const reachedTime = trip.farmStepSubmitted ? trip.reachedTime : new Date().toLocaleString();
     const updatedData = { ...trip, ...data, reachedTime };
-    
+
     const validation = validateFarmStep(updatedData as Trip);
     if (!validation.valid) {
       showNotification?.(validation.errors[0], "error");
@@ -127,30 +132,59 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     }
     const savedTrip = tripService.update({ ...updatedData, farmStepSubmitted: true });
     setTrip(savedTrip);
-    
-    // 🟢 NOTIFICATION ADDED HERE
     showNotification?.(isEditing ? `✅ Step 2 updated successfully.` : `✅ Step 2 completed successfully. Moving to Step 3...`, "success");
     return true;
   };
 
-  // 🔹 FIXED: Added success notification for Step 3
-  const submitPickupStep = (data: Partial<Trip>): boolean => {
+  const updateBoxDetails = (rows: BoxDetail[], persistToStorage: boolean = false) => {
+    const totalBirds = rows.reduce((sum, r) => sum + (r.birds || 0), 0);
+    const dcWeight = Number(rows.reduce((sum, r) => sum + (r.weight || 0), 0).toFixed(2));
+    const boxes = rows.length;
+    const avgWeight = calculateAvgWeight(dcWeight, totalBirds);
+
+    const updatedTrip: Trip = {
+      ...trip,
+      boxDetails: rows,
+      totalBirds,
+      dcWeight,
+      boxes,
+      avgWeight
+    };
+
+    if (persistToStorage) {
+      const savedTrip = tripService.update(updatedTrip);
+      setTrip(savedTrip);
+      showNotification?.(`💾 Pickup progress saved.`, "info");
+    } else {
+      setTrip(updatedTrip);
+    }
+  };
+
+  const submitPickupStep = (data: Partial<Trip> = {}): boolean => {
     const updatedData = { ...trip, ...data };
+
+    if (!updatedData.boxDetails || updatedData.boxDetails.length === 0) {
+      showNotification?.(`❌ Please add at least one box before submitting Pickup.`, "error");
+      return false;
+    }
+
     const validation = validatePickupStep(updatedData as Trip);
     if (!validation.valid) {
       showNotification?.(validation.errors[0], "error");
       return false;
     }
+
     const avg = calculateAvgWeight(updatedData.dcWeight || 0, updatedData.totalBirds || 0);
-    const savedTrip = tripService.update({ 
-      ...updatedData, 
-      avgWeight: avg, 
-      pickupLoadTime: new Date().toLocaleString(),
-      pickupStepSubmitted: true 
+    const pickupLoadTime = trip.pickupStepSubmitted ? trip.pickupLoadTime : new Date().toLocaleString();
+
+    const savedTrip = tripService.update({
+      ...updatedData,
+      avgWeight: avg,
+      pickupLoadTime,
+      pickupStepSubmitted: true
     });
     setTrip(savedTrip);
-    
-    // 🟢 NOTIFICATION ADDED HERE
+
     showNotification?.(isEditing ? `✅ Step 3 updated successfully.` : `✅ Step 3 completed successfully. Moving to Step 4...`, "success");
     return true;
   };
@@ -171,10 +205,10 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
   const updateDeliveries = (rows: ShopDelivery[], persistToStorage: boolean = true) => {
     const totalMortalityCount = rows.reduce((sum, r) => sum + (r.mortality || 0), 0);
     const kpis = calculateDeliveryKPIs(
-      rows, 
-      trip.totalBirds, 
-      trip.dcWeight, 
-      trip.avgWeight, 
+      rows,
+      trip.totalBirds,
+      trip.dcWeight,
+      trip.avgWeight,
       totalMortalityCount
     );
 
@@ -220,9 +254,9 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     }
 
     const totalKm = trip.closingMeter - trip.openingMeter;
-    const updatedTrip = { 
-      ...trip, 
-      totalKm, 
+    const updatedTrip = {
+      ...trip,
+      totalKm,
       endTime: new Date().toLocaleString(),
       status: "Completed" as TripStatus
     };
@@ -237,7 +271,8 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     setTrip({
       ...tripToLoad,
       helpers: tripToLoad.helpers || [],
-      deliveries: tripToLoad.deliveries || []
+      deliveries: tripToLoad.deliveries || [],
+      boxDetails: tripToLoad.boxDetails || []
     });
     setIsEditing(true);
   };
@@ -247,19 +282,20 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     setIsEditing(false);
   };
 
-  return { 
-    trip, 
-    setTrip, 
+  return {
+    trip,
+    setTrip,
     isEditing,
     setIsEditing,
-    updateTrip, 
-    updateDeliveries, 
-    submitStartStep, 
-    submitFarmStep, 
-    submitPickupStep, 
+    updateTrip,
+    updateDeliveries,
+    updateBoxDetails,        // ✅ now exposed
+    submitStartStep,
+    submitFarmStep,
+    submitPickupStep,
     submitDeliveriesStep,
     submitEndTrip,
     loadTrip,
-    clearTrip 
+    clearTrip
   };
 }

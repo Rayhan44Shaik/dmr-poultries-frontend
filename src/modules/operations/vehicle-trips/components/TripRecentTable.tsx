@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Eye, Pencil, RefreshCw, History, Trash2, Clock, Layers, AlertCircle, Search, FileText } from "lucide-react";
+import { Eye, Pencil, RefreshCw, History, Trash2, Clock, Layers, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
 import type { Trip } from "../types/trip";
-// 🔹 Import the 10-day rule directly from your dateUtils file
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
 
 interface Props {
@@ -10,6 +9,7 @@ interface Props {
   onView: (trip: Trip) => void;
   onEdit: (trip: Trip) => void;
   onDelete?: (trip: Trip, reason: string) => void;
+  onStatusChange?: (trip: Trip, status: "Pending" | "Completed") => void;
 }
 
 function TripRecentTable({
@@ -18,6 +18,7 @@ function TripRecentTable({
   onView,
   onEdit,
   onDelete,
+  onStatusChange,
 }: Props) {
   const safeTrips = Array.isArray(trips) ? trips : [];
 
@@ -65,15 +66,17 @@ function TripRecentTable({
   }, [safeTrips, searchTerm]);
 
   const allDraft = sortedTrips.filter((t) => !t.deleted && !t.deliveryStepSubmitted);
-  const allPending = sortedTrips.filter((t) => !t.deleted && t.deliveryStepSubmitted);
+  const allPending = sortedTrips.filter((t) => !t.deleted && t.deliveryStepSubmitted && t.status !== "Completed");
+  const allApproved = sortedTrips.filter((t) => !t.deleted && t.status === "Completed");
   const allDeleted = sortedTrips.filter((t) => t.deleted === true);
 
   const draftCount = allDraft.length;
   const pendingCount = allPending.length;
+  const approvedCount = allApproved.length;
   const deletedCount = allDeleted.length;
 
   let filteredTrips: Trip[] = [];
-  if (statusFilter === "All") filteredTrips = [...allDraft, ...allPending, ...allDeleted];
+  if (statusFilter === "All") filteredTrips = [...allDraft, ...allPending, ...allApproved, ...allDeleted];
   else if (statusFilter === "Draft") filteredTrips = allDraft;
   else if (statusFilter === "Pending") filteredTrips = allPending;
   else filteredTrips = allDeleted;
@@ -127,6 +130,26 @@ function TripRecentTable({
     setDeleteReason("");
   };
 
+  // 🔹 Helper to generate the dynamic step badges
+  const getStepBadge = (trip: Trip) => {
+    if (trip.status === "Completed") {
+      return { label: "Completed", color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={12} /> };
+    }
+    if (!trip.startStepSubmitted) {
+      return { label: "Step 1", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <FileText size={12} /> };
+    }
+    if (trip.startStepSubmitted && !trip.farmStepSubmitted) {
+      return { label: "Step 2", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <FileText size={12} /> };
+    }
+    if (trip.farmStepSubmitted && !trip.pickupStepSubmitted) {
+      return { label: "Step 3", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <FileText size={12} /> };
+    }
+    if (trip.pickupStepSubmitted && !trip.deliveryStepSubmitted) {
+      return { label: "Step 4", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <FileText size={12} /> };
+    }
+    return { label: "Pending", color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} /> };
+  };
+
   return (
     <>
       <div ref={tableRef} className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden mt-8 transition-all duration-300">
@@ -152,7 +175,7 @@ function TripRecentTable({
                 if (tab === "Draft") { count = draftCount; Icon = FileText; }
                 if (tab === "Pending") { count = pendingCount; Icon = Clock; }
                 if (tab === "Deleted") { count = deletedCount; Icon = AlertCircle; }
-                if (tab === "All") { count = draftCount + pendingCount + deletedCount; Icon = Layers; }
+                if (tab === "All") { count = draftCount + pendingCount + approvedCount + deletedCount; Icon = Layers; }
                 return (
                   <button key={tab} onClick={() => setStatusFilter(tab)} className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-1 ${isActive ? "bg-white text-blue-700 shadow-sm border border-slate-200/50" : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"}`}>
                     <Icon size={11} className={isActive ? (tab === "Deleted" ? "text-rose-500" : "text-blue-500") : "text-slate-400"} />
@@ -206,9 +229,9 @@ function TripRecentTable({
               ) : (
                 paginatedTrips.map((trip) => {
                   const isSelected = trip.id === selectedTripId;
-                  const isDraft = !trip.deleted && !trip.deliveryStepSubmitted;
-                  const isPending = !trip.deleted && trip.deliveryStepSubmitted;
                   const isDeleted = trip.deleted === true;
+                  const isApproved = trip.status === "Completed";
+                  const showDropdown = !isDeleted && onStatusChange && trip.deliveryStepSubmitted && !isApproved;
 
                   return (
                     <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
@@ -225,10 +248,43 @@ function TripRecentTable({
                       <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                         {isDeleted ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-rose-100 text-rose-700 border border-rose-200/80"><AlertCircle size={12} /> Deleted</span>
-                        ) : isPending ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-emerald-50 text-emerald-700 border border-emerald-200/60"><Clock size={12} /> Pending</span>
+                        ) : showDropdown ? (
+                          <div className="relative inline-block w-32">
+                            <select
+                              value={trip.status}
+                              onChange={(e) => onStatusChange(trip, e.target.value as "Pending" | "Completed")}
+                              className={`w-full appearance-none rounded-xl px-3 py-1.5 text-xs font-bold border transition-all shadow-sm cursor-pointer pr-8 focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+                                trip.status === "Completed"
+                                  ? "text-emerald-700 border-emerald-300 bg-emerald-50/80 focus:ring-emerald-500"
+                                  : "text-amber-700 border-amber-300 bg-amber-50/80 focus:ring-amber-500"
+                              }`}
+                            >
+                              <option value="Pending" className="text-amber-700 font-semibold bg-white">⏳ Pending</option>
+                              <option value="Completed" className="text-emerald-700 font-semibold bg-white">✅ Approved</option>
+                            </select>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500">
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
+                          </div>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-amber-50 text-amber-700 border border-amber-200/60"><FileText size={12} /> Draft</span>
+                          // 🟢 FIXED: Wrapped badge in a clickable button
+                          (() => {
+                            const badge = getStepBadge(trip);
+                            return (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation(); // Prevent row selection
+                                  if (onEdit) onEdit(trip);
+                                }}
+                                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm border cursor-pointer hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-200 ${badge.color}`}
+                              >
+                                {badge.icon}
+                                {badge.label}
+                              </button>
+                            );
+                          })()
                         )}
                       </td>
                       <td className="text-center px-4 py-3">
