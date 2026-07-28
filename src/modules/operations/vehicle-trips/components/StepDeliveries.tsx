@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { CheckCircle, Pencil, X, Lock } from "lucide-react";
 import UnLoadingTable from "./UnLoadingTable";
 import TripTotals from "./TripTotals";
-import type { ShopDelivery, Trip } from "../types/trip";
+import type { ShopDelivery, Trip, BoxDetail } from "../types/trip";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
 interface Props {
@@ -18,6 +18,7 @@ interface Props {
   editable?: boolean;
   canEdit?: boolean;
   onCancel?: () => void;
+  boxDetails?: BoxDetail[];  // ← NEW
 }
 
 export default function StepDeliveries({
@@ -33,6 +34,7 @@ export default function StepDeliveries({
   editable = false,
   canEdit = false,
   onCancel,
+  boxDetails = [],            // ← default empty
 }: Props) {
   const { showNotification } = useSafeNotification(); 
   const [isLocalEditing, setIsLocalEditing] = useState(false);
@@ -49,7 +51,7 @@ export default function StepDeliveries({
     showNotification?.(`✅ Shop "${updatedRow.shopName}" saved successfully.`, "success");
   };
 
-  // 🔹 LIVE VALIDATION ENGINE (Disables the Lock button until ALL matches)
+  // ─── Live validation for the Lock button ────────────────────────────
   const canLock = useMemo(() => {
     if (rows.length === 0) return false;
     if (trip.dcWeight <= 0) return false;
@@ -61,10 +63,7 @@ export default function StepDeliveries({
     const mortalityWeight = totalMortalityCount * (trip.avgWeight || 0);
     const totalOutWeight = totalDelWeight + mortalityWeight;
 
-    // Validation 1: Pickup Birds must equal Delivered Birds + Mortality Birds
     if (trip.totalBirds !== (totalDelBirds + totalMortalityCount)) return false;
-
-    // Validation 2: DC Weight must be greater than or equal to (Delivered Weight + Mortality Weight)
     if (totalOutWeight > trip.dcWeight) return false;
 
     return true;
@@ -79,7 +78,7 @@ export default function StepDeliveries({
     submitDeliveriesStep();
   };
 
-  // LOCKED VIEW
+  // ─── LOCKED VIEW ──────────────────────────────────────────────────
   if (trip.deliveryStepSubmitted && !editable && !isLocalEditing) {
     return (
       <div className="bg-blue-50/30 border-2 border-blue-100 rounded-2xl p-6 space-y-4">
@@ -106,7 +105,7 @@ export default function StepDeliveries({
     );
   }
 
-  // EDIT STATE
+  // ─── EDIT STATE ──────────────────────────────────────────────────
   return (
     <div className="space-y-4">
       <div className="bg-white border border-slate-200/80 shadow-sm rounded-2xl p-6 space-y-6">
@@ -123,6 +122,7 @@ export default function StepDeliveries({
           setRows={setRows} 
           shops={shops} 
           birdTypes={birdTypes} 
+          boxDetails={boxDetails}      // ← PASS TO TABLE
           readOnly={isReadOnly} 
           onSaveRow={handleSaveRow} 
         />

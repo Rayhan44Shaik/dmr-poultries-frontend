@@ -64,7 +64,7 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     rateCompleted: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    // ✅ Legacy fields – now included
+    // Legacy fields
     boxNo: 0,
     birds: 0,
     weight: 0
@@ -136,7 +136,10 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     return true;
   };
 
-  const updateBoxDetails = (rows: BoxDetail[], persistToStorage: boolean = false) => {
+  /**
+   * ✅ UPDATED: Now accepts a `silent` parameter to suppress the "Pickup progress saved." notification.
+   */
+  const updateBoxDetails = (rows: BoxDetail[], persistToStorage: boolean = false, silent: boolean = false) => {
     const totalBirds = rows.reduce((sum, r) => sum + (r.birds || 0), 0);
     const dcWeight = Number(rows.reduce((sum, r) => sum + (r.weight || 0), 0).toFixed(2));
     const boxes = rows.length;
@@ -154,7 +157,9 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     if (persistToStorage) {
       const savedTrip = tripService.update(updatedTrip);
       setTrip(savedTrip);
-      showNotification?.(`💾 Pickup progress saved.`, "info");
+      if (!silent) {
+        showNotification?.(`💾 Pickup progress saved.`, "info");
+      }
     } else {
       setTrip(updatedTrip);
     }
@@ -289,7 +294,7 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     setIsEditing,
     updateTrip,
     updateDeliveries,
-    updateBoxDetails,        // ✅ now exposed
+    updateBoxDetails,        // ✅ now accepts `silent` parameter
     submitStartStep,
     submitFarmStep,
     submitPickupStep,

@@ -12,8 +12,8 @@ interface Props {
   vehicleOptions: { id: number; vehicleNumber: string }[];
   employeeOptions: { id: number; employeeName: string; department: string }[];
   editable?: boolean;
-  canEdit?: boolean; // 10-day rule
-  onCancel?: () => void; // Global Edit Close
+  canEdit?: boolean;
+  onCancel?: () => void;
   clearForm?: () => void;
 }
 
@@ -68,7 +68,11 @@ export default function StepStart({
   }, [trip.vehicleId, trip.openingMeter, trip.id]);
 
   useEffect(() => {
-    if (trip.advanceAmount !== undefined && trip.advanceAmount < 0) {
+    // Advance must be a valid number >= 0
+    const amount = trip.advanceAmount;
+    if (amount === undefined || amount === null || isNaN(amount)) {
+      setAdvanceError("Advance amount is required");
+    } else if (amount < 0) {
       setAdvanceError("Advance amount cannot be negative");
     } else {
       setAdvanceError(null);
@@ -162,7 +166,7 @@ export default function StepStart({
             <p className="font-semibold text-slate-800">{trip.openingMeter} KM</p>
           </div>
           <div className="bg-white p-4 rounded-xl shadow-sm col-span-1">
-            <p className="text-xs text-slate-500">Advance Given</p>
+            <p className="text-xs text-slate-500">Advance / Expenses</p>
             <p className="font-semibold text-slate-800">
               ₹{(trip.advanceAmount ?? 0).toLocaleString()}
             </p>
@@ -306,7 +310,7 @@ export default function StepStart({
 
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-              <Wallet size={14} className="text-slate-400" /> Advance / Expenses Given
+              <Wallet size={14} className="text-slate-400" /> Advance / Expenses <span className="text-red-500">*</span>
             </label>
             <div className="relative mt-1.5">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-400">₹</span>

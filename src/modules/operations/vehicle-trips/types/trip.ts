@@ -103,6 +103,7 @@ export interface Trip {
   updatedAt?: string;
   deleted?: boolean;
   deletedReason?: string;
+  dcPhotoKey?: string;
 }
 
 export interface BoxDetail {

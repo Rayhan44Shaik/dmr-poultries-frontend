@@ -1,17 +1,25 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Lock, Scale, Bird, Box, Gauge, Clock, Pencil, X, CheckCircle,
-  Plus, Trash2, Save, FileText, Loader2, AlertTriangle, Check
+  Plus, Trash2, Save, FileText, Loader2, AlertTriangle, Check, Camera, Download
 } from "lucide-react";
 import type { Trip, BoxDetail } from "../types/trip";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import localforage from "localforage";
+
+// Configure localforage
+localforage.config({
+  name: "DMRPoultry",
+  storeName: "dc_photos",
+  description: "DC Photo storage",
+});
 
 interface Props {
   trip: Trip;
   setTrip: React.Dispatch<React.SetStateAction<Trip>>;
   updateTrip: (updates: Partial<Trip>) => void;
-  updateBoxDetails: (rows: BoxDetail[], persistToStorage?: boolean) => void;
+  updateBoxDetails: (rows: BoxDetail[], persistToStorage?: boolean, silent?: boolean) => void;
   submitPickupStep: (data: Partial<Trip>) => boolean;
   editable?: boolean;
   canEdit?: boolean;
@@ -134,6 +142,12 @@ export default function StepPickup({
     return details.length > 0 ? details.map((d) => ({ ...d, uid: generateUid() })) : [makeRow(1)];
   });
 
+  // ─── Image upload state ────────────────────────────────────────────
+  const [imageKey, setImageKey] = useState<string | null>(trip.dcPhotoKey || null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isImageLoading, setIsImageLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // ─── Toast state ────────────────────────────────────────────────────
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -165,6 +179,44 @@ export default function StepPickup({
     return JSON.stringify(currentBoxes) !== JSON.stringify(savedBoxes);
   }, [rows, trip.boxDetails]);
 
+  // ─── Load image from IndexedDB when key changes ────────────────────
+  useEffect(() => {
+    const loadImage = async () => {
+      if (!imageKey) {
+        setImagePreview(null);
+        return;
+      }
+      try {
+        setIsImageLoading(true);
+        const blob = await localforage.getItem<Blob>(imageKey);
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          setImagePreview(url);
+        } else {
+          setImagePreview(null);
+        }
+      } catch (error) {
+        console.error("Failed to load image:", error);
+        setImagePreview(null);
+      } finally {
+        setIsImageLoading(false);
+      }
+    };
+    loadImage();
+    return () => {
+      if (imagePreview && imagePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imageKey]);
+
+  // ─── Sync imageKey with trip.dcPhotoKey ────────────────────────────
+  useEffect(() => {
+    if (trip.dcPhotoKey !== imageKey) {
+      setImageKey(trip.dcPhotoKey || null);
+    }
+  }, [trip.dcPhotoKey]);
+
   useEffect(() => {
     const details = trip.boxDetails || [];
     if (details.length > 0) {
@@ -182,7 +234,7 @@ export default function StepPickup({
     return { totalBirds, dcWeight, boxes, avgWeight };
   }, [rows]);
 
-  // ─── Auto‑save ──────────────────────────────────────────────────────
+  // ─── Auto‑save (silent) ────────────────────────────────────────────
   const triggerAutoSave = useCallback(() => {
     if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current);
     if (isSavingRef.current || trip.pickupStepSubmitted) {
@@ -193,7 +245,7 @@ export default function StepPickup({
     autoSaveTimeout.current = setTimeout(() => {
       if (!isSavingRef.current && !trip.pickupStepSubmitted) {
         const boxDetails = rows.map(({ uid, ...rest }) => rest);
-        updateBoxDetails(boxDetails, true);
+        updateBoxDetails(boxDetails, true, true);
       }
       setIsAutoSaving(false);
       autoSaveTimeout.current = null;
@@ -244,7 +296,74 @@ export default function StepPickup({
     return lastRow.birds > 0 && lastRow.weight > 0;
   }, [rows]);
 
-  // ─── Manual Save (Save Progress) ────────────────────────────────────
+  // ─── Image upload handlers ──────────────────────────────────────────
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setToast({ message: "Please select a valid image file.", type: "error" });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setToast({ message: "Image size must be less than 5MB.", type: "error" });
+      return;
+    }
+
+    try {
+      const key = `dc_photo_${trip.id || Date.now()}_${Date.now()}`;
+      await localforage.setItem(key, file);
+      setImageKey(key);
+      updateTrip({ dcPhotoKey: key });
+      setToast({ message: "Image uploaded successfully!", type: "success" });
+    } catch (error) {
+      console.error("Failed to upload image:", error);
+      setToast({ message: "Failed to upload image. Please try again.", type: "error" });
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const removeImage = async () => {
+    if (imageKey) {
+      try {
+        await localforage.removeItem(imageKey);
+        setImageKey(null);
+        updateTrip({ dcPhotoKey: undefined });
+        setImagePreview(null);
+        setToast({ message: "Image removed.", type: "success" });
+      } catch (error) {
+        console.error("Failed to remove image:", error);
+        setToast({ message: "Failed to remove image.", type: "error" });
+      }
+    }
+  };
+
+  // ─── Download Image ──────────────────────────────────────────────────
+  const downloadImage = async () => {
+    if (!imageKey) return;
+    try {
+      const blob = await localforage.getItem<Blob>(imageKey);
+      if (!blob) {
+        setToast({ message: "Image not found.", type: "error" });
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `DC_Photo_${trip.tripNo || "trip"}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to download image:", error);
+      setToast({ message: "Failed to download image.", type: "error" });
+    }
+  };
+
+  // ─── Manual Save ────────────────────────────────────────────────
   const handleSaveProgress = () => {
     if (isSavingRef.current) return;
     isSavingRef.current = true;
@@ -255,7 +374,7 @@ export default function StepPickup({
       setIsAutoSaving(false);
     }
     const boxDetails = rows.map(({ uid, ...rest }) => rest);
-    updateBoxDetails(boxDetails, true);
+    updateBoxDetails(boxDetails, true, true);
     setIsSaving(false);
     setTimeout(() => {
       isSavingRef.current = false;
@@ -299,6 +418,11 @@ export default function StepPickup({
     if (isSubmitting) return;
     if (trip.pickupStepSubmitted && !editable && !isLocalEditing) return;
 
+    if (!imageKey) {
+      setToast({ message: "Please upload a DC photo before submitting.", type: "error" });
+      return;
+    }
+
     const isEditMode = editable || isLocalEditing;
     const title = isEditMode ? "Update Pickup KPI" : "Submit Pickup KPI";
     const message = isEditMode
@@ -339,7 +463,7 @@ export default function StepPickup({
     });
   };
 
-  const canSubmit = rows.length > 0 && totals.totalBirds > 0 && totals.dcWeight > 0;
+  const canSubmit = rows.length > 0 && totals.totalBirds > 0 && totals.dcWeight > 0 && imageKey !== null;
 
   // ─── PDF Generation ─────────────────────────────────────────────────
   const generatePDF = () => {
@@ -463,7 +587,7 @@ export default function StepPickup({
     }, []) || [];
 
     return (
-      <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50/50 border-2 border-slate-700 rounded-2xl p-4 shadow-lg shadow-slate-500/30 space-y-4">
+      <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50/50 rounded-2xl p-4 shadow-lg shadow-slate-500/30 space-y-4">
         <div className="flex items-center justify-between border-b border-blue-200 pb-2">
           <div className="flex items-center gap-3">
             <span className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold shadow-md">3</span>
@@ -481,29 +605,39 @@ export default function StepPickup({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-white p-3 rounded-xl shadow-sm border border-blue-100">
+        {/* ─── Single row: 5 columns ──────────────────────────────────── */}
+        <div className="grid grid-cols-5 gap-3">
+          <div className="bg-white p-2 rounded-xl shadow-sm border border-blue-100 text-center">
             <p className="text-[10px] text-slate-500 font-medium">Time</p>
-            <p className="font-bold text-slate-800 text-sm">{trip.pickupLoadTime || "--"}</p>
+            <p className="font-bold text-slate-800 text-sm truncate">{trip.pickupLoadTime || "--"}</p>
           </div>
-          <div className="bg-white p-3 rounded-xl shadow-sm border border-blue-100">
+          <div className="bg-white p-2 rounded-xl shadow-sm border border-blue-100 text-center">
             <p className="text-[10px] text-slate-500 font-medium">DC Wt</p>
             <p className="font-bold text-slate-800 text-sm">{trip.dcWeight.toFixed(2)} Kg</p>
           </div>
-          <div className="bg-white p-3 rounded-xl shadow-sm border border-blue-100">
+          <div className="bg-white p-2 rounded-xl shadow-sm border border-blue-100 text-center">
             <p className="text-[10px] text-slate-500 font-medium">Birds</p>
             <p className="font-bold text-slate-800 text-sm">{trip.totalBirds}</p>
           </div>
-          <div className="bg-white p-3 rounded-xl shadow-sm border border-blue-100">
+          <div className="bg-white p-2 rounded-xl shadow-sm border border-blue-100 text-center">
             <p className="text-[10px] text-slate-500 font-medium">Boxes</p>
             <p className="font-bold text-slate-800 text-sm">{trip.boxes}</p>
           </div>
-          <div className="bg-white p-3 rounded-xl shadow-sm border border-blue-100 col-span-2 md:col-span-4">
+          <div className="bg-white p-2 rounded-xl shadow-sm border border-blue-100 text-center">
             <p className="text-[10px] text-slate-500 font-medium">Avg Wt</p>
             <p className="font-bold text-slate-800 text-sm">{trip.avgWeight || 0} Kg</p>
           </div>
         </div>
 
+        {/* ─── DC Photo label (just name, no image preview) ──────────── */}
+        {imageKey && (
+          <div className="bg-white p-2 rounded-xl shadow-sm border border-blue-100 flex items-center gap-2">
+            <Camera size={16} className="text-slate-400" />
+            <span className="text-xs font-medium text-slate-700">DC Photo uploaded</span>
+          </div>
+        )}
+
+        {/* Box table */}
         {trip.boxDetails && trip.boxDetails.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto max-h-96 overflow-y-auto">
             <table className="w-full table-fixed border-collapse text-xs">
@@ -562,15 +696,27 @@ export default function StepPickup({
             </table>
           </div>
         )}
-        <div className="flex items-center justify-between">
+
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <p className="text-sm text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 font-medium">✅ Submitted</p>
-          <button
-            onClick={generatePDF}
-            className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white text-sm font-bold rounded-lg shadow-md transition-all active:scale-95"
-          >
-            <FileText size={16} />
-            Download PDF
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {imageKey && (
+              <button
+                onClick={downloadImage}
+                className="flex items-center justify-center p-2 bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white rounded-lg shadow-md transition-all active:scale-95"
+                title="Download Image"
+              >
+                <Download size={18} />
+              </button>
+            )}
+            <button
+              onClick={generatePDF}
+              className="flex items-center justify-center p-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-lg shadow-md transition-all active:scale-95"
+              title="Download PDF"
+            >
+              <FileText size={18} />
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -684,6 +830,52 @@ export default function StepPickup({
         <div className="flex items-center gap-2 text-xs text-slate-600">
           <Clock size={14} className="text-slate-400" />
           <span className="font-medium">{trip.pickupLoadTime || "Auto time on submit"}</span>
+        </div>
+
+        {/* ─── Image Upload Section ─────────────────────────────────────── */}
+        <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
+          <div className="flex items-start gap-4">
+            <div className="flex-1">
+              <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                <Camera size={14} className="text-slate-400" />
+                DC Photo <span className="text-red-500">*</span>
+              </label>
+              <div className="mt-1 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-3 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition-all"
+                >
+                  Choose Image
+                </button>
+                {imageKey && (
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="px-3 py-1.5 text-xs font-semibold bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-all"
+                  >
+                    Remove
+                  </button>
+                )}
+                <span className="text-xs text-slate-400">
+                  {imageKey ? "✅ Uploaded" : "No image selected"}
+                </span>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">Max 5MB, JPG/PNG</p>
+            </div>
+            {imagePreview && (
+              <div className="flex-shrink-0">
+                <img src={imagePreview} alt="DC Preview" className="h-20 w-20 object-cover rounded-lg border border-slate-200" />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Entry Table Container */}

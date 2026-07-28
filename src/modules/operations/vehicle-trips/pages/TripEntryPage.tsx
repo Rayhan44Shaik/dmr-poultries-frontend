@@ -54,7 +54,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setIsEditing,
     updateTrip, 
     updateDeliveries, 
-    updateBoxDetails,          // ✅ destructure the new function
+    updateBoxDetails,
     submitStartStep, 
     submitFarmStep, 
     submitPickupStep, 
@@ -155,44 +155,103 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     isManualSelect.current = false;
   }, [trip.id]);
 
+  // ─── Render step with correct editable logic ─────────────────────────
   const renderSelectedStep = () => {
     const isViewingActiveStep = !isTripEnded && viewStepIndex === currentStep;
     const onCancelEdit = () => setIsEditing(false);
 
+    // Helper: only allow editing if this is the active step AND not yet completed
+    const isEditable = (stepCompleted: boolean) => {
+      return isViewingActiveStep && !stepCompleted && isGlobalEditMode;
+    };
+
     if (viewStepIndex === 0) {
-      if (isViewingActiveStep && !isStartCompleted) {
-        return <StepStart trip={trip} setTrip={setTrip} updateTrip={updateTrip} submitStartStep={submitStartStep} vehicleOptions={vehicleOpts} employeeOptions={employeeOpts} editable={isGlobalEditMode} canEdit={canEditTrip} onCancel={onCancelEdit} clearForm={clearForm} />;
-      } else if (isStartCompleted) {
-        return <StepStart trip={trip} setTrip={setTrip} updateTrip={updateTrip} submitStartStep={submitStartStep} vehicleOptions={vehicleOpts} employeeOptions={employeeOpts} editable={isGlobalEditMode} canEdit={canEditTrip} onCancel={onCancelEdit} clearForm={clearForm} />;
-      }
+      return (
+        <StepStart
+          trip={trip}
+          setTrip={setTrip}
+          updateTrip={updateTrip}
+          submitStartStep={submitStartStep}
+          vehicleOptions={vehicleOpts}
+          employeeOptions={employeeOpts}
+          editable={isEditable(isStartCompleted)}
+          canEdit={canEditTrip}
+          onCancel={onCancelEdit}
+          clearForm={clearForm}
+        />
+      );
     }
+
     if (viewStepIndex === 1) {
-      if (isViewingActiveStep && isStartCompleted && !isFarmCompleted) {
-        return <StepFarm trip={trip} setTrip={setTrip} updateTrip={updateTrip} submitFarmStep={submitFarmStep} farms={farms} editable={isGlobalEditMode} canEdit={canEditTrip} onCancel={onCancelEdit} />;
-      } else if (isFarmCompleted) {
-        return <StepFarm trip={trip} setTrip={setTrip} updateTrip={updateTrip} submitFarmStep={submitFarmStep} farms={farms} editable={isGlobalEditMode} canEdit={canEditTrip} onCancel={onCancelEdit} />;
-      }
+      return (
+        <StepFarm
+          trip={trip}
+          setTrip={setTrip}
+          updateTrip={updateTrip}
+          submitFarmStep={submitFarmStep}
+          farms={farms}
+          editable={isEditable(isFarmCompleted)}
+          canEdit={canEditTrip}
+          onCancel={onCancelEdit}
+        />
+      );
     }
+
     if (viewStepIndex === 2) {
-      if (isViewingActiveStep && isFarmCompleted && !isPickupCompleted) {
-        return <StepPickup trip={trip} setTrip={setTrip} updateTrip={updateTrip} submitPickupStep={submitPickupStep} updateBoxDetails={updateBoxDetails} editable={isGlobalEditMode} canEdit={canEditTrip} onCancel={onCancelEdit} clearForm={clearForm} />;
-      } else if (isPickupCompleted) {
-        return <StepPickup trip={trip} setTrip={setTrip} updateTrip={updateTrip} submitPickupStep={submitPickupStep} updateBoxDetails={updateBoxDetails} editable={isGlobalEditMode} canEdit={canEditTrip} onCancel={onCancelEdit} clearForm={clearForm} />;
-      }
+      return (
+        <StepPickup
+          trip={trip}
+          setTrip={setTrip}
+          updateTrip={updateTrip}
+          submitPickupStep={submitPickupStep}
+          updateBoxDetails={updateBoxDetails}
+          editable={isEditable(isPickupCompleted)}
+          canEdit={canEditTrip}
+          onCancel={onCancelEdit}
+          clearForm={clearForm}
+        />
+      );
     }
+
     if (viewStepIndex === 3) {
-      if (isViewingActiveStep && isPickupCompleted && !isDeliveryCompleted) {
-        return <StepDeliveries rows={rows} setRows={setRows} shops={shops} birdTypes={birdTypes} trip={trip} updateDeliveries={updateDeliveries} submitDeliveriesStep={submitDeliveriesStep} readOnly={!isGlobalEditMode} editable={isGlobalEditMode} canEdit={canEditTrip} onCancel={onCancelEdit} clearForm={clearForm} />;
-      } else if (isDeliveryCompleted) {
-        return <StepDeliveries rows={rows} setRows={setRows} shops={shops} birdTypes={birdTypes} trip={trip} updateDeliveries={updateDeliveries} submitDeliveriesStep={submitDeliveriesStep} readOnly={!isGlobalEditMode} editable={isGlobalEditMode} canEdit={canEditTrip} onCancel={onCancelEdit} clearForm={clearForm} />;
-      }
+      return (
+        <StepDeliveries
+          rows={rows}
+          setRows={setRows}
+          shops={shops}
+          birdTypes={birdTypes}
+          trip={trip}
+          updateDeliveries={updateDeliveries}
+          submitDeliveriesStep={submitDeliveriesStep}
+          boxDetails={trip.boxDetails || []}          // ✅ PASS BOXES HERE
+          readOnly={!isEditable(isDeliveryCompleted)}
+          editable={isEditable(isDeliveryCompleted)}
+          canEdit={canEditTrip}
+          onCancel={onCancelEdit}
+          clearForm={clearForm}
+        />
+      );
     }
-    
+
     if (viewStepIndex === 4) {
-      return <StepEnd trip={trip} setTrip={setTrip} updateTrip={updateTrip} submitEndTrip={submitEndTrip} editable={isGlobalEditMode} canEdit={canEditTrip} onCancel={onCancelEdit} />;
+      return (
+        <StepEnd
+          trip={trip}
+          setTrip={setTrip}
+          updateTrip={updateTrip}
+          submitEndTrip={submitEndTrip}
+          editable={isEditable(isTripEnded)}
+          canEdit={canEditTrip}
+          onCancel={onCancelEdit}
+        />
+      );
     }
-    
-    return <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">👈 Select a completed step or the current step to view it here.</div>;
+
+    return (
+      <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">
+        👈 Select a completed step or the current step to view it here.
+      </div>
+    );
   };
 
   const content = (
