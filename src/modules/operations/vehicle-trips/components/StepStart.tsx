@@ -54,11 +54,15 @@ export default function StepStart({
       const lastTrip = vehicleTrips[0];
       const lastMeter = lastTrip.closingMeter;
       setLastKnownMeter(lastMeter);
-      if (!trip.openingMeter || trip.openingMeter === 0) {
-        setLastMeterError(`Starting KM must be > ${lastMeter} KM`);
-      } else if (trip.openingMeter <= lastMeter) {
-        setLastMeterError(`Starting KM must be > ${lastMeter} KM`);
+      // Only validate if a value has been entered (not undefined/null)
+      if (trip.openingMeter !== undefined && trip.openingMeter !== null && trip.openingMeter !== 0) {
+        if (trip.openingMeter < lastMeter) {
+          setLastMeterError(`Starting KM must be >= ${lastMeter} KM`);
+        } else {
+          setLastMeterError(null);
+        }
       } else {
+        // No value entered yet – no error
         setLastMeterError(null);
       }
     } else {
@@ -68,7 +72,6 @@ export default function StepStart({
   }, [trip.vehicleId, trip.openingMeter, trip.id]);
 
   useEffect(() => {
-    // Advance must be a valid number >= 0
     const amount = trip.advanceAmount;
     if (amount === undefined || amount === null || isNaN(amount)) {
       setAdvanceError("Advance amount is required");
@@ -272,7 +275,7 @@ export default function StepStart({
             />
           </div>
 
-          {/* Starting Meter + Advance/Expenses side by side */}
+          {/* Starting Meter */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Gauge size={14} className="text-slate-400" /> Starting Meter (KM) <span className="text-red-500">*</span>
@@ -282,10 +285,12 @@ export default function StepStart({
               inputMode="decimal"
               step="0.01"
               min="0"
-              value={trip.openingMeter ?? ""}
+              // ✅ Show empty when value is 0 or undefined
+              value={trip.openingMeter === 0 ? "" : trip.openingMeter ?? ""}
               onChange={(e) => {
                 const val = e.target.value;
-                updateTrip({ openingMeter: val === "" ? 0 : Number(val) });
+                // ✅ If empty, set undefined (so no validation error), else number
+                updateTrip({ openingMeter: val === "" ? undefined : Number(val) });
               }}
               onWheel={(e) => e.currentTarget.blur()}
               onKeyDown={(e) => {
@@ -294,7 +299,7 @@ export default function StepStart({
               className={`hide-spinner w-full mt-1.5 rounded-xl border ${
                 lastMeterError ? "border-red-500" : "border-slate-200"
               } bg-slate-50/80 px-4 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all`}
-              placeholder="Enter starting odometer reading..."
+              placeholder="0.00"
             />
             {lastKnownMeter !== null && (
               <p className="mt-1.5 text-xs text-slate-500 flex items-center gap-1">
@@ -308,6 +313,7 @@ export default function StepStart({
             )}
           </div>
 
+          {/* Advance */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Wallet size={14} className="text-slate-400" /> Advance / Expenses <span className="text-red-500">*</span>
@@ -319,10 +325,10 @@ export default function StepStart({
                 inputMode="decimal"
                 step="0.01"
                 min="0"
-                value={trip.advanceAmount ?? ""}
+                value={trip.advanceAmount === 0 ? "" : trip.advanceAmount ?? ""}
                 onChange={(e) => {
                   const val = e.target.value;
-                  updateTrip({ advanceAmount: val === "" ? 0 : Number(val) });
+                  updateTrip({ advanceAmount: val === "" ? undefined : Number(val) });
                 }}
                 onWheel={(e) => e.currentTarget.blur()}
                 onKeyDown={(e) => {

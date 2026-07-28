@@ -25,7 +25,7 @@ export interface ShopDelivery {
   remarks: string;
 }
 
-export type TripStatus = "Pending" | "Completed";
+export type TripStatus = "Draft" | "Pending" | "Completed" | "Deleted";
 
 export interface Trip {
   id: number;
@@ -44,7 +44,7 @@ export interface Trip {
   advanceAmount: number; 
   helpers: string[];
   openingMeter: number;
-  startStepSubmitted: boolean; // 🔹 NEW
+  startStepSubmitted: boolean;
 
   // --- STEP 2: REACH FARM ---
   sourceFarmId: number;
@@ -52,7 +52,9 @@ export interface Trip {
   reachedTime: string;
   destMeter: number;
   pickupTolls: number;
-  farmStepSubmitted: boolean; // 🔹 NEW
+  farmStepSubmitted: boolean;
+  // ✅ NEW: store farm address separately
+  farmAddress?: string;
 
   // --- STEP 3: PICKUP KPI ---
   dcWeight: number;
@@ -64,30 +66,30 @@ export interface Trip {
   boxNo: number;
   birds: number;
   weight: number; 
-  boxDetails: BoxDetail[];// 🔹 NEW
-
-  
+  boxDetails: BoxDetail[];
 
   // --- STEP 4: SHOP DELIVERIES ---
   deliveries: ShopDelivery[];
-  deliveryStepSubmitted: boolean; // 🔹 NEW
+  deliveryStepSubmitted: boolean;
 
   // --- STEP 5: END TRIP ---
   closingMeter: number;
   endTime: string;
   deliveryTolls: number;
+  // ✅ NEW: indicates End step has been submitted
+  endStepSubmitted?: boolean;
 
   // --- ADVANCED KPI FIELDS (Calculated) ---
   totalKm: number;
   totalShops: number;
-  totalWeight: number; // Legacy
-  totalDeliveredWeight: number; // 🔹 NEW
-  totalBirdsDelivered: number; // 🔹 NEW
-  totalMortality: number; // Legacy
-  totalMortalityCount: number; // 🔹 NEW
-  totalMortalityWeight: number; // 🔹 NEW
-  weightLoss: number; // 🔹 NEW
-  survivalRate: number; // 🔹 NEW
+  totalWeight: number;
+  totalDeliveredWeight: number;
+  totalBirdsDelivered: number;
+  totalMortality: number;
+  totalMortalityCount: number;
+  totalMortalityWeight: number;
+  weightLoss: number;
+  survivalRate: number;
 
   lastShop: string;
 

@@ -18,7 +18,7 @@ interface Props {
   editable?: boolean;
   canEdit?: boolean;
   onCancel?: () => void;
-  boxDetails?: BoxDetail[];  // ← NEW
+  boxDetails?: BoxDetail[];
 }
 
 export default function StepDeliveries({
@@ -34,11 +34,10 @@ export default function StepDeliveries({
   editable = false,
   canEdit = false,
   onCancel,
-  boxDetails = [],            // ← default empty
+  boxDetails = [],
 }: Props) {
-  const { showNotification } = useSafeNotification(); 
+  const { showNotification } = useSafeNotification();
   const [isLocalEditing, setIsLocalEditing] = useState(false);
-
   const isReadOnly = readOnly || !editable;
 
   const handleSaveRow = (updatedRow: ShopDelivery) => {
@@ -51,7 +50,7 @@ export default function StepDeliveries({
     showNotification?.(`✅ Shop "${updatedRow.shopName}" saved successfully.`, "success");
   };
 
-  // ─── Live validation for the Lock button ────────────────────────────
+  // ─── Lock validation (robust avgWeight calculation) ────────────────
   const canLock = useMemo(() => {
     if (rows.length === 0) return false;
     if (trip.dcWeight <= 0) return false;
@@ -60,14 +59,20 @@ export default function StepDeliveries({
     const totalMortalityCount = rows.reduce((sum, r) => sum + (r.mortality || 0), 0);
     const totalDelBirds = rows.reduce((sum, r) => sum + (r.birds || 0), 0);
     const totalDelWeight = rows.reduce((sum, r) => sum + (r.weight || 0), 0);
-    const mortalityWeight = totalMortalityCount * (trip.avgWeight || 0);
+
+    // ✅ Calculate avg weight from farm totals (not trip.avgWeight)
+    const avgWeight = trip.totalBirds > 0 ? trip.dcWeight / trip.totalBirds : 0;
+    const mortalityWeight = totalMortalityCount * avgWeight;
     const totalOutWeight = totalDelWeight + mortalityWeight;
 
+    // Bird count validation
     if (trip.totalBirds !== (totalDelBirds + totalMortalityCount)) return false;
+
+    // Weight validation
     if (totalOutWeight > trip.dcWeight) return false;
 
     return true;
-  }, [rows, trip.dcWeight, trip.totalBirds, trip.avgWeight, trip.destMeter, trip.openingMeter]);
+  }, [rows, trip]);
 
   const handleLockDeliveries = () => {
     if (!canLock) {
@@ -78,7 +83,7 @@ export default function StepDeliveries({
     submitDeliveriesStep();
   };
 
-  // ─── LOCKED VIEW ──────────────────────────────────────────────────
+  // ─── LOCKED VIEW (shows table read‑only) ──────────────────────────
   if (trip.deliveryStepSubmitted && !editable && !isLocalEditing) {
     return (
       <div className="bg-blue-50/30 border-2 border-blue-100 rounded-2xl p-6 space-y-4">
@@ -98,14 +103,33 @@ export default function StepDeliveries({
             </span>
           </div>
         </div>
-        <div className="p-4 bg-white border border-slate-100 rounded-xl shadow-sm">
-           <p className="text-sm text-slate-500 text-center">Deliveries are locked. Click the edit icon to modify.</p>
-        </div>
+
+        {/* ✅ Show deliveries in read‑only mode */}
+        <UnLoadingTable
+          rows={rows}
+          setRows={setRows}
+          shops={shops}
+          birdTypes={birdTypes}
+          boxDetails={boxDetails}
+          readOnly={true}
+          onSaveRow={handleSaveRow}
+          tripNo={trip.tripNo}
+          vehicleNo={trip.vehicleNo}
+          supervisorName={trip.supervisorName}
+          supervisorPhone=""
+          tripDate={trip.tripDate}
+        />
+
+        <TripTotals rows={rows} />
+
+        <p className="text-sm text-emerald-700 bg-emerald-50 p-3 rounded-lg mt-2 border border-emerald-200">
+          ✅ Deliveries locked. Click the edit icon to modify.
+        </p>
       </div>
     );
   }
 
-  // ─── EDIT STATE ──────────────────────────────────────────────────
+  // ─── EDIT STATE ────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
       <div className="bg-white border border-slate-200/80 shadow-sm rounded-2xl p-6 space-y-6">
@@ -114,19 +138,26 @@ export default function StepDeliveries({
             <span className="bg-blue-700 text-white w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold">4</span>
             <h2 className="text-lg font-bold text-slate-800 tracking-tight">SHOP DELIVERIES</h2>
           </div>
-          {((editable && trip.deliveryStepSubmitted) || isLocalEditing) && <span className="text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full border border-blue-200">✏️ Editable View</span>}
+          {((editable && trip.deliveryStepSubmitted) || isLocalEditing) && (
+            <span className="text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full border border-blue-200">✏️ Editable View</span>
+          )}
         </div>
 
-        <UnLoadingTable 
-          rows={rows} 
-          setRows={setRows} 
-          shops={shops} 
-          birdTypes={birdTypes} 
-          boxDetails={boxDetails}      // ← PASS TO TABLE
-          readOnly={isReadOnly} 
-          onSaveRow={handleSaveRow} 
+        <UnLoadingTable
+          rows={rows}
+          setRows={setRows}
+          shops={shops}
+          birdTypes={birdTypes}
+          boxDetails={boxDetails}
+          readOnly={isReadOnly}
+          onSaveRow={handleSaveRow}
+          tripNo={trip.tripNo}
+          vehicleNo={trip.vehicleNo}
+          supervisorName={trip.supervisorName}
+          supervisorPhone=""
+          tripDate={trip.tripDate}
         />
-        
+
         <TripTotals rows={rows} />
 
         <div className="flex items-center justify-center gap-4 pt-4 border-t border-slate-100 mt-6">
@@ -135,28 +166,22 @@ export default function StepDeliveries({
               Clear Form
             </button>
           )}
-          
           {(editable || isLocalEditing) && (
-            <button onClick={() => {
-              if (editable && onCancel) onCancel();
-              else setIsLocalEditing(false);
-            }} className="px-6 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-sm active:scale-95 flex items-center gap-2">
+            <button onClick={() => { if (editable && onCancel) onCancel(); else setIsLocalEditing(false); }} className="px-6 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-sm active:scale-95 flex items-center gap-2">
               <X size={15} /> Close
             </button>
           )}
-
           {!isReadOnly && (
-            <button 
-              onClick={handleLockDeliveries} 
+            <button
+              onClick={handleLockDeliveries}
               disabled={!canLock}
               className={`px-8 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-all active:scale-[0.98] flex items-center gap-1.5 ${
-                canLock 
-                  ? "bg-blue-700 hover:bg-blue-800 shadow-blue-200" 
+                canLock
+                  ? "bg-blue-700 hover:bg-blue-800 shadow-blue-200"
                   : "bg-blue-400/60 cursor-not-allowed shadow-none"
               }`}
             >
-              <CheckCircle size={15} />
-              Complete & Lock Deliveries
+              <CheckCircle size={15} /> Complete & Lock Deliveries
             </button>
           )}
         </div>

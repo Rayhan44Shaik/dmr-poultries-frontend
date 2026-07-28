@@ -14,23 +14,48 @@ import {
   Box,
   ChevronDown,
   Search,
+  Pencil,
+  FileText,
+  Users,
 } from "lucide-react";
 import Select from "react-select";
 import type { ShopDelivery, BoxDetail } from "../types/trip";
 import TripPagination from "./TripPagination";
+import jsPDF from "jspdf";
 
-// ─── Custom Box Selector ──────────────────────────────────────────────
+type ShopDeliveryWithExtra = ShopDelivery & {
+  deliveryMode?: string;
+  selectedBoxIds?: number[];
+  farmBirds?: number;
+  farmWeight?: number;
+  mortKg?: number;
+  perBoxData?: { boxNo: number; birds: number; weight: number }[];
+};
+
 interface BoxSelectorProps {
   boxes: BoxDetail[];
   selectedIds: number[];
   onSelectionChange: (ids: number[]) => void;
   disabled?: boolean;
+  usedBoxIds?: number[];
 }
 
-function BoxSelector({ boxes, selectedIds, onSelectionChange, disabled = false }: BoxSelectorProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+function BoxSelector({ boxes, selectedIds, onSelectionChange, disabled = false, usedBoxIds = [] }: BoxSelectorProps) {
+  const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const availableBoxes = useMemo<BoxDetail[]>(() => {
+    return boxes.filter((b: BoxDetail) => !usedBoxIds.includes(b.boxNo) || selectedIds.includes(b.boxNo));
+  }, [boxes, usedBoxIds, selectedIds]);
+
+  const filteredBoxes = useMemo<BoxDetail[]>(() => {
+    if (!searchQuery.trim()) return availableBoxes;
+    return availableBoxes.filter((b: BoxDetail) => String(b.boxNo).includes(searchQuery.trim()));
+  }, [availableBoxes, searchQuery]);
+
+  const allSelected = availableBoxes.length > 0 && availableBoxes.every((b: BoxDetail) => selectedIds.includes(b.boxNo));
+  const selectedCount = selectedIds.length;
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -42,18 +67,10 @@ function BoxSelector({ boxes, selectedIds, onSelectionChange, disabled = false }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredBoxes = useMemo(() => {
-    if (!searchQuery.trim()) return boxes;
-    return boxes.filter((b) => String(b.boxNo).includes(searchQuery.trim()));
-  }, [boxes, searchQuery]);
-
-  const allSelected = boxes.length > 0 && boxes.every((b) => selectedIds.includes(b.boxNo));
-  const selectedCount = selectedIds.length;
-
   const toggleBox = (boxNo: number) => {
     const isSelected = selectedIds.includes(boxNo);
     const newSelected = isSelected
-      ? selectedIds.filter((id) => id !== boxNo)
+      ? selectedIds.filter((id: number) => id !== boxNo)
       : [...selectedIds, boxNo];
     onSelectionChange(newSelected);
   };
@@ -62,7 +79,7 @@ function BoxSelector({ boxes, selectedIds, onSelectionChange, disabled = false }
     if (allSelected) {
       onSelectionChange([]);
     } else {
-      onSelectionChange(boxes.map((b) => b.boxNo));
+      onSelectionChange(availableBoxes.map((b: BoxDetail) => b.boxNo));
     }
   };
 
@@ -71,9 +88,9 @@ function BoxSelector({ boxes, selectedIds, onSelectionChange, disabled = false }
       <button
         type="button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        disabled={disabled || boxes.length === 0}
+        disabled={disabled || availableBoxes.length === 0}
         className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border bg-slate-50/50 text-sm font-medium transition-all touch-manipulation ${
-          disabled || boxes.length === 0
+          disabled || availableBoxes.length === 0
             ? "border-slate-200 text-slate-400 cursor-not-allowed"
             : "border-slate-200 hover:border-blue-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-slate-700"
         }`}
@@ -89,14 +106,14 @@ function BoxSelector({ boxes, selectedIds, onSelectionChange, disabled = false }
         <ChevronDown size={18} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
-      {isOpen && !disabled && boxes.length > 0 && (
+      {isOpen && !disabled && availableBoxes.length > 0 && (
         <div className="absolute z-20 mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-80 flex flex-col">
           <div className="p-2 border-b border-slate-200 flex items-center gap-2 bg-slate-50/50">
             <Search size={16} className="text-slate-400" />
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
               placeholder="Search box number..."
               className="flex-1 bg-transparent border-none outline-none text-sm font-medium text-slate-700 placeholder-slate-400 py-1"
               autoFocus
@@ -110,15 +127,15 @@ function BoxSelector({ boxes, selectedIds, onSelectionChange, disabled = false }
                 onChange={toggleAll}
                 className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
               />
-              Select All ({boxes.length})
+              Select All ({availableBoxes.length})
             </label>
             <span className="text-[10px] text-slate-400">{selectedCount} selected</span>
           </div>
           <div className="flex-1 overflow-y-auto max-h-44 p-1">
             {filteredBoxes.length === 0 ? (
-              <div className="text-center py-3 text-sm text-slate-400">No boxes match.</div>
+              <div className="text-center py-3 text-sm text-slate-400">No boxes available.</div>
             ) : (
-              filteredBoxes.map((box) => (
+              filteredBoxes.map((box: BoxDetail) => (
                 <label
                   key={box.boxNo}
                   className={`flex items-center gap-3 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
@@ -160,6 +177,11 @@ interface Props {
   boxDetails?: BoxDetail[];
   readOnly?: boolean;
   onSaveRow?: (row: ShopDelivery) => void;
+  tripNo?: string;
+  vehicleNo?: string;
+  supervisorName?: string;
+  supervisorPhone?: string;
+  tripDate?: string;
 }
 
 function UnLoadingTable({
@@ -170,82 +192,236 @@ function UnLoadingTable({
   boxDetails = [],
   readOnly = false,
   onSaveRow,
+  tripNo = "",
+  vehicleNo = "",
+  supervisorName = "",
+  supervisorPhone = "",
+  tripDate = "",
 }: Props) {
   const safeRows = rows ?? [];
   const safeShops = shops ?? [];
   const safeBirdTypes = birdTypes ?? [];
   const safeBoxDetails = boxDetails ?? [];
 
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 10;
 
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState<boolean>(false);
   const [mode, setMode] = useState<"box" | "weight">("box");
-  const [formData, setFormData] = useState({
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [formData, setFormData] = useState<{
+    shopId: number;
+    shopName: string;
+    birdTypeId: number;
+    birdType: string;
+    selectedBoxIds: number[];
+    birds: number;
+    weight: number;
+    mortality: number;
+    mortWeight: number;
+    remarks: string;
+    perBoxData: { boxNo: number; birds: number; weight: number }[];
+  }>({
     shopId: 0,
     shopName: "",
     birdTypeId: 0,
     birdType: "",
-    selectedBoxIds: [] as number[],
+    selectedBoxIds: [],
     birds: 0,
     weight: 0,
     mortality: 0,
+    mortWeight: 0,
     remarks: "",
+    perBoxData: [],
   });
 
-  const [validationErrors, setValidationErrors] = useState({
+  const [validationErrors, setValidationErrors] = useState<{
+    birdsExceed: boolean;
+    birdsMismatch: boolean;
+    weightMismatch: boolean;
+    birdsExceedFarm: boolean;
+    weightExceedFarm: boolean;
+    perBoxBirdsErrors: boolean[];
+    perBoxWeightErrors: boolean[];
+  }>({
     birdsExceed: false,
-    weightExceed: false,
+    birdsMismatch: false,
+    weightMismatch: false,
+    birdsExceedFarm: false,
+    weightExceedFarm: false,
+    perBoxBirdsErrors: [],
+    perBoxWeightErrors: [],
   });
 
-  // ─── Computed farm values ──────────────────────────────────────────
-  const farmBirds = useMemo(() => {
-    const selected = safeBoxDetails.filter((b) => formData.selectedBoxIds.includes(b.boxNo));
-    return selected.reduce((sum, b) => sum + b.birds, 0);
-  }, [formData.selectedBoxIds, safeBoxDetails]);
+  // ─── Compute used box numbers ──────────────────────────────────
+  const usedBoxIds = useMemo<number[]>(() => {
+    const used = new Set<number>();
+    safeRows.forEach((row: ShopDelivery) => {
+      if (editingId !== null && row.id === editingId) return;
+      const rowWithExtra = row as ShopDeliveryWithExtra;
+      if (rowWithExtra.selectedBoxIds && rowWithExtra.selectedBoxIds.length > 0) {
+        rowWithExtra.selectedBoxIds.forEach((id: number) => used.add(id));
+      }
+    });
+    return Array.from(used);
+  }, [safeRows, editingId]);
 
-  const farmWeight = useMemo(() => {
-    const selected = safeBoxDetails.filter((b) => formData.selectedBoxIds.includes(b.boxNo));
-    return selected.reduce((sum, b) => sum + b.weight, 0);
-  }, [formData.selectedBoxIds, safeBoxDetails]);
+  // ─── Available boxes ───────────────────────────────────────────
+  const availableBoxDetails = useMemo<BoxDetail[]>(() => {
+    return safeBoxDetails.filter(
+      (b: BoxDetail) => !usedBoxIds.includes(b.boxNo) || formData.selectedBoxIds.includes(b.boxNo)
+    );
+  }, [safeBoxDetails, usedBoxIds, formData.selectedBoxIds]);
+
+  // ─── Farm values ──────────────────────────────────────────────
+  const farmBirds = useMemo<number>(() => {
+    const selected = availableBoxDetails.filter((b: BoxDetail) => formData.selectedBoxIds.includes(b.boxNo));
+    return selected.reduce((sum: number, b: BoxDetail) => sum + b.birds, 0);
+  }, [availableBoxDetails, formData.selectedBoxIds]);
+
+  const farmWeight = useMemo<number>(() => {
+    const selected = availableBoxDetails.filter((b: BoxDetail) => formData.selectedBoxIds.includes(b.boxNo));
+    return selected.reduce((sum: number, b: BoxDetail) => sum + b.weight, 0);
+  }, [availableBoxDetails, formData.selectedBoxIds]);
 
   const boxCount = formData.selectedBoxIds.length;
 
-  const mortKg = useMemo(() => {
-    if (formData.birds > 0 && formData.mortality > 0) {
-      return (formData.weight / formData.birds) * formData.mortality;
-    }
-    return 0;
-  }, [formData.birds, formData.weight, formData.mortality]);
+  // ─── Weight mode totals ──────────────────────────────────────
+  const weightModeTotals = useMemo<{ birds: number; weight: number }>(() => {
+    if (mode !== "weight") return { birds: 0, weight: 0 };
+    const totalBirds = formData.perBoxData.reduce((sum: number, item: { boxNo: number; birds: number; weight: number }) => sum + item.birds, 0);
+    const totalWeight = formData.perBoxData.reduce((sum: number, item: { boxNo: number; birds: number; weight: number }) => sum + item.weight, 0);
+    return { birds: totalBirds, weight: totalWeight };
+  }, [formData.perBoxData, mode]);
 
-  // ─── Maximum allowed values (accounting for mortality) ────────────
-  const maxAllowedBirds = Math.max(0, farmBirds - formData.mortality);
-  const maxAllowedWeight = Math.max(0, farmWeight - mortKg);
+  // ─── Mortality weight ──────────────────────────────────────────
+  const mortKg = useMemo<number>(() => {
+    if (mode === "box") {
+      if (farmBirds > 0 && formData.mortality > 0) {
+        return (farmWeight / farmBirds) * formData.mortality;
+      }
+      return 0;
+    } else {
+      return formData.mortWeight || 0;
+    }
+  }, [mode, farmBirds, farmWeight, formData.mortality, formData.mortWeight]);
+
+  const deliveredBirds = mode === "box" ? Math.max(0, farmBirds - formData.mortality) : weightModeTotals.birds;
+  const deliveredWeight = mode === "box" ? Math.max(0, farmWeight - mortKg) : weightModeTotals.weight;
+
+  // ─── Weight Loss (only for Weight mode) ──────────────────────
+  const weightLoss = useMemo<number>(() => {
+    if (mode !== "weight") return 0;
+    const totalDeliveredWeight = weightModeTotals.weight;
+    const totalMortalityWeight = formData.mortWeight || 0;
+    return Math.max(0, farmWeight - (totalDeliveredWeight + totalMortalityWeight));
+  }, [mode, farmWeight, weightModeTotals.weight, formData.mortWeight]);
 
   // ─── Validation ──────────────────────────────────────────────────
   const validate = useCallback(() => {
-    const birdsExceed = formData.birds > maxAllowedBirds && farmBirds > 0;
-    const weightExceed = formData.weight > maxAllowedWeight && farmWeight > 0;
-    setValidationErrors({ birdsExceed, weightExceed });
-    return !birdsExceed && !weightExceed;
-  }, [formData.birds, formData.weight, maxAllowedBirds, maxAllowedWeight, farmBirds, farmWeight]);
+    let birdsExceed = false;
+    let birdsMismatch = false;
+    let weightMismatch = false;
+    let birdsExceedFarm = false;
+    let weightExceedFarm = false;
+    const perBoxBirdsErrors: boolean[] = [];
+    const perBoxWeightErrors: boolean[] = [];
+
+    if (mode === "box") {
+      birdsExceed = formData.mortality > farmBirds && farmBirds > 0;
+    } else {
+      const totalBirds = weightModeTotals.birds + formData.mortality;
+      const totalWeight = weightModeTotals.weight + mortKg;
+
+      if (farmBirds > 0) {
+        if (totalBirds > farmBirds) {
+          birdsExceedFarm = true;
+        } else if (totalBirds !== farmBirds) {
+          birdsMismatch = true;
+        }
+      }
+      if (farmWeight > 0) {
+        if (totalWeight > farmWeight) {
+          weightExceedFarm = true;
+        }
+      }
+
+      formData.perBoxData.forEach((item, index) => {
+        const farmBox = availableBoxDetails.find((b) => b.boxNo === item.boxNo);
+        if (farmBox) {
+          perBoxBirdsErrors[index] = item.birds > farmBox.birds;
+          perBoxWeightErrors[index] = item.weight > farmBox.weight;
+        } else {
+          perBoxBirdsErrors[index] = false;
+          perBoxWeightErrors[index] = false;
+        }
+      });
+    }
+
+    setValidationErrors({
+      birdsExceed,
+      birdsMismatch,
+      weightMismatch,
+      birdsExceedFarm,
+      weightExceedFarm,
+      perBoxBirdsErrors,
+      perBoxWeightErrors,
+    });
+    return (
+      !birdsExceed &&
+      !birdsMismatch &&
+      !weightMismatch &&
+      !birdsExceedFarm &&
+      !weightExceedFarm &&
+      !perBoxBirdsErrors.some((err) => err) &&
+      !perBoxWeightErrors.some((err) => err)
+    );
+  }, [mode, farmBirds, farmWeight, formData.mortality, formData.mortWeight, weightModeTotals, mortKg, formData.perBoxData, availableBoxDetails]);
 
   useEffect(() => {
     validate();
-  }, [formData.birds, formData.weight, formData.mortality, farmBirds, farmWeight, mortKg, validate]);
+  }, [mode, farmBirds, farmWeight, formData.mortality, formData.mortWeight, weightModeTotals, mortKg, formData.perBoxData, availableBoxDetails, validate]);
+
+  useEffect(() => {
+    if (mode === "box") {
+      setFormData((prev) => ({ ...prev, birds: 0, weight: 0, perBoxData: [], mortWeight: 0 }));
+    } else {
+      if (formData.selectedBoxIds.length > 0 && formData.perBoxData.length === 0) {
+        const initialData = formData.selectedBoxIds.map((boxNo: number) => ({
+          boxNo,
+          birds: 0,
+          weight: 0,
+        }));
+        setFormData((prev) => ({ ...prev, perBoxData: initialData, mortWeight: 0 }));
+      }
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode === "weight") {
+      const currentBoxNos = formData.perBoxData.map((item: { boxNo: number }) => item.boxNo);
+      const newBoxNos = formData.selectedBoxIds.filter((id: number) => !currentBoxNos.includes(id));
+      const removedBoxNos = currentBoxNos.filter((id: number) => !formData.selectedBoxIds.includes(id));
+      if (newBoxNos.length > 0 || removedBoxNos.length > 0) {
+        let updated = formData.perBoxData.filter((item: { boxNo: number }) => formData.selectedBoxIds.includes(item.boxNo));
+        newBoxNos.forEach((boxNo: number) => {
+          updated.push({ boxNo, birds: 0, weight: 0 });
+        });
+        updated.sort((a: { boxNo: number }, b: { boxNo: number }) => a.boxNo - b.boxNo);
+        setFormData((prev) => ({ ...prev, perBoxData: updated }));
+      }
+    }
+  }, [formData.selectedBoxIds, mode]);
 
   // ─── Display rows ──────────────────────────────────────────────────
-  const displayRows = useMemo(() => {
-    const saved = safeRows.filter((r) => r.shopId > 0 && r.birds > 0 && r.weight > 0);
-    return [...saved].sort((a, b) => b.id - a.id);
+  const displayRows = useMemo<ShopDelivery[]>(() => {
+    const saved = safeRows.filter((r: ShopDelivery) => r.shopId > 0 && r.birds > 0 && r.weight > 0);
+    return [...saved].sort((a: ShopDelivery, b: ShopDelivery) => b.id - a.id);
   }, [safeRows]);
 
-  const totalPages = useMemo(
-    () => Math.ceil(displayRows.length / itemsPerPage),
-    [displayRows.length]
-  );
+  const totalPages = useMemo<number>(() => Math.ceil(displayRows.length / itemsPerPage), [displayRows.length]);
 
-  const currentRows = useMemo(() => {
+  const currentRows = useMemo<ShopDelivery[]>(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return displayRows.slice(startIndex, startIndex + itemsPerPage);
   }, [displayRows, currentPage]);
@@ -259,7 +435,8 @@ function UnLoadingTable({
   }, [totalPages, currentPage]);
 
   // ─── Form handlers ────────────────────────────────────────────────
-  const openForm = () => {
+  const openAddForm = () => {
+    setEditingId(null);
     setMode("box");
     setFormData({
       shopId: 0,
@@ -270,18 +447,68 @@ function UnLoadingTable({
       birds: 0,
       weight: 0,
       mortality: 0,
+      mortWeight: 0,
       remarks: "",
+      perBoxData: [],
     });
-    setValidationErrors({ birdsExceed: false, weightExceed: false });
+    setValidationErrors({
+      birdsExceed: false,
+      birdsMismatch: false,
+      weightMismatch: false,
+      birdsExceedFarm: false,
+      weightExceedFarm: false,
+      perBoxBirdsErrors: [],
+      perBoxWeightErrors: [],
+    });
+    setShowForm(true);
+  };
+
+  const openEditForm = (row: ShopDelivery) => {
+    const rowWithExtra = row as ShopDeliveryWithExtra;
+    setEditingId(row.id);
+    const modeFromRow = rowWithExtra.deliveryMode || "box";
+    setMode(modeFromRow as "box" | "weight");
+    const perBoxData = rowWithExtra.perBoxData || [];
+    setFormData({
+      shopId: row.shopId,
+      shopName: row.shopName,
+      birdTypeId: row.birdTypeId,
+      birdType: row.birdType,
+      selectedBoxIds: rowWithExtra.selectedBoxIds || [],
+      birds: row.birds,
+      weight: row.weight,
+      mortality: row.mortality || 0,
+      mortWeight: rowWithExtra.mortKg || 0,
+      remarks: row.remarks || "",
+      perBoxData: perBoxData,
+    });
+    setValidationErrors({
+      birdsExceed: false,
+      birdsMismatch: false,
+      weightMismatch: false,
+      birdsExceedFarm: false,
+      weightExceedFarm: false,
+      perBoxBirdsErrors: [],
+      perBoxWeightErrors: [],
+    });
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
+    setEditingId(null);
   };
 
   const handleFormChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handlePerBoxChange = (index: number, field: "birds" | "weight", value: number) => {
+    setFormData((prev) => {
+      const updated = [...prev.perBoxData];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, perBoxData: updated };
+    });
   };
 
   const handleBoxSelection = (newSelectedIds: number[]) => {
@@ -325,45 +552,262 @@ function UnLoadingTable({
   };
 
   const handleSubmit = () => {
+    if (validationErrors.birdsExceedFarm) {
+      alert(`⚠️ Cannot exceed more than Bird(Farm) (${farmBirds}).`);
+      return;
+    }
+    if (validationErrors.weightExceedFarm) {
+      alert(`⚠️ Cannot exceed more than Wt(Farm) (${farmWeight.toFixed(2)}).`);
+      return;
+    }
+    if (validationErrors.perBoxBirdsErrors.some((err) => err)) {
+      alert("⚠️ Some boxes have Birds(Del.) exceeding Birds(Farm). Please fix.");
+      return;
+    }
+    if (validationErrors.perBoxWeightErrors.some((err) => err)) {
+      alert("⚠️ Some boxes have Wt(Del.) exceeding Wt(Farm). Please fix.");
+      return;
+    }
     if (!validate()) {
       alert("Please fix the validation errors before saving.");
       return;
     }
 
-    if (formData.shopId === 0 || formData.birds === 0 || formData.weight === 0) {
-      alert("Please select a Shop, and enter Delivery Birds and Wt (Del.).");
+    if (formData.shopId === 0) {
+      alert("Please select a Shop.");
       return;
     }
 
-    if (formData.selectedBoxIds.length === 0) {
-      alert("Please select at least one box.");
-      return;
+    let finalBirds = formData.birds;
+    let finalWeight = formData.weight;
+    let selectedBoxIds: number[] = [];
+    let farmBirdsVal = 0;
+    let farmWeightVal = 0;
+    let mortKgVal = 0;
+    let perBoxData: { boxNo: number; birds: number; weight: number }[] = [];
+
+    if (mode === "box") {
+      if (formData.mortality < 0) {
+        alert("Mortality cannot be negative.");
+        return;
+      }
+      if (formData.selectedBoxIds.length === 0) {
+        alert("Please select at least one box.");
+        return;
+      }
+      selectedBoxIds = formData.selectedBoxIds;
+      farmBirdsVal = farmBirds;
+      farmWeightVal = farmWeight;
+      mortKgVal = mortKg;
+      finalBirds = farmBirds - formData.mortality;
+      finalWeight = farmWeight - mortKg;
+      perBoxData = [];
+    } else {
+      if (formData.selectedBoxIds.length === 0) {
+        alert("Please select at least one box.");
+        return;
+      }
+      for (const item of formData.perBoxData) {
+        if (item.birds < 0 || item.weight < 0) {
+          alert("Values cannot be negative.");
+          return;
+        }
+      }
+      if (formData.mortality < 0 || formData.mortWeight < 0) {
+        alert("Mortality values cannot be negative.");
+        return;
+      }
+      selectedBoxIds = formData.selectedBoxIds;
+      farmBirdsVal = farmBirds;
+      farmWeightVal = farmWeight;
+      const totalBirds = formData.perBoxData.reduce((sum: number, item: { boxNo: number; birds: number; weight: number }) => sum + item.birds, 0);
+      const totalWeight = formData.perBoxData.reduce((sum: number, item: { boxNo: number; birds: number; weight: number }) => sum + item.weight, 0);
+      finalBirds = totalBirds;
+      finalWeight = totalWeight;
+      mortKgVal = formData.mortWeight;
+      perBoxData = formData.perBoxData.map((item: { boxNo: number; birds: number; weight: number }) => ({ ...item }));
     }
 
-    const maxSerial = safeRows.reduce((max, r) => Math.max(max, r.serialNo || 0), 0);
-    const newRow: ShopDelivery = {
-      id: Date.now(),
-      serialNo: maxSerial + 1,
+    const maxSerial = safeRows.reduce((max: number, r: ShopDelivery) => Math.max(max, r.serialNo || 0), 0);
+    const newRow: ShopDeliveryWithExtra = {
+      id: editingId ?? Date.now(),
+      serialNo: editingId ? (safeRows.find((r: ShopDelivery) => r.id === editingId)?.serialNo || maxSerial + 1) : maxSerial + 1,
       shopId: formData.shopId,
       shopName: formData.shopName,
       birdTypeId: formData.birdTypeId,
       birdType: formData.birdType,
       boxNo: formData.selectedBoxIds.length,
-      birds: formData.birds,
-      weight: formData.weight,
-      mortality: formData.mortality || 0,
+      birds: finalBirds,
+      weight: finalWeight,
+      mortality: formData.mortality,
       remarks: formData.remarks || "",
       rate: 0,
       amount: 0,
+      deliveryMode: mode,
+      selectedBoxIds: selectedBoxIds,
+      farmBirds: farmBirdsVal,
+      farmWeight: farmWeightVal,
+      mortKg: mortKgVal,
+      perBoxData: perBoxData,
     };
 
-    if (onSaveRow) {
-      onSaveRow(newRow);
+    if (editingId !== null) {
+      setRows((prev: ShopDelivery[]) => prev.map((r: ShopDelivery) => (r.id === editingId ? newRow : r)));
+      if (onSaveRow) onSaveRow(newRow);
+    } else {
+      if (onSaveRow) onSaveRow(newRow);
+      setRows((prev: ShopDelivery[]) => [newRow, ...prev]);
     }
-
-    setRows((prev) => [newRow, ...prev]);
     setShowForm(false);
+    setEditingId(null);
     setCurrentPage(1);
+  };
+
+  // ─── PDF generation ────────────────────────────────────────────────
+  const generatePDF = (row: ShopDeliveryWithExtra) => {
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const primaryColor: [number, number, number] = [37, 99, 235];
+      const secondaryColor: [number, number, number] = [71, 85, 105];
+
+      doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.rect(0, 0, pageWidth, 6, 'F');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(24);
+      doc.setTextColor(15, 23, 42);
+      doc.text('DMR POULTRY', 14, 22);
+      doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.setLineWidth(0.8);
+      doc.line(14, 26, 14 + doc.getStringUnitWidth('DMR POULTRY') * 24 * 0.6, 26);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+
+      const leftX = 14;
+      const rightX = pageWidth - 14;
+      const yStart = 36;
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Vehicle No : ${vehicleNo || 'N/A'}`, leftX, yStart);
+      doc.text(`Supervisor Name : ${supervisorName || 'N/A'}`, leftX, yStart + 8);
+      doc.text(`Supervisor No : ${supervisorPhone || 'N/A'}`, leftX, yStart + 16);
+
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Shop Name : ${row.shopName}`, rightX, yStart, { align: 'right' });
+      doc.text(`Date : ${tripDate || new Date().toLocaleDateString()}`, rightX, yStart + 8, { align: 'right' });
+
+      const isBoxMode = row.deliveryMode === 'box';
+      let y = yStart + 28;
+
+      if (isBoxMode) {
+        const boxNumbers = row.selectedBoxIds && row.selectedBoxIds.length > 0
+          ? row.selectedBoxIds.sort((a: number, b: number) => a - b).join(', ')
+          : 'N/A';
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text('Box no\'s Delivered:', leftX, y);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(boxNumbers, leftX + 50, y);
+        y += 12;
+
+        const colX = [14, 50, 90, 130];
+        const colWidths = [36, 40, 40, 40];
+        const tableY = y;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(255, 255, 255);
+        doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.rect(colX[0], tableY, colWidths.reduce((a: number, b: number) => a + b, 0), 8, 'F');
+        doc.text('', colX[0] + 2, tableY + 5);
+        doc.text('Birds Farm', colX[1] + 2, tableY + 5);
+        doc.text('Mor', colX[2] + 2, tableY + 5);
+        doc.text('Final Birds', colX[3] + 2, tableY + 5);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('helvetica', 'normal');
+        doc.setFillColor(248, 250, 252);
+        const row1Y = tableY + 8;
+        doc.rect(colX[0], row1Y, colWidths.reduce((a: number, b: number) => a + b, 0), 7, 'F');
+        doc.text('Birds (Wt)', colX[0] + 2, row1Y + 5);
+        doc.text(String(row.farmBirds || 0), colX[1] + 2, row1Y + 5);
+        doc.text(String(row.mortality), colX[2] + 2, row1Y + 5);
+        doc.text(String(row.birds), colX[3] + 2, row1Y + 5);
+        const row2Y = row1Y + 7;
+        doc.rect(colX[0], row2Y, colWidths.reduce((a: number, b: number) => a + b, 0), 7, 'F');
+        doc.text('Wt (Kg)', colX[0] + 2, row2Y + 5);
+        doc.text((row.farmWeight || 0).toFixed(2), colX[1] + 2, row2Y + 5);
+        doc.text((row.mortKg || 0).toFixed(2), colX[2] + 2, row2Y + 5);
+        doc.text(row.weight.toFixed(2), colX[3] + 2, row2Y + 5);
+        y = row2Y + 12;
+      } else {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text('Per-Box Delivery Details', leftX, y);
+        y += 8;
+        if (row.perBoxData && row.perBoxData.length > 0) {
+          doc.setFontSize(9);
+          const colX = [14, 40, 70, 100, 130];
+          doc.setFillColor(240, 242, 245);
+          doc.rect(colX[0], y, 26, 6, 'F');
+          doc.text('Box', colX[0] + 2, y + 4);
+          doc.rect(colX[1], y, 30, 6, 'F');
+          doc.text('Birds (Farm)', colX[1] + 2, y + 4);
+          doc.rect(colX[2], y, 30, 6, 'F');
+          doc.text('Birds (Del.)', colX[2] + 2, y + 4);
+          doc.rect(colX[3], y, 30, 6, 'F');
+          doc.text('Wt (Farm)', colX[3] + 2, y + 4);
+          doc.rect(colX[4], y, 30, 6, 'F');
+          doc.text('Wt (Del.)', colX[4] + 2, y + 4);
+          y += 8;
+          doc.setFillColor(255, 255, 255);
+          row.perBoxData.forEach((item: { boxNo: number; birds: number; weight: number }) => {
+            const farmBox = safeBoxDetails.find((b: BoxDetail) => b.boxNo === item.boxNo);
+            doc.text(String(item.boxNo), colX[0] + 2, y + 4);
+            doc.text(String(farmBox?.birds || 0), colX[1] + 2, y + 4);
+            doc.text(String(item.birds), colX[2] + 2, y + 4);
+            doc.text((farmBox?.weight || 0).toFixed(2), colX[3] + 2, y + 4);
+            doc.text(item.weight.toFixed(2), colX[4] + 2, y + 4);
+            y += 6;
+          });
+          const totalBirds = row.perBoxData.reduce((s: number, i: { boxNo: number; birds: number; weight: number }) => s + i.birds, 0);
+          const totalWeight = row.perBoxData.reduce((s: number, i: { boxNo: number; birds: number; weight: number }) => s + i.weight, 0);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Totals:', colX[0] + 2, y + 4);
+          doc.text(String(totalBirds), colX[2] + 2, y + 4);
+          doc.text(totalWeight.toFixed(2), colX[4] + 2, y + 4);
+          y += 10;
+        } else {
+          doc.text('No per-box data available.', leftX, y);
+          y += 6;
+        }
+        doc.setFont('helvetica', 'bold');
+        doc.text('Mortality & Loss:', leftX, y);
+        y += 6;
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Mor (Birds): ${row.mortality}`, leftX, y);
+        doc.text(`Mor (kg): ${(row.mortKg || 0).toFixed(2)}`, leftX + 60, y);
+        const totalDelWt = row.perBoxData?.reduce((s, i) => s + i.weight, 0) || 0;
+        const loss = Math.max(0, (row.farmWeight || 0) - (totalDelWt + (row.mortKg || 0)));
+        doc.text(`Weight Loss: ${loss.toFixed(2)} kg`, leftX + 120, y);
+        y += 10;
+      }
+
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Thank You', pageWidth / 2, y + 10, { align: 'center' });
+
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, leftX, doc.internal.pageSize.getHeight() - 10);
+
+      doc.save(`ShopDelivery_${row.shopName.replace(/\s/g, '_')}_${isBoxMode ? 'Box' : 'Weight'}.pdf`);
+    } catch (error) {
+      console.error("PDF generation error:", error);
+      alert("Failed to generate PDF. Please try again.");
+    }
   };
 
   // ─── Options ───────────────────────────────────────────────────────
@@ -377,8 +821,8 @@ function UnLoadingTable({
         const label = shop.shopName ?? shop.name ?? `Shop ${value}`;
         return { value, label, isDisabled: false };
       })
-      .filter((opt) => opt.value > 0);
-    opts.sort((a, b) => a.label.localeCompare(b.label));
+      .filter((opt: { value: number; label: string; isDisabled: boolean }) => opt.value > 0);
+    opts.sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
     return opts;
   }, [safeShops]);
 
@@ -392,19 +836,40 @@ function UnLoadingTable({
         const label = bird.birdType ?? bird.name ?? `Bird ${value}`;
         return { value, label, isDisabled: false };
       })
-      .filter((opt) => opt.value > 0);
+      .filter((opt: { value: number; label: string; isDisabled: boolean }) => opt.value > 0);
   }, [safeBirdTypes]);
 
-  const isFormValid = useMemo(() => {
-    return (
-      formData.shopId > 0 &&
-      formData.birds > 0 &&
-      formData.weight > 0 &&
-      formData.selectedBoxIds.length > 0 &&
-      !validationErrors.birdsExceed &&
-      !validationErrors.weightExceed
-    );
-  }, [formData, validationErrors]);
+  const isFormValid = useMemo<boolean>(() => {
+    if (mode === "box") {
+      return (
+        formData.shopId > 0 &&
+        formData.selectedBoxIds.length > 0 &&
+        farmBirds > 0 &&
+        formData.mortality >= 0 &&
+        formData.mortality <= farmBirds &&
+        !validationErrors.birdsExceed
+      );
+    } else {
+      const allBoxesFilled = formData.perBoxData.every(
+        (item: { boxNo: number; birds: number; weight: number }) => item.birds > 0 && item.weight > 0
+      );
+      const noPerBoxErrors =
+        !validationErrors.perBoxBirdsErrors.some((err) => err) &&
+        !validationErrors.perBoxWeightErrors.some((err) => err);
+      return (
+        formData.shopId > 0 &&
+        formData.selectedBoxIds.length > 0 &&
+        allBoxesFilled &&
+        formData.mortality >= 0 &&
+        formData.mortWeight >= 0 &&
+        !validationErrors.birdsExceed &&
+        !validationErrors.birdsMismatch &&
+        !validationErrors.birdsExceedFarm &&
+        !validationErrors.weightExceedFarm &&
+        noPerBoxErrors
+      );
+    }
+  }, [mode, formData, farmBirds, validationErrors]);
 
   // ─── Render ────────────────────────────────────────────────────────
   return (
@@ -421,7 +886,7 @@ function UnLoadingTable({
         </h2>
         {!readOnly && !showForm && (
           <button
-            onClick={openForm}
+            onClick={openAddForm}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl shadow-sm transition-colors active:scale-95 touch-manipulation"
           >
             <Plus size={18} />
@@ -430,11 +895,13 @@ function UnLoadingTable({
         )}
       </div>
 
-      {/* ─── INLINE FORM ────────────────────────────────────────────── */}
       {showForm ? (
+        // ─── FORM VIEW ──────────────────────────────────────────────
         <div className="p-4 sm:p-6 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-5">
           <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-            <h3 className="text-base sm:text-lg font-semibold text-slate-800">Add New Shop Delivery</h3>
+            <h3 className="text-base sm:text-lg font-semibold text-slate-800">
+              {editingId !== null ? "Edit Shop Delivery" : "Add New Shop Delivery"}
+            </h3>
             <button
               onClick={closeForm}
               className="h-10 w-10 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors touch-manipulation"
@@ -443,10 +910,10 @@ function UnLoadingTable({
             </button>
           </div>
 
-          {/* Row 1: Delivery Type + Shop Name */}
+          {/* Row 1: Delivery Mode + Shop Name */}
           <div className="flex flex-col sm:flex-row gap-4 sm:gap-5">
             <div className="sm:w-[40%]">
-              <label className="text-sm font-medium text-slate-700 block mb-1.5">Delivery Type</label>
+              <label className="text-sm font-medium text-slate-700 block mb-1.5">Delivery Mode</label>
               <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-fit">
                 <button
                   type="button"
@@ -457,7 +924,7 @@ function UnLoadingTable({
                       : "text-slate-500 hover:text-slate-700"
                   }`}
                 >
-                  Box
+                  Box (Farm Weight)
                 </button>
                 <button
                   type="button"
@@ -468,7 +935,7 @@ function UnLoadingTable({
                       : "text-slate-500 hover:text-slate-700"
                   }`}
                 >
-                  Weight
+                  Weight (Weigh at Shop)
                 </button>
               </div>
             </div>
@@ -492,21 +959,21 @@ function UnLoadingTable({
                 onChange={handleShopSelect}
                 maxMenuHeight={140}
                 styles={{
-                  control: (base) => ({
+                  control: (base: any) => ({
                     ...base,
                     minHeight: 44,
                     borderRadius: 12,
                     borderColor: "#e2e8f0",
                     backgroundColor: "#f8fafc",
                   }),
-                  menu: (base) => ({
+                  menu: (base: any) => ({
                     ...base,
                     zIndex: 9999,
                     borderRadius: 12,
                     overflow: "hidden",
                     boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.15)",
                   }),
-                  option: (base, state) => ({
+                  option: (base: any, state: any) => ({
                     ...base,
                     backgroundColor: state.isFocused ? "#e2e8f0" : "white",
                     color: "#1e293b",
@@ -542,21 +1009,21 @@ function UnLoadingTable({
                 onChange={handleBirdSelect}
                 maxMenuHeight={140}
                 styles={{
-                  control: (base) => ({
+                  control: (base: any) => ({
                     ...base,
                     minHeight: 44,
                     borderRadius: 12,
                     borderColor: "#e2e8f0",
                     backgroundColor: "#f8fafc",
                   }),
-                  menu: (base) => ({
+                  menu: (base: any) => ({
                     ...base,
                     zIndex: 9999,
                     borderRadius: 12,
                     overflow: "hidden",
                     boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.15)",
                   }),
-                  option: (base, state) => ({
+                  option: (base: any, state: any) => ({
                     ...base,
                     backgroundColor: state.isFocused ? "#e2e8f0" : "white",
                     color: "#1e293b",
@@ -578,6 +1045,7 @@ function UnLoadingTable({
                   selectedIds={formData.selectedBoxIds}
                   onSelectionChange={handleBoxSelection}
                   disabled={readOnly}
+                  usedBoxIds={usedBoxIds}
                 />
               ) : (
                 <div className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 text-center">
@@ -589,111 +1057,247 @@ function UnLoadingTable({
                 </div>
               )}
               <p className="text-[10px] text-slate-400 mt-1">
-                Select the boxes being delivered. Enter Delivery Birds and Wt (Del.) manually below.
+                {mode === "box"
+                  ? "Boxes delivered from farm weight. Enter mortality – delivered birds & weight are auto-calculated."
+                  : "Enter per-box delivery birds and weight. Enter total mortality birds and mortality weight."}
               </p>
             </div>
           </div>
 
-          {/* Row 3: Box No | Birds (Farm) | Birds (Del.) | Mor (Birds) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
-            <div>
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                <Box size={16} className="text-slate-400" /> Box No
-              </label>
-              <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
-                {boxCount}
+          {/* ─── Conditional Grid ────────────────────────────────────── */}
+          {mode === "box" ? (
+            // BOX MODE: Two rows, 4 columns
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
+                <div>
+                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
+                    <Box size={16} className="text-slate-400" /> Box No
+                  </label>
+                  <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
+                    {boxCount}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
+                    <span className="text-slate-400">🌾</span> Birds (Farm)
+                  </label>
+                  <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
+                    {farmBirds}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
+                    <span className="text-slate-400">⚰️</span> Mor (Birds)
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.mortality || ""}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      handleFormChange("mortality", Number(e.target.value))
+                    }
+                    placeholder="0"
+                    min="0"
+                    className={`w-full rounded-xl border px-4 sm:px-5 py-2 text-sm font-medium outline-none transition-all no-spinner h-[44px] ${
+                      validationErrors.birdsExceed
+                        ? "border-red-500 bg-red-50 focus:border-red-600 focus:ring-red-200"
+                        : "border-slate-200 bg-slate-50/50 text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10"
+                    }`}
+                  />
+                  {validationErrors.birdsExceed && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertCircle size={12} /> Cannot be more than {farmBirds}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
+                    <span className="text-slate-400">🐔</span> Birds (Del.)
+                  </label>
+                  <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
+                    {deliveredBirds}
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
+                <div />
+                <div>
+                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
+                    <Scale size={16} className="text-slate-400" /> Wt (Farm)
+                  </label>
+                  <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
+                    {farmWeight.toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
+                    <Scale size={16} className="text-slate-400" /> Mor (kg)
+                  </label>
+                  <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
+                    {mortKg > 0 ? mortKg.toFixed(2) : "—"}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
+                    <Scale size={16} className="text-slate-400" /> Wt (Del.)
+                  </label>
+                  <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
+                    {deliveredWeight > 0 ? deliveredWeight.toFixed(2) : "—"}
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            // ─── WEIGHT MODE: Per‑box table + mortality ──────────────
+            <div className="space-y-4">
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-100">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-semibold">Box</th>
+                      <th className="px-3 py-2 text-left font-semibold">Birds (Farm)</th>
+                      <th className="px-3 py-2 text-left font-semibold">Birds (Del.) <span className="text-rose-500">*</span></th>
+                      <th className="px-3 py-2 text-left font-semibold">Wt (Farm)</th>
+                      <th className="px-3 py-2 text-left font-semibold">Wt (Del.) <span className="text-rose-500">*</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {formData.perBoxData.map((item, index) => {
+                      const farmBox = safeBoxDetails.find((b) => b.boxNo === item.boxNo);
+                      const birdsError = validationErrors.perBoxBirdsErrors[index] || false;
+                      const weightError = validationErrors.perBoxWeightErrors[index] || false;
+                      return (
+                        <tr key={item.boxNo} className="border-t border-slate-200">
+                          <td className="px-3 py-2 font-medium">#{item.boxNo}</td>
+                          <td className="px-3 py-2">{farmBox?.birds || 0}</td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              value={item.birds || ""}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                handlePerBoxChange(index, "birds", Number(e.target.value))
+                              }
+                              placeholder="0"
+                              min="0"
+                              className={`w-20 rounded border px-2 py-1 text-sm focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all no-spinner ${
+                                birdsError
+                                  ? "border-red-500 bg-red-50"
+                                  : "border-slate-200 bg-slate-50/50"
+                              }`}
+                            />
+                            {birdsError && (
+                              <div className="text-xs text-red-600 mt-0.5">Cannot exceed {farmBox?.birds || 0}</div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2">{farmBox?.weight.toFixed(2) || "0.00"}</td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.weight || ""}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                handlePerBoxChange(index, "weight", Number(e.target.value))
+                              }
+                              placeholder="0.00"
+                              min="0"
+                              className={`w-24 rounded border px-2 py-1 text-sm focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all no-spinner ${
+                                weightError
+                                  ? "border-red-500 bg-red-50"
+                                  : "border-slate-200 bg-slate-50/50"
+                              }`}
+                            />
+                            {weightError && (
+                              <div className="text-xs text-red-600 mt-0.5">Cannot exceed {farmBox?.weight.toFixed(2)}</div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {formData.perBoxData.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-3 py-4 text-center text-slate-400">
+                          No boxes selected.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot className="bg-slate-50 font-semibold border-t border-slate-200">
+                    <tr>
+                      <td className="px-3 py-2">Totals</td>
+                      <td className="px-3 py-2">{farmBirds}</td>
+                      <td className="px-3 py-2">{weightModeTotals.birds}</td>
+                      <td className="px-3 py-2">{farmWeight.toFixed(2)}</td>
+                      <td className="px-3 py-2">{weightModeTotals.weight.toFixed(2)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              {/* Mortality fields */}
+              <div className="grid grid-cols-3 gap-4 sm:gap-6">
+                <div>
+                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
+                    <span className="text-slate-400">⚰️</span> Mor (Birds)
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.mortality || ""}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      handleFormChange("mortality", Number(e.target.value))
+                    }
+                    placeholder="0"
+                    min="0"
+                    className={`w-full rounded-xl border px-4 sm:px-5 py-2 text-sm font-medium outline-none transition-all no-spinner h-[44px] ${
+                      validationErrors.birdsExceedFarm || validationErrors.birdsMismatch
+                        ? "border-red-500 bg-red-50 focus:border-red-600 focus:ring-red-200"
+                        : "border-slate-200 bg-slate-50/50 text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10"
+                    }`}
+                  />
+                  {validationErrors.birdsExceedFarm && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertCircle size={12} /> Cannot exceed more than Bird(Farm) ({farmBirds})
+                    </p>
+                  )}
+                  {validationErrors.birdsMismatch && !validationErrors.birdsExceedFarm && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertCircle size={12} /> Total Birds + Mortality must equal {farmBirds}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
+                    <Scale size={16} className="text-slate-400" /> Mor (kg)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.mortWeight || ""}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      handleFormChange("mortWeight", Number(e.target.value))
+                    }
+                    placeholder="0.00"
+                    min="0"
+                    className={`w-full rounded-xl border px-4 sm:px-5 py-2 text-sm font-medium outline-none transition-all no-spinner h-[44px] ${
+                      validationErrors.weightExceedFarm
+                        ? "border-red-500 bg-red-50 focus:border-red-600 focus:ring-red-200"
+                        : "border-slate-200 bg-slate-50/50 text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10"
+                    }`}
+                  />
+                  {validationErrors.weightExceedFarm && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertCircle size={12} /> Total Weight + Mort Kg cannot exceed Farm Weight ({farmWeight.toFixed(2)})
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
+                    <span className="text-slate-400">📉</span> Weight Loss
+                  </label>
+                  <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
+                    {weightLoss.toFixed(2)}
+                  </div>
+                </div>
               </div>
             </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                <span className="text-slate-400">🌾</span> Birds (Farm)
-              </label>
-              <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
-                {farmBirds}
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                <span className="text-slate-400">🐔</span> Birds (Del.) <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="number"
-                value={formData.birds || ""}
-                onChange={(e) => handleFormChange("birds", Number(e.target.value))}
-                placeholder="0"
-                min="0"
-                className={`w-full rounded-xl border px-4 sm:px-5 py-2 text-sm font-medium outline-none transition-all no-spinner h-[44px] ${
-                  validationErrors.birdsExceed
-                    ? "border-red-500 bg-red-50 focus:border-red-600 focus:ring-red-200"
-                    : "border-slate-200 bg-slate-50/50 text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10"
-                }`}
-                required
-              />
-              {validationErrors.birdsExceed && (
-                <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                  <AlertCircle size={12} /> Cannot be more than {maxAllowedBirds}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                <span className="text-slate-400">⚰️</span> Mor (Birds)
-              </label>
-              <input
-                type="number"
-                value={formData.mortality || ""}
-                onChange={(e) => handleFormChange("mortality", Number(e.target.value))}
-                placeholder="0"
-                min="0"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all no-spinner h-[44px]"
-              />
-            </div>
-          </div>
-
-          {/* Row 4: (empty) | Wt (Farm) | Wt (Del.) | Mor (kg) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
-            <div>{/* Empty placeholder */}</div>
-            <div>
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                <Scale size={16} className="text-slate-400" /> Wt (Farm)
-              </label>
-              <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
-                {farmWeight.toFixed(2)}
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                <Scale size={16} className="text-slate-400" /> Wt (Del.) <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.weight || ""}
-                onChange={(e) => handleFormChange("weight", Number(e.target.value))}
-                placeholder="0.00"
-                min="0"
-                className={`w-full rounded-xl border px-4 sm:px-5 py-2 text-sm font-medium outline-none transition-all no-spinner h-[44px] ${
-                  validationErrors.weightExceed
-                    ? "border-red-500 bg-red-50 focus:border-red-600 focus:ring-red-200"
-                    : "border-slate-200 bg-slate-50/50 text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10"
-                }`}
-                required
-              />
-              {validationErrors.weightExceed && (
-                <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                  <AlertCircle size={12} /> Cannot be more than {maxAllowedWeight.toFixed(2)}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                <Scale size={16} className="text-slate-400" /> Mor (kg)
-              </label>
-              <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
-                {mortKg > 0 ? mortKg.toFixed(2) : "—"}
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* Remarks */}
           <div>
@@ -702,7 +1306,7 @@ function UnLoadingTable({
             </label>
             <input
               value={formData.remarks || ""}
-              onChange={(e) => handleFormChange("remarks", e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFormChange("remarks", e.target.value)}
               placeholder="Optional notes..."
               className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all h-[44px]"
             />
@@ -724,15 +1328,15 @@ function UnLoadingTable({
                   : "bg-slate-300 text-slate-500 cursor-not-allowed shadow-none"
               }`}
             >
-              Save Delivery
+              {editingId !== null ? "Update" : "Save"} Delivery
             </button>
           </div>
         </div>
       ) : (
-        /* ─── TABLE VIEW ────────────────────────────────────────────── */
+        // ─── TABLE VIEW: Single‑line cards with icons ──────────────
         <>
-          <div className="p-3 sm:p-4 bg-slate-50/40 space-y-3">
-            {currentRows.length === 0 && (
+          <div className="p-3 sm:p-4 bg-slate-50/40">
+            {currentRows.length === 0 ? (
               <div className="text-center py-12 text-slate-400 text-sm bg-white rounded-2xl border border-slate-200 border-dashed">
                 <div className="flex flex-col items-center justify-center gap-2">
                   <div className="h-14 w-14 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
@@ -744,45 +1348,66 @@ function UnLoadingTable({
                   </p>
                 </div>
               </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {currentRows.map((row: ShopDelivery) => {
+                  const avgPerBird = row.birds > 0 ? row.weight / row.birds : 0;
+                  const mortWeight = row.mortality > 0 ? row.mortality * avgPerBird : 0;
+
+                  return (
+                    <div
+                      key={row.id}
+                      className="group bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col"
+                    >
+                      {/* Header */}
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className="h-6 w-6 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0">
+                            <Check size={14} />
+                          </div>
+                          <span className="font-semibold text-slate-800 text-sm truncate">
+                            {row.shopName}
+                          </span>
+                          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <Box size={12} /> {row.boxNo}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {!readOnly && (
+                            <button
+                              onClick={() => openEditForm(row)}
+                              className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => generatePDF(row as ShopDeliveryWithExtra)}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 transition-colors"
+                            title="PDF"
+                          >
+                            <FileText size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Body - Single line with icons */}
+                      <div className="flex justify-around items-center py-1">
+                        <div className="flex items-center gap-2">
+                          <Users size={16} className="text-blue-500" />
+                          <span className="font-bold text-slate-800 text-sm">{row.birds}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Scale size={16} className="text-emerald-500" />
+                          <span className="font-bold text-slate-800 text-sm">{row.weight.toFixed(2)} kg</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
-
-            {currentRows.map((row) => {
-              const avgPerBird = row.birds > 0 ? row.weight / row.birds : 0;
-              const mortWeight = row.mortality > 0 ? row.mortality * avgPerBird : 0;
-
-              return (
-                <div
-                  key={row.id}
-                  className="bg-gradient-to-br from-white to-emerald-50/70 border border-emerald-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all duration-300"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-emerald-500 border-none shadow-sm flex items-center justify-center text-white shrink-0">
-                      <Check size={16} />
-                    </div>
-                    <span className="font-bold text-slate-800 text-sm tracking-wide truncate">{row.shopName}</span>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    <div className="bg-white/40 rounded-xl px-3 py-2 border border-emerald-100/60 shadow-sm flex justify-between items-center">
-                      <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Birds</span>
-                      <span className="font-bold text-slate-900 text-sm">{row.birds}</span>
-                    </div>
-                    <div className="bg-white/40 rounded-xl px-3 py-2 border border-emerald-100/60 shadow-sm flex justify-between items-center">
-                      <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Kg</span>
-                      <span className="font-bold text-slate-900 text-sm">{row.weight.toFixed(2)}</span>
-                    </div>
-                    <div className="bg-white/40 rounded-xl px-3 py-2 border border-emerald-100/60 shadow-sm flex justify-between items-center">
-                      <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Mortality</span>
-                      <span className="font-bold text-rose-600 text-sm">{row.mortality}</span>
-                    </div>
-                    <div className="bg-white/40 rounded-xl px-3 py-2 border border-emerald-100/60 shadow-sm flex justify-between items-center">
-                      <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Mort. Kg</span>
-                      <span className="font-bold text-rose-600 text-sm">{mortWeight.toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
           </div>
 
           {/* Pagination */}

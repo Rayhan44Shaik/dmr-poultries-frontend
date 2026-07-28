@@ -34,6 +34,7 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     destMeter: 0,
     pickupTolls: 0,
     farmStepSubmitted: false,
+    farmAddress: "",
     dcWeight: 0,
     totalBirds: 0,
     boxes: 0,
@@ -46,6 +47,7 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     closingMeter: 0,
     endTime: "",
     deliveryTolls: 0,
+    endStepSubmitted: false,
     totalKm: 0,
     totalShops: 0,
     totalWeight: 0,
@@ -57,7 +59,7 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     weightLoss: 0,
     survivalRate: 0,
     lastShop: "",
-    status: "Pending",
+    status: "Draft",
     fuel: 0,
     expense: 0,
     remarks: "",
@@ -72,6 +74,12 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
 
   const [trip, setTrip] = useState<Trip>(emptyTrip());
   const [isEditing, setIsEditing] = useState(false);
+  const [endStepSubmitted, setEndStepSubmitted] = useState<boolean>(false);
+
+  // Sync endStepSubmitted when trip changes
+  const syncEndStep = (tripData: Trip) => {
+    setEndStepSubmitted(tripData.endStepSubmitted || false);
+  };
 
   const calculateDeliveryKPIs = (
     deliveries: ShopDelivery[],
@@ -113,11 +121,14 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
         ...updatedData,
         id: Date.now(),
         tripNo,
-        startStepSubmitted: true
+        startStepSubmitted: true,
+        status: "Draft",
+        endStepSubmitted: false
       });
       showNotification?.(`✅ Step 1 completed successfully. Moving to Step 2...`, "success");
     }
     setTrip(savedTrip);
+    syncEndStep(savedTrip);
     return true;
   };
 
@@ -132,13 +143,11 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     }
     const savedTrip = tripService.update({ ...updatedData, farmStepSubmitted: true });
     setTrip(savedTrip);
+    syncEndStep(savedTrip);
     showNotification?.(isEditing ? `✅ Step 2 updated successfully.` : `✅ Step 2 completed successfully. Moving to Step 3...`, "success");
     return true;
   };
 
-  /**
-   * ✅ UPDATED: Now accepts a `silent` parameter to suppress the "Pickup progress saved." notification.
-   */
   const updateBoxDetails = (rows: BoxDetail[], persistToStorage: boolean = false, silent: boolean = false) => {
     const totalBirds = rows.reduce((sum, r) => sum + (r.birds || 0), 0);
     const dcWeight = Number(rows.reduce((sum, r) => sum + (r.weight || 0), 0).toFixed(2));
@@ -157,11 +166,13 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     if (persistToStorage) {
       const savedTrip = tripService.update(updatedTrip);
       setTrip(savedTrip);
+      syncEndStep(savedTrip);
       if (!silent) {
         showNotification?.(`💾 Pickup progress saved.`, "info");
       }
     } else {
       setTrip(updatedTrip);
+      syncEndStep(updatedTrip);
     }
   };
 
@@ -189,6 +200,7 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
       pickupStepSubmitted: true
     });
     setTrip(savedTrip);
+    syncEndStep(savedTrip);
 
     showNotification?.(isEditing ? `✅ Step 3 updated successfully.` : `✅ Step 3 completed successfully. Moving to Step 4...`, "success");
     return true;
@@ -199,13 +211,22 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
       showNotification?.(`❌ Please add at least one shop delivery before proceeding.`, "error");
       return false;
     }
-    const savedTrip = tripService.update({ ...trip, deliveryStepSubmitted: true });
+    const savedTrip = tripService.update({
+      ...trip,
+      deliveryStepSubmitted: true
+    });
     setTrip(savedTrip);
+    syncEndStep(savedTrip);
     showNotification?.(`✅ Deliveries locked. Proceed to End Trip.`, "success");
     return true;
   };
 
-  const updateTrip = (updates: Partial<Trip>) => setTrip(prev => ({ ...prev, ...updates }));
+  const updateTrip = (updates: Partial<Trip>) => {
+    setTrip(prev => ({ ...prev, ...updates }));
+    if (updates.endStepSubmitted !== undefined) {
+      setEndStepSubmitted(updates.endStepSubmitted);
+    }
+  };
 
   const updateDeliveries = (rows: ShopDelivery[], persistToStorage: boolean = true) => {
     const totalMortalityCount = rows.reduce((sum, r) => sum + (r.mortality || 0), 0);
@@ -235,8 +256,10 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     if (persistToStorage) {
       const savedTrip = tripService.update(updatedTrip);
       setTrip(savedTrip);
+      syncEndStep(savedTrip);
     } else {
       setTrip(updatedTrip);
+      syncEndStep(updatedTrip);
     }
   };
 
@@ -263,12 +286,14 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
       ...trip,
       totalKm,
       endTime: new Date().toLocaleString(),
-      status: "Completed" as TripStatus
+      status: "Pending" as TripStatus,
+      endStepSubmitted: true,
     };
 
     const savedTrip = tripService.update(updatedTrip);
     setTrip(savedTrip);
-    showNotification?.(`✅ Trip ${savedTrip.tripNo} completed successfully!`, "success");
+    setEndStepSubmitted(true);
+    showNotification?.(`✅ Trip ${savedTrip.tripNo} completed! Awaiting approval.`, "success");
     return true;
   };
 
@@ -280,11 +305,13 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
       boxDetails: tripToLoad.boxDetails || []
     });
     setIsEditing(true);
+    setEndStepSubmitted(tripToLoad.endStepSubmitted === true);
   };
 
   const clearTrip = () => {
     setTrip(emptyTrip());
     setIsEditing(false);
+    setEndStepSubmitted(false);
   };
 
   return {
@@ -292,9 +319,10 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     setTrip,
     isEditing,
     setIsEditing,
+    endStepSubmitted,
     updateTrip,
     updateDeliveries,
-    updateBoxDetails,        // ✅ now accepts `silent` parameter
+    updateBoxDetails,
     submitStartStep,
     submitFarmStep,
     submitPickupStep,

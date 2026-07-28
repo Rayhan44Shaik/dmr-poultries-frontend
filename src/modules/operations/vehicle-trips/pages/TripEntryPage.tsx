@@ -52,6 +52,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setTrip, 
     isEditing, 
     setIsEditing,
+    endStepSubmitted,
     updateTrip, 
     updateDeliveries, 
     updateBoxDetails,
@@ -136,12 +137,17 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const isFarmCompleted = trip.farmStepSubmitted;
   const isPickupCompleted = trip.pickupStepSubmitted;
   const isDeliveryCompleted = trip.deliveryStepSubmitted;
-  const isTripEnded = trip.status === "Completed";
-  
+  const isTripEnded = endStepSubmitted;
+
   const canEditTrip = trip.createdAt ? canEditItem(trip.createdAt) : false;
   const isGlobalEditMode = isEditing && canEditTrip;
 
-  const currentStep = isTripEnded ? 5 : (isDeliveryCompleted ? 4 : (isPickupCompleted ? 3 : (isFarmCompleted ? 2 : (isStartCompleted ? 1 : 0))));
+  const currentStep = isTripEnded ? 5 
+    : (isDeliveryCompleted ? 4 
+      : (isPickupCompleted ? 3 
+        : (isFarmCompleted ? 2 
+          : (isStartCompleted ? 1 : 0))));
+  
   const vehicleOpts = vehicles.map((v: any) => ({ id: v.id, vehicleNumber: v.vehicleNumber }));
   const employeeOpts = employees.map((e: any) => ({ id: e.id, employeeName: e.employeeName, department: e.department }));
 
@@ -155,13 +161,22 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     isManualSelect.current = false;
   }, [trip.id]);
 
-  // ─── Render step with correct editable logic ─────────────────────────
+  // ─── SAFEGUARD: prevent "Pending" status before End step ──────────
+  useEffect(() => {
+    // If the trip is not yet ended (endStepSubmitted is false) but status is "Pending",
+    // reset it to "Draft" to prevent premature approval.
+    if (!endStepSubmitted && trip.status === "Pending") {
+      setTrip(prev => ({ ...prev, status: "Draft" as any }) as Trip);
+      showNotification?.("⏳ Trip is still in draft. Complete the End step to submit for approval.", "info");
+    }
+  }, [endStepSubmitted, trip.status, setTrip, showNotification]);
+
   const renderSelectedStep = () => {
     const isViewingActiveStep = !isTripEnded && viewStepIndex === currentStep;
     const onCancelEdit = () => setIsEditing(false);
 
-    // Helper: only allow editing if this is the active step AND not yet completed
     const isEditable = (stepCompleted: boolean) => {
+      if (viewStepIndex === 4 && isTripEnded) return false;
       return isViewingActiveStep && !stepCompleted && isGlobalEditMode;
     };
 
@@ -223,7 +238,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           trip={trip}
           updateDeliveries={updateDeliveries}
           submitDeliveriesStep={submitDeliveriesStep}
-          boxDetails={trip.boxDetails || []}          // ✅ PASS BOXES HERE
+          boxDetails={trip.boxDetails || []}
           readOnly={!isEditable(isDeliveryCompleted)}
           editable={isEditable(isDeliveryCompleted)}
           canEdit={canEditTrip}
@@ -291,7 +306,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
             />
             
             <div className="mt-6">{renderSelectedStep()}</div>
-            {isStartCompleted && <TripFinalKPI trip={trip} />}
+            {isStartCompleted && <TripFinalKPI trip={trip} deliveries={rows} />}
           </>
         )}
       </div>

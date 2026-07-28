@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Clock, MapPin, Gauge, Lock, MessageSquare, Store, Ticket, Pencil, X, CheckCircle } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Clock, MapPin, Gauge, Lock, MessageSquare, Store, Ticket, Pencil, X, CheckCircle, Loader2 } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 
@@ -27,7 +27,11 @@ export default function StepFarm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(false);
   const [destMeterError, setDestMeterError] = useState<string | null>(null);
-  const [farmAddress, setFarmAddress] = useState("");
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+
+  // ─── Use farmAddress from trip (fallback to empty string) ──────────
+  const farmAddress = (trip as any).farmAddress || "";
+  const remarks = trip.remarks || "";
 
   const farmOptions = farms.map((farm: any) => ({ value: farm.id, label: farm.farmName }));
 
@@ -36,6 +40,50 @@ export default function StepFarm({
     control: (base: any, state: any) => ({ ...base, minHeight: 38, borderRadius: 12, borderColor: state.isFocused ? "#2563eb" : "#e2e8f0", backgroundColor: "#ffffff", boxShadow: state.isFocused ? "0 0 0 4px rgba(37, 99, 235, 0.1)" : "none", "&:hover": { borderColor: "#cbd5e1" } }),
     option: (base: any, { isFocused, isSelected }: any) => ({ ...base, backgroundColor: isSelected ? "#2563eb" : isFocused ? "#f1f5f9" : "transparent", color: isSelected ? "white" : "#334155", fontSize: "13px", cursor: "pointer" }),
     menu: (base: any) => ({ ...base, maxHeight: 150, overflowY: "auto", scrollbarWidth: "none", "::-webkit-scrollbar": { display: "none" } }),
+  };
+
+  // ─── Fetch current location ──────────────────────────────────────────
+  const fetchCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+    setIsFetchingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
+          );
+          const data = await response.json();
+          if (data && data.display_name) {
+            const address = data.display_name;
+            // ✅ Store in farmAddress field
+            updateTrip({ farmAddress: address } as any);
+          } else {
+            const fallback = `Lat: ${latitude.toFixed(6)}, Lon: ${longitude.toFixed(6)}`;
+            updateTrip({ farmAddress: fallback } as any);
+          }
+        } catch (error) {
+          console.error("Reverse geocoding error:", error);
+          const fallback = `Lat: ${latitude.toFixed(6)}, Lon: ${longitude.toFixed(6)}`;
+          updateTrip({ farmAddress: fallback } as any);
+        } finally {
+          setIsFetchingLocation(false);
+        }
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        alert("Unable to fetch location. Please check your browser permissions and try again.");
+        setIsFetchingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  const handleAddressChange = (value: string) => {
+    updateTrip({ farmAddress: value } as any);
   };
 
   const handleDestMeterChange = (value: string) => {
@@ -49,8 +97,7 @@ export default function StepFarm({
   };
 
   const handleClear = () => {
-    setFarmAddress("");
-    updateTrip({ sourceFarmId: 0, sourceFarm: "", destMeter: 0, pickupTolls: 0, remarks: "" });
+    updateTrip({ sourceFarmId: 0, sourceFarm: "", destMeter: 0, pickupTolls: 0, remarks: "", farmAddress: "" } as any);
     setDestMeterError(null);
   };
 
@@ -117,7 +164,7 @@ export default function StepFarm({
             </div>
             <div className="md:col-span-3 bg-white border border-slate-100 rounded-xl p-4 shadow-sm flex flex-col gap-1.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5"><MessageSquare size={14} className="text-indigo-500" /> Remarks</span>
-              <span className="text-sm font-medium text-slate-800 truncate">{trip.remarks || '—'}</span>
+              <span className="text-sm font-medium text-slate-800 truncate">{remarks || '—'}</span>
             </div>
           </div>
         </div>
@@ -140,11 +187,10 @@ export default function StepFarm({
         </div>
 
         <div className="space-y-6">
-          {/* ROW 1: 50% Time / 50% Farm */}
+          {/* Row 1: Time & Farm */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5"><Clock size={14} className="text-slate-400" /> Reached Time</label>
-              {/* 🔹 FIXED: Now shows existing time on Edit, instead of hardcoded '—' */}
               <div className="mt-1.5 h-[38px] bg-slate-50/80 border border-slate-200 rounded-xl px-4 py-2.5 flex items-center text-sm font-medium text-slate-700">
                 <Clock size={16} className="text-slate-400 mr-2" />
                 <span>{trip.reachedTime || '—'}</span>
@@ -158,11 +204,35 @@ export default function StepFarm({
             </div>
           </div>
 
-          {/* ROW 2: 75% Address / 25% Dest. Meter */}
+          {/* Row 2: Address (with location button) */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="md:col-span-3">
-              <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5"><MapPin size={14} className="text-slate-400" /> Detailed Farm Address</label>
-              <input type="text" value={farmAddress} onChange={(e) => setFarmAddress(e.target.value)} className="w-full mt-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all" placeholder="Enter farm address details..." />
+              <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                <MapPin size={14} className="text-slate-400" /> Detailed Farm Address
+              </label>
+              <div className="flex items-center gap-2 mt-1.5">
+                <input
+                  type="text"
+                  value={farmAddress}
+                  onChange={(e) => handleAddressChange(e.target.value)}
+                  className="flex-1 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                  placeholder="Enter farm address details..."
+                />
+                <button
+                  type="button"
+                  onClick={fetchCurrentLocation}
+                  disabled={isFetchingLocation}
+                  className="shrink-0 h-[42px] px-4 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-all active:scale-95 flex items-center gap-1.5 text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isFetchingLocation ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <MapPin size={18} />
+                  )}
+                  <span className="hidden sm:inline">Get Location</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1.5">Use your device's GPS to fill the address automatically</p>
             </div>
 
             <div className="md:col-span-1">
@@ -175,7 +245,7 @@ export default function StepFarm({
             </div>
           </div>
 
-          {/* ROW 3: 25% Toll Gates / 75% Remarks */}
+          {/* Row 3: Toll Gates & Remarks */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="md:col-span-1">
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5"><Ticket size={14} className="text-slate-400" /> Toll Gates <span className="text-red-500">*</span></label>
@@ -186,7 +256,7 @@ export default function StepFarm({
             </div>
             <div className="md:col-span-3">
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5"><MessageSquare size={14} className="text-slate-400" /> Remarks</label>
-              <textarea rows={1} value={trip.remarks || ""} onChange={(e) => updateTrip({ remarks: e.target.value })} className="w-full mt-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all resize-none" placeholder="Enter any additional remarks about the farm..." />
+              <textarea rows={1} value={remarks} onChange={(e) => updateTrip({ remarks: e.target.value })} className="w-full mt-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all resize-none" placeholder="Enter any additional remarks about the farm..." />
             </div>
           </div>
         </div>
