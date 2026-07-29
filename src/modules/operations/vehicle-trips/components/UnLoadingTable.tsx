@@ -17,6 +17,8 @@ import {
   Pencil,
   FileText,
   Users,
+  Clock,
+  Building2,
 } from "lucide-react";
 import Select from "react-select";
 import type { ShopDelivery, BoxDetail } from "../types/trip";
@@ -30,6 +32,7 @@ type ShopDeliveryWithExtra = ShopDelivery & {
   farmWeight?: number;
   mortKg?: number;
   perBoxData?: { boxNo: number; birds: number; weight: number }[];
+  autoCaptureTime?: string;
 };
 
 interface BoxSelectorProps {
@@ -209,6 +212,8 @@ function UnLoadingTable({
   const [showForm, setShowForm] = useState<boolean>(false);
   const [mode, setMode] = useState<"box" | "weight">("box");
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [autoCaptureTime, setAutoCaptureTime] = useState<string>("");
+
   const [formData, setFormData] = useState<{
     shopId: number;
     shopName: string;
@@ -252,6 +257,32 @@ function UnLoadingTable({
     perBoxBirdsErrors: [],
     perBoxWeightErrors: [],
   });
+
+  // ─── Top KPI Calculations ────────────────────────────────────
+  const topKpiTotals = useMemo(() => {
+    const totalShops = safeRows.length;
+    const totalBirds = safeRows.reduce((acc, r) => acc + (r.birds || 0), 0);
+    const totalWeight = safeRows.reduce((acc, r) => acc + (r.weight || 0), 0);
+    const totalMortality = safeRows.reduce((acc, r) => acc + (r.mortality || 0), 0);
+    const totalMortKg = safeRows.reduce((acc, r) => {
+      const extra = r as ShopDeliveryWithExtra;
+      return acc + (extra.mortKg || 0);
+    }, 0);
+
+    const latestCaptured = safeRows.reduce((latest, r) => {
+      const extra = r as ShopDeliveryWithExtra;
+      return extra.autoCaptureTime || latest;
+    }, "");
+
+    return {
+      shops: totalShops,
+      birds: totalBirds,
+      weight: totalWeight,
+      mortality: totalMortality,
+      mortKg: totalMortKg,
+      lastCaptureTime: latestCaptured || new Date().toLocaleString(),
+    };
+  }, [safeRows]);
 
   // ─── Compute used box numbers ──────────────────────────────────
   const usedBoxIds = useMemo<number[]>(() => {
@@ -438,6 +469,7 @@ function UnLoadingTable({
   const openAddForm = () => {
     setEditingId(null);
     setMode("box");
+    setAutoCaptureTime(new Date().toLocaleString());
     setFormData({
       shopId: 0,
       shopName: "",
@@ -468,6 +500,7 @@ function UnLoadingTable({
     setEditingId(row.id);
     const modeFromRow = rowWithExtra.deliveryMode || "box";
     setMode(modeFromRow as "box" | "weight");
+    setAutoCaptureTime(rowWithExtra.autoCaptureTime || new Date().toLocaleString());
     const perBoxData = rowWithExtra.perBoxData || [];
     setFormData({
       shopId: row.shopId,
@@ -553,19 +586,19 @@ function UnLoadingTable({
 
   const handleSubmit = () => {
     if (validationErrors.birdsExceedFarm) {
-      alert(`⚠️ Cannot exceed more than Bird(Farm) (${farmBirds}).`);
+      alert(`⚠️ Cannot exceed more than Temple Birds (${farmBirds}).`);
       return;
     }
     if (validationErrors.weightExceedFarm) {
-      alert(`⚠️ Cannot exceed more than Wt(Farm) (${farmWeight.toFixed(2)}).`);
+      alert(`⚠️ Cannot exceed more than Temple Wt (${farmWeight.toFixed(2)}).`);
       return;
     }
     if (validationErrors.perBoxBirdsErrors.some((err) => err)) {
-      alert("⚠️ Some boxes have Birds(Del.) exceeding Birds(Farm). Please fix.");
+      alert("⚠️ Some boxes have Birds(Del.) exceeding Birds(Temple). Please fix.");
       return;
     }
     if (validationErrors.perBoxWeightErrors.some((err) => err)) {
-      alert("⚠️ Some boxes have Wt(Del.) exceeding Wt(Farm). Please fix.");
+      alert("⚠️ Some boxes have Wt(Del.) exceeding Wt(Temple). Please fix.");
       return;
     }
     if (!validate()) {
@@ -649,6 +682,7 @@ function UnLoadingTable({
       farmWeight: farmWeightVal,
       mortKg: mortKgVal,
       perBoxData: perBoxData,
+      autoCaptureTime: autoCaptureTime || new Date().toLocaleString(),
     };
 
     if (editingId !== null) {
@@ -697,6 +731,7 @@ function UnLoadingTable({
       doc.setFont('helvetica', 'normal');
       doc.text(`Shop Name : ${row.shopName}`, rightX, yStart, { align: 'right' });
       doc.text(`Date : ${tripDate || new Date().toLocaleDateString()}`, rightX, yStart + 8, { align: 'right' });
+      doc.text(`Captured : ${row.autoCaptureTime || 'N/A'}`, rightX, yStart + 16, { align: 'right' });
 
       const isBoxMode = row.deliveryMode === 'box';
       let y = yStart + 28;
@@ -722,7 +757,7 @@ function UnLoadingTable({
         doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
         doc.rect(colX[0], tableY, colWidths.reduce((a: number, b: number) => a + b, 0), 8, 'F');
         doc.text('', colX[0] + 2, tableY + 5);
-        doc.text('Birds Farm', colX[1] + 2, tableY + 5);
+        doc.text('Unloading Temple', colX[1] + 2, tableY + 5);
         doc.text('Mor', colX[2] + 2, tableY + 5);
         doc.text('Final Birds', colX[3] + 2, tableY + 5);
         doc.setTextColor(0, 0, 0);
@@ -753,11 +788,11 @@ function UnLoadingTable({
           doc.rect(colX[0], y, 26, 6, 'F');
           doc.text('Box', colX[0] + 2, y + 4);
           doc.rect(colX[1], y, 30, 6, 'F');
-          doc.text('Birds (Farm)', colX[1] + 2, y + 4);
+          doc.text('Birds (Temple)', colX[1] + 2, y + 4);
           doc.rect(colX[2], y, 30, 6, 'F');
           doc.text('Birds (Del.)', colX[2] + 2, y + 4);
           doc.rect(colX[3], y, 30, 6, 'F');
-          doc.text('Wt (Farm)', colX[3] + 2, y + 4);
+          doc.text('Wt (Temple)', colX[3] + 2, y + 4);
           doc.rect(colX[4], y, 30, 6, 'F');
           doc.text('Wt (Del.)', colX[4] + 2, y + 4);
           y += 8;
@@ -873,35 +908,83 @@ function UnLoadingTable({
 
   // ─── Render ────────────────────────────────────────────────────────
   return (
-    <div className="w-full">
+    <div className="w-full space-y-4">
       <style>{`
         .no-spinner::-webkit-inner-spin-button,.no-spinner::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.no-spinner{-moz-appearance:textfield}
       `}</style>
 
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-white border-b border-slate-200">
-        <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-          <ShoppingCart size={18} className="text-emerald-600" />
-          Shop Deliveries
-        </h2>
-        {!readOnly && !showForm && (
+      {/* Top Auto-Capture KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="bg-emerald-50/70 border border-emerald-100 p-3 rounded-xl flex flex-col justify-between shadow-xs">
+          <span className="text-xs font-semibold text-emerald-800 flex items-center gap-1">
+            <Clock size={13} className="text-emerald-600" /> Captured Time
+          </span>
+          <span className="text-xs font-bold text-slate-800 mt-1 truncate" title={topKpiTotals.lastCaptureTime}>
+            {topKpiTotals.lastCaptureTime}
+          </span>
+        </div>
+
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
+          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+            <Building2 size={13} className="text-slate-400" /> Shops
+          </span>
+          <span className="text-base font-bold text-slate-800">{topKpiTotals.shops}</span>
+        </div>
+
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
+          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+            <Users size={13} className="text-blue-500" /> Birds
+          </span>
+          <span className="text-base font-bold text-slate-800">{topKpiTotals.birds}</span>
+        </div>
+
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
+          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+            <Scale size={13} className="text-emerald-500" /> Weight (kg)
+          </span>
+          <span className="text-base font-bold text-slate-800">{topKpiTotals.weight.toFixed(2)}</span>
+        </div>
+
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
+          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+            <AlertCircle size={13} className="text-rose-500" /> Mor
+          </span>
+          <span className="text-base font-bold text-slate-800">{topKpiTotals.mortality}</span>
+        </div>
+
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
+          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+            <Scale size={13} className="text-rose-500" /> Mor (kg)
+          </span>
+          <span className="text-base font-bold text-slate-800">{topKpiTotals.mortKg.toFixed(2)}</span>
+        </div>
+      </div>
+
+      {/* Header action button */}
+      {!readOnly && !showForm && (
+        <div className="flex justify-end">
           <button
             onClick={openAddForm}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl shadow-sm transition-colors active:scale-95 touch-manipulation"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl shadow-xs transition-all active:scale-95 touch-manipulation"
           >
             <Plus size={18} />
             Add Shop
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {showForm ? (
         // ─── FORM VIEW ──────────────────────────────────────────────
         <div className="p-4 sm:p-6 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-5">
           <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-            <h3 className="text-base sm:text-lg font-semibold text-slate-800">
-              {editingId !== null ? "Edit Shop Delivery" : "Add New Shop Delivery"}
-            </h3>
+            <div>
+              <h3 className="text-base sm:text-lg font-semibold text-slate-800">
+                {editingId !== null ? "Edit Shop Delivery" : "Add New Shop Delivery"}
+              </h3>
+              <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                <Clock size={12} /> Auto-Captured: <span className="font-medium text-slate-600">{autoCaptureTime}</span>
+              </p>
+            </div>
             <button
               onClick={closeForm}
               className="h-10 w-10 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors touch-manipulation"
@@ -920,22 +1003,22 @@ function UnLoadingTable({
                   onClick={() => setMode("box")}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all touch-manipulation ${
                     mode === "box"
-                      ? "bg-white text-blue-700 shadow-sm"
+                      ? "bg-white text-blue-700 shadow-xs"
                       : "text-slate-500 hover:text-slate-700"
                   }`}
                 >
-                  Box (Farm Weight)
+                  Box Mode
                 </button>
                 <button
                   type="button"
                   onClick={() => setMode("weight")}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all touch-manipulation ${
                     mode === "weight"
-                      ? "bg-white text-blue-700 shadow-sm"
+                      ? "bg-white text-blue-700 shadow-xs"
                       : "text-slate-500 hover:text-slate-700"
                   }`}
                 >
-                  Weight (Weigh at Shop)
+                  Weight Mode
                 </button>
               </div>
             </div>
@@ -1051,22 +1134,13 @@ function UnLoadingTable({
                 <div className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 text-center">
                   <AlertCircle size={20} className="mx-auto mb-1 text-slate-300" />
                   <p className="text-sm text-slate-500">No boxes available from pickup.</p>
-                  <p className="text-xs text-slate-400">
-                    Please complete the Pickup KPI step first.
-                  </p>
                 </div>
               )}
-              <p className="text-[10px] text-slate-400 mt-1">
-                {mode === "box"
-                  ? "Boxes delivered from farm weight. Enter mortality – delivered birds & weight are auto-calculated."
-                  : "Enter per-box delivery birds and weight. Enter total mortality birds and mortality weight."}
-              </p>
             </div>
           </div>
 
           {/* ─── Conditional Grid ────────────────────────────────────── */}
           {mode === "box" ? (
-            // BOX MODE: Two rows, 4 columns
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
                 <div>
@@ -1079,7 +1153,7 @@ function UnLoadingTable({
                 </div>
                 <div>
                   <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                    <span className="text-slate-400">🌾</span> Birds (Farm)
+                    <span>🕌</span> Temple Birds
                   </label>
                   <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
                     {farmBirds}
@@ -1087,7 +1161,7 @@ function UnLoadingTable({
                 </div>
                 <div>
                   <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                    <span className="text-slate-400">⚰️</span> Mor (Birds)
+                    <span>⚰️</span> Mor (Birds)
                   </label>
                   <input
                     type="number"
@@ -1111,7 +1185,7 @@ function UnLoadingTable({
                 </div>
                 <div>
                   <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                    <span className="text-slate-400">🐔</span> Birds (Del.)
+                    <span>🐔</span> Birds (Del.)
                   </label>
                   <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
                     {deliveredBirds}
@@ -1122,7 +1196,7 @@ function UnLoadingTable({
                 <div />
                 <div>
                   <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                    <Scale size={16} className="text-slate-400" /> Wt (Farm)
+                    <Scale size={16} className="text-slate-400" /> Wt (Temple)
                   </label>
                   <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
                     {farmWeight.toFixed(2)}
@@ -1147,16 +1221,15 @@ function UnLoadingTable({
               </div>
             </>
           ) : (
-            // ─── WEIGHT MODE: Per‑box table + mortality ──────────────
             <div className="space-y-4">
               <div className="overflow-x-auto border border-slate-200 rounded-xl">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-100">
                     <tr>
                       <th className="px-3 py-2 text-left font-semibold">Box</th>
-                      <th className="px-3 py-2 text-left font-semibold">Birds (Farm)</th>
+                      <th className="px-3 py-2 text-left font-semibold">Birds (Temple)</th>
                       <th className="px-3 py-2 text-left font-semibold">Birds (Del.) <span className="text-rose-500">*</span></th>
-                      <th className="px-3 py-2 text-left font-semibold">Wt (Farm)</th>
+                      <th className="px-3 py-2 text-left font-semibold">Wt (Temple)</th>
                       <th className="px-3 py-2 text-left font-semibold">Wt (Del.) <span className="text-rose-500">*</span></th>
                     </tr>
                   </thead>
@@ -1179,14 +1252,9 @@ function UnLoadingTable({
                               placeholder="0"
                               min="0"
                               className={`w-20 rounded border px-2 py-1 text-sm focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all no-spinner ${
-                                birdsError
-                                  ? "border-red-500 bg-red-50"
-                                  : "border-slate-200 bg-slate-50/50"
+                                birdsError ? "border-red-500 bg-red-50" : "border-slate-200 bg-slate-50/50"
                               }`}
                             />
-                            {birdsError && (
-                              <div className="text-xs text-red-600 mt-0.5">Cannot exceed {farmBox?.birds || 0}</div>
-                            )}
                           </td>
                           <td className="px-3 py-2">{farmBox?.weight.toFixed(2) || "0.00"}</td>
                           <td className="px-3 py-2">
@@ -1200,101 +1268,15 @@ function UnLoadingTable({
                               placeholder="0.00"
                               min="0"
                               className={`w-24 rounded border px-2 py-1 text-sm focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all no-spinner ${
-                                weightError
-                                  ? "border-red-500 bg-red-50"
-                                  : "border-slate-200 bg-slate-50/50"
+                                weightError ? "border-red-500 bg-red-50" : "border-slate-200 bg-slate-50/50"
                               }`}
                             />
-                            {weightError && (
-                              <div className="text-xs text-red-600 mt-0.5">Cannot exceed {farmBox?.weight.toFixed(2)}</div>
-                            )}
                           </td>
                         </tr>
                       );
                     })}
-                    {formData.perBoxData.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="px-3 py-4 text-center text-slate-400">
-                          No boxes selected.
-                        </td>
-                      </tr>
-                    )}
                   </tbody>
-                  <tfoot className="bg-slate-50 font-semibold border-t border-slate-200">
-                    <tr>
-                      <td className="px-3 py-2">Totals</td>
-                      <td className="px-3 py-2">{farmBirds}</td>
-                      <td className="px-3 py-2">{weightModeTotals.birds}</td>
-                      <td className="px-3 py-2">{farmWeight.toFixed(2)}</td>
-                      <td className="px-3 py-2">{weightModeTotals.weight.toFixed(2)}</td>
-                    </tr>
-                  </tfoot>
                 </table>
-              </div>
-              {/* Mortality fields */}
-              <div className="grid grid-cols-3 gap-4 sm:gap-6">
-                <div>
-                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                    <span className="text-slate-400">⚰️</span> Mor (Birds)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.mortality || ""}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      handleFormChange("mortality", Number(e.target.value))
-                    }
-                    placeholder="0"
-                    min="0"
-                    className={`w-full rounded-xl border px-4 sm:px-5 py-2 text-sm font-medium outline-none transition-all no-spinner h-[44px] ${
-                      validationErrors.birdsExceedFarm || validationErrors.birdsMismatch
-                        ? "border-red-500 bg-red-50 focus:border-red-600 focus:ring-red-200"
-                        : "border-slate-200 bg-slate-50/50 text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10"
-                    }`}
-                  />
-                  {validationErrors.birdsExceedFarm && (
-                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                      <AlertCircle size={12} /> Cannot exceed more than Bird(Farm) ({farmBirds})
-                    </p>
-                  )}
-                  {validationErrors.birdsMismatch && !validationErrors.birdsExceedFarm && (
-                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                      <AlertCircle size={12} /> Total Birds + Mortality must equal {farmBirds}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                    <Scale size={16} className="text-slate-400" /> Mor (kg)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.mortWeight || ""}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      handleFormChange("mortWeight", Number(e.target.value))
-                    }
-                    placeholder="0.00"
-                    min="0"
-                    className={`w-full rounded-xl border px-4 sm:px-5 py-2 text-sm font-medium outline-none transition-all no-spinner h-[44px] ${
-                      validationErrors.weightExceedFarm
-                        ? "border-red-500 bg-red-50 focus:border-red-600 focus:ring-red-200"
-                        : "border-slate-200 bg-slate-50/50 text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10"
-                    }`}
-                  />
-                  {validationErrors.weightExceedFarm && (
-                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                      <AlertCircle size={12} /> Total Weight + Mort Kg cannot exceed Farm Weight ({farmWeight.toFixed(2)})
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                    <span className="text-slate-400">📉</span> Weight Loss
-                  </label>
-                  <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
-                    {weightLoss.toFixed(2)}
-                  </div>
-                </div>
               </div>
             </div>
           )}
@@ -1333,9 +1315,9 @@ function UnLoadingTable({
           </div>
         </div>
       ) : (
-        // ─── TABLE VIEW: Single‑line cards with icons ──────────────
+        // ─── 3-COLUMN CARDS VIEW ───────────────────────────────────────────
         <>
-          <div className="p-3 sm:p-4 bg-slate-50/40">
+          <div className="p-3 sm:p-4 bg-slate-50/40 rounded-2xl border border-slate-200/80">
             {currentRows.length === 0 ? (
               <div className="text-center py-12 text-slate-400 text-sm bg-white rounded-2xl border border-slate-200 border-dashed">
                 <div className="flex flex-col items-center justify-center gap-2">
@@ -1349,58 +1331,72 @@ function UnLoadingTable({
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              /* Three Column Grid Layout */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {currentRows.map((row: ShopDelivery) => {
-                  const avgPerBird = row.birds > 0 ? row.weight / row.birds : 0;
-                  const mortWeight = row.mortality > 0 ? row.mortality * avgPerBird : 0;
-
                   return (
                     <div
                       key={row.id}
-                      className="group bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col"
+                      className="group bg-white border border-slate-200 rounded-2xl p-4 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between"
                     >
-                      {/* Header */}
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
-                        <div className="flex items-center gap-2 flex-wrap">
+                      {/* Top Row: Shop Name (Left) + Edit Pencil & PDF Icons (Right) */}
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-2.5">
+                        <div className="flex items-center gap-2 overflow-hidden">
                           <div className="h-6 w-6 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0">
                             <Check size={14} />
                           </div>
-                          <span className="font-semibold text-slate-800 text-sm truncate">
+                          <span className="font-semibold text-slate-800 text-sm truncate" title={row.shopName}>
                             {row.shopName}
                           </span>
-                          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            <Box size={12} /> {row.boxNo}
-                          </span>
                         </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+
+                        {/* ✅ Edit Pencil & PDF Action Icons */}
+                        <div className="flex items-center gap-1 shrink-0">
                           {!readOnly && (
                             <button
                               onClick={() => openEditForm(row)}
-                              className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
+                              className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors flex items-center gap-1 font-medium text-xs"
                               title="Edit"
                             >
-                              <Pencil size={16} />
+                              <Pencil size={15} />
                             </button>
                           )}
                           <button
                             onClick={() => generatePDF(row as ShopDeliveryWithExtra)}
-                            className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 transition-colors"
-                            title="PDF"
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 transition-colors flex items-center gap-1 font-medium text-xs"
+                            title="Download PDF"
                           >
-                            <FileText size={16} />
+                            <FileText size={15} />
                           </button>
                         </div>
                       </div>
 
-                      {/* Body - Single line with icons */}
-                      <div className="flex justify-around items-center py-1">
-                        <div className="flex items-center gap-2">
-                          <Users size={16} className="text-blue-500" />
-                          <span className="font-bold text-slate-800 text-sm">{row.birds}</span>
+                      {/* Middle Details: Boxes, Birds & Weight Underneath */}
+                      <div className="flex items-center justify-between py-1 my-1">
+                        {/* Boxes */}
+                        <div className="flex items-center gap-1 text-slate-600 font-medium text-xs bg-slate-100 px-2.5 py-1 rounded-lg">
+                          <Box size={14} className="text-slate-500" />
+                          <span>{row.boxNo} Box{row.boxNo > 1 ? "es" : ""}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Scale size={16} className="text-emerald-500" />
-                          <span className="font-bold text-slate-800 text-sm">{row.weight.toFixed(2)} kg</span>
+
+                        {/* Birds */}
+                        <div className="flex items-center gap-1 text-slate-800 font-semibold text-xs">
+                          <Users size={14} className="text-blue-500" />
+                          <span>{row.birds} Birds</span>
+                        </div>
+
+                        {/* Weight */}
+                        <div className="flex items-center gap-1 text-slate-800 font-semibold text-xs">
+                          <Scale size={14} className="text-emerald-500" />
+                          <span>{row.weight.toFixed(2)} kg</span>
+                        </div>
+                      </div>
+
+                      {/* Footer: Timestamp */}
+                      <div className="flex items-center justify-between border-t border-slate-100 pt-2 mt-1 text-[11px] text-slate-400">
+                        <div className="flex items-center gap-1">
+                          <Clock size={12} />
+                          <span>{(row as ShopDeliveryWithExtra).autoCaptureTime || "Just now"}</span>
                         </div>
                       </div>
                     </div>
@@ -1411,7 +1407,7 @@ function UnLoadingTable({
           </div>
 
           {/* Pagination */}
-          <div className="border-t border-slate-100 bg-white px-4 py-3">
+          <div className="border-t border-slate-100 bg-white px-4 py-3 rounded-2xl border">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-xs font-medium text-slate-500">
                 Page <span className="font-bold text-slate-700">{currentPage}</span> of{" "}

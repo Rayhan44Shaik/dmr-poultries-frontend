@@ -61,10 +61,10 @@ function ConfirmationModal({
   if (!isOpen) return null;
 
   const iconColor = type === "warning" ? "text-amber-600" : "text-blue-600";
-  const borderColor = type === "warning" ? "border-amber-200" : "border-blue-200";
+  const borderColor = type === "warning" ? "border-amber-200" : "border-slate-200";
   const bgGradient = type === "warning"
     ? "from-amber-50 to-orange-50"
-    : "from-blue-50 to-indigo-50";
+    : "from-blue-50 to-slate-50";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -92,7 +92,7 @@ function ConfirmationModal({
             className={`px-5 py-2 rounded-lg text-sm font-bold text-white shadow-sm transition-all hover:shadow-md active:scale-[0.98] ${
               type === "warning"
                 ? "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700"
-                : "bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800"
+                : "bg-blue-600 hover:bg-blue-700"
             }`}
           >
             {confirmLabel}
@@ -110,7 +110,7 @@ function Toast({ message, type = "success", onClose }: { message: string; type?:
     return () => clearTimeout(timer);
   }, [onClose]);
 
-  const bgColor = type === "success" ? "bg-emerald-500" : "bg-red-500";
+  const bgColor = type === "success" ? "bg-slate-800" : "bg-red-500";
   const icon = type === "success" ? <Check size={18} className="text-white" /> : <AlertTriangle size={18} className="text-white" />;
 
   return (
@@ -587,59 +587,68 @@ export default function StepPickup({
     }, []) || [];
 
     return (
-      <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50/50 rounded-2xl p-4 shadow-lg shadow-slate-500/30 space-y-4">
-        <div className="flex items-center justify-between border-b border-blue-200 pb-2">
-          <div className="flex items-center gap-3">
-            <span className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold shadow-md">3</span>
-            <h2 className="text-xl font-extrabold bg-gradient-to-r from-blue-700 to-indigo-700 bg-clip-text text-transparent">PICKUP KPI</h2>
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
+        {/* Header Matching StepFarm Exact Styling */}
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
+              3
+            </span>
+            <h2 className="text-base font-bold text-slate-800 tracking-tight">
+              PICKUP KPI
+            </h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {canEdit && (
-              <button onClick={() => setIsLocalEditing(true)} className="bg-white hover:bg-blue-50 p-1.5 rounded-lg border border-blue-200 text-blue-600 shadow-sm">
+              <button
+                onClick={() => setIsLocalEditing(true)}
+                className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
+                title="Edit Pickup KPI"
+              >
                 <Pencil size={14} />
               </button>
             )}
-            <span className="bg-slate-200 text-slate-600 px-3 py-1 rounded-full text-[10px] font-bold border border-slate-300 flex items-center gap-1">
-              <Lock size={12} /> Locked
+            <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
+              Submitted & Locked
             </span>
           </div>
         </div>
 
-        {/* ─── Single row: 5 columns ──────────────────────────────────── */}
-        <div className="grid grid-cols-5 gap-3">
-          <div className="bg-white p-2 rounded-xl shadow-sm border border-blue-100 text-center">
-            <p className="text-[10px] text-slate-500 font-medium">Time</p>
-            <p className="font-bold text-slate-800 text-sm truncate">{trip.pickupLoadTime || "--"}</p>
+        {/* 5 Column Metric Cards Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4 pt-2">
+          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
+            <p className="text-xs text-slate-500 font-medium">Time</p>
+            <p className="font-semibold text-slate-900 mt-0.5 truncate">{trip.pickupLoadTime || "--"}</p>
           </div>
-          <div className="bg-white p-2 rounded-xl shadow-sm border border-blue-100 text-center">
-            <p className="text-[10px] text-slate-500 font-medium">DC Wt</p>
-            <p className="font-bold text-slate-800 text-sm">{trip.dcWeight.toFixed(2)} Kg</p>
+          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
+            <p className="text-xs text-slate-500 font-medium">DC Wt</p>
+            <p className="font-semibold text-slate-900 mt-0.5">{trip.dcWeight.toFixed(2)} Kg</p>
           </div>
-          <div className="bg-white p-2 rounded-xl shadow-sm border border-blue-100 text-center">
-            <p className="text-[10px] text-slate-500 font-medium">Birds</p>
-            <p className="font-bold text-slate-800 text-sm">{trip.totalBirds}</p>
+          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
+            <p className="text-xs text-slate-500 font-medium">Birds</p>
+            <p className="font-semibold text-slate-900 mt-0.5">{trip.totalBirds}</p>
           </div>
-          <div className="bg-white p-2 rounded-xl shadow-sm border border-blue-100 text-center">
-            <p className="text-[10px] text-slate-500 font-medium">Boxes</p>
-            <p className="font-bold text-slate-800 text-sm">{trip.boxes}</p>
+          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
+            <p className="text-xs text-slate-500 font-medium">Boxes</p>
+            <p className="font-semibold text-slate-900 mt-0.5">{trip.boxes}</p>
           </div>
-          <div className="bg-white p-2 rounded-xl shadow-sm border border-blue-100 text-center">
-            <p className="text-[10px] text-slate-500 font-medium">Avg Wt</p>
-            <p className="font-bold text-slate-800 text-sm">{trip.avgWeight || 0} Kg</p>
+          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
+            <p className="text-xs text-slate-500 font-medium">Avg Wt</p>
+            <p className="font-semibold text-slate-900 mt-0.5">{trip.avgWeight || 0} Kg</p>
           </div>
         </div>
 
-        {/* ─── DC Photo label (just name, no image preview) ──────────── */}
+        {/* DC Photo Status Card */}
         {imageKey && (
-          <div className="bg-white p-2 rounded-xl shadow-sm border border-blue-100 flex items-center gap-2">
+          <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center gap-2 text-xs font-medium text-slate-700">
             <Camera size={16} className="text-slate-400" />
-            <span className="text-xs font-medium text-slate-700">DC Photo uploaded</span>
+            <span>DC Photo uploaded</span>
           </div>
         )}
 
-        {/* Box table */}
+        {/* Box Table */}
         {trip.boxDetails && trip.boxDetails.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto max-h-96 overflow-y-auto">
+          <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto max-h-96 overflow-y-auto">
             <table className="w-full table-fixed border-collapse text-xs">
               <colgroup>
                 <col className="w-[8%]" />
@@ -653,12 +662,12 @@ export default function StepPickup({
                 <col className="w-[13.33%]" />
               </colgroup>
               <thead>
-                <tr className="bg-white text-slate-800 text-[10px] uppercase sticky top-0 z-10 border-b border-slate-200">
+                <tr className="bg-slate-50 text-slate-600 text-[10px] uppercase sticky top-0 z-10 border-b border-slate-200">
                   {[1, 2, 3].map((i, idx) => (
                     <React.Fragment key={i}>
-                      <th className={`text-center px-3 py-2 font-bold bg-white text-slate-800 border-r border-slate-200 ${idx > 0 ? 'pl-5' : ''}`}>BOX</th>
-                      <th className="text-center px-3 py-2 font-bold bg-white text-slate-800 border-r border-slate-200">BIRDS</th>
-                      <th className={`text-center px-3 py-2 font-bold bg-white text-slate-800 ${idx < 2 ? 'border-r-2 border-green-500 pr-5' : ''}`}>
+                      <th className={`text-center px-3 py-2 font-bold bg-slate-50 text-slate-600 border-r border-slate-200 ${idx > 0 ? 'pl-5' : ''}`}>BOX</th>
+                      <th className="text-center px-3 py-2 font-bold bg-slate-50 text-slate-600 border-r border-slate-200">BIRDS</th>
+                      <th className={`text-center px-3 py-2 font-bold bg-slate-50 text-slate-600 ${idx < 2 ? 'border-r-2 border-slate-300 pr-5' : ''}`}>
                         WT(KG)
                       </th>
                     </React.Fragment>
@@ -670,9 +679,9 @@ export default function StepPickup({
                   <tr key={idx} className="bg-white hover:bg-slate-50 transition-colors">
                     {group.map((r, colIdx) => (
                       <React.Fragment key={r.boxNo}>
-                        <td className={`text-center px-3 py-2 font-semibold bg-white text-slate-800 border-r border-slate-200 ${colIdx > 0 ? 'pl-5' : ''}`}>{r.boxNo}</td>
-                        <td className="text-center px-3 py-2 font-bold text-slate-800 bg-white border-r border-slate-200">{r.birds}</td>
-                        <td className={`text-center px-3 py-2 font-semibold text-slate-800 bg-white ${colIdx < 2 ? 'border-r-2 border-green-500 pr-5' : ''}`}>
+                        <td className={`text-center px-3 py-2 font-semibold text-slate-800 border-r border-slate-200 ${colIdx > 0 ? 'pl-5' : ''}`}>{r.boxNo}</td>
+                        <td className="text-center px-3 py-2 font-bold text-slate-800 border-r border-slate-200">{r.birds}</td>
+                        <td className={`text-center px-3 py-2 font-semibold text-slate-800 ${colIdx < 2 ? 'border-r-2 border-slate-300 pr-5' : ''}`}>
                           {r.weight.toFixed(2)}
                         </td>
                       </React.Fragment>
@@ -682,9 +691,9 @@ export default function StepPickup({
                         const emptyIdx = group.length + i;
                         return (
                           <React.Fragment key={i}>
-                            <td className={`text-center px-3 py-2 text-slate-300 bg-white border-r border-slate-200 ${emptyIdx > 0 ? 'pl-5' : ''}`}>—</td>
-                            <td className="text-center px-3 py-2 text-slate-300 bg-white border-r border-slate-200">—</td>
-                            <td className={`text-center px-3 py-2 text-slate-300 bg-white ${emptyIdx < 2 ? 'border-r-2 border-green-500 pr-5' : ''}`}>
+                            <td className={`text-center px-3 py-2 text-slate-300 border-r border-slate-200 ${emptyIdx > 0 ? 'pl-5' : ''}`}>—</td>
+                            <td className="text-center px-3 py-2 text-slate-300 border-r border-slate-200">—</td>
+                            <td className={`text-center px-3 py-2 text-slate-300 ${emptyIdx < 2 ? 'border-r-2 border-slate-300 pr-5' : ''}`}>
                               —
                             </td>
                           </React.Fragment>
@@ -697,24 +706,27 @@ export default function StepPickup({
           </div>
         )}
 
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <p className="text-sm text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 font-medium">✅ Submitted</p>
+        {/* Bottom Banner with Actions */}
+        <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-center justify-between flex-wrap gap-2">
+          <p className="text-xs text-slate-600 font-normal">
+            Pickup KPI details submitted successfully.
+          </p>
           <div className="flex items-center gap-2 flex-wrap">
             {imageKey && (
               <button
                 onClick={downloadImage}
-                className="flex items-center justify-center p-2 bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white rounded-lg shadow-md transition-all active:scale-95"
+                className="flex items-center justify-center p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-xs transition-all active:scale-95"
                 title="Download Image"
               >
-                <Download size={18} />
+                <Download size={16} />
               </button>
             )}
             <button
               onClick={generatePDF}
-              className="flex items-center justify-center p-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-lg shadow-md transition-all active:scale-95"
+              className="flex items-center justify-center p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs transition-all active:scale-95"
               title="Download PDF"
             >
-              <FileText size={18} />
+              <FileText size={16} />
             </button>
           </div>
         </div>
@@ -722,7 +734,7 @@ export default function StepPickup({
     );
   }
 
-  // ─── EDIT / ENTRY ──────────────────────────────────────────────────────
+  // ─── EDIT / ENTRY VIEW ──────────────────────────────────────────────────
   const groupedRows = rows.reduce((acc: Row[][], _, i, arr) => {
     if (i % 3 === 0) acc.push(arr.slice(i, i + 3));
     return acc;
@@ -762,9 +774,9 @@ export default function StepPickup({
         }
         .mini-input:focus {
           background: white;
-          border-color: #3b82f6;
+          border-color: #2563eb;
           outline: none;
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
         }
         .mini-input:hover {
           border-color: #93c5fd;
@@ -794,7 +806,7 @@ export default function StepPickup({
         }
         .auto-save-indicator {
           font-size: 0.65rem;
-          color: #3b82f6;
+          color: #2563eb;
           display: flex;
           align-items: center;
           gap: 4px;
@@ -806,12 +818,16 @@ export default function StepPickup({
         }
       `}</style>
 
-      <div className="bg-white border border-slate-200/80 shadow-md rounded-xl p-4 space-y-4">
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-          <div className="flex items-center gap-3">
-            <span className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold shadow-md">3</span>
-            <h2 className="text-xl font-extrabold bg-gradient-to-r from-blue-700 to-indigo-700 bg-clip-text text-transparent">PICKUP KPI</h2>
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
+              3
+            </span>
+            <h2 className="text-base font-bold text-slate-800 tracking-tight">
+              PICKUP KPI
+            </h2>
           </div>
           <div className="flex items-center gap-3">
             {isAutoSaving && (
@@ -821,19 +837,21 @@ export default function StepPickup({
               </span>
             )}
             {(isEditMode || isLocalEditing) && trip.pickupStepSubmitted && (
-              <span className="text-[10px] text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">✏️ Edit</span>
+              <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
+                Editable View
+              </span>
             )}
           </div>
         </div>
 
         {/* Auto time */}
-        <div className="flex items-center gap-2 text-xs text-slate-600">
+        <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
           <Clock size={14} className="text-slate-400" />
-          <span className="font-medium">{trip.pickupLoadTime || "Auto time on submit"}</span>
+          <span>{trip.pickupLoadTime || "Auto time on submit"}</span>
         </div>
 
-        {/* ─── Image Upload Section ─────────────────────────────────────── */}
-        <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
+        {/* Image Upload Section */}
+        <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50">
           <div className="flex items-start gap-4">
             <div className="flex-1">
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
@@ -844,7 +862,7 @@ export default function StepPickup({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition-all"
+                  className="px-3 py-1.5 text-xs font-semibold bg-white text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-all shadow-xs"
                 >
                   Choose Image
                 </button>
@@ -857,7 +875,7 @@ export default function StepPickup({
                     Remove
                   </button>
                 )}
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-slate-500">
                   {imageKey ? "✅ Uploaded" : "No image selected"}
                 </span>
               </div>
@@ -880,7 +898,7 @@ export default function StepPickup({
 
         {/* Entry Table Container */}
         <div>
-          <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-slate-600">Box entries (three per row)</span>
             <button
               type="button"
@@ -897,29 +915,26 @@ export default function StepPickup({
             </button>
           </div>
 
-          <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm max-h-80 overflow-y-auto">
+          <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs max-h-80 overflow-y-auto">
             <table className="w-full table-fixed border-collapse text-xs">
               <colgroup>
-                {/* Block 1 */}
                 <col className="w-[8%]" />
                 <col className="w-[12%]" />
                 <col className="w-[13.33%]" />
-                {/* Block 2 */}
                 <col className="w-[8%]" />
                 <col className="w-[12%]" />
                 <col className="w-[13.33%]" />
-                {/* Block 3 */}
                 <col className="w-[8%]" />
                 <col className="w-[12%]" />
                 <col className="w-[13.33%]" />
               </colgroup>
               <thead>
-                <tr className="bg-white text-slate-700 text-[10px] uppercase font-bold sticky top-0 z-10 border-b border-slate-200">
+                <tr className="bg-slate-50 text-slate-600 text-[10px] uppercase font-bold sticky top-0 z-10 border-b border-slate-200">
                   {[1, 2, 3].map((blockIdx) => (
                     <React.Fragment key={blockIdx}>
-                      <th className={`text-center px-1 py-2 font-bold text-slate-700 bg-white border-r border-slate-200 ${blockIdx > 1 ? 'pl-5' : ''}`}>BOX</th>
-                      <th className="text-center px-1 py-2 font-bold text-slate-700 bg-white border-r border-slate-200">BIRDS</th>
-                      <th className={`px-1 py-2 font-bold text-slate-700 bg-white ${blockIdx < 3 ? 'border-r-2 border-green-500 pr-5' : ''}`}>
+                      <th className={`text-center px-1 py-2 font-bold text-slate-600 bg-slate-50 border-r border-slate-200 ${blockIdx > 1 ? 'pl-5' : ''}`}>BOX</th>
+                      <th className="text-center px-1 py-2 font-bold text-slate-600 bg-slate-50 border-r border-slate-200">BIRDS</th>
+                      <th className={`px-1 py-2 font-bold text-slate-600 bg-slate-50 ${blockIdx < 3 ? 'border-r-2 border-slate-300 pr-5' : ''}`}>
                         <div className="flex items-center justify-center">
                           <span className="text-center">WT(KG)</span>
                           <div className="w-[22px] shrink-0" />
@@ -948,7 +963,7 @@ export default function StepPickup({
                             className="mini-input hide-spinner"
                           />
                         </td>
-                        <td className={`px-1 py-1.5 bg-white ${groupIdx < 2 ? 'border-r-2 border-green-500 pr-5' : ''}`}>
+                        <td className={`px-1 py-1.5 bg-white ${groupIdx < 2 ? 'border-r-2 border-slate-300 pr-5' : ''}`}>
                           <div className="flex items-center gap-0.5">
                             <input
                               type="number"
@@ -981,7 +996,7 @@ export default function StepPickup({
                           <React.Fragment key={i}>
                             <td className={`text-center px-1 py-1.5 text-slate-300 text-xs bg-white border-r border-slate-200 ${emptyIdx > 0 ? 'pl-5' : ''}`}>—</td>
                             <td className="text-center px-1 py-1.5 text-slate-300 text-xs bg-white border-r border-slate-200">—</td>
-                            <td className={`text-center px-1 py-1.5 text-slate-300 text-xs bg-white ${emptyIdx < 2 ? 'border-r-2 border-green-500 pr-5' : ''}`}>
+                            <td className={`text-center px-1 py-1.5 text-slate-300 text-xs bg-white ${emptyIdx < 2 ? 'border-r-2 border-slate-300 pr-5' : ''}`}>
                               —
                             </td>
                           </React.Fragment>
@@ -1000,35 +1015,35 @@ export default function StepPickup({
           </p>
         </div>
 
-        {/* Totals */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t border-slate-200">
-          <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-center">
+        {/* Totals Summary Bar */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center">
             <p className="text-[10px] text-slate-500 font-medium">Boxes</p>
-            <p className="font-bold text-slate-800 text-sm">{totals.boxes}</p>
+            <p className="font-semibold text-slate-900 text-sm mt-0.5">{totals.boxes}</p>
           </div>
-          <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-center">
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center">
             <p className="text-[10px] text-slate-500 font-medium">Birds</p>
-            <p className="font-bold text-slate-800 text-sm">{totals.totalBirds}</p>
+            <p className="font-semibold text-slate-900 text-sm mt-0.5">{totals.totalBirds}</p>
           </div>
-          <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-center">
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center">
             <p className="text-[10px] text-slate-500 font-medium">DC Wt</p>
-            <p className="font-bold text-slate-800 text-sm">{totals.dcWeight.toFixed(2)}</p>
+            <p className="font-semibold text-slate-900 text-sm mt-0.5">{totals.dcWeight.toFixed(2)}</p>
           </div>
-          <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-center">
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center">
             <p className="text-[10px] text-slate-500 font-medium">Avg Wt</p>
-            <p className="font-bold text-slate-800 text-sm">
+            <p className="font-semibold text-slate-900 text-sm mt-0.5">
               {totals.avgWeight > 0 ? totals.avgWeight : "—"}
             </p>
           </div>
         </div>
 
-        {/* Buttons */}
-        <div className="flex flex-wrap items-center justify-center gap-2 pt-2 border-t border-slate-200">
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-slate-100">
           {/* Close */}
           {isEditMode && (
             <button
               onClick={handleClose}
-              className="px-4 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-medium text-slate-600 shadow-sm transition-all active:scale-95 flex items-center gap-1.5"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5"
             >
               <X size={14} /> Close
             </button>
@@ -1039,10 +1054,10 @@ export default function StepPickup({
             <button
               onClick={handleSaveProgress}
               disabled={isSaving || isSavingRef.current || rows.length === 0}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 ${
+              className={`w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 ${
                 isSaving || isSavingRef.current || rows.length === 0
                   ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                  : "bg-white text-blue-700 border-blue-200 hover:bg-blue-50 shadow-sm"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 shadow-xs"
               }`}
             >
               <Save size={14} />
@@ -1054,7 +1069,7 @@ export default function StepPickup({
           {!trip.pickupStepSubmitted && !isEditMode && clearForm && (
             <button
               onClick={clearForm}
-              className="px-4 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-medium text-slate-600 shadow-sm"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all active:scale-95"
             >
               Clear
             </button>
@@ -1064,10 +1079,10 @@ export default function StepPickup({
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || !canSubmit || (trip.pickupStepSubmitted && !isEditMode)}
-            className={`px-5 py-1.5 rounded-lg text-xs font-semibold text-white shadow-md transition-all active:scale-[0.98] flex items-center gap-1.5 ${
+            className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold text-white transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
               isSubmitting || !canSubmit || (trip.pickupStepSubmitted && !isEditMode)
-                ? "bg-blue-400/60 cursor-not-allowed shadow-none"
-                : "bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 shadow-blue-200"
+                ? "bg-blue-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700 shadow-sm"
             }`}
           >
             <CheckCircle size={14} />

@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { CheckCircle, Pencil, X, Lock } from "lucide-react";
 import UnLoadingTable from "./UnLoadingTable";
-import TripTotals from "./TripTotals";
 import type { ShopDelivery, Trip, BoxDetail } from "../types/trip";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
@@ -120,8 +119,6 @@ export default function StepDeliveries({
           tripDate={trip.tripDate}
         />
 
-        <TripTotals rows={rows} />
-
         <p className="text-sm text-emerald-700 bg-emerald-50 p-3 rounded-lg mt-2 border border-emerald-200">
           ✅ Deliveries locked. Click the edit icon to modify.
         </p>
@@ -157,8 +154,6 @@ export default function StepDeliveries({
           supervisorPhone=""
           tripDate={trip.tripDate}
         />
-
-        <TripTotals rows={rows} />
 
         <div className="flex items-center justify-center gap-4 pt-4 border-t border-slate-100 mt-6">
           {!trip.deliveryStepSubmitted && !editable && clearForm && (

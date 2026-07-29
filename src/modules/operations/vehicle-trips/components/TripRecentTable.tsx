@@ -65,8 +65,9 @@ function TripRecentTable({
     });
   }, [safeTrips, searchTerm]);
 
-  const allDraft = sortedTrips.filter((t) => !t.deleted && !t.deliveryStepSubmitted);
-  const allPending = sortedTrips.filter((t) => !t.deleted && t.deliveryStepSubmitted && t.status !== "Completed");
+  // ✅ FIXED: Use endStepSubmitted to determine Draft vs Pending
+  const allDraft = sortedTrips.filter((t) => !t.deleted && !t.endStepSubmitted);
+  const allPending = sortedTrips.filter((t) => !t.deleted && t.endStepSubmitted && t.status !== "Completed");
   const allApproved = sortedTrips.filter((t) => !t.deleted && t.status === "Completed");
   const allDeleted = sortedTrips.filter((t) => t.deleted === true);
 
@@ -91,7 +92,6 @@ function TripRecentTable({
 
   const selectedTrip = safeTrips.find((t) => t.id === selectedTripId) || null;
 
-  // 🔹 STRICT 10-DAY RULE FROM DATEUTILS
   const canEdit = selectedTrip
     ? canEditItem(selectedTrip.createdAt || "") && !selectedTrip.deleted
     : false;
@@ -130,7 +130,6 @@ function TripRecentTable({
     setDeleteReason("");
   };
 
-  // 🔹 Helper to generate the dynamic step badges
   const getStepBadge = (trip: Trip) => {
     if (trip.status === "Completed") {
       return { label: "Completed", color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={12} /> };
@@ -146,6 +145,9 @@ function TripRecentTable({
     }
     if (trip.pickupStepSubmitted && !trip.deliveryStepSubmitted) {
       return { label: "Step 4", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <FileText size={12} /> };
+    }
+    if (trip.deliveryStepSubmitted && !trip.endStepSubmitted) {
+      return { label: "Step 5 (End)", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <FileText size={12} /> };
     }
     return { label: "Pending", color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} /> };
   };
@@ -231,7 +233,7 @@ function TripRecentTable({
                   const isSelected = trip.id === selectedTripId;
                   const isDeleted = trip.deleted === true;
                   const isApproved = trip.status === "Completed";
-                  const showDropdown = !isDeleted && onStatusChange && trip.deliveryStepSubmitted && !isApproved;
+                  const showDropdown = !isDeleted && onStatusChange && trip.endStepSubmitted && !isApproved;
 
                   return (
                     <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
@@ -269,13 +271,12 @@ function TripRecentTable({
                             </div>
                           </div>
                         ) : (
-                          // 🟢 FIXED: Wrapped badge in a clickable button
                           (() => {
                             const badge = getStepBadge(trip);
                             return (
                               <button
                                 onClick={(e) => {
-                                  e.stopPropagation(); // Prevent row selection
+                                  e.stopPropagation();
                                   if (onEdit) onEdit(trip);
                                 }}
                                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm border cursor-pointer hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-200 ${badge.color}`}

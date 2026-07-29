@@ -75,6 +75,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   const [showEntryPrompt, setShowEntryPrompt] = useState(true);
   const isManualSelect = useRef(false);
+  const endStepJustSubmitted = useRef(false);
 
   const handleView = (selectedTrip: Trip) => { 
     setViewTrip(selectedTrip); 
@@ -163,22 +164,43 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   // ─── SAFEGUARD: prevent "Pending" status before End step ──────────
   useEffect(() => {
-    // If the trip is not yet ended (endStepSubmitted is false) but status is "Pending",
-    // reset it to "Draft" to prevent premature approval.
     if (!endStepSubmitted && trip.status === "Pending") {
       setTrip(prev => ({ ...prev, status: "Draft" as any }) as Trip);
       showNotification?.("⏳ Trip is still in draft. Complete the End step to submit for approval.", "info");
     }
   }, [endStepSubmitted, trip.status, setTrip, showNotification]);
 
-  const renderSelectedStep = () => {
-    const isViewingActiveStep = !isTripEnded && viewStepIndex === currentStep;
-    const onCancelEdit = () => setIsEditing(false);
+  // ─── Force status to "Pending" when End step is submitted ──────────
+  useEffect(() => {
+    if (endStepSubmitted && trip.status === "Draft" && !endStepJustSubmitted.current) {
+      endStepJustSubmitted.current = true;
+      setTrip(prev => ({ ...prev, status: "Pending" }));
+      showNotification?.("✅ Trip submitted for approval.", "success");
+    }
+    if (!endStepSubmitted) {
+      endStepJustSubmitted.current = false;
+    }
+  }, [endStepSubmitted, trip.status, setTrip, showNotification]);
 
-    const isEditable = (stepCompleted: boolean) => {
-      if (viewStepIndex === 4 && isTripEnded) return false;
-      return isViewingActiveStep && !stepCompleted && isGlobalEditMode;
-    };
+  // ─── Check if the trip is new (no saved data) ───────────────────────
+  const isNewTrip = trip.id === 0 || !trip.tripNo;
+
+  // ─── Editable logic ────────────────────────────────────────────────────
+  const isEditable = (stepCompleted: boolean) => {
+    // End step is never editable once the trip is ended
+    if (viewStepIndex === 4 && isTripEnded) return false;
+    const isViewingActiveStep = !isTripEnded && viewStepIndex === currentStep;
+    if (isViewingActiveStep && !stepCompleted) {
+      // For the active step, we allow editing if:
+      // - The trip is new (no saved data yet), OR
+      // - We are in edit mode (isEditing) and can edit (canEditTrip)
+      return isNewTrip || (isEditing && canEditTrip);
+    }
+    return false;
+  };
+
+  const renderSelectedStep = () => {
+    const onCancelEdit = () => setIsEditing(false);
 
     if (viewStepIndex === 0) {
       return (
