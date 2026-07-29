@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Pencil, X, Loader2 } from "lucide-react";
+import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Pencil, X, Loader2, Scale } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 
@@ -12,6 +12,7 @@ interface Props {
   editable?: boolean;
   canEdit?: boolean;
   onCancel?: () => void;
+  showNotification?: (message: string, type?: "info" | "success" | "error" | "warning") => void; // ← new
 }
 
 export default function StepFarm({
@@ -23,6 +24,7 @@ export default function StepFarm({
   editable = false,
   canEdit = false,
   onCancel,
+  showNotification, // ← new
 }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(false);
@@ -31,6 +33,7 @@ export default function StepFarm({
 
   const farmAddress = (trip as any).farmAddress || "";
   const remarks = trip.remarks || "";
+  const avgBirdWeight = (trip as any).avgBirdWeight || 0;
 
   const farmOptions = farms.map((farm: any) => ({
     value: farm.id,
@@ -80,7 +83,7 @@ export default function StepFarm({
 
   const fetchCurrentLocation = () => {
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser.");
+      showNotification?.("Geolocation is not supported by your browser.", "error");
       return;
     }
     setIsFetchingLocation(true);
@@ -108,7 +111,7 @@ export default function StepFarm({
       },
       (error) => {
         console.error("Geolocation error:", error);
-        alert("Unable to fetch location. Please check your browser permissions and try again.");
+        showNotification?.("Unable to fetch location. Check browser permissions.", "error");
         setIsFetchingLocation(false);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -137,19 +140,41 @@ export default function StepFarm({
       pickupTolls: 0,
       remarks: "",
       farmAddress: "",
+      avgBirdWeight: 0,
     } as any);
     setDestMeterError(null);
   };
 
   const handleSubmit = async () => {
-    if (!trip.sourceFarmId || !trip.sourceFarm) return alert("Please select a Destination / Farm.");
-    if (!trip.destMeter || trip.destMeter <= 0) return alert("Please enter a valid Destination Meter (KM).");
-    if (destMeterError) return alert(destMeterError);
-    if (trip.pickupTolls === undefined || trip.pickupTolls < 0) return alert("Please enter valid Toll Gates.");
+    if (!trip.sourceFarmId || !trip.sourceFarm) {
+      showNotification?.("Please select a Destination / Farm.", "warning");
+      return;
+    }
+    if (!trip.destMeter || trip.destMeter <= 0) {
+      showNotification?.("Please enter a valid Destination Meter (KM).", "warning");
+      return;
+    }
+    if (destMeterError) {
+      showNotification?.(destMeterError, "warning");
+      return;
+    }
+    if (trip.pickupTolls === undefined || trip.pickupTolls < 0) {
+      showNotification?.("Please enter valid Toll Gates.", "warning");
+      return;
+    }
+    if (!(trip as any).avgBirdWeight || (trip as any).avgBirdWeight <= 0) {
+      showNotification?.("Please enter a valid Average Bird Weight.", "warning");
+      return;
+    }
 
     setIsSubmitting(true);
     const success = submitFarmStep({});
-    if (success) setIsLocalEditing(false);
+    if (success) {
+      setIsLocalEditing(false);
+      showNotification?.("Destination details saved successfully.", "success");
+    } else {
+      showNotification?.("Submission failed. Please try again.", "error");
+    }
     setIsSubmitting(false);
   };
 
@@ -195,15 +220,19 @@ export default function StepFarm({
             <p className="text-xs text-slate-500 font-medium">Farm Address</p>
             <p className="font-semibold text-slate-900 mt-0.5 truncate">{farmAddress || "--"}</p>
           </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl col-span-1">
+          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
             <p className="text-xs text-slate-500 font-medium">Destination Meter</p>
             <p className="font-semibold text-slate-900 mt-0.5">{trip.destMeter ? `${trip.destMeter} KM` : "--"}</p>
           </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl col-span-1">
+          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
             <p className="text-xs text-slate-500 font-medium">Toll Gates (Pickup)</p>
             <p className="font-semibold text-slate-900 mt-0.5">{trip.pickupTolls ?? "--"}</p>
           </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl col-span-2">
+          <div className="bg-white border border-slate-200/80 p-4 rounded-xl col-span-2 md:col-span-2">
+            <p className="text-xs text-slate-500 font-medium">Avg Bird Weight (kg)</p>
+            <p className="font-semibold text-slate-900 mt-0.5">{avgBirdWeight > 0 ? `${avgBirdWeight} kg` : "--"}</p>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-4 rounded-xl col-span-2 md:col-span-2">
             <p className="text-xs text-slate-500 font-medium">Remarks</p>
             <p className="font-semibold text-slate-900 mt-0.5 truncate">{remarks || "--"}</p>
           </div>
@@ -351,15 +380,36 @@ export default function StepFarm({
             <p className="text-[11px] text-slate-400 mt-1">Total tolls passed on the way</p>
           </div>
 
-          <div className="sm:col-span-2">
+          {/* SAME HEIGHT PAIR: Avg Bird Weight & Remarks */}
+          <div>
+            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+              <Scale size={14} className="text-slate-400" /> Avg Bird Weight (kg) <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0"
+              value={avgBirdWeight === 0 ? "" : avgBirdWeight}
+              onChange={(e) => {
+                const val = e.target.value === "" ? 0 : Number(e.target.value);
+                updateTrip({ avgBirdWeight: val } as any);
+              }}
+              onWheel={(e) => e.currentTarget.blur()}
+              className="hide-spinner w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-400"
+              placeholder="e.g., 1.5"
+            />
+          </div>
+
+          <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <MessageSquare size={14} className="text-slate-400" /> Remarks
             </label>
-            <textarea
-              rows={2}
+            <input
+              type="text"
               value={remarks}
               onChange={(e) => updateTrip({ remarks: e.target.value })}
-              className="w-full mt-1 rounded-xl border border-slate-200 bg-white p-3 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all resize-none placeholder:text-slate-400"
+              className="w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-400"
               placeholder="Enter any additional notes..."
             />
           </div>
@@ -393,9 +443,19 @@ export default function StepFarm({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isSubmitting || !!destMeterError || !trip.sourceFarmId}
+            disabled={
+              isSubmitting ||
+              !!destMeterError ||
+              !trip.sourceFarmId ||
+              !(trip as any).avgBirdWeight ||
+              (trip as any).avgBirdWeight <= 0
+            }
             className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold text-white transition-all active:scale-95 ${
-              isSubmitting || !!destMeterError || !trip.sourceFarmId
+              isSubmitting ||
+              !!destMeterError ||
+              !trip.sourceFarmId ||
+              !(trip as any).avgBirdWeight ||
+              (trip as any).avgBirdWeight <= 0
                 ? "bg-blue-400 cursor-not-allowed"
                 : "bg-blue-600 hover:bg-blue-700 shadow-sm"
             }`}

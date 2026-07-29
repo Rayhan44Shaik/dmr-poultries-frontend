@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { AlertCircle, FileText, Plus } from "lucide-react";
 
 // --- Components ---
-import UnLoadingTable from "../components/UnLoadingTable";
+import UnLoadingTable from "../components/Step_4";            // ✅ updated path
 import TripTotals from "../components/TripTotals";
 import TripRecentTable from "../components/TripRecentTable";
 import TripViewModal from "../components/TripViewModal";
@@ -43,26 +43,26 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const { farms } = useFarms();
   const { shops } = useShops();
   const { birdTypes } = useBirdTypes();
-  
+
   const { showNotification } = useSafeNotification();
   const { trips, allTrips, refreshTrips, deleteTrip, changeStatus } = useTrips(showNotification);
 
-  const { 
-    trip, 
-    setTrip, 
-    isEditing, 
+  const {
+    trip,
+    setTrip,
+    isEditing,
     setIsEditing,
     endStepSubmitted,
-    updateTrip, 
-    updateDeliveries, 
+    updateTrip,
+    updateDeliveries,
     updateBoxDetails,
-    submitStartStep, 
-    submitFarmStep, 
-    submitPickupStep, 
-    submitDeliveriesStep, 
-    submitEndTrip, 
-    loadTrip, 
-    clearTrip 
+    submitStartStep,
+    submitFarmStep,
+    submitPickupStep,
+    submitDeliveriesStep,
+    submitEndTrip,
+    loadTrip,
+    clearTrip,
   } = useTripEntry(showNotification);
 
   const validator = useFuelKMValidator(trip.vehicleNo);
@@ -77,12 +77,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const isManualSelect = useRef(false);
   const endStepJustSubmitted = useRef(false);
 
-  const handleView = (selectedTrip: Trip) => { 
-    setViewTrip(selectedTrip); 
-    setViewOpen(true); 
+  const handleView = (selectedTrip: Trip) => {
+    setViewTrip(selectedTrip);
+    setViewOpen(true);
   };
-  
-  const handleEdit = (selectedTrip: Trip) => { 
+
+  const handleEdit = (selectedTrip: Trip) => {
     setShowEntryPrompt(false);
     let targetStep = 0;
     if (selectedTrip.status === "Completed") targetStep = 4;
@@ -92,14 +92,14 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     else if (selectedTrip.startStepSubmitted) targetStep = 1;
 
     setViewStepIndex(targetStep);
-    loadTrip(selectedTrip); 
-    setRows(selectedTrip.deliveries); 
-    showNotification(`✏️ Trip ${selectedTrip.tripNo} loaded. Proceed to edit.`, "info"); 
+    loadTrip(selectedTrip);
+    setRows(selectedTrip.deliveries);
+    showNotification(`✏️ Trip ${selectedTrip.tripNo} loaded. Proceed to edit.`, "info");
   };
-  
-  const handleRefresh = () => { 
-    refreshTrips(); 
-    showNotification("🔄 Refreshed", "info"); 
+
+  const handleRefresh = () => {
+    refreshTrips();
+    showNotification("🔄 Refreshed", "info");
   };
 
   const lastGeneratedDate = useRef<string | null>(null);
@@ -107,9 +107,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   useEffect(() => {
     if (isInitialMount.current) {
-      if (!trip.tripDate) { 
-        const yesterday = getYesterday(); 
-        setTrip((prev) => ({ ...prev, tripDate: yesterday })); 
+      if (!trip.tripDate) {
+        const yesterday = getYesterday();
+        setTrip((prev) => ({ ...prev, tripDate: yesterday }));
       }
       isInitialMount.current = false;
     }
@@ -125,13 +125,13 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     refreshTrips();
   }, [trip]);
 
-  const clearForm = () => { 
-    clearTrip(); 
-    setRows([]); 
+  const clearForm = () => {
+    clearTrip();
+    setRows([]);
     setShowEntryPrompt(true);
     setViewStepIndex(0);
-    setTrip((prev) => ({ ...prev, tripDate: getYesterday() })); 
-    showNotification("✨ Cleared.", "info"); 
+    setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
+    showNotification("✨ Cleared.", "info");
   };
 
   const isStartCompleted = trip.startStepSubmitted;
@@ -143,12 +143,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const canEditTrip = trip.createdAt ? canEditItem(trip.createdAt) : false;
   const isGlobalEditMode = isEditing && canEditTrip;
 
-  const currentStep = isTripEnded ? 5 
-    : (isDeliveryCompleted ? 4 
-      : (isPickupCompleted ? 3 
-        : (isFarmCompleted ? 2 
+  const currentStep = isTripEnded ? 5
+    : (isDeliveryCompleted ? 4
+      : (isPickupCompleted ? 3
+        : (isFarmCompleted ? 2
           : (isStartCompleted ? 1 : 0))));
-  
+
   const vehicleOpts = vehicles.map((v: any) => ({ id: v.id, vehicleNumber: v.vehicleNumber }));
   const employeeOpts = employees.map((e: any) => ({ id: e.id, employeeName: e.employeeName, department: e.department }));
 
@@ -165,7 +165,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   // ─── SAFEGUARD: prevent "Pending" status before End step ──────────
   useEffect(() => {
     if (!endStepSubmitted && trip.status === "Pending") {
-      setTrip(prev => ({ ...prev, status: "Draft" as any }) as Trip);
+      setTrip((prev) => ({ ...prev, status: "Draft" as any }) as Trip);
       showNotification?.("⏳ Trip is still in draft. Complete the End step to submit for approval.", "info");
     }
   }, [endStepSubmitted, trip.status, setTrip, showNotification]);
@@ -174,7 +174,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   useEffect(() => {
     if (endStepSubmitted && trip.status === "Draft" && !endStepJustSubmitted.current) {
       endStepJustSubmitted.current = true;
-      setTrip(prev => ({ ...prev, status: "Pending" }));
+      setTrip((prev) => ({ ...prev, status: "Pending" }));
       showNotification?.("✅ Trip submitted for approval.", "success");
     }
     if (!endStepSubmitted) {
@@ -182,18 +182,14 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     }
   }, [endStepSubmitted, trip.status, setTrip, showNotification]);
 
-  // ─── Check if the trip is new (no saved data) ───────────────────────
+  // ─── Check if the trip is new ───────────────────────────────────────
   const isNewTrip = trip.id === 0 || !trip.tripNo;
 
   // ─── Editable logic ────────────────────────────────────────────────────
   const isEditable = (stepCompleted: boolean) => {
-    // End step is never editable once the trip is ended
     if (viewStepIndex === 4 && isTripEnded) return false;
     const isViewingActiveStep = !isTripEnded && viewStepIndex === currentStep;
     if (isViewingActiveStep && !stepCompleted) {
-      // For the active step, we allow editing if:
-      // - The trip is new (no saved data yet), OR
-      // - We are in edit mode (isEditing) and can edit (canEditTrip)
       return isNewTrip || (isEditing && canEditTrip);
     }
     return false;
@@ -294,8 +290,13 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const content = (
     <div className="space-y-6">
       <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/80 shadow-xl shadow-slate-100/70 space-y-6">
-        {pendingWarning && ( <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700"><AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" /><span>{pendingWarning}</span></div> )}
-        
+        {pendingWarning && (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+            <span>{pendingWarning}</span>
+          </div>
+        )}
+
         {showEntryPrompt ? (
           <div className="flex flex-col items-center justify-center text-center py-16 space-y-6">
             <div className="h-20 w-20 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shadow-inner">
@@ -317,32 +318,50 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           </div>
         ) : (
           <>
-            <TripWizardStepper 
-              steps={["Start", "Farm", "Pickup", "Deliveries", "End"]} 
-              currentStep={currentStep} 
-              completedMask={{ start: isStartCompleted, farm: isFarmCompleted, pickup: isPickupCompleted, delivery: isDeliveryCompleted }} 
-              onStepClick={(idx) => { 
-                setViewStepIndex(idx); 
-                isManualSelect.current = true; 
-              }} 
+            <TripWizardStepper
+              steps={["Start", "Farm", "Pickup", "Deliveries", "End"]}
+              currentStep={currentStep}
+              completedMask={{
+                start: isStartCompleted,
+                farm: isFarmCompleted,
+                pickup: isPickupCompleted,
+                delivery: isDeliveryCompleted,
+              }}
+              onStepClick={(idx) => {
+                setViewStepIndex(idx);
+                isManualSelect.current = true;
+              }}
             />
-            
+
             <div className="mt-6">{renderSelectedStep()}</div>
             {isStartCompleted && <TripFinalKPI trip={trip} deliveries={rows} />}
           </>
         )}
       </div>
 
-      <TripRecentTable 
-        trips={allTrips} 
-        onRefresh={handleRefresh} 
-        onView={handleView} 
-        onEdit={handleEdit} 
-        onDelete={(trip, reason) => deleteTrip(trip.id, reason)} 
-        onStatusChange={changeStatus} 
+      <TripRecentTable
+        trips={allTrips}
+        onRefresh={handleRefresh}
+        onView={handleView}
+        onEdit={handleEdit}
+        onDelete={(trip, reason) => deleteTrip(trip.id, reason)}
+        onStatusChange={changeStatus}
       />
-      
-      <TripViewModal trip={viewTrip} open={viewOpen} onClose={() => { setViewOpen(false); setViewTrip(null); }} shops={shops} birdTypes={birdTypes} onEdit={(selectedTrip) => { handleEdit(selectedTrip); setViewOpen(false); }} />
+
+      <TripViewModal
+        trip={viewTrip}
+        open={viewOpen}
+        onClose={() => {
+          setViewOpen(false);
+          setViewTrip(null);
+        }}
+        shops={shops}
+        birdTypes={birdTypes}
+        onEdit={(selectedTrip) => {
+          handleEdit(selectedTrip);
+          setViewOpen(false);
+        }}
+      />
     </div>
   );
 

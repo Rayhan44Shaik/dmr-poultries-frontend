@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { CheckCircle, Pencil, X, Lock } from "lucide-react";
-import UnLoadingTable from "./UnLoadingTable";
+import UnLoadingTable from "./Step_4";
 import type { ShopDelivery, Trip, BoxDetail } from "../types/trip";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
@@ -49,7 +49,7 @@ export default function StepDeliveries({
     showNotification?.(`✅ Shop "${updatedRow.shopName}" saved successfully.`, "success");
   };
 
-  // ─── Lock validation (robust avgWeight calculation) ────────────────
+  // ─── Lock validation ────────────────────────────────────────────────
   const canLock = useMemo(() => {
     if (rows.length === 0) return false;
     if (trip.dcWeight <= 0) return false;
@@ -59,15 +59,11 @@ export default function StepDeliveries({
     const totalDelBirds = rows.reduce((sum, r) => sum + (r.birds || 0), 0);
     const totalDelWeight = rows.reduce((sum, r) => sum + (r.weight || 0), 0);
 
-    // ✅ Calculate avg weight from farm totals (not trip.avgWeight)
     const avgWeight = trip.totalBirds > 0 ? trip.dcWeight / trip.totalBirds : 0;
     const mortalityWeight = totalMortalityCount * avgWeight;
     const totalOutWeight = totalDelWeight + mortalityWeight;
 
-    // Bird count validation
-    if (trip.totalBirds !== (totalDelBirds + totalMortalityCount)) return false;
-
-    // Weight validation
+    if (trip.totalBirds !== totalDelBirds + totalMortalityCount) return false;
     if (totalOutWeight > trip.dcWeight) return false;
 
     return true;
@@ -82,28 +78,35 @@ export default function StepDeliveries({
     submitDeliveriesStep();
   };
 
-  // ─── LOCKED VIEW (shows table read‑only) ──────────────────────────
+  // ─── LOCKED VIEW ────────────────────────────────────────────────────
   if (trip.deliveryStepSubmitted && !editable && !isLocalEditing) {
     return (
-      <div className="bg-blue-50/30 border-2 border-blue-100 rounded-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between border-b border-blue-200 pb-3">
-          <div className="flex items-center gap-3">
-            <span className="bg-blue-700 text-white w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold">4</span>
-            <h2 className="text-lg font-bold text-slate-800 tracking-tight">SHOP DELIVERIES</h2>
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
+              4
+            </span>
+            <h2 className="text-base font-bold text-slate-800 tracking-tight">
+              SHOP DELIVERIES
+            </h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {canEdit && (
-              <button onClick={() => setIsLocalEditing(true)} className="bg-white hover:bg-blue-50 p-1.5 rounded-lg border border-blue-200 text-blue-600 shadow-sm transition-all active:scale-95" title="Edit Step">
+              <button
+                onClick={() => setIsLocalEditing(true)}
+                className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
+                title="Edit Step"
+              >
                 <Pencil size={14} />
               </button>
             )}
-            <span className="bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full text-xs font-bold border border-slate-300 shadow-sm flex items-center gap-1.5">
-              <Lock size={12} /> Locked
+            <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex items-center gap-1.5">
+              <Lock size={12} className="text-slate-500" /> Submitted & Locked
             </span>
           </div>
         </div>
 
-        {/* ✅ Show deliveries in read‑only mode */}
         <UnLoadingTable
           rows={rows}
           setRows={setRows}
@@ -119,67 +122,88 @@ export default function StepDeliveries({
           tripDate={trip.tripDate}
         />
 
-        <p className="text-sm text-emerald-700 bg-emerald-50 p-3 rounded-lg mt-2 border border-emerald-200">
-          ✅ Deliveries locked. Click the edit icon to modify.
+        <p className="text-xs text-slate-600 bg-white p-3 rounded-xl border border-slate-200 mt-2">
+          Shop delivery details locked. Click the edit icon to modify.
         </p>
       </div>
     );
   }
 
-  // ─── EDIT STATE ────────────────────────────────────────────────────
+  // ─── EDIT / ACTIVE STATE ────────────────────────────────────────────
   return (
-    <div className="space-y-4">
-      <div className="bg-white border border-slate-200/80 shadow-sm rounded-2xl p-6 space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-2">
-          <div className="flex items-center gap-3">
-            <span className="bg-blue-700 text-white w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold">4</span>
-            <h2 className="text-lg font-bold text-slate-800 tracking-tight">SHOP DELIVERIES</h2>
-          </div>
-          {((editable && trip.deliveryStepSubmitted) || isLocalEditing) && (
-            <span className="text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full border border-blue-200">✏️ Editable View</span>
-          )}
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
+        <div className="flex items-center gap-2.5">
+          <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
+            4
+          </span>
+          <h2 className="text-base font-bold text-slate-800 tracking-tight">
+            SHOP DELIVERIES
+          </h2>
         </div>
+        {((editable && trip.deliveryStepSubmitted) || isLocalEditing) && (
+          <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
+            Editable View
+          </span>
+        )}
+      </div>
 
-        <UnLoadingTable
-          rows={rows}
-          setRows={setRows}
-          shops={shops}
-          birdTypes={birdTypes}
-          boxDetails={boxDetails}
-          readOnly={isReadOnly}
-          onSaveRow={handleSaveRow}
-          tripNo={trip.tripNo}
-          vehicleNo={trip.vehicleNo}
-          supervisorName={trip.supervisorName}
-          supervisorPhone=""
-          tripDate={trip.tripDate}
-        />
+      {/* Table Section */}
+      <UnLoadingTable
+        rows={rows}
+        setRows={setRows}
+        shops={shops}
+        birdTypes={birdTypes}
+        boxDetails={boxDetails}
+        readOnly={isReadOnly}
+        onSaveRow={handleSaveRow}
+        tripNo={trip.tripNo}
+        vehicleNo={trip.vehicleNo}
+        supervisorName={trip.supervisorName}
+        supervisorPhone=""
+        tripDate={trip.tripDate}
+      />
 
-        <div className="flex items-center justify-center gap-4 pt-4 border-t border-slate-100 mt-6">
-          {!trip.deliveryStepSubmitted && !editable && clearForm && (
-            <button onClick={clearForm} className="px-6 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-sm active:scale-95">
-              Clear Form
-            </button>
-          )}
-          {(editable || isLocalEditing) && (
-            <button onClick={() => { if (editable && onCancel) onCancel(); else setIsLocalEditing(false); }} className="px-6 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-sm active:scale-95 flex items-center gap-2">
-              <X size={15} /> Close
-            </button>
-          )}
-          {!isReadOnly && (
-            <button
-              onClick={handleLockDeliveries}
-              disabled={!canLock}
-              className={`px-8 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-all active:scale-[0.98] flex items-center gap-1.5 ${
-                canLock
-                  ? "bg-blue-700 hover:bg-blue-800 shadow-blue-200"
-                  : "bg-blue-400/60 cursor-not-allowed shadow-none"
-              }`}
-            >
-              <CheckCircle size={15} /> Complete & Lock Deliveries
-            </button>
-          )}
-        </div>
+      {/* Actions */}
+      <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-slate-100">
+        {!trip.deliveryStepSubmitted && !editable && clearForm && (
+          <button
+            type="button"
+            onClick={clearForm}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all active:scale-95"
+          >
+            Clear Form
+          </button>
+        )}
+
+        {(editable || isLocalEditing) && (
+          <button
+            type="button"
+            onClick={() => {
+              if (editable && onCancel) onCancel();
+              else setIsLocalEditing(false);
+            }}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5"
+          >
+            <X size={14} /> Cancel
+          </button>
+        )}
+
+        {!isReadOnly && (
+          <button
+            type="button"
+            onClick={handleLockDeliveries}
+            disabled={!canLock}
+            className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold text-white transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+              canLock
+                ? "bg-blue-600 hover:bg-blue-700 shadow-sm"
+                : "bg-blue-400 cursor-not-allowed"
+            }`}
+          >
+            <CheckCircle size={14} /> Complete & Lock Deliveries
+          </button>
+        )}
       </div>
     </div>
   );
