@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { Vehicle } from "../types/vehicle";
-import { useSafeNotification } from "../../../../hooks/useSafeNotification"; // 👈 new import
+import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import {
   Truck,
   Package,
@@ -10,9 +10,12 @@ import {
   Landmark,
   Gauge,
   Cpu,
+  IndianRupee,
+  CalendarDays,
+  Clock,
   Calendar,
 } from "lucide-react";
-import { DatePicker } from "../../../../components/common/DatePicker"; // adjust path
+import { DatePicker } from "../../../../components/common/DatePicker";
 
 type VehicleFormProps = {
   vehicle?: Vehicle | null;
@@ -21,74 +24,188 @@ type VehicleFormProps = {
 };
 
 function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
-  const { showNotification } = useSafeNotification(); // 👈 use safe version
+  const { showNotification } = useSafeNotification();
 
+  // Fields (in new order)
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [vehicleType, setVehicleType] = useState("");
+  const [trackingId, setTrackingId] = useState("");
   const [noOfBoxes, setNoOfBoxes] = useState<number | "">("");
   const [birdCapacity, setBirdCapacity] = useState<number | "">("");
   const [capacityKg, setCapacityKg] = useState<number | "">("");
-  const [trackingId, setTrackingId] = useState("");
   const [fastagBank, setFastagBank] = useState("");
+  const [purchaseDate, setPurchaseDate] = useState("");
+  const [purchaseAmount, setPurchaseAmount] = useState<number | "">(""); // renamed from loanAmount
+  const [emiDay, setEmiDay] = useState<number | "">("");
+  const [totalEMIs, setTotalEMIs] = useState<number | "">("");
   const [engineNumber, setEngineNumber] = useState("");
   const [chassisNumber, setChassisNumber] = useState("");
-  const [insuranceExpiry, setInsuranceExpiry] = useState("");
-  const [permitExpiry, setPermitExpiry] = useState("");
-  const [fitnessExpiry, setFitnessExpiry] = useState("");
+  const [rcDate, setRcDate] = useState("");
+
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
 
+  // Raw digits for Purchase Amount (without commas)
+  const [purchaseAmountRaw, setPurchaseAmountRaw] = useState<string>("");
+  const purchaseInputRef = useRef<HTMLInputElement>(null);
+
   const isEditing = !!vehicle;
+
+  // Helper to format Indian number with commas
+  const formatIndianNumber = (numStr: string): string => {
+    if (!numStr) return "";
+    const clean = numStr.replace(/,/g, "");
+    if (clean === "") return "";
+    const num = parseFloat(clean);
+    if (isNaN(num)) return "";
+    return num.toLocaleString('en-IN');
+  };
 
   useEffect(() => {
     if (vehicle) {
       setVehicleNumber(vehicle.vehicleNumber);
       setVehicleType(vehicle.vehicleType);
+      setTrackingId(vehicle.trackingId ?? "");
       setNoOfBoxes(vehicle.noOfBoxes);
       setBirdCapacity(vehicle.birdCapacity);
       setCapacityKg(vehicle.capacityKg);
-      setTrackingId(vehicle.trackingId ?? "");
       setFastagBank(vehicle.fastagBank ?? "");
+      setPurchaseDate(vehicle.purchaseDate ?? "");
+      setPurchaseAmount(vehicle.purchaseAmount ?? "");
+      setPurchaseAmountRaw(vehicle.purchaseAmount ? String(vehicle.purchaseAmount) : "");
+      setEmiDay((vehicle as any).emiDay ?? "");
+      setTotalEMIs((vehicle as any).totalEMIs ?? "");
       setEngineNumber(vehicle.engineNumber ?? "");
       setChassisNumber(vehicle.chassisNumber ?? "");
-      setInsuranceExpiry(vehicle.insuranceExpiry ?? "");
-      setPermitExpiry(vehicle.permitExpiry ?? "");
-      setFitnessExpiry(vehicle.fitnessExpiry ?? "");
+      setRcDate((vehicle as any).rcDate ?? "");
       setStatus(vehicle.status);
     } else {
+      // Reset all
       setVehicleNumber("");
       setVehicleType("");
+      setTrackingId("");
       setNoOfBoxes("");
       setBirdCapacity("");
       setCapacityKg("");
-      setTrackingId("");
       setFastagBank("");
+      setPurchaseDate("");
+      setPurchaseAmount("");
+      setPurchaseAmountRaw("");
+      setEmiDay("");
+      setTotalEMIs("");
       setEngineNumber("");
       setChassisNumber("");
-      setInsuranceExpiry("");
-      setPermitExpiry("");
-      setFitnessExpiry("");
+      setRcDate("");
       setStatus("Active");
     }
   }, [vehicle]);
 
+  // Sync purchaseAmountRaw with purchaseAmount when vehicle changes
+  useEffect(() => {
+    if (purchaseInputRef.current) {
+      const formatted = purchaseAmountRaw ? formatIndianNumber(purchaseAmountRaw) : "";
+      purchaseInputRef.current.value = formatted;
+    }
+  }, [purchaseAmountRaw]);
+
+  // Handlers for Purchase Amount input
+  const handlePurchaseFocus = () => {
+    if (purchaseInputRef.current) {
+      purchaseInputRef.current.value = purchaseAmountRaw;
+    }
+  };
+
+  const handlePurchaseBlur = () => {
+    if (purchaseInputRef.current) {
+      const formatted = purchaseAmountRaw ? formatIndianNumber(purchaseAmountRaw) : "";
+      purchaseInputRef.current.value = formatted;
+    }
+  };
+
+  const handlePurchaseChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/,/g, "").replace(/[^0-9]/g, "");
+    setPurchaseAmountRaw(val);
+    setPurchaseAmount(val === "" ? "" : parseFloat(val));
+  };
+
+  // Bird Capacity – integer only
+  const handleBirdCapacityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/[^0-9]/g, "");
+    if (val === "") {
+      setBirdCapacity("");
+      return;
+    }
+    const num = parseInt(val, 10);
+    if (!isNaN(num) && num >= 0) {
+      setBirdCapacity(num);
+    }
+  };
+
+  // EMI Day validation (1-31)
+  const handleEmiDayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/[^0-9]/g, "");
+    if (val === "") {
+      setEmiDay("");
+      return;
+    }
+    const num = parseInt(val, 10);
+    if (num >= 1 && num <= 31) {
+      setEmiDay(num);
+    }
+  };
+
+  const handleEmiDayBlur = () => {
+    if (emiDay !== "") {
+      const num = Number(emiDay);
+      if (num < 1 || num > 31) {
+        showNotification("EMI day must be between 1 and 31.", "error");
+        setEmiDay("");
+      }
+    }
+  };
+
+  // Total EMIs handler
+  const handleTotalEMIsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/[^0-9]/g, "");
+    if (val === "") {
+      setTotalEMIs("");
+      return;
+    }
+    const num = parseInt(val, 10);
+    if (num > 0) {
+      setTotalEMIs(num);
+    }
+  };
+
   const handleSubmit = () => {
+    // Required fields
     if (!vehicleNumber || !vehicleType || noOfBoxes === "" || birdCapacity === "" || capacityKg === "") {
       showNotification("Please fill all required fields.", "error");
+      return;
+    }
+    // Engine and Chassis are now mandatory
+    if (!engineNumber.trim()) {
+      showNotification("Engine Number is required.", "error");
+      return;
+    }
+    if (!chassisNumber.trim()) {
+      showNotification("Chassis Number is required.", "error");
       return;
     }
     onSave({
       vehicleNumber,
       vehicleType,
+      trackingId,
       noOfBoxes: Number(noOfBoxes),
       birdCapacity: Number(birdCapacity),
       capacityKg: Number(capacityKg),
-      trackingId,
       fastagBank,
+      purchaseDate,
+      purchaseAmount: purchaseAmount === "" ? undefined : Number(purchaseAmount),
+      emiDay: emiDay === "" ? undefined : Number(emiDay),
+      totalEMIs: totalEMIs === "" ? undefined : Number(totalEMIs),
       engineNumber,
       chassisNumber,
-      insuranceExpiry,
-      permitExpiry,
-      fitnessExpiry,
+      rcDate,
       status,
     });
   };
@@ -121,8 +238,6 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
             <p className="text-sm text-slate-500 font-medium">{subtitle}</p>
           </div>
         </div>
-
-        {/* Status toggle */}
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-slate-600">Status</span>
           <button
@@ -151,7 +266,7 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
       {/* Form Body – 3 columns */}
       <div className="p-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Vehicle Number */}
+          {/* Row 1: Vehicle Number, Vehicle Type, Tracking ID */}
           <div className="relative">
             <label className="block mb-2 text-base font-medium text-slate-700">
               Vehicle Number <span className="text-red-500">*</span>
@@ -167,7 +282,6 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
             </div>
           </div>
 
-          {/* Vehicle Type */}
           <div className="relative">
             <label className="block mb-2 text-base font-medium text-slate-700">
               Vehicle Type <span className="text-red-500">*</span>
@@ -183,7 +297,22 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
             </div>
           </div>
 
-          {/* No. of Boxes */}
+          <div className="relative">
+            <label className="block mb-2 text-base font-medium text-slate-700">
+              Tracking ID
+            </label>
+            <div className="relative">
+              <MapPin className={iconWrapperClass} size={20} />
+              <input
+                value={trackingId}
+                onChange={(e) => setTrackingId(e.target.value)}
+                placeholder="GPS tracking ID"
+                className={inputClass()}
+              />
+            </div>
+          </div>
+
+          {/* Row 2: No. of Boxes, Bird Capacity, Capacity (kg) */}
           <div className="relative">
             <label className="block mb-2 text-base font-medium text-slate-700">
               No. of Boxes <span className="text-red-500">*</span>
@@ -200,7 +329,6 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
             </div>
           </div>
 
-          {/* Bird Capacity */}
           <div className="relative">
             <label className="block mb-2 text-base font-medium text-slate-700">
               Bird Capacity <span className="text-red-500">*</span>
@@ -209,15 +337,15 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
               <Bird className={iconWrapperClass} size={20} />
               <input
                 type="number"
+                step="1"
                 value={birdCapacity}
-                onChange={(e) => setBirdCapacity(e.target.value === "" ? "" : Number(e.target.value))}
+                onChange={handleBirdCapacityChange}
                 placeholder="e.g., 2000"
                 className={numberInputClass()}
               />
             </div>
           </div>
 
-          {/* Capacity (Kg) */}
           <div className="relative">
             <label className="block mb-2 text-base font-medium text-slate-700">
               Capacity (Kg) <span className="text-red-500">*</span>
@@ -234,23 +362,7 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
             </div>
           </div>
 
-          {/* Tracking ID */}
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              Tracking ID
-            </label>
-            <div className="relative">
-              <MapPin className={iconWrapperClass} size={20} />
-              <input
-                value={trackingId}
-                onChange={(e) => setTrackingId(e.target.value)}
-                placeholder="GPS tracking ID"
-                className={inputClass()}
-              />
-            </div>
-          </div>
-
-          {/* Fastag Bank */}
+          {/* Row 3: Fastag Bank, Purchase Date, Purchase Amount */}
           <div className="relative">
             <label className="block mb-2 text-base font-medium text-slate-700">
               Fastag Bank
@@ -266,10 +378,104 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
             </div>
           </div>
 
-          {/* Engine Number */}
           <div className="relative">
             <label className="block mb-2 text-base font-medium text-slate-700">
-              Engine Number
+              Purchase Date
+            </label>
+            <div className="relative">
+              <CalendarDays className={iconWrapperClass} size={20} />
+              <DatePicker
+                value={purchaseDate}
+                onChange={setPurchaseDate}
+                placeholder="Select date"
+                placement="top"
+                className="w-full pl-12 pr-4 py-4 text-base border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition border-slate-200 bg-white appearance-none"
+              />
+            </div>
+          </div>
+
+          <div className="relative">
+            <label className="block mb-2 text-base font-medium text-slate-700">
+              Purchase Amount (₹) {/* 👈 Changed from Loan Amount */}
+            </label>
+            <div className="relative">
+              <IndianRupee className={iconWrapperClass} size={20} />
+              <input
+                ref={purchaseInputRef}
+                type="text"
+                onFocus={handlePurchaseFocus}
+                onBlur={handlePurchaseBlur}
+                onChange={handlePurchaseChange}
+                placeholder="e.g., 800000"
+                className={inputClass()}
+                defaultValue={purchaseAmountRaw ? formatIndianNumber(purchaseAmountRaw) : ""}
+              />
+            </div>
+          </div>
+
+          {/* Row 4: EMI Day, Total EMIs, RC Date */}
+          <div className="relative">
+            <label className="block mb-2 text-base font-medium text-slate-700">
+              EMI Day (1–31)
+            </label>
+            <div className="relative">
+              <CalendarDays className={iconWrapperClass} size={20} />
+              <input
+                type="number"
+                min="1"
+                max="31"
+                value={emiDay}
+                onChange={handleEmiDayChange}
+                onBlur={handleEmiDayBlur}
+                placeholder="e.g., 15"
+                className={numberInputClass()}
+              />
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              EMI due day each month. Month‑end dates adjust automatically.
+            </p>
+          </div>
+
+          <div className="relative">
+            <label className="block mb-2 text-base font-medium text-slate-700">
+              Total EMIs (months)
+            </label>
+            <div className="relative">
+              <Clock className={iconWrapperClass} size={20} />
+              <input
+                type="number"
+                min="1"
+                value={totalEMIs}
+                onChange={handleTotalEMIsChange}
+                placeholder="e.g., 36"
+                className={numberInputClass()}
+              />
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              Total number of monthly installments.
+            </p>
+          </div>
+
+          <div className="relative">
+            <label className="block mb-2 text-base font-medium text-slate-700">
+              RC Date
+            </label>
+            <div className="relative">
+              <Calendar className={iconWrapperClass} size={20} />
+              <DatePicker
+                value={rcDate}
+                onChange={setRcDate}
+                placeholder="Select date"
+                placement="top"
+                className="w-full pl-12 pr-4 py-4 text-base border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition border-slate-200 bg-white appearance-none"
+              />
+            </div>
+          </div>
+
+          {/* Row 5: Engine Number, Chassis Number, (empty) */}
+          <div className="relative">
+            <label className="block mb-2 text-base font-medium text-slate-700">
+              Engine Number <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <Gauge className={iconWrapperClass} size={20} />
@@ -282,10 +488,9 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
             </div>
           </div>
 
-          {/* Chassis Number */}
           <div className="relative">
             <label className="block mb-2 text-base font-medium text-slate-700">
-              Chassis Number
+              Chassis Number <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <Cpu className={iconWrapperClass} size={20} />
@@ -298,56 +503,7 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
             </div>
           </div>
 
-          {/* Insurance Expiry */}
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              Insurance Expiry
-            </label>
-            <div className="relative">
-              <Calendar className={iconWrapperClass} size={20} />
-              <DatePicker
-                value={insuranceExpiry}
-                onChange={setInsuranceExpiry}
-                placeholder="Select date"
-                placement="top"
-                className="w-full pl-12 pr-4 py-4 text-base border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition border-slate-200 bg-white appearance-none"
-              />
-            </div>
-          </div>
-
-          {/* Permit Expiry */}
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              Permit Expiry
-            </label>
-            <div className="relative">
-              <Calendar className={iconWrapperClass} size={20} />
-              <DatePicker
-                value={permitExpiry}
-                onChange={setPermitExpiry}
-                placeholder="Select date"
-                placement="top"
-                className="w-full pl-12 pr-4 py-4 text-base border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition border-slate-200 bg-white appearance-none"
-              />
-            </div>
-          </div>
-
-          {/* Fitness Expiry */}
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              Fitness Expiry
-            </label>
-            <div className="relative">
-              <Calendar className={iconWrapperClass} size={20} />
-              <DatePicker
-                value={fitnessExpiry}
-                onChange={setFitnessExpiry}
-                placeholder="Select date"
-                placement="top"
-                className="w-full pl-12 pr-4 py-4 text-base border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition border-slate-200 bg-white appearance-none"
-              />
-            </div>
-          </div>
+          <div className="relative">{/* empty placeholder */}</div>
         </div>
 
         {/* Action Buttons */}

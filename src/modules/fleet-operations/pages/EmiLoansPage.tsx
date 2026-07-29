@@ -5,47 +5,105 @@ import ErrorBoundary from '../components/common/ErrorBoundary';
 import EmiScheduleTable from '../components/emi/EmiScheduleTable';
 import { Search, CreditCard } from 'lucide-react';
 
+// Dummy data with explicit types to avoid implicit any errors
+const DUMMY_VEHICLES: any[] = [
+  { id: 'v1', vehicleNumber: 'KA01AB1234', vehicleType: 'LCV', noOfBoxes: 12, birdCapacity: 2000, capacityKg: 5000,
+    trackingId: 'GPS123', fastagBank: 'HDFC', engineNumber: 'ENG123', chassisNumber: 'CHAS123', status: 'Active',
+    purchaseDate: '2025-01-01', purchaseAmount: 800000, emiDay: 15, totalEMIs: 36, rcDate: '2025-01-15' },
+  { id: 'v2', vehicleNumber: 'KA02CD5678', vehicleType: 'Truck', noOfBoxes: 8, birdCapacity: 1500, capacityKg: 3000,
+    trackingId: 'GPS456', fastagBank: 'ICICI', engineNumber: 'ENG456', chassisNumber: 'CHAS456', status: 'Active',
+    purchaseDate: '2024-06-15', purchaseAmount: 600000, emiDay: 20, totalEMIs: 36, rcDate: '2024-07-01' },
+  { id: 'v3', vehicleNumber: 'KA03EF9012', vehicleType: 'Trailer', noOfBoxes: 6, birdCapacity: 1000, capacityKg: 2000,
+    trackingId: 'GPS789', fastagBank: 'Axis', engineNumber: 'ENG789', chassisNumber: 'CHAS789', status: 'Inactive',
+    purchaseDate: '2025-03-10', purchaseAmount: 950000, emiDay: 28, totalEMIs: 36, rcDate: '2025-04-01' },
+];
+
+// Explicitly type as any[] to avoid implicit any error
+const DUMMY_EMI_RECORDS: any[] = [
+  // You can keep this empty or with dummy records; it's only used as fallback
+];
+
 const EmiLoansPage = () => {
-  const { vehicles } = useVehicles();
-  const { emiRecords } = useFleetData();
+  const { vehicles: realVehicles } = useVehicles();
+  const { emiRecords: realEmiRecords } = useFleetData();
+
+  // Cast to any[] to avoid TypeScript errors
+  const vehicles = (realVehicles?.length ? realVehicles : DUMMY_VEHICLES) as any[];
+  const emiRecords = (realEmiRecords?.length ? realEmiRecords : DUMMY_EMI_RECORDS) as any[];
 
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredRecords = useMemo(() => {
-    if (!searchTerm.trim()) return emiRecords;
-    return emiRecords.filter((emi: any) => {
-      const vehicle = vehicles.find((v) => v.id === emi.vehicleId);
-      const vehicleNumber = vehicle?.vehicleNumber || '';
-      return vehicleNumber.toLowerCase().includes(searchTerm.toLowerCase());
-    });
-  }, [emiRecords, vehicles, searchTerm]);
+  // Filter vehicles by search term
+  const filteredVehicles = useMemo(() => {
+    if (!searchTerm.trim()) return vehicles;
+    return vehicles.filter((v: any) =>
+      v.vehicleNumber.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [vehicles, searchTerm]);
 
+  // Compute pending/completed status (based on whether vehicle has EMI data)
   const vehicleStatus = useMemo(() => {
-    const statusMap: Record<string, 'pending' | 'completed'> = {};
-    vehicles.forEach((v) => { statusMap[v.id] = 'completed'; });
-
-    emiRecords.forEach((emi: any) => {
-      if (emi.status === 'active' || emi.status === 'overdue') {
-        statusMap[emi.vehicleId] = 'pending';
+    let pending = 0;
+    let completed = 0;
+    vehicles.forEach((v: any) => {
+      const emi = emiRecords.find((e: any) => e.vehicleId === v.id);
+      // If vehicle has EMI details (from records) or totalEMIs, consider pending
+      const hasEmi = emi || (v.totalEMIs && v.totalEMIs > 0);
+      if (hasEmi) {
+        pending++;
+      } else {
+        completed++;
       }
     });
-
-    let pendingVehicles = 0;
-    let completedVehicles = 0;
-    Object.values(statusMap).forEach((status) => {
-      if (status === 'pending') pendingVehicles++;
-      else completedVehicles++;
-    });
-
-    return { pendingVehicles, completedVehicles };
+    return { pendingVehicles: pending, completedVehicles: completed };
   }, [vehicles, emiRecords]);
+
+  // Build synthetic EMI records from vehicle data (if no real EMI records)
+  const syntheticEmiRecords = useMemo(() => {
+    // If we have real EMI records, use them
+    if (realEmiRecords?.length) return emiRecords;
+
+    // Otherwise create from vehicles that have required fields
+    return vehicles
+      .filter((v: any) => v.purchaseDate && v.emiDay && v.totalEMIs && v.purchaseAmount)
+      .map((v: any) => {
+        const purchaseDate = new Date(v.purchaseDate);
+        const startDate = purchaseDate;
+        const endDate = new Date(purchaseDate);
+        endDate.setMonth(endDate.getMonth() + v.totalEMIs);
+
+        // Compute next EMI date: find the next occurrence of emiDay from today
+        const today = new Date();
+        let nextDate = new Date(today.getFullYear(), today.getMonth(), v.emiDay);
+        if (nextDate < today) {
+          nextDate.setMonth(nextDate.getMonth() + 1);
+        }
+
+        // Estimate paid EMIs based on months passed since purchase
+        const monthsPassed = (today.getFullYear() - purchaseDate.getFullYear()) * 12 +
+          (today.getMonth() - purchaseDate.getMonth());
+        const paidEMIs = Math.min(Math.max(0, monthsPassed), v.totalEMIs);
+        const status = paidEMIs >= v.totalEMIs ? 'completed' : 'active';
+
+        return {
+          id: `emi-${v.id}`,
+          vehicleId: v.id,
+          loanAmount: v.purchaseAmount,
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: endDate.toISOString().split('T')[0],
+          totalEMIs: v.totalEMIs,
+          paidEMIs: paidEMIs,
+          nextEMIDate: nextDate.toISOString().split('T')[0],
+          emiAmount: v.totalEMIs ? Math.round(v.purchaseAmount / v.totalEMIs) : 0,
+          status: status,
+          financeCompany: v.fastagBank || '',
+        };
+      });
+  }, [vehicles, emiRecords, realEmiRecords]);
 
   return (
     <ErrorBoundary>
-      {/* 👇 Container updated with reduced padding and increased top spacing, background added */}
       <div className="px-1 md:px-3 py-6 md:py-8 space-y-6 max-w-7xl mx-auto bg-slate-50 min-h-screen">
-        {/* Heading removed */}
-
         {/* Summary Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
           <div className="flex items-center gap-6">
@@ -81,13 +139,19 @@ const EmiLoansPage = () => {
           </div>
         </div>
 
-        {/* Table with Icon in Header */}
+        {/* Table with all vehicles (filtered) */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center gap-2 mb-4">
             <CreditCard className="w-5 h-5 text-blue-500" />
             <h3 className="text-sm font-semibold text-gray-700">EMI Schedule</h3>
           </div>
-          <EmiScheduleTable emiRecords={filteredRecords} vehicles={vehicles} simplified={true} pageSize={10} />
+          <EmiScheduleTable
+            emiRecords={syntheticEmiRecords}
+            vehicles={filteredVehicles}
+            simplified={true}
+            pageSize={10}
+            showAllVehicles={true}
+          />
         </div>
       </div>
     </ErrorBoundary>

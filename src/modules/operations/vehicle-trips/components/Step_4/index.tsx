@@ -6,7 +6,7 @@ import ShopDeliveryForm from "./ShopDeliveryForm";
 import ShopDeliveryCard from "./ShopDeliveryCard";
 import { generateShopPDF } from "../../utils/generateShopPDF";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
-import henImage from "./Hen_Image.webp";
+import henImage from "./Hen_Image_1.webp";
 
 interface Props {
   rows: ShopDelivery[];

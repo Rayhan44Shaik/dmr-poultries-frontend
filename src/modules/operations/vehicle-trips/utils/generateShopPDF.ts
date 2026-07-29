@@ -3,167 +3,188 @@ import autoTable from "jspdf-autotable";
 import type { BoxDetail } from "../types/trip";
 import { ShopDeliveryWithExtra } from "../components/Step_4/useShopDeliveryForm";
 
-// ─── Shared Shape Helpers ─────────────────────────────────────────────
+// ─── COLOR PALETTE ──────────────────────────────────────────────────────────
+const COLOR = {
+  primary: [15, 23, 42] as [number, number, number],       // Dark Navy / Slate 900
+  secondary: [30, 58, 138] as [number, number, number],    // Accent Blue 900
+  accent: [225, 29, 72] as [number, number, number],       // Rose Red 600
+  cardBg: [248, 250, 252] as [number, number, number],     // Light Slate / White
+  cardBorder: [226, 232, 240] as [number, number, number], // Clean Slate Border
+  iconBg: [239, 246, 255] as [number, number, number],     // Soft Blue Badge Background
+  iconStroke: [37, 99, 235] as [number, number, number],   // Bright Blue Icon Vector Stroke
+  textDark: [30, 41, 59] as [number, number, number],      // Slate 800 Text
+  textMuted: [100, 116, 139] as [number, number, number],  // Slate 500 Subtitle Text
+  tableHeader: [15, 43, 92] as [number, number, number],   // Deep Navy
+  tableAltRow: [248, 250, 252] as [number, number, number],
+  totalBg: [224, 231, 255] as [number, number, number],
+};
 
-// FIXED: Reverted to the strictly correct array-of-pairs syntax for jsPDF.lines
-function drawDiamond(doc: jsPDF, cx: number, cy: number, size: number) {
-  doc.lines(
-    [[size, size], [-size, size], [-size, -size], [size, -size]],
-    cx,
-    cy - size,
-    [1, 1],
-    "F",
-    true
-  );
-}
+// ─── PREMIUM VECTOR LOGO ENGINES ───────────────────────────────────────────
 
-function drawFlourish(doc: jsPDF, x: number, y: number, isRight = false) {
+/**
+ * BRAND LOGO: DMR POULTRY (Corporate Geometric Emblem)
+ */
+function drawDmrBrandLogo(doc: jsPDF, x: number, y: number, size = 22) {
   doc.saveGraphicsState();
-  doc.setLineWidth(0.6);
-  doc.setDrawColor(180, 25, 35);
-  const scaleX = isRight ? -1 : 1;
-  doc.line(x, y, x - 12 * scaleX, y);
-  doc.setFillColor(180, 25, 35);
-  doc.circle(x - 13 * scaleX, y, 0.8, "F");
-  doc.circle(x - 6 * scaleX, y - 1.8, 0.6, "F");
-  doc.circle(x - 6 * scaleX, y + 1.8, 0.6, "F");
-  doc.restoreGraphicsState();
-}
 
-// ─── VECTOR ICONS ──────────────────────────────────────────────────────
+  const cx = x + size / 2;
+  const cy = y + size / 2;
 
-// FIXED: doc.polygon completely removed, using absolutely valid array-of-pairs for doc.lines
-function drawSupervisorIcon(doc: jsPDF, x: number, y: number, color: [number, number, number]) {
-  doc.saveGraphicsState();
-  const primaryColor = color;
-  
-  // 1. Draw Suit Shoulders & Base using strictly correct lines format
-  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.lines(
-    [
-      [-3, 0],
-      [-3.8, 2.5],
-      [-3.8, 4],
-      [3.8, 4],
-      [3.8, 2.5],
-      [3, 0]
-    ],
-    x - 3, y,
-    [1, 1],
-    "F",
-    true
-  );
-
-  // 2. Collar Cutouts (White)
-  doc.setFillColor(255, 255, 255);
-  doc.triangle(x - 1.5, y + 0.5, x - 0.3, y + 0.5, x - 1.5, y + 2.5, "F");
-  doc.triangle(x + 1.5, y + 0.5, x + 0.3, y + 0.5, x + 1.5, y + 2.5, "F");
-
-  // 3. Tie
-  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.rect(x - 0.4, y + 0.5, 0.8, 2, "F");
-  doc.triangle(x - 0.6, y + 2.5, x + 0.6, y + 2.5, x, y + 3.2, "F");
-
-  // 4. Face
-  doc.setFillColor(255, 255, 255);
-  doc.circle(x, y - 2, 1.5, "F");
-  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.circle(x, y - 2, 1.5, "S");
-
-  // 5. Hard Hat
-  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.roundedRect(x - 2.5, y - 3.5, 5, 1, 0.2, 0.2, "F");
-  doc.rect(x - 1.5, y - 5, 3, 2, "F");
-  doc.circle(x, y - 5, 1.5, "F");
-  doc.rect(x - 0.9, y - 5, 0.4, 1.3, "F");
-  doc.rect(x - 0.1, y - 5, 0.4, 1.3, "F");
-  
-  doc.restoreGraphicsState();
-}
-
-function drawTruckIcon(doc: jsPDF, x: number, y: number, color: [number, number, number]) {
-  doc.saveGraphicsState();
-  doc.setFillColor(color[0], color[1], color[2]);
-  doc.roundedRect(x - 2.6, y - 2.5, 3.2, 3.5, 0.4, 0.4, "F");
-  doc.roundedRect(x + 0.6, y - 1.5, 3.6, 2.5, 0.4, 0.4, "F");
-  doc.circle(x - 1.2, y + 1.2, 0.7, "F");
-  doc.circle(x + 2.4, y + 1.2, 0.7, "F");
-  doc.restoreGraphicsState();
-}
-
-function drawPhoneIcon(doc: jsPDF, x: number, y: number, color: [number, number, number]) {
-  doc.saveGraphicsState();
-  doc.setFillColor(color[0], color[1], color[2]);
-  doc.roundedRect(x - 1.8, y - 3, 3.6, 6, 0.8, 0.8, "F");
-  doc.restoreGraphicsState();
-}
-
-function drawStoreIcon(doc: jsPDF, x: number, y: number, color: [number, number, number]) {
-  doc.saveGraphicsState();
-  doc.setFillColor(color[0], color[1], color[2]);
-  doc.triangle(x - 2.8, y - 0.5, x + 2.8, y - 0.5, x, y - 3.5, "F");
-  doc.roundedRect(x - 2.4, y - 0.5, 4.8, 3.5, 0.3, 0.3, "F");
-  doc.restoreGraphicsState();
-}
-
-function drawCalendarIcon(doc: jsPDF, x: number, y: number, color: [number, number, number]) {
-  doc.saveGraphicsState();
-  doc.setFillColor(color[0], color[1], color[2]);
-  doc.roundedRect(x - 2.4, y - 2.4, 4.8, 4.8, 0.4, 0.4, "F");
-  doc.setFillColor(255, 255, 255);
-  doc.rect(x - 2.4, y - 2.4, 4.8, 1.2, "F");
-  doc.setFillColor(color[0], color[1], color[2]);
-  doc.rect(x - 1.4, y - 3.2, 0.6, 1.2, "F");
-  doc.rect(x + 0.8, y - 3.2, 0.6, 1.2, "F");
-  doc.restoreGraphicsState();
-}
-
-// ─── Vector DMR Logo (Left) ──────────────────────────────────────────
-
-function drawVectorDMRLogo(doc: jsPDF, x: number, y: number) {
-  doc.saveGraphicsState();
-  const cx = x + 12;
-  const cy = y + 12;
-  doc.setDrawColor(15, 43, 92);
-  doc.setLineWidth(0.8);
-  doc.circle(cx, cy, 11, "S");
-  doc.setLineWidth(0.3);
-  doc.circle(cx, cy, 9.8, "S");
-  doc.setFillColor(210, 35, 42);
-  doc.circle(cx - 1.6, cy - 8.8, 1.1, "F");
-  doc.circle(cx, cy - 9.6, 1.2, "F");
-  doc.circle(cx + 1.6, cy - 8.8, 1.1, "F");
+  // Outer Rounded Navy Badge
   doc.setFillColor(15, 43, 92);
-  doc.circle(cx, cy - 7, 1.6, "F");
-  doc.setFillColor(245, 158, 11);
-  doc.triangle(cx + 1.2, cy - 7.3, cx + 2.8, cy - 6.7, cx + 1.2, cy - 6.1, "F");
+  doc.roundedRect(x, y, size, size, 4, 4, "F");
+
+  // Sleek Inner Rose Gold Border
+  doc.setDrawColor(225, 29, 72);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(x + 1.2, y + 1.2, size - 2.4, size - 2.4, 3, 3, "S");
+
+  // Central Emblem Circle
+  doc.setFillColor(255, 255, 255);
+  doc.circle(cx, cy - 1.5, 5.5, "F");
+
+  // Stylized Monogram Graphic "DMR" Wings
+  doc.setFillColor(15, 43, 92);
+  doc.triangle(cx - 3.5, cy + 0.5, cx, cy - 5.0, cx + 3.5, cy + 0.5, "F");
+  
+  doc.setFillColor(225, 29, 72);
+  doc.triangle(cx - 2.0, cy + 1.2, cx, cy - 3.0, cx + 2.0, cy + 1.2, "F");
+
+  // Bold Clean Text Base
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(210, 35, 42);
-  doc.text("DMR", cx, cy + 2.5, { align: "center" });
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(4.5);
-  doc.setTextColor(15, 43, 92);
-  doc.text("POULTRY", cx, cy + 6, { align: "center" });
+  doc.setFontSize(5.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text("DMR", cx, cy + 6.8, { align: "center" });
+
   doc.restoreGraphicsState();
 }
 
-// ─── MAIN PDF GENERATOR ──────────────────────────────────────────────
+/**
+ * SHOP LOGO: ANBU CHICKEN CENTER (Modern Minimalist Retail Badge)
+ */
+function drawAnbuShopLogo(doc: jsPDF, x: number, y: number, size = 22) {
+  doc.saveGraphicsState();
+
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+
+  // Crisp White Circular Container with Rose Accent Ring
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(225, 29, 72);
+  doc.setLineWidth(0.8);
+  doc.circle(cx, cy, size / 2 - 0.5, "FD");
+
+  // Inner Soft Rose Ring Background
+  doc.setFillColor(254, 242, 242);
+  doc.circle(cx, cy, size / 2 - 2, "F");
+
+  // Central Crown / Wing Geometry
+  doc.setFillColor(225, 29, 72);
+  doc.circle(cx - 2.2, cy - 2.5, 1.6, "F");
+  doc.circle(cx + 2.2, cy - 2.5, 1.6, "F");
+  doc.circle(cx, cy - 3.5, 2.0, "F");
+
+  // Shield Base Overlay
+  doc.setFillColor(15, 43, 92);
+  doc.triangle(cx - 4.5, cy - 1.2, cx + 4.5, cy - 1.2, cx, cy + 3.0, "F");
+
+  // Shop Label Text Box
+  doc.setFillColor(225, 29, 72);
+  doc.roundedRect(cx - 7.5, cy + 3.2, 15, 4.2, 1, 1, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(4.2);
+  doc.setTextColor(255, 255, 255);
+  doc.text("ANBU", cx, cy + 6.2, { align: "center" });
+
+  doc.restoreGraphicsState();
+}
+
+/**
+ * HIGH-PRECISION VECTOR FIELD ICONS (Lucide-inspired)
+ */
+function drawModernIcon(
+  doc: jsPDF,
+  type: "supervisor" | "vehicle" | "phone" | "store" | "calendar",
+  cx: number,
+  cy: number
+) {
+  doc.saveGraphicsState();
+
+  // Circular Soft Blue Badge
+  doc.setFillColor(COLOR.iconBg[0], COLOR.iconBg[1], COLOR.iconBg[2]);
+  doc.setDrawColor(219, 234, 254);
+  doc.setLineWidth(0.25);
+  doc.circle(cx, cy, 3.8, "FD");
+
+  // Crisp Vector Stroke
+  doc.setDrawColor(COLOR.iconStroke[0], COLOR.iconStroke[1], COLOR.iconStroke[2]);
+  doc.setLineWidth(0.4);
+
+  switch (type) {
+    case "supervisor":
+      doc.circle(cx, cy - 1.1, 1.1, "S");
+      doc.path([
+        { op: "m", c: [cx - 2.0, cy + 2.0] },
+        { op: "c", c: [cx - 2.0, cy + 0.6, cx + 2.0, cy + 0.6, cx + 2.0, cy + 2.0] }
+      ]);
+      doc.stroke();
+      break;
+
+    case "vehicle":
+      doc.roundedRect(cx - 2.4, cy - 1.5, 3.2, 2.2, 0.3, 0.3, "S");
+      doc.roundedRect(cx + 0.8, cy - 0.7, 1.6, 1.4, 0.3, 0.3, "S");
+      doc.circle(cx - 1.2, cy + 1.2, 0.6, "S");
+      doc.circle(cx + 1.4, cy + 1.2, 0.6, "S");
+      break;
+
+    case "phone":
+      doc.path([
+        { op: "m", c: [cx - 1.5, cy - 1.2] },
+        { op: "c", c: [cx - 2.0, cy - 0.2, cx - 0.2, cy + 1.8, cx + 1.0, cy + 1.5] },
+        { op: "l", c: [cx + 1.8, cy + 0.7] },
+        { op: "c", c: [cx + 2.0, cy + 0.3, cx + 1.5, cy - 0.2, cx + 1.1, cy + 0.1] },
+        { op: "l", c: [cx - 0.7, cy - 1.7] },
+        { op: "c", c: [cx - 1.0, cy - 2.0, cx - 1.4, cy - 1.6, cx - 1.5, cy - 1.2] }
+      ]);
+      doc.stroke();
+      break;
+
+    case "store":
+      doc.triangle(cx - 2.2, cy - 0.4, cx + 2.2, cy - 0.4, cx, cy - 2.2, "S");
+      doc.rect(cx - 1.8, cy - 0.4, 3.6, 2.2, "S");
+      doc.rect(cx - 0.6, cy + 0.4, 1.2, 1.4, "S");
+      break;
+
+    case "calendar":
+      doc.roundedRect(cx - 2.1, cy - 2.0, 4.2, 4.0, 0.5, 0.5, "S");
+      doc.line(cx - 2.1, cy - 0.7, cx + 2.1, cy - 0.7);
+      doc.setFillColor(COLOR.iconStroke[0], COLOR.iconStroke[1], COLOR.iconStroke[2]);
+      doc.circle(cx - 1.0, cy + 0.8, 0.3, "F");
+      doc.circle(cx + 1.0, cy + 0.8, 0.3, "F");
+      break;
+  }
+
+  doc.restoreGraphicsState();
+}
+
+// ─── MAIN GENERATOR ──────────────────────────────────────────────────────────
 
 export function generateShopPDF(
   row: ShopDeliveryWithExtra,
-  safeBoxDetails: BoxDetail[],
+  safeBoxDetails: BoxDetail[] = [],
   tripNo?: string,
   vehicleNo?: string,
   supervisorName?: string,
   supervisorPhone?: string,
   tripDate?: string,
   logoLeftUrl?: string,
-  logoRightUrl?: string
+  logoRightUrl?: string,
+  supervisorIconUrl?: string,
+  vehicleIconUrl?: string
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     try {
-      console.log("✅ 1. PDF generation STARTED...");
       const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
@@ -172,138 +193,138 @@ export function generateShopPDF(
 
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 14;
+      const contentWidth = pageWidth - margin * 2;
 
-      const primaryNavy: [number, number, number] = [15, 43, 92];
-      const accentRed: [number, number, number] = [210, 35, 42];
-      const totalRowBg: [number, number, number] = [225, 235, 248];
-      const cardBorder: [number, number, number] = [205, 218, 235];
-      const textDark: [number, number, number] = [15, 23, 42];
-      const textGray: [number, number, number] = [70, 80, 95];
+      let currentY = 12;
 
-      let startY = 12;
+      // ─── 1. HEADER LOGOS & TITLE ──────────────────────────────────────────
 
-      // ─── 1. HEADER LOGOS ──────────────────────────────────────────────
-
+      // Left Brand Logo
       try {
-        if (logoLeftUrl && typeof logoLeftUrl === "string") {
-          doc.addImage(logoLeftUrl, "PNG", 14, startY, 25, 25);
+        if (logoLeftUrl) {
+          doc.addImage(logoLeftUrl, "PNG", margin, currentY, 22, 22);
         } else {
-          drawVectorDMRLogo(doc, 14, startY);
+          drawDmrBrandLogo(doc, margin, currentY, 22);
         }
-      } catch (e) {
-        console.warn("Left logo failed, using vector fallback:", e);
-        drawVectorDMRLogo(doc, 14, startY);
+      } catch {
+        drawDmrBrandLogo(doc, margin, currentY, 22);
       }
 
+      // Right Shop Logo
       try {
-        if (logoRightUrl && typeof logoRightUrl === "string") {
-          const logoX = pageWidth - 39;
-          const logoY = startY;
-          const logoW = 25;
-          const logoH = 25;
-
-          doc.saveGraphicsState();
-          doc.setFillColor(248, 249, 250);
-          doc.setDrawColor(220, 225, 232);
-          doc.setLineWidth(0.3);
-          doc.roundedRect(logoX - 1.5, logoY - 1.5, logoW + 3, logoH + 3, 2, 2, "FD");
-          doc.restoreGraphicsState();
-
-          doc.addImage(logoRightUrl, "PNG", logoX, logoY, logoW, logoH);
+        if (logoRightUrl) {
+          doc.addImage(logoRightUrl, "PNG", pageWidth - margin - 22, currentY, 22, 22);
+        } else {
+          drawAnbuShopLogo(doc, pageWidth - margin - 22, currentY, 22);
         }
-      } catch (e) {
-        console.warn("Hen image failed to load. PDF will continue without it:", e);
+      } catch {
+        drawAnbuShopLogo(doc, pageWidth - margin - 22, currentY, 22);
       }
 
-      // Main Title
+      // Center Titles
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(26);
-      doc.setTextColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
-      doc.text("DMR POULTRY", pageWidth / 2, startY + 15, { align: "center" });
+      doc.setFontSize(22);
+      doc.setTextColor(COLOR.tableHeader[0], COLOR.tableHeader[1], COLOR.tableHeader[2]);
+      doc.text("DMR POULTRY", pageWidth / 2, currentY + 9, { align: "center" });
 
-      const lineY = startY + 23;
-      doc.setDrawColor(200, 212, 228);
-      doc.setLineWidth(0.5);
-      doc.line(45, lineY, pageWidth - 45, lineY);
-      doc.setFillColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
-      drawDiamond(doc, pageWidth / 2, lineY, 1.5);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(COLOR.textMuted[0], COLOR.textMuted[1], COLOR.textMuted[2]);
+      doc.text(
+        `DELIVERY RECEIPT ${tripNo ? `• TRIP #${tripNo}` : ""}`,
+        pageWidth / 2,
+        currentY + 16,
+        { align: "center" }
+      );
 
-      startY += 28;
+      currentY += 26;
 
-      // ─── 2. INFO CARDS ────────────────────────────────────────────────
+      // Divider Line
+      doc.setDrawColor(COLOR.cardBorder[0], COLOR.cardBorder[1], COLOR.cardBorder[2]);
+      doc.setLineWidth(0.4);
+      doc.line(margin, currentY, pageWidth - margin, currentY);
+
+      currentY += 6;
+
+      // ─── 2. INFO CARDS ────────────────────────────────────────────────────
 
       const isBoxMode = row.deliveryMode === "box";
-      const dateValue = tripDate || new Date().toLocaleDateString();
+      const dateValue = tripDate || new Date().toISOString().split("T")[0];
 
-      // Top Card
-      doc.setDrawColor(cardBorder[0], cardBorder[1], cardBorder[2]);
-      doc.setFillColor(252, 254, 255);
-      doc.roundedRect(14, startY, pageWidth - 28, 20, 3, 3, "FD");
-      doc.setFontSize(9.5);
+      doc.setFillColor(COLOR.cardBg[0], COLOR.cardBg[1], COLOR.cardBg[2]);
+      doc.setDrawColor(COLOR.cardBorder[0], COLOR.cardBorder[1], COLOR.cardBorder[2]);
+      doc.roundedRect(margin, currentY, contentWidth, 34, 3, 3, "FD");
 
-      drawSupervisorIcon(doc, 20, startY + 7.5, primaryNavy);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-      doc.text("Supervisor Name :", 25, startY + 8);
+      const col1X = margin + 8;
+      const col2X = margin + 98;
+
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-      doc.text(supervisorName || "", 57, startY + 8);
-      doc.line(57, startY + 9, 108, startY + 9);
 
-      drawTruckIcon(doc, 116, startY + 7.5, primaryNavy);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-      doc.text("Vehicle No :", 121, startY + 8);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-      doc.text(vehicleNo || "", 143, startY + 8);
-      doc.line(143, startY + 9, 188, startY + 9);
+      // --- ROW 1: Supervisor & Vehicle ---
+      if (supervisorIconUrl) {
+        try {
+          doc.addImage(supervisorIconUrl, "PNG", col1X - 3, currentY + 4, 7, 7);
+        } catch {
+          drawModernIcon(doc, "supervisor", col1X, currentY + 7);
+        }
+      } else {
+        drawModernIcon(doc, "supervisor", col1X, currentY + 7);
+      }
+      doc.setFontSize(8.5);
+      doc.setTextColor(COLOR.textDark[0], COLOR.textDark[1], COLOR.textDark[2]);
+      doc.text("Supervisor Name :", col1X + 6, currentY + 8);
+      doc.setTextColor(COLOR.textMuted[0], COLOR.textMuted[1], COLOR.textMuted[2]);
+      doc.text(supervisorName || "Saifuddin", col1X + 34, currentY + 8);
 
-      drawPhoneIcon(doc, 20, startY + 14.5, primaryNavy);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-      doc.text("Mobile No :", 25, startY + 15);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-      doc.text(supervisorPhone || "", 57, startY + 15);
-      doc.line(57, startY + 16, 108, startY + 16);
+      if (vehicleIconUrl) {
+        try {
+          doc.addImage(vehicleIconUrl, "PNG", col2X - 3, currentY + 4, 7, 7);
+        } catch {
+          drawModernIcon(doc, "vehicle", col2X, currentY + 7);
+        }
+      } else {
+        drawModernIcon(doc, "vehicle", col2X, currentY + 7);
+      }
+      doc.setTextColor(COLOR.textDark[0], COLOR.textDark[1], COLOR.textDark[2]);
+      doc.text("Vehicle No :", col2X + 6, currentY + 8);
+      doc.setTextColor(COLOR.textMuted[0], COLOR.textMuted[1], COLOR.textMuted[2]);
+      doc.text(vehicleNo || "AP-02-CD-5678", col2X + 26, currentY + 8);
 
-      startY += 23;
+      // --- ROW 2: Mobile No ---
+      drawModernIcon(doc, "phone", col1X, currentY + 17);
+      doc.setTextColor(COLOR.textDark[0], COLOR.textDark[1], COLOR.textDark[2]);
+      doc.text("Mobile No :", col1X + 6, currentY + 18);
+      doc.setTextColor(COLOR.textMuted[0], COLOR.textMuted[1], COLOR.textMuted[2]);
+      doc.text(supervisorPhone || "N/A", col1X + 34, currentY + 18);
 
-      // Bottom Card
-      doc.setDrawColor(cardBorder[0], cardBorder[1], cardBorder[2]);
-      doc.setFillColor(252, 254, 255);
-      doc.roundedRect(14, startY, pageWidth - 28, 14, 3, 3, "FD");
-      doc.line(122, startY, 122, startY + 14);
+      // Inner Card Line
+      doc.setDrawColor(COLOR.cardBorder[0], COLOR.cardBorder[1], COLOR.cardBorder[2]);
+      doc.setLineWidth(0.2);
+      doc.line(margin + 4, currentY + 23, pageWidth - margin - 4, currentY + 23);
 
-      drawStoreIcon(doc, 20, startY + 7, primaryNavy);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-      doc.text("Shop Name :", 25, startY + 7.5);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-      doc.text(row.shopName || "", 49, startY + 7.5);
-      doc.line(49, startY + 8.5, 115, startY + 8.5);
+      // --- ROW 3: Shop Name & Date ---
+      drawModernIcon(doc, "store", col1X, currentY + 28);
+      doc.setTextColor(COLOR.textDark[0], COLOR.textDark[1], COLOR.textDark[2]);
+      doc.text("Shop Name :", col1X + 6, currentY + 29);
+      doc.setTextColor(COLOR.textMuted[0], COLOR.textMuted[1], COLOR.textMuted[2]);
+      doc.text(row.shopName || "Anbu Chicken Center", col1X + 26, currentY + 29);
 
-      drawCalendarIcon(doc, 129, startY + 7, primaryNavy);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-      doc.text("Date :", 134, startY + 7.5);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-      doc.text(dateValue, 148, startY + 7.5);
-      doc.line(148, startY + 8.5, 188, startY + 8.5);
+      drawModernIcon(doc, "calendar", col2X, currentY + 28);
+      doc.setTextColor(COLOR.textDark[0], COLOR.textDark[1], COLOR.textDark[2]);
+      doc.text("Date :", col2X + 6, currentY + 29);
+      doc.setTextColor(COLOR.textMuted[0], COLOR.textMuted[1], COLOR.textMuted[2]);
+      doc.text(dateValue, col2X + 18, currentY + 29);
 
-      startY += 18;
+      currentY += 40;
 
-      // ─── 3. TABLE DATA ────────────────────────────────────────────────
+      // ─── 3. TABLE SECTION ─────────────────────────────────────────────────
 
-      const isWeightMode = !isBoxMode;
       const headers = isBoxMode
         ? ["Box No", "Birds No.", "Weight (Kg)"]
         : ["Box No", "Birds No.", "Weight (Farm) (kg)"];
 
-      let tableRows: any[] = [];
+      let tableRows: (string | number)[][] = [];
       let totalBirds = 0;
       let totalWeight = 0;
 
@@ -326,36 +347,33 @@ export function generateShopPDF(
         });
       }
 
-      const totalBoxCount = tableData.length;
       tableRows.push([
-        `TOTAL             ${totalBoxCount}`,
+        `TOTAL BOXES: ${tableData.length}`,
         totalBirds.toLocaleString(),
         totalWeight.toFixed(2),
       ]);
 
-      // ─── 4. AUTOTABLE ──────────────────────────────────────────────────
-
       autoTable(doc, {
-        startY: startY,
+        startY: currentY,
         head: [headers],
         body: tableRows,
         theme: "grid",
-        margin: { left: 14, right: 14 },
+        margin: { left: margin, right: margin },
         headStyles: {
-          fillColor: primaryNavy,
+          fillColor: COLOR.tableHeader,
           textColor: [255, 255, 255],
-          fontStyle: "bold",
-          fontSize: 10,
+          fontStyle: "normal",
+          fontSize: 9,
           halign: "center",
           valign: "middle",
           cellPadding: 3.5,
         },
         styles: {
-          fontSize: 9.5,
+          fontSize: 8.5,
           cellPadding: 2.5,
           valign: "middle",
-          textColor: textDark,
-          lineColor: [210, 220, 235],
+          textColor: COLOR.textDark,
+          lineColor: COLOR.cardBorder,
           lineWidth: 0.25,
         },
         columnStyles: {
@@ -363,110 +381,92 @@ export function generateShopPDF(
           1: { halign: "center" },
           2: { halign: "center" },
         },
-        didParseCell: function (data) {
+        alternateRowStyles: {
+          fillColor: COLOR.tableAltRow,
+        },
+        didParseCell: (data) => {
           if (data.row.index === tableRows.length - 1) {
-            data.cell.styles.fillColor = totalRowBg;
-            data.cell.styles.textColor = primaryNavy;
-            data.cell.styles.fontStyle = "bold";
-            data.cell.styles.fontSize = 10;
-            data.cell.styles.halign = data.column.index === 0 ? "left" : "center";
+            data.cell.styles.fillColor = COLOR.totalBg;
+            data.cell.styles.textColor = COLOR.tableHeader;
+            data.cell.styles.fontStyle = "normal";
+            data.cell.styles.fontSize = 9;
           }
         },
       });
 
-      let finalY = (doc as any).lastAutoTable.finalY || startY + 50;
+      let finalY = (doc as any).lastAutoTable.finalY || currentY + 40;
 
-      // ─── 5. WEIGHT MODE EXTRAS ────────────────────────────────────────
+      // ─── 4. MORTALITY & FINAL DEDUCTION SUMMARY ───────────────────────────
 
-      if (isWeightMode) {
+      if (!isBoxMode) {
         const mortalityBirds = Number(row.mortality) || 0;
         const mortalityWeight = Number(row.mortKg) || 0;
         const finalBirds = totalBirds - mortalityBirds;
         const finalWeight = totalWeight - mortalityWeight;
 
-        finalY += 6;
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9.5);
-        doc.setTextColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
-        doc.text(`MORTALITY : ${mortalityBirds}`, 16, finalY);
-        doc.text(`MORTALITY (KG) : ${mortalityWeight.toFixed(2)} kg`, 90, finalY);
+        finalY += 8;
 
-        finalY += 6;
-        doc.text(`FINAL BIRDS : ${finalBirds}`, 16, finalY);
-        doc.text(`FINAL WEIGHT : ${finalWeight.toFixed(2)} kg`, 90, finalY);
-
-        finalY += 6;
-        doc.setFont("helvetica", "italic");
-        doc.setFontSize(8.5);
-        doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-        doc.text("(AFTER MORTALITY DEDUCTION)", 16, finalY);
-      }
-
-      // ─── 6. FOOTER ─────────────────────────────────────────────────────
-
-      const renderFooter = (pageNumber: number, totalPages: number) => {
-        doc.setPage(pageNumber);
-        const footerY = pageHeight - 25;
-
-        doc.setDrawColor(200, 212, 228);
-        doc.setLineWidth(0.4);
-        doc.line(25, footerY - 8, pageWidth - 25, footerY - 8);
-        doc.setFillColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
-        drawDiamond(doc, pageWidth / 2, footerY - 8, 1.2);
-
-        doc.setFont("times", "italic");
-        doc.setFontSize(22);
-        doc.setTextColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
-        doc.text("Thank You", pageWidth / 2, footerY + 1, { align: "center" });
-
-        drawFlourish(doc, pageWidth / 2 - 25, footerY - 1, false);
-        drawFlourish(doc, pageWidth / 2 + 25, footerY - 1, true);
-
-        // Safe straight line (completely bypasses doc.lines scale errors)
-        const waveTop = pageHeight - 12;
-        doc.setDrawColor(accentRed[0], accentRed[1], accentRed[2]);
-        doc.setLineWidth(2.5);
-        doc.line(0, waveTop, pageWidth, waveTop + 4);
-
-        doc.setFillColor(primaryNavy[0], primaryNavy[1], primaryNavy[2]);
-        doc.rect(0, pageHeight - 8, pageWidth, 8, "F");
+        doc.setFillColor(COLOR.cardBg[0], COLOR.cardBg[1], COLOR.cardBg[2]);
+        doc.setDrawColor(COLOR.cardBorder[0], COLOR.cardBorder[1], COLOR.cardBorder[2]);
+        doc.roundedRect(margin, finalY, contentWidth, 20, 2, 2, "FD");
 
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(7);
-        doc.setTextColor(255, 255, 255);
-        doc.text(`Generated: ${new Date().toLocaleString()}`, 10, pageHeight - 2.5);
-        doc.text(`Page ${pageNumber} of ${totalPages}`, pageWidth - 10, pageHeight - 2.5, { align: "right" });
-      };
+        doc.setFontSize(8.5);
+        doc.setTextColor(COLOR.accent[0], COLOR.accent[1], COLOR.accent[2]);
+        doc.text("MORTALITY DEDUCTIONS", margin + 6, finalY + 6);
 
-      const totalPages = doc.internal.pages.length - 1;
-      for (let i = 1; i <= totalPages; i++) {
-        renderFooter(i, totalPages);
+        doc.setFontSize(8);
+        doc.setTextColor(COLOR.textDark[0], COLOR.textDark[1], COLOR.textDark[2]);
+        doc.text(`Mortality Count: ${mortalityBirds} birds`, margin + 6, finalY + 12);
+        doc.text(`Mortality Weight: ${mortalityWeight.toFixed(2)} kg`, margin + 6, finalY + 16);
+
+        doc.setFontSize(8.5);
+        doc.setTextColor(COLOR.tableHeader[0], COLOR.tableHeader[1], COLOR.tableHeader[2]);
+        doc.text("NET DELIVERED", margin + 100, finalY + 6);
+
+        doc.setFontSize(8.5);
+        doc.setTextColor(COLOR.textDark[0], COLOR.textDark[1], COLOR.textDark[2]);
+        doc.text(`Final Birds: ${finalBirds} birds`, margin + 100, finalY + 12);
+        doc.text(`Final Weight: ${finalWeight.toFixed(2)} kg`, margin + 100, finalY + 16);
       }
 
-      // ─── 7. SAVE & RESOLVE ─────────────────────────────────────────────
+      // ─── 5. FOOTER ────────────────────────────────────────────────────────
+
+      const pageCount = doc.internal.pages.length - 1;
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+
+        doc.setDrawColor(COLOR.cardBorder[0], COLOR.cardBorder[1], COLOR.cardBorder[2]);
+        doc.setLineWidth(0.4);
+        doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(COLOR.textMuted[0], COLOR.textMuted[1], COLOR.textMuted[2]);
+        doc.text(`Generated on: ${new Date().toLocaleString()}`, margin, pageHeight - 6);
+        doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 6, { align: "right" });
+      }
+
+      // ─── 6. DOWNLOAD HANDLER ──────────────────────────────────────────────
 
       const suffix = isBoxMode ? "Box" : "Weight";
-      const cleanShopName = (row.shopName || "Shop").replace(/\s+/g, "_");
-      
-      console.log("✅ 2. PDF Built. Forcing download...");
-      
-      // Use Blob + virtual link to guarantee bypassing browser blockers
-      const pdfBlob = doc.output('blob');
-      const url = window.URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `ShopDelivery_${cleanShopName}_${suffix}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
-      
-      console.log("✅ 3. Download triggered!");
-      resolve();
+      const cleanShopName = (row.shopName || "Anbu_Chicken_Center").replace(/\s+/g, "_");
 
+      const pdfBlob = doc.output("blob");
+      const blobUrl = window.URL.createObjectURL(pdfBlob);
+      const downloadLink = document.createElement("a");
+
+      downloadLink.href = blobUrl;
+      downloadLink.download = `DeliveryReceipt_${cleanShopName}_${suffix}.pdf`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+
+      resolve();
     } catch (error: any) {
-      console.error("❌ CRITICAL ERROR caught inside PDF generator:", error);
-      reject(new Error(error?.message || "Failed to generate PDF. Check browser console."));
+      reject(new Error(error?.message || "Failed to generate PDF receipt."));
     }
   });
 }
