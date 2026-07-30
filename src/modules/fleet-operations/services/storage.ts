@@ -1,4 +1,6 @@
-// No external dependency - use Date.now() + random suffix
+import { VehicleDocument } from '../types';
+import { DocumentType } from '../utils/constants';
+
 const generateId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 };
@@ -9,11 +11,9 @@ export const FLEET_KEYS = {
   FASTAG: 'dmr-vehicle-fastag',
   FASTAG_TRANSACTIONS: 'dmr-vehicle-fastag-transactions',
   EMI: 'dmr-vehicle-emi',
-  // NEW: key for deleted maintenance records
   DELETED_MAINTENANCE: 'dmr-vehicle-maintenance-deleted',
 } as const;
 
-// Generic CRUD with error handling (unchanged)
 export const getData = <T>(key: string): T[] => {
   try {
     const raw = localStorage.getItem(key);
@@ -59,17 +59,14 @@ export const deleteRecord = <T extends { id: string }>(key: string, id: string):
   return updated;
 };
 
-// ============================================================
-// EXISTING SPECIFIC ACCESSORS (UNCHANGED)
-// ============================================================
 export const getMaintenance = () => getData(FLEET_KEYS.MAINTENANCE);
-export const getDocuments = () => getData(FLEET_KEYS.DOCUMENTS);
+export const getDocuments = (): VehicleDocument[] => getData(FLEET_KEYS.DOCUMENTS);
 export const getFastags = () => getData(FLEET_KEYS.FASTAG);
 export const getFastagTransactions = () => getData(FLEET_KEYS.FASTAG_TRANSACTIONS);
 export const getEMIRecords = () => getData(FLEET_KEYS.EMI);
 
 export const addMaintenance = (record: any) => addRecord(FLEET_KEYS.MAINTENANCE, record);
-export const addDocument = (doc: any) => addRecord(FLEET_KEYS.DOCUMENTS, doc);
+export const addDocument = (doc: VehicleDocument) => addRecord(FLEET_KEYS.DOCUMENTS, doc);
 export const addFastag = (tag: any) => addRecord(FLEET_KEYS.FASTAG, tag);
 export const addFastagTransaction = (tx: any) => addRecord(FLEET_KEYS.FASTAG_TRANSACTIONS, tx);
 export const addEMIRecord = (emi: any) => addRecord(FLEET_KEYS.EMI, emi);
@@ -79,35 +76,46 @@ export const updateDocument = (id: string, updates: any) => updateRecord(FLEET_K
 export const updateFastag = (id: string, updates: any) => updateRecord(FLEET_KEYS.FASTAG, id, updates);
 export const updateEMIRecord = (id: string, updates: any) => updateRecord(FLEET_KEYS.EMI, id, updates);
 
-// ============================================================
-// PERMANENT DELETE (unchanged – used by other modules)
-// ============================================================
 export const deleteMaintenance = (id: string) => deleteRecord(FLEET_KEYS.MAINTENANCE, id);
 export const deleteDocument = (id: string) => deleteRecord(FLEET_KEYS.DOCUMENTS, id);
 export const deleteFastag = (id: string) => deleteRecord(FLEET_KEYS.FASTAG, id);
 export const deleteEMIRecord = (id: string) => deleteRecord(FLEET_KEYS.EMI, id);
 
-// ============================================================
-// NEW: SOFT DELETE FOR MAINTENANCE (moves to deleted list)
-// ============================================================
 export const softDeleteMaintenance = (id: string): boolean => {
-  // 1. Get the record from active list
   const active = getMaintenance();
   const record = active.find((r: any) => r.id === id);
   if (!record) return false;
-
-  // 2. Remove from active (permanent delete)
   const filtered = active.filter((r: any) => r.id !== id);
   setData(FLEET_KEYS.MAINTENANCE, filtered);
-
-  // 3. Add to deleted list with timestamp
   const deleted = getDeletedMaintenance();
   deleted.push({ ...record, deletedAt: new Date().toISOString() });
   setData(FLEET_KEYS.DELETED_MAINTENANCE, deleted);
   return true;
 };
 
-// NEW: Get all deleted maintenance records
 export const getDeletedMaintenance = (): any[] => {
   return getData(FLEET_KEYS.DELETED_MAINTENANCE);
+};
+
+// Update or create a document (excluding RC – we don't store RC in documents)
+export const updateDocumentExpiry = (vehicleId: string, type: string, expiryDate: string): void => {
+  if (type === 'rc') {
+    console.warn('RC is not stored in documents; update vehicle.rcDate instead.');
+    return;
+  }
+  const docs = getDocuments();
+  const existing = docs.find((d) => d.vehicleId === vehicleId && d.type === type);
+  if (existing) {
+    existing.expiryDate = expiryDate;
+    setData(FLEET_KEYS.DOCUMENTS, docs);
+  } else {
+    addDocument({
+      id: generateId(),
+      vehicleId,
+      type: type as unknown as DocumentType,
+      documentNumber: '',
+      expiryDate,
+      status: 'valid',
+    });
+  }
 };

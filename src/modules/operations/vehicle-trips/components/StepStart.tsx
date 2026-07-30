@@ -249,6 +249,7 @@ export default function StepStart({
 
         {/* Inputs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 sm:gap-x-6 gap-y-3.5 sm:gap-y-4">
+          {/* Start Time (read-only) */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Clock size={14} className="text-slate-400" /> Start Time <span className="text-red-500">*</span>
@@ -258,6 +259,7 @@ export default function StepStart({
             </div>
           </div>
 
+          {/* Vehicle No. */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Truck size={14} className="text-slate-400" /> Vehicle No. <span className="text-red-500">*</span>
@@ -276,6 +278,7 @@ export default function StepStart({
             />
           </div>
 
+          {/* Supervisor */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <User size={14} className="text-slate-400" /> Supervisor <span className="text-red-500">*</span>
@@ -294,6 +297,7 @@ export default function StepStart({
             />
           </div>
 
+          {/* Driver */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <User size={14} className="text-slate-400" /> Driver <span className="text-red-500">*</span>
@@ -312,6 +316,7 @@ export default function StepStart({
             />
           </div>
 
+          {/* Starting Meter */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Gauge size={14} className="text-slate-400" /> Starting Meter (KM) <span className="text-red-500">*</span>
@@ -332,6 +337,7 @@ export default function StepStart({
             />
           </div>
 
+          {/* Advance / Expenses */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Wallet size={14} className="text-slate-400" /> Advance / Expenses <span className="text-red-500">*</span>
@@ -349,6 +355,26 @@ export default function StepStart({
               onWheel={(e) => e.currentTarget.blur()}
               className="hide-spinner w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-400"
               placeholder="0.00"
+            />
+          </div>
+
+          {/* 👇 NEW: Helpers (full width) */}
+          <div className="col-span-2">
+            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+              <User size={14} className="text-slate-400" /> Helpers
+            </label>
+            <Select
+              options={helperOptions}
+              getOptionLabel={(e) => e?.employeeName || ""}
+              getOptionValue={(e) => e?.employeeName || ""}
+              value={helperOptions.filter((o) => trip.helpers?.includes(o.employeeName)) || []}
+              onChange={handleHelpersChange}
+              className="mt-1 text-sm"
+              placeholder="Select helpers..."
+              isMulti
+              isSearchable
+              styles={selectStyles}
+              menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
             />
           </div>
         </div>

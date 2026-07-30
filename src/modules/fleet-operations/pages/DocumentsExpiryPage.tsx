@@ -1,6 +1,6 @@
-import { memo, useState, useCallback, useMemo } from 'react';
+import { memo, useState, useCallback, useMemo, useEffect } from 'react';
 import { useDocumentsData } from '../hooks/useDocumentsData';
-import { DOCUMENT_TYPES, DOCUMENT_LABELS } from '../utils/constants';
+import { DOCUMENT_LABELS, DOCUMENT_TYPE_ORDER } from '../utils/constants';
 import ErrorBoundary from '../../../components/common/ErrorBoundary';
 import DocumentSummaryTiles from '../components/documents/DocumentSummaryTiles';
 import DocumentMatrix from '../components/documents/DocumentMatrix';
@@ -10,26 +10,52 @@ import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const PAGE_SIZE = 10;
 
+const getNearestExpiry = (row: any): number => {
+  const docMap = row.docMap || {};
+  const dates = Object.values(docMap)
+    .map((doc: any) => {
+      if (doc && typeof doc === 'object') {
+        return doc.expiryDate;
+      }
+      return undefined;
+    })
+    .filter((date): date is string => !!date)
+    .map((date) => new Date(date).getTime());
+  if (dates.length === 0) return Infinity;
+  return Math.min(...dates);
+};
+
 const DocumentsExpiryPage = () => {
-  const { expiringCounts, matrix, getStatusColor, refetch } = useDocumentsData();
+  const {
+    totalCounts,
+    statusCounts,
+    matrix,
+    getStatusColor,
+    formatExpiryDate,
+    refetch,
+    updateDocument,
+  } = useDocumentsData();
   const { showNotification } = useSafeNotification();
 
-  const [editData, setEditData] = useState<{ vehicle: any; docMap: any } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [editData, setEditData] = useState<{ vehicle: any; docMap: any } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    refetch();
+  }, []);
+
+  const filteredMatrix = useMemo(() => {
+    if (!searchTerm.trim()) return matrix;
+    return matrix.filter((row: any) =>
+      row.vehicle.vehicleNumber.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [matrix, searchTerm]);
 
   const sortedMatrix = useMemo(() => {
-    return [...matrix].sort((a, b) => {
-      const getNearestExpiry = (row: any) => {
-        const dates = Object.values(row.docMap)
-          .filter((doc: any) => doc && doc.expiryDate)
-          .map((doc: any) => new Date(doc.expiryDate).getTime());
-        if (dates.length === 0) return Infinity;
-        return Math.min(...dates);
-      };
-      return getNearestExpiry(a) - getNearestExpiry(b);
-    });
-  }, [matrix]);
+    return [...filteredMatrix].sort((a, b) => getNearestExpiry(a) - getNearestExpiry(b));
+  }, [filteredMatrix]);
 
   const totalPages = Math.ceil(sortedMatrix.length / PAGE_SIZE);
   const startIndex = (currentPage - 1) * PAGE_SIZE;
@@ -44,7 +70,7 @@ const DocumentsExpiryPage = () => {
     setIsRefreshing(true);
     try {
       await refetch?.();
-      showNotification('Documents data refreshed successfully', 'success');
+      showNotification('Data refreshed successfully', 'success');
     } catch (error) {
       showNotification('Failed to refresh data', 'error');
     } finally {
@@ -52,22 +78,33 @@ const DocumentsExpiryPage = () => {
     }
   }, [refetch, isRefreshing, showNotification]);
 
+  // ✅ Enhanced edit handler
   const handleEdit = useCallback((vehicle: any, docMap: any) => {
-    setEditData({ vehicle, docMap });
+    console.log('✏️ Edit clicked for vehicle:', vehicle);
+    // Normalise vehicle ID to string
+    const normalizedVehicle = {
+      ...vehicle,
+      id: String(vehicle.id),
+    };
+    setEditData({ vehicle: normalizedVehicle, docMap });
   }, []);
 
   const handleCloseEdit = useCallback(() => setEditData(null), []);
 
-  // ✅ Fix: prefix unused params with underscore to silence warnings
-  const handleSaveEdit = useCallback(async (_vehicleId: string, _updates: Record<string, string | null>) => {
-    try {
-      showNotification('Document updated successfully', 'success');
-      await refetch?.();
-      setEditData(null);
-    } catch (error) {
-      showNotification('Failed to update documents', 'error');
-    }
-  }, [refetch, showNotification]);
+  const handleSaveEdit = useCallback(
+    async (vehicleId: string, updates: Record<string, string | null>) => {
+      console.log('📝 Saving changes for vehicle', vehicleId, updates);
+      try {
+        await updateDocument(vehicleId, updates);
+        await refetch?.();
+        showNotification('Document dates updated successfully', 'success');
+        setEditData(null);
+      } catch (error: any) {
+        showNotification(error?.message || 'Failed to update documents', 'error');
+      }
+    },
+    [refetch, updateDocument, showNotification]
+  );
 
   const renderPagination = () => {
     if (totalPages <= 1) return null;
@@ -111,39 +148,60 @@ const DocumentsExpiryPage = () => {
     );
   };
 
+  // ✅ Include ALL document types (including RC)
+  const editableDocTypes = DOCUMENT_TYPE_ORDER as unknown as string[];
+
   return (
     <ErrorBoundary>
       <div className="px-1 md:px-3 py-6 md:py-8 space-y-6 max-w-7xl mx-auto bg-slate-50 min-h-screen">
-        <DocumentSummaryTiles counts={expiringCounts} docLabels={DOCUMENT_LABELS} />
+        <DocumentSummaryTiles
+          counts={totalCounts}
+          statusCounts={statusCounts}
+          docLabels={DOCUMENT_LABELS}
+        />
 
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
             <h3 className="text-sm font-semibold text-gray-700">Vehicle Document Status</h3>
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-all shadow-sm active:scale-95"
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {isRefreshing ? 'Refreshing...' : 'Refresh'}
-            </button>
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="relative flex-1 sm:flex-none">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search by vehicle number..."
+                  className="w-full sm:w-64 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-all shadow-sm active:scale-95"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
           </div>
 
           <DocumentMatrix
             matrix={paginatedMatrix}
-            docTypes={[...DOCUMENT_TYPES]}
+            docTypes={DOCUMENT_TYPE_ORDER as unknown as string[]}
             docLabels={DOCUMENT_LABELS}
             getStatusColor={getStatusColor}
+            formatExpiryDate={formatExpiryDate}
             onEdit={handleEdit}
           />
 
           {renderPagination()}
         </div>
 
+        {/* ✅ Modal conditionally rendered */}
         {editData && (
           <DocumentEditModal
             vehicle={editData.vehicle}
             docMap={editData.docMap}
+            docTypes={editableDocTypes}
             onClose={handleCloseEdit}
             onSave={handleSaveEdit}
           />

@@ -8,8 +8,8 @@ interface DocumentDetailModalProps {
 }
 
 const DocumentDetailModal = ({ vehicle, docMap, onClose }: DocumentDetailModalProps) => {
-  // Helper to determine status
   const getDocStatus = (expiryDate: string) => {
+    if (!expiryDate) return { label: 'Unknown', color: 'text-gray-600 bg-gray-50', icon: FileText };
     const now = new Date();
     const exp = new Date(expiryDate);
     const diffDays = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
@@ -36,6 +36,7 @@ const DocumentDetailModal = ({ vehicle, docMap, onClose }: DocumentDetailModalPr
 
         <div className="space-y-4">
           {Object.entries(docMap).map(([type, doc]) => {
+            if (!doc || !doc.expiryDate) return null;
             const status = getDocStatus(doc.expiryDate);
             const StatusIcon = status.icon;
             return (

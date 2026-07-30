@@ -6,62 +6,81 @@ import { useSafeNotification } from '../../../../hooks/useSafeNotification';
 interface DocumentEditModalProps {
   vehicle: any;
   docMap: Record<string, any>;
+  docTypes?: string[];
   onClose: () => void;
   onSave: (vehicleId: string, updates: Record<string, string | null>) => Promise<void>;
 }
 
-// Map document type to icon and colour scheme
 const docConfig: Record<string, { icon: any; bg: string; border: string; text: string }> = {
+  rc: { icon: FileText, bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700' },
   insurance: { icon: Shield, bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
   fitness: { icon: Dumbbell, bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700' },
   permit: { icon: FileCheck, bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
   puc: { icon: Car, bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' },
-  rc: { icon: FileText, bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700' },
 };
 
-const DocumentEditModal = ({ vehicle, docMap, onClose, onSave }: DocumentEditModalProps) => {
+const fallbackConfig = { icon: FileText, bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700' };
+
+const getExpiry = (doc: any): string | undefined => {
+  if (doc && typeof doc === 'object') {
+    return doc.expiryDate;
+  }
+  return undefined;
+};
+
+const normalizeDate = (input: any): string => {
+  if (!input) return '';
+  if (typeof input === 'string') {
+    let date = new Date(input);
+    if (!isNaN(date.getTime())) return date.toISOString().split('T')[0];
+    const parts = input.split('/');
+    if (parts.length === 3) {
+      const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+      if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+    }
+    return '';
+  }
+  if (input instanceof Date) {
+    if (!isNaN(input.getTime())) return input.toISOString().split('T')[0];
+  }
+  return '';
+};
+
+const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: DocumentEditModalProps) => {
   const { showNotification } = useSafeNotification();
 
-  // ... (all existing state and logic unchanged) ...
-  const [editedDates, setEditedDates] = useState<Record<string, string>>(() => {
-    const initial: Record<string, string> = {};
-    Object.entries(docMap).forEach(([type, doc]) => {
-      if (doc && doc.expiryDate) {
-        const dateObj = new Date(doc.expiryDate);
-        if (!isNaN(dateObj.getTime())) {
-          initial[type] = dateObj.toISOString().split('T')[0];
-        } else {
-          const parts = doc.expiryDate.split('-');
-          if (parts.length === 3) {
-            const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-            if (!isNaN(d.getTime())) {
-              initial[type] = d.toISOString().split('T')[0];
-            }
-          }
-        }
-      }
-    });
-    return initial;
+  // ✅ Include ALL document types – no filter
+  const documentTypes = (docTypes && docTypes.length > 0) 
+    ? docTypes 
+    : Object.keys(docMap);
+
+  const initialDates: Record<string, string> = {};
+  documentTypes.forEach((type) => {
+    const expiry = getExpiry(docMap[type]);
+    if (expiry) {
+      const normalized = normalizeDate(expiry);
+      if (normalized) initialDates[type] = normalized;
+    }
   });
 
+  const [editedDates, setEditedDates] = useState<Record<string, string>>(() => ({ ...initialDates }));
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleDateChange = (type: string, value: string) => {
-    setEditedDates((prev) => ({ ...prev, [type]: value }));
+  const handleDateChange = (type: string, value: any) => {
+    const normalized = normalizeDate(value);
+    setEditedDates((prev) => ({ ...prev, [type]: normalized }));
     setErrors((prev) => ({ ...prev, [type]: '' }));
   };
 
-  const validateDates = (): boolean => {
+  const validateChangedDates = (): boolean => {
     const newErrors: Record<string, string> = {};
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayStr = new Date().toISOString().split('T')[0];
 
-    Object.entries(editedDates).forEach(([type, dateStr]) => {
-      if (dateStr) {
-        const selectedDate = new Date(dateStr + 'T00:00:00');
-        if (selectedDate < today) {
-          newErrors[type] = 'Date cannot be in the past';
-        }
+    documentTypes.forEach((type) => {
+      const newDate = editedDates[type];
+      const oldDate = initialDates[type];
+      if (newDate && newDate !== oldDate && newDate < todayStr) {
+        newErrors[type] = 'Date cannot be in the past';
       }
     });
 
@@ -70,23 +89,18 @@ const DocumentEditModal = ({ vehicle, docMap, onClose, onSave }: DocumentEditMod
   };
 
   const handleSave = async () => {
-    if (!validateDates()) {
-      showNotification('Please fix the errors before saving', 'error');
+    if (!validateChangedDates()) {
+      showNotification('Please fix the errors on changed fields before saving.', 'error');
       return;
     }
 
     try {
       const updates: Record<string, string> = {};
-      Object.entries(editedDates).forEach(([type, dateStr]) => {
-        const existing = docMap[type]?.expiryDate;
-        if (dateStr) {
-          const formatted = new Date(dateStr + 'T00:00:00').toISOString().split('T')[0];
-          const existingFormatted = existing
-            ? new Date(existing).toISOString().split('T')[0]
-            : null;
-          if (formatted !== existingFormatted) {
-            updates[type] = dateStr;
-          }
+      documentTypes.forEach((type) => {
+        const newDate = editedDates[type];
+        const oldDate = initialDates[type];
+        if (newDate && newDate !== oldDate) {
+          updates[type] = newDate;
         }
       });
 
@@ -103,12 +117,14 @@ const DocumentEditModal = ({ vehicle, docMap, onClose, onSave }: DocumentEditMod
     }
   };
 
-  const documentTypes = Object.keys(docMap);
+  const getConfig = (type: string) => {
+    const key = type.toLowerCase();
+    return docConfig[key] || fallbackConfig;
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
-        {/* Header */}
         <div className="flex justify-between items-start mb-6 pb-2 border-b border-gray-100">
           <div>
             <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
@@ -125,14 +141,14 @@ const DocumentEditModal = ({ vehicle, docMap, onClose, onSave }: DocumentEditMod
           </button>
         </div>
 
-        {/* Document rows */}
         <div className="space-y-3">
           {documentTypes.map((type) => {
             const doc = docMap[type];
+            const expiry = getExpiry(doc);
             const currentDate = editedDates[type] || '';
             const error = errors[type];
-            const hasExisting = !!doc;
-            const config = docConfig[type] || { icon: FileText, bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700' };
+            const hasExisting = !!expiry;
+            const config = getConfig(type);
             const Icon = config.icon;
 
             return (
@@ -162,7 +178,7 @@ const DocumentEditModal = ({ vehicle, docMap, onClose, onSave }: DocumentEditMod
                   </div>
                 </div>
 
-                {hasExisting && doc.documentNumber && (
+                {hasExisting && doc?.documentNumber && (
                   <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
                     <FileText className="w-3 h-3" />
                     Document #: {doc.documentNumber}
@@ -174,12 +190,12 @@ const DocumentEditModal = ({ vehicle, docMap, onClose, onSave }: DocumentEditMod
                     No document on file – pick a date to add one.
                   </div>
                 )}
+                {error && <div className="mt-1 text-xs text-red-600">{error}</div>}
               </div>
             );
           })}
         </div>
 
-        {/* Footer buttons */}
         <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <button
             onClick={onClose}

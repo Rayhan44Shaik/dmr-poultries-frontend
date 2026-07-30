@@ -1,5 +1,6 @@
 import { memo, useState } from 'react';
-import { format } from 'date-fns';
+import { format, setDate, addMonths, isPast, isAfter } from 'date-fns';
+import { CreditCard, Truck } from 'lucide-react';
 
 interface EmiScheduleTableProps {
   emiRecords: any[];
@@ -18,7 +19,6 @@ const EmiScheduleTable = ({
 }: EmiScheduleTableProps) => {
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Build data source: combine vehicle and EMI data
   const dataSource = showAllVehicles
     ? vehicles.map((vehicle) => {
         const emi = emiRecords.find((e) => e.vehicleId === vehicle.id) || null;
@@ -65,13 +65,11 @@ const EmiScheduleTable = ({
     return pages;
   };
 
-  // Helper to format Indian currency
   const formatCurrency = (amount: number) => {
     if (!amount) return '-';
     return `₹${amount.toLocaleString('en-IN')}`;
   };
 
-  // Helper to format date
   const formatDate = (dateString: string) => {
     if (!dateString) return '-';
     try {
@@ -81,16 +79,34 @@ const EmiScheduleTable = ({
     }
   };
 
-  // Helper to get status badge
+  const computeNextEMIDate = (vehicle: any) => {
+    if (!vehicle?.purchaseDate || !vehicle?.emiDay) return null;
+    try {
+      const purchaseDate = new Date(vehicle.purchaseDate);
+      const day = vehicle.emiDay;
+      let nextDate = setDate(purchaseDate, day);
+      const today = new Date();
+      if (isPast(nextDate) && !isAfter(nextDate, today)) {
+        nextDate = addMonths(nextDate, 1);
+      }
+      while (isPast(nextDate) && !isAfter(nextDate, today)) {
+        nextDate = addMonths(nextDate, 1);
+      }
+      return nextDate;
+    } catch {
+      return null;
+    }
+  };
+
   const StatusBadge = ({ status }: { status: string }) => {
-    const styles = {
+    const styles: Record<string, string> = {
       active: 'bg-blue-100 text-blue-700 border-blue-200',
       overdue: 'bg-red-100 text-red-700 border-red-200',
       completed: 'bg-green-100 text-green-700 border-green-200',
       paid: 'bg-green-100 text-green-700 border-green-200',
     };
     const defaultStyle = 'bg-gray-100 text-gray-600 border-gray-200';
-    const selected = styles[status as keyof typeof styles] || defaultStyle;
+    const selected = styles[status] || defaultStyle;
     
     return (
       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${selected}`}>
@@ -114,9 +130,9 @@ const EmiScheduleTable = ({
               <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Vehicle</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Purchase Date</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Purchase Amount</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">EMI Day</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Total EMIs</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Next EMI Date</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Pending EMIs</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">EMI Date</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
             </tr>
           </thead>
@@ -125,10 +141,17 @@ const EmiScheduleTable = ({
               const vehicleNumber = vehicle?.vehicleNumber || 'Unknown';
               const purchaseDate = vehicle?.purchaseDate || emi?.startDate;
               const purchaseAmount = vehicle?.purchaseAmount || emi?.loanAmount;
-              const emiDay = vehicle?.emiDay;
               const totalEMIs = vehicle?.totalEMIs || emi?.totalEMIs;
-              const nextEMIDate = emi?.nextEMIDate;
-              const status = emi?.status || 'No EMI';
+              const paidEMIs = emi?.paidEMIs ?? 0; // fallback to 0 if not present
+              const pendingEMIs = totalEMIs ? totalEMIs - paidEMIs : null;
+
+              let emiDate = emi?.nextEMIDate;
+              if (!emiDate && vehicle) {
+                const computed = computeNextEMIDate(vehicle);
+                if (computed) emiDate = format(computed, 'yyyy-MM-dd');
+              }
+
+              const status = emi?.status || (vehicle?.totalEMIs ? 'active' : 'No EMI');
 
               return (
                 <tr key={vehicle?.id || emi?.id || index} className="hover:bg-blue-50/50 transition-colors duration-150 even:bg-slate-50/50">
@@ -145,13 +168,15 @@ const EmiScheduleTable = ({
                   </td>
                   <td className="px-4 py-3.5 text-sm text-slate-600">{formatDate(purchaseDate)}</td>
                   <td className="px-4 py-3.5 text-sm font-medium text-slate-700">{formatCurrency(purchaseAmount)}</td>
-                  <td className="px-4 py-3.5 text-sm text-slate-600 text-center">{emiDay || '-'}</td>
                   <td className="px-4 py-3.5 text-sm text-slate-600 text-center">{totalEMIs || '-'}</td>
+                  <td className="px-4 py-3.5 text-sm font-medium text-slate-700 text-center">
+                    {pendingEMIs !== null ? pendingEMIs : '-'}
+                  </td>
                   <td className="px-4 py-3.5 text-sm font-medium text-slate-700">
                     {status === 'completed' || status === 'paid' ? (
                       <span className="text-green-600">Completed</span>
                     ) : (
-                      formatDate(nextEMIDate)
+                      formatDate(emiDate)
                     )}
                   </td>
                   <td className="px-4 py-3.5">
@@ -164,7 +189,6 @@ const EmiScheduleTable = ({
         </table>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-slate-200">
           <div className="text-sm text-slate-500">
@@ -206,8 +230,5 @@ const EmiScheduleTable = ({
     </div>
   );
 };
-
-// Don't forget to import CreditCard, Truck if not imported globally
-import { CreditCard, Truck } from 'lucide-react';
 
 export default memo(EmiScheduleTable);

@@ -2,14 +2,15 @@ import React from "react";
 import Select from "react-select";
 import { X, ShoppingCart, Layers, Box, Scale, MessageSquare, AlertCircle, Clock } from "lucide-react";
 import BoxSelector from "./BoxSelector";
-import type { ShopDelivery } from "../../types/trip";
+import type { ShopDelivery, BoxDetail } from "../../types/trip";
 
-interface Props {
+export interface Props {
   mode: "box" | "weight";
   setMode: (mode: "box" | "weight") => void;
   formData: any;
   setFormData: React.Dispatch<React.SetStateAction<any>>;
   validationErrors: any;
+
   farmBirds: number;
   farmWeight: number;
   boxCount: number;
@@ -17,11 +18,15 @@ interface Props {
   mortKg: number;
   deliveredBirds: number;
   deliveredWeight: number;
+
   usedBoxIds: number[];
   safeBoxDetails: any[];
   readOnly: boolean;
   autoCaptureTime: string;
+
   editingId: number | null;
+  editingShopId?: number | null;
+
   onClose: () => void;
   onSubmit: () => void;
   handleShopSelect: (selected: any) => void;
@@ -29,9 +34,18 @@ interface Props {
   handleBoxSelection: (ids: number[]) => void;
   handleFormChange: (field: string, value: any) => void;
   handlePerBoxChange: (index: number, field: "birds" | "weight", value: number) => void;
+
   shopOptions: any[];
   birdOptions: any[];
   isFormValid: boolean;
+
+  rows?: ShopDelivery[];
+  setRows?: React.Dispatch<React.SetStateAction<ShopDelivery[]>>;
+  shops?: any[];
+  birdTypes?: any[];
+  boxDetails?: BoxDetail[];
+  tripDate?: string;
+  [key: string]: any;
 }
 
 export default function ShopDeliveryForm({
@@ -42,7 +56,6 @@ export default function ShopDeliveryForm({
   farmBirds,
   farmWeight,
   boxCount,
-  weightModeTotals,
   mortKg,
   deliveredBirds,
   deliveredWeight,
@@ -227,7 +240,7 @@ export default function ShopDeliveryForm({
         </div>
       </div>
 
-      {/* ─── Conditional Grid ────────────────────────────────────── */}
+      {/* Conditional Grid */}
       {mode === "box" ? (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">

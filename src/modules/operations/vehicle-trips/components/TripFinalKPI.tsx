@@ -18,45 +18,72 @@ interface Props {
 }
 
 export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
-  // ─── Compute delivery totals from rows ────────────────────────────
+  // ─── Compute totals directly from Shop Deliveries ──────────────────
   const deliveryTotals = useMemo(() => {
     if (!deliveries || deliveries.length === 0) {
-      // Fallback to trip fields if no rows provided
       return {
         totalBirds: trip.totalBirdsDelivered || 0,
         totalWeight: trip.totalDeliveredWeight || 0,
         totalMortality: trip.totalMortalityCount || 0,
+        totalMortalityKg: trip.totalMortalityWeight || 0,
       };
     }
-    const totalBirds = deliveries.reduce((sum, row) => sum + row.birds, 0);
-    const totalWeight = deliveries.reduce((sum, row) => sum + row.weight, 0);
-    const totalMortality = deliveries.reduce((sum, row) => sum + row.mortality, 0);
-    return { totalBirds, totalWeight, totalMortality };
+
+    return deliveries.reduce(
+      (acc, row) => {
+        const rowWithExtra = row as ShopDelivery & {
+          mortalityWeight?: number;
+          mortalityKg?: number;
+        };
+
+        // 1. Check if direct mortality weight was saved on the row
+        let rowMortalityKg =
+          rowWithExtra.mortalityWeight ?? rowWithExtra.mortalityKg ?? 0;
+
+        // 2. If not directly entered, calculate from the shop row or trip average
+        if (rowMortalityKg === 0 && (row.mortality || 0) > 0) {
+          const avgPerBird =
+            row.birds > 0
+              ? row.weight / row.birds // Shop average per bird
+              : trip.totalBirds > 0
+              ? (trip.dcWeight || 0) / trip.totalBirds // Trip fallback average per bird
+              : 0;
+
+          rowMortalityKg = row.mortality * avgPerBird;
+        }
+
+        return {
+          totalBirds: acc.totalBirds + (row.birds || 0),
+          totalWeight: acc.totalWeight + (row.weight || 0),
+          totalMortality: acc.totalMortality + (row.mortality || 0),
+          totalMortalityKg: acc.totalMortalityKg + rowMortalityKg,
+        };
+      },
+      { totalBirds: 0, totalWeight: 0, totalMortality: 0, totalMortalityKg: 0 }
+    );
   }, [deliveries, trip]);
 
-  // ─── Mortality weight (average from farm) ──────────────────────────
-  const mortalityWeight = useMemo(() => {
-    const avgPerBird = trip.totalBirds > 0 ? trip.dcWeight / trip.totalBirds : 0;
-    return deliveryTotals.totalMortality * avgPerBird;
-  }, [deliveryTotals, trip]);
+  // Direct mortality weight straight from the shop data
+  const mortalityWeight = deliveryTotals.totalMortalityKg;
 
-  // ─── Weight Loss ────────────────────────────────────────────────────
+  // ─── Weight Loss (DC Weight - Delivered Weight - Mortality Weight) ───
   const weightLoss = useMemo(() => {
+    const dcWeight = trip.dcWeight || 0;
     const totalOut = deliveryTotals.totalWeight + mortalityWeight;
-    return Math.max(0, (trip.dcWeight || 0) - totalOut);
-  }, [deliveryTotals, mortalityWeight, trip]);
+    return Math.max(0, dcWeight - totalOut);
+  }, [deliveryTotals.totalWeight, mortalityWeight, trip.dcWeight]);
 
-  // ─── Survival Rate ─────────────────────────────────────────────────
+  // ─── Survival Rate ──────────────────────────────────────────────────
   const survivalRate = useMemo(() => {
     const total = trip.totalBirds || 0;
     const delivered = deliveryTotals.totalBirds;
     return total > 0 ? (delivered / total) * 100 : 0;
-  }, [deliveryTotals, trip]);
+  }, [deliveryTotals.totalBirds, trip.totalBirds]);
 
   // ─── Distances ──────────────────────────────────────────────────────
-  const pickupDist = Math.max(0, trip.destMeter - trip.openingMeter);
-  const deliveryDist = Math.max(0, trip.closingMeter - trip.destMeter);
-  const totalDist = Math.max(0, trip.closingMeter - trip.openingMeter);
+  const pickupDist = Math.max(0, (trip.destMeter || 0) - (trip.openingMeter || 0));
+  const deliveryDist = Math.max(0, (trip.closingMeter || 0) - (trip.destMeter || 0));
+  const totalDist = Math.max(0, (trip.closingMeter || 0) - (trip.openingMeter || 0));
 
   const cards = [
     {
@@ -97,7 +124,7 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
     {
       label: "MORTALITY (KG)",
       value: `${mortalityWeight.toFixed(2)} Kg`,
-      sub: "Weight loss",
+      sub: "From Shop data",
       bg: "bg-red-50",
       icon: <Weight size={18} className="text-red-600" />,
     },
@@ -111,27 +138,27 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
     {
       label: "TOLL GATES",
       value: `${(trip.pickupTolls || 0) + (trip.deliveryTolls || 0)}`,
-      sub: `P:${trip.pickupTolls||0} • D:${trip.deliveryTolls||0}`,
+      sub: `P:${trip.pickupTolls || 0} • D:${trip.deliveryTolls || 0}`,
       bg: "bg-indigo-50",
       icon: <Ticket size={18} className="text-indigo-600" />,
     },
     {
       label: "TILL PICKUP",
-      value: `${pickupDist || 0} KM`,
+      value: `${pickupDist} KM`,
       sub: "Office to Farm",
       bg: "bg-sky-50",
       icon: <MapPin size={18} className="text-sky-600" />,
     },
     {
       label: "DELIVERY DIST.",
-      value: `${deliveryDist || 0} KM`,
+      value: `${deliveryDist} KM`,
       sub: "Farm to End",
       bg: "bg-sky-50",
       icon: <Route size={18} className="text-sky-600" />,
     },
     {
       label: "DISTANCE",
-      value: `${totalDist || 0} KM`,
+      value: `${totalDist} KM`,
       sub: "Total Covered",
       bg: "bg-indigo-50",
       icon: <Route size={18} className="text-indigo-600" />,
@@ -147,7 +174,9 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
 
   return (
     <div className="mt-8 p-6 bg-slate-50/50 rounded-3xl border border-slate-200/60 shadow-sm">
-      <h3 className="text-sm font-bold text-slate-700 mb-4 uppercase tracking-wider">Trip KPI Summary</h3>
+      <h3 className="text-sm font-bold text-slate-700 mb-4 uppercase tracking-wider">
+        Trip KPI Summary
+      </h3>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {cards.map((card) => (
           <div
@@ -163,8 +192,14 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
               </div>
             </div>
             <div className="mt-1">
-              <div className="text-lg md:text-xl font-bold text-slate-900">{card.value}</div>
-              {card.sub && <div className="text-[10px] text-slate-500 font-medium mt-0.5">{card.sub}</div>}
+              <div className="text-lg md:text-xl font-bold text-slate-900">
+                {card.value}
+              </div>
+              {card.sub && (
+                <div className="text-[10px] text-slate-500 font-medium mt-0.5">
+                  {card.sub}
+                </div>
+              )}
             </div>
           </div>
         ))}

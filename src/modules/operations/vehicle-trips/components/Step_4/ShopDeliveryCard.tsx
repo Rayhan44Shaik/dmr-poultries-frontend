@@ -1,5 +1,5 @@
 import React from "react";
-import { Check, Box, Users, Scale, Clock, Pencil, FileText, User, Phone, Truck, Calendar, Store } from "lucide-react";
+import { Check, Box, Users, Scale, Clock, Pencil, FileText } from "lucide-react";
 import type { ShopDelivery } from "../../types/trip";
 import { ShopDeliveryWithExtra } from "./useShopDeliveryForm";
 
@@ -19,10 +19,6 @@ export default function ShopDeliveryCard({
   readOnly,
   onEdit,
   onPDF,
-  supervisorName = "N/A",
-  supervisorPhone = "N/A",
-  vehicleNo = "N/A",
-  tripDate = "N/A",
 }: Props) {
   return (
     <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between gap-3">
@@ -38,15 +34,17 @@ export default function ShopDeliveryCard({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
+          {/* ONLY render Pencil edit button when readOnly is false (Un-locked at Step Level) */}
           {!readOnly && (
             <button
               onClick={() => onEdit(row)}
               className="p-1.5 rounded-lg bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 border border-slate-200/60 transition-colors flex items-center gap-1 text-xs font-medium"
-              title="Edit"
+              title="Edit Shop Delivery"
             >
               <Pencil size={14} className="stroke-[2]" />
             </button>
           )}
+
           <button
             onClick={() => onPDF(row)}
             className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200/60 transition-colors flex items-center gap-1 text-xs font-medium"

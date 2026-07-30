@@ -15,6 +15,9 @@ interface Props {
   birdTypes: any[];
   boxDetails?: BoxDetail[];
   readOnly?: boolean;
+  editingShopId?: string | number | null;
+  onEditShop?: (shopId: string | number) => void;
+  onCancelEdit?: () => void;
   onSaveRow?: (row: ShopDelivery) => void;
   tripNo?: string;
   vehicleNo?: string;
@@ -30,6 +33,9 @@ export default function UnLoadingTable({
   birdTypes,
   boxDetails = [],
   readOnly = false,
+  editingShopId = null,
+  onEditShop,
+  onCancelEdit,
   onSaveRow,
   tripNo = "",
   vehicleNo = "",
@@ -66,6 +72,16 @@ export default function UnLoadingTable({
     weightLoss,
     validate,
   } = useShopDeliveryForm(safeRows, safeBoxDetails, editingId);
+
+  // Sync editing ID from parent if present
+  useEffect(() => {
+    if (editingShopId !== null && editingShopId !== undefined) {
+      const targetRow = safeRows.find((r) => r.id === editingShopId || String(r.id) === String(editingShopId));
+      if (targetRow) {
+        openEditForm(targetRow);
+      }
+    }
+  }, [editingShopId, safeRows]);
 
   // ─── Top KPI Calculations ────────────────────────────────────
   const topKpiTotals = useMemo(() => {
@@ -153,6 +169,7 @@ export default function UnLoadingTable({
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
+    if (onCancelEdit) onCancelEdit();
   };
 
   const handleFormChange = (field: string, value: any) => {
@@ -387,12 +404,11 @@ export default function UnLoadingTable({
         supervisorName,
         supervisorPhone,
         tripDate,
-        undefined, // left logo URL
-        henImage    // right logo URL
+        undefined,
+        henImage
       );
     } catch (error: any) {
       console.error("PDF download failed:", error);
-      // You can safely upgrade this to a Toast library later!
       alert("Failed to generate PDF. Please check the browser console (F12) for error details.");
     }
   };
@@ -473,7 +489,7 @@ export default function UnLoadingTable({
           deliveredWeight={deliveredWeight}
           usedBoxIds={usedBoxIds}
           safeBoxDetails={safeBoxDetails}
-          readOnly={readOnly}
+          readOnly={false}
           autoCaptureTime={autoCaptureTime}
           editingId={editingId}
           onClose={closeForm}
@@ -509,7 +525,13 @@ export default function UnLoadingTable({
                     key={row.id}
                     row={row as any}
                     readOnly={readOnly}
-                    onEdit={openEditForm}
+                    onEdit={(selectedRow) => {
+                      if (onEditShop) {
+                        onEditShop(selectedRow.id);
+                      } else {
+                        openEditForm(selectedRow);
+                      }
+                    }}
                     onPDF={handleDownloadPDF}
                   />
                 ))}
