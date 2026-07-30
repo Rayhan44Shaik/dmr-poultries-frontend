@@ -31,8 +31,7 @@ import FleetPages from "../modules/fleet-operations/pages/FleetPages";
 import StaffPages from "../modules/staff/pages/StaffPages";
 import ReportsDashboardPage from "../modules/reports/pages/ReportsDashboardPage";
 
-// Settings Module
-import SettingsLayout from "../modules/settings/components/SettingsLayout";
+// Settings Module (Standalone page without separate layout)
 import SettingsPage from "../modules/settings/pages/SettingsPage";
 
 function AppRoutes() {
@@ -81,25 +80,24 @@ function AppRoutes() {
       <Route path="/reports" element={<DashboardLayout><ReportsDashboardPage /></DashboardLayout>} />
 
       {/* ===============================================
-          🚀 SETTINGS - ROUTED TABS SYNCHRONIZATION
+          🚀 SETTINGS - SINGLE PAGE ROUTE
           =============================================== */}
       <Route 
         path="/settings" 
         element={
           <DashboardLayout>
-            <SettingsLayout />
+            <SettingsPage />
           </DashboardLayout>
-        }
-      >
-        <Route index element={<Navigate to="profile" replace />} />
-        <Route path="profile" element={<SettingsPage />} />
-        <Route path="password" element={<SettingsPage />} />
-        <Route path="language" element={<SettingsPage />} />
-        <Route path="appearance" element={<SettingsPage />} />
-        <Route path="users" element={<SettingsPage />} />
-        <Route path="permissions" element={<SettingsPage />} />
-        <Route path="about" element={<SettingsPage />} />
-      </Route>
+        } 
+      />
+      <Route 
+        path="/settings/*" 
+        element={
+          <DashboardLayout>
+            <SettingsPage />
+          </DashboardLayout>
+        } 
+      />
 
       {/* ============ 404 - Not Found ============ */}
       <Route 
