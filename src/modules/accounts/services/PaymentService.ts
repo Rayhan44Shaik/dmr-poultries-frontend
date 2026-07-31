@@ -86,6 +86,22 @@ export const PaymentService = {
     return payments.find((p) => p.id === id) || null;
   },
 
+  // ---- NEW: Get payments for a specific week (Monday to Sunday) ----
+  getPaymentsForWeek(weekStart: Date): Payment[] {
+    const start = new Date(weekStart);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+
+    // Get all payments (already sorted) and filter by date
+    const all = this.getPayments();
+    return all.filter((p) => {
+      const d = new Date(p.paymentDate);
+      return d >= start && d <= end;
+    });
+  },
+
   createPayment(data: Omit<Payment, 'id' | 'paymentNo' | 'createdAt' | 'updatedAt' | 'attachments'>): Payment {
     const now = new Date().toISOString();
     const newPayment: Payment = {

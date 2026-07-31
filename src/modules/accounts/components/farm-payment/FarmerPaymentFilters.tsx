@@ -1,6 +1,8 @@
+// D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\accounts\components\farm-payment\FarmerPaymentFilters.tsx
+
 import React from 'react';
 import { DatePicker } from '../../../../components/common/DatePicker';
-import { Search, X } from 'lucide-react';
+import { Search, X, Filter } from 'lucide-react';
 
 interface FarmerPaymentFiltersProps {
   dateFrom: string;
@@ -51,6 +53,22 @@ export function FarmerPaymentFilters({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const statusOptions = [
+    { value: 'All', label: 'All Status', color: 'text-slate-600' },
+    { value: 'Unpaid', label: 'Unpaid', color: 'text-red-600' },
+    { value: 'Partially Paid', label: 'Partially Paid', color: 'text-orange-600' },
+    { value: 'Paid', label: 'Paid', color: 'text-emerald-600' },
+  ];
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Unpaid': return 'text-red-600';
+      case 'Partially Paid': return 'text-orange-600';
+      case 'Paid': return 'text-emerald-600';
+      default: return 'text-slate-600';
+    }
+  };
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-4">
@@ -121,11 +139,17 @@ export function FarmerPaymentFilters({
           <select
             value={statusFilter}
             onChange={(e) => onStatusChange(e.target.value)}
-            className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white"
+            className={`w-full h-10 px-3 rounded-lg border border-slate-300 text-sm font-medium focus:ring-2 focus:ring-blue-400 outline-none bg-white ${getStatusColor(statusFilter)}`}
           >
-            <option value="All">All</option>
-            <option value="Pending">Pending</option>
-            <option value="Saved">Saved</option>
+            {statusOptions.map((option) => (
+              <option 
+                key={option.value} 
+                value={option.value}
+                className={option.color}
+              >
+                {option.label}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -156,7 +180,7 @@ export function FarmerPaymentFilters({
           onClick={onApply}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition flex items-center gap-2 shadow-sm whitespace-nowrap"
         >
-          Apply
+          <Filter size={14} /> Apply
         </button>
         <button
           onClick={onClear}

@@ -1,4 +1,4 @@
-// src/modules/accounts/pages/FarmerPaymentPage.tsx
+// D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\accounts\pages\FarmPaymentPage.tsx
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
@@ -7,7 +7,8 @@ import { FarmerPaymentFilters } from '../components/farm-payment/FarmerPaymentFi
 import { tripService } from '../../operations/vehicle-trips/services/tripService';
 import { FarmPaymentService } from '../services/FarmPaymentService';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import type { FarmPayment } from '../types/farmPayment.types';
+import { ChevronLeft, ChevronRight, Save, RotateCcw } from 'lucide-react';
 
 type FarmerPaymentPageProps = { embedded?: boolean };
 
@@ -18,6 +19,10 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   const [allTrips, setAllTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Payment state management
+  const [paymentData, setPaymentData] = useState<Record<string, Partial<FarmPayment>>>({});
+  const [savingPayments, setSavingPayments] = useState(false);
 
   // Filter states
   const [dateFrom, setDateFrom] = useState('');
@@ -35,8 +40,38 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     setLoading(true);
     try {
       const all = tripService.getAll();
-      const completed = all.filter((t) => t.status === 'Completed' && !t.deleted);
+      
+      const completed = all.filter((t) => {
+        const isCompleted = t.status === 'Completed';
+        const notDeleted = !t.deleted;
+        const pickupSubmitted = t.pickupStepSubmitted === true;
+        return isCompleted && notDeleted && pickupSubmitted;
+      });
+      
       setAllTrips(completed);
+
+      const savedPayments: Record<string, Partial<FarmPayment>> = {};
+      completed.forEach((trip) => {
+        const tripId = String(trip.id);
+        const existingPayment = FarmPaymentService.getByTripId(tripId);
+        
+        if (existingPayment) {
+          savedPayments[tripId] = {
+            ...existingPayment,
+            totalBirds: trip.totalBirds || 0,
+            dcWeight: trip.dcWeight || 0,
+          };
+        } else {
+          savedPayments[tripId] = {
+            tripId,
+            totalBirds: trip.totalBirds || 0,
+            dcWeight: trip.dcWeight || 0,
+            paymentStatus: 'Unpaid',
+          };
+        }
+      });
+      
+      setPaymentData(savedPayments);
     } catch (error) {
       console.error('Failed to load trips:', error);
       showNotification('Failed to load trips', 'error');
@@ -50,7 +85,6 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
-  // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [dateFrom, dateTo, selectedFarm, statusFilter, searchQuery]);
@@ -64,19 +98,17 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   // ----- filter trips -----
   const filteredTrips = useMemo(() => {
     return allTrips.filter((trip) => {
-      // Date range
       if (dateFrom && trip.tripDate < dateFrom) return false;
       if (dateTo && trip.tripDate > dateTo) return false;
-
-      // Farm
       if (selectedFarm !== 'All' && trip.sourceFarm !== selectedFarm) return false;
 
-      // Status filter: uses payment status from saved payments, not trip status
-      const hasPayment = FarmPaymentService.getByTripId(trip.id) !== undefined;
-      if (statusFilter === 'Pending' && hasPayment) return false;
-      if (statusFilter === 'Saved' && !hasPayment) return false;
+      const tripPayment = paymentData[String(trip.id)];
+      const paymentStatus = tripPayment?.paymentStatus || 'Unpaid';
+      
+      if (statusFilter === 'Paid' && paymentStatus !== 'Paid') return false;
+      if (statusFilter === 'Partially Paid' && paymentStatus !== 'Partially Paid') return false;
+      if (statusFilter === 'Unpaid' && paymentStatus !== 'Unpaid') return false;
 
-      // Global search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const match =
@@ -90,7 +122,34 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
 
       return true;
     });
-  }, [allTrips, dateFrom, dateTo, selectedFarm, statusFilter, searchQuery]);
+  }, [allTrips, dateFrom, dateTo, selectedFarm, statusFilter, searchQuery, paymentData]);
+
+  // ----- compute KPI totals (based on filtered trips) -----
+  const totalBirdsKPI = useMemo(() => {
+    return filteredTrips.reduce((sum, trip) => sum + (trip.totalBirds || 0), 0);
+  }, [filteredTrips]);
+
+  const totalWeightKPI = useMemo(() => {
+    return filteredTrips.reduce((sum, trip) => sum + (trip.dcWeight || 0), 0);
+  }, [filteredTrips]);
+
+  const totalAmountKPI = useMemo(() => {
+    return filteredTrips.reduce((sum, trip) => {
+      const payment = paymentData[String(trip.id)];
+      return sum + (payment?.totalAmount || 0);
+    }, 0);
+  }, [filteredTrips, paymentData]);
+
+  const totalPaidKPI = useMemo(() => {
+    return filteredTrips.reduce((sum, trip) => {
+      const payment = paymentData[String(trip.id)];
+      return sum + (payment?.amountPaid || 0);
+    }, 0);
+  }, [filteredTrips, paymentData]);
+
+  const totalBalanceKPI = useMemo(() => {
+    return totalAmountKPI - totalPaidKPI;
+  }, [totalAmountKPI, totalPaidKPI]);
 
   // ----- pagination -----
   const totalPages = Math.ceil(filteredTrips.length / itemsPerPage) || 1;
@@ -120,21 +179,126 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     return pages;
   };
 
-  // ----- handlers -----
-  const handlePaymentSaved = () => {
-    // Force reload trips with a new refresh key
-    setRefreshKey(prev => prev + 1);
-    showNotification('Payments saved successfully!', 'success');
+  // ----- payment handlers -----
+  const handlePaymentUpdate = (tripId: string, updates: Partial<FarmPayment>) => {
+    setPaymentData((prev) => {
+      const existing = prev[tripId] || {};
+      return {
+        ...prev,
+        [tripId]: {
+          ...existing,
+          ...updates,
+          tripId,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    });
+  };
+
+  const handleSaveAll = async () => {
+    const paymentsToSave = Object.entries(paymentData).filter(([, payment]) => {
+      return payment.ratePerBird !== undefined || 
+             payment.ratePerKg !== undefined || 
+             payment.totalAmount !== undefined;
+    });
+
+    if (paymentsToSave.length === 0) {
+      showNotification('No payments to save. Please fill in payment details first.', 'info');
+      return;
+    }
+
+    setSavingPayments(true);
+
+    try {
+      let savedCount = 0;
+      let partialCount = 0;
+
+      for (const [tripId, paymentDataItem] of paymentsToSave) {
+        const trip = allTrips.find(t => String(t.id) === tripId);
+        if (!trip) continue;
+
+        const totalBirdsLoaded = trip.totalBirds || 0;
+        const dcWeight = trip.dcWeight || 0;
+        const ratePerBird = paymentDataItem.ratePerBird || 0;
+        const totalAmount = paymentDataItem.totalAmount || (totalBirdsLoaded * ratePerBird);
+        const paidAmount = paymentDataItem.amountPaid || 0;
+        const paymentStatus = paidAmount > 0 
+          ? (paidAmount >= totalAmount ? 'Paid' : 'Partially Paid')
+          : (paymentDataItem.paymentStatus || 'Unpaid');
+
+        const finalPayment: FarmPayment = {
+          ...paymentDataItem,
+          tripId,
+          totalBirds: totalBirdsLoaded,
+          dcWeight: dcWeight,
+          totalAmount,
+          amountPaid: paidAmount,
+          balance: totalAmount - paidAmount,
+          paymentStatus,
+          paidDate: paymentDataItem.paidDate || new Date().toISOString().split('T')[0],
+          paymentMode: paymentDataItem.paymentMode || 'Cash',
+          createdAt: paymentDataItem.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        const existing = FarmPaymentService.getByTripId(tripId);
+        if (existing) {
+          FarmPaymentService.updatePayment(tripId, finalPayment);
+        } else {
+          FarmPaymentService.createPayment(finalPayment);
+        }
+
+        savedCount++;
+        if (paymentStatus === 'Partially Paid') partialCount++;
+      }
+
+      setRefreshKey(prev => prev + 1);
+      
+      const message = partialCount > 0
+        ? `Saved ${savedCount} payments (${partialCount} partial payments)`
+        : `${savedCount} payments saved successfully`;
+      showNotification(message, 'success');
+
+    } catch (error) {
+      console.error('Failed to save payments:', error);
+      showNotification('Failed to save payments. Please try again.', 'error');
+    } finally {
+      setSavingPayments(false);
+    }
+  };
+
+  const handleResetPayments = () => {
+    if (Object.keys(paymentData).length === 0) {
+      showNotification('No changes to reset', 'info');
+      return;
+    }
+
+    const savedPayments: Record<string, Partial<FarmPayment>> = {};
+    allTrips.forEach((trip) => {
+      const tripId = String(trip.id);
+      const existingPayment = FarmPaymentService.getByTripId(tripId);
+      if (existingPayment) {
+        savedPayments[tripId] = {
+          ...existingPayment,
+          totalBirds: trip.totalBirds || 0,
+          dcWeight: trip.dcWeight || 0,
+        };
+      } else {
+        savedPayments[tripId] = {
+          tripId,
+          totalBirds: trip.totalBirds || 0,
+          dcWeight: trip.dcWeight || 0,
+          paymentStatus: 'Unpaid',
+        };
+      }
+    });
+    setPaymentData(savedPayments);
+    showNotification('All changes reset', 'info');
   };
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
     showNotification('Refreshed', 'info');
-  };
-
-  const handleApplyFilters = () => {
-    setCurrentPage(1);
-    showNotification('Filters applied', 'info');
   };
 
   const handleClearFilters = () => {
@@ -147,9 +311,68 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     showNotification('Filters cleared', 'info');
   };
 
+  const modifiedCount = useMemo(() => {
+    return Object.values(paymentData).filter(payment => {
+      return payment.ratePerBird !== undefined || 
+             payment.ratePerKg !== undefined || 
+             payment.totalAmount !== undefined;
+    }).length;
+  }, [paymentData]);
+
+  // Format number with L, Cr notation
+  const formatNumber = (num: number): string => {
+    if (num >= 10000000) {
+      return `${(num / 10000000).toFixed(2)} Cr`;
+    }
+    if (num >= 100000) {
+      return `${(num / 100000).toFixed(2)} L`;
+    }
+    return num.toLocaleString('en-IN');
+  };
+
+  // Format currency with L, Cr notation
+  const formatCurrency = (amount: number): string => {
+    if (amount >= 10000000) {
+      return `₹${(amount / 10000000).toFixed(2)} Cr`;
+    }
+    if (amount >= 100000) {
+      return `₹${(amount / 100000).toFixed(2)} L`;
+    }
+    return `₹${amount.toLocaleString('en-IN')}`;
+  };
+
+  // Check if any filter is active
+  const isFilterActive = dateFrom || dateTo || selectedFarm !== 'All' || statusFilter !== 'All' || searchQuery;
+
   // ----- render -----
   const content = (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-6 space-y-5 max-w-7xl mx-auto bg-slate-50 min-h-screen">
+      {/* KPI Cards - Only show when filters are active */}
+      {isFilterActive && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm">
+            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Total Birds</p>
+            <p className="text-lg font-bold text-slate-800">{formatNumber(totalBirdsKPI)}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm">
+            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Total Weight</p>
+            <p className="text-lg font-bold text-slate-800">{formatNumber(totalWeightKPI)} Kg</p>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm">
+            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Total Amount</p>
+            <p className="text-lg font-bold text-red-600">{formatCurrency(totalAmountKPI)}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm">
+            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Total Paid</p>
+            <p className="text-lg font-bold text-emerald-600">{formatCurrency(totalPaidKPI)}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm">
+            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Balance Due</p>
+            <p className="text-lg font-bold text-orange-600">{formatCurrency(totalBalanceKPI)}</p>
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <FarmerPaymentFilters
         dateFrom={dateFrom}
@@ -163,49 +386,87 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
         onFarmChange={setSelectedFarm}
         onStatusChange={setStatusFilter}
         onSearchChange={setSearchQuery}
-        onApply={handleApplyFilters}
+        onApply={() => setCurrentPage(1)}
         onClear={handleClearFilters}
       />
 
-      {/* Table */}
-      {loading ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500">Loading trips...</div>
-      ) : (
-        <>
-          <FarmPaymentTable
-            trips={paginatedTrips}
-            onPaymentSaved={handlePaymentSaved}
-            onRefresh={handleRefresh}
-            showNotification={showNotification}
-          />
+      {/* Table Card */}
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
+        {/* Header with Save button */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-gradient-to-r from-slate-50/80 to-white border-b border-slate-200/60">
+          <h2 className="text-sm font-bold text-slate-800">Farm Payments</h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleResetPayments}
+              disabled={modifiedCount === 0}
+              className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-1.5"
+            >
+              <RotateCcw size={14} /> Reset
+            </button>
+            <button
+              onClick={handleSaveAll}
+              disabled={savingPayments || modifiedCount === 0}
+              className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {savingPayments ? (
+                <>
+                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save size={14} /> Save
+                </>
+              )}
+            </button>
+          </div>
+        </div>
 
-          {/* Pagination footer */}
-          {filteredTrips.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-white rounded-xl border border-slate-200 shadow-sm">
+        {/* Table */}
+        {loading ? (
+          <div className="p-8 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+            <p className="mt-3 text-slate-500 text-sm">Loading trips...</p>
+          </div>
+        ) : (
+          <>
+            <FarmPaymentTable
+              trips={paginatedTrips}
+              paymentData={paymentData}
+              onPaymentUpdate={handlePaymentUpdate}
+              onPaymentSaved={handleSaveAll}
+              onRefresh={handleRefresh}
+              showNotification={showNotification}
+            />
+
+            {/* Pagination Footer */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-slate-50/50 border-t border-slate-200">
               <div className="text-xs text-slate-500">
-                Showing {startEntry} to {endEntry} of {filteredTrips.length} entries
+                {filteredTrips.length > 0 
+                  ? `Showing ${startEntry} to ${endEntry} of ${filteredTrips.length} entries`
+                  : 'No entries found'}
               </div>
 
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-1"
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1"
                 >
-                  <ChevronLeft size={14} /> Prev
+                  <ChevronLeft size={13} /> Prev
                 </button>
 
                 {getPageNumbers().map((page, idx) =>
                   page === 'ellipsis' ? (
-                    <span key={`ellipsis-${idx}`} className="px-2 text-xs text-slate-400">…</span>
+                    <span key={`ellipsis-${idx}`} className="px-1.5 text-xs text-slate-400">…</span>
                   ) : (
                     <button
                       key={page}
                       onClick={() => goToPage(page)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                      className={`w-8 h-8 rounded-lg text-xs font-semibold transition ${
                         currentPage === page
-                          ? 'bg-blue-600 text-white shadow-xs'
-                          : 'border border-slate-300 text-slate-700 bg-white hover:bg-slate-100'
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'text-slate-600 hover:bg-slate-100'
                       }`}
                     >
                       {page}
@@ -216,15 +477,15 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
                 <button
                   onClick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-1"
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1"
                 >
-                  Next <ChevronRight size={14} />
+                  Next <ChevronRight size={13} />
                 </button>
               </div>
             </div>
-          )}
-        </>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 

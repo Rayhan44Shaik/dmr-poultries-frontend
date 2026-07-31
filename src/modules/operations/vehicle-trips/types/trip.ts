@@ -42,7 +42,7 @@ export interface Trip {
   sourceFarm: string;
   reachedTime: string;
   destMeter: number;
-  pickupTolls: number;
+  pickupTolls: number;  
   farmStepSubmitted: boolean;
   farmAddress?: string;
 

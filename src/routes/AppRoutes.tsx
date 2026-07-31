@@ -20,9 +20,8 @@ import BirdTypesPage from "../modules/masters/bird-types/pages/BirdTypesPage";
 // Operations Module
 import OperationsPages from "../modules/operations/pages/OperationsPages";
 
-// Accounts Module – Payment Book & Farmer Payment
-import { PaymentBookPage } from "../modules/accounts/pages/PaymentBookPage";
-import { FarmerPaymentPage } from "../modules/accounts/pages/FarmPaymentPage";
+// Accounts Module
+import AccountsPage from "../modules/accounts/pages/AccountsPage";
 
 // Fleet Module
 import FleetPages from "../modules/fleet-operations/pages/FleetPages";
@@ -64,9 +63,8 @@ function AppRoutes() {
       <Route path="/operations/*" element={<DashboardLayout><OperationsPages /></DashboardLayout>} />
 
       {/* ============ ACCOUNTS ============ */}
-      <Route path="/accounts" element={<Navigate to="/accounts/payment-book" replace />} />
-      <Route path="/accounts/payment-book" element={<DashboardLayout><PaymentBookPage /></DashboardLayout>} />
-      <Route path="/accounts/farm-payment" element={<DashboardLayout><FarmerPaymentPage /></DashboardLayout>} />
+      <Route path="/accounts" element={<DashboardLayout><AccountsPage /></DashboardLayout>} />
+      <Route path="/accounts/*" element={<DashboardLayout><AccountsPage /></DashboardLayout>} />
 
       {/* ============ FLEET ============ */}
       <Route path="/fleet" element={<DashboardLayout><FleetPages /></DashboardLayout>} />
