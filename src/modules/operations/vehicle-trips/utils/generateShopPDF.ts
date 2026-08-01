@@ -1,175 +1,221 @@
+// src/modules/operations/vehicle-trips/utils/generateShopPDF.ts
+//
+// DMR POULTRY — Delivery Receipt PDF
+// Pixel-matched to the two approved slip designs:
+//   • Weight mode -> full slip (info card, table, totals, mortality, final blocks)
+//   • Box mode    -> simple slip (info cards, table with TOTAL row, footer strip)
+//
+// Hen rendering fix: the previous version stripped every dark pixel (r,g,b < 65),
+// which destroyed the bird's own outline + shading and left a flat 2D cut-out with
+// black fringes. We now remove only the near-WHITE studio background, feather the
+// edge alpha, and draw a soft blurred contact shadow instead of hard grey ellipses.
+
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { BoxDetail } from "../types/trip";
 import { ShopDeliveryWithExtra } from "../components/Step_4/useShopDeliveryForm";
 
-// ─── COLOR PALETTE ──────────────────────────────────────────────────────────
+// ─── COLOR PALETTE ───────────────────────────────────────────────────────────
+type RGB = [number, number, number];
+
 const COLOR = {
-  primary: [15, 23, 42] as [number, number, number],       // Dark Navy / Slate 900
-  secondary: [30, 58, 138] as [number, number, number],    // Accent Blue 900
-  accent: [225, 29, 72] as [number, number, number],       // Rose Red 600
-  cardBg: [248, 250, 252] as [number, number, number],     // Light Slate / White
-  cardBorder: [226, 232, 240] as [number, number, number], // Clean Slate Border
-  iconBg: [239, 246, 255] as [number, number, number],     // Soft Blue Badge Background
-  iconStroke: [37, 99, 235] as [number, number, number],   // Bright Blue Icon Vector Stroke
-  textDark: [30, 41, 59] as [number, number, number],      // Slate 800 Text
-  textMuted: [100, 116, 139] as [number, number, number],  // Slate 500 Subtitle Text
-  tableHeader: [15, 43, 92] as [number, number, number],   // Deep Navy
-  tableAltRow: [248, 250, 252] as [number, number, number],
-  totalBg: [224, 231, 255] as [number, number, number],
+  navy: [15, 35, 79] as RGB, // deep navy used for titles + header band
+  tableHeader: [16, 42, 94] as RGB, // #102a5e
+  brandRed: [178, 20, 34] as RGB, // #b21422
+  cardBg: [252, 253, 255] as RGB,
+  cardBorder: [219, 226, 238] as RGB,
+  textDark: [26, 36, 54] as RGB,
+  textMuted: [96, 110, 132] as RGB,
+  tableAltRow: [246, 249, 253] as RGB,
+  totalBg: [222, 231, 246] as RGB,
+  white: [255, 255, 255] as RGB,
+  pageBg: [255, 255, 255] as RGB,
 };
 
-// ─── PREMIUM VECTOR LOGO ENGINES ───────────────────────────────────────────
+const setFill = (doc: jsPDF, c: RGB) => doc.setFillColor(c[0], c[1], c[2]);
+const setDraw = (doc: jsPDF, c: RGB) => doc.setDrawColor(c[0], c[1], c[2]);
+const setText = (doc: jsPDF, c: RGB) => doc.setTextColor(c[0], c[1], c[2]);
 
-/**
- * BRAND LOGO: DMR POULTRY (Corporate Geometric Emblem)
- */
+// ─── HELPER: CLEAN THE HEN CUT-OUT (keeps 3D shading, kills white box + fringe)
+async function cleanHenImage(
+  src: string
+): Promise<{ dataUrl: string; width: number; height: number }> {
+  return new Promise((resolve) => {
+    const fallback = { dataUrl: src, width: 0, height: 0 };
+    try {
+      const img = new Image();
+      img.crossOrigin = "Anonymous";
+
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return resolve(fallback);
+
+        ctx.drawImage(img, 0, 0);
+
+        let imageData: ImageData;
+        try {
+          imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        } catch {
+          // tainted canvas (cross-origin) -> use the original image untouched
+          return resolve({ dataUrl: src, width: canvas.width, height: canvas.height });
+        }
+
+        const d = imageData.data;
+
+        // 1) Remove only the near-WHITE background. Dark pixels (the hen's own
+        //    outline, eye, shading, legs) are preserved so it still reads as 3D.
+        for (let i = 0; i < d.length; i += 4) {
+          const r = d[i];
+          const g = d[i + 1];
+          const b = d[i + 2];
+          const min = Math.min(r, g, b);
+          const max = Math.max(r, g, b);
+          const chroma = max - min; // grey/white background has ~0 chroma
+
+          if (min >= 244 && chroma <= 10) {
+            d[i + 3] = 0; // pure background -> transparent
+          } else if (min >= 228 && chroma <= 14) {
+            // soft anti-aliased rim -> partial alpha, avoids a hard white halo
+            d[i + 3] = Math.round(((min - 228) / 16) * 0 + ((244 - min) / 16) * 255);
+          }
+        }
+
+        // 2) Feather: any opaque pixel touching a transparent one gets softened,
+        //    which removes the "sticker" edge that made it look flat.
+        const w = canvas.width;
+        const h = canvas.height;
+        const alpha = new Uint8ClampedArray(w * h);
+        for (let p = 0; p < w * h; p++) alpha[p] = d[p * 4 + 3];
+
+        for (let y = 1; y < h - 1; y++) {
+          for (let x = 1; x < w - 1; x++) {
+            const p = y * w + x;
+            if (alpha[p] === 0) continue;
+            const neighbours =
+              alpha[p - 1] + alpha[p + 1] + alpha[p - w] + alpha[p + w];
+            if (neighbours < 4 * 255) {
+              d[p * 4 + 3] = Math.min(alpha[p], Math.round(neighbours / 4));
+            }
+          }
+        }
+
+        ctx.clearRect(0, 0, w, h);
+        ctx.putImageData(imageData, 0, 0);
+
+        resolve({ dataUrl: canvas.toDataURL("image/png"), width: w, height: h });
+      };
+
+      img.onerror = () => resolve(fallback);
+      img.src = src;
+    } catch {
+      resolve(fallback);
+    }
+  });
+}
+
+// ─── HELPER: SOFT CONTACT SHADOW (no hard outlines) ──────────────────────────
+function drawSoftShadow(doc: jsPDF, cx: number, baseY: number, width: number) {
+  const anyDoc = doc as any;
+  doc.saveGraphicsState();
+  for (let i = 6; i >= 1; i--) {
+    const opacity = 0.035 * i;
+    if (typeof anyDoc.GState === "function") {
+      doc.setGState(new anyDoc.GState({ opacity }));
+    }
+    doc.setFillColor(150, 158, 172);
+    doc.ellipse(cx, baseY, (width / 2) * (i / 6) * 0.75, 1.6 * (i / 6), "F");
+  }
+  doc.restoreGraphicsState();
+}
+
+// ─── HELPER: VECTOR FALLBACKS ────────────────────────────────────────────────
 function drawDmrBrandLogo(doc: jsPDF, x: number, y: number, size = 22) {
   doc.saveGraphicsState();
-
   const cx = x + size / 2;
   const cy = y + size / 2;
 
-  // Outer Rounded Navy Badge
-  doc.setFillColor(15, 43, 92);
-  doc.roundedRect(x, y, size, size, 4, 4, "F");
-
-  // Sleek Inner Rose Gold Border
-  doc.setDrawColor(225, 29, 72);
-  doc.setLineWidth(0.6);
-  doc.roundedRect(x + 1.2, y + 1.2, size - 2.4, size - 2.4, 3, 3, "S");
-
-  // Central Emblem Circle
-  doc.setFillColor(255, 255, 255);
-  doc.circle(cx, cy - 1.5, 5.5, "F");
-
-  // Stylized Monogram Graphic "DMR" Wings
-  doc.setFillColor(15, 43, 92);
-  doc.triangle(cx - 3.5, cy + 0.5, cx, cy - 5.0, cx + 3.5, cy + 0.5, "F");
-  
-  doc.setFillColor(225, 29, 72);
-  doc.triangle(cx - 2.0, cy + 1.2, cx, cy - 3.0, cx + 2.0, cy + 1.2, "F");
-
-  // Bold Clean Text Base
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(5.5);
-  doc.setTextColor(255, 255, 255);
-  doc.text("DMR", cx, cy + 6.8, { align: "center" });
-
-  doc.restoreGraphicsState();
-}
-
-/**
- * SHOP LOGO: ANBU CHICKEN CENTER (Modern Minimalist Retail Badge)
- */
-function drawAnbuShopLogo(doc: jsPDF, x: number, y: number, size = 22) {
-  doc.saveGraphicsState();
-
-  const cx = x + size / 2;
-  const cy = y + size / 2;
-
-  // Crisp White Circular Container with Rose Accent Ring
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(225, 29, 72);
-  doc.setLineWidth(0.8);
+  setFill(doc, COLOR.white);
+  setDraw(doc, COLOR.tableHeader);
+  doc.setLineWidth(0.9);
   doc.circle(cx, cy, size / 2 - 0.5, "FD");
 
-  // Inner Soft Rose Ring Background
-  doc.setFillColor(254, 242, 242);
-  doc.circle(cx, cy, size / 2 - 2, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  setText(doc, COLOR.brandRed);
+  doc.text("DMR", cx, cy + 1, { align: "center" });
 
-  // Central Crown / Wing Geometry
-  doc.setFillColor(225, 29, 72);
-  doc.circle(cx - 2.2, cy - 2.5, 1.6, "F");
-  doc.circle(cx + 2.2, cy - 2.5, 1.6, "F");
-  doc.circle(cx, cy - 3.5, 2.0, "F");
+  doc.setFontSize(4);
+  setText(doc, COLOR.tableHeader);
+  doc.text("POULTRY", cx, cy + 5, { align: "center" });
 
-  // Shield Base Overlay
-  doc.setFillColor(15, 43, 92);
-  doc.triangle(cx - 4.5, cy - 1.2, cx + 4.5, cy - 1.2, cx, cy + 3.0, "F");
+  doc.restoreGraphicsState();
+}
 
-  // Shop Label Text Box
-  doc.setFillColor(225, 29, 72);
-  doc.roundedRect(cx - 7.5, cy + 3.2, 15, 4.2, 1, 1, "F");
+function drawHenPlaceholder(doc: jsPDF, x: number, y: number, size = 24) {
+  doc.saveGraphicsState();
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+
+  doc.setFillColor(238, 240, 244);
+  doc.ellipse(cx, cy + 1, size / 2.6, size / 3.4, "F");
+  doc.setFillColor(232, 234, 240);
+  doc.circle(cx + size / 4, cy - size / 4, size / 7, "F");
+  setFill(doc, COLOR.brandRed);
+  doc.circle(cx + size / 4, cy - size / 2.4, size / 16, "F");
+
+  doc.restoreGraphicsState();
+}
+
+// ─── HELPER: LABELLED FIELD WITH RULE LINE ───────────────────────────────────
+function drawField(
+  doc: jsPDF,
+  label: string,
+  value: string,
+  x: number,
+  y: number,
+  labelWidth: number,
+  lineWidth: number
+) {
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  setText(doc, COLOR.textDark);
+  doc.text(label, x, y);
+  doc.text(":", x + labelWidth - 4, y);
+
+  const valueX = x + labelWidth;
+  doc.setFont("helvetica", "normal");
+  doc.text(value || "", valueX, y);
+
+  setDraw(doc, [150, 163, 184]);
+  doc.setLineWidth(0.3);
+  doc.line(valueX, y + 1.6, valueX + lineWidth, y + 1.6);
+}
+
+// ─── HELPER: STAT CARD ───────────────────────────────────────────────────────
+function drawStat(
+  doc: jsPDF,
+  label: string,
+  value: string,
+  x: number,
+  y: number,
+  valueColor: RGB,
+  labelColor: RGB
+) {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  setText(doc, labelColor);
+  doc.text(label.toUpperCase(), x, y);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(4.2);
-  doc.setTextColor(255, 255, 255);
-  doc.text("ANBU", cx, cy + 6.2, { align: "center" });
-
-  doc.restoreGraphicsState();
+  doc.setFontSize(13);
+  setText(doc, valueColor);
+  doc.text(value, x, y + 7);
 }
 
-/**
- * HIGH-PRECISION VECTOR FIELD ICONS (Lucide-inspired)
- */
-function drawModernIcon(
-  doc: jsPDF,
-  type: "supervisor" | "vehicle" | "phone" | "store" | "calendar",
-  cx: number,
-  cy: number
-) {
-  doc.saveGraphicsState();
-
-  // Circular Soft Blue Badge
-  doc.setFillColor(COLOR.iconBg[0], COLOR.iconBg[1], COLOR.iconBg[2]);
-  doc.setDrawColor(219, 234, 254);
-  doc.setLineWidth(0.25);
-  doc.circle(cx, cy, 3.8, "FD");
-
-  // Crisp Vector Stroke
-  doc.setDrawColor(COLOR.iconStroke[0], COLOR.iconStroke[1], COLOR.iconStroke[2]);
-  doc.setLineWidth(0.4);
-
-  switch (type) {
-    case "supervisor":
-      doc.circle(cx, cy - 1.1, 1.1, "S");
-      doc.path([
-        { op: "m", c: [cx - 2.0, cy + 2.0] },
-        { op: "c", c: [cx - 2.0, cy + 0.6, cx + 2.0, cy + 0.6, cx + 2.0, cy + 2.0] }
-      ]);
-      doc.stroke();
-      break;
-
-    case "vehicle":
-      doc.roundedRect(cx - 2.4, cy - 1.5, 3.2, 2.2, 0.3, 0.3, "S");
-      doc.roundedRect(cx + 0.8, cy - 0.7, 1.6, 1.4, 0.3, 0.3, "S");
-      doc.circle(cx - 1.2, cy + 1.2, 0.6, "S");
-      doc.circle(cx + 1.4, cy + 1.2, 0.6, "S");
-      break;
-
-    case "phone":
-      doc.path([
-        { op: "m", c: [cx - 1.5, cy - 1.2] },
-        { op: "c", c: [cx - 2.0, cy - 0.2, cx - 0.2, cy + 1.8, cx + 1.0, cy + 1.5] },
-        { op: "l", c: [cx + 1.8, cy + 0.7] },
-        { op: "c", c: [cx + 2.0, cy + 0.3, cx + 1.5, cy - 0.2, cx + 1.1, cy + 0.1] },
-        { op: "l", c: [cx - 0.7, cy - 1.7] },
-        { op: "c", c: [cx - 1.0, cy - 2.0, cx - 1.4, cy - 1.6, cx - 1.5, cy - 1.2] }
-      ]);
-      doc.stroke();
-      break;
-
-    case "store":
-      doc.triangle(cx - 2.2, cy - 0.4, cx + 2.2, cy - 0.4, cx, cy - 2.2, "S");
-      doc.rect(cx - 1.8, cy - 0.4, 3.6, 2.2, "S");
-      doc.rect(cx - 0.6, cy + 0.4, 1.2, 1.4, "S");
-      break;
-
-    case "calendar":
-      doc.roundedRect(cx - 2.1, cy - 2.0, 4.2, 4.0, 0.5, 0.5, "S");
-      doc.line(cx - 2.1, cy - 0.7, cx + 2.1, cy - 0.7);
-      doc.setFillColor(COLOR.iconStroke[0], COLOR.iconStroke[1], COLOR.iconStroke[2]);
-      doc.circle(cx - 1.0, cy + 0.8, 0.3, "F");
-      doc.circle(cx + 1.0, cy + 0.8, 0.3, "F");
-      break;
-  }
-
-  doc.restoreGraphicsState();
-}
-
-// ─── MAIN GENERATOR ──────────────────────────────────────────────────────────
-
+// ─── MAIN PDF GENERATOR ──────────────────────────────────────────────────────
 export function generateShopPDF(
   row: ShopDeliveryWithExtra,
   safeBoxDetails: BoxDetail[] = [],
@@ -179,152 +225,188 @@ export function generateShopPDF(
   supervisorPhone?: string,
   tripDate?: string,
   logoLeftUrl?: string,
-  logoRightUrl?: string,
-  supervisorIconUrl?: string,
-  vehicleIconUrl?: string
+  henIconUrl?: string,
+  deliveryTime?: string
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     try {
-      const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 14;
+      const margin = 12;
       const contentWidth = pageWidth - margin * 2;
-
-      let currentY = 12;
-
-      // ─── 1. HEADER LOGOS & TITLE ──────────────────────────────────────────
-
-      // Left Brand Logo
-      try {
-        if (logoLeftUrl) {
-          doc.addImage(logoLeftUrl, "PNG", margin, currentY, 22, 22);
-        } else {
-          drawDmrBrandLogo(doc, margin, currentY, 22);
-        }
-      } catch {
-        drawDmrBrandLogo(doc, margin, currentY, 22);
-      }
-
-      // Right Shop Logo
-      try {
-        if (logoRightUrl) {
-          doc.addImage(logoRightUrl, "PNG", pageWidth - margin - 22, currentY, 22, 22);
-        } else {
-          drawAnbuShopLogo(doc, pageWidth - margin - 22, currentY, 22);
-        }
-      } catch {
-        drawAnbuShopLogo(doc, pageWidth - margin - 22, currentY, 22);
-      }
-
-      // Center Titles
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(22);
-      doc.setTextColor(COLOR.tableHeader[0], COLOR.tableHeader[1], COLOR.tableHeader[2]);
-      doc.text("DMR POULTRY", pageWidth / 2, currentY + 9, { align: "center" });
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(COLOR.textMuted[0], COLOR.textMuted[1], COLOR.textMuted[2]);
-      doc.text(
-        `DELIVERY RECEIPT ${tripNo ? `• TRIP #${tripNo}` : ""}`,
-        pageWidth / 2,
-        currentY + 16,
-        { align: "center" }
-      );
-
-      currentY += 26;
-
-      // Divider Line
-      doc.setDrawColor(COLOR.cardBorder[0], COLOR.cardBorder[1], COLOR.cardBorder[2]);
-      doc.setLineWidth(0.4);
-      doc.line(margin, currentY, pageWidth - margin, currentY);
-
-      currentY += 6;
-
-      // ─── 2. INFO CARDS ────────────────────────────────────────────────────
 
       const isBoxMode = row.deliveryMode === "box";
       const dateValue = tripDate || new Date().toISOString().split("T")[0];
+      const timeValue = deliveryTime || "08:45 AM";
 
-      doc.setFillColor(COLOR.cardBg[0], COLOR.cardBg[1], COLOR.cardBg[2]);
-      doc.setDrawColor(COLOR.cardBorder[0], COLOR.cardBorder[1], COLOR.cardBorder[2]);
-      doc.roundedRect(margin, currentY, contentWidth, 34, 3, 3, "FD");
+      // ─── 1. HEADER ────────────────────────────────────────────────────────
+      const headerTop = 12;
 
-      const col1X = margin + 8;
-      const col2X = margin + 98;
-
-      doc.setFont("helvetica", "normal");
-
-      // --- ROW 1: Supervisor & Vehicle ---
-      if (supervisorIconUrl) {
+      // Left logo
+      if (logoLeftUrl) {
         try {
-          doc.addImage(supervisorIconUrl, "PNG", col1X - 3, currentY + 4, 7, 7);
+          doc.addImage(logoLeftUrl, "PNG", margin, headerTop, 24, 24, undefined, "FAST");
         } catch {
-          drawModernIcon(doc, "supervisor", col1X, currentY + 7);
+          drawDmrBrandLogo(doc, margin, headerTop, 24);
         }
       } else {
-        drawModernIcon(doc, "supervisor", col1X, currentY + 7);
+        drawDmrBrandLogo(doc, margin, headerTop, 24);
       }
-      doc.setFontSize(8.5);
-      doc.setTextColor(COLOR.textDark[0], COLOR.textDark[1], COLOR.textDark[2]);
-      doc.text("Supervisor Name :", col1X + 6, currentY + 8);
-      doc.setTextColor(COLOR.textMuted[0], COLOR.textMuted[1], COLOR.textMuted[2]);
-      doc.text(supervisorName || "Saifuddin", col1X + 34, currentY + 8);
 
-      if (vehicleIconUrl) {
+      // Right hen (aspect-correct, transparent, soft shadow — never a 2D box)
+      const henBoxW = 30;
+      const henBoxH = 28;
+      const henX = pageWidth - margin - henBoxW;
+      const henY = headerTop - 2;
+
+      let henDrawn = false;
+      if (henIconUrl) {
         try {
-          doc.addImage(vehicleIconUrl, "PNG", col2X - 3, currentY + 4, 7, 7);
+          const { dataUrl, width, height } = await cleanHenImage(henIconUrl);
+          let drawW = henBoxW;
+          let drawH = henBoxH;
+          if (width && height) {
+            const ratio = Math.min(henBoxW / width, henBoxH / height);
+            drawW = width * ratio;
+            drawH = height * ratio;
+          }
+          const dx = henX + (henBoxW - drawW) / 2;
+          const dy = henY + (henBoxH - drawH);
+
+          drawSoftShadow(doc, dx + drawW / 2, dy + drawH - 0.5, drawW);
+          doc.addImage(dataUrl, "PNG", dx, dy, drawW, drawH, undefined, "FAST");
+          henDrawn = true;
         } catch {
-          drawModernIcon(doc, "vehicle", col2X, currentY + 7);
+          henDrawn = false;
         }
-      } else {
-        drawModernIcon(doc, "vehicle", col2X, currentY + 7);
       }
-      doc.setTextColor(COLOR.textDark[0], COLOR.textDark[1], COLOR.textDark[2]);
-      doc.text("Vehicle No :", col2X + 6, currentY + 8);
-      doc.setTextColor(COLOR.textMuted[0], COLOR.textMuted[1], COLOR.textMuted[2]);
-      doc.text(vehicleNo || "AP-02-CD-5678", col2X + 26, currentY + 8);
+      if (!henDrawn) drawHenPlaceholder(doc, henX, henY, henBoxH);
 
-      // --- ROW 2: Mobile No ---
-      drawModernIcon(doc, "phone", col1X, currentY + 17);
-      doc.setTextColor(COLOR.textDark[0], COLOR.textDark[1], COLOR.textDark[2]);
-      doc.text("Mobile No :", col1X + 6, currentY + 18);
-      doc.setTextColor(COLOR.textMuted[0], COLOR.textMuted[1], COLOR.textMuted[2]);
-      doc.text(supervisorPhone || "N/A", col1X + 34, currentY + 18);
+      // Centre title
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(30);
+      setText(doc, COLOR.navy);
+      doc.text("DMR POULTRY", pageWidth / 2, headerTop + 14, { align: "center" });
 
-      // Inner Card Line
-      doc.setDrawColor(COLOR.cardBorder[0], COLOR.cardBorder[1], COLOR.cardBorder[2]);
-      doc.setLineWidth(0.2);
-      doc.line(margin + 4, currentY + 23, pageWidth - margin - 4, currentY + 23);
+      // Divider under title
+      const dividerY = headerTop + 21;
+      const dividerHalf = 52;
+      if (isBoxMode) {
+        setDraw(doc, [148, 163, 184]);
+        doc.setLineWidth(0.3);
+        doc.line(pageWidth / 2 - dividerHalf, dividerY, pageWidth / 2 - 5, dividerY);
+        doc.line(pageWidth / 2 + 5, dividerY, pageWidth / 2 + dividerHalf, dividerY);
+        setFill(doc, COLOR.navy);
+        doc.circle(pageWidth / 2, dividerY, 0.9, "F");
+      } else {
+        setDraw(doc, COLOR.brandRed);
+        doc.setLineWidth(0.5);
+        doc.line(pageWidth / 2 - dividerHalf, dividerY, pageWidth / 2 - 14, dividerY);
+        doc.line(pageWidth / 2 + 14, dividerY, pageWidth / 2 + dividerHalf, dividerY);
+        doc.setFontSize(9);
+        setText(doc, COLOR.brandRed);
+        doc.text("*  *  *", pageWidth / 2, dividerY + 1.6, { align: "center" });
+      }
 
-      // --- ROW 3: Shop Name & Date ---
-      drawModernIcon(doc, "store", col1X, currentY + 28);
-      doc.setTextColor(COLOR.textDark[0], COLOR.textDark[1], COLOR.textDark[2]);
-      doc.text("Shop Name :", col1X + 6, currentY + 29);
-      doc.setTextColor(COLOR.textMuted[0], COLOR.textMuted[1], COLOR.textMuted[2]);
-      doc.text(row.shopName || "Anbu Chicken Center", col1X + 26, currentY + 29);
+      let currentY = headerTop + 28;
 
-      drawModernIcon(doc, "calendar", col2X, currentY + 28);
-      doc.setTextColor(COLOR.textDark[0], COLOR.textDark[1], COLOR.textDark[2]);
-      doc.text("Date :", col2X + 6, currentY + 29);
-      doc.setTextColor(COLOR.textMuted[0], COLOR.textMuted[1], COLOR.textMuted[2]);
-      doc.text(dateValue, col2X + 18, currentY + 29);
+      // ─── 2. INFO CARDS ────────────────────────────────────────────────────
+      const c1 = margin + 8;
+      const c2 = margin + 100;
 
-      currentY += 40;
+      if (isBoxMode) {
+        // Card A: supervisor / vehicle / mobile
+        const cardAH = 26;
+        setFill(doc, COLOR.cardBg);
+        setDraw(doc, COLOR.cardBorder);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(margin, currentY, contentWidth, cardAH, 3, 3, "FD");
 
-      // ─── 3. TABLE SECTION ─────────────────────────────────────────────────
+        drawField(doc, "Supervisor Name", supervisorName || "", c1, currentY + 10, 34, 48);
+        drawField(doc, "Vehicle No", vehicleNo || "", c2, currentY + 10, 26, 48);
+        drawField(doc, "Mobile No", supervisorPhone || "", c1, currentY + 20, 34, 48);
 
+        currentY += cardAH + 5;
+
+        // Card B: shop name | date (split)
+        const cardBH = 18;
+        setFill(doc, COLOR.cardBg);
+        setDraw(doc, COLOR.cardBorder);
+        doc.roundedRect(margin, currentY, contentWidth * 0.6 - 2, cardBH, 3, 3, "FD");
+        doc.roundedRect(
+          margin + contentWidth * 0.6 + 2,
+          currentY,
+          contentWidth * 0.4 - 2,
+          cardBH,
+          3,
+          3,
+          "FD"
+        );
+
+        drawField(doc, "Shop Name", row.shopName || "", c1, currentY + 11, 28, 62);
+        drawField(
+          doc,
+          "Date",
+          dateValue,
+          margin + contentWidth * 0.6 + 10,
+          currentY + 11,
+          18,
+          42
+        );
+
+        currentY += cardBH + 6;
+      } else {
+        const cardH = 36;
+        setFill(doc, COLOR.cardBg);
+        setDraw(doc, COLOR.cardBorder);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(margin, currentY, contentWidth, cardH, 3, 3, "FD");
+
+        drawField(doc, "Supervisor Name", supervisorName || "", c1, currentY + 8, 34, 48);
+        drawField(doc, "Vehicle No", vehicleNo || "", c2, currentY + 8, 30, 48);
+        drawField(doc, "Mobile No", supervisorPhone || "", c1, currentY + 16, 34, 48);
+
+        // inner divider
+        setDraw(doc, COLOR.cardBorder);
+        doc.line(margin + 2, currentY + 20, pageWidth - margin - 2, currentY + 20);
+
+        drawField(doc, "Shop Name", row.shopName || "", c1, currentY + 27, 34, 48);
+        drawField(doc, "Date", dateValue, c2, currentY + 27, 30, 48);
+
+        // Delivery type checkboxes
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        setText(doc, COLOR.textDark);
+        doc.text("Delivery Type", c1, currentY + 33);
+        doc.text(":", c1 + 30, currentY + 33);
+
+        setDraw(doc, COLOR.textDark);
+        doc.setLineWidth(0.35);
+        doc.rect(c1 + 34, currentY + 30, 4, 4, "S");
+        if (!isBoxMode) {
+          doc.setLineWidth(0.6);
+          doc.line(c1 + 35, currentY + 32.1, c1 + 35.9, currentY + 33.2);
+          doc.line(c1 + 35.9, currentY + 33.2, c1 + 37.4, currentY + 30.7);
+        }
+        doc.text("Weight", c1 + 40, currentY + 33);
+
+        doc.setLineWidth(0.35);
+        doc.rect(c1 + 56, currentY + 30, 4, 4, "S");
+        doc.text("Box", c1 + 62, currentY + 33);
+
+        drawField(doc, "Time", timeValue, c2, currentY + 33, 30, 48);
+
+        currentY += cardH + 6;
+      }
+
+      // ─── 3. TABLE ─────────────────────────────────────────────────────────
       const headers = isBoxMode
         ? ["Box No", "Birds No.", "Weight (Kg)"]
         : ["Box No", "Birds No.", "Weight (Farm) (kg)"];
 
-      let tableRows: (string | number)[][] = [];
+      const tableRows: (string | number)[][] = [];
       let totalBirds = 0;
       let totalWeight = 0;
 
@@ -338,7 +420,7 @@ export function generateShopPDF(
       if (tableData.length === 0) {
         tableRows.push(["—", "—", "—"]);
       } else {
-        tableData.forEach((item) => {
+        tableData.forEach((item: any) => {
           const birds = Number(item.birds) || 0;
           const weight = Number(item.weight) || 0;
           tableRows.push([item.boxNo, birds.toLocaleString(), weight.toFixed(2)]);
@@ -347,11 +429,14 @@ export function generateShopPDF(
         });
       }
 
-      tableRows.push([
-        `TOTAL BOXES: ${tableData.length}`,
-        totalBirds.toLocaleString(),
-        totalWeight.toFixed(2),
-      ]);
+      const hasTotalRow = isBoxMode && tableData.length > 0;
+      if (hasTotalRow) {
+        tableRows.push([
+          `TOTAL     ${tableData.length}`,
+          totalBirds.toLocaleString(),
+          totalWeight.toFixed(2),
+        ]);
+      }
 
       autoTable(doc, {
         startY: currentY,
@@ -361,107 +446,199 @@ export function generateShopPDF(
         margin: { left: margin, right: margin },
         headStyles: {
           fillColor: COLOR.tableHeader,
-          textColor: [255, 255, 255],
-          fontStyle: "normal",
-          fontSize: 9,
+          textColor: COLOR.white,
+          fontStyle: "bold",
+          fontSize: 10,
           halign: "center",
           valign: "middle",
-          cellPadding: 3.5,
+          cellPadding: { top: 3.4, bottom: 3.4 },
+          lineColor: COLOR.tableHeader,
+          lineWidth: 0.1,
         },
         styles: {
-          fontSize: 8.5,
-          cellPadding: 2.5,
+          font: "helvetica",
+          fontSize: 9,
+          cellPadding: { top: 2.1, bottom: 2.1 },
           valign: "middle",
+          halign: "center",
           textColor: COLOR.textDark,
           lineColor: COLOR.cardBorder,
-          lineWidth: 0.25,
+          lineWidth: 0.2,
         },
         columnStyles: {
-          0: { halign: "center" },
-          1: { halign: "center" },
+          0: { halign: "center", cellWidth: contentWidth * 0.28 },
+          1: { halign: "center", cellWidth: contentWidth * 0.34 },
           2: { halign: "center" },
         },
-        alternateRowStyles: {
-          fillColor: COLOR.tableAltRow,
-        },
+        alternateRowStyles: { fillColor: COLOR.tableAltRow },
         didParseCell: (data) => {
-          if (data.row.index === tableRows.length - 1) {
+          if (
+            hasTotalRow &&
+            data.section === "body" &&
+            data.row.index === tableRows.length - 1
+          ) {
             data.cell.styles.fillColor = COLOR.totalBg;
             data.cell.styles.textColor = COLOR.tableHeader;
-            data.cell.styles.fontStyle = "normal";
-            data.cell.styles.fontSize = 9;
+            data.cell.styles.fontStyle = "bold";
+            data.cell.styles.fontSize = 10;
+            if (data.column.index === 0) data.cell.styles.halign = "left";
           }
         },
       });
 
-      let finalY = (doc as any).lastAutoTable.finalY || currentY + 40;
+      let finalY = (doc as any).lastAutoTable?.finalY ?? currentY + 40;
 
-      // ─── 4. MORTALITY & FINAL DEDUCTION SUMMARY ───────────────────────────
-
+      // ─── 4. SUMMARY CARDS (WEIGHT MODE) ───────────────────────────────────
       if (!isBoxMode) {
         const mortalityBirds = Number(row.mortality) || 0;
         const mortalityWeight = Number(row.mortKg) || 0;
         const finalBirds = totalBirds - mortalityBirds;
         const finalWeight = totalWeight - mortalityWeight;
 
-        finalY += 8;
+        finalY += 5;
+        const cardW = (contentWidth - 4) / 2;
 
-        doc.setFillColor(COLOR.cardBg[0], COLOR.cardBg[1], COLOR.cardBg[2]);
-        doc.setDrawColor(COLOR.cardBorder[0], COLOR.cardBorder[1], COLOR.cardBorder[2]);
-        doc.roundedRect(margin, finalY, contentWidth, 20, 2, 2, "FD");
+        // Row 1 — totals
+        setFill(doc, COLOR.cardBg);
+        setDraw(doc, COLOR.cardBorder);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(margin, finalY, contentWidth, 16, 2.5, 2.5, "FD");
+        doc.line(pageWidth / 2, finalY + 3, pageWidth / 2, finalY + 13);
+        drawStat(
+          doc,
+          "Total Boxes",
+          `${tableData.length}`,
+          margin + 10,
+          finalY + 6,
+          COLOR.textDark,
+          COLOR.tableHeader
+        );
+        drawStat(
+          doc,
+          "Total Weight (Farm)",
+          `${totalWeight.toFixed(2)} kg`,
+          pageWidth / 2 + 10,
+          finalY + 6,
+          COLOR.brandRed,
+          COLOR.tableHeader
+        );
 
+        finalY += 20;
+
+        // Row 2 — mortality
+        setFill(doc, COLOR.cardBg);
+        setDraw(doc, COLOR.cardBorder);
+        doc.roundedRect(margin, finalY, contentWidth, 16, 2.5, 2.5, "FD");
+        doc.line(pageWidth / 2, finalY + 3, pageWidth / 2, finalY + 13);
+        drawStat(
+          doc,
+          "Mortality",
+          `${mortalityBirds}`,
+          margin + 10,
+          finalY + 6,
+          COLOR.brandRed,
+          COLOR.tableHeader
+        );
+        drawStat(
+          doc,
+          "Mortality (Kg)",
+          `${mortalityWeight.toFixed(2)} kg`,
+          pageWidth / 2 + 10,
+          finalY + 6,
+          COLOR.brandRed,
+          COLOR.tableHeader
+        );
+
+        finalY += 20;
+
+        // Row 3 — final blocks (navy | red)
+        setFill(doc, COLOR.tableHeader);
+        doc.roundedRect(margin, finalY, cardW, 19, 2.5, 2.5, "F");
+        drawStat(
+          doc,
+          "Final Birds",
+          `${finalBirds.toLocaleString()}`,
+          margin + 10,
+          finalY + 6,
+          COLOR.white,
+          COLOR.white
+        );
+
+        setFill(doc, COLOR.brandRed);
+        doc.roundedRect(margin + cardW + 4, finalY, cardW, 19, 2.5, 2.5, "F");
+        drawStat(
+          doc,
+          "Final Weight",
+          `${finalWeight.toFixed(2)} kg`,
+          margin + cardW + 14,
+          finalY + 6,
+          COLOR.white,
+          COLOR.white
+        );
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(8.5);
-        doc.setTextColor(COLOR.accent[0], COLOR.accent[1], COLOR.accent[2]);
-        doc.text("MORTALITY DEDUCTIONS", margin + 6, finalY + 6);
+        doc.setFontSize(6);
+        setText(doc, COLOR.white);
+        doc.text(
+          "(AFTER MORTALITY DEDUCTION)",
+          margin + cardW + 14,
+          finalY + 16.5
+        );
 
-        doc.setFontSize(8);
-        doc.setTextColor(COLOR.textDark[0], COLOR.textDark[1], COLOR.textDark[2]);
-        doc.text(`Mortality Count: ${mortalityBirds} birds`, margin + 6, finalY + 12);
-        doc.text(`Mortality Weight: ${mortalityWeight.toFixed(2)} kg`, margin + 6, finalY + 16);
-
-        doc.setFontSize(8.5);
-        doc.setTextColor(COLOR.tableHeader[0], COLOR.tableHeader[1], COLOR.tableHeader[2]);
-        doc.text("NET DELIVERED", margin + 100, finalY + 6);
-
-        doc.setFontSize(8.5);
-        doc.setTextColor(COLOR.textDark[0], COLOR.textDark[1], COLOR.textDark[2]);
-        doc.text(`Final Birds: ${finalBirds} birds`, margin + 100, finalY + 12);
-        doc.text(`Final Weight: ${finalWeight.toFixed(2)} kg`, margin + 100, finalY + 16);
+        finalY += 25;
       }
 
       // ─── 5. FOOTER ────────────────────────────────────────────────────────
+      const footerY = isBoxMode ? pageHeight - 26 : Math.min(finalY + 12, pageHeight - 20);
 
-      const pageCount = doc.internal.pages.length - 1;
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
+      setDraw(doc, [148, 163, 184]);
+      doc.setLineWidth(0.3);
+      doc.line(margin + 12, footerY - 4, pageWidth / 2 - 34, footerY - 4);
+      doc.line(pageWidth / 2 + 34, footerY - 4, pageWidth - margin - 12, footerY - 4);
 
-        doc.setDrawColor(COLOR.cardBorder[0], COLOR.cardBorder[1], COLOR.cardBorder[2]);
-        doc.setLineWidth(0.4);
-        doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+      setText(doc, COLOR.brandRed);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.text("~", pageWidth / 2 - 30, footerY, { align: "center" });
+      doc.text("~", pageWidth / 2 + 30, footerY, { align: "center" });
 
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(7.5);
-        doc.setTextColor(COLOR.textMuted[0], COLOR.textMuted[1], COLOR.textMuted[2]);
-        doc.text(`Generated on: ${new Date().toLocaleString()}`, margin, pageHeight - 6);
-        doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 6, { align: "right" });
+      doc.setFont("times", "italic");
+      doc.setFontSize(24);
+      setText(doc, COLOR.navy);
+      doc.text(isBoxMode ? "Thank You" : "Thank You!", pageWidth / 2, footerY + 1, {
+        align: "center",
+      });
+
+      if (!isBoxMode) {
+        doc.setFont("times", "normal");
+        doc.setFontSize(11);
+        setText(doc, COLOR.navy);
+        doc.text("We appreciate your business", pageWidth / 2, footerY + 8, {
+          align: "center",
+        });
       }
 
-      // ─── 6. DOWNLOAD HANDLER ──────────────────────────────────────────────
+      // Bottom decorative strip (box mode)
+      if (isBoxMode) {
+        setFill(doc, COLOR.brandRed);
+        doc.rect(0, pageHeight - 9, pageWidth, 2.4, "F");
+        setFill(doc, COLOR.white);
+        doc.rect(0, pageHeight - 6.6, pageWidth, 0.9, "F");
+        setFill(doc, COLOR.tableHeader);
+        doc.rect(0, pageHeight - 5.7, pageWidth, 5.7, "F");
+      }
 
+      // ─── 6. DOWNLOAD ──────────────────────────────────────────────────────
       const suffix = isBoxMode ? "Box" : "Weight";
-      const cleanShopName = (row.shopName || "Anbu_Chicken_Center").replace(/\s+/g, "_");
+      const cleanShopName = (row.shopName || "Shop").replace(/\s+/g, "_");
 
       const pdfBlob = doc.output("blob");
       const blobUrl = window.URL.createObjectURL(pdfBlob);
-      const downloadLink = document.createElement("a");
-
-      downloadLink.href = blobUrl;
-      downloadLink.download = `DeliveryReceipt_${cleanShopName}_${suffix}.pdf`;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `DeliveryReceipt_${cleanShopName}_${suffix}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
 
       resolve();

@@ -1,6 +1,17 @@
 import React from "react";
 import Select from "react-select";
-import { X, ShoppingCart, Layers, Box, Scale, MessageSquare, AlertCircle, Clock } from "lucide-react";
+import {
+  X,
+  ShoppingCart,
+  Layers,
+  Box,
+  Scale,
+  MessageSquare,
+  AlertCircle,
+  Clock,
+  PackageCheck,
+  Tag,
+} from "lucide-react";
 import BoxSelector from "./BoxSelector";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
 
@@ -75,59 +86,115 @@ export default function ShopDeliveryForm({
   birdOptions,
   isFormValid,
 }: Props) {
+  const selectedBoxIds: number[] = formData.selectedBoxIds || [];
+
+  // Compact & Clean React-Select Styles
+  const customSelectStyles = {
+    control: (base: any, state: any) => ({
+      ...base,
+      minHeight: 38,
+      height: 38,
+      borderRadius: 8,
+      borderColor: state.isFocused ? "#3b82f6" : "#e2e8f0",
+      backgroundColor: "#ffffff",
+      boxShadow: "none",
+      "&:hover": {
+        borderColor: "#cbd5e1",
+      },
+    }),
+    valueContainer: (base: any) => ({
+      ...base,
+      padding: "0 10px",
+    }),
+    input: (base: any) => ({
+      ...base,
+      margin: 0,
+      padding: 0,
+    }),
+    menu: (base: any) => ({
+      ...base,
+      zIndex: 9999,
+      borderRadius: 8,
+      overflow: "hidden",
+      border: "1px solid #e2e8f0",
+      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isSelected
+        ? "#eff6ff"
+        : state.isFocused
+        ? "#f8fafc"
+        : "white",
+      color: state.isSelected ? "#1d4ed8" : "#1e293b",
+      cursor: "pointer",
+      fontSize: "13px",
+      padding: "6px 12px",
+    }),
+  };
+
   return (
-    <div className="p-4 sm:p-6 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-5">
-      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+    <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-4">
+      {/* Form Header */}
+      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
         <div>
-          <h3 className="text-base sm:text-lg font-semibold text-slate-800">
+          <h3 className="text-base font-semibold text-slate-800">
             {editingId !== null ? "Edit Shop Delivery" : "Add New Shop Delivery"}
           </h3>
-          <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-            <Clock size={12} /> Auto-Captured: <span className="font-medium text-slate-600">{autoCaptureTime}</span>
+          <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+            <Clock size={12} className="text-slate-400" />
+            Auto-Captured: <span className="font-medium text-slate-600">{autoCaptureTime}</span>
           </p>
         </div>
         <button
+          type="button"
           onClick={onClose}
-          className="h-10 w-10 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors touch-manipulation"
+          className="h-7 w-7 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
         >
-          <X size={20} />
+          <X size={16} />
         </button>
       </div>
 
-      {/* Row 1: Delivery Mode + Shop Name */}
-      <div className="flex flex-col sm:flex-row gap-4 sm:gap-5">
-        <div className="sm:w-[40%]">
-          <label className="text-sm font-medium text-slate-700 block mb-1.5">Delivery Mode</label>
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+      {/* Row 1: Delivery Mode & Shop Name */}
+      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+        {/* Delivery Mode Toggle */}
+        <div className="sm:col-span-5">
+          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+            Delivery Mode
+          </label>
+          <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200/60 h-[38px]">
             <button
               type="button"
               onClick={() => setMode("box")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all touch-manipulation ${
+              className={`flex items-center justify-center gap-1.5 rounded-md text-xs transition-all ${
                 mode === "box"
-                  ? "bg-white text-blue-700 shadow-xs"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white text-blue-700 shadow-2xs font-semibold"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
+              <Box size={13} />
               Box Mode
             </button>
             <button
               type="button"
               onClick={() => setMode("weight")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all touch-manipulation ${
+              className={`flex items-center justify-center gap-1.5 rounded-md text-xs transition-all ${
                 mode === "weight"
-                  ? "bg-white text-blue-700 shadow-xs"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white text-blue-700 shadow-2xs font-semibold"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
+              <Scale size={13} />
               Weight Mode
             </button>
           </div>
         </div>
 
-        <div className="sm:w-[60%]">
-          <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-            <ShoppingCart size={16} className="text-slate-400" /> Shop Name{" "}
-            <span className="text-rose-500">*</span>
+        {/* Shop Select */}
+        <div className="sm:col-span-7">
+          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
+            <ShoppingCart size={13} className="text-slate-400" />
+            Shop Name <span className="text-rose-500">*</span>
           </label>
           <Select
             key={`shop-${shopOptions.length}`}
@@ -137,47 +204,26 @@ export default function ShopDeliveryForm({
                 : null
             }
             options={shopOptions}
-            placeholder={shopOptions.length > 0 ? "Search Shop..." : "No shops available"}
+            placeholder={shopOptions.length > 0 ? "Select Shop..." : "No shops available"}
             isSearchable
             isDisabled={shopOptions.length === 0 || shopOptions[0]?.isDisabled}
             onChange={handleShopSelect}
-            maxMenuHeight={140}
-            styles={{
-              control: (base: any) => ({
-                ...base,
-                minHeight: 44,
-                borderRadius: 12,
-                borderColor: "#e2e8f0",
-                backgroundColor: "#f8fafc",
-              }),
-              menu: (base: any) => ({
-                ...base,
-                zIndex: 9999,
-                borderRadius: 12,
-                overflow: "hidden",
-                boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.15)",
-              }),
-              option: (base: any, state: any) => ({
-                ...base,
-                backgroundColor: state.isFocused ? "#e2e8f0" : "white",
-                color: "#1e293b",
-                cursor: "pointer",
-                padding: 8,
-              }),
-            }}
+            maxMenuHeight={150}
+            styles={customSelectStyles}
           />
-          <div className="text-[10px] text-slate-400 mt-1">
+          <span className="text-[10px] text-slate-400 mt-0.5 block">
             {shopOptions.length} shop(s) available
-          </div>
+          </span>
         </div>
       </div>
 
-      {/* Row 2: Bird Type + Box Selector */}
-      <div className="flex flex-col sm:flex-row gap-4 sm:gap-5">
-        <div className="sm:w-[40%]">
-          <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-            <Layers size={16} className="text-slate-400" /> Bird Type{" "}
-            <span className="text-rose-500">*</span>
+      {/* Row 2: Bird Type & Box Selector */}
+      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+        {/* Bird Type Select */}
+        <div className="sm:col-span-5">
+          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
+            <Layers size={13} className="text-slate-400" />
+            Bird Type <span className="text-rose-500">*</span>
           </label>
           <Select
             key={`bird-${birdOptions.length}`}
@@ -191,78 +237,68 @@ export default function ShopDeliveryForm({
             isSearchable
             isDisabled={birdOptions.length === 0 || birdOptions[0]?.isDisabled}
             onChange={handleBirdSelect}
-            maxMenuHeight={140}
-            styles={{
-              control: (base: any) => ({
-                ...base,
-                minHeight: 44,
-                borderRadius: 12,
-                borderColor: "#e2e8f0",
-                backgroundColor: "#f8fafc",
-              }),
-              menu: (base: any) => ({
-                ...base,
-                zIndex: 9999,
-                borderRadius: 12,
-                overflow: "hidden",
-                boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.15)",
-              }),
-              option: (base: any, state: any) => ({
-                ...base,
-                backgroundColor: state.isFocused ? "#e2e8f0" : "white",
-                color: "#1e293b",
-                cursor: "pointer",
-                padding: 8,
-              }),
-            }}
+            maxMenuHeight={150}
+            styles={customSelectStyles}
           />
-          <div className="text-[10px] text-slate-400 mt-1">
+          <span className="text-[10px] text-slate-400 mt-0.5 block">
             {birdOptions.length} bird type(s) available
-          </div>
+          </span>
         </div>
 
-        <div className="sm:w-[60%]">
-          <label className="text-sm font-medium text-slate-700 block mb-1.5">Select Boxes</label>
+        {/* Box Selector Container */}
+        <div className="sm:col-span-7">
+          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
+            <PackageCheck size={13} className="text-slate-400" />
+            Select Available Boxes
+          </label>
           {safeBoxDetails.length > 0 ? (
-            <BoxSelector
-              boxes={safeBoxDetails}
-              selectedIds={formData.selectedBoxIds}
-              onSelectionChange={handleBoxSelection}
-              disabled={readOnly}
-              usedBoxIds={usedBoxIds}
-            />
+            <div className="bg-slate-50/50 p-2 border border-slate-200 rounded-lg">
+              <BoxSelector
+                boxes={safeBoxDetails}
+                selectedIds={formData.selectedBoxIds}
+                onSelectionChange={handleBoxSelection}
+                disabled={readOnly}
+                usedBoxIds={usedBoxIds}
+              />
+            </div>
           ) : (
-            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 text-center">
-              <AlertCircle size={20} className="mx-auto mb-1 text-slate-300" />
-              <p className="text-sm text-slate-500">No boxes available from pickup.</p>
+            <div className="border border-slate-200 rounded-lg p-2 bg-slate-50 text-center flex items-center justify-center gap-1.5 h-[38px]">
+              <AlertCircle size={14} className="text-slate-400" />
+              <p className="text-xs text-slate-500">No boxes available from pickup.</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Conditional Grid */}
+      {/* Conditional Delivery Mode Breakdown Section */}
       {mode === "box" ? (
-        <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
+        <div className="bg-slate-50/60 border border-slate-200/80 p-3.5 rounded-xl space-y-3">
+          {/* Top Metric Inputs Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            {/* 1. Selected Boxes Count Box */}
             <div>
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                <Box size={16} className="text-slate-400" /> Box No
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                Selected Boxes
               </label>
-              <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
+              <div className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-800 flex items-center h-[38px]">
                 {boxCount}
               </div>
             </div>
+
+            {/* 2. Farm Birds */}
             <div>
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                <span>🕌</span> Temple Birds
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                Farm Birds
               </label>
-              <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
+              <div className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 flex items-center h-[38px]">
                 {farmBirds}
               </div>
             </div>
+
+            {/* 3. Mortality Birds */}
             <div>
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                <span>⚰️</span> Mor (Birds)
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                Mortality (Birds)
               </label>
               <input
                 type="number"
@@ -270,100 +306,143 @@ export default function ShopDeliveryForm({
                 onChange={(e) => handleFormChange("mortality", Number(e.target.value))}
                 placeholder="0"
                 min="0"
-                className={`w-full rounded-xl border px-4 sm:px-5 py-2 text-sm font-medium outline-none transition-all no-spinner h-[44px] ${
+                className={`w-full rounded-lg border px-3 text-xs font-medium outline-none transition-all h-[38px] ${
                   validationErrors.birdsExceed
-                    ? "border-red-500 bg-red-50 focus:border-red-600 focus:ring-red-200"
-                    : "border-slate-200 bg-slate-50/50 text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10"
+                    ? "border-rose-500 bg-rose-50 text-rose-900 focus:ring-1 focus:ring-rose-300"
+                    : "border-slate-200 bg-white text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
                 }`}
               />
               {validationErrors.birdsExceed && (
-                <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                  <AlertCircle size={12} /> Cannot be more than {farmBirds}
+                <p className="text-[10px] text-rose-600 mt-0.5 flex items-center gap-1">
+                  <AlertCircle size={10} /> Max: {farmBirds}
                 </p>
               )}
             </div>
+
+            {/* 4. Delivered Birds */}
             <div>
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                <span>🐔</span> Birds (Del.)
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                Delivered Birds
               </label>
-              <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
+              <div className="w-full rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 text-xs font-bold text-emerald-700 flex items-center h-[38px]">
                 {deliveredBirds}
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
-            <div />
-            <div>
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                <Scale size={16} className="text-slate-400" /> Wt (Temple)
+
+          {/* Bottom Weights & Selected Box Nos Tags Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-start">
+            {/* Box Numbers Tag List (Placed directly in lower-left space) */}
+            <div className="flex flex-col justify-start">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                Box Nos List
               </label>
-              <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
+              <div className="p-2 bg-white border border-slate-200 rounded-lg min-h-[38px] max-h-[85px] overflow-y-auto flex flex-wrap gap-1">
+                {selectedBoxIds.length > 0 ? (
+                  selectedBoxIds.map((id) => (
+                    <span
+                      key={id}
+                      className="px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded text-[10px] font-semibold flex items-center gap-0.5 shrink-0"
+                    >
+                      <Tag size={9} className="text-blue-500" />
+                      #{id}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs text-slate-400 italic">None selected</span>
+                )}
+              </div>
+            </div>
+
+            {/* Farm Weight */}
+            <div>
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                Farm Weight (kg)
+              </label>
+              <div className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 flex items-center h-[38px]">
                 {farmWeight.toFixed(2)}
               </div>
             </div>
+
+            {/* Mortality Weight */}
             <div>
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                <Scale size={16} className="text-slate-400" /> Mor (kg)
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                Mortality Weight (kg)
               </label>
-              <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
-                {mortKg > 0 ? mortKg.toFixed(2) : "—"}
+              <div className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 flex items-center h-[38px]">
+                {mortKg > 0 ? mortKg.toFixed(2) : "0.00"}
               </div>
             </div>
+
+            {/* Delivered Weight */}
             <div>
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                <Scale size={16} className="text-slate-400" /> Wt (Del.)
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                Delivered Weight (kg)
               </label>
-              <div className="w-full rounded-xl border border-slate-200 bg-slate-100/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-600 flex items-center h-[44px]">
-                {deliveredWeight > 0 ? deliveredWeight.toFixed(2) : "—"}
+              <div className="w-full rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 text-xs font-bold text-emerald-700 flex items-center h-[38px]">
+                {deliveredWeight > 0 ? deliveredWeight.toFixed(2) : "0.00"}
               </div>
             </div>
           </div>
-        </>
+        </div>
       ) : (
-        <div className="space-y-4">
-          <div className="overflow-x-auto border border-slate-200 rounded-xl">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-100">
+        /* Weight Mode Breakdown Table */
+        <div className="space-y-3">
+          <div className="overflow-x-auto border border-slate-200 rounded-lg bg-white">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase">
                 <tr>
-                  <th className="px-3 py-2 text-left font-semibold">Box</th>
-                  <th className="px-3 py-2 text-left font-semibold">Birds (Temple)</th>
-                  <th className="px-3 py-2 text-left font-semibold">Birds (Del.) <span className="text-rose-500">*</span></th>
-                  <th className="px-3 py-2 text-left font-semibold">Wt (Temple)</th>
-                  <th className="px-3 py-2 text-left font-semibold">Wt (Del.) <span className="text-rose-500">*</span></th>
+                  <th className="px-3 py-2">Box No</th>
+                  <th className="px-3 py-2">Farm Birds</th>
+                  <th className="px-3 py-2">
+                    Delivered Birds <span className="text-rose-500">*</span>
+                  </th>
+                  <th className="px-3 py-2">Farm Weight (kg)</th>
+                  <th className="px-3 py-2">
+                    Delivered Weight (kg) <span className="text-rose-500">*</span>
+                  </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
                 {formData.perBoxData.map((item: any, index: number) => {
                   const farmBox = safeBoxDetails.find((b) => b.boxNo === item.boxNo);
                   const birdsError = validationErrors.perBoxBirdsErrors[index] || false;
                   const weightError = validationErrors.perBoxWeightErrors[index] || false;
                   return (
-                    <tr key={item.boxNo} className="border-t border-slate-200">
-                      <td className="px-3 py-2 font-medium">#{item.boxNo}</td>
-                      <td className="px-3 py-2">{farmBox?.birds || 0}</td>
-                      <td className="px-3 py-2">
+                    <tr key={item.boxNo}>
+                      <td className="px-3 py-1.5 font-bold text-slate-800">#{item.boxNo}</td>
+                      <td className="px-3 py-1.5">{farmBox?.birds || 0}</td>
+                      <td className="px-3 py-1.5">
                         <input
                           type="number"
                           value={item.birds || ""}
-                          onChange={(e) => handlePerBoxChange(index, "birds", Number(e.target.value))}
+                          onChange={(e) =>
+                            handlePerBoxChange(index, "birds", Number(e.target.value))
+                          }
                           placeholder="0"
                           min="0"
-                          className={`w-20 rounded border px-2 py-1 text-sm focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all no-spinner ${
-                            birdsError ? "border-red-500 bg-red-50" : "border-slate-200 bg-slate-50/50"
+                          className={`w-20 rounded border px-2 py-1 text-xs outline-none ${
+                            birdsError
+                              ? "border-rose-500 bg-rose-50"
+                              : "border-slate-200 focus:border-blue-500"
                           }`}
                         />
                       </td>
-                      <td className="px-3 py-2">{farmBox?.weight.toFixed(2) || "0.00"}</td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-1.5">{farmBox?.weight?.toFixed(2) || "0.00"}</td>
+                      <td className="px-3 py-1.5">
                         <input
                           type="number"
                           step="0.01"
                           value={item.weight || ""}
-                          onChange={(e) => handlePerBoxChange(index, "weight", Number(e.target.value))}
+                          onChange={(e) =>
+                            handlePerBoxChange(index, "weight", Number(e.target.value))
+                          }
                           placeholder="0.00"
                           min="0"
-                          className={`w-24 rounded border px-2 py-1 text-sm focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all no-spinner ${
-                            weightError ? "border-red-500 bg-red-50" : "border-slate-200 bg-slate-50/50"
+                          className={`w-24 rounded border px-2 py-1 text-xs outline-none ${
+                            weightError
+                              ? "border-rose-500 bg-rose-50"
+                              : "border-slate-200 focus:border-blue-500"
                           }`}
                         />
                       </td>
@@ -373,10 +452,11 @@ export default function ShopDeliveryForm({
               </tbody>
             </table>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+
+          <div className="grid grid-cols-2 gap-3 bg-slate-50/60 p-2.5 rounded-lg border border-slate-200">
             <div>
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                <span>⚰️</span> Mor (Birds)
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                Mortality (Birds)
               </label>
               <input
                 type="number"
@@ -384,12 +464,12 @@ export default function ShopDeliveryForm({
                 onChange={(e) => handleFormChange("mortality", Number(e.target.value))}
                 placeholder="0"
                 min="0"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all no-spinner h-[44px]"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs outline-none focus:border-blue-500 h-[38px]"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-                <Scale size={16} className="text-slate-400" /> Mor (kg)
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                Mortality Weight (kg)
               </label>
               <input
                 type="number"
@@ -398,7 +478,7 @@ export default function ShopDeliveryForm({
                 onChange={(e) => handleFormChange("mortWeight", Number(e.target.value))}
                 placeholder="0.00"
                 min="0"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all no-spinner h-[44px]"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs outline-none focus:border-blue-500 h-[38px]"
               />
             </div>
           </div>
@@ -407,34 +487,38 @@ export default function ShopDeliveryForm({
 
       {/* Remarks */}
       <div>
-        <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5 mb-1">
-          <MessageSquare size={16} className="text-slate-400" /> Remarks
+        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
+          <MessageSquare size={13} className="text-slate-400" />
+          Remarks
         </label>
         <input
           value={formData.remarks || ""}
           onChange={(e) => handleFormChange("remarks", e.target.value)}
-          placeholder="Optional notes..."
-          className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 sm:px-5 py-2 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all h-[44px]"
+          placeholder="Optional delivery notes..."
+          className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-800 outline-none focus:border-blue-500 h-[38px]"
         />
       </div>
 
-      <div className="flex justify-end gap-3 pt-2 border-t border-slate-200">
+      {/* Actions */}
+      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
         <button
+          type="button"
           onClick={onClose}
-          className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors touch-manipulation"
+          className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-colors"
         >
           Cancel
         </button>
         <button
+          type="button"
           onClick={onSubmit}
           disabled={!isFormValid}
-          className={`px-5 py-2.5 rounded-xl text-sm font-medium shadow-sm transition-colors active:scale-95 touch-manipulation ${
+          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${
             isFormValid
-              ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-              : "bg-slate-300 text-slate-500 cursor-not-allowed shadow-none"
+              ? "bg-blue-600 hover:bg-blue-700 text-white"
+              : "bg-slate-200 text-slate-400 cursor-not-allowed"
           }`}
         >
-          {editingId !== null ? "Update" : "Save"} Delivery
+          {editingId !== null ? "Update Delivery" : "Save Delivery"}
         </button>
       </div>
     </div>

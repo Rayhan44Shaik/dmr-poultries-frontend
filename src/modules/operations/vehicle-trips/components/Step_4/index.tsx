@@ -1,12 +1,15 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { Plus, Clock, Building2, Users, Scale, AlertCircle } from "lucide-react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { 
+  Plus, Clock, Building2, Users, Scale, AlertCircle, Search, X, 
+  LayoutGrid, BarChart2, Save, CheckCircle, Lock, ArrowLeft 
+} from "lucide-react";
 import TripPagination from "../TripPagination";
 import { useShopDeliveryForm } from "./useShopDeliveryForm";
 import ShopDeliveryForm from "./ShopDeliveryForm";
 import ShopDeliveryCard from "./ShopDeliveryCard";
 import { generateShopPDF } from "../../utils/generateShopPDF";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
-import henImage from "./Hen_Image_1.webp";
+import henImage from "./Hen_Image.webp";
 
 interface Props {
   rows: ShopDelivery[];
@@ -24,6 +27,13 @@ interface Props {
   supervisorName?: string;
   supervisorPhone?: string;
   tripDate?: string;
+  viewMode?: "shop" | "box";
+  onViewModeChange?: (mode: "shop" | "box") => void;
+  stepNumber?: number | string;
+  
+  // Props for sync and saving
+  updateDeliveries?: (rows: ShopDelivery[], persist?: boolean, silent?: boolean) => void;
+  submitDeliveries?: () => boolean;
 }
 
 export default function UnLoadingTable({
@@ -42,6 +52,11 @@ export default function UnLoadingTable({
   supervisorName = "",
   supervisorPhone = "",
   tripDate = "",
+  viewMode = "shop",
+  onViewModeChange,
+  stepNumber = 4,
+  updateDeliveries,
+  submitDeliveries,
 }: Props) {
   const safeRows = rows ?? [];
   const safeShops = shops ?? [];
@@ -53,6 +68,14 @@ export default function UnLoadingTable({
   const [showForm, setShowForm] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [autoCaptureTime, setAutoCaptureTime] = useState<string>("");
+
+  // ─── Manual Save & Success Notification State ──────────────────
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
+  const isSavingRef = useRef(false);
+
+  // ─── Table Search State ─────────────────────────────────────────
+  const [searchTerm, setSearchTerm] = useState<string>("");
 
   const {
     mode,
@@ -83,6 +106,44 @@ export default function UnLoadingTable({
     }
   }, [editingShopId, safeRows]);
 
+  // ─── Manual Save & Perfect Sync Handler ────────────────────────
+  const handleSaveProgress = () => {
+    if (isSavingRef.current || readOnly) return;
+    isSavingRef.current = true;
+    setIsSaving(true);
+
+    try {
+      if (updateDeliveries) {
+        updateDeliveries(safeRows, true, false);
+      }
+      setSaveSuccessMessage("Progress saved and synced successfully!");
+      setTimeout(() => {
+        setSaveSuccessMessage(null);
+      }, 4000);
+    } catch (error) {
+      console.error("Save progress error:", error);
+      alert("Failed to save progress. Please try again.");
+    } finally {
+      setIsSaving(false);
+      isSavingRef.current = false;
+    }
+  };
+
+  const handleComplete = () => {
+    if (submitDeliveries) {
+      submitDeliveries();
+    }
+  };
+
+  const handleCancelEditing = () => {
+    if (onCancelEdit) {
+      onCancelEdit();
+    } else {
+      setShowForm(false);
+      setEditingId(null);
+    }
+  };
+
   // ─── Top KPI Calculations ────────────────────────────────────
   const topKpiTotals = useMemo(() => {
     const totalShops = safeRows.length;
@@ -107,13 +168,24 @@ export default function UnLoadingTable({
     };
   }, [safeRows]);
 
-  // ─── Display rows with pagination ──────────────────────────────
+  // ─── Search & Display rows ─────────────────────────────────────
   const displayRows = useMemo<ShopDelivery[]>(() => {
     const saved = safeRows.filter((r: ShopDelivery) => r.shopId > 0 && r.birds > 0 && r.weight > 0);
-    return [...saved].sort((a, b) => b.id - a.id);
-  }, [safeRows]);
+
+    const filtered = saved.filter((r: ShopDelivery) => {
+      if (!searchTerm.trim()) return true;
+      const query = searchTerm.toLowerCase();
+      const shopNameMatch = (r.shopName || "").toLowerCase().includes(query);
+      const birdTypeMatch = (r.birdType || "").toLowerCase().includes(query);
+      const remarksMatch = (r.remarks || "").toLowerCase().includes(query);
+      return shopNameMatch || birdTypeMatch || remarksMatch;
+    });
+
+    return [...filtered].sort((a, b) => b.id - a.id);
+  }, [safeRows, searchTerm]);
 
   const totalPages = useMemo<number>(() => Math.ceil(displayRows.length / itemsPerPage), [displayRows.length]);
+
   const currentRows = useMemo<ShopDelivery[]>(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return displayRows.slice(startIndex, startIndex + itemsPerPage);
@@ -124,7 +196,17 @@ export default function UnLoadingTable({
     else if (totalPages === 0) setCurrentPage(1);
   }, [totalPages, currentPage]);
 
-  // ─── Form handlers ────────────────────────────────────────────────
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
+
+  const clearSearch = () => {
+    setSearchTerm("");
+    setCurrentPage(1);
+  };
+
+  // ─── Form Handlers ──────────────────────────────────────────────
   const openAddForm = () => {
     setEditingId(null);
     setMode("box");
@@ -393,7 +475,6 @@ export default function UnLoadingTable({
     }
   }, [mode, formData, farmBirds, validationErrors]);
 
-  // ─── Safe Async PDF Handler ────────────────────────────────────────
   const handleDownloadPDF = async (row: ShopDelivery) => {
     try {
       await generateShopPDF(
@@ -409,17 +490,86 @@ export default function UnLoadingTable({
       );
     } catch (error: any) {
       console.error("PDF download failed:", error);
-      alert("Failed to generate PDF. Please check the browser console (F12) for error details.");
+      alert("Failed to generate PDF. Please check the browser console for details.");
     }
   };
 
-  // ─── Render ────────────────────────────────────────────────────────
   return (
     <div className="w-full space-y-4">
       <style>{`
         .no-spinner::-webkit-inner-spin-button,.no-spinner::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.no-spinner{-moz-appearance:textfield}
       `}</style>
 
+      {/* ─── SEARCH & ACTION BAR ─── */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pb-3 border-b border-slate-100">
+        
+        {/* Left Side: Shop View / Box Analysis Toggle + Search Input */}
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto flex-1">
+          {onViewModeChange && (
+            <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200/80 shrink-0">
+              <button
+                onClick={() => onViewModeChange("shop")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  viewMode === "shop"
+                    ? "bg-white text-blue-600 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <LayoutGrid size={13} />
+                Shop View
+              </button>
+              <button
+                onClick={() => onViewModeChange("box")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  viewMode === "box"
+                    ? "bg-white text-blue-600 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <BarChart2 size={13} />
+                Box Analysis
+              </button>
+            </div>
+          )}
+
+          {/* Search Input right beside View Toggles */}
+          <div className="relative w-full sm:w-64 max-w-xs">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <Search size={14} />
+            </div>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              placeholder="Search by shop name, bird type..."
+              className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 rounded-lg text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-xs"
+            />
+            {searchTerm && (
+              <button
+                onClick={clearSearch}
+                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Right Side Actions */}
+        <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+          {!readOnly && !showForm && (
+            <button
+              onClick={openAddForm}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg shadow-xs transition-all active:scale-95"
+            >
+              <Plus size={15} />
+              Add Shop
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ─── KPI Cards Bar ─── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-emerald-50/70 border border-emerald-100 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-semibold text-emerald-800 flex items-center gap-1">
@@ -461,18 +611,6 @@ export default function UnLoadingTable({
         </div>
       </div>
 
-      {!readOnly && !showForm && (
-        <div className="flex justify-end">
-          <button
-            onClick={openAddForm}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl shadow-xs transition-all active:scale-95 touch-manipulation"
-          >
-            <Plus size={18} />
-            Add Shop
-          </button>
-        </div>
-      )}
-
       {showForm ? (
         <ShopDeliveryForm
           mode={mode}
@@ -502,6 +640,7 @@ export default function UnLoadingTable({
           shopOptions={shopOptions}
           birdOptions={birdOptions}
           isFormValid={isFormValid}
+          showActions={formData.shopId > 0}
         />
       ) : (
         <>
@@ -512,10 +651,26 @@ export default function UnLoadingTable({
                   <div className="h-14 w-14 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                     <AlertCircle className="w-6 h-6" />
                   </div>
-                  <p className="font-medium text-slate-600">No shops added yet</p>
-                  <p className="text-xs text-slate-400">
-                    Click <span className="font-semibold text-emerald-600">Add Shop</span> to begin recording entries.
-                  </p>
+                  {searchTerm ? (
+                    <>
+                      <p className="font-medium text-slate-600">No matching shops found</p>
+                      <p className="text-xs text-slate-400">
+                        Try searching for another keyword or{" "}
+                        <button onClick={clearSearch} className="font-semibold text-emerald-600 hover:underline">
+                          clear search
+                        </button>.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-medium text-slate-600">No shops added yet</p>
+                      {!readOnly && (
+                        <p className="text-xs text-slate-400">
+                          Click <span className="font-semibold text-emerald-600">Add Shop</span> to begin recording entries.
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             ) : (
@@ -557,6 +712,50 @@ export default function UnLoadingTable({
           </div>
         </>
       )}
+
+      {/* ─── BOTTOM ACTION BAR (Cancel Editing | Save Progress with Green Notification | Complete & Lock Deliveries) ─── */}
+      <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xs flex flex-col gap-3">
+        {saveSuccessMessage && (
+          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-xl text-xs font-medium animate-fadeIn">
+            <CheckCircle size={16} className="text-emerald-600 shrink-0" />
+            <span>{saveSuccessMessage}</span>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={handleCancelEditing}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all active:scale-95"
+          >
+            <ArrowLeft size={15} />
+            Cancel Editing
+          </button>
+
+          <div className="flex items-center gap-3">
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={handleSaveProgress}
+                disabled={isSaving}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all active:scale-95 disabled:opacity-50"
+              >
+                <Save size={15} />
+                {isSaving ? "Saving..." : "Save Progress"}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleComplete}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all active:scale-95"
+            >
+              <Lock size={15} />
+              Complete & Lock Deliveries
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
