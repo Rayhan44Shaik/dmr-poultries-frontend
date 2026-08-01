@@ -272,10 +272,14 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           trip={trip}
           setTrip={setTrip}
           updateTrip={updateTrip}
-          submitEndTrip={submitEndTrip}
           editable={isEditable(isTripEnded)}
           canEdit={canEditTrip}
           onCancel={onCancelEdit}
+          {...({
+            submitEndTrip,
+            submitEndStep: submitEndTrip,
+            onSubmit: submitEndTrip,
+          } as any)}
         />
       );
     }

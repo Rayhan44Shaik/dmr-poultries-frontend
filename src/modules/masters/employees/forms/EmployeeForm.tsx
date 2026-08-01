@@ -1,6 +1,7 @@
+// src/modules/masters/employees/forms/EmployeeForm.tsx
 import { useEffect, useState } from "react";
 import type { Employee } from "../types/employee";
-import { useSafeNotification } from "../../../../hooks/useSafeNotification"; // 👈 new import
+import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import {
   User,
   Building2,
@@ -20,22 +21,41 @@ type EmployeeFormProps = {
   employee?: Employee | null;
   onSave: (employee: any) => void;
   onCancel: () => void;
+  isSaving?: boolean;
 };
 
+// Departments sorted alphabetically
 const DEPARTMENTS = [
-  "Driver",
-  "Supervisor",
-  "Loader",
   "Accountant",
   "Collection",
+  "Driver",
+  "Helper",
+  "Loader",
   "Office Staff",
-  "Other",
   "Operations",
+  "Other",
   "Sales",
-];
+  "Supervisor",
+].sort();
 
-function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
-  const { showNotification } = useSafeNotification(); // 👈 use safe version
+// Helper: format salary with commas
+const formatSalary = (value: number | ""): string => {
+  if (value === "" || value === null || value === undefined) return "";
+  const num = Number(value);
+  if (isNaN(num) || num < 0) return "";
+  return num.toLocaleString("en-IN");
+};
+
+// Helper: parse formatted string to number
+const parseSalary = (display: string): number | "" => {
+  const cleaned = display.replace(/,/g, "").trim();
+  if (cleaned === "") return "";
+  const num = Number(cleaned);
+  return isNaN(num) ? "" : num;
+};
+
+function EmployeeForm({ employee, onSave, onCancel, isSaving = false }: EmployeeFormProps) {
+  const { showNotification } = useSafeNotification();
 
   const [employeeName, setEmployeeName] = useState("");
   const [department, setDepartment] = useState("");
@@ -46,7 +66,7 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
   const [joiningDate, setJoiningDate] = useState("");
   const [aadharNumber, setAadharNumber] = useState("");
   const [licenseNumber, setLicenseNumber] = useState("");
-  const [salary, setSalary] = useState<number | "">("");
+  const [salaryDisplay, setSalaryDisplay] = useState("");
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
 
   const isEditing = !!employee;
@@ -62,7 +82,7 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
       setJoiningDate(employee.joiningDate ?? "");
       setAadharNumber(employee.aadharNumber ?? "");
       setLicenseNumber(employee.licenseNumber ?? "");
-      setSalary(employee.salary ?? "");
+      setSalaryDisplay(formatSalary(employee.salary ?? ""));
       setStatus(employee.status);
     } else {
       setEmployeeName("");
@@ -74,35 +94,51 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
       setJoiningDate("");
       setAadharNumber("");
       setLicenseNumber("");
-      setSalary("");
+      setSalaryDisplay("");
       setStatus("Active");
     }
   }, [employee]);
 
-  // Format Aadhar with spaces every 4 digits
   const formatAadhar = (value: string) => {
     const digits = value.replace(/\D/g, "");
     const parts = digits.match(/.{1,4}/g);
-    if (parts) {
-      return parts.join(" ");
-    }
+    if (parts) return parts.join(" ");
     return digits;
   };
 
+  const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/[^0-9,]/g, "").replace(/,/g, "");
+    if (digits === "") {
+      setSalaryDisplay("");
+      return;
+    }
+    const num = Number(digits);
+    if (!isNaN(num)) setSalaryDisplay(num.toLocaleString("en-IN"));
+  };
+
+  const handleSalaryBlur = () => {
+    if (salaryDisplay === "") return;
+    const num = parseSalary(salaryDisplay);
+    if (num === "" || isNaN(Number(num))) setSalaryDisplay("");
+    else setSalaryDisplay(Number(num).toLocaleString("en-IN"));
+  };
+
   const handleSubmit = () => {
-    if (!employeeName || !department || !role || !phoneNumber || !email || salary === "") {
-      showNotification("Please fill all required fields.", "error");
+    const salaryNumber = parseSalary(salaryDisplay);
+
+    if (!employeeName || !department || !phoneNumber || salaryDisplay === "") {
+      showNotification("Please fill all required fields (marked with *).", "error");
       return;
     }
     if (!/^[0-9]{10}$/.test(phoneNumber)) {
       showNotification("Mobile Number must be exactly 10 digits.", "error");
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       showNotification("Please enter a valid email address.", "error");
       return;
     }
-    if (Number(salary) < 0) {
+    if (salaryNumber === "" || Number(salaryNumber) < 0) {
       showNotification("Salary must be a positive number.", "error");
       return;
     }
@@ -132,7 +168,7 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
       joiningDate,
       aadharNumber,
       licenseNumber,
-      salary: Number(salary),
+      salary: Number(salaryNumber),
       status,
     });
   };
@@ -140,7 +176,7 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
   const inputClass = (hasError = false) =>
     `w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition ${
       hasError ? "border-red-300 focus:border-red-500" : "border-slate-200"
-    } bg-white`;
+    } bg-white ${isSaving ? "opacity-70 cursor-not-allowed" : ""}`;
 
   const iconWrapperClass = "absolute left-3 top-1/2 -translate-y-1/2 text-slate-400";
 
@@ -148,12 +184,12 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
   const subtitle = isEditing ? "Update details" : "Fill in the details";
 
   const toggleStatus = () => {
-    setStatus(status === "Active" ? "Inactive" : "Active");
+    if (!isSaving) setStatus(status === "Active" ? "Inactive" : "Active");
   };
 
   return (
     <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-      {/* Header with icon, title, and status toggle */}
+      {/* Header */}
       <div className="bg-gradient-to-r from-slate-100 to-slate-200/80 px-6 py-5 flex items-center justify-between border-b border-slate-200/60">
         <div className="flex items-center gap-3">
           <div className="bg-blue-100 p-2.5 rounded-xl">
@@ -165,15 +201,15 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
           </div>
         </div>
 
-        {/* Status toggle switch */}
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-slate-600">Status</span>
           <button
             type="button"
             onClick={toggleStatus}
+            disabled={isSaving}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-200 ${
               status === "Active" ? "bg-emerald-500" : "bg-slate-300"
-            }`}
+            } ${isSaving ? "opacity-60 cursor-not-allowed" : ""}`}
           >
             <span
               className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -181,17 +217,13 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
               }`}
             />
           </button>
-          <span
-            className={`text-sm font-medium ${
-              status === "Active" ? "text-emerald-600" : "text-slate-500"
-            }`}
-          >
+          <span className={`text-sm font-medium ${status === "Active" ? "text-emerald-600" : "text-slate-500"}`}>
             {status}
           </span>
         </div>
       </div>
 
-      {/* Form Body – 2 columns */}
+      {/* Form Body */}
       <div className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {/* Employee Name */}
@@ -206,11 +238,12 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
                 onChange={(e) => setEmployeeName(e.target.value)}
                 placeholder="Full name"
                 className={inputClass()}
+                disabled={isSaving}
               />
             </div>
           </div>
 
-          {/* Department */}
+          {/* Department – with helper text */}
           <div className="relative">
             <label className="block mb-1.5 text-sm font-medium text-slate-700">
               Department <span className="text-red-500">*</span>
@@ -220,20 +253,23 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
               <select
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition border-slate-200 bg-white appearance-none"
+                className={`w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition border-slate-200 bg-white appearance-none ${isSaving ? "opacity-70 cursor-not-allowed" : ""}`}
+                disabled={isSaving}
               >
-                <option value="">Select Department</option>
+                <option value="" disabled>Select Department</option>
                 {DEPARTMENTS.map((dept) => (
                   <option key={dept} value={dept}>{dept}</option>
                 ))}
               </select>
             </div>
+            {/* Helper text */}
+            <p className="text-xs text-slate-400 mt-1">Departments are listed alphabetically</p>
           </div>
 
-          {/* Role */}
+          {/* Role – optional */}
           <div className="relative">
             <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              Role <span className="text-red-500">*</span>
+              Role <span className="text-xs text-slate-400 ml-1">(Optional)</span>
             </label>
             <div className="relative">
               <Briefcase className={iconWrapperClass} size={18} />
@@ -242,6 +278,7 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
                 onChange={(e) => setRole(e.target.value)}
                 placeholder="e.g., Manager, Staff, Collector"
                 className={inputClass()}
+                disabled={isSaving}
               />
             </div>
           </div>
@@ -259,14 +296,15 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
                 onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
                 placeholder="10-digit mobile number"
                 className={inputClass()}
+                disabled={isSaving}
               />
             </div>
           </div>
 
-          {/* Email */}
+          {/* Email – optional */}
           <div className="relative">
             <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              Email <span className="text-red-500">*</span>
+              Email <span className="text-xs text-slate-400 ml-1">(Optional)</span>
             </label>
             <div className="relative">
               <Mail className={iconWrapperClass} size={18} />
@@ -275,11 +313,12 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
                 className={inputClass()}
+                disabled={isSaving}
               />
             </div>
           </div>
 
-          {/* Joining Date – using DatePicker */}
+          {/* Joining Date */}
           <div className="relative">
             <label className="block mb-1.5 text-sm font-medium text-slate-700">
               Joining Date
@@ -290,12 +329,13 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
                 value={joiningDate}
                 onChange={setJoiningDate}
                 placeholder="Select joining date"
-                className="w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition border-slate-200 bg-white"
+                className={`w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition border-slate-200 bg-white ${isSaving ? "opacity-70 cursor-not-allowed" : ""}`}
+                disabled={isSaving}
               />
             </div>
           </div>
 
-          {/* Salary – with Rupee symbol */}
+          {/* Salary */}
           <div className="relative">
             <label className="block mb-1.5 text-sm font-medium text-slate-700">
               Salary <span className="text-red-500">*</span>
@@ -303,16 +343,18 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
             <div className="relative">
               <IndianRupee className={iconWrapperClass} size={18} />
               <input
-                type="number"
-                value={salary}
-                onChange={(e) => setSalary(e.target.value === "" ? "" : Number(e.target.value))}
-                placeholder="Monthly salary"
-                className={`${inputClass()} [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+                type="text"
+                value={salaryDisplay}
+                onChange={handleSalaryChange}
+                onBlur={handleSalaryBlur}
+                placeholder="e.g., 20,000"
+                className={`${inputClass()} [appearance:textfield]`}
+                disabled={isSaving}
               />
             </div>
           </div>
 
-          {/* Aadhar Number – with space formatting */}
+          {/* Aadhar Number */}
           <div className="relative">
             <label className="block mb-1.5 text-sm font-medium text-slate-700">
               Aadhar Number
@@ -321,13 +363,14 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
               <CreditCard className={iconWrapperClass} size={18} />
               <input
                 value={formatAadhar(aadharNumber)}
-                maxLength={14} // 12 digits + 2 spaces
+                maxLength={14}
                 onChange={(e) => {
                   const raw = e.target.value.replace(/\s/g, "");
                   setAadharNumber(raw);
                 }}
                 placeholder="3044 6064 2044"
                 className={inputClass()}
+                disabled={isSaving}
               />
             </div>
           </div>
@@ -349,6 +392,7 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
                 className={inputClass(
                   (department === "Driver" || department === "Collection") && !licenseNumber
                 )}
+                disabled={isSaving}
               />
             </div>
           </div>
@@ -365,7 +409,8 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="Enter address"
                 rows={2}
-                className="w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition border-slate-200 bg-white resize-y"
+                className={`w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition border-slate-200 bg-white resize-y ${isSaving ? "opacity-70 cursor-not-allowed" : ""}`}
+                disabled={isSaving}
               />
             </div>
           </div>
@@ -376,16 +421,29 @@ function EmployeeForm({ employee, onSave, onCancel }: EmployeeFormProps) {
           <button
             type="button"
             onClick={onCancel}
-            className="px-6 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition font-medium text-sm text-slate-700"
+            disabled={isSaving}
+            className="px-6 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition font-medium text-sm text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleSubmit}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition shadow-sm hover:shadow font-medium text-sm"
+            disabled={isSaving}
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition shadow-sm hover:shadow font-medium text-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center"
           >
-            {isEditing ? "Update Employee" : "Save Employee"}
+            {isSaving && (
+              <svg
+                className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            )}
+            {isSaving ? "Saving..." : isEditing ? "Update Employee" : "Save Employee"}
           </button>
         </div>
       </div>
