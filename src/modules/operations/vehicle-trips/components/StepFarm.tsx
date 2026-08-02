@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Pencil, X, Loader2, Scale } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Pencil, X, Loader2, Scale, Check, AlertTriangle } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 
@@ -12,7 +12,27 @@ interface Props {
   editable?: boolean;
   canEdit?: boolean;
   onCancel?: () => void;
-  showNotification?: (message: string, type?: "info" | "success" | "error" | "warning") => void; // ← new
+  showNotification?: (message: string, type?: "info" | "success" | "error" | "warning") => void;
+}
+
+// ─── Toast notification ──────────────────────────────────────────────
+function Toast({ message, type = "success", onClose }: { message: string; type?: "success" | "error" | "warning"; onClose: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 2500);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const bgColor = type === "success" ? "bg-slate-800" : type === "warning" ? "bg-amber-600" : "bg-red-600";
+  const icon = type === "success" ? <Check size={18} className="text-white" /> : <AlertTriangle size={18} className="text-white" />;
+
+  return (
+    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
+      <div className={`${bgColor} text-white px-6 py-3 rounded-2xl shadow-lg flex items-center gap-3 border border-white/20`}>
+        {icon}
+        <span className="font-medium text-sm">{message}</span>
+      </div>
+    </div>
+  );
 }
 
 export default function StepFarm({
@@ -24,12 +44,21 @@ export default function StepFarm({
   editable = false,
   canEdit = false,
   onCancel,
-  showNotification, // ← new
+  showNotification,
 }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(false);
   const [destMeterError, setDestMeterError] = useState<string | null>(null);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" } | null>(null);
+
+  const notify = (msg: string, type: "success" | "error" | "warning" = "success") => {
+    if (showNotification) {
+      showNotification(msg, type);
+    } else {
+      setToast({ message: msg, type });
+    }
+  };
 
   const farmAddress = (trip as any).farmAddress || "";
   const remarks = trip.remarks || "";
@@ -77,13 +106,13 @@ export default function StepFarm({
       maxHeight: 180,
       overflowY: "auto",
       scrollbarWidth: "none",
-      "::-webkit-scrollbar": { display: "none" },
+      ":-webkit-scrollbar": { display: "none" },
     }),
   };
 
   const fetchCurrentLocation = () => {
     if (!navigator.geolocation) {
-      showNotification?.("Geolocation is not supported by your browser.", "error");
+      notify("Geolocation is not supported by your browser.", "error");
       return;
     }
     setIsFetchingLocation(true);
@@ -111,7 +140,7 @@ export default function StepFarm({
       },
       (error) => {
         console.error("Geolocation error:", error);
-        showNotification?.("Unable to fetch location. Check browser permissions.", "error");
+        notify("Unable to fetch location. Check browser permissions.", "error");
         setIsFetchingLocation(false);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -147,23 +176,23 @@ export default function StepFarm({
 
   const handleSubmit = async () => {
     if (!trip.sourceFarmId || !trip.sourceFarm) {
-      showNotification?.("Please select a Destination / Farm.", "warning");
+      notify("Please select a Destination / Farm.", "warning");
       return;
     }
     if (!trip.destMeter || trip.destMeter <= 0) {
-      showNotification?.("Please enter a valid Destination Meter (KM).", "warning");
+      notify("Please enter a valid Destination Meter (KM).", "warning");
       return;
     }
     if (destMeterError) {
-      showNotification?.(destMeterError, "warning");
+      notify(destMeterError, "warning");
       return;
     }
     if (trip.pickupTolls === undefined || trip.pickupTolls < 0) {
-      showNotification?.("Please enter valid Toll Gates.", "warning");
+      notify("Please enter valid Toll Gates.", "warning");
       return;
     }
     if (!(trip as any).avgBirdWeight || (trip as any).avgBirdWeight <= 0) {
-      showNotification?.("Please enter a valid Average Bird Weight.", "warning");
+      notify("Please enter a valid Average Bird Weight.", "warning");
       return;
     }
 
@@ -171,14 +200,14 @@ export default function StepFarm({
     const success = submitFarmStep({});
     if (success) {
       setIsLocalEditing(false);
-      showNotification?.("Destination details saved successfully.", "success");
+      notify("Destination details saved successfully.", "success");
     } else {
-      showNotification?.("Submission failed. Please try again.", "error");
+      notify("Submission failed. Please try again.", "error");
     }
     setIsSubmitting(false);
   };
 
-  // LOCKED VIEW
+  // ─── LOCKED VIEW ───────────────────────────────────────────────────
   if (trip.farmStepSubmitted && !editable && !isLocalEditing) {
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
@@ -207,45 +236,65 @@ export default function StepFarm({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 pt-2">
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
-            <p className="text-xs text-slate-500 font-medium">Reached Time</p>
-            <p className="font-semibold text-slate-900 mt-0.5">{trip.reachedTime || "--"}</p>
+        {/* Compact Deliveries-Style KPI Cards Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Clock size={12} className="text-slate-500" /> Time
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{trip.reachedTime || "--"}</span>
           </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
-            <p className="text-xs text-slate-500 font-medium">Farm</p>
-            <p className="font-semibold text-slate-900 mt-0.5 truncate">{trip.sourceFarm || "--"}</p>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Store size={12} className="text-blue-500" /> Farm
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{trip.sourceFarm || "--"}</span>
           </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl col-span-2">
-            <p className="text-xs text-slate-500 font-medium">Farm Address</p>
-            <p className="font-semibold text-slate-900 mt-0.5 truncate">{farmAddress || "--"}</p>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Gauge size={12} className="text-purple-500" /> Dest Meter
+            </span>
+            <span className="text-xs font-bold text-slate-800">{trip.destMeter ? `${trip.destMeter} KM` : "--"}</span>
           </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
-            <p className="text-xs text-slate-500 font-medium">Destination Meter</p>
-            <p className="font-semibold text-slate-900 mt-0.5">{trip.destMeter ? `${trip.destMeter} KM` : "--"}</p>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
-            <p className="text-xs text-slate-500 font-medium">Toll Gates (Pickup)</p>
-            <p className="font-semibold text-slate-900 mt-0.5">{trip.pickupTolls ?? "--"}</p>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl col-span-2 md:col-span-2">
-            <p className="text-xs text-slate-500 font-medium">Avg Bird Weight (kg)</p>
-            <p className="font-semibold text-slate-900 mt-0.5">{avgBirdWeight > 0 ? `${avgBirdWeight} kg` : "--"}</p>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl col-span-2 md:col-span-2">
-            <p className="text-xs text-slate-500 font-medium">Remarks</p>
-            <p className="font-semibold text-slate-900 mt-0.5 truncate">{remarks || "--"}</p>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Ticket size={12} className="text-amber-500" /> Tolls
+            </span>
+            <span className="text-xs font-bold text-slate-800">{trip.pickupTolls ?? "--"}</span>
           </div>
         </div>
 
-        <p className="text-xs text-slate-600 bg-white p-3 rounded-xl border border-slate-200 mt-2">
-          Destination details submitted successfully.
-        </p>
+        {/* Additional Details Card */}
+        <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-0.5">Farm Address</span>
+              <span className="text-xs font-semibold text-slate-800">{farmAddress || "--"}</span>
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-0.5">Avg Bird Weight</span>
+              <span className="text-xs font-semibold text-slate-800">{avgBirdWeight > 0 ? `${avgBirdWeight} kg` : "--"}</span>
+            </div>
+          </div>
+          {remarks && (
+            <div className="border-t border-slate-100 pt-2.5">
+              <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-0.5">Remarks</span>
+              <span className="text-xs font-medium text-slate-700">{remarks}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Banner */}
+        <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-center justify-between">
+          <p className="text-xs text-slate-600 font-normal">
+            Destination details submitted successfully.
+          </p>
+        </div>
       </div>
     );
   }
 
-  // EDIT / ACTIVE STATE
+  // ─── EDIT / ACTIVE STATE ───────────────────────────────────────────
   return (
     <>
       <style>{`
@@ -278,7 +327,7 @@ export default function StepFarm({
               <Clock size={14} className="text-slate-400" /> Reached Time <span className="text-red-500">*</span>
             </label>
             <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
-              {trip.reachedTime ? trip.reachedTime : <span className="text-slate-400 font-normal">Auto-captured on submit</span>}
+              {trip.reachedTime ? trip.reachedTime : <span className="text-slate-400 font-normal text-xs">Auto-captured on submit</span>}
             </div>
           </div>
 
@@ -380,7 +429,6 @@ export default function StepFarm({
             <p className="text-[11px] text-slate-400 mt-1">Total tolls passed on the way</p>
           </div>
 
-          {/* SAME HEIGHT PAIR: Avg Bird Weight & Remarks */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Scale size={14} className="text-slate-400" /> Avg Bird Weight (kg) <span className="text-red-500">*</span>
@@ -468,6 +516,8 @@ export default function StepFarm({
           </button>
         </div>
       </div>
+
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </>
   );
 }

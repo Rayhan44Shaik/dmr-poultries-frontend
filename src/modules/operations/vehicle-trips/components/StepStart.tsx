@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Clock, User, Truck, Gauge, Wallet, Pencil, X } from "lucide-react";
+import { Clock, User, Truck, Gauge, Wallet, Pencil, X, AlertCircle } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { tripService } from "../services/tripService";
@@ -86,6 +86,7 @@ export default function StepStart({
   };
 
   const handleSubmit = async () => {
+    if (lastMeterError || advanceError) return;
     setIsSubmitting(true);
     const success = submitStartStep({});
     if (success) {
@@ -148,11 +149,11 @@ export default function StepStart({
       maxHeight: 180,
       overflowY: "auto",
       scrollbarWidth: "none",
-      "::-webkit-scrollbar": { display: "none" },
+      ":-webkit-scrollbar": { display: "none" },
     }),
   };
 
-  // LOCKED VIEW
+  // ─── LOCKED VIEW ───────────────────────────────────────────────────
   if (trip.startStepSubmitted && !editable && !isLocalEditing) {
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
@@ -181,47 +182,68 @@ export default function StepStart({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 pt-2">
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
-            <p className="text-xs text-slate-500 font-medium">Start Time</p>
-            <p className="font-semibold text-slate-900 mt-0.5">{trip.startTime || "--"}</p>
+        {/* Compact KPI Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Clock size={12} className="text-slate-500" /> Start Time
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{trip.startTime || "--"}</span>
           </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
-            <p className="text-xs text-slate-500 font-medium">Vehicle</p>
-            <p className="font-semibold text-slate-900 mt-0.5">{trip.vehicleNo}</p>
+
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Truck size={12} className="text-blue-500" /> Vehicle No.
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{trip.vehicleNo || "--"}</span>
           </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
-            <p className="text-xs text-slate-500 font-medium">Supervisor</p>
-            <p className="font-semibold text-slate-900 mt-0.5">{trip.supervisorName}</p>
+
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <User size={12} className="text-indigo-500" /> Supervisor
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{trip.supervisorName || "--"}</span>
           </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
-            <p className="text-xs text-slate-500 font-medium">Driver</p>
-            <p className="font-semibold text-slate-900 mt-0.5">{trip.driverName}</p>
+
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <User size={12} className="text-emerald-500" /> Driver
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{trip.driverName || "--"}</span>
           </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl col-span-1">
-            <p className="text-xs text-slate-500 font-medium">Opening Meter</p>
-            <p className="font-semibold text-slate-900 mt-0.5">{trip.openingMeter} KM</p>
+
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Gauge size={12} className="text-purple-500" /> Opening Meter
+            </span>
+            <span className="text-xs font-bold text-slate-800">{trip.openingMeter ? `${trip.openingMeter} KM` : "--"}</span>
           </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl col-span-1">
-            <p className="text-xs text-slate-500 font-medium">Advance / Expenses</p>
-            <p className="font-semibold text-slate-900 mt-0.5">
-              ₹{(trip.advanceAmount ?? 0).toLocaleString()}
-            </p>
+
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Wallet size={12} className="text-amber-500" /> Advance / Expenses
+            </span>
+            <span className="text-xs font-bold text-slate-800">₹{(trip.advanceAmount ?? 0).toLocaleString()}</span>
           </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl col-span-2">
-            <p className="text-xs text-slate-500 font-medium">Helpers</p>
-            <p className="font-semibold text-slate-900 mt-0.5">{trip.helpers.join(", ") || "--"}</p>
+
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-2 lg:col-span-2">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <User size={12} className="text-slate-500" /> Helpers
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{trip.helpers?.join(", ") || "--"}</span>
           </div>
         </div>
 
-        <p className="text-xs text-slate-600 bg-white p-3 rounded-xl border border-slate-200 mt-2">
-          Start details submitted successfully.
-        </p>
+        <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-center justify-between">
+          <p className="text-xs text-slate-600 font-normal">
+            Start details submitted successfully.
+          </p>
+        </div>
       </div>
     );
   }
 
-  // EDIT / ACTIVE STATE
+  // ─── EDIT / ACTIVE STATE ───────────────────────────────────────────
   return (
     <>
       <style>{`
@@ -248,14 +270,14 @@ export default function StepStart({
         </div>
 
         {/* Inputs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 sm:gap-x-6 gap-y-3.5 sm:gap-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 sm:gap-x-6 gap-y-4 sm:gap-y-5">
           {/* Start Time (read-only) */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Clock size={14} className="text-slate-400" /> Start Time <span className="text-red-500">*</span>
             </label>
             <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
-              {trip.startTime ? trip.startTime : <span className="text-slate-400 font-normal">Auto-captured on submit</span>}
+              {trip.startTime ? trip.startTime : <span className="text-slate-400 font-normal text-xs">Auto-captured on submit</span>}
             </div>
           </div>
 
@@ -332,9 +354,23 @@ export default function StepStart({
                 updateTrip({ openingMeter: val === "" ? undefined : Number(val) });
               }}
               onWheel={(e) => e.currentTarget.blur()}
-              className="hide-spinner w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-400"
+              className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
+                lastMeterError 
+                  ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10" 
+                  : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
+              }`}
               placeholder="0.00"
             />
+            {lastKnownMeter !== null && !lastMeterError && (
+              <p className="text-[11px] text-slate-400 mt-1">
+                Last recorded closing meter: <span className="text-slate-700 font-semibold">{lastKnownMeter} KM</span>
+              </p>
+            )}
+            {lastMeterError && (
+              <p className="text-[11px] text-red-500 mt-1 font-medium flex items-center gap-1">
+                <AlertCircle size={12} /> {lastMeterError}
+              </p>
+            )}
           </div>
 
           {/* Advance / Expenses */}
@@ -353,13 +389,22 @@ export default function StepStart({
                 updateTrip({ advanceAmount: val === "" ? 0 : Number(val) });
               }}
               onWheel={(e) => e.currentTarget.blur()}
-              className="hide-spinner w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-400"
+              className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
+                advanceError 
+                  ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10" 
+                  : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
+              }`}
               placeholder="0.00"
             />
+            {advanceError && (
+              <p className="text-[11px] text-red-500 mt-1 font-medium flex items-center gap-1">
+                <AlertCircle size={12} /> {advanceError}
+              </p>
+            )}
           </div>
 
-          {/* 👇 NEW: Helpers (full width) */}
-          <div className="col-span-2">
+          {/* Helpers (full width) */}
+          <div className="col-span-1 sm:col-span-2">
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <User size={14} className="text-slate-400" /> Helpers
             </label>
@@ -380,7 +425,7 @@ export default function StepStart({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-slate-100">
+        <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-slate-100">
           {!trip.startStepSubmitted && !editable && (
             <button
               type="button"
@@ -407,8 +452,8 @@ export default function StepStart({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all active:scale-95"
+            disabled={isSubmitting || !!lastMeterError || !!advanceError}
+            className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed shadow-sm transition-all active:scale-95"
           >
             {isSubmitting
               ? "Saving..."

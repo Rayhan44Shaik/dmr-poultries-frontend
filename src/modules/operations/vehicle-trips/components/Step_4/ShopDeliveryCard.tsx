@@ -1,7 +1,7 @@
 import React from "react";
-import { Check, Box, Users, Scale, Clock, Pencil, FileText, Package } from "lucide-react";
+import { Check, Box, Users, Scale, Clock, Pencil, FileText, Package, AlertCircle } from "lucide-react";
 import type { ShopDelivery } from "../../types/trip";
-import { ShopDeliveryWithExtra } from "./useShopDeliveryForm";
+import type { ShopDeliveryWithExtra } from "./useShopDeliveryForm";
 
 interface Props {
   row: ShopDeliveryWithExtra;
@@ -22,10 +22,11 @@ export default function ShopDeliveryCard({
 }: Props) {
   const isWeightMode = row.deliveryMode === "weight";
   const selectedBoxes = row.selectedBoxIds || [];
+  const mortalityCount = row.mortality || 0;
 
   return (
     <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between gap-2.5">
-      {/* Top Bar: Shop Name, Mode Icon Badge & Actions */}
+      {/* Top Bar: Shop Name, Mode Icon Badge, Mortality Badge & Actions */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-2">
         <div className="flex items-center gap-2 overflow-hidden">
           <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200/50">
@@ -54,6 +55,17 @@ export default function ShopDeliveryCard({
                 className="p-1 rounded-md bg-amber-50 text-amber-700 border border-amber-200/60 shrink-0 flex items-center justify-center"
               >
                 <Box size={13} className="stroke-[2.5]" />
+              </span>
+            )}
+
+            {/* Mortality Badge (Shown only if mortality > 0) */}
+            {mortalityCount > 0 && (
+              <span
+                title={`Mortality: ${mortalityCount} birds`}
+                className="px-1.5 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-200/60 shrink-0 flex items-center gap-1 text-[10px] font-bold"
+              >
+                <AlertCircle size={13} className="text-rose-500 stroke-[2.5]" />
+                <span>{mortalityCount}</span>
               </span>
             )}
           </div>

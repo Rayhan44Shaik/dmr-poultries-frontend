@@ -1,8 +1,6 @@
 import React, { useState, useMemo } from "react";
 import {
-  CheckCircle,
   Pencil,
-  X,
   Lock,
   LayoutGrid,
   BarChart3,
@@ -10,7 +8,6 @@ import {
 import UnLoadingTable from "./Step_4";
 import BoxWeightAnalysis from "./Step_4/BoxWeightAnalysis";
 import type { ShopDelivery, Trip, BoxDetail } from "../types/trip";
-import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
 interface Props {
   rows: ShopDelivery[];
@@ -18,7 +15,7 @@ interface Props {
   shops: any[];
   birdTypes: any[];
   trip: Trip;
-  updateDeliveries: (rows: ShopDelivery[], persistToStorage?: boolean) => void;
+  updateDeliveries: (rows: ShopDelivery[], persistToStorage?: boolean, silent?: boolean) => void;
   submitDeliveriesStep: () => boolean;
   clearForm: () => void;
   readOnly?: boolean;
@@ -39,13 +36,11 @@ export default function StepDeliveries({
   clearForm,
   readOnly = false,
   editable = false,
-  canEdit = false,
+  canEdit = true,
   onCancel,
   boxDetails = [],
 }: Props) {
-  const { showNotification } = useSafeNotification();
-
-  // Toggle state: 'shops' | 'analysis'
+  // Toggle view mode: 'shops' | 'analysis'
   const [viewMode, setViewMode] = useState<"shops" | "analysis">("shops");
 
   // Step-level edit mode
@@ -54,32 +49,27 @@ export default function StepDeliveries({
   // Shop-level edit mode
   const [editingShopId, setEditingShopId] = useState<string | number | null>(null);
 
-  // Locked IF step is submitted AND user hasn't toggled "Edit Shop" at step level
+  // Locked state: step submitted AND user hasn't enabled step-level edit mode
   const isLocked = trip.deliveryStepSubmitted && !editable && !isStepEditing;
 
-  // Save shop row
+  // Save individual shop row & trigger persist sync
   const handleSaveRow = (updatedRow: ShopDelivery) => {
     const rowIndex = rows.findIndex((r) => r.id === updatedRow.id);
-    if (rowIndex === -1) return;
-
-    const updatedRows = [...rows];
-    updatedRows[rowIndex] = updatedRow;
+    let updatedRows: ShopDelivery[] = [];
+    if (rowIndex === -1) {
+      updatedRows = [updatedRow, ...rows];
+    } else {
+      updatedRows = [...rows];
+      updatedRows[rowIndex] = updatedRow;
+    }
     setRows(updatedRows);
-    updateDeliveries(updatedRows, true);
+    updateDeliveries(updatedRows, true, false);
     setEditingShopId(null);
-    showNotification?.(
-      `✅ Shop "${updatedRow.shopName}" saved successfully.`,
-      "success"
-    );
   };
 
   const handleStartEditShop = (shopId: string | number) => {
     if (isLocked) return;
     setEditingShopId(shopId);
-  };
-
-  const handleCancelShopEdit = () => {
-    setEditingShopId(null);
   };
 
   const handleEnableStepEdit = () => {
@@ -92,7 +82,7 @@ export default function StepDeliveries({
     if (onCancel) onCancel();
   };
 
-  // ─── Lock Validation ────────────────────────────────────────────────
+  // ─── Lock Validation Pipeline ────────────────────────────────────────
   const validationResult = useMemo(() => {
     if (rows.length === 0)
       return { valid: false, reason: "Please add at least one shop delivery." };
@@ -143,15 +133,15 @@ export default function StepDeliveries({
 
   const canLock = validationResult.valid;
 
-  const handleLockDeliveries = () => {
+  const handleLockDeliveries = (): boolean => {
     if (!canLock) {
-      showNotification?.(`❌ ${validationResult.reason}`, "error");
-      return;
+      alert(`⚠️ ${validationResult.reason}`);
+      return false;
     }
     setIsStepEditing(false);
     setEditingShopId(null);
-    updateDeliveries(rows, true);
-    submitDeliveriesStep();
+    updateDeliveries(rows, true, false);
+    return submitDeliveriesStep();
   };
 
   return (
@@ -194,14 +184,16 @@ export default function StepDeliveries({
             </button>
           </div>
 
-          {/* STEP LEVEL EDIT BUTTON: Only visible when step is locked */}
-          {isLocked && canEdit && rows.length > 0 && (
+          {/* STEP LEVEL EDIT BUTTON (PENCIL) */}
+          {isLocked && canEdit && (
             <button
               type="button"
               onClick={handleEnableStepEdit}
-              className="bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95 flex items-center gap-1.5 text-xs font-semibold shadow-2xs"
+              title="Edit Shop Deliveries"
+              aria-label="Edit Shop Deliveries"
+              className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95 flex items-center justify-center text-xs font-semibold shadow-2xs"
             >
-              <Pencil size={14} /> Edit Shop
+              <Pencil size={14} />
             </button>
           )}
 
@@ -211,13 +203,13 @@ export default function StepDeliveries({
             </span>
           ) : (
             <span className="text-xs text-blue-700 font-semibold bg-blue-50 px-3 py-1 rounded-full border border-blue-200 whitespace-nowrap">
-              {editingShopId ? "Editing Shop Details" : "Step Editing Enabled"}
+              {editingShopId ? "Editing Shop Details" : isStepEditing ? "Edit Mode Active" : "Step Unlocked"}
             </span>
           )}
         </div>
       </div>
 
-      {/* Main View rendering based on toggle selection */}
+      {/* Main Content View */}
       {viewMode === "shops" ? (
         <UnLoadingTable
           rows={rows}
@@ -226,15 +218,19 @@ export default function StepDeliveries({
           birdTypes={birdTypes}
           boxDetails={boxDetails}
           readOnly={isLocked}
+          isSubmitted={trip.deliveryStepSubmitted}
           editingShopId={editingShopId}
           onEditShop={handleStartEditShop}
-          onCancelEdit={handleCancelShopEdit}
+          onCancelEdit={handleCancelStepEdit}
           onSaveRow={handleSaveRow}
           tripNo={trip.tripNo}
           vehicleNo={trip.vehicleNo}
           supervisorName={trip.supervisorName}
           supervisorPhone=""
           tripDate={trip.tripDate}
+          updateDeliveries={updateDeliveries}
+          submitDeliveries={handleLockDeliveries}
+          onClose={handleCancelStepEdit}
         />
       ) : (
         <BoxWeightAnalysis
@@ -242,53 +238,11 @@ export default function StepDeliveries({
           deliveries={rows}
           dcWeight={trip.dcWeight}
           totalFarmBirds={trip.totalBirds}
-          /* SYNCED TRIP PROPS */
           tripNo={trip.tripNo}
           vehicleNo={trip.vehicleNo}
           supervisorName={trip.supervisorName}
           tripDate={trip.tripDate}
         />
-      )}
-
-      {/* Footer Controls */}
-      {!isLocked && !editingShopId && viewMode === "shops" && (
-        <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-slate-100">
-          {!trip.deliveryStepSubmitted &&
-            !editable &&
-            clearForm &&
-            !isStepEditing && (
-              <button
-                type="button"
-                onClick={clearForm}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all active:scale-95"
-              >
-                Clear Form
-              </button>
-            )}
-
-          {(editable || isStepEditing) && (
-            <button
-              type="button"
-              onClick={handleCancelStepEdit}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5"
-            >
-              <X size={14} /> Cancel Editing
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={handleLockDeliveries}
-            disabled={!canLock}
-            className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold text-white transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
-              canLock
-                ? "bg-blue-600 hover:bg-blue-700 shadow-sm"
-                : "bg-blue-400 cursor-not-allowed"
-            }`}
-          >
-            <CheckCircle size={14} /> Complete & Lock Deliveries
-          </button>
-        </div>
       )}
     </div>
   );

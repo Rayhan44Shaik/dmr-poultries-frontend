@@ -4,6 +4,7 @@ import {
   Plus, Trash2, Save, FileText, Loader2, AlertTriangle, Check, Camera, Download
 } from "lucide-react";
 import type { Trip, BoxDetail } from "../types/trip";
+import { getVehicles } from "../../../masters/vehicles/services/vehicleService";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import localforage from "localforage";
@@ -106,11 +107,11 @@ function ConfirmationModal({
 // ─── Toast notification ──────────────────────────────────────────────
 function Toast({ message, type = "success", onClose }: { message: string; type?: "success" | "error"; onClose: () => void }) {
   useEffect(() => {
-    const timer = setTimeout(onClose, 2000);
+    const timer = setTimeout(onClose, 2500);
     return () => clearTimeout(timer);
   }, [onClose]);
 
-  const bgColor = type === "success" ? "bg-slate-800" : "bg-red-500";
+  const bgColor = type === "success" ? "bg-slate-800" : "bg-red-600";
   const icon = type === "success" ? <Check size={18} className="text-white" /> : <AlertTriangle size={18} className="text-white" />;
 
   return (
@@ -141,6 +142,20 @@ export default function StepPickup({
     const details = trip.boxDetails || [];
     return details.length > 0 ? details.map((d) => ({ ...d, uid: generateUid() })) : [makeRow(1)];
   });
+
+  // ─── Fetch Vehicle Max Box Limit ───────────────────────────────────
+  const maxBoxes = useMemo(() => {
+    try {
+      const vehicles = getVehicles();
+      const matched = vehicles.find(
+        (v) =>
+          v.vehicleNumber?.trim().toLowerCase() === trip.vehicleNo?.trim().toLowerCase()
+      );
+      return matched?.noOfBoxes ?? 85; // Default max limit fallback if not specified
+    } catch {
+      return 85;
+    }
+  }, [trip.vehicleNo]);
 
   // ─── Image upload state ────────────────────────────────────────────
   const [imageKey, setImageKey] = useState<string | null>(trip.dcPhotoKey || null);
@@ -261,8 +276,15 @@ export default function StepPickup({
     };
   }, [rows, triggerAutoSave, isSubmitting, trip.pickupStepSubmitted]);
 
-  // ─── Row operations ─────────────────────────────────────────────────
+  // ─── Row operations with Max Box Limit Check ───────────────────────
   const addRow = () => {
+    if (rows.length >= maxBoxes) {
+      setToast({
+        message: `Box limit exceeded! Maximum allowed boxes for this vehicle is ${maxBoxes}.`,
+        type: "error",
+      });
+      return;
+    }
     if (rows.length > 0) {
       const lastRow = rows[rows.length - 1];
       if (lastRow.birds === 0 || lastRow.weight === 0) {
@@ -282,12 +304,15 @@ export default function StepPickup({
       return next.map((r, idx) => ({ ...r, boxNo: idx + 1 }));
     });
   };
+
   const updateRow = (uid: string, field: "birds" | "weight", value: number) => {
     setRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, [field]: value } : r)));
   };
+
   const blockScrollAndArrows = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
   };
+
   const getBoxDetails = (): BoxDetail[] => rows.map(({ uid, ...rest }) => rest);
 
   const isLastRowComplete = useMemo(() => {
@@ -550,7 +575,7 @@ export default function StepPickup({
       const summaryData = [
         ['Total DC Weight', totals.dcWeight.toFixed(2) + ' Kg'],
         ['Total Birds', totals.totalBirds],
-        ['Loaded Boxes', totals.boxes],
+        ['Loaded Boxes', `${totals.boxes} / ${maxBoxes}`],
         ['Average Weight', totals.avgWeight > 0 ? totals.avgWeight + ' Kg' : '—'],
       ];
       doc.setFontSize(9);
@@ -588,7 +613,7 @@ export default function StepPickup({
 
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
-        {/* Header Matching StepFarm Exact Styling */}
+        {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
           <div className="flex items-center gap-2.5">
             <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
@@ -614,27 +639,37 @@ export default function StepPickup({
           </div>
         </div>
 
-        {/* 5 Column Metric Cards Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4 pt-2">
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
-            <p className="text-xs text-slate-500 font-medium">Time</p>
-            <p className="font-semibold text-slate-900 mt-0.5 truncate">{trip.pickupLoadTime || "--"}</p>
+        {/* 5 Column Compact Deliveries-Style KPI Cards Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-2">
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Clock size={12} className="text-slate-500" /> Time
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{trip.pickupLoadTime || "--"}</span>
           </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
-            <p className="text-xs text-slate-500 font-medium">DC Wt</p>
-            <p className="font-semibold text-slate-900 mt-0.5">{trip.dcWeight.toFixed(2)} Kg</p>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Scale size={12} className="text-emerald-500" /> DC Wt
+            </span>
+            <span className="text-xs font-bold text-slate-800">{trip.dcWeight.toFixed(2)} Kg</span>
           </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
-            <p className="text-xs text-slate-500 font-medium">Birds</p>
-            <p className="font-semibold text-slate-900 mt-0.5">{trip.totalBirds}</p>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Bird size={12} className="text-blue-500" /> Birds
+            </span>
+            <span className="text-xs font-bold text-slate-800">{trip.totalBirds}</span>
           </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
-            <p className="text-xs text-slate-500 font-medium">Boxes</p>
-            <p className="font-semibold text-slate-900 mt-0.5">{trip.boxes}</p>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Box size={12} className="text-amber-500" /> Boxes
+            </span>
+            <span className="text-xs font-bold text-slate-800">{trip.boxes} / {maxBoxes}</span>
           </div>
-          <div className="bg-white border border-slate-200/80 p-4 rounded-xl">
-            <p className="text-xs text-slate-500 font-medium">Avg Wt</p>
-            <p className="font-semibold text-slate-900 mt-0.5">{trip.avgWeight || 0} Kg</p>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Gauge size={12} className="text-purple-500" /> Avg Wt
+            </span>
+            <span className="text-xs font-bold text-slate-800">{trip.avgWeight || 0} Kg</span>
           </div>
         </div>
 
@@ -899,17 +934,19 @@ export default function StepPickup({
         {/* Entry Table Container */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-600">Box entries (three per row)</span>
+            <span className="text-xs font-semibold text-slate-600">
+              Box entries (Max limit: {maxBoxes} boxes)
+            </span>
             <button
               type="button"
               onClick={addRow}
-              disabled={!isLastRowComplete}
+              disabled={!isLastRowComplete || rows.length >= maxBoxes}
               className={`flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-lg border transition-all active:scale-95 ${
-                isLastRowComplete
+                isLastRowComplete && rows.length < maxBoxes
                   ? "text-blue-700 bg-blue-50 hover:bg-blue-100 border-blue-200"
                   : "text-slate-400 bg-slate-50 border-slate-200 cursor-not-allowed"
               }`}
-              title={isLastRowComplete ? "Add a new box" : "Fill the current box first"}
+              title={rows.length >= maxBoxes ? `Max vehicle box limit (${maxBoxes}) reached` : isLastRowComplete ? "Add a new box" : "Fill the current box first"}
             >
               <Plus size={14} /> Add Box
             </button>
@@ -1012,28 +1049,39 @@ export default function StepPickup({
             {!isLastRowComplete && rows.length > 0 && (
               <span className="text-amber-600 ml-2">⚠️ Fill the current box before adding another.</span>
             )}
+            {rows.length >= maxBoxes && (
+              <span className="text-red-600 ml-2 font-bold">🚫 Box limit ({maxBoxes}) reached for this vehicle.</span>
+            )}
           </p>
         </div>
 
-        {/* Totals Summary Bar */}
+        {/* Totals Summary Bar - Deliveries Style KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
-          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center">
-            <p className="text-[10px] text-slate-500 font-medium">Boxes</p>
-            <p className="font-semibold text-slate-900 text-sm mt-0.5">{totals.boxes}</p>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Box size={12} className="text-amber-500" /> Boxes
+            </span>
+            <span className="text-xs font-bold text-slate-800">{totals.boxes} / {maxBoxes}</span>
           </div>
-          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center">
-            <p className="text-[10px] text-slate-500 font-medium">Birds</p>
-            <p className="font-semibold text-slate-900 text-sm mt-0.5">{totals.totalBirds}</p>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Bird size={12} className="text-blue-500" /> Birds
+            </span>
+            <span className="text-xs font-bold text-slate-800">{totals.totalBirds}</span>
           </div>
-          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center">
-            <p className="text-[10px] text-slate-500 font-medium">DC Wt</p>
-            <p className="font-semibold text-slate-900 text-sm mt-0.5">{totals.dcWeight.toFixed(2)}</p>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Scale size={12} className="text-emerald-500" /> DC Wt
+            </span>
+            <span className="text-xs font-bold text-slate-800">{totals.dcWeight.toFixed(2)} Kg</span>
           </div>
-          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center">
-            <p className="text-[10px] text-slate-500 font-medium">Avg Wt</p>
-            <p className="font-semibold text-slate-900 text-sm mt-0.5">
-              {totals.avgWeight > 0 ? totals.avgWeight : "—"}
-            </p>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Gauge size={12} className="text-purple-500" /> Avg Wt
+            </span>
+            <span className="text-xs font-bold text-slate-800">
+              {totals.avgWeight > 0 ? `${totals.avgWeight} Kg` : "—"}
+            </span>
           </div>
         </div>
 
