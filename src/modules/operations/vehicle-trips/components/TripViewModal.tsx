@@ -10,7 +10,7 @@ import StepStart from "./StepStart";
 import StepFarm from "./StepFarm";
 import StepPickup from "./StepPickup";
 import StepDeliveries from "./StepDeliveries";
-import StepEnd from "./StepEnd"; // ✅ Ensure this is imported
+import StepEnd from "./Step_5/StepEnd"; // ✅ Ensure this is imported
 import TripFinalKPI from "./TripFinalKPI";
 
 interface Props {
@@ -119,7 +119,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
   const noop = () => {};
   const noopDispatch = () => {};
 
-  // 🔹 UPDATED: Properly renders Step 5 even if the trip is Pending (but Step 4 is locked)
+  // 🔹 UPDATED: Properly renders steps with correct mock props matching their required definitions
   const renderViewStep = () => {
     if (viewStepIndex === 0 && isStartCompleted) {
       return <StepStart trip={trip} setTrip={noopDispatch} updateTrip={noop} submitStartStep={() => false} vehicleOptions={[]} employeeOptions={[]} />;
@@ -128,7 +128,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
       return <StepFarm trip={trip} setTrip={noopDispatch} updateTrip={noop} submitFarmStep={() => false} farms={[]} />;
     }
     if (viewStepIndex === 2 && isPickupCompleted) {
-      return <StepPickup trip={trip} setTrip={noopDispatch} updateTrip={noop} submitPickupStep={() => false} />;
+      return <StepPickup trip={trip} setTrip={noopDispatch} updateTrip={noop} submitPickupStep={() => false} updateBoxDetails={noop} />;
     }
     if (viewStepIndex === 3 && isDeliveryCompleted) {
       return <StepDeliveries rows={trip.deliveries || []} setRows={noopDispatch} shops={shops} birdTypes={birdTypes} trip={trip} updateDeliveries={noop} submitDeliveriesStep={() => false} clearForm={noop} readOnly={true} />;
@@ -136,9 +136,8 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
     if (viewStepIndex === 4 && isTripEnded) {
       return <div className="mt-8 bg-emerald-50 border border-emerald-200 rounded-2xl p-8 text-center"><h2 className="text-2xl font-bold text-emerald-700">🎉 Trip Completed Successfully</h2></div>;
     }
-    // ✅ NEW CONDITION: Shows Step 5 when Step 4 is locked, but the trip is still pending!
     if (viewStepIndex === 4 && !isTripEnded && isDeliveryCompleted) {
-      return <StepEnd trip={trip} setTrip={noopDispatch} updateTrip={noop} submitEndTrip={() => false} />;
+      return <StepEnd trip={trip} setTrip={noopDispatch} updateTrip={noop} />;
     }
     return <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">Select a completed step to view its details.</div>;
   };

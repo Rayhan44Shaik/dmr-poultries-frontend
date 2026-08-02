@@ -11,7 +11,7 @@ import StepStart from "../components/StepStart";
 import StepDeliveries from "../components/StepDeliveries";
 import StepFarm from "../components/StepFarm";
 import StepPickup from "../components/StepPickup";
-import StepEnd from "../components/StepEnd";
+import StepEnd from "../components/Step_5/StepEnd";
 import TripFinalKPI from "../components/TripFinalKPI";
 
 // --- Hooks ---
