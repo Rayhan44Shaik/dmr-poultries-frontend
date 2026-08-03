@@ -15,7 +15,11 @@
     "electron:dist:win": "electron-builder --win",
     "electron:dist:mac": "electron-builder --mac",
     "electron:dist:linux": "electron-builder --linux",
-    "electron:dist:all": "electron-builder --mac --win --linux"
+    "electron:dist:all": "electron-builder --mac --win --linux",
+    "backend:install": "npm install --prefix backend",
+    "backend:dev": "npm run dev --prefix backend",
+    "backend:migrate": "npm run db:migrate --prefix backend",
+    "backend:seed": "npm run db:seed --prefix backend"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
