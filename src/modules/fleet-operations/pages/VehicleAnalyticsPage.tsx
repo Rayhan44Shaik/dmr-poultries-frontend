@@ -1,4 +1,3 @@
-// src/modules/fleet-operations/pages/VehicleAnalyticsPage.tsx
 import { memo } from 'react';
 import { useAnalyticsData } from '../hooks/useAnalyticsData';
 import ErrorBoundary from '../components/common/ErrorBoundary';
@@ -9,7 +8,11 @@ import HighestExpenseTable from '../components/analytics/HighestExpenseTable';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp, Fuel, DollarSign, Gauge } from 'lucide-react';
 
-const VehicleAnalyticsPage = () => {
+interface VehicleAnalyticsPageProps {
+  embedded?: boolean;
+}
+
+const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) => {
   const {
     stats,
     weeklyData,
@@ -30,8 +33,10 @@ const VehicleAnalyticsPage = () => {
 
   return (
     <ErrorBoundary>
-      {/* Updated outer container with reduced horizontal padding & increased vertical spacing */}
-      <div className="px-1 md:px-3 py-6 md:py-8 space-y-6 max-w-7xl mx-auto bg-slate-50 min-h-screen">
+      {/* Updated outer container without max-w constraints for perfect embedded layout */}
+      <div className={`w-full space-y-6 animate-in fade-in duration-500 ${
+        embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
+      }`}>
         {/* Period Selector – placed above KPI cards */}
         <div className="flex justify-end items-center gap-2">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Report Timeline:</span>

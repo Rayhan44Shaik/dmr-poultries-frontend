@@ -1,5 +1,3 @@
-// D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\accounts\pages\FarmPaymentPage.tsx
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { FarmPaymentTable } from '../components/farm-payment/FarmPaymentTable';
@@ -346,7 +344,9 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
 
   // ----- render -----
   const content = (
-    <div className="p-4 sm:p-6 space-y-5 max-w-7xl mx-auto bg-slate-50 min-h-screen">
+    <div className={`w-full space-y-5 animate-in fade-in duration-500 ${
+      embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
+    }`}>
       {/* KPI Cards - Only show when filters are active */}
       {isFilterActive && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -489,5 +489,5 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     </div>
   );
 
-  return embedded ? content : content;
+  return content;
 }

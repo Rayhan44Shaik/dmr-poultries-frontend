@@ -14,10 +14,12 @@ import {
   CheckCircle,
   AlertCircle,
 } from "lucide-react";
-import type { Trip } from "../../types/trip";
+import type { Trip, TripStatus } from "../../types/trip";
 import { tripService } from "../../services/tripService";
 import GeneralExpensesTable from "./GeneralExpensesTable";
 import DieselExpensesTable from "./DieselExpensesTable";
+import { fuelExpenseService } from "../../../fuel-expenses/services/fuelExpenseService";
+import type { FuelExpense } from "../../../fuel-expenses/types/fuelExpense";
 
 // ─── Toast Component ──────────────────────────────────────────────
 function Toast({ message, type = "success", onClose }: {
@@ -112,36 +114,6 @@ interface SheetData extends Record<string, any> {
   startMeter: number | string;
   endMeter: number | string;
   destinationTolls: number | string;
-  dieselLtr1: number | string;
-  dieselRate1: number | string;
-  dieselMeter1: number | string;
-  dieselBunk1: string;
-  dieselImage1: string;
-  dieselLtr2: number | string;
-  dieselRate2: number | string;
-  dieselMeter2: number | string;
-  dieselBunk2: string;
-  dieselImage2: string;
-  dieselLtr3: number | string;
-  dieselRate3: number | string;
-  dieselMeter3: number | string;
-  dieselBunk3: string;
-  dieselImage3: string;
-  dieselLtr4: number | string;
-  dieselRate4: number | string;
-  dieselMeter4: number | string;
-  dieselBunk4: string;
-  dieselImage4: string;
-  dieselLtr5: number | string;
-  dieselRate5: number | string;
-  dieselMeter5: number | string;
-  dieselBunk5: string;
-  dieselImage5: string;
-  dieselLtr6: number | string;
-  dieselRate6: number | string;
-  dieselMeter6: number | string;
-  dieselBunk6: string;
-  dieselImage6: string;
   remarks: string;
 }
 
@@ -171,7 +143,6 @@ export default function StepEnd({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null);
   const [confirmation, setConfirmation] = useState<{
     isOpen: boolean;
@@ -192,58 +163,38 @@ export default function StepEnd({
 
   // ─── Local isSubmitted state ─────────────────────────────────────
   const [isSubmittedLocal, setIsSubmittedLocal] = useState(false);
-  const isSubmitted = Boolean((trip as any).expensesStepSubmitted || isSubmittedLocal);
+  const isSubmitted = Boolean((trip as any).expensesStepSubmitted || (trip as any).endStepSubmitted || isSubmittedLocal);
 
   // ─── Helper to build sheet data from trip ──────────────────────
-  const buildSheetDataFromTrip = (tripData: Trip): SheetData => ({
-    vehicleNo: tripData.vehicleNo || "",
-    submittedAtTimestamp: (tripData as any).submittedAtTimestamp || (tripData as any).submittedAt || "",
-    advance: tripData.advanceAmount ?? "",
-    meals: (tripData as any).meals ?? "",
-    loading: (tripData as any).loading ?? "",
-    mealsTiffin: (tripData as any).mealsTiffin ?? "",
-    vehicleMaintenance: (tripData as any).vehicleMaintenance ?? "",
-    othersRC: (tripData as any).othersRC ?? "",
-    others1Amt: (tripData as any).others1Amt ?? "",
-    others2Amt: (tripData as any).others2Amt ?? "",
-    others3Amt: (tripData as any).others3Amt ?? "",
-    others4Amt: (tripData as any).others4Amt ?? "",
-    others5Amt: (tripData as any).others5Amt ?? "",
-    startMeter: tripData.openingMeter || 0,
-    endMeter: (tripData as any).endMeter ?? (tripData as any).closingMeter ?? "",
-    destinationTolls: (tripData as any).destinationTolls ?? (tripData as any).deliveryTolls ?? "",
-    dieselLtr1: (tripData as any).dieselLtr1 ?? "",
-    dieselRate1: (tripData as any).dieselRate1 ?? "",
-    dieselMeter1: (tripData as any).dieselMeter1 ?? "",
-    dieselBunk1: (tripData as any).dieselBunk1 ?? "",
-    dieselImage1: (tripData as any).dieselImage1 ?? "",
-    dieselLtr2: (tripData as any).dieselLtr2 ?? "",
-    dieselRate2: (tripData as any).dieselRate2 ?? "",
-    dieselMeter2: (tripData as any).dieselMeter2 ?? "",
-    dieselBunk2: (tripData as any).dieselBunk2 ?? "",
-    dieselImage2: (tripData as any).dieselImage2 ?? "",
-    dieselLtr3: (tripData as any).dieselLtr3 ?? "",
-    dieselRate3: (tripData as any).dieselRate3 ?? "",
-    dieselMeter3: (tripData as any).dieselMeter3 ?? "",
-    dieselBunk3: (tripData as any).dieselBunk3 ?? "",
-    dieselImage3: (tripData as any).dieselImage3 ?? "",
-    dieselLtr4: (tripData as any).dieselLtr4 ?? "",
-    dieselRate4: (tripData as any).dieselRate4 ?? "",
-    dieselMeter4: (tripData as any).dieselMeter4 ?? "",
-    dieselBunk4: (tripData as any).dieselBunk4 ?? "",
-    dieselImage4: (tripData as any).dieselImage4 ?? "",
-    dieselLtr5: (tripData as any).dieselLtr5 ?? "",
-    dieselRate5: (tripData as any).dieselRate5 ?? "",
-    dieselMeter5: (tripData as any).dieselMeter5 ?? "",
-    dieselBunk5: (tripData as any).dieselBunk5 ?? "",
-    dieselImage5: (tripData as any).dieselImage5 ?? "",
-    dieselLtr6: (tripData as any).dieselLtr6 ?? "",
-    dieselRate6: (tripData as any).dieselRate6 ?? "",
-    dieselMeter6: (tripData as any).dieselMeter6 ?? "",
-    dieselBunk6: (tripData as any).dieselBunk6 ?? "",
-    dieselImage6: (tripData as any).dieselImage6 ?? "",
-    remarks: (tripData as any).remarks ?? "",
-  });
+  const buildSheetDataFromTrip = (tripData: Trip): SheetData => {
+    const data: SheetData = {
+      vehicleNo: tripData.vehicleNo || "",
+      submittedAtTimestamp: (tripData as any).submittedAtTimestamp || (tripData as any).submittedAt || "",
+      advance: tripData.advanceAmount ?? "",
+      meals: (tripData as any).meals ?? "",
+      loading: (tripData as any).loading ?? "",
+      mealsTiffin: (tripData as any).mealsTiffin ?? "",
+      vehicleMaintenance: (tripData as any).vehicleMaintenance ?? "",
+      othersRC: (tripData as any).othersRC ?? "",
+      others1Amt: (tripData as any).others1Amt ?? "",
+      others2Amt: (tripData as any).others2Amt ?? "",
+      others3Amt: (tripData as any).others3Amt ?? "",
+      others4Amt: (tripData as any).others4Amt ?? "",
+      others5Amt: (tripData as any).others5Amt ?? "",
+      startMeter: tripData.openingMeter || 0,
+      endMeter: (tripData as any).endMeter ?? (tripData as any).closingMeter ?? "",
+      destinationTolls: (tripData as any).destinationTolls ?? (tripData as any).deliveryTolls ?? "",
+      remarks: (tripData as any).remarks ?? "",
+    };
+    // Copy all diesel fields from trip
+    Object.keys(tripData).forEach(key => {
+      if (key.startsWith("dieselLtr") || key.startsWith("dieselRate") || key.startsWith("dieselMeter") ||
+          key.startsWith("dieselBunk") || key.startsWith("dieselImage") || key.startsWith("dieselImageName")) {
+        (data as any)[key] = (tripData as any)[key];
+      }
+    });
+    return data;
+  };
 
   // ─── Sheet Data state ───────────────────────────────────────────
   const [sheetData, setSheetData] = useState<SheetData>(() => buildSheetDataFromTrip(trip));
@@ -274,10 +225,27 @@ export default function StepEnd({
     totalDistanceCovered = endMeterNum - openingMeter;
   }
 
-  let totalDieselLiters = 0;
-  for (let i = 1; i <= 6; i++) {
-    totalDieselLiters += Number(sheetData[`dieselLtr${i}`] || 0);
-  }
+  // ─── Dynamically compute diesel totals from all rows ────────────
+  const getDieselIndices = (data: SheetData): number[] => {
+    const indices: number[] = [];
+    Object.keys(data).forEach(key => {
+      const match = key.match(/^dieselLtr(\d+)$/);
+      if (match) {
+        const idx = parseInt(match[1], 10);
+        if (!indices.includes(idx)) indices.push(idx);
+      }
+    });
+    return indices.sort((a,b) => a - b);
+  };
+
+  const dieselIndices = getDieselIndices(sheetData);
+  const dieselAmounts = dieselIndices.map(idx => {
+    const ltr = Number(sheetData[`dieselLtr${idx}`] || 0);
+    const rate = Number(sheetData[`dieselRate${idx}`] || 0);
+    return ltr * rate;
+  });
+  const totalDieselAmount = dieselAmounts.reduce((acc, curr) => acc + curr, 0);
+  const totalDieselLiters = dieselIndices.reduce((acc, idx) => acc + Number(sheetData[`dieselLtr${idx}`] || 0), 0);
 
   let averageKmLtr = "0.00";
   if (totalDistanceCovered > 0 && totalDieselLiters > 0) {
@@ -294,6 +262,8 @@ export default function StepEnd({
         advanceAmount: data.advance === "" ? 0 : Number(data.advance),
         openingMeter: openingMeter,
         expensesStepSubmitted: stepSubmitted,
+        endStepSubmitted: stepSubmitted, // ✅ Ensure endStepSubmitted is set
+        status: stepSubmitted ? "Completed" : trip.status, // ✅ FIXED: Mark trip as Completed if step is submitted
       };
       const updatedTrip = { ...trip, ...payload };
       tripService.update(updatedTrip);
@@ -351,16 +321,6 @@ export default function StepEnd({
 
   const totalAllExpenses = totalExpenses1 + totalExpenses2;
 
-  const dieselAmounts = [
-    Number(sheetData.dieselLtr1 || 0) * Number(sheetData.dieselRate1 || 0),
-    Number(sheetData.dieselLtr2 || 0) * Number(sheetData.dieselRate2 || 0),
-    Number(sheetData.dieselLtr3 || 0) * Number(sheetData.dieselRate3 || 0),
-    Number(sheetData.dieselLtr4 || 0) * Number(sheetData.dieselRate4 || 0),
-    Number(sheetData.dieselLtr5 || 0) * Number(sheetData.dieselRate5 || 0),
-    Number(sheetData.dieselLtr6 || 0) * Number(sheetData.dieselRate6 || 0),
-  ];
-  const totalDieselAmount = dieselAmounts.reduce((acc, curr) => acc + curr, 0);
-
   const remainingBalance =
     Number(sheetData.advance || 0) - totalAllExpenses - totalDieselAmount;
 
@@ -377,6 +337,15 @@ export default function StepEnd({
       hour12: true,
     });
 
+    let newStatus: TripStatus = trip.status || "Draft";
+    if (stepSubmitted) {
+      if (trip.status !== "Deleted") {
+        newStatus = "Completed"; // ✅ FIXED: End step signifies trip completion
+      } else {
+        newStatus = "Deleted";
+      }
+    }
+
     return {
       ...sheetData,
       submittedAtTimestamp: capturedTimestamp,
@@ -389,8 +358,56 @@ export default function StepEnd({
       advanceAmount: sheetData.advance === "" ? 0 : Number(sheetData.advance),
       openingMeter: openingMeter,
       expensesStepSubmitted: stepSubmitted,
+      endStepSubmitted: stepSubmitted, // ✅ Explicitly set endStepSubmitted
+      status: newStatus,
     };
   };
+
+  // ─── Sync fuel bills after submission ──────────────────────────
+  const syncFuelBillsOnSubmit = useCallback((data: SheetData) => {
+    const indices = getDieselIndices(data);
+    if (indices.length === 0) return;
+
+    const existingBills = fuelExpenseService.getBillsForTrip(trip.vehicleId, trip.tripDate);
+    const existingKeys = new Set<string>();
+    existingBills.forEach(b => {
+      const key = `${b.amount}-${b.meterReading}-${b.petrolBunk}`;
+      existingKeys.add(key);
+    });
+
+    indices.forEach(idx => {
+      const ltr = Number(data[`dieselLtr${idx}`] || 0);
+      const rate = Number(data[`dieselRate${idx}`] || 0);
+      const meter = Number(data[`dieselMeter${idx}`] || 0);
+      const bunk = data[`dieselBunk${idx}`] || "";
+      const image = data[`dieselImage${idx}`] || "";
+      if (!ltr || !rate || !meter || !bunk) return;
+
+      const amount = ltr * rate;
+      const key = `${amount}-${meter}-${bunk}`;
+      if (existingKeys.has(key)) return;
+
+      const fuelBill: Omit<FuelExpense, "id" | "billNo" | "createdDate" | "createdBy" | "status"> = {
+        date: trip.tripDate,
+        vehicleId: trip.vehicleId,
+        vehicleNo: trip.vehicleNo,
+        driverId: trip.driverId,
+        driverName: trip.driverName,
+        supervisorId: trip.supervisorId,
+        supervisorName: trip.supervisorName,
+        meterReading: meter,
+        amount: amount,
+        rate: rate,
+        litres: ltr,
+        petrolBunk: bunk,
+        remarks: `Auto-created from trip ${trip.tripNo}`,
+        image: image,
+        synced: true,
+      };
+
+      fuelExpenseService.save(fuelBill);
+    });
+  }, [trip]);
 
   // ─── Save progress (manual) ──────────────────────────────────────
   const handleSaveProgress = () => {
@@ -437,7 +454,6 @@ export default function StepEnd({
       return;
     }
 
-    // ✅ FIX: Require destination tolls > 0 (not just non‑empty)
     const destTollsNum = Number(sheetData.destinationTolls);
     if (sheetData.destinationTolls === "" || sheetData.destinationTolls === null || isNaN(destTollsNum) || destTollsNum <= 0) {
       setErrorMsg("Total Toll Gates (Destination) must be greater than 0.");
@@ -450,7 +466,7 @@ export default function StepEnd({
       title: isSubmitted ? "Update Expenses Sheet" : "Submit Expenses Sheet",
       message: isSubmitted
         ? "Are you sure you want to update the submitted expenses sheet with recent changes?"
-        : "Are you sure you want to submit this expenses sheet? This will lock current entries.",
+        : "Are you sure you want to submit this expenses sheet? This will mark the trip as completed and lock current entries.",
       confirmLabel: isSubmitted ? "Yes, Update" : "Yes, Submit",
       cancelLabel: "Cancel",
       type: "info",
@@ -474,12 +490,13 @@ export default function StepEnd({
         if (result === false) success = false;
       }
       if (success) {
+        // ✅ Save and update parent state
         immediateSave(finalData as any);
         setSheetData(finalData as any);
         setIsLocalEditing(false);
         setIsSubmittedLocal(true);
-        setShowSuccessModal(true);
-        setToast({ message: "Expenses sheet successfully submitted!", type: "success" });
+        syncFuelBillsOnSubmit(finalData as any);
+        setToast({ message: "Expenses sheet submitted successfully! Trip marked as completed.", type: "success" });
       } else {
         setErrorMsg("Failed to save step details.");
         setToast({ message: "Failed to save step details.", type: "error" });
@@ -514,20 +531,8 @@ export default function StepEnd({
         .sheet-joined-table input { width: 100%; outline: none; background: transparent; font-size: 0.8125rem; color: #0f172a; font-weight: 500; padding: 2px; text-align: left !important; }
       `}</style>
 
-      {showSuccessModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-lg space-y-4">
-            <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto"><CheckCircle2 size={28} /></div>
-            <div>
-              <h3 className="text-lg font-bold text-slate-800">Expenses Saved!</h3>
-              <p className="text-xs text-slate-500 mt-1">Expenses Sheet & Trip details have been updated successfully.</p>
-            </div>
-            <button onClick={() => { setShowSuccessModal(false); if (onCancel) onCancel(); }} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all">Done & Close</button>
-          </div>
-        </div>
-      )}
-
       {isSubmitted && !isLocalEditing ? (
+        // ─── Locked View ──────────────────────────────────────────────
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-3">
             <div className="flex items-center gap-2">
@@ -535,18 +540,45 @@ export default function StepEnd({
               <h2 className="text-sm font-bold text-slate-800 tracking-tight">EXPENSES SHEET (SUBMITTED)</h2>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {canEdit && <button onClick={() => setIsLocalEditing(true)} className="bg-white hover:bg-slate-50 p-1.5 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95 flex items-center gap-1 text-xs font-semibold"><Pencil size={13} /> Edit</button>}
-              <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap">Completed & Saved</span>
+              {canEdit && (
+                <button
+                  onClick={() => setIsLocalEditing(true)}
+                  className="bg-white hover:bg-slate-50 p-1.5 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
+                  title="Edit"
+                >
+                  <Pencil size={14} />
+                </button>
+              )}
+              <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap">
+                Submitted & Locked
+              </span>
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
-            <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg"><p className="text-[11px] text-slate-500 font-medium">Date & Time</p><p className="text-xs font-semibold text-slate-900 mt-0.5">{sheetData.submittedAtTimestamp || "--"}</p></div>
-            <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg"><p className="text-[11px] text-slate-500 font-medium">Vehicle No</p><p className="text-xs font-semibold text-slate-900 mt-0.5">{sheetData.vehicleNo || "--"}</p></div>
-            <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg"><p className="text-[11px] text-slate-500 font-medium">Total Expenses</p><p className="text-xs font-semibold text-red-600 mt-0.5">₹{totalAllExpenses.toFixed(2)}</p></div>
-            <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg"><p className="text-[11px] text-slate-500 font-medium">Remaining Balance</p><p className="text-xs font-semibold text-emerald-600 mt-0.5">₹{remainingBalance.toFixed(2)}</p></div>
+            <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
+              <p className="text-[11px] text-slate-500 font-medium">Date & Time</p>
+              <p className="text-xs font-semibold text-slate-900 mt-0.5">{sheetData.submittedAtTimestamp || "--"}</p>
+            </div>
+            <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
+              <p className="text-[11px] text-slate-500 font-medium">Vehicle No</p>
+              <p className="text-xs font-semibold text-slate-900 mt-0.5">{sheetData.vehicleNo || "--"}</p>
+            </div>
+            <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
+              <p className="text-[11px] text-slate-500 font-medium">Total Expenses</p>
+              <p className="text-xs font-semibold text-red-600 mt-0.5">₹{totalAllExpenses.toFixed(2)}</p>
+            </div>
+            <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
+              <p className="text-[11px] text-slate-500 font-medium">Total Diesel</p>
+              <p className="text-xs font-semibold text-blue-600 mt-0.5">₹{totalDieselAmount.toFixed(2)}</p>
+            </div>
+            <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
+              <p className="text-[11px] text-slate-500 font-medium">Remaining Balance</p>
+              <p className="text-xs font-semibold text-emerald-600 mt-0.5">₹{remainingBalance.toFixed(2)}</p>
+            </div>
           </div>
         </div>
       ) : (
+        // ─── Editable View ────────────────────────────────────────────
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
             <div className="flex items-center gap-2">

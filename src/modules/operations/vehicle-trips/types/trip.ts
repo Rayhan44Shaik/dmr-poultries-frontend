@@ -35,6 +35,7 @@ export interface Trip {
   supervisorName: string;
   advanceAmount: number; 
   helpers: string[];
+  loaders?: string[];
   openingMeter: number;
   startStepSubmitted: boolean;
 
@@ -90,6 +91,7 @@ export interface Trip {
   deleted?: boolean;
   deletedReason?: string;
   dcPhotoKey?: string;
+  approvedBy?: string;
 }
 
 export interface BoxDetail {

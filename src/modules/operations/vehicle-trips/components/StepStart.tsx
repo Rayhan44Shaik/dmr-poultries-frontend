@@ -1,3 +1,5 @@
+// src/modules/operations/vehicle-trips/components/StepStart.tsx
+
 import React, { useState, useEffect } from "react";
 import { Clock, User, Truck, Gauge, Wallet, Pencil, X, AlertCircle } from "lucide-react";
 import Select from "react-select";
@@ -38,6 +40,7 @@ export default function StepStart({
   const driverOptions = employeeOptions.filter((e) => e.department === "Driver");
   const supervisorOptions = employeeOptions.filter((e) => e.department === "Supervisor");
   const helperOptions = employeeOptions.filter((e) => e.department === "Helper" || e.department === "Labor");
+  const loaderOptions = employeeOptions.filter((e) => e.department === "Loader");
 
   useEffect(() => {
     if (!trip.vehicleId) {
@@ -83,6 +86,11 @@ export default function StepStart({
   const handleHelpersChange = (selectedOptions: any) => {
     const helpers = selectedOptions ? selectedOptions.map((opt: any) => opt.employeeName) : [];
     updateTrip({ helpers });
+  };
+
+  const handleLoadersChange = (selectedOptions: any) => {
+    const loaders = selectedOptions ? selectedOptions.map((opt: any) => opt.employeeName) : [];
+    updateTrip({ loaders } as Partial<Trip>);
   };
 
   const handleSubmit = async () => {
@@ -225,11 +233,21 @@ export default function StepStart({
             <span className="text-xs font-bold text-slate-800">₹{(trip.advanceAmount ?? 0).toLocaleString()}</span>
           </div>
 
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-2 lg:col-span-2">
+          {/* ─── Helpers & Loaders side‑by‑side ────────────────────── */}
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <User size={12} className="text-slate-500" /> Helpers
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{trip.helpers?.join(", ") || "--"}</span>
+          </div>
+
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <User size={12} className="text-amber-500" /> Loaders
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">
+              {(trip as any).loaders?.join(", ") || "--"}
+            </span>
           </div>
         </div>
 
@@ -268,6 +286,7 @@ export default function StepStart({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 sm:gap-x-6 gap-y-4 sm:gap-y-5">
+          {/* Start Time */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Clock size={14} className="text-slate-400" /> Start Time <span className="text-red-500">*</span>
@@ -277,6 +296,7 @@ export default function StepStart({
             </div>
           </div>
 
+          {/* Vehicle */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Truck size={14} className="text-slate-400" /> Vehicle No. <span className="text-red-500">*</span>
@@ -295,6 +315,7 @@ export default function StepStart({
             />
           </div>
 
+          {/* Supervisor */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <User size={14} className="text-slate-400" /> Supervisor <span className="text-red-500">*</span>
@@ -313,6 +334,7 @@ export default function StepStart({
             />
           </div>
 
+          {/* Driver */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <User size={14} className="text-slate-400" /> Driver <span className="text-red-500">*</span>
@@ -331,6 +353,7 @@ export default function StepStart({
             />
           </div>
 
+          {/* Starting Meter */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Gauge size={14} className="text-slate-400" /> Starting Meter (KM) <span className="text-red-500">*</span>
@@ -365,6 +388,7 @@ export default function StepStart({
             )}
           </div>
 
+          {/* Advance Amount */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Wallet size={14} className="text-slate-400" /> Advance / Expenses <span className="text-red-500">*</span>
@@ -394,23 +418,47 @@ export default function StepStart({
             )}
           </div>
 
+          {/* ─── Helpers & Loaders side‑by‑side ────────────────────── */}
           <div className="col-span-1 sm:col-span-2">
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-              <User size={14} className="text-slate-400" /> Helpers
-            </label>
-            <Select
-              options={helperOptions}
-              getOptionLabel={(e) => e?.employeeName || ""}
-              getOptionValue={(e) => e?.employeeName || ""}
-              value={helperOptions.filter((o) => trip.helpers?.includes(o.employeeName)) || []}
-              onChange={handleHelpersChange}
-              className="mt-1 text-sm"
-              placeholder="Select helpers..."
-              isMulti
-              isSearchable
-              styles={selectStyles}
-              menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                  <User size={14} className="text-slate-400" /> Helpers
+                </label>
+                <Select
+                  options={helperOptions}
+                  getOptionLabel={(e) => e?.employeeName || ""}
+                  getOptionValue={(e) => e?.employeeName || ""}
+                  value={helperOptions.filter((o) => trip.helpers?.includes(o.employeeName)) || []}
+                  onChange={handleHelpersChange}
+                  className="mt-1 text-sm"
+                  placeholder="Select helpers..."
+                  isMulti
+                  isSearchable
+                  styles={selectStyles}
+                  menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                  <User size={14} className="text-amber-500" /> Loaders
+                </label>
+                <Select
+                  options={loaderOptions}
+                  getOptionLabel={(e) => e?.employeeName || ""}
+                  getOptionValue={(e) => e?.employeeName || ""}
+                  value={loaderOptions.filter((o) => (trip as any).loaders?.includes(o.employeeName)) || []}
+                  onChange={handleLoadersChange}
+                  className="mt-1 text-sm"
+                  placeholder="Select loaders..."
+                  isMulti
+                  isSearchable
+                  styles={selectStyles}
+                  menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                />
+              </div>
+            </div>
           </div>
         </div>
 

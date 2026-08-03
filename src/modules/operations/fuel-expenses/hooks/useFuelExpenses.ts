@@ -1,3 +1,5 @@
+// src/modules/operations/fuel-expenses/hooks/useFuelExpenses.ts
+
 import { useEffect, useMemo, useState } from "react";
 import { fuelExpenseService } from "../services/fuelExpenseService";
 import type { FuelExpense } from "../types/fuelExpense";
@@ -7,6 +9,7 @@ type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void
 export function useFuelExpenses(showNotification?: NotificationFn) {
   const [expenses, setExpenses] = useState<FuelExpense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
@@ -41,7 +44,6 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     const pendingCount = filteredData.filter((e) => e.status === "Pending").length;
     const approvedCount = filteredData.filter((e) => e.status === "Approved").length;
 
-    // Avg Efficiency (KM/L)
     const vehicleBills = new Map<number, FuelExpense[]>();
     filteredData.forEach((bill) => {
       if (!vehicleBills.has(bill.vehicleId)) {
@@ -66,7 +68,6 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     });
     const avgMileage = efficiencyCount > 0 ? totalEfficiency / efficiencyCount : null;
 
-    // Recent Trip Mileage: only when exactly one vehicle is selected
     let recentTripMileage = null;
     if (selectedVehicles.length === 1) {
       const vehicle = selectedVehicles[0];
@@ -96,8 +97,9 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
   const totalPages = Math.ceil(filteredData.length / pageSize);
   const paginatedData = filteredData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  // CRUD methods unchanged
+  // ─── CRUD with saving state ──────────────────────────────────────
   const saveExpense = (expense: Omit<FuelExpense, "id" | "billNo" | "createdDate" | "createdBy" | "status">) => {
+    setIsSaving(true);
     const ok = fuelExpenseService.save(expense);
     if (ok) {
       showNotification?.("Fuel bill saved successfully!", "success");
@@ -105,10 +107,12 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     } else {
       showNotification?.("Failed to save fuel bill.", "error");
     }
+    setIsSaving(false);
     return ok;
   };
 
   const updateExpense = (id: string, updates: Partial<FuelExpense>) => {
+    setIsSaving(true);
     const ok = fuelExpenseService.update(id, updates);
     if (ok) {
       showNotification?.("Fuel bill updated successfully!", "success");
@@ -116,10 +120,12 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     } else {
       showNotification?.("Edit not allowed (approved or older than 10 days).", "error");
     }
+    setIsSaving(false);
     return ok;
   };
 
   const deleteExpense = (id: string) => {
+    setIsSaving(true);
     const ok = fuelExpenseService.remove(id);
     if (ok) {
       showNotification?.("Fuel bill deleted successfully!", "success");
@@ -127,10 +133,12 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     } else {
       showNotification?.("Delete not allowed (approved or older than 10 days).", "error");
     }
+    setIsSaving(false);
     return ok;
   };
 
   const approveExpense = (id: string) => {
+    setIsSaving(true);
     const ok = fuelExpenseService.approve(id);
     if (ok) {
       showNotification?.("Fuel bill approved successfully!", "success");
@@ -138,6 +146,7 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     } else {
       showNotification?.("Failed to approve fuel bill.", "error");
     }
+    setIsSaving(false);
     return ok;
   };
 
@@ -164,6 +173,7 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     resetFilters,
     refresh,
     loading,
+    isSaving,        // ← new
     filteredSummary,
     saveExpense,
     updateExpense,

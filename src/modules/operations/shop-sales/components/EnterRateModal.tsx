@@ -1,5 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { X, Truck, CalendarDays, Store, Package, Scale, IndianRupee, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  X,
+  Truck,
+  CalendarDays,
+  Store,
+  Package,
+  Scale,
+  IndianRupee,
+  CheckCircle2,
+  AlertCircle,
+  TrendingUp,
+  Info
+} from "lucide-react";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 
 interface Props {
@@ -14,6 +26,14 @@ export default function EnterRateModal({ open, trip, onClose, onSave }: Props) {
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  // ─── MARKET RATES STATE (READ-ONLY REFERENCE) ───
+  const [showMarketRates, setShowMarketRates] = useState(true);
+  const [referenceDays, setReferenceDays] = useState<Array<{ label: string; dateStr: string }>>([]);
+  const [tableOneData, setTableOneData] = useState<Record<string, Record<string, string>>>({});
+  const [tableTwoData, setTableTwoData] = useState<Record<string, Record<string, string>>>({});
+  const [summaryData, setSummaryData] = useState<Record<string, Record<string, string>>>({});
+
+  // 1. Initialize Trip Deliveries & Compute 3-Day Window for Market Rates
   useEffect(() => {
     if (!trip) return;
     setShowSuccessToast(false);
@@ -26,8 +46,36 @@ export default function EnterRateModal({ open, trip, onClose, onSave }: Props) {
         amount: isModify ? ((d as any).amount ?? 0) : 0,
       }))
     );
+
+    // Calculate 3-Day Range (Yesterday, Trip Date, Tomorrow)
+    const tripDateObj = new Date(trip.tripDate);
+    const days = [];
+    
+    for (let i = -1; i <= 1; i++) {
+      const d = new Date(tripDateObj);
+      d.setDate(tripDateObj.getDate() + i);
+      days.push({
+        label: d.getDate().toString().padStart(2, "0"), // Shows as "03", "04", "05" etc.
+        dateStr: d.toISOString().split("T")[0],
+      });
+    }
+    setReferenceDays(days);
+
+    // Load persistent rates (Read-only)
+    const savedYearlyRates = localStorage.getItem("yearly_market_rates_store");
+    if (savedYearlyRates) {
+      try {
+        const parsed = JSON.parse(savedYearlyRates);
+        setTableOneData(parsed.tableOne || {});
+        setTableTwoData(parsed.tableTwo || {});
+        setSummaryData(parsed.summary || {});
+      } catch (e) {
+        console.error("Error loading stored rates", e);
+      }
+    }
   }, [trip]);
 
+  // ─── CALCULATIONS ───
   const totalBirds = useMemo(() => deliveries.reduce((sum, row) => sum + row.birds, 0), [deliveries]);
   const totalWeight = useMemo(() => deliveries.reduce((sum, row) => sum + row.weight, 0), [deliveries]);
   const grandAmount = useMemo(() => deliveries.reduce((sum, row) => sum + ((row as any).amount || 0), 0), [deliveries]);
@@ -47,16 +95,13 @@ export default function EnterRateModal({ open, trip, onClose, onSave }: Props) {
   const confirmSave = () => {
     setShowConfirm(false);
     setShowSuccessToast(true);
-
     setTimeout(() => {
       onSave(deliveries);
       onClose();
     }, 1200);
   };
 
-  const cancelSave = () => {
-    setShowConfirm(false);
-  };
+  const cancelSave = () => setShowConfirm(false);
 
   if (!open || !trip) return null;
 
@@ -64,17 +109,12 @@ export default function EnterRateModal({ open, trip, onClose, onSave }: Props) {
     <>
       <style>{`
         .no-spinner::-webkit-inner-spin-button,
-        .no-spinner::-webkit-outer-spin-button {
-          -webkit-appearance: none;
-          margin: 0;
-        }
-        .no-spinner {
-          -moz-appearance: textfield;
-        }
+        .no-spinner::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        .no-spinner { -moz-appearance: textfield; }
       `}</style>
 
       <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
-        {/* ── Success Toast (no blur) ── */}
+        {/* Success Toast */}
         {showSuccessToast && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20 transition-all">
             <div className="bg-white rounded-2xl shadow-2xl border border-emerald-100 p-6 flex flex-col items-center gap-3 animate-in fade-in zoom-in duration-200">
@@ -89,7 +129,7 @@ export default function EnterRateModal({ open, trip, onClose, onSave }: Props) {
           </div>
         )}
 
-        {/* ── Confirmation Modal (no blur) ── */}
+        {/* Confirmation Modal */}
         {showConfirm && (
           <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/30 transition-all">
             <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full mx-4 p-6 animate-in fade-in zoom-in duration-200">
@@ -103,28 +143,12 @@ export default function EnterRateModal({ open, trip, onClose, onSave }: Props) {
                     Save rates and lock this trip? You won't be able to edit rates after this.
                   </p>
                 </div>
-                <button
-                  onClick={cancelSave}
-                  className="h-8 w-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-colors"
-                  aria-label="Close"
-                >
-                  <span className="sr-only">Close</span>
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
               </div>
               <div className="mt-6 flex justify-end gap-3">
-                <button
-                  onClick={cancelSave}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all"
-                >
+                <button onClick={cancelSave} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">
                   Cancel
                 </button>
-                <button
-                  onClick={confirmSave}
-                  className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-sm font-medium text-white transition-all shadow-sm active:scale-95"
-                >
+                <button onClick={confirmSave} className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-sm font-medium text-white transition-all shadow-sm active:scale-95">
                   OK
                 </button>
               </div>
@@ -132,10 +156,11 @@ export default function EnterRateModal({ open, trip, onClose, onSave }: Props) {
           </div>
         )}
 
-        {/* ── Main Modal (unchanged) ── */}
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto relative">
+        {/* Main Modal Container */}
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto flex flex-col relative">
+          
           {/* Header */}
-          <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between z-10">
+          <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between z-20 shrink-0">
             <div>
               <h2 className="text-xl font-bold text-slate-800">
                 {trip.rateCompleted ? "Modify Selling Rates" : "Enter Selling Rates"}
@@ -156,10 +181,10 @@ export default function EnterRateModal({ open, trip, onClose, onSave }: Props) {
           </div>
 
           {/* Trip Info */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-6 py-3 border-b bg-slate-50/60">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-6 py-3 border-b bg-slate-50/60 shrink-0">
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                <Truck size={16} className="text-blue-700" />
+              <div className="h-8 w-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                <Truck size={16} className="text-indigo-700" />
               </div>
               <div>
                 <p className="text-[10px] uppercase text-slate-500">Vehicle</p>
@@ -177,10 +202,138 @@ export default function EnterRateModal({ open, trip, onClose, onSave }: Props) {
             </div>
           </div>
 
+          {/* COMPACT MARKET RATES WIDGET (READ-ONLY) */}
+          <div className="border-b border-slate-200 shrink-0 bg-slate-50">
+            <div 
+              className="px-6 py-2.5 flex items-center justify-between cursor-pointer hover:bg-slate-100 transition-colors"
+              onClick={() => setShowMarketRates(!showMarketRates)}
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 text-slate-800 font-semibold text-sm">
+                  <TrendingUp size={16} className="text-indigo-600" />
+                  <span>3-Day Market Rates Reference</span>
+                </div>
+                <div className="hidden sm:flex items-center gap-1 text-[10px] bg-slate-200/60 text-slate-600 px-2 py-0.5 rounded-full font-medium">
+                  <Info size={12} /> Syncs automatically from Accounts
+                </div>
+              </div>
+              <span className="text-xs font-medium text-slate-600 bg-white px-3 py-1 rounded-md border border-slate-200 shadow-sm">
+                {showMarketRates ? "Hide Reference" : "Show Reference"}
+              </span>
+            </div>
+
+            {showMarketRates && (
+              <div className="px-5 pb-5 pt-1 grid grid-cols-1 lg:grid-cols-12 gap-5 overflow-x-auto">
+                
+                {/* 1. Additional Metrics (Proportional Size: 3 Cols) */}
+                <div className="lg:col-span-3 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
+                  <div className="bg-slate-100 px-3 py-2 border-b border-slate-200 text-xs font-bold text-slate-700 text-center">
+                    1. Metrics (Vij, Gun, R.P)
+                  </div>
+                  <table className="w-full text-center text-xs">
+                    <thead className="bg-slate-50 text-slate-500">
+                      <tr>
+                        <th className="py-2 border-r border-slate-200 font-medium">Date</th>
+                        <th className="py-2 border-r border-slate-200 font-medium">Vij</th>
+                        <th className="py-2 border-r border-slate-200 font-medium">Gun</th>
+                        <th className="py-2 font-medium">R.P</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {referenceDays.map((d) => {
+                        const isToday = d.dateStr === trip.tripDate;
+                        const row = summaryData[d.dateStr] || {};
+                        return (
+                          <tr key={d.dateStr} className={`transition-colors ${isToday ? 'bg-blue-50/70 border-l-4 border-l-blue-500 font-bold' : 'hover:bg-slate-50'}`}>
+                            <td className="py-2 border-r border-slate-100 text-slate-600">{d.label}</td>
+                            <td className="py-2 border-r border-slate-100 text-slate-800">{row.vij || "-"}</td>
+                            <td className="py-2 border-r border-slate-100 text-slate-800">{row.gun || "-"}</td>
+                            <td className="py-2 text-blue-700">{row.rp || "-"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 2. Company Rates Matrix (Proportional Size: 5 Cols) */}
+                <div className="lg:col-span-5 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
+                  <div className="bg-slate-100 px-3 py-2 border-b border-slate-200 text-xs font-bold text-slate-700 text-center">
+                    2. Company Rates Matrix
+                  </div>
+                  <table className="w-full text-center text-xs">
+                    <thead className="bg-slate-50 text-slate-500">
+                      <tr>
+                        <th className="py-2 border-r border-slate-200 font-medium">Date</th>
+                        <th className="py-2 border-r border-slate-200 font-medium">Sneha</th>
+                        <th className="py-2 border-r border-slate-200 font-medium">VenCob</th>
+                        <th className="py-2 border-r border-slate-200 font-medium">V.Vii</th>
+                        <th className="py-2 border-r border-slate-200 font-medium">V.Gun</th>
+                        <th className="py-2 font-medium">A.Vii</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {referenceDays.map((d) => {
+                        const isToday = d.dateStr === trip.tripDate;
+                        const row = tableOneData[d.dateStr] || {};
+                        return (
+                          <tr key={d.dateStr} className={`transition-colors ${isToday ? 'bg-blue-50/70 border-l-4 border-l-blue-500 font-bold' : 'hover:bg-slate-50'}`}>
+                            <td className="py-2 border-r border-slate-100 text-slate-600">{d.label}</td>
+                            {["sneha", "vencobRate", "vencobVii", "vencobGun", "associationVii"].map((key) => (
+                              <td key={key} className="py-2 border-r border-slate-100 text-slate-800 last:border-0">
+                                {row[key] || "-"}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 3. Size & Category Breakdown (Proportional Size: 4 Cols) */}
+                <div className="lg:col-span-4 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
+                  <div className="bg-slate-100 px-3 py-2 border-b border-slate-200 text-xs font-bold text-slate-700 text-center">
+                    3. Size & Category Breakdown
+                  </div>
+                  <table className="w-full text-center text-xs">
+                    <thead className="bg-slate-50 text-slate-500">
+                      <tr>
+                        <th className="py-2 border-r border-slate-200 font-medium">Date</th>
+                        <th className="py-2 border-r border-slate-200 font-medium">17</th>
+                        <th className="py-2 border-r border-slate-200 font-medium">15</th>
+                        <th className="py-2 border-r border-slate-200 font-medium">13</th>
+                        <th className="py-2 border-r border-slate-200 font-medium">12</th>
+                        <th className="py-2 font-medium">10</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {referenceDays.map((d) => {
+                        const isToday = d.dateStr === trip.tripDate;
+                        const row = tableTwoData[d.dateStr] || {};
+                        return (
+                          <tr key={d.dateStr} className={`transition-colors ${isToday ? 'bg-blue-50/70 border-l-4 border-l-blue-500 font-bold' : 'hover:bg-slate-50'}`}>
+                            <td className="py-2 border-r border-slate-100 text-slate-600">{d.label}</td>
+                            {["c17", "c15", "c13", "c12", "c10"].map((key) => (
+                              <td key={key} className="py-2 border-r border-slate-100 text-slate-800 last:border-0">
+                                {row[key] || "-"}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+              </div>
+            )}
+          </div>
+
           {/* Table */}
-          <div className="overflow-x-auto px-1">
+          <div className="overflow-x-auto px-1 flex-1">
             <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 border-b">
+              <thead className="bg-slate-50 border-b sticky top-0 z-10 shadow-sm">
                 <tr className="text-slate-600">
                   <th className="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wider">S.No</th>
                   <th className="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wider">Shop Name</th>
@@ -197,11 +350,11 @@ export default function EnterRateModal({ open, trip, onClose, onSave }: Props) {
                   const isValid = rate !== null && rate !== undefined && rate >= 50 && rate <= 300;
 
                   return (
-                    <tr key={delivery.id} className="border-t hover:bg-blue-50/50 transition-colors">
-                      <td className="px-3 py-2 text-center text-xs text-slate-500">{index + 1}</td>
-                      <td className="px-3 py-2 text-xs font-medium text-slate-700">{delivery.shopName}</td>
-                      <td className="px-3 py-2 text-center text-xs font-semibold text-blue-700">{delivery.birds.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-center text-xs font-semibold text-orange-600">{delivery.weight.toFixed(2)}</td>
+                    <tr key={delivery.id} className="border-b last:border-0 hover:bg-indigo-50/40 transition-colors">
+                      <td className="px-3 py-3 text-center text-xs text-slate-500">{index + 1}</td>
+                      <td className="px-3 py-3 text-xs font-medium text-slate-700">{delivery.shopName}</td>
+                      <td className="px-3 py-3 text-center text-xs font-semibold text-blue-700">{delivery.birds.toLocaleString()}</td>
+                      <td className="px-3 py-3 text-center text-xs font-semibold text-orange-600">{delivery.weight.toFixed(2)}</td>
                       <td className="px-3 py-2 bg-amber-50/50">
                         <div className="flex items-center justify-center gap-1">
                           <span className="text-xs text-slate-500">₹</span>
@@ -225,23 +378,15 @@ export default function EnterRateModal({ open, trip, onClose, onSave }: Props) {
                                 ? isValid
                                   ? "border-green-400 focus:ring-green-200 bg-green-50"
                                   : "border-red-400 focus:ring-red-200 bg-red-50"
-                                : "border-slate-300 focus:border-blue-500 focus:ring-blue-200"
+                                : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-200"
                             }`}
                           />
                         </div>
-                        {rate === null && (
-                          <p className="text-[9px] text-amber-600 text-center mt-0.5">Required</p>
-                        )}
-                        {rate !== null && !isValid && (
-                          <p className="text-[9px] text-red-500 text-center mt-0.5">50-300 only</p>
-                        )}
+                        {rate === null && <p className="text-[9px] text-amber-600 text-center mt-0.5">Required</p>}
+                        {rate !== null && !isValid && <p className="text-[9px] text-red-500 text-center mt-0.5">50-300 only</p>}
                       </td>
                       <td className="px-3 py-2 text-center">
-                        <span
-                          className={`inline-block rounded-lg px-3 py-1 text-xs font-bold min-w-[80px] ${
-                            amount > 0 ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-400"
-                          }`}
-                        >
+                        <span className={`inline-block rounded-lg px-3 py-1 text-xs font-bold min-w-[80px] ${amount > 0 ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-400"}`}>
                           ₹ {amount.toFixed(2)}
                         </span>
                       </td>
@@ -253,7 +398,7 @@ export default function EnterRateModal({ open, trip, onClose, onSave }: Props) {
           </div>
 
           {/* Footer */}
-          <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-4">
+          <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-4 z-20 shrink-0">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               <div className="bg-slate-50 rounded-lg px-3 py-2 text-center flex items-center justify-center gap-2">
                 <Store size={18} className="text-blue-600" />

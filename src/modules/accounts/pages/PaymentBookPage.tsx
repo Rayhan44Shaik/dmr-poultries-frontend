@@ -192,9 +192,10 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
     setSearchQuery('');
   };
 
-  // ----- render -----
-  const content = (
-    <div className="p-4 sm:p-6 space-y-5 max-w-7xl mx-auto bg-gradient-to-br from-slate-50 via-white to-slate-50 min-h-screen">
+  return (
+    <div className={`w-full space-y-5 animate-in fade-in duration-500 ${
+      embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-gradient-to-br from-slate-50 via-white to-slate-50 min-h-screen'
+    }`}>
       {/* New Payment Button */}
       <div className="flex justify-end">
         <button
@@ -426,6 +427,4 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
       />
     </div>
   );
-
-  return embedded ? content : content;
 }

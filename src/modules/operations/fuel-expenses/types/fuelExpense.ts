@@ -1,3 +1,5 @@
+// src/modules/operations/fuel-expenses/types/fuelExpense.ts
+
 export interface FuelExpense {
   id: string;
   billNo: string;               // BILL-YYYYMMDD-XXX
@@ -20,4 +22,6 @@ export interface FuelExpense {
   approvedDate?: string;
   approvedBy?: string;
   updatedDate?: string;
+  image?: string;               // base64 image (optional)
+  synced?: boolean;             // flag to prevent duplicate creation from Step 5
 }

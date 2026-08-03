@@ -9,7 +9,7 @@ interface MarketRatePageProps {
   embedded?: boolean;
 }
 
-export const MarketRatePage: React.FC<MarketRatePageProps> = () => {
+export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false }) => {
   const { showNotification } = useSafeNotification();
 
   // Filter tab state ("This Week" selected by default)
@@ -197,15 +197,17 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className={`w-full space-y-6 animate-in fade-in duration-500 ${
+      embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
+    }`}>
       {/* Sticky Header with Filter Tabs, Navigation, and Integrated Auto-Save Status */}
       <div className="sticky top-0 z-30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white/95 backdrop-blur-md p-4 rounded-xl border border-slate-200/80 shadow-sm">
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl overflow-x-auto scrollbar-none">
           {(['This Week', 'Month', 'Quarter', 'Custom Range'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => handleTabClick(tab)}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+              className={`px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                 activeTab === tab
                   ? 'bg-emerald-600 text-white shadow-sm'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -269,7 +271,7 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = () => {
 
       {/* 1. Additional Metrics Entry (Vij, Gun, R.P) */}
       <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
             <Tag size={16} className="text-slate-500" />
             <h3 className="font-semibold text-slate-800 text-sm">Additional Metrics Entry (Vij, Gun, R.P)</h3>
@@ -343,7 +345,7 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = () => {
         
         {/* 2. Company Rates Matrix Entry */}
         <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+          <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
             <h3 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
               <Tag size={16} className="text-slate-500" />
               Company Rates Matrix Entry
@@ -398,7 +400,7 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = () => {
 
         {/* 3. Size & Category Breakdown Entry */}
         <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+          <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
             <h3 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
               <Tag size={16} className="text-slate-500" />
               Size & Category Breakdown Entry
@@ -452,7 +454,6 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = () => {
         </div>
 
       </div>
-
     </div>
   );
 };

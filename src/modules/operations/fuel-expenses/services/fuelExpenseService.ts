@@ -1,8 +1,9 @@
+// src/modules/operations/fuel-expenses/services/fuelExpenseService.ts
+
 import type { FuelExpense } from "../types/fuelExpense";
 
 const STORAGE_KEY = "dmr-fuel-expenses";
 
-// ----- Helpers -----
 function getData(): FuelExpense[] {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
@@ -15,7 +16,6 @@ function saveData(expenses: FuelExpense[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
 }
 
-// ----- Generate Bill No -----
 function generateBillNo(date: string): string {
   const dateStr = date.replace(/-/g, "");
   const existing = getData().filter((e) => e.date === date);
@@ -81,6 +81,7 @@ function remove(id: string): boolean {
   return true;
 }
 
+// ✅ UPDATED: Accept approverName (default "Admin")
 function approve(id: string, approvedBy: string = "Admin"): boolean {
   const all = getData();
   const index = all.findIndex((e) => e.id === id);
@@ -91,7 +92,7 @@ function approve(id: string, approvedBy: string = "Admin"): boolean {
     ...existing,
     status: "Approved",
     approvedDate: new Date().toISOString(),
-    approvedBy,
+    approvedBy: approvedBy, // Store the name string
   };
   saveData(all);
   return true;
@@ -101,7 +102,6 @@ function getRecent(count: number = 5): FuelExpense[] {
   return getData().sort((a, b) => b.createdDate.localeCompare(a.createdDate)).slice(0, count);
 }
 
-// ----- Summary with totals -----
 function getSummary() {
   const all = getData();
   return {
@@ -112,7 +112,6 @@ function getSummary() {
   };
 }
 
-// ✅ NEW: Get latest meter reading for a vehicle
 function getLatestMeterReading(vehicleId: number): number {
   const all = getData();
   const filtered = all
@@ -121,7 +120,6 @@ function getLatestMeterReading(vehicleId: number): number {
   return filtered.length > 0 ? filtered[0].meterReading : 0;
 }
 
-// ✅ NEW: Get total mileage (sum of distance covered per vehicle)
 function getTotalMileage(): number {
   const all = getData();
   const vehicleMap = new Map<number, { min: number; max: number }>();
@@ -141,15 +139,20 @@ function getTotalMileage(): number {
   return total;
 }
 
+function getBillsForTrip(vehicleId: number, date: string): FuelExpense[] {
+  return getData().filter((e) => e.vehicleId === vehicleId && e.date === date);
+}
+
 export const fuelExpenseService = {
   getAll,
   getById,
   save,
   update,
   remove,
-  approve,
+  approve, // updated
   getRecent,
   getSummary,
   getLatestMeterReading,
   getTotalMileage,
+  getBillsForTrip,
 };

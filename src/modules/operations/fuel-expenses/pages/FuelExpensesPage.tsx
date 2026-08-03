@@ -1,10 +1,12 @@
+// src/modules/operations/fuel-expenses/pages/FuelExpensesPage.tsx
+
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import Select from "react-select";
 import { useFuelExpenses } from "../hooks/useFuelExpenses";
 import { FuelKPICards } from "../components/FuelKPICards";
 import { FuelEntryForm } from "../components/FuelEntryForm";
 import { FuelBillTable } from "../components/FuelBillTable";
-import { FuelViewModal } from "../components/FuelViewModal"; // <-- NEW IMPORT
+import { FuelViewModal } from "../components/FuelViewModal";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { useVehicles } from "../../../masters/vehicles/hooks/useVehicles";
 import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
@@ -19,6 +21,8 @@ import {
   FileText,
   FileSpreadsheet,
   RotateCcw,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import type { FuelExpense } from "../types/fuelExpense";
 import { DatePicker } from "../../../../components/common/DatePicker";
@@ -69,6 +73,9 @@ function FuelExpensesPage() {
     updateExpense,
     deleteExpense,
     approveExpense,
+    refresh,
+    loading,
+    isSaving,
   } = useFuelExpenses(showNotification);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -161,8 +168,6 @@ function FuelExpensesPage() {
     setViewingBill(null);
   }, []);
 
-  // formatDate is no longer needed here – it's inside FuelViewModal
-
   const handleExportPDF = useCallback(() => {
     if (filteredData.length === 0) {
       showNotification("No data to export.", "error");
@@ -239,6 +244,11 @@ function FuelExpensesPage() {
     showNotification("Filters reset.", "info");
   };
 
+  const handleRefresh = () => {
+    refresh();
+    showNotification("Data refreshed.", "info");
+  };
+
   const KpiCards = useMemo(
     () =>
       hasFilters ? (
@@ -291,15 +301,33 @@ function FuelExpensesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Action Buttons */}
+      {/* ─── Action Buttons ──────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 cursor-pointer transition"
-        >
-          <Plus size={16} />
-          {showForm ? "Hide Form" : "Add Fuel Bill"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 cursor-pointer transition"
+          >
+            <Plus size={16} />
+            {showForm ? "Hide Form" : "Add Fuel Bill"}
+          </button>
+          {/* ─── Refresh Button ──────────────────────────────────────── */}
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-md border border-blue-600 bg-white px-3 py-2 text-sm font-medium text-blue-600 shadow-sm hover:bg-blue-50 transition disabled:opacity-50 cursor-pointer"
+          >
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            <span>Refresh</span>
+          </button>
+          {/* ─── Auto‑Save Indicator ────────────────────────────────── */}
+          {isSaving && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+              <Loader2 size={14} className="animate-spin text-blue-500" />
+              Saving...
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <button
             onClick={handleExportPDF}
@@ -328,7 +356,7 @@ function FuelExpensesPage() {
 
       {KpiCards}
 
-      {/* Filter Bar Card */}
+      {/* ─── Filters ──────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
           <div className="md:col-span-1">
@@ -377,7 +405,6 @@ function FuelExpensesPage() {
         </div>
       </div>
 
-      {/* Fuel Entry Form */}
       {showForm && (
         <FuelEntryForm
           onSave={saveExpense}
@@ -391,9 +418,8 @@ function FuelExpensesPage() {
         />
       )}
 
-      {/* ======== TABLE CARD ======== */}
+      {/* ─── Table Card ──────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden" ref={tableContainerRef}>
-        {/* Table Header with Title + Icon Actions */}
         <div className="px-6 py-3 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <h3 className="text-sm font-semibold text-slate-700">Fuel Bill Table</h3>
@@ -405,7 +431,6 @@ function FuelExpensesPage() {
                 <span className="text-sm font-medium text-slate-700 mr-1">
                   Selected: {selectedBill.billNo}
                 </span>
-                {/* View Icon */}
                 <button
                   onClick={handleView}
                   className="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition"
@@ -413,7 +438,6 @@ function FuelExpensesPage() {
                 >
                   <Eye size={16} />
                 </button>
-                {/* Edit Icon */}
                 <button
                   onClick={handleEdit}
                   disabled={!canEditDelete(selectedBill)}
@@ -426,7 +450,6 @@ function FuelExpensesPage() {
                 >
                   <Pencil size={16} />
                 </button>
-                {/* Delete Icon */}
                 <button
                   onClick={handleDelete}
                   disabled={!canEditDelete(selectedBill)}
@@ -439,7 +462,6 @@ function FuelExpensesPage() {
                 >
                   <Trash2 size={16} />
                 </button>
-                {/* Approve Icon (only if pending) */}
                 {selectedBill.status === "Pending" && (
                   <button
                     onClick={handleApprove}
@@ -456,14 +478,12 @@ function FuelExpensesPage() {
           </div>
         </div>
 
-        {/* Table */}
         <FuelBillTable
           bills={paginatedData}
           selectedId={selectedId}
           onSelect={setSelectedId}
         />
 
-        {/* Pagination Controls */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
             <div className="text-sm text-slate-600">
@@ -500,7 +520,6 @@ function FuelExpensesPage() {
         )}
       </div>
 
-      {/* ======== VIEW MODAL (now imported) ======== */}
       <FuelViewModal
         isOpen={viewModalOpen}
         bill={viewingBill}

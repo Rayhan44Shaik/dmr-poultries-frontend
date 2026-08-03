@@ -517,187 +517,184 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   };
 
   // ─── UI (Original Colors) ──────────────────────────────────
-  const content = (
-    <div className="bg-white rounded-2xl p-4 md:p-6 border border-slate-200/85 shadow-sm space-y-4 text-slate-800">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-slate-800">Shop Ledger</h2>
-        <div className="flex gap-2">
-          <button
-            onClick={handleExportPDF}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition"
-          >
-            <Download size={16} />
-            PDF
-          </button>
-          <button
-            onClick={handleExportExcel}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition"
-          >
-            <Download size={16} />
-            Excel
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-end gap-4 bg-slate-50/70 rounded-xl p-3 border border-slate-200/60">
-        <div className="flex-1 min-w-[160px]">
-          <label className="block text-xs font-medium text-slate-600 mb-1">Date From</label>
-          <DatePicker
-            value={dateFrom}
-            onChange={setDateFrom}
-            placeholder="From date"
-            className="w-full"
-          />
-        </div>
-        <div className="flex-1 min-w-[160px]">
-          <label className="block text-xs font-medium text-slate-600 mb-1">Date To</label>
-          <DatePicker
-            value={dateTo}
-            onChange={setDateTo}
-            placeholder="To date"
-            className="w-full"
-          />
-        </div>
-        <div className="flex-1 min-w-[160px]">
-          <label className="block text-xs font-medium text-slate-600 mb-1">Shop</label>
-          <Select
-            options={shopOptions}
-            value={shopOptions.find((opt) => opt.value === selectedShop)}
-            onChange={(selected) => setSelectedShop(selected?.value || "All Shops")}
-            isSearchable
-            placeholder="Search or select shop..."
-            styles={selectStyles}
-            maxMenuHeight={200}
-          />
-        </div>
-        <button
-          onClick={() => {
-            setDateFrom(format(new Date(new Date().setDate(1)), "yyyy-MM-dd"));
-            setDateTo(format(new Date(), "yyyy-MM-dd"));
-            setSelectedShop("All Shops");
-          }}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50 transition"
-        >
-          Reset Filters
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="text-xs text-slate-500">Total Debit (Sales)</p>
-          <p className="text-xl font-bold text-emerald-600">₹ {summary.totalDebit.toFixed(2)}</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="text-xs text-slate-500">Total Credit (Collections)</p>
-          <p className="text-xl font-bold text-blue-600">₹ {summary.totalCredit.toFixed(2)}</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="text-xs text-slate-500">Total Birds</p>
-          <p className="text-xl font-bold text-slate-800">{summary.totalBirds}</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="text-xs text-slate-500">Total Weight (KG)</p>
-          <p className="text-xl font-bold text-slate-800">{summary.totalWeight.toFixed(2)}</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="text-xs text-slate-500">Closing Balance</p>
-          <p className={`text-xl font-bold ${summary.closingBalance >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-            ₹ {summary.closingBalance.toFixed(2)}
-          </p>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-slate-200/70 overflow-hidden bg-white shadow-sm">
-        <div className="overflow-x-auto max-h-[70vh]">
-          <table className="min-w-full text-sm">
-            <thead className="sticky top-0 bg-slate-100/95 backdrop-blur-sm border-b border-slate-200 text-slate-700 shadow-sm">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Particulars</th>
-                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Birds</th>
-                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Weight (KG)</th>
-                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Rate</th>
-                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Debit</th>
-                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Credit</th>
-                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Balance</th>
-                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Payment Mode</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {ledgerData.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
-                    No transactions found for the selected filters.
-                  </td>
-                </tr>
-              ) : (
-                <>
-                  {ledgerData.map((tx, idx) => {
-                    const isOpening = idx === 0;
-                    const isSale = tx.type === "sale";
-                    return (
-                      <tr
-                        key={idx}
-                        className={`transition-colors ${isOpening ? "bg-amber-50/50 font-semibold" : "hover:bg-slate-50/80"}`}
-                      >
-                        <td className="px-4 py-3 text-xs font-medium text-slate-600">{tx.date}</td>
-                        <td className="px-4 py-3 text-xs font-medium text-slate-700">
-                          {tx.particulars}
-                          {!isOpening && (
-                            <span className={`ml-2 text-[10px] font-semibold ${isSale ? "text-emerald-600" : "text-blue-600"}`}>
-                              {isSale ? "(Sale)" : "(Collection)"}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-center text-xs">{isSale ? tx.birds : "-"}</td>
-                        <td className="px-4 py-3 text-center text-xs">{isSale ? tx.weight.toFixed(2) : "-"}</td>
-                        <td className="px-4 py-3 text-center text-xs">{isSale ? tx.rate.toFixed(2) : "-"}</td>
-                        <td className="px-4 py-3 text-center text-xs font-bold text-emerald-600">
-                          {tx.debit > 0 ? `₹ ${tx.debit.toFixed(2)}` : "-"}
-                        </td>
-                        <td className="px-4 py-3 text-center text-xs font-bold text-blue-600">
-                          {tx.credit > 0 ? `₹ ${tx.credit.toFixed(2)}` : "-"}
-                        </td>
-                        <td className={`px-4 py-3 text-center text-xs font-bold ${tx.balance >= 0 ? "text-slate-800" : "text-rose-600"}`}>
-                          ₹ {tx.balance.toFixed(2)}
-                        </td>
-                        <td className="px-4 py-3 text-center text-xs">{tx.paymentMode || "-"}</td>
-                      </tr>
-                    );
-                  })}
-                  {ledgerData.length > 1 && (
-                    <tr className="bg-slate-100/80 font-bold border-t-2 border-slate-300">
-                      <td className="px-4 py-3 text-xs text-slate-700" colSpan={2}>
-                        TOTAL
-                      </td>
-                      <td className="px-4 py-3 text-center text-xs text-slate-800">{summary.totalBirds}</td>
-                      <td className="px-4 py-3 text-center text-xs text-slate-800">{summary.totalWeight.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-center text-xs text-slate-800">-</td>
-                      <td className="px-4 py-3 text-center text-xs font-bold text-emerald-700">
-                        ₹ {summary.totalDebit.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-center text-xs font-bold text-blue-700">
-                        ₹ {summary.totalCredit.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-center text-xs font-bold text-slate-800">
-                        ₹ {summary.closingBalance.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-center text-xs text-slate-800">-</td>
-                    </tr>
-                  )}
-                </>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (embedded) return content;
   return (
-    <div className="px-3 md:px-6 py-4 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen text-slate-800">
-      {content}
+    <div className={`w-full space-y-4 animate-in fade-in duration-500 text-slate-800 ${
+      embedded ? '' : 'px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen'
+    }`}>
+      <div className="bg-white rounded-2xl p-4 md:p-6 border border-slate-200/85 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-slate-800">Shop Ledger</h2>
+          <div className="flex gap-2">
+            <button
+              onClick={handleExportPDF}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition"
+            >
+              <Download size={16} />
+              PDF
+            </button>
+            <button
+              onClick={handleExportExcel}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition"
+            >
+              <Download size={16} />
+              Excel
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-4 bg-slate-50/70 rounded-xl p-3 border border-slate-200/60">
+          <div className="flex-1 min-w-[160px]">
+            <label className="block text-xs font-medium text-slate-600 mb-1">Date From</label>
+            <DatePicker
+              value={dateFrom}
+              onChange={setDateFrom}
+              placeholder="From date"
+              className="w-full"
+            />
+          </div>
+          <div className="flex-1 min-w-[160px]">
+            <label className="block text-xs font-medium text-slate-600 mb-1">Date To</label>
+            <DatePicker
+              value={dateTo}
+              onChange={setDateTo}
+              placeholder="To date"
+              className="w-full"
+            />
+          </div>
+          <div className="flex-1 min-w-[160px]">
+            <label className="block text-xs font-medium text-slate-600 mb-1">Shop</label>
+            <Select
+              options={shopOptions}
+              value={shopOptions.find((opt) => opt.value === selectedShop)}
+              onChange={(selected) => setSelectedShop(selected?.value || "All Shops")}
+              isSearchable
+              placeholder="Search or select shop..."
+              styles={selectStyles}
+              maxMenuHeight={200}
+            />
+          </div>
+          <button
+            onClick={() => {
+              setDateFrom(format(new Date(new Date().setDate(1)), "yyyy-MM-dd"));
+              setDateTo(format(new Date(), "yyyy-MM-dd"));
+              setSelectedShop("All Shops");
+            }}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50 transition"
+          >
+            Reset Filters
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="text-xs text-slate-500">Total Debit (Sales)</p>
+            <p className="text-xl font-bold text-emerald-600">₹ {summary.totalDebit.toFixed(2)}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="text-xs text-slate-500">Total Credit (Collections)</p>
+            <p className="text-xl font-bold text-blue-600">₹ {summary.totalCredit.toFixed(2)}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="text-xs text-slate-500">Total Birds</p>
+            <p className="text-xl font-bold text-slate-800">{summary.totalBirds}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="text-xs text-slate-500">Total Weight (KG)</p>
+            <p className="text-xl font-bold text-slate-800">{summary.totalWeight.toFixed(2)}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="text-xs text-slate-500">Closing Balance</p>
+            <p className={`text-xl font-bold ${summary.closingBalance >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+              ₹ {summary.closingBalance.toFixed(2)}
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/70 overflow-hidden bg-white shadow-sm">
+          <div className="overflow-x-auto max-h-[70vh]">
+            <table className="min-w-full text-sm">
+              <thead className="sticky top-0 bg-slate-100/95 backdrop-blur-sm border-b border-slate-200 text-slate-700 shadow-sm">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Particulars</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Birds</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Weight (KG)</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Rate</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Debit</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Credit</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Balance</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Payment Mode</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {ledgerData.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-12 text-center text-slate-400">
+                      No transactions found for the selected filters.
+                    </td>
+                  </tr>
+                ) : (
+                  <>
+                    {ledgerData.map((tx, idx) => {
+                      const isOpening = idx === 0;
+                      const isSale = tx.type === "sale";
+                      return (
+                        <tr
+                          key={idx}
+                          className={`transition-colors ${isOpening ? "bg-amber-50/50 font-semibold" : "hover:bg-slate-50/80"}`}
+                        >
+                          <td className="px-4 py-3 text-xs font-medium text-slate-600">{tx.date}</td>
+                          <td className="px-4 py-3 text-xs font-medium text-slate-700">
+                            {tx.particulars}
+                            {!isOpening && (
+                              <span className={`ml-2 text-[10px] font-semibold ${isSale ? "text-emerald-600" : "text-blue-600"}`}>
+                                {isSale ? "(Sale)" : "(Collection)"}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center text-xs">{isSale ? tx.birds : "-"}</td>
+                          <td className="px-4 py-3 text-center text-xs">{isSale ? tx.weight.toFixed(2) : "-"}</td>
+                          <td className="px-4 py-3 text-center text-xs">{isSale ? tx.rate.toFixed(2) : "-"}</td>
+                          <td className="px-4 py-3 text-center text-xs font-bold text-emerald-600">
+                            {tx.debit > 0 ? `₹ ${tx.debit.toFixed(2)}` : "-"}
+                          </td>
+                          <td className="px-4 py-3 text-center text-xs font-bold text-blue-600">
+                            {tx.credit > 0 ? `₹ ${tx.credit.toFixed(2)}` : "-"}
+                          </td>
+                          <td className={`px-4 py-3 text-center text-xs font-bold ${tx.balance >= 0 ? "text-slate-800" : "text-rose-600"}`}>
+                            ₹ {tx.balance.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 text-center text-xs">{tx.paymentMode || "-"}</td>
+                        </tr>
+                      );
+                    })}
+                    {ledgerData.length > 1 && (
+                      <tr className="bg-slate-100/80 font-bold border-t-2 border-slate-300">
+                        <td className="px-4 py-3 text-xs text-slate-700" colSpan={2}>
+                          TOTAL
+                        </td>
+                        <td className="px-4 py-3 text-center text-xs text-slate-800">{summary.totalBirds}</td>
+                        <td className="px-4 py-3 text-center text-xs text-slate-800">{summary.totalWeight.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-center text-xs text-slate-800">-</td>
+                        <td className="px-4 py-3 text-center text-xs font-bold text-emerald-700">
+                          ₹ {summary.totalDebit.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-center text-xs font-bold text-blue-700">
+                          ₹ {summary.totalCredit.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-center text-xs font-bold text-slate-800">
+                          ₹ {summary.closingBalance.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-center text-xs text-slate-800">-</td>
+                      </tr>
+                    )}
+                  </>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

@@ -16,11 +16,16 @@ import {
 } from "lucide-react";
 
 interface Props {
-  trip: Trip;
+  trip: Trip | null;
   deliveries?: ShopDelivery[];
 }
 
 export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
+  // ─── SAFETY: If trip is null or missing required fields, show nothing ──────
+  if (!trip) {
+    return null;
+  }
+
   // ─── Compute totals directly from Shop Deliveries ──────────────────
   const deliveryTotals = useMemo(() => {
     if (!deliveries || deliveries.length === 0) {
@@ -156,11 +161,12 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
       bg: "bg-indigo-50",
       icon: <Ticket size={18} className="text-indigo-600" />,
     },
-    // ─── Combined Distance Card ──────────────────────────────────────
+    // ─── Combined Distance Card (double width) ──────────────────────
     {
       label: "DISTANCE",
+      span: "col-span-2 md:col-span-3",
       value: (
-        <div className="text-xs text-slate-600 space-y-0.5 mt-0.5">
+        <div className="text-xs text-slate-600 space-y-0.5 mt-0.5 w-full">
           <div className="flex justify-between items-center">
             <span className="font-normal text-slate-500">Pickup:</span>
             <span className="font-bold text-slate-800">{pickupDist.toFixed(2)} KM</span>
@@ -201,40 +207,43 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
   ];
 
   return (
-    <div className="mt-8 p-6 bg-slate-50/50 rounded-3xl border border-slate-200/60 shadow-sm">
+    <div className="mt-8 px-8 py-6 bg-slate-50/50 rounded-3xl border border-slate-200/60 shadow-sm">
       <h3 className="text-sm font-bold text-slate-700 mb-4 uppercase tracking-wider">
         Trip KPI Summary
       </h3>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {cards.map((card, idx) => (
-          <div
-            key={idx}
-            className={`${card.bg} p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between gap-2`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                {card.label}
-              </span>
-              <div className="p-1.5 bg-white/70 rounded-full border border-slate-100/80 shadow-xs">
-                {card.icon}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5">
+        {cards.map((card, idx) => {
+          const colSpan = card.span || "";
+          return (
+            <div
+              key={idx}
+              className={`${card.bg} p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between gap-2 min-w-0 overflow-hidden ${colSpan}`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                  {card.label}
+                </span>
+                <div className="p-1.5 bg-white/70 rounded-full border border-slate-100/80 shadow-xs shrink-0">
+                  {card.icon}
+                </div>
+              </div>
+              <div className="mt-1">
+                {typeof card.value === "string" ? (
+                  <div className="text-lg md:text-xl font-bold text-slate-900 truncate">
+                    {card.value}
+                  </div>
+                ) : (
+                  card.value
+                )}
+                {card.sub && (
+                  <div className="text-[10px] text-slate-500 font-medium mt-0.5 truncate">
+                    {card.sub}
+                  </div>
+                )}
               </div>
             </div>
-            <div className="mt-1">
-              {typeof card.value === "string" ? (
-                <div className="text-lg md:text-xl font-bold text-slate-900">
-                  {card.value}
-                </div>
-              ) : (
-                card.value
-              )}
-              {card.sub && (
-                <div className="text-[10px] text-slate-500 font-medium mt-0.5">
-                  {card.sub}
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

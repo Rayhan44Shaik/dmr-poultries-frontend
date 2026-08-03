@@ -79,8 +79,10 @@ const getQuarterRange = (year: number, quarter: number): { start: Date; end: Dat
   return { start, end };
 };
 
+type SummaryPageProps = { embedded?: boolean };
+
 // ---- Component ----
-export default function SummaryPage() {
+export default function SummaryPage({ embedded = false }: SummaryPageProps) {
   const [period, setPeriod] = useState<'week' | 'month' | 'quarter' | 'custom'>('week');
   const [selectedMonthDate, setSelectedMonthDate] = useState<Date>(() => {
     const now = new Date();
@@ -341,7 +343,9 @@ export default function SummaryPage() {
 
   // ---- Render ----
   return (
-    <div className="w-full space-y-4">
+    <div className={`w-full space-y-4 animate-in fade-in duration-500 ${
+      embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
+    }`}>
       {/* ─── Period Tabs with Export ─── */}
       <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
         <div className="flex items-center gap-3 flex-wrap">
@@ -656,4 +660,4 @@ export default function SummaryPage() {
       </div>
     </div>
   );
-}   
+}

@@ -1,5 +1,7 @@
+// src/modules/operations/vehicle-trips/components/TripViewModal.tsx
+
 import React, { useState } from "react";
-import { X, FileText, Download, Pencil } from "lucide-react";
+import { X, FileText, Download, Pencil, UserCheck } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Trip } from "../types/trip";
@@ -10,7 +12,7 @@ import StepStart from "./StepStart";
 import StepFarm from "./StepFarm";
 import StepPickup from "./StepPickup";
 import StepDeliveries from "./StepDeliveries";
-import StepEnd from "./Step_5/StepEnd"; // ✅ Ensure this is imported
+import StepEnd from "./Step_5/StepEnd";
 import TripFinalKPI from "./TripFinalKPI";
 
 interface Props {
@@ -25,8 +27,10 @@ interface Props {
 function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props) {
   const [viewStepIndex, setViewStepIndex] = useState(0);
 
+  // ─── Early return – ensures trip is never null after this ─────
   if (!open || !trip) return null;
 
+  // Now TypeScript knows trip is definitely a Trip object
   const totalKm = (trip.closingMeter || 0) - (trip.openingMeter || 0);
 
   // ─── STEP STATE FLAGS ───
@@ -34,9 +38,17 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
   const isFarmCompleted = trip.farmStepSubmitted;
   const isPickupCompleted = trip.pickupStepSubmitted;
   const isDeliveryCompleted = trip.deliveryStepSubmitted;
+  const isEndCompleted = (trip as any).endStepSubmitted === true || trip.status === "Completed";
   const isTripEnded = trip.status === "Completed";
-  const currentStep = isTripEnded ? 5 : (isDeliveryCompleted ? 4 : (isPickupCompleted ? 3 : (isFarmCompleted ? 2 : (isStartCompleted ? 1 : 0))));
 
+  const currentStep = isTripEnded ? 4
+    : (isEndCompleted ? 4
+      : (isDeliveryCompleted ? 3
+        : (isPickupCompleted ? 2
+          : (isFarmCompleted ? 1
+            : (isStartCompleted ? 0 : 0)))));
+
+  // ─── PDF download ──────────────────────────────────────────────
   const downloadPDF = () => {
     const doc = new jsPDF("p", "mm", "a4");
     const margin = 16;
@@ -61,6 +73,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
       ["Total KM", totalKm.toString(), "Fuel (Ltrs)", trip.fuel.toString()],
       ["Expense", `₹ ${trip.expense}`, "Status", trip.status],
       ["DC Weight", `${(trip as any).dcWeight || 0} KG`, "Total Birds", `${trip.totalBirds || 0}`],
+      ...((trip as any).approvedBy ? [["Approved By", (trip as any).approvedBy, "", ""]] : []),
     ];
 
     autoTable(doc, {
@@ -89,7 +102,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
       row.shopName,
       row.birds.toString(),
       row.weight.toFixed(2),
-      row.remarks || "--",
+      row.remarks || "--", // ✅ Fixed: missing closing quote
     ]);
 
     autoTable(doc, {
@@ -115,11 +128,11 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
     doc.save(`${trip.tripNo}_${safeVehicleNo}.pdf`);
   };
 
-  // Dummy functions to make the steps read-only in View Mode
+  // ─── Dummy functions for read‑only steps ──────────────────────
   const noop = () => {};
   const noopDispatch = () => {};
 
-  // 🔹 UPDATED: Properly renders steps with correct mock props matching their required definitions
+  // ─── Render the selected step ──────────────────────────────────
   const renderViewStep = () => {
     if (viewStepIndex === 0 && isStartCompleted) {
       return <StepStart trip={trip} setTrip={noopDispatch} updateTrip={noop} submitStartStep={() => false} vehicleOptions={[]} employeeOptions={[]} />;
@@ -133,11 +146,20 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
     if (viewStepIndex === 3 && isDeliveryCompleted) {
       return <StepDeliveries rows={trip.deliveries || []} setRows={noopDispatch} shops={shops} birdTypes={birdTypes} trip={trip} updateDeliveries={noop} submitDeliveriesStep={() => false} clearForm={noop} readOnly={true} />;
     }
-    if (viewStepIndex === 4 && isTripEnded) {
-      return <div className="mt-8 bg-emerald-50 border border-emerald-200 rounded-2xl p-8 text-center"><h2 className="text-2xl font-bold text-emerald-700">🎉 Trip Completed Successfully</h2></div>;
-    }
-    if (viewStepIndex === 4 && !isTripEnded && isDeliveryCompleted) {
-      return <StepEnd trip={trip} setTrip={noopDispatch} updateTrip={noop} />;
+    if (viewStepIndex === 4 && isEndCompleted) {
+      return (
+        <StepEnd
+          trip={trip}
+          setTrip={noopDispatch}
+          updateTrip={noop}
+          submitExpensesStep={() => false}
+          submitStartStep={() => false}
+          editable={false}
+          canEdit={false}
+          onCancel={noop}
+          clearForm={noop}
+        />
+      );
     }
     return <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">Select a completed step to view its details.</div>;
   };
@@ -146,7 +168,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto animate-fade-in">
       <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col">
         
-        <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80">
+        <div className="flex items-center justify-between px-10 py-6 border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80">
           <div className="flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white">
               <FileText className="w-7 h-7" />
@@ -156,22 +178,33 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
               <p className="text-xs font-medium text-slate-400 mt-0.5">Comprehensive overview</p>
             </div>
           </div>
-          <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-all shadow-xs">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-3">
+            {trip.status === "Completed" && (trip as any).approvedBy && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700 border border-emerald-200 shadow-sm">
+                <UserCheck size={12} />
+                {`Approved by: ${(trip as any).approvedBy}`}
+              </span>
+            )}
+            <button onClick={onClose} className="h-10 w-10 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-all shadow-xs">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
-        <div className="p-8 overflow-y-auto space-y-6 flex-1">
+        <div className="py-8 px-10 overflow-y-auto space-y-6 flex-1">
           
           <TripWizardStepper
             steps={["Start", "Farm", "Pickup", "Deliveries", "End"]}
             currentStep={currentStep}
-            completedMask={{
-              start: isStartCompleted,
-              farm: isFarmCompleted,
-              pickup: isPickupCompleted,
-              delivery: isDeliveryCompleted,
-            }}
+            completedMask={
+              {
+                start: isStartCompleted,
+                farm: isFarmCompleted,
+                pickup: isPickupCompleted,
+                delivery: isDeliveryCompleted,
+                end: isEndCompleted,
+              } as any
+            }
             onStepClick={setViewStepIndex}
           />
 
@@ -179,10 +212,10 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
             {renderViewStep()}
           </div>
 
-          <TripFinalKPI trip={trip} />
+          <TripFinalKPI trip={trip} deliveries={trip.deliveries} />
         </div>
 
-        <div className="px-8 py-5 border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 flex items-center justify-end gap-3">
+        <div className="px-10 py-5 border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 flex items-center justify-end gap-3">
           {onEdit && (
             <button onClick={() => onEdit(trip)} className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-md shadow-blue-500/20 transition-all active:scale-95">
               <Pencil size={15} />

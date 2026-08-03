@@ -25,7 +25,11 @@ const getNearestExpiry = (row: any): number => {
   return Math.min(...dates);
 };
 
-const DocumentsExpiryPage = () => {
+interface DocumentsExpiryPageProps {
+  embedded?: boolean;
+}
+
+const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => {
   const {
     totalCounts,
     statusCounts,
@@ -153,7 +157,10 @@ const DocumentsExpiryPage = () => {
 
   return (
     <ErrorBoundary>
-      <div className="px-1 md:px-3 py-6 md:py-8 space-y-6 max-w-7xl mx-auto bg-slate-50 min-h-screen">
+      {/* Removed max-w constraints to match the uniform embedded layout perfectly */}
+      <div className={`w-full space-y-4 animate-in fade-in duration-500 ${
+        embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
+      }`}>
         <DocumentSummaryTiles
           counts={totalCounts}
           statusCounts={statusCounts}

@@ -48,7 +48,11 @@ const formatDate = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-export function NewPaymentPage() {
+interface NewPaymentPageProps {
+  embedded?: boolean;
+}
+
+export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
   const { showNotification } = useSafeNotification();
   const navigate = useNavigate();
 
@@ -416,7 +420,9 @@ export function NewPaymentPage() {
   const showSelectFarm = category === 'Farm Payment' && subCategoryOptions.length > 0;
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 w-full mx-auto bg-gradient-to-br from-slate-50 via-white to-slate-50 min-h-screen">
+    <div className={`w-full space-y-6 animate-in fade-in duration-500 ${
+      embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
+    }`}>
       <style>{`
         .hide-spinner::-webkit-inner-spin-button,
         .hide-spinner::-webkit-outer-spin-button {

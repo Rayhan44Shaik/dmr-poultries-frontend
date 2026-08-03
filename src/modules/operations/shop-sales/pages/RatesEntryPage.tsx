@@ -55,25 +55,10 @@ export default function RatesEntryPage({ embedded = false }: Props) {
       showNotification("No data to export.", "error");
       return;
     }
-    const headers = [
-      "Trip No",
-      "Date",
-      "Vehicle",
-      "Supervisor",
-      "Source Farm",
-      "Shops",
-      "Birds",
-      "Weight (KG)",
-    ];
+    const headers = ["Trip No", "Date", "Vehicle", "Supervisor", "Source Farm", "Shops", "Birds", "Weight (KG)"];
     const rows = filteredTrips.map((t) => [
-      t.tripNo,
-      t.tripDate,
-      t.vehicleNo,
-      t.supervisorName,
-      t.sourceFarm,
-      t.totalShops.toString(),
-      t.totalBirds.toString(),
-      t.totalWeight.toFixed(2),
+      t.tripNo, t.tripDate, t.vehicleNo, t.supervisorName, t.sourceFarm,
+      t.totalShops.toString(), t.totalBirds.toString(), t.totalWeight.toFixed(2),
     ]);
     const filename = `Rates_${new Date().toISOString().split("T")[0]}`;
     exportToPDF("Rates Entry Report", headers, rows, filename);
@@ -85,32 +70,16 @@ export default function RatesEntryPage({ embedded = false }: Props) {
       showNotification("No data to export.", "error");
       return;
     }
-    const headers = [
-      "Trip No",
-      "Date",
-      "Vehicle",
-      "Supervisor",
-      "Source Farm",
-      "Shops",
-      "Birds",
-      "Weight (KG)",
-    ];
+    const headers = ["Trip No", "Date", "Vehicle", "Supervisor", "Source Farm", "Shops", "Birds", "Weight (KG)"];
     const rows = filteredTrips.map((t) => [
-      t.tripNo,
-      t.tripDate,
-      t.vehicleNo,
-      t.supervisorName,
-      t.sourceFarm,
-      t.totalShops,
-      t.totalBirds,
-      t.totalWeight,
+      t.tripNo, t.tripDate, t.vehicleNo, t.supervisorName, t.sourceFarm,
+      t.totalShops, t.totalBirds, t.totalWeight,
     ]);
     const filename = `Rates_${new Date().toISOString().split("T")[0]}`;
     exportToExcel("Rates Entry Report", headers, rows, filename);
     showNotification("Excel exported successfully!", "success");
   };
 
-  // ─── Content with only vertical spacing ───
   const content = (
     <div className="space-y-6">
       <CompletedTripsFilters
@@ -165,6 +134,5 @@ export default function RatesEntryPage({ embedded = false }: Props) {
     </div>
   );
 
-  // No standalone wrapper – the parent container supplies padding.
   return content;
 }

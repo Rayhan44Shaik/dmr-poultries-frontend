@@ -1,5 +1,7 @@
+// src/modules/operations/vehicle-trips/components/TripRecentTable.tsx
+
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Eye, Pencil, RefreshCw, History, Trash2, Clock, Layers, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
+import { Eye, Pencil, RefreshCw, History, Trash2, Clock, Layers, AlertCircle, Search, FileText, CheckCircle, UserCheck } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
 
@@ -9,7 +11,8 @@ interface Props {
   onView: (trip: Trip) => void;
   onEdit: (trip: Trip) => void;
   onDelete?: (trip: Trip, reason: string) => void;
-  onStatusChange?: (trip: Trip, status: "Pending" | "Completed") => void;
+  // ✅ Updated: accept optional approvedBy parameter
+  onStatusChange?: (trip: Trip, status: "Pending" | "Completed", approvedBy?: string) => void;
 }
 
 function TripRecentTable({
@@ -33,6 +36,16 @@ function TripRecentTable({
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
 
   const tableRef = useRef<HTMLDivElement>(null);
+
+  // ✅ Get current user name (or fallback to "Admin")
+  const getCurrentUser = () => {
+    try {
+      const user = localStorage.getItem("user");
+      return user ? JSON.parse(user).name : "Admin";
+    } catch {
+      return "Admin";
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -65,7 +78,6 @@ function TripRecentTable({
     });
   }, [safeTrips, searchTerm]);
 
-  // ✅ FIXED: Use endStepSubmitted to determine Draft vs Pending
   const allDraft = sortedTrips.filter((t) => !t.deleted && !t.endStepSubmitted);
   const allPending = sortedTrips.filter((t) => !t.deleted && t.endStepSubmitted && t.status !== "Completed");
   const allApproved = sortedTrips.filter((t) => !t.deleted && t.status === "Completed");
@@ -152,10 +164,20 @@ function TripRecentTable({
     return { label: "Pending", color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} /> };
   };
 
+  // ✅ Handle status change with approver name
+  const handleStatusChange = (trip: Trip, newStatus: "Pending" | "Completed") => {
+    if (newStatus === "Completed") {
+      const approver = getCurrentUser();
+      if (onStatusChange) onStatusChange(trip, "Completed", approver);
+    } else {
+      if (onStatusChange) onStatusChange(trip, "Pending");
+    }
+  };
+
   return (
     <>
       <div ref={tableRef} className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden mt-8 transition-all duration-300">
-        {/* ── Header ── */}
+        {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-inner">
@@ -206,7 +228,7 @@ function TripRecentTable({
           </div>
         </div>
 
-        {/* ── Table ── */}
+        {/* Table */}
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm text-left border-collapse">
             <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
@@ -222,12 +244,13 @@ function TripRecentTable({
                 <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Weight (KG)</th>
                 <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Mortality</th>
                 <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Approved By</th>
                 <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">View</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedTrips.length === 0 ? (
-                <tr><td colSpan={12} className="py-16 text-center text-slate-400"><History size={24} className="mx-auto mb-2" /> No trips found.</td></tr>
+                <tr><td colSpan={13} className="py-16 text-center text-slate-400"><History size={24} className="mx-auto mb-2" /> No trips found.</td></tr>
               ) : (
                 paginatedTrips.map((trip) => {
                   const isSelected = trip.id === selectedTripId;
@@ -254,7 +277,7 @@ function TripRecentTable({
                           <div className="relative inline-block w-32">
                             <select
                               value={trip.status}
-                              onChange={(e) => onStatusChange(trip, e.target.value as "Pending" | "Completed")}
+                              onChange={(e) => handleStatusChange(trip, e.target.value as "Pending" | "Completed")}
                               className={`w-full appearance-none rounded-xl px-3 py-1.5 text-xs font-bold border transition-all shadow-sm cursor-pointer pr-8 focus:outline-none focus:ring-2 focus:ring-offset-1 ${
                                 trip.status === "Completed"
                                   ? "text-emerald-700 border-emerald-300 bg-emerald-50/80 focus:ring-emerald-500"
@@ -288,6 +311,10 @@ function TripRecentTable({
                           })()
                         )}
                       </td>
+                      {/* ✅ Approved By column */}
+                      <td className="px-4 py-3 text-center text-xs font-medium text-slate-600">
+                        {trip.status === "Completed" && (trip as any).approvedBy ? (trip as any).approvedBy : "-"}
+                      </td>
                       <td className="text-center px-4 py-3">
                         <button onClick={(e) => { e.stopPropagation(); onView(trip); }} className="h-8 w-8 rounded-xl bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95 group-hover:border-blue-200" title="View Trip Details"><Eye size={14} /></button>
                       </td>
@@ -318,7 +345,7 @@ function TripRecentTable({
         )}
       </div>
 
-      {/* ── Delete Modal ── */}
+      {/* Delete Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm transition-opacity">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 max-w-md w-full mx-4 p-6">

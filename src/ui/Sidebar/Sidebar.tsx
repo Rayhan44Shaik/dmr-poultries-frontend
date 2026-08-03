@@ -12,25 +12,13 @@ import {
   ReceiptIndianRupee,
   FileText,
   Settings,
-  ChevronDown,
-  ChevronRight,
   Building2,
-  Receipt,
-  HandCoins, // added for Farm Payment
 } from "lucide-react";
 
 export default function Sidebar() {
   const location = useLocation();
 
-  const [openAccounts, setOpenAccounts] = useState(
-    location.pathname.startsWith("/accounts")
-  );
-
-  // Accounts children
-  const accountsChildren = [
-    { title: "Payment Book", path: "/accounts/payment-book", icon: <Receipt size={14} /> },
-    { title: "Farm Payment", path: "/accounts/farm-payment", icon: <HandCoins size={14} /> },
-  ];
+  // Accounts children removed – now a single link
 
   // Better matching logic for parent items
   const isActiveParent = (path: string) => {
@@ -118,37 +106,18 @@ export default function Sidebar() {
           Staff
         </Link>
 
-        {/* 6. Accounts (Dropdown) */}
-        <button
-          type="button"
-          onClick={() => setOpenAccounts(!openAccounts)}
-          className="mb-1 flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+        {/* 6. Accounts – now a single link (no dropdown) */}
+        <Link
+          to="/accounts"
+          className={`mb-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+            isActiveParent("/accounts")
+              ? "bg-blue-600 text-white"
+              : "text-slate-700 hover:bg-slate-100"
+          }`}
         >
-          <div className="flex items-center gap-3">
-            <ReceiptIndianRupee size={18} />
-            Accounts
-          </div>
-          {openAccounts ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-        </button>
-
-        {openAccounts && (
-          <div className="mb-2 ml-5 border-l border-slate-200 pl-3">
-            {accountsChildren.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`mb-1 flex items-center gap-2 rounded-md px-3 py-2 text-sm transition ${
-                  location.pathname === item.path
-                    ? "bg-blue-50 font-semibold text-blue-700"
-                    : "text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                {item.icon}
-                {item.title}
-              </Link>
-            ))}
-          </div>
-        )}
+          <ReceiptIndianRupee size={18} />
+          Accounts
+        </Link>
 
         {/* 7. Reports */}
         <Link

@@ -24,7 +24,11 @@ const reports = [
   { id: 'summary', title: 'Fleet Summary Report', description: 'Overall fleet performance', icon: ClipboardList },
 ];
 
-const VehicleReportsPage = () => {
+interface VehicleReportsPageProps {
+  embedded?: boolean;
+}
+
+const VehicleReportsPage = ({ embedded = false }: VehicleReportsPageProps) => {
   const { showToast } = useToast();
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -41,8 +45,10 @@ const VehicleReportsPage = () => {
 
   return (
     <ErrorBoundary>
-      {/* 👇 Updated container with reduced horizontal padding and increased top spacing */}
-      <div className="px-1 md:px-3 py-6 md:py-8 space-y-6 max-w-7xl mx-auto bg-slate-50 min-h-screen">
+      {/* Removed max-w constraints to perfectly adapt to embedded contexts */}
+      <div className={`w-full space-y-6 animate-in fade-in duration-500 ${
+        embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
+      }`}>
         {/* Heading removed */}
 
         {/* Filters */}

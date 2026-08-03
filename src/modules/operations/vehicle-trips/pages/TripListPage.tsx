@@ -9,6 +9,8 @@ import TripViewModal from "../components/TripViewModal";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 import { useVehicles } from "../../../masters/vehicles/hooks/useVehicles";
+import { useShops } from "../../../masters/shops/hooks/useShops";
+import { useBirdTypes } from "../../../masters/bird-types/hooks/useBirdTypes";
 
 import type { Trip } from "../types/trip";
 
@@ -66,6 +68,9 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   }, []);
 
   const { vehicles: masterVehicles } = useVehicles();
+  const { shops } = useShops();
+  const { birdTypes } = useBirdTypes();
+
   const vehicleOptions = [
     "All Vehicles",
     ...Array.from(new Set(masterVehicles.map((v) => v.vehicleNumber).filter(Boolean))),
@@ -198,7 +203,9 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   };
 
   const content = (
-    <div className="space-y-4">
+    <div className={`w-full space-y-4 animate-in fade-in duration-500 ${
+      embedded ? '' : 'px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen text-slate-800'
+    }`}>
       <div className="bg-white rounded-2xl p-4 md:p-6 border border-slate-200/85 shadow-sm space-y-4 text-slate-800">
         
         <div>
@@ -291,6 +298,8 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       <TripViewModal
         open={viewOpen}
         trip={selectedTrip}
+        shops={shops}
+        birdTypes={birdTypes}
         onClose={() => {
           setViewOpen(false);
           setSelectedTrip(null);
@@ -299,13 +308,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     </div>
   );
 
-  if (embedded) return content;
-  
-  return (
-    <div className="px-3 md:px-6 py-4 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen text-slate-800">
-      {content}
-    </div>
-  );
+  return content;
 }
 
 export default React.memo(TripListPage);

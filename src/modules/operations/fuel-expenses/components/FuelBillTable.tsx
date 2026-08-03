@@ -1,4 +1,6 @@
-import { Circle, CheckCircle2 } from "lucide-react";
+// src/modules/operations/fuel-expenses/components/FuelBillTable.tsx
+
+import { FileImage } from "lucide-react";
 import type { FuelExpense } from "../types/fuelExpense";
 
 interface Props {
@@ -21,77 +23,92 @@ export function FuelBillTable({ bills, selectedId, onSelect }: Props) {
     onSelect(selectedId === bill.id ? null : bill.id);
   };
 
+  // ✅ Filename: just the bill number with .png extension
+  const getImageFilename = (bill: FuelExpense): string => {
+    return `${bill.billNo}.png`;
+  };
+
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
       <table className="w-full text-sm">
         <thead className="bg-slate-50 border-b border-slate-200">
           <tr className="text-slate-600">
-            <th className="w-24 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Status</th>
+            <th className="w-8 px-2 py-2.5 text-center text-xs font-semibold uppercase tracking-wider">#</th>
             <th className="w-36 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Bill No</th>
             <th className="w-28 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Date</th>
             <th className="w-40 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Vehicle</th>
-            <th className="w-32 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Driver</th>
             <th className="w-32 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Supervisor</th>
-            {/* Meter first */}
-            <th className="w-28 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Meter (KM)</th>
-            {/* Litres second */}
-            <th className="w-20 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Litres</th>
-            {/* Rate third */}
-            <th className="w-24 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Rate (₹/L)</th>
-            {/* Amount last */}
-            <th className="w-32 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Amount (₹)</th>
+            <th className="w-28 px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider">Meter (KM)</th>
+            <th className="w-20 px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider">Litres</th>
+            <th className="w-24 px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider">Rate (₹/L)</th>
+            <th className="w-32 px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider">Amount (₹)</th>
             <th className="w-40 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Bunk</th>
+            <th className="w-32 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Bill Image</th>
           </tr>
         </thead>
         <tbody>
-          {bills.map((bill) => {
+          {bills.map((bill, idx) => {
             const isSelected = selectedId === bill.id;
+            const isPending = bill.status === "Pending";
+
             return (
               <tr
                 key={bill.id}
-                className={`border-b border-slate-200 hover:bg-blue-100 transition-colors duration-150 cursor-pointer ${
+                className={`border-b border-slate-200 hover:bg-blue-50 transition-colors duration-150 cursor-pointer ${
                   isSelected ? "bg-blue-100" : ""
-                }`}
+                } ${isPending ? "border-l-4 border-l-orange-400" : ""}`}
                 onClick={() => handleRowClick(bill)}
               >
-                <td className="px-3 py-2.5">
-                  <span
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      bill.status === "Approved"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-yellow-100 text-yellow-700"
-                    }`}
-                  >
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        bill.status === "Approved" ? "bg-green-500" : "bg-yellow-500"
-                      }`}
-                    />
-                    {bill.status}
-                  </span>
+                {/* Serial number with status dot */}
+                <td className="px-2 py-2.5 text-center text-xs text-slate-500">
+                  <div className="flex items-center justify-center gap-1">
+                    <span>{idx + 1}</span>
+                    {isPending && (
+                      <span className="inline-block h-2 w-2 rounded-full bg-orange-400" title="Pending" />
+                    )}
+                    {!isPending && (
+                      <span className="inline-block h-2 w-2 rounded-full bg-green-400" title="Approved" />
+                    )}
+                  </div>
                 </td>
                 <td className="px-3 py-2.5 font-medium text-blue-700 truncate">{bill.billNo}</td>
                 <td className="px-3 py-2.5 whitespace-nowrap">{formatDate(bill.date)}</td>
                 <td className="px-3 py-2.5 truncate">{bill.vehicleNo}</td>
-                <td className="px-3 py-2.5 truncate">{bill.driverName}</td>
                 <td className="px-3 py-2.5 truncate">{bill.supervisorName}</td>
-                {/* Meter (KM) – right-aligned */}
                 <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
                   {bill.meterReading.toLocaleString()}
                 </td>
-                {/* Litres – right-aligned */}
                 <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
                   {bill.litres.toFixed(2)}
                 </td>
-                {/* Rate – right-aligned */}
                 <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
                   {bill.rate.toFixed(2)}
                 </td>
-                {/* Amount – right-aligned & bold */}
                 <td className="px-3 py-2.5 text-right font-bold tabular-nums whitespace-nowrap">
                   ₹ {bill.amount.toFixed(2)}
                 </td>
-                <td className="px-3 py-2.5 truncate">{bill.petrolBunk}</td>
+                <td className="px-3 py-2.5 truncate max-w-[150px]">{bill.petrolBunk}</td>
+                {/* Image column – show filename as clickable link */}
+                <td className="px-3 py-2.5">
+                  {bill.image ? (
+                    <a
+                      href={bill.image}
+                      download={getImageFilename(bill)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 hover:underline text-xs font-medium truncate block max-w-[120px]"
+                      onClick={(e) => e.stopPropagation()} // prevent row click
+                      title="Download image"
+                    >
+                      {getImageFilename(bill)}
+                    </a>
+                  ) : (
+                    <span className="text-xs text-slate-400 flex items-center gap-1">
+                      <FileImage size={14} className="text-slate-300" />
+                      No image
+                    </span>
+                  )}
+                </td>
               </tr>
             );
           })}

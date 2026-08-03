@@ -14,7 +14,7 @@ import { MAINTENANCE_TYPES } from '../utils/constants';
 import type { MaintenanceEvent } from '../types';
 import { RotateCcw, Save, Wrench, AlertTriangle, X, AlertCircle } from 'lucide-react';
 
-const MaintenanceEntryPage = () => {
+const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
   const { employees } = useEmployees();
   const { showNotification } = useSafeNotification();
   const { vehicles, maintenance, refresh: refreshMaintenance } = useMaintenanceData();
@@ -334,7 +334,8 @@ const MaintenanceEntryPage = () => {
 
   return (
     <ErrorBoundary>
-      <div className="max-w-7xl mx-auto space-y-6 pb-12">
+      {/* Removed the max-width constraints to match BanksPage uniform embedded sizing */}
+      <div className="w-full space-y-4">
         {/* Form Card */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">

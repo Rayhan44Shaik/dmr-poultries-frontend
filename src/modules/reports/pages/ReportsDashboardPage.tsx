@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { format, subDays } from 'date-fns';
 import { TrendingUp, Truck, ShoppingBag, CreditCard, BookOpen, FileText } from 'lucide-react';
 import type { ReportFilters, ReportType } from '../types/reportTypes';
@@ -16,13 +17,8 @@ import { exportToPDF, exportToExcel } from '../../../utils/exportUtils';
 
 // ========== REPORT CONFIGURATIONS & ICONS ==========
 const tabs = [
-  { key: 'shopLedger', label: 'Shop Ledger', icon: BookOpen, color: 'text-purple-500' },
-  // other tabs can be uncommented if needed
-  //{ key: 'weekly', label: 'Weekly Report', icon: TrendingUp, color: 'text-amber-500' },
-  //{ key: 'vehicle', label: 'Vehicle Report', icon: Truck, color: 'text-blue-500' },
-  //{ key: 'shopSales', label: 'Shop Sales', icon: ShoppingBag, color: 'text-emerald-500' },
-  //{ key: 'collection', label: 'Collection Report', icon: CreditCard, color: 'text-teal-500' },
-  //{ key: 'expenses', label: 'Expenses Report', icon: FileText, color: 'text-rose-500' },
+  { key: 'shopLedger', label: 'Shop Ledger', icon: BookOpen, color: 'text-purple-500', component: ShopLedgerPage },
+  // Other reports can be mapped here as well when active
 ] as const;
 
 const REPORT_LABELS: Record<ReportType, string> = {
@@ -84,15 +80,29 @@ const getDefaultFilters = (type: ReportType): ReportFilters => {
 type ReportsDashboardPageProps = { embedded?: boolean };
 
 const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ embedded = false }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const activeTab = (searchParams.get('tab') as ReportType) || 'shopLedger';
+
   const { showNotification } = useSafeNotification();
 
   const { vehicles } = useVehicles();
   const { employees } = useEmployees();
   const { shops } = useShops();
 
-  // ✅ Set default to 'shopLedger'
-  const [selectedReport, setSelectedReport] = useState<ReportType>('shopLedger');
-  const [filters, setFilters] = useState<ReportFilters>(getDefaultFilters('shopLedger'));
+  const [filters, setFilters] = useState<ReportFilters>(() => getDefaultFilters(activeTab));
+
+  useEffect(() => {
+    if (!searchParams.get('tab')) {
+      navigate('/reports?tab=shopLedger', { replace: true });
+    }
+  }, [location.search, navigate, searchParams]);
+
+  // Update filters when active tab changes from query params
+  useEffect(() => {
+    setFilters(getDefaultFilters(activeTab));
+  }, [activeTab]);
 
   const vehicleOptions = useMemo(
     () => [
@@ -130,21 +140,19 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
     [shops]
   );
 
-  const handleTabChange = useCallback((type: ReportType) => {
-    setSelectedReport(type);
-    setFilters(getDefaultFilters(type));
-  }, []);
+  const handleTabChange = useCallback((tabKey: string) => {
+    navigate(`/reports?tab=${tabKey}`);
+  }, [navigate]);
 
   const reportData = useMemo(() => {
-    // Skip fetching for shopLedger because we use custom component
-    if (selectedReport === 'shopLedger') return null;
+    if (activeTab === 'shopLedger') return null;
     try {
-      return getReportData(selectedReport, filters);
+      return getReportData(activeTab, filters);
     } catch (error) {
       console.error('Error generating report:', error);
       return null;
     }
-  }, [selectedReport, filters]);
+  }, [activeTab, filters]);
 
   const isDataAvailable = useMemo(() => {
     if (!reportData) return false;
@@ -166,8 +174,8 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
       try {
         const headers = ['Metric', 'Value'];
         const rows = Object.entries(reportData.summary).map(([key, value]) => [key, String(value)]);
-        const filename = `${selectedReport}_${format(new Date(), 'yyyy-MM-dd')}`;
-        const title = REPORT_LABELS[selectedReport];
+        const filename = `${activeTab}_${format(new Date(), 'yyyy-MM-dd')}`;
+        const title = REPORT_LABELS[activeTab];
 
         if (formatType === 'PDF') {
           exportToPDF(title, headers, rows, filename);
@@ -180,24 +188,24 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
         showNotification('Failed to generate report. Please try again.', 'error');
       }
     },
-    [reportData, selectedReport, isDataAvailable, showNotification]
+    [reportData, activeTab, isDataAvailable, showNotification]
   );
 
   const content = (
     <div className="w-full pt-3 pb-6 space-y-4">
-      {/* Tab Navigation */}
-      <div className="bg-white border-y sm:border border-slate-200/90 sm:rounded-xl shadow-sm px-3 py-1.5 w-full">
+      {/* Tab Navigation Container */}
+      <div className="bg-white border-y sm:border border-slate-200/90 sm:rounded-xl shadow-sm px-4 sm:px-6 py-1.5 w-full">
         <div className="flex items-center gap-1 overflow-x-auto scrollbar-none [ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {tabs.map((tab) => {
             const Icon = tab.icon;
-            const isActive = selectedReport === tab.key;
+            const isActive = activeTab === tab.key;
             return (
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => handleTabChange(tab.key as ReportType)}
+                onClick={() => handleTabChange(tab.key)}
                 className={`
-                  flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 shrink-0 cursor-pointer
+                  flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 cursor-pointer
                   ${
                     isActive
                       ? "bg-blue-50 text-blue-700 font-semibold"
@@ -213,14 +221,14 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content Area */}
       <div className="w-full px-4 sm:px-6 lg:px-8 space-y-6">
-        {selectedReport === 'shopLedger' ? (
+        {activeTab === 'shopLedger' ? (
           <ShopLedgerPage embedded={true} />
         ) : (
           <>
             <ReportFiltersComponent
-              reportType={selectedReport}
+              reportType={activeTab}
               filters={filters}
               setFilters={setFilters}
               vehicleOptions={vehicleOptions}
@@ -229,9 +237,9 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
               collectorOptions={collectorOptions}
             />
             <ReportCard
-              title={REPORT_LABELS[selectedReport]}
-              description={REPORT_DESCRIPTIONS[selectedReport]}
-              includeList={REPORT_INCLUDES[selectedReport]}
+              title={REPORT_LABELS[activeTab]}
+              description={REPORT_DESCRIPTIONS[activeTab]}
+              includeList={REPORT_INCLUDES[activeTab]}
               onDownloadPDF={() => handleExport('PDF')}
               onDownloadExcel={() => handleExport('Excel')}
               isDataAvailable={isDataAvailable}
@@ -243,7 +251,7 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
   );
 
   if (embedded) return content;
-  return <div className="max-w-7xl mx-auto">{content}</div>;
+  return <div className="w-full space-y-4">{content}</div>;
 });
 
 export default ReportsDashboardPage;

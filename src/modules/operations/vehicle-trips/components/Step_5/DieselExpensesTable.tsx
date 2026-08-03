@@ -27,6 +27,7 @@ export default function DieselExpensesTable({
   const [meterErrors, setMeterErrors] = useState<{ [key: number]: string }>({});
   const [isFetchingGPS, setIsFetchingGPS] = useState<{ [key: number]: boolean }>({});
   const [rowIndices, setRowIndices] = useState<number[]>([1]);
+  const initialLoadDone = useRef(false);
 
   const today = new Date();
   const yyyy = today.getFullYear();
@@ -34,8 +35,9 @@ export default function DieselExpensesTable({
   const dd = String(today.getDate()).padStart(2, "0");
   const fallbackDateStr = `${yyyy}${mm}${dd}`;
 
-  // ─── Determine which rows have data ─────────────────────────────
+  // ─── Initial load: scan for existing data ──────────────────────
   useEffect(() => {
+    if (initialLoadDone.current) return;
     const activeIndices: number[] = [];
     for (let i = 1; i <= 6; i++) {
       const ltr = sheetData[`dieselLtr${i}`];
@@ -51,6 +53,7 @@ export default function DieselExpensesTable({
       activeIndices.push(1);
     }
     setRowIndices(activeIndices);
+    initialLoadDone.current = true;
   }, [sheetData]);
 
   // ─── Toast timer ──────────────────────────────────────────────────
@@ -82,16 +85,10 @@ export default function DieselExpensesTable({
 
   // ─── Helper: apply batch updates and save immediately ──────────
   const applyBatchUpdates = (updates: Record<string, any>) => {
-    // Apply each update via handleChange (debounced) – but we want immediate.
-    // So we'll use a different approach: call immediateSave with the full updated data.
-    // However, we don't have the full updated data here because sheetData is not yet updated.
-    // So we merge updates into sheetData and save.
     const updated = { ...sheetData, ...updates };
-    // Update each field via handleChange so that parent state syncs, but we also call immediateSave.
     Object.keys(updates).forEach(key => {
       handleChange(key, updates[key]);
     });
-    // Now trigger immediate save with the merged data.
     if (immediateSave) {
       immediateSave(updated);
     }
@@ -115,19 +112,18 @@ export default function DieselExpensesTable({
       return;
     }
     const nextId = lastRow + 1;
-    const updates: Record<string, any> = {};
-    if (!sheetData[`dieselLtr${nextId}`] && !sheetData[`dieselRate${nextId}`]) {
-      updates[`dieselLtr${nextId}`] = "";
-      updates[`dieselRate${nextId}`] = "";
-      updates[`dieselMeter${nextId}`] = "";
-      updates[`dieselBunk${nextId}`] = "";
-      updates[`dieselImage${nextId}`] = "";
-      updates[`dieselImageName${nextId}`] = "";
-    }
-    if (Object.keys(updates).length > 0) {
-      applyBatchUpdates(updates);
-      notifyUser(`New row added.`, "info" as any);
-    }
+    const updates: Record<string, any> = {
+      [`dieselLtr${nextId}`]: "",
+      [`dieselRate${nextId}`]: "",
+      [`dieselMeter${nextId}`]: "",
+      [`dieselBunk${nextId}`]: "",
+      [`dieselImage${nextId}`]: "",
+      [`dieselImageName${nextId}`]: "",
+    };
+    applyBatchUpdates(updates);
+    // ✅ Add the new index to the list so it appears
+    setRowIndices(prev => [...prev, nextId]);
+    notifyUser(`New row added.`, "info" as any);
   };
 
   const handleImageUpload = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -151,7 +147,14 @@ export default function DieselExpensesTable({
 
   const handleClearRow = (num: number) => {
     const updates: Record<string, any> = {};
-    [`dieselLtr${num}`, `dieselRate${num}`, `dieselMeter${num}`, `dieselBunk${num}`, `dieselImage${num}`, `dieselImageName${num}`].forEach(field => {
+    [
+      `dieselLtr${num}`,
+      `dieselRate${num}`,
+      `dieselMeter${num}`,
+      `dieselBunk${num}`,
+      `dieselImage${num}`,
+      `dieselImageName${num}`,
+    ].forEach(field => {
       updates[field] = "";
     });
     if (fileInputRefs.current[num]) {
@@ -163,12 +166,18 @@ export default function DieselExpensesTable({
       delete copy[num];
       return copy;
     });
+    // If this is not the only row, remove the index
+    if (rowIndices.length > 1) {
+      setRowIndices(prev => prev.filter(id => id !== num));
+    }
     notifyUser(`Row ${num} data cleared.`, "info" as any);
   };
 
   const handleDeleteRow = (num: number) => {
-    handleClearRow(num);
     if (rowIndices.length > 1) {
+      // Clear first, then remove
+      handleClearRow(num);
+      // The clear already removed the index if not the only one, so we just notify
       notifyUser(`Row ${num} deleted.`, "info" as any);
     } else {
       notifyUser(`Cannot delete the last row.`, "warning");
@@ -288,7 +297,6 @@ export default function DieselExpensesTable({
       notifyUser(`Please resolve the reading error in Row ${num} before submitting.`, "error");
       return;
     }
-    // Row is considered submitted – trigger immediate save
     if (immediateSave) {
       immediateSave(sheetData);
     }
@@ -296,11 +304,13 @@ export default function DieselExpensesTable({
   };
 
   const lastRowIndex = rowIndices[rowIndices.length - 1];
-  const isLastRowSubmitted = !!(sheetData[`dieselLtr${lastRowIndex}`] &&
+  const isLastRowSubmitted = !!(
+    sheetData[`dieselLtr${lastRowIndex}`] &&
     sheetData[`dieselRate${lastRowIndex}`] &&
     sheetData[`dieselMeter${lastRowIndex}`] &&
     sheetData[`dieselBunk${lastRowIndex}`] &&
-    sheetData[`dieselImage${lastRowIndex}`]);
+    sheetData[`dieselImage${lastRowIndex}`]
+  );
 
   return (
     <div className="space-y-3">
@@ -485,7 +495,6 @@ export default function DieselExpensesTable({
                             <button
                               type="button"
                               onClick={() => {
-                                // Remove image and clear file input
                                 const updates: Record<string, any> = {
                                   [`dieselImage${num}`]: "",
                                   [`dieselImageName${num}`]: "",

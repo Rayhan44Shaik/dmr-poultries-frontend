@@ -1,3 +1,5 @@
+// src/modules/operations/vehicle-trips/hooks/useTrips.ts
+
 import { useMemo, useState } from "react";
 import type { Trip } from "../types/trip";
 import { tripService } from "../services/tripService";
@@ -50,7 +52,6 @@ export default function useTrips(showNotification?: NotificationFn) {
       const wasPending = tripToDelete.status === "Pending";
       const tripDate = tripToDelete.tripDate;
 
-      // 1. Mark as deleted and store reason
       const updatedTrip: Trip = {
         ...tripToDelete,
         deleted: true,
@@ -59,10 +60,9 @@ export default function useTrips(showNotification?: NotificationFn) {
       tripService.update(updatedTrip);
       refreshTrips();
 
-      // 2. If it was pending, renumber remaining pending trips for that date
       if (wasPending) {
         renumberPendingTripsForDate(tripDate);
-        refreshTrips(); // reload after renumbering
+        refreshTrips();
         notify(`Trip deleted and remaining pending trips for ${tripDate} renumbered.`, "success");
       } else {
         notify("Trip deleted successfully!", "success");
@@ -82,15 +82,19 @@ export default function useTrips(showNotification?: NotificationFn) {
     }
   };
 
-  const changeStatus = (trip: Trip, status: "Pending" | "Completed") => {
-    updateTrip({ ...trip, status });
+  // ✅ Updated: accept approvedBy parameter
+  const changeStatus = (trip: Trip, status: "Pending" | "Completed", approvedBy?: string) => {
+    const updatedTrip = { ...trip, status };
+    if (status === "Completed" && approvedBy) {
+      (updatedTrip as any).approvedBy = approvedBy;
+    }
+    updateTrip(updatedTrip);
   };
 
   const recentTrips = useMemo(() => tripService.getRecent(5) || [], [trips]);
 
   const filteredTrips = useMemo(() => {
     return (trips || []).filter((trip) => {
-      // 🔹 Exclude deleted trips from default views (they are shown only in "Deleted" filter)
       const text = search.toLowerCase();
       const searchMatched =
         text === "" ||
@@ -117,7 +121,7 @@ export default function useTrips(showNotification?: NotificationFn) {
         farmMatched &&
         fromMatched &&
         toMatched &&
-        !trip.deleted  // ⬅️ Exclude deleted trips from default lists
+        !trip.deleted
       );
     });
   }, [
@@ -138,7 +142,6 @@ export default function useTrips(showNotification?: NotificationFn) {
     currentPage * pageSize
   );
 
-  // 👇 Expose all trips including deleted ones for the Recent Table
   const allTrips = trips || [];
 
   const totalTrips = filteredTrips?.length || 0;
