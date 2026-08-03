@@ -1,11 +1,12 @@
 // src/modules/accounts/payment-book/PaymentBookPage.tsx
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { PaymentTable } from '../components/payment-book/PaymentTable';
 import { PaymentViewModal } from '../components/payment-book/PaymentViewModal';
 import { PaymentEditModal } from '../components/payment-book/PaymentEditModal';
 import { PaymentDeleteModal } from '../components/payment-book/PaymentDeleteModal';
+import { NewPaymentModal } from '../components/payment-book/NewPaymentModal';
 import { PaymentService } from '../services/PaymentService';
 import type { Payment } from '../types/payment.types';
 import { DatePicker } from '../../../components/common/DatePicker';
@@ -29,7 +30,6 @@ import {
 
 type PaymentBookPageProps = { embedded?: boolean };
 
-// Format currency with L, Cr notation
 const formatCurrency = (amount: number): string => {
   if (amount >= 10000000) {
     return `₹${(amount / 10000000).toFixed(2)}Cr`;
@@ -43,31 +43,32 @@ const formatCurrency = (amount: number): string => {
 export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
   const { showNotification } = useSafeNotification();
 
-  // ----- state -----
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // filters
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [paymentType, setPaymentType] = useState('');
   const [paymentMode, setPaymentMode] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // modals
+  const isFilterActive = useMemo(() => {
+    return Boolean(dateFrom || dateTo || paymentType || paymentMode || searchQuery.trim());
+  }, [dateFrom, dateTo, paymentType, paymentMode, searchQuery]);
+
+  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [viewingPayment, setViewingPayment] = useState<Payment | null>(null);
   const [deletingPayment, setDeletingPayment] = useState<Payment | null>(null);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  // ----- load data -----
-  const loadPayments = () => {
-    setLoading(true);
+  const loadPayments = useCallback(() => {
     const filters: any = { search: searchQuery };
     if (dateFrom) filters.dateFrom = dateFrom;
     if (dateTo) filters.dateTo = dateTo;
@@ -77,43 +78,60 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
     const data = PaymentService.getPayments(filters);
     setPayments(data);
     setLoading(false);
-  };
-
-  useEffect(() => {
-    loadPayments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    loadPayments();
   }, [dateFrom, dateTo, paymentType, paymentMode, searchQuery]);
+
+  // Auto-sync interval / listener setup for background entries
+  useEffect(() => {
+    loadPayments();
+    const interval = setInterval(() => {
+      loadPayments();
+    }, 1000); // Polls and auto-syncs entries instantly every second
+    return () => clearInterval(interval);
+  }, [loadPayments]);
 
   useEffect(() => {
     setSelectedId(null);
   }, [payments]);
 
-  // ----- KPIs -----
   const kpis = useMemo(() => {
-    const filters: any = {};
-    if (dateFrom) filters.dateFrom = dateFrom;
-    if (dateTo) filters.dateTo = dateTo;
-    return PaymentService.getKPIs(filters);
-  }, [dateFrom, dateTo]);
+    if (!isFilterActive) {
+      return { totalPayments: 0, cashPayments: 0, bankPayments: 0, totalTransactions: 0 };
+    }
+    
+    let totalPayments = 0;
+    let cashPayments = 0;
+    let bankPayments = 0;
 
-  // ----- handlers -----
+    payments.forEach((p) => {
+      const amt = Number(p.amount) || 0;
+      totalPayments += amt;
+      if (p.paymentMode && p.paymentMode.toLowerCase().includes('cash')) {
+        cashPayments += amt;
+      } else {
+        bankPayments += amt;
+      }
+    });
+
+    return {
+      totalPayments,
+      cashPayments,
+      bankPayments,
+      totalTransactions: payments.length,
+    };
+  }, [isFilterActive, payments]);
+
   const selectedPayment = useMemo(
     () => payments.find((p) => p.id === selectedId) || null,
     [payments, selectedId]
   );
 
   const handleNewPayment = () => {
-    setEditingPayment(null);
-    setIsEditModalOpen(true);
+    setIsNewModalOpen(true);
   };
 
   const handleModalSave = (saved: Payment) => {
     showNotification(
-      saved.id ? 'Payment updated successfully' : 'Payment created successfully',
+      saved.id ? 'Payment successfully saved' : 'Action completed',
       'success'
     );
     loadPayments();
@@ -128,7 +146,6 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
 
   const handleEdit = () => {
     if (selectedPayment) {
-      // Check 10-day rule using global utility
       if (!canEditItem(selectedPayment.createdAt)) {
         showNotification('This payment is older than 10 days and cannot be edited.', 'error');
         return;
@@ -140,7 +157,6 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
 
   const handleDelete = () => {
     if (selectedPayment) {
-      // Check 10-day rule using global utility
       if (!canDeleteItem(selectedPayment.createdAt)) {
         showNotification('This payment is older than 10 days and cannot be deleted.', 'error');
         return;
@@ -206,45 +222,47 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
         </button>
       </div>
 
-      {/* Compact KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm flex items-center gap-3">
-          <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-            <FileText size={16} />
+      {/* Compact KPI Cards (Only rendered when a filter is active) */}
+      {isFilterActive && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm flex items-center gap-3">
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+              <FileText size={16} />
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Total</p>
+              <p className="text-sm font-bold text-slate-800">{formatCurrency(kpis.totalPayments)}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Total</p>
-            <p className="text-sm font-bold text-slate-800">{formatCurrency(kpis.totalPayments)}</p>
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm flex items-center gap-3">
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+              <Wallet size={16} />
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Cash</p>
+              <p className="text-sm font-bold text-slate-800">{formatCurrency(kpis.cashPayments)}</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm flex items-center gap-3">
+            <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
+              <Banknote size={16} />
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Bank</p>
+              <p className="text-sm font-bold text-slate-800">{formatCurrency(kpis.bankPayments)}</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm flex items-center gap-3">
+            <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
+              <TrendingUp size={16} />
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Transactions</p>
+              <p className="text-sm font-bold text-slate-800">{kpis.totalTransactions}</p>
+            </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm flex items-center gap-3">
-          <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-            <Wallet size={16} />
-          </div>
-          <div>
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Cash</p>
-            <p className="text-sm font-bold text-slate-800">{formatCurrency(kpis.cashPayments)}</p>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm flex items-center gap-3">
-          <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
-            <Banknote size={16} />
-          </div>
-          <div>
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Bank</p>
-            <p className="text-sm font-bold text-slate-800">{formatCurrency(kpis.bankPayments)}</p>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm flex items-center gap-3">
-          <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
-            <TrendingUp size={16} />
-          </div>
-          <div>
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Transactions</p>
-            <p className="text-sm font-bold text-slate-800">{kpis.totalTransactions}</p>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Filter Bar */}
       <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-sm">
@@ -396,7 +414,13 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
         )}
       </div>
 
-      {/* Modals */}
+      {/* ─── MODALS ─── */}
+      <NewPaymentModal
+        isOpen={isNewModalOpen}
+        onClose={() => setIsNewModalOpen(false)}
+        onSave={handleModalSave}
+      />
+
       <PaymentEditModal
         isOpen={isEditModalOpen}
         payment={editingPayment}

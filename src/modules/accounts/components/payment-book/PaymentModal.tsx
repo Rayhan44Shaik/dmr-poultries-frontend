@@ -6,14 +6,21 @@ import { Payment } from '../../types/payment.types';
 import { PaymentService } from '../../services/PaymentService';
 import { FarmPaymentService } from '../../services/FarmPaymentService';
 import { tripService } from '../../../operations/vehicle-trips/services/tripService';
-import type { FarmPayment } from '../../types/farmPayment.types';
-import type { Trip } from '../../../operations/vehicle-trips/types/trip';
+import { getBanks } from '../../../masters/banks/services/bankService';
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (payment: Payment) => void;
   editPayment?: Payment | null;
+}
+
+interface MappedFarmPayment {
+  id: string; // Maps to tripId
+  farmName: string;
+  tripNo: string;
+  vehicleNo: string;
+  amountDue: number;
 }
 
 const PAYMENT_TYPES = [
@@ -28,28 +35,44 @@ const PAYMENT_TYPES = [
   'Other Expense',
 ];
 
-const PAYMENT_MODES = ['Cash', 'Bank Transfer', 'UPI', 'NEFT', 'RTGS', 'IMPS', 'Cheque'];
-
 const CATEGORIES = ['Farmer', 'Fuel', 'Maintenance', 'Salary', 'Loan', 'Office', 'Tax', 'Other'];
 
 export function PaymentModal({ isOpen, onClose, onSave, editPayment }: PaymentModalProps) {
+  // Dynamically fetch "Cash" + Active Banks (Strictly Cash and Bank names only, no sub-categories)
+  const paymentModeOptions = useMemo(() => {
+    try {
+      const activeBanks = getBanks()
+        .filter((b) => b.status === 'Active')
+        .map((b) => b.bankName);
+      
+      const modes = new Set(['Cash', ...activeBanks]);
+      
+      // Keep legacy mode if editing an old payment that had a different mode
+      if (editPayment?.paymentMode) {
+        modes.add(editPayment.paymentMode);
+      }
+      
+      return Array.from(modes);
+    } catch {
+      return ['Cash'];
+    }
+  }, [editPayment]);
+
   const [form, setForm] = useState({
     paymentDate: new Date().toISOString().split('T')[0],
     paymentType: PAYMENT_TYPES[0],
-    paymentMode: PAYMENT_MODES[0],
+    paymentMode: 'Cash', // Default to Cash
     paidTo: '',
     amount: 0,
     referenceNo: '',
     category: CATEGORIES[0],
     remarks: '',
-    status: 'Draft' as Payment['status'],
+    status: 'Approved' as Payment['status'],
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-
   const [selectedFarm, setSelectedFarm] = useState<string>('');
   const [selectedPaymentIds, setSelectedPaymentIds] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
 
   // Get all completed trips (for farm list) - stable, no re-renders
   const allTrips = useMemo(() => {
@@ -76,18 +99,34 @@ export function PaymentModal({ isOpen, onClose, onSave, editPayment }: PaymentMo
     return ['', ...Array.from(farmSet)];
   }, [allTrips]);
 
-  // Get unpaid payments for selected farm - stable
-  const unpaidPayments = useMemo(() => {
+  // Safely map FarmPayments combined with Trip data
+  const unpaidPayments = useMemo<MappedFarmPayment[]>(() => {
     if (!selectedFarm) return [];
-    return allPayments.filter((p) => p.farmName === selectedFarm && p.status === 'Unpaid');
-  }, [selectedFarm, allPayments]);
+    
+    const results: MappedFarmPayment[] = [];
+    allPayments.forEach((p) => {
+      if (p.paymentStatus === 'Unpaid' || p.paymentStatus === 'Partially Paid') {
+        const trip = allTrips.find((t) => String(t.id) === p.tripId);
+        if (trip && trip.sourceFarm === selectedFarm) {
+          results.push({
+            id: p.tripId,
+            farmName: trip.sourceFarm,
+            tripNo: trip.tripNo,
+            vehicleNo: trip.vehicleNo,
+            amountDue: p.balance || 0,
+          });
+        }
+      }
+    });
+    return results;
+  }, [selectedFarm, allPayments, allTrips]);
 
   // Calculate total amount of selected payments
   const selectedTotal = useMemo(() => {
     let total = 0;
     unpaidPayments.forEach((payment) => {
       if (selectedPaymentIds.includes(payment.id)) {
-        total += payment.amount || 0;
+        total += payment.amountDue || 0;
       }
     });
     return total;
@@ -105,7 +144,7 @@ export function PaymentModal({ isOpen, onClose, onSave, editPayment }: PaymentMo
       setForm({
         paymentDate: editPayment.paymentDate,
         paymentType: editPayment.paymentType,
-        paymentMode: editPayment.paymentMode,
+        paymentMode: editPayment.paymentMode || 'Cash',
         paidTo: editPayment.paidTo,
         amount: editPayment.amount,
         referenceNo: editPayment.referenceNo,
@@ -113,30 +152,38 @@ export function PaymentModal({ isOpen, onClose, onSave, editPayment }: PaymentMo
         remarks: editPayment.remarks || '',
         status: editPayment.status,
       });
+      
       if (editPayment.paymentIds) {
-        setSelectedPaymentIds(editPayment.paymentIds);
-        const firstPayment = unpaidPayments.find((p) => p.id === editPayment.paymentIds?.[0]);
-        if (firstPayment) {
-          setSelectedFarm(firstPayment.farmName || '');
+        const validIds = editPayment.paymentIds.filter((id): id is string => Boolean(id));
+        setSelectedPaymentIds(validIds);
+        
+        if (validIds.length > 0) {
+          const firstPayment = allPayments.find(p => p.tripId === validIds[0]);
+          if (firstPayment) {
+            const trip = allTrips.find(t => String(t.id) === firstPayment.tripId);
+            if (trip && trip.sourceFarm) {
+              setSelectedFarm(trip.sourceFarm);
+            }
+          }
         }
       }
     } else {
       setForm({
         paymentDate: new Date().toISOString().split('T')[0],
         paymentType: PAYMENT_TYPES[0],
-        paymentMode: PAYMENT_MODES[0],
+        paymentMode: paymentModeOptions.includes('Cash') ? 'Cash' : paymentModeOptions[0],
         paidTo: '',
         amount: 0,
         referenceNo: '',
         category: CATEGORIES[0],
         remarks: '',
-        status: 'Draft',
+        status: 'Approved',
       });
       setSelectedFarm('');
       setSelectedPaymentIds([]);
     }
     setErrors({});
-  }, [editPayment, isOpen]);
+  }, [editPayment, isOpen, allPayments, allTrips, paymentModeOptions]);
 
   const handleChange = (field: keyof typeof form, value: any) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -193,7 +240,7 @@ export function PaymentModal({ isOpen, onClose, onSave, editPayment }: PaymentMo
     let paymentIds: string[] | undefined = undefined;
 
     if (form.paymentType === 'Farmer Payment' && selectedPaymentIds.length > 0) {
-      finalAmount = Number(form.amount); // Use the manually entered amount
+      finalAmount = Number(form.amount);
       paymentIds = selectedPaymentIds;
       
       if (!form.paidTo.trim() && selectedFarm) {
@@ -217,21 +264,22 @@ export function PaymentModal({ isOpen, onClose, onSave, editPayment }: PaymentMo
       saved = PaymentService.createPayment(paymentData);
     }
 
+    // Safely update farm payments to paid
     if (paymentIds && paymentIds.length > 0) {
-      FarmPaymentService.markPaymentsAsPaid(paymentIds);
+      paymentIds.forEach(tripId => {
+        const fp = FarmPaymentService.getByTripId(tripId);
+        if (fp) {
+          FarmPaymentService.updatePayment(tripId, {
+            paymentStatus: 'Paid',
+            amountPaid: fp.totalAmount,
+            balance: 0
+          });
+        }
+      });
     }
 
     onSave(saved);
     onClose();
-  };
-
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
   };
 
   const formatCurrency = (amount: number) => {
@@ -330,16 +378,6 @@ export function PaymentModal({ isOpen, onClose, onSave, editPayment }: PaymentMo
                     <p className="text-xs text-slate-400 mt-1">
                       Please go to <strong>Farm Payment</strong> page, enter rates, and click <strong>Save All</strong>.
                     </p>
-                    <div className="mt-3 p-3 bg-slate-50 rounded text-left text-xs text-slate-600">
-                      <p className="font-semibold">How to add payments:</p>
-                      <ol className="list-decimal list-inside mt-1 space-y-1">
-                        <li>Go to Accounts → Farm Payment</li>
-                        <li>Select a farm from filters</li>
-                        <li>Enter Rate (₹/kg) for each trip</li>
-                        <li>Click <strong>"Save All"</strong> button</li>
-                        <li>Return here to see unpaid payments</li>
-                      </ol>
-                    </div>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -386,7 +424,7 @@ export function PaymentModal({ isOpen, onClose, onSave, editPayment }: PaymentMo
                               <td className="px-3 py-2 text-slate-700">{payment.vehicleNo || '-'}</td>
                               <td className="px-3 py-2 text-slate-700">{payment.farmName}</td>
                               <td className="px-3 py-2 text-right font-bold text-emerald-600">
-                                {payment.amount > 0 ? formatCurrency(payment.amount) : '—'}
+                                {payment.amountDue > 0 ? formatCurrency(payment.amountDue) : '—'}
                               </td>
                             </tr>
                           );
@@ -424,7 +462,7 @@ export function PaymentModal({ isOpen, onClose, onSave, editPayment }: PaymentMo
                 errors.paymentMode ? 'border-red-500' : 'border-slate-300'
               } text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white`}
             >
-              {PAYMENT_MODES.map((m) => (
+              {paymentModeOptions.map((m) => (
                 <option key={m} value={m}>{m}</option>
               ))}
             </select>
@@ -445,7 +483,7 @@ export function PaymentModal({ isOpen, onClose, onSave, editPayment }: PaymentMo
             {errors.paidTo && <p className="text-xs text-red-500 mt-1">{errors.paidTo}</p>}
           </div>
 
-          {/* Amount - Now editable even when payments are selected */}
+          {/* Amount */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Amount (₹) *</label>
             <input

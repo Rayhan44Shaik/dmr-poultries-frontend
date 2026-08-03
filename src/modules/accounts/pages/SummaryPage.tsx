@@ -41,7 +41,6 @@ const formatDateLabel = (date: Date): string => {
   return format(date, 'MMM d');
 };
 
-/** Monday of the week containing `date` */
 const getMonday = (date: Date): Date => {
   const d = new Date(date);
   const day = d.getDay();
@@ -51,7 +50,6 @@ const getMonday = (date: Date): Date => {
   return d;
 };
 
-/** Sunday of the week containing `date` */
 const getSunday = (date: Date): Date => {
   const d = new Date(date);
   const day = d.getDay();
@@ -61,7 +59,6 @@ const getSunday = (date: Date): Date => {
   return d;
 };
 
-/** Check if two dates are in the same month/year */
 const isSameMonth = (d1: Date, d2: Date): boolean => {
   return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth();
 };
@@ -100,22 +97,10 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
   }, []);
 
   // ---- Month navigation ----
-  const goToPrevMonth = () => {
-    setSelectedMonthDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-  };
-  const goToNextMonth = () => {
-    setSelectedMonthDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
-  };
-
-  const handleMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newMonth = parseInt(e.target.value, 10);
-    setSelectedMonthDate(prev => new Date(prev.getFullYear(), newMonth, 1));
-  };
-
-  const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newYear = parseInt(e.target.value, 10);
-    setSelectedMonthDate(prev => new Date(newYear, prev.getMonth(), 1));
-  };
+  const goToPrevMonth = () => setSelectedMonthDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  const goToNextMonth = () => setSelectedMonthDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  const handleMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => setSelectedMonthDate(prev => new Date(prev.getFullYear(), parseInt(e.target.value, 10), 1));
+  const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => setSelectedMonthDate(prev => new Date(parseInt(e.target.value, 10), prev.getMonth(), 1));
 
   // ---- Date range ----
   const getDateRange = useCallback(() => {
@@ -166,17 +151,9 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
   const { start, end } = getDateRange();
 
   // ---- Fetch data ----
-  const trips = useMemo(() => {
-    return summaryService.getCompletedTripsByDateRange(start, end);
-  }, [start, end, refreshKey]);
-
-  const collections = useMemo(() => {
-    return summaryService.getApprovedCollectionsByDateRange(start, end);
-  }, [start, end, refreshKey]);
-
-  const farmPayments = useMemo(() => {
-    return summaryService.getFarmPaymentsByDateRange(start, end);
-  }, [start, end, refreshKey]);
+  const trips = useMemo(() => summaryService.getCompletedTripsByDateRange(start, end), [start, end, refreshKey]);
+  const collections = useMemo(() => summaryService.getApprovedCollectionsByDateRange(start, end), [start, end, refreshKey]);
+  const farmPayments = useMemo(() => summaryService.getFarmPaymentsByDateRange(start, end), [start, end, refreshKey]);
 
   // ---- Group trips into weeks or quarters ----
   const weeklyGroups = useMemo(() => {
@@ -189,12 +166,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
           const d = new Date(trip.tripDate);
           return d >= qStart && d <= qEnd;
         });
-        groups.push({
-          label: getQuarterLabel(q),
-          startDate: qStart,
-          endDate: qEnd,
-          trips: qTrips,
-        });
+        groups.push({ label: getQuarterLabel(q), startDate: qStart, endDate: qEnd, trips: qTrips });
       }
       return groups;
     }
@@ -254,7 +226,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
     return groups;
   }, [trips, start, end, period, selectedMonthDate]);
 
-  // ---- Metrics & Expenses ----
+  // ---- Metrics ----
   const weeklyMetrics: WeeklyMetrics[] = useMemo(() => {
     return weeklyGroups.map(group => {
       const groupCollections = collections.filter(c => {
@@ -265,11 +237,16 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
     });
   }, [weeklyGroups, collections]);
 
+  // ✅ Combined Expenses mapping
   const weeklyExpenses: ExpenseBreakdown[] = useMemo(() => {
     return weeklyGroups.map(group =>
-      summaryService.computeExpenses(group.startDate, group.endDate, farmPayments)
+      summaryService.computeCombinedExpenses(group.trips, group.startDate, group.endDate, farmPayments)
     );
   }, [weeklyGroups, farmPayments]);
+
+  const totalExpenses = useMemo<ExpenseBreakdown>(() => {
+    return summaryService.computeCombinedExpenses(trips, start, end, farmPayments);
+  }, [trips, start, end, farmPayments]);
 
   const totalMetrics = useMemo<WeeklyMetrics>(() => {
     const total = { trips: 0, birds: 0, weight: 0, mortality: 0, sales: 0, collection: 0, pending: 0 };
@@ -284,19 +261,6 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
     });
     return total;
   }, [weeklyMetrics]);
-
-  const totalExpenses = useMemo<ExpenseBreakdown>(() => {
-    const total = { farm: 0, fuel: 0, trip: 0, salary: 0, maintenance: 0, office: 0 };
-    weeklyExpenses.forEach(w => {
-      total.farm += w.farm;
-      total.fuel += w.fuel;
-      total.trip += w.trip;
-      total.salary += w.salary;
-      total.maintenance += w.maintenance;
-      total.office += w.office;
-    });
-    return total;
-  }, [weeklyExpenses]);
 
   // ---- Export handlers ----
   const getReportTitle = (): string => {
@@ -316,29 +280,13 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
   const handleExportPDF = () => {
     const title = getReportTitle();
     const dateRange = getDateRangeLabel();
-    exportPDF(
-      title,
-      dateRange,
-      weeklyGroups,
-      weeklyMetrics,
-      weeklyExpenses,
-      totalMetrics,
-      totalExpenses
-    );
+    exportPDF(title, dateRange, weeklyGroups, weeklyMetrics, weeklyExpenses, totalMetrics, totalExpenses);
   };
 
   const handleExportExcel = () => {
     const title = getReportTitle();
     const dateRange = getDateRangeLabel();
-    exportExcel(
-      title,
-      dateRange,
-      weeklyGroups,
-      weeklyMetrics,
-      weeklyExpenses,
-      totalMetrics,
-      totalExpenses
-    );
+    exportExcel(title, dateRange, weeklyGroups, weeklyMetrics, weeklyExpenses, totalMetrics, totalExpenses);
   };
 
   // ---- Render ----
@@ -354,9 +302,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
             <button
               onClick={() => setPeriod('week')}
               className={`px-4 py-1.5 text-xs font-semibold rounded-full transition ${
-                period === 'week'
-                  ? 'bg-emerald-600 text-white shadow'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                period === 'week' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               This Week
@@ -366,20 +312,14 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
               <button
                 onClick={() => setPeriod('month')}
                 className={`px-4 py-1.5 text-xs font-semibold rounded-full transition ${
-                  period === 'month'
-                    ? 'bg-emerald-600 text-white shadow'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  period === 'month' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
                 Month
               </button>
               {period === 'month' && (
                 <div className="flex items-center gap-1 ml-1">
-                  <button
-                    onClick={goToPrevMonth}
-                    className="p-1 rounded hover:bg-slate-100 text-slate-500"
-                    title="Previous month"
-                  >
+                  <button onClick={goToPrevMonth} className="p-1 rounded hover:bg-slate-100 text-slate-500" title="Previous month">
                     <ChevronLeft size={16} />
                   </button>
                   <select
@@ -388,9 +328,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                     className="h-7 rounded border border-slate-200 bg-white px-1.5 text-xs font-medium text-slate-700 outline-none focus:border-emerald-500"
                   >
                     {Array.from({ length: 12 }, (_, i) => (
-                      <option key={i} value={i}>
-                        {format(new Date(2000, i, 1), 'MMM')}
-                      </option>
+                      <option key={i} value={i}>{format(new Date(2000, i, 1), 'MMM')}</option>
                     ))}
                   </select>
                   <select
@@ -400,18 +338,10 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                   >
                     {Array.from({ length: 11 }, (_, i) => {
                       const year = new Date().getFullYear() - 5 + i;
-                      return (
-                        <option key={year} value={year}>
-                          {year}
-                        </option>
-                      );
+                      return <option key={year} value={year}>{year}</option>;
                     })}
                   </select>
-                  <button
-                    onClick={goToNextMonth}
-                    className="p-1 rounded hover:bg-slate-100 text-slate-500"
-                    title="Next month"
-                  >
+                  <button onClick={goToNextMonth} className="p-1 rounded hover:bg-slate-100 text-slate-500" title="Next month">
                     <ChevronRight size={16} />
                   </button>
                 </div>
@@ -421,9 +351,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
             <button
               onClick={() => setPeriod('quarter')}
               className={`px-4 py-1.5 text-xs font-semibold rounded-full transition ${
-                period === 'quarter'
-                  ? 'bg-emerald-600 text-white shadow'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                period === 'quarter' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               Quarter
@@ -431,36 +359,18 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
             <button
               onClick={() => setPeriod('custom')}
               className={`px-4 py-1.5 text-xs font-semibold rounded-full transition ${
-                period === 'custom'
-                  ? 'bg-emerald-600 text-white shadow'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                period === 'custom' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               Custom Range
             </button>
             {period === 'custom' && (
               <div className="flex items-center gap-2 ml-2">
-                <DatePicker
-                  value={customStart}
-                  onChange={setCustomStart}
-                  placeholder="Start Date"
-                  className="w-40"
-                  placement="bottom"
-                />
+                <DatePicker value={customStart} onChange={setCustomStart} placeholder="Start Date" className="w-40" placement="bottom" />
                 <span className="text-xs text-slate-500">to</span>
-                <DatePicker
-                  value={customEnd}
-                  onChange={setCustomEnd}
-                  placeholder="End Date"
-                  className="w-40"
-                  placement="bottom"
-                />
+                <DatePicker value={customEnd} onChange={setCustomEnd} placeholder="End Date" className="w-40" placement="bottom" />
                 <button
-                  onClick={() => {
-                    setCustomStart('');
-                    setCustomEnd('');
-                    setPeriod('week');
-                  }}
+                  onClick={() => { setCustomStart(''); setCustomEnd(''); setPeriod('week'); }}
                   className="px-3 py-1.5 text-xs font-semibold rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition"
                 >
                   Clear
@@ -476,7 +386,6 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
             FY {new Date().getFullYear()}-{new Date().getFullYear()+1}
           </span>
 
-          {/* Export Dropdown */}
           <div className="relative">
             <button
               onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
@@ -489,30 +398,13 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
 
             {exportDropdownOpen && (
               <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setExportDropdownOpen(false)}
-                />
+                <div className="fixed inset-0 z-40" onClick={() => setExportDropdownOpen(false)} />
                 <div className="absolute right-0 mt-1 z-50 w-44 bg-white rounded-lg border border-slate-200 shadow-lg py-1 overflow-hidden">
-                  <button
-                    onClick={() => {
-                      setExportDropdownOpen(false);
-                      handleExportPDF();
-                    }}
-                    className="flex items-center gap-2 w-full px-4 py-2 text-xs text-slate-700 hover:bg-emerald-50 transition"
-                  >
-                    <FileText size={14} className="text-red-500" />
-                    Export as PDF
+                  <button onClick={() => { setExportDropdownOpen(false); handleExportPDF(); }} className="flex items-center gap-2 w-full px-4 py-2 text-xs text-slate-700 hover:bg-emerald-50 transition">
+                    <FileText size={14} className="text-red-500" /> Export as PDF
                   </button>
-                  <button
-                    onClick={() => {
-                      setExportDropdownOpen(false);
-                      handleExportExcel();
-                    }}
-                    className="flex items-center gap-2 w-full px-4 py-2 text-xs text-slate-700 hover:bg-emerald-50 transition border-t border-slate-100"
-                  >
-                    <FileSpreadsheet size={14} className="text-green-600" />
-                    Export as Excel
+                  <button onClick={() => { setExportDropdownOpen(false); handleExportExcel(); }} className="flex items-center gap-2 w-full px-4 py-2 text-xs text-slate-700 hover:bg-emerald-50 transition border-t border-slate-100">
+                    <FileSpreadsheet size={14} className="text-green-600" /> Export as Excel
                   </button>
                 </div>
               </>
@@ -529,9 +421,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
               <tr>
                 <th className="w-32 px-4 py-3 text-left font-semibold text-slate-600">Particulars</th>
                 {weeklyGroups.map((g, i) => (
-                  <th key={i} className="w-24 px-4 py-3 text-center font-semibold text-slate-600">
-                    {g.label}
-                  </th>
+                  <th key={i} className="w-24 px-4 py-3 text-center font-semibold text-slate-600">{g.label}</th>
                 ))}
                 <th className="w-20 px-4 py-3 text-center font-semibold text-slate-600 bg-emerald-50">Total</th>
               </tr>
@@ -551,17 +441,12 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                   {weeklyMetrics.map((m, idx) => {
                     const value = (m[item.key as keyof WeeklyMetrics] as number) || 0;
                     let display: string;
-                    if (item.key === 'sales' || item.key === 'collection' || item.key === 'pending') {
-                      display = formatCurrency(value);
-                    } else if (item.key === 'weight') {
-                      display = value.toFixed(2);
-                    } else {
-                      display = formatNumber(value);
-                    }
+                    if (item.key === 'sales' || item.key === 'collection' || item.key === 'pending') display = formatCurrency(value);
+                    else if (item.key === 'weight') display = value.toFixed(2);
+                    else display = formatNumber(value);
+                    
                     return (
-                      <td key={idx} className="w-24 px-4 py-2.5 text-center text-slate-600">
-                        {display}
-                      </td>
+                      <td key={idx} className="w-24 px-4 py-2.5 text-center text-slate-600">{display}</td>
                     );
                   })}
                   <td className="w-20 px-4 py-2.5 text-center font-bold text-slate-800 bg-emerald-50/50">
@@ -586,9 +471,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
               <tr>
                 <th className="w-32 px-4 py-3 text-left font-semibold text-slate-600">Expense</th>
                 {weeklyGroups.map((g, i) => (
-                  <th key={i} className="w-24 px-4 py-3 text-center font-semibold text-slate-600">
-                    {g.label}
-                  </th>
+                  <th key={i} className="w-24 px-4 py-3 text-center font-semibold text-slate-600">{g.label}</th>
                 ))}
                 <th className="w-20 px-4 py-3 text-center font-semibold text-slate-600 bg-emerald-50">Total</th>
               </tr>
@@ -608,9 +491,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                   <tr key={item.key} className="border-b border-slate-100 hover:bg-slate-50/50">
                     <td className="w-32 px-4 py-2.5 font-medium text-slate-700 truncate">{item.label}</td>
                     {values.map((val, idx) => (
-                      <td key={idx} className="w-24 px-4 py-2.5 text-center text-slate-600">
-                        {formatCurrency(val)}
-                      </td>
+                      <td key={idx} className="w-24 px-4 py-2.5 text-center text-slate-600">{formatCurrency(val)}</td>
                     ))}
                     <td className="w-20 px-4 py-2.5 text-center font-bold text-slate-800 bg-emerald-50/50">
                       {formatCurrency(total)}
@@ -624,9 +505,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                 {weeklyExpenses.map((w, idx) => {
                   const sum = Object.values(w).reduce((a, b) => a + b, 0);
                   return (
-                    <td key={idx} className="w-24 px-4 py-2.5 text-center font-bold text-slate-700">
-                      {formatCurrency(sum)}
-                    </td>
+                    <td key={idx} className="w-24 px-4 py-2.5 text-center font-bold text-slate-700">{formatCurrency(sum)}</td>
                   );
                 })}
                 <td className="w-20 px-4 py-2.5 text-center font-bold text-slate-800 bg-emerald-50/50">
@@ -640,9 +519,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                   const totalExp = Object.values(weeklyExpenses[idx] || {}).reduce((a, b) => a + b, 0);
                   const profit = m.sales - totalExp;
                   return (
-                    <td key={idx} className="w-24 px-4 py-2.5 text-center font-bold text-emerald-700">
-                      {formatCurrency(profit)}
-                    </td>
+                    <td key={idx} className="w-24 px-4 py-2.5 text-center font-bold text-emerald-700">{formatCurrency(profit)}</td>
                   );
                 })}
                 <td className="w-20 px-4 py-2.5 text-center font-bold text-emerald-700 bg-emerald-100/50">

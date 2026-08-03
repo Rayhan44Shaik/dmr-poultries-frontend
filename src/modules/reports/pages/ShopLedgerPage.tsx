@@ -2,27 +2,13 @@ import React, { useState, useMemo, useCallback } from "react";
 import { format, isWithinInterval, parseISO } from "date-fns";
 import { Download } from "lucide-react";
 import Select from "react-select";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 import { shopSalesService } from "../../operations/shop-sales/services/shopSalesService";
 import { collectionService } from "../../operations/collections/services/collectionService";
 import { useShops } from "../../masters/shops/hooks/useShops";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { DatePicker } from "../../../components/common/DatePicker";
-import * as XLSX from "xlsx";
-
-interface LedgerTransaction {
-  date: string;
-  particulars: string;
-  birds: number;
-  weight: number;
-  rate: number;
-  debit: number;
-  credit: number;
-  balance: number;
-  type: "sale" | "collection";
-  paymentMode?: string;
-}
+import { generateShopLedgerPDF, LedgerTransaction } from "../components/ShopLedgerPDF";
 
 interface ShopLedgerProps {
   embedded?: boolean;
@@ -227,7 +213,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     const allSales = shopSalesService.getAll();
     const allCollections = collectionService.getCollections().filter((c) => c.status === "Approved");
 
-    // Determine which shops to include
     let shopNames: string[] = [];
     if (selectedShop === "All Shops") {
       const filterDate = (item: any) => {
@@ -253,11 +238,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       return;
     }
 
-    // Build ledger data per shop
     const allLedgers: { shop: string; data: LedgerTransaction[] }[] = [];
     for (const shop of shopNames) {
       const ledger = getLedgerForShop(shop, allSales, allCollections, dateFrom, dateTo);
-      if (ledger.length > 1) { // has transactions
+      if (ledger.length > 1) {
         allLedgers.push({ shop, data: ledger });
       }
     }
@@ -267,117 +251,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       return;
     }
 
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
-    const headers = ["Date", "Particulars", "Birds", "Weight", "Rate", "Debit", "Credit", "Balance", "Payment Mode"];
-
-    allLedgers.forEach(({ shop, data }, index) => {
-      if (index > 0) doc.addPage();
-
-      // Header (Clean Monochrome Styling)
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.setTextColor(17, 24, 39);
-      doc.text(`${shop}`, 14, 15);
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(100, 100, 100);
-      doc.text(`Period: ${dateFrom} to ${dateTo}`, 14, 21);
-      doc.text(`Generated: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, doc.internal.pageSize.getWidth() - 14, 21, { align: "right" });
-
-      // Build rows
-      const rows = data.map((t) => [
-        t.date,
-        t.particulars,
-        t.type === "sale" ? String(t.birds) : "-",
-        t.type === "sale" ? t.weight.toFixed(2) : "-",
-        t.type === "sale" ? t.rate.toFixed(2) : "-",
-        t.debit > 0 ? t.debit.toFixed(2) : "-",
-        t.credit > 0 ? t.credit.toFixed(2) : "-",
-        t.balance.toFixed(2),
-        t.paymentMode || "-",
-      ]);
-
-      // Totals for this shop
-      const tx = data.slice(1);
-      const totalDebit = tx.reduce((sum, t) => sum + t.debit, 0);
-      const totalCredit = tx.reduce((sum, t) => sum + t.credit, 0);
-      const totalBirds = tx.filter((t) => t.type === "sale").reduce((sum, t) => sum + t.birds, 0);
-      const totalWeight = tx.filter((t) => t.type === "sale").reduce((sum, t) => sum + t.weight, 0);
-      const closingBalance = data.length > 0 ? data[data.length - 1].balance : 0;
-
-      rows.push([
-        "TOTAL",
-        "",
-        String(totalBirds),
-        totalWeight.toFixed(2),
-        "",
-        totalDebit.toFixed(2),
-        totalCredit.toFixed(2),
-        closingBalance.toFixed(2),
-        "",
-      ]);
-
-      autoTable(doc, {
-        head: [headers],
-        body: rows,
-        startY: 26,
-        margin: { top: 26, bottom: 15, left: 10, right: 10 },
-        theme: "grid",
-        headStyles: { 
-          fillColor: [243, 244, 246], 
-          textColor: [17, 24, 39], 
-          fontStyle: "bold", 
-          halign: "center",
-          fontSize: 8,
-          lineWidth: 0.1,
-          cellPadding: 4,
-          lineColor: [209, 213, 219]
-        },
-        bodyStyles: { 
-          valign: "middle", 
-          fontSize: 8,
-          textColor: [55, 65, 81],
-          lineWidth: 0.1,
-          lineColor: [229, 231, 235],
-          cellPadding: 3.5,
-          fontStyle: "normal"
-        },
-        didParseCell: (hookData) => {
-          hookData.cell.styles.fontStyle = "normal";
-          
-          // Apply background to total row
-          if (hookData.row.index === rows.length - 1) {
-            hookData.cell.styles.fillColor = [249, 250, 251];
-            hookData.cell.styles.textColor = [17, 24, 39];
-            hookData.cell.styles.fontStyle = "bold";
-          }
-        },
-        columnStyles: {
-          0: { cellWidth: 21, halign: "center" },
-          1: { cellWidth: 35, halign: "left" },
-          2: { cellWidth: 12, halign: "center" },
-          3: { cellWidth: 18, halign: "right" },
-          4: { cellWidth: 16, halign: "right" },
-          5: { cellWidth: 23, halign: "right" },
-          6: { cellWidth: 20, halign: "right" },
-          7: { cellWidth: 24, halign: "right" },
-          8: { cellWidth: 22, halign: "center" },
-        },
-        didDrawPage: (data) => {
-          const docInstance = data.doc;
-          const pageWidth = docInstance.internal.pageSize.getWidth();
-          const pageHeight = docInstance.internal.pageSize.getHeight();
-          docInstance.setFont("helvetica", "normal");
-          docInstance.setFontSize(8);
-          docInstance.setTextColor(156, 163, 175);
-          docInstance.text(`Page ${data.pageNumber}`, pageWidth - 14, pageHeight - 10, { align: "right" });
-        },
-      });
-    });
-
-    const filename = `ShopLedger_${selectedShop === "All Shops" ? "AllShops" : selectedShop.replace(/\s+/g, "_")}_${format(new Date(), "yyyy-MM-dd")}.pdf`;
-    doc.save(filename);
+    generateShopLedgerPDF(allLedgers, dateFrom, dateTo, selectedShop);
     showNotification("PDF downloaded successfully.", "success");
   }, [selectedShop, dateFrom, dateTo, showNotification]);
 
@@ -385,7 +259,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     const allSales = shopSalesService.getAll();
     const allCollections = collectionService.getCollections().filter((c) => c.status === "Approved");
 
-    // Determine shops
     let shopNames: string[] = [];
     if (selectedShop === "All Shops") {
       const filterDate = (item: any) => {
@@ -414,10 +287,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     const headers = ["Date", "Particulars", "Birds", "Weight (KG)", "Rate (₹)", "Debit (₹)", "Credit (₹)", "Balance (₹)", "Payment Mode"];
     const workbook = XLSX.utils.book_new();
 
-    // Sheet per shop
     shopNames.forEach((shop) => {
       const ledger = getLedgerForShop(shop, allSales, allCollections, dateFrom, dateTo);
-      if (ledger.length <= 1) return; // skip empty
+      if (ledger.length <= 1) return;
 
       const rows = ledger.map((t) => [
         t.date,
@@ -431,7 +303,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         t.paymentMode || "-",
       ]);
 
-      // Totals
       const tx = ledger.slice(1);
       const totalDebit = tx.reduce((sum, t) => sum + t.debit, 0);
       const totalCredit = tx.reduce((sum, t) => sum + t.credit, 0);
@@ -452,10 +323,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
       const wsData = [headers, ...rows];
       const ws = XLSX.utils.aoa_to_sheet(wsData);
-      XLSX.utils.book_append_sheet(workbook, ws, shop.slice(0, 31)); // Excel sheet name max 31 chars
+      XLSX.utils.book_append_sheet(workbook, ws, shop.slice(0, 31));
     });
 
-    // Summary sheet
     const summaryRows = [
       ["Shop", "Total Debit", "Total Credit", "Closing Balance"],
     ];

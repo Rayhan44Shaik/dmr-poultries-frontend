@@ -1,16 +1,44 @@
 // src/modules/accounts/pages/NewPaymentPage.tsx
 
+import React from 'react';
+
+interface NewPaymentPageProps {
+  embedded?: boolean;
+}
+
+export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
+  return (
+    <div className={`w-full flex items-center justify-center animate-in fade-in duration-500 ${
+      embedded ? 'min-h-[60vh]' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
+    }`}>
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center max-w-md w-full mx-4">
+        <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 border border-blue-100 shadow-sm animate-bounce">
+          🚧
+        </div>
+        <h2 className="text-xl font-bold text-slate-800 mb-2">Fuel Payment - Coming Soon</h2>
+        <p className="text-sm text-slate-500 leading-relaxed">
+          This payment configuration module is currently being enhanced and will be made fully available after the upcoming updates.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ====================================================================================================
+   ====================================================================================================
+   COMMENTED OUT FOR CLIENT PRESENTATION - TO BE ENHANCED AND RESTORED LATER
+   ====================================================================================================
+   ====================================================================================================
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { PaymentService } from '../services/PaymentService';
 import { FarmPaymentService } from '../services/FarmPaymentService';
 import { tripService } from '../../operations/vehicle-trips/services/tripService';
-import type { Payment } from '../types/payment.types';
 import type { FarmPayment } from '../types/farmPayment.types';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import { DatePicker } from '../../../components/common/DatePicker';
-import { RefreshCw } from 'lucide-react';
 import { getBanks } from '../../masters/banks/services/bankService';
 import type { Bank } from '../../masters/banks/types/bank';
 
@@ -25,20 +53,6 @@ const CATEGORY_OPTIONS = [
   'Insurance',
   'Other',
 ];
-
-// Helper: get current week Monday–Sunday
-const getCurrentWeekRange = () => {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = (day === 0 ? 6 : day - 1);
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - diff);
-  monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
-  return { monday, sunday };
-};
 
 // Format date to YYYY-MM-DD for input default
 const formatDate = (date: Date) => {
@@ -61,7 +75,7 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
   const [paymentDate, setPaymentDate] = useState(formatDate(today));
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'Bank Transfer' | 'UPI' | 'Cheque'>('Cash');
   const [amount, setAmount] = useState<number | ''>('');
-  const [category, setCategory] = useState('Farm Payment');
+  const [category, setCategory] = useState(''); // Default to empty string
   const [subCategory, setSubCategory] = useState('');
   const [remarks, setRemarks] = useState('');
   const [paidTo, setPaidTo] = useState('');
@@ -73,11 +87,6 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
   const [allTrips, setAllTrips] = useState<Trip[]>([]);
   const [allFarmPayments, setAllFarmPayments] = useState<FarmPayment[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
-
-  // ---- Weekly payments ----
-  const [weeklyPayments, setWeeklyPayments] = useState<Payment[]>([]);
-  const [weeklyRefreshKey, setWeeklyRefreshKey] = useState(0);
-  const [weekRange] = useState(getCurrentWeekRange);
 
   // ---- Trip selection state ----
   const [selectedTripNos, setSelectedTripNos] = useState<Set<string>>(new Set());
@@ -93,18 +102,6 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
     const farmPayments = FarmPaymentService.getAll();
     setAllFarmPayments(farmPayments);
   }, [refreshKey]);
-
-  // Load weekly payments
-  const loadWeeklyPayments = () => {
-    const payments = PaymentService.getPaymentsForWeek(weekRange.monday);
-    setWeeklyPayments(payments);
-    setWeeklyRefreshKey(prev => prev + 1); // force re-render of table
-  };
-
-  useEffect(() => {
-    loadWeeklyPayments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // ---- Memoized sub‑category options ----
   const subCategoryOptions = useMemo(() => {
@@ -368,12 +365,11 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
       setPaidTo('');
       setReferenceNo('');
       setRemarks('');
-      setCategory('Farm Payment');
+      setCategory('');
       setSubCategory('');
       setSelectedTripNos(new Set());
 
-      // Refresh both weekly payments and farm data
-      loadWeeklyPayments();
+      // Refresh farm data
       setRefreshKey(prev => prev + 1);
 
     } catch (err) {
@@ -384,15 +380,6 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
     }
   };
 
-  // ---- Weekly payments grouping ----
-  const grouped = {
-    Draft: weeklyPayments.filter((p) => p.status === 'Draft'),
-    Approved: weeklyPayments.filter((p) => p.status === 'Approved'),
-    Paid: weeklyPayments.filter((p) => p.status === 'Paid'),
-    Cancelled: weeklyPayments.filter((p) => p.status === 'Cancelled'),
-  };
-  const totalAmount = weeklyPayments.reduce((sum, p) => sum + p.amount, 0);
-
   // ---- Payment mode options ----
   const paymentModeOptions = useMemo(() => {
     const baseOptions: { value: 'Cash' | 'Bank Transfer' | 'UPI' | 'Cheque'; label: string }[] = [
@@ -401,7 +388,6 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
       { value: 'UPI', label: 'UPI' },
       { value: 'Cheque', label: 'Cheque' },
     ];
-    // Add banks as options (assuming bank names match the union – you may need to map)
     const bankOptions = banks.map((bank) => ({
       value: bank.bankName as 'Cash' | 'Bank Transfer' | 'UPI' | 'Cheque',
       label: bank.bankName,
@@ -409,14 +395,12 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
     return [...baseOptions, ...bankOptions];
   }, [banks]);
 
-  // Format currency
   const formatCurrency = (amount: number) => {
     if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(2)} Cr`;
     if (amount >= 100000) return `₹${(amount / 100000).toFixed(2)} L`;
     return `₹${amount.toLocaleString('en-IN')}`;
   };
 
-  // Determine if we should show Select Farm
   const showSelectFarm = category === 'Farm Payment' && subCategoryOptions.length > 0;
 
   return (
@@ -435,10 +419,8 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
         }
       `}</style>
 
-      {/* ---- Form Card ---- */}
       <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 w-full">
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* ---- Row 1: Date | Mode | Category ---- */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700">
@@ -481,6 +463,7 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
                 className="w-full mt-1 h-10 px-3 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-400 outline-none"
                 required
               >
+                <option value="" disabled>Select category...</option>
                 {CATEGORY_OPTIONS.map((cat) => (
                   <option key={cat} value={cat}>
                     {cat}
@@ -490,14 +473,12 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
             </div>
           </div>
 
-          {/* ---- No unpaid farm payments message ---- */}
           {category === 'Farm Payment' && subCategoryOptions.length === 0 && (
             <div className="text-sm text-amber-600 bg-amber-50 p-2 rounded-lg border border-amber-200">
               No unpaid farm payments found. All farm payments are settled.
             </div>
           )}
 
-          {/* ---- Row 2: Select Farm (if shown) | Amount (with summary) | (empty or Paid To/Reference) ---- */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {showSelectFarm ? (
               <>
@@ -550,7 +531,7 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
                     )}
                   </div>
                 </div>
-                <div>{/* empty cell */}</div>
+                <div></div>
               </>
             ) : (
               <>
@@ -600,7 +581,6 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
             )}
           </div>
 
-          {/* ---- Row 3: Paid To | Reference | (empty) – only if showSelectFarm ---- */}
           {showSelectFarm && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
@@ -629,11 +609,10 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
                   required
                 />
               </div>
-              <div>{/* empty cell */}</div>
+              <div></div>
             </div>
           )}
 
-          {/* ---- Row 4: Remarks (full width) ---- */}
           <div className="grid grid-cols-1 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700">Remarks</label>
@@ -647,7 +626,6 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
             </div>
           </div>
 
-          {/* ---- Farm Payment Details Table ---- */}
           {subCategory && farmPaymentDetails.length > 0 && (
             <div className="mt-4 border-t border-slate-200 pt-4">
               <div className="flex items-center justify-between mb-3">
@@ -741,9 +719,7 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
             </div>
           )}
 
-          {/* ---- Bottom Row: Summary (left) + Buttons (right, fixed) ---- */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-200">
-            {/* Payment Summary (left side) */}
             {subCategory && selectedTripNos.size > 0 && (
               <div className="flex-1 min-w-0 w-full sm:w-auto">
                 <div className="bg-slate-50 rounded-lg border border-slate-200 px-3 py-2 text-sm flex items-center gap-4 flex-wrap">
@@ -763,7 +739,6 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
                       </span>
                     )}
                   </div>
-                  {/* Show only partial allocations */}
                   {paymentSummary.allocation.filter(a => a.status === 'partial').length > 0 && (
                     <div className="text-xs text-slate-600 flex items-center gap-2 flex-wrap">
                       {paymentSummary.allocation
@@ -779,7 +754,6 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
               </div>
             )}
 
-            {/* Buttons (right side, fixed) */}
             <div className="flex items-center gap-3 flex-shrink-0 w-full sm:w-auto sm:ml-auto">
               <button
                 type="button"
@@ -789,7 +763,7 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
                   setPaidTo('');
                   setReferenceNo('');
                   setRemarks('');
-                  setCategory('Farm Payment');
+                  setCategory('');
                   setSubCategory('');
                   setSelectedTripNos(new Set());
                 }}
@@ -808,89 +782,8 @@ export function NewPaymentPage({ embedded = false }: NewPaymentPageProps) {
           </div>
         </form>
       </div>
-
-      {/* ---- Weekly Payments Table ---- */}
-      <div key={weeklyRefreshKey} className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden w-full">
-        <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-200/60 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-800">
-            This Week's Payments
-            <span className="ml-2 text-xs font-normal text-slate-500">
-              ({weekRange.monday.toLocaleDateString()} – {weekRange.sunday.toLocaleDateString()})
-            </span>
-          </h2>
-          <button
-            onClick={loadWeeklyPayments}
-            className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-          >
-            <RefreshCw size={14} /> Refresh
-          </button>
-        </div>
-
-        <div className="px-4 py-2 bg-white border-b border-slate-100 flex flex-wrap gap-4 text-sm">
-          <span className="text-slate-600">Total: <strong>{weeklyPayments.length}</strong></span>
-          <span className="text-slate-600">Amount: <strong>₹{totalAmount.toLocaleString('en-IN')}</strong></span>
-          <span className="text-amber-600">Draft: <strong>{grouped.Draft.length}</strong></span>
-          <span className="text-blue-600">Approved: <strong>{grouped.Approved.length}</strong></span>
-          <span className="text-emerald-600">Paid: <strong>{grouped.Paid.length}</strong></span>
-          <span className="text-rose-600">Cancelled: <strong>{grouped.Cancelled.length}</strong></span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50/50 text-slate-500 text-xs uppercase tracking-wider">
-              <tr>
-                <th className="px-4 py-2 text-left">Date</th>
-                <th className="px-4 py-2 text-left">Payment No</th>
-                <th className="px-4 py-2 text-left">Paid To</th>
-                <th className="px-4 py-2 text-left">Type</th>
-                <th className="px-4 py-2 text-right">Amount</th>
-                <th className="px-4 py-2 text-left">Mode</th>
-                <th className="px-4 py-2 text-left">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {weeklyPayments.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-slate-400 text-sm">
-                    No payments this week.
-                  </td>
-                </tr>
-              ) : (
-                weeklyPayments.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50 transition">
-                    <td className="px-4 py-2.5 text-slate-700">
-                      {new Date(p.paymentDate).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-700 font-mono text-xs">{p.paymentNo}</td>
-                    <td className="px-4 py-2.5 text-slate-700">{p.paidTo}</td>
-                    <td className="px-4 py-2.5 text-slate-700">{p.paymentType}</td>
-                    <td className="px-4 py-2.5 text-right font-medium text-slate-800">
-                      ₹{p.amount.toLocaleString('en-IN')}
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-700">{p.paymentMode}</td>
-                    <td className="px-4 py-2.5">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium
-                          ${
-                            p.status === 'Draft'
-                              ? 'bg-amber-100 text-amber-700'
-                              : p.status === 'Approved'
-                              ? 'bg-blue-100 text-blue-700'
-                              : p.status === 'Paid'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-rose-100 text-rose-700'
-                          }`}
-                      >
-                        {p.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 }
+
+==================================================================================================== */

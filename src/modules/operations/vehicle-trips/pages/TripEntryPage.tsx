@@ -26,6 +26,9 @@ import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useBirdTypes } from "../../../masters/bird-types/hooks/useBirdTypes";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
+// --- Services ---
+import { fuelExpenseService } from "../../fuel-expenses/services/fuelExpenseService";
+
 // --- Utils ---
 import { canEditItem } from "../../../../utils/dateUtils";
 import type { Trip, ShopDelivery } from "../types/trip";
@@ -75,12 +78,32 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const isManualSelect = useRef(false);
   const endStepJustSubmitted = useRef(false);
 
+  // ─── Handle status change with fuel bill validation ────────────
+  const handleStatusChange = (trip: Trip, status: "Pending" | "Completed") => {
+    // Only validate when moving to "Completed"
+    if (status === "Completed") {
+      // Check if there are any pending fuel bills for this trip
+      const bills = fuelExpenseService.getBillsForTrip(trip.vehicleId, trip.tripDate);
+      const pendingBills = bills.filter(b => b.status === "Pending");
+
+      if (pendingBills.length > 0) {
+        const msg = pendingBills.length === 1
+          ? `⚠️ 1 fuel bill for this trip is not approved. Please approve it before completing the trip.`
+          : `⚠️ ${pendingBills.length} fuel bills for this trip are not approved. Please approve them before completing the trip.`;
+        showNotification(msg, "info"); // ✅ Changed from "warning" to "info"
+        return; // Do NOT change status
+      }
+    }
+
+    // If all checks pass, change the status
+    changeStatus(trip, status);
+  };
+
   const handleView = (selectedTrip: Trip) => {
     setViewTrip(selectedTrip);
     setViewOpen(true);
   };
 
-  // ✅ Added explicit type for selectedTrip
   const handleEdit = (selectedTrip: Trip) => {
     setShowEntryPrompt(false);
     let targetStep = 0;
@@ -320,7 +343,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           <>
             <TripWizardStepper
               steps={["Start", "Farm", "Pickup", "Deliveries", "End"]}
-              // ✅ Fixed: use 4 instead of 5 when ended
               currentStep={isTripEnded ? 4 : currentStep}
               completedMask={{
                 start: isStartCompleted,
@@ -347,7 +369,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         onView={handleView}
         onEdit={handleEdit}
         onDelete={(trip, reason) => deleteTrip(trip.id, reason)}
-        onStatusChange={changeStatus}
+        onStatusChange={handleStatusChange} // ✅ Pass the validated version
       />
 
       <TripViewModal
@@ -359,7 +381,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         }}
         shops={shops}
         birdTypes={birdTypes}
-        // ✅ Added explicit type for selectedTrip
         onEdit={(selectedTrip: Trip) => {
           handleEdit(selectedTrip);
           setViewOpen(false);

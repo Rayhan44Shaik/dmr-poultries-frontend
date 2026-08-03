@@ -21,7 +21,6 @@ export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10
     return payments.slice(start, end);
   }, [payments, currentPage, itemsPerPage]);
 
-  // Reset to first page when payments list changes (e.g., filter)
   useMemo(() => {
     if (currentPage > totalPages) setCurrentPage(1);
   }, [payments, currentPage, totalPages]);
@@ -43,11 +42,17 @@ export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10
     });
   };
 
+  // Generate clean sequential Payment Number like #PAY-20260803-001
+  const formatPaymentNo = (payment: Payment, index: number) => {
+    const dateClean = payment.paymentDate ? payment.paymentDate.replace(/-/g, '') : '20260803';
+    const sequentialNum = String(index + 1).padStart(3, '0');
+    return `#PAY-${dateClean}-${sequentialNum}`;
+  };
+
   const handleRowClick = (id: string) => {
     onSelect(selectedId === id ? null : id);
   };
 
-  // Generate page numbers with ellipsis
   const getPageNumbers = (): (number | 'ellipsis')[] => {
     const pages: (number | 'ellipsis')[] = [];
     if (totalPages <= 7) {
@@ -70,31 +75,28 @@ export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-slate-50/80 border-b border-slate-200">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase whitespace-nowrap">
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                Payment No
+              </th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                 Date
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase whitespace-nowrap">
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                 Payment Type
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase whitespace-nowrap">
-                Reference
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase whitespace-nowrap">
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                 Paid To
               </th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase whitespace-nowrap">
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap text-right">
                 Amount
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase whitespace-nowrap">
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                 Mode
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase whitespace-nowrap">
-                Category
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase whitespace-nowrap">
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                 Remarks
               </th>
             </tr>
@@ -102,45 +104,43 @@ export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10
           <tbody className="divide-y divide-slate-100 bg-white">
             {paginatedPayments.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500 text-sm">
+                <td colSpan={7} className="px-6 py-12 text-center text-slate-400 text-sm">
                   No payments found. Click <span className="font-semibold text-blue-600">"New Payment"</span> to add one.
                 </td>
               </tr>
             ) : (
-              paginatedPayments.map((payment) => {
+              paginatedPayments.map((payment, index) => {
                 const isSelected = selectedId === payment.id;
+                const absoluteIndex = (currentPage - 1) * itemsPerPage + index;
                 return (
                   <tr
                     key={payment.id}
                     onClick={() => handleRowClick(payment.id)}
-                    className={`cursor-pointer transition-all duration-150 ${
+                    className={`cursor-pointer transition-all duration-150 group ${
                       isSelected
-                        ? 'bg-blue-50/80 shadow-[inset_0_0_0_2px_#3b82f6]'
-                        : 'hover:bg-slate-50'
+                        ? 'bg-blue-50/40 shadow-[inset_0_0_0_2px_#3b82f6]'
+                        : 'hover:bg-slate-50/80'
                     }`}
                   >
-                    <td className="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">
+                    <td className="px-6 py-4.5 text-sm font-mono font-semibold text-blue-600 whitespace-nowrap">
+                      {formatPaymentNo(payment, absoluteIndex)}
+                    </td>
+                    <td className="px-6 py-4.5 text-sm text-slate-600 whitespace-nowrap">
                       {formatDate(payment.paymentDate)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">
+                    <td className="px-6 py-4.5 text-sm text-slate-700 whitespace-nowrap">
                       {payment.paymentType}
                     </td>
-                    <td className="px-4 py-3 text-sm font-mono text-slate-600 whitespace-nowrap">
-                      {payment.referenceNo}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">
+                    <td className="px-6 py-4.5 text-sm text-slate-700 whitespace-nowrap">
                       {payment.paidTo}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right font-bold text-emerald-600 whitespace-nowrap">
+                    <td className="px-6 py-4.5 text-sm font-bold text-emerald-600 text-right whitespace-nowrap tracking-wide">
                       {formatCurrency(payment.amount)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-600 whitespace-nowrap">
+                    <td className="px-6 py-4.5 text-sm text-slate-600 whitespace-nowrap">
                       {payment.paymentMode}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-600 whitespace-nowrap">
-                      {payment.category}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-500 max-w-[150px] truncate">
+                    <td className="px-6 py-4.5 text-sm text-slate-500 truncate max-w-[240px]">
                       {payment.remarks || '-'}
                     </td>
                   </tr>
@@ -153,8 +153,8 @@ export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-slate-50 border-t border-slate-200">
-          <span className="text-xs text-slate-500">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 bg-slate-50/80 border-t border-slate-200">
+          <span className="text-xs font-medium text-slate-500">
             Showing {startItem} to {endItem} of {payments.length} entries
           </span>
 
@@ -162,7 +162,7 @@ export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10
             <button
               onClick={() => setCurrentPage(currentPage - 1)}
               disabled={currentPage === 1}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-1"
+              className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 shadow-sm"
             >
               <ChevronLeft size={14} /> Prev
             </button>
@@ -176,8 +176,8 @@ export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10
                   onClick={() => setCurrentPage(page)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                     currentPage === page
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'border border-slate-300 text-slate-700 bg-white hover:bg-slate-100'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'border border-slate-300 text-slate-700 bg-white hover:bg-slate-100 shadow-sm'
                   }`}
                 >
                   {page}
@@ -188,7 +188,7 @@ export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10
             <button
               onClick={() => setCurrentPage(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-1"
+              className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 shadow-sm"
             >
               Next <ChevronRight size={14} />
             </button>

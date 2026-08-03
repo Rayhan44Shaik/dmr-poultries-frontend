@@ -18,22 +18,32 @@ import { NewPaymentPage } from './NewPaymentPage';
 import MarketRatePage from './MarketRatePage';
 import SummaryPage from './SummaryPage';
 
-const PlaceholderTab = ({ title }: { title: string }) => (
-  <div className="flex items-center justify-center h-64 bg-white rounded-xl border border-slate-200/80">
-    <p className="text-slate-500 text-sm font-medium">{title} - Coming Soon</p>
+// ---- Reusable "Coming Soon" Component ----
+const ComingSoonTab = ({ title }: { title: string }) => (
+  <div className="w-full flex items-center justify-center animate-in fade-in duration-500 min-h-[60vh]">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center max-w-md w-full mx-4">
+      <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 border border-blue-100 shadow-sm animate-bounce">
+        🚧
+      </div>
+      <h2 className="text-xl font-bold text-slate-800 mb-2">{title} - Coming Soon</h2>
+      <p className="text-sm text-slate-500 leading-relaxed">
+        This payment configuration module is currently being enhanced and will be made fully available after the upcoming updates.
+      </p>
+    </div>
   </div>
 );
-const FuelPaymentPage = () => <PlaceholderTab title="Fuel Payment" />;
-const VehiclePaymentPage = () => <PlaceholderTab title="Vehicle Payment" />;
+
+const FuelPaymentPage = () => <ComingSoonTab title="Fuel Payment" />;
+const VehiclePaymentPage = () => <ComingSoonTab title="Vehicle Payment" />;
 
 const tabs = [
   { key: 'paid-payments', label: 'Paid Payments', icon: CheckCircle, color: 'text-emerald-600', component: PaymentBookPage },
-  { key: 'new-payments', label: 'New Payments', icon: PlusCircle, color: 'text-blue-600', component: NewPaymentPage },
-  { key: 'farm-payment', label: 'Farm Payment', icon: Sprout, color: 'text-green-600', component: FarmerPaymentPage },
-  { key: 'fuel-payment', label: 'Fuel Payment', icon: Fuel, color: 'text-amber-600', component: FuelPaymentPage },
-  { key: 'vehicle-payment', label: 'Vehicle Payment', icon: Truck, color: 'text-purple-600', component: VehiclePaymentPage },
   { key: 'market-rate', label: 'Market Rate', icon: TrendingUp, color: 'text-indigo-600', component: MarketRatePage },
   { key: 'summary', label: 'Summary', icon: BarChart3, color: 'text-rose-600', component: SummaryPage },
+  { key: 'farm-payment', label: 'Farm Payment', icon: Sprout, color: 'text-green-600', component: FarmerPaymentPage },
+  { key: 'new-payments', label: 'New Payments', icon: PlusCircle, color: 'text-blue-600', component: NewPaymentPage },
+  { key: 'fuel-payment', label: 'Fuel Payment', icon: Fuel, color: 'text-amber-600', component: FuelPaymentPage },
+  { key: 'vehicle-payment', label: 'Vehicle Payment', icon: Truck, color: 'text-purple-600', component: VehiclePaymentPage },
 ];
 
 function AccountsPage() {

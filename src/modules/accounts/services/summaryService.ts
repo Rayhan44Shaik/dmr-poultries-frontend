@@ -5,15 +5,14 @@ import { collectionService } from '../../operations/collections/services/collect
 import { shopSalesService } from '../../operations/shop-sales/services/shopSalesService';
 import { FarmPaymentService } from './FarmPaymentService';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
-import type { ShopSale } from '../../operations/shop-sales/types/shopSale';
 import type { Collection } from '../../operations/collections/types/collection';
 import type { FarmPayment } from '../types/farmPayment.types';
 import type { WeeklyMetrics, ExpenseBreakdown } from '../types/summary.types';
 
-// ----- Internal helpers (typed) -----
-
+// ---- Core Data Fetchers ----
 const getCompletedTrips = (): Trip[] => {
-  return tripService.getAll().filter(trip => trip.status === 'Completed');
+  // Pulls only trips that are formally Completed (or Approved)
+  return tripService.getAll().filter(trip => trip.status === 'Completed' || (trip as any).status === 'Approved');
 };
 
 const getApprovedCollections = (): Collection[] => {
@@ -24,7 +23,35 @@ const getFarmPayments = (): FarmPayment[] => {
   return FarmPaymentService.getAll();
 };
 
-// ----- Exported functions with types -----
+// ---- Trip Expense Extractor ----
+const getExpensesFromTrip = (trip: Trip): ExpenseBreakdown => {
+  // 1. Primary Modern Trip Fields
+  const tripExpense = Number(trip.expense || 0);
+  const pickupTolls = Number(trip.pickupTolls || 0);
+  const deliveryTolls = Number(trip.deliveryTolls || 0);
+  const totalTripExp = tripExpense + pickupTolls + deliveryTolls;
+
+  // 2. Legacy Fallbacks (In case older trips used dynamic meal fields)
+  const meals = Number((trip as any).meals || 0);
+  const loading = Number((trip as any).loading || 0);
+  const mealsTiffin = Number((trip as any).mealsTiffin || 0);
+  const othersRC = Number((trip as any).othersRC || 0);
+  const legacyTripExp = meals + loading + mealsTiffin + othersRC;
+
+  const vehicleMaintenance = Number((trip as any).vehicleMaintenance || 0) + Number((trip as any).maintenance || 0);
+  const farmPayment = Number((trip as any).farmPayment || 0);
+  const salary = Number((trip as any).salary || 0);
+  const office = Number((trip as any).office || 0);
+
+  return {
+    farm: farmPayment,
+    fuel: 0, // ✅ EXPLICITLY IGNORING FUEL FROM TRIPS AS REQUESTED
+    trip: totalTripExp > 0 ? totalTripExp : legacyTripExp,
+    salary: salary,
+    maintenance: vehicleMaintenance,
+    office: office,
+  };
+};
 
 export const summaryService = {
   getCompletedTrips,
@@ -55,24 +82,26 @@ export const summaryService = {
   },
 
   /**
-   * Compute WeeklyMetrics from a list of trips and collections.
+   * Compute Metrics for Trips & Collections
    */
   computeMetrics(trips: Trip[], collections: Collection[]): WeeklyMetrics {
-    let birds = 0,
-      weight = 0,
-      mortality = 0,
-      sales = 0;
+    let birds = 0, weight = 0, mortality = 0, sales = 0;
+    
     trips.forEach(trip => {
       birds += trip.totalBirds || 0;
       weight += trip.totalWeight || 0;
       mortality += trip.totalMortality || 0;
+      
+      // Sales: sum of deliveries weight * rate
       (trip.deliveries || []).forEach(d => {
-        const rate = (d as any).rate || 14;
+        const rate = (d as any).rate || 0;
         sales += (d.weight || 0) * rate;
       });
     });
+    
     const collection = collections.reduce((sum, c) => sum + c.amount, 0);
     const pending = sales - collection;
+    
     return {
       trips: trips.length,
       birds,
@@ -85,69 +114,56 @@ export const summaryService = {
   },
 
   /**
-   * Compute ExpenseBreakdown for a given date range from farm payments and other payments.
+   * ✅ COMBINED EXPENSES
+   * Aggregates Trip Expenses + Farm Payments + Global Operational Ledger
    */
-  computeExpenses(startDate: Date, endDate: Date, farmPayments: FarmPayment[]): ExpenseBreakdown {
-    // Start with farm payments within this range
-    const farmTotal = farmPayments
-      .filter(p => {
-        const d = new Date(p.paidDate || p.createdAt || '');
-        return d >= startDate && d <= endDate;
-      })
-      .reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+  computeCombinedExpenses(trips: Trip[], startDate: Date, endDate: Date, farmPayments: FarmPayment[]): ExpenseBreakdown {
+    const total: ExpenseBreakdown = { farm: 0, fuel: 0, trip: 0, salary: 0, maintenance: 0, office: 0 };
 
-    // Other expenses from 'dmr-payments' (your Payment Book)
-    let fuel = 0,
-      trip = 0,
-      salary = 0,
-      maintenance = 0,
-      office = 0;
+    // 1. Direct Completed Trip Expenses
+    trips.forEach(trip => {
+      const exp = getExpensesFromTrip(trip);
+      total.farm += exp.farm;
+      total.fuel += exp.fuel; // Will remain 0 from trips based on the logic above
+      total.trip += exp.trip;
+      total.salary += exp.salary;
+      total.maintenance += exp.maintenance;
+      total.office += exp.office;
+    });
+
+    // 2. Direct Farm Payments
+    farmPayments.forEach(p => {
+      const d = new Date(p.paidDate || p.createdAt || '');
+      if (d >= startDate && d <= endDate) {
+        total.farm += Number(p.amountPaid || p.totalAmount || 0);
+      }
+    });
+
+    // 3. Operational Ledger (dmr-payments)
     try {
       const raw = localStorage.getItem('dmr-payments');
       if (raw) {
         const payments = JSON.parse(raw);
         const filtered = payments.filter((p: any) => {
           const d = new Date(p.paymentDate);
-          return d >= startDate && d <= endDate && p.status === 'Approved';
+          return d >= startDate && d <= endDate && (p.status === 'Approved' || p.status === 'Paid');
         });
+
         filtered.forEach((p: any) => {
-          const cat = p.category?.toLowerCase() || 'office';
-          if (cat.includes('fuel')) fuel += p.amount;
-          else if (cat.includes('trip')) trip += p.amount;
-          else if (cat.includes('salary')) salary += p.amount;
-          else if (cat.includes('maintenance') || cat.includes('repair')) maintenance += p.amount;
-          else office += p.amount;
+          const cat = (p.category || '').toLowerCase();
+          const amt = Number(p.amount || 0);
+          
+          if (cat.includes('fuel')) total.fuel += amt;
+          else if (cat.includes('trip') || cat.includes('fastag') || cat.includes('vehicle expenses')) total.trip += amt;
+          else if (cat.includes('salary')) total.salary += amt;
+          else if (cat.includes('maintenance') || cat.includes('insurance') || cat.includes('repair')) total.maintenance += amt;
+          else if (!cat.includes('farm')) total.office += amt;
         });
       }
     } catch {
-      // ignore
+      // Safely ignore parsing issues
     }
 
-    return { farm: farmTotal, fuel, trip, salary, maintenance, office };
-  },
-
-  /**
-   * Get all expenses for each week (grouped).
-   */
-  getWeeklyExpenses(
-    weeklyTrips: { trips: Trip[]; startDate: Date; endDate: Date }[],
-    farmPayments: FarmPayment[]
-  ): ExpenseBreakdown[] {
-    return weeklyTrips.map(({ startDate, endDate }) =>
-      this.computeExpenses(startDate, endDate, farmPayments)
-    );
-  },
-
-  /**
-   * Get the current week's Monday and Sunday.
-   */
-  getCurrentWeek(): { start: Date; end: Date } {
-    const now = new Date();
-    const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-    const start = new Date(now.getFullYear(), now.getMonth(), diff);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    return { start, end };
-  },
+    return total;
+  }
 };
