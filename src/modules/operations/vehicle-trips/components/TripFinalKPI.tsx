@@ -1,3 +1,5 @@
+// src/modules/operations/vehicle-trips/components/TripFinalKPI.tsx
+
 import React, { useMemo } from "react";
 import type { Trip, ShopDelivery } from "../types/trip";
 import {
@@ -10,6 +12,7 @@ import {
   MapPin,
   Route,
   Activity,
+  Fuel,
 } from "lucide-react";
 
 interface Props {
@@ -36,19 +39,16 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
           mortalityKg?: number;
         };
 
-        // 1. Check if direct mortality weight was saved on the row
         let rowMortalityKg =
           rowWithExtra.mortalityWeight ?? rowWithExtra.mortalityKg ?? 0;
 
-        // 2. If not directly entered, calculate from the shop row or trip average
         if (rowMortalityKg === 0 && (row.mortality || 0) > 0) {
           const avgPerBird =
             row.birds > 0
-              ? row.weight / row.birds // Shop average per bird
+              ? row.weight / row.birds
               : trip.totalBirds > 0
-              ? (trip.dcWeight || 0) / trip.totalBirds // Trip fallback average per bird
+              ? (trip.dcWeight || 0) / trip.totalBirds
               : 0;
-
           rowMortalityKg = row.mortality * avgPerBird;
         }
 
@@ -63,10 +63,9 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
     );
   }, [deliveries, trip]);
 
-  // Direct mortality weight straight from the shop data
   const mortalityWeight = deliveryTotals.totalMortalityKg;
 
-  // ─── Weight Loss (DC Weight - Delivered Weight - Mortality Weight) ───
+  // ─── Weight Loss ──────────────────────────────────────────────────
   const weightLoss = useMemo(() => {
     const dcWeight = trip.dcWeight || 0;
     const totalOut = deliveryTotals.totalWeight + mortalityWeight;
@@ -85,6 +84,21 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
   const deliveryDist = Math.max(0, (trip.closingMeter || 0) - (trip.destMeter || 0));
   const totalDist = Math.max(0, (trip.closingMeter || 0) - (trip.openingMeter || 0));
 
+  // ─── Mileage ──────────────────────────────────────────────────────
+  let totalDieselLiters = 0;
+  for (let i = 1; i <= 6; i++) {
+    const key = `dieselLtr${i}`;
+    const val = (trip as any)[key];
+    if (val !== undefined && val !== null && val !== "") {
+      totalDieselLiters += Number(val);
+    }
+  }
+  const totalDistanceCovered = totalDist;
+  const mileage = totalDistanceCovered > 0 && totalDieselLiters > 0
+    ? totalDistanceCovered / totalDieselLiters
+    : 0;
+
+  // ─── Define cards ──────────────────────────────────────────────────
   const cards = [
     {
       label: "DC WEIGHT",
@@ -142,34 +156,48 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
       bg: "bg-indigo-50",
       icon: <Ticket size={18} className="text-indigo-600" />,
     },
-    {
-      label: "TILL PICKUP",
-      value: `${pickupDist} KM`,
-      sub: "Office to Farm",
-      bg: "bg-sky-50",
-      icon: <MapPin size={18} className="text-sky-600" />,
-    },
-    {
-      label: "DELIVERY DIST.",
-      value: `${deliveryDist} KM`,
-      sub: "Farm to End",
-      bg: "bg-sky-50",
-      icon: <Route size={18} className="text-sky-600" />,
-    },
+    // ─── Combined Distance Card ──────────────────────────────────────
     {
       label: "DISTANCE",
-      value: `${totalDist} KM`,
-      sub: "Total Covered",
+      value: (
+        <div className="text-xs text-slate-600 space-y-0.5 mt-0.5">
+          <div className="flex justify-between items-center">
+            <span className="font-normal text-slate-500">Pickup:</span>
+            <span className="font-bold text-slate-800">{pickupDist.toFixed(2)} KM</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="font-normal text-slate-500">Delivery:</span>
+            <span className="font-bold text-slate-800">{deliveryDist.toFixed(2)} KM</span>
+          </div>
+          <div className="flex justify-between items-center border-t border-slate-200 pt-0.5 mt-0.5">
+            <span className="font-semibold text-slate-600">Total:</span>
+            <span className="font-bold text-slate-900">{totalDist.toFixed(2)} KM</span>
+          </div>
+        </div>
+      ),
+      sub: "Office → Farm → End",
       bg: "bg-indigo-50",
       icon: <Route size={18} className="text-indigo-600" />,
     },
     {
       label: "SURVIVAL RATE",
-      value: `${survivalRate.toFixed(1)}%`,
+      value: `${survivalRate.toFixed(2)}%`,
       sub: "Healthy Birds",
       bg: "bg-emerald-100",
       icon: <Activity size={18} className="text-emerald-600" />,
     },
+    // ─── Mileage card ────────────────────────────────────────────────
+    ...(mileage > 0
+      ? [
+          {
+            label: "MILEAGE",
+            value: `${mileage.toFixed(2)} KM/Ltr`,
+            sub: "Fuel Efficiency",
+            bg: "bg-purple-50",
+            icon: <Fuel size={18} className="text-purple-600" />,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -178,9 +206,9 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
         Trip KPI Summary
       </h3>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {cards.map((card) => (
+        {cards.map((card, idx) => (
           <div
-            key={card.label}
+            key={idx}
             className={`${card.bg} p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between gap-2`}
           >
             <div className="flex items-center justify-between">
@@ -192,9 +220,13 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
               </div>
             </div>
             <div className="mt-1">
-              <div className="text-lg md:text-xl font-bold text-slate-900">
-                {card.value}
-              </div>
+              {typeof card.value === "string" ? (
+                <div className="text-lg md:text-xl font-bold text-slate-900">
+                  {card.value}
+                </div>
+              ) : (
+                card.value
+              )}
               {card.sub && (
                 <div className="text-[10px] text-slate-500 font-medium mt-0.5">
                   {card.sub}

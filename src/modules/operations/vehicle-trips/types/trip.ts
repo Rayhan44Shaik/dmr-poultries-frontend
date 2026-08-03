@@ -64,6 +64,7 @@ export interface Trip {
   endTime: string;
   deliveryTolls: number;
   endStepSubmitted?: boolean;
+  expensesStepSubmitted?: boolean;
 
   totalKm: number;
   totalShops: number;

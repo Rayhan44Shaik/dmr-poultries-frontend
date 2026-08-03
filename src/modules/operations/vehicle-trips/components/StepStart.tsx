@@ -182,7 +182,6 @@ export default function StepStart({
           </div>
         </div>
 
-        {/* Compact KPI Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
@@ -252,7 +251,6 @@ export default function StepStart({
         .hide-spinner { -moz-appearance: textfield; appearance: none; }
       `}</style>
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
           <div className="flex items-center gap-2.5">
             <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
@@ -269,9 +267,7 @@ export default function StepStart({
           )}
         </div>
 
-        {/* Inputs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 sm:gap-x-6 gap-y-4 sm:gap-y-5">
-          {/* Start Time (read-only) */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Clock size={14} className="text-slate-400" /> Start Time <span className="text-red-500">*</span>
@@ -281,7 +277,6 @@ export default function StepStart({
             </div>
           </div>
 
-          {/* Vehicle No. */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Truck size={14} className="text-slate-400" /> Vehicle No. <span className="text-red-500">*</span>
@@ -300,7 +295,6 @@ export default function StepStart({
             />
           </div>
 
-          {/* Supervisor */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <User size={14} className="text-slate-400" /> Supervisor <span className="text-red-500">*</span>
@@ -319,7 +313,6 @@ export default function StepStart({
             />
           </div>
 
-          {/* Driver */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <User size={14} className="text-slate-400" /> Driver <span className="text-red-500">*</span>
@@ -338,7 +331,6 @@ export default function StepStart({
             />
           </div>
 
-          {/* Starting Meter */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Gauge size={14} className="text-slate-400" /> Starting Meter (KM) <span className="text-red-500">*</span>
@@ -373,7 +365,6 @@ export default function StepStart({
             )}
           </div>
 
-          {/* Advance / Expenses */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Wallet size={14} className="text-slate-400" /> Advance / Expenses <span className="text-red-500">*</span>
@@ -403,7 +394,6 @@ export default function StepStart({
             )}
           </div>
 
-          {/* Helpers (full width) */}
           <div className="col-span-1 sm:col-span-2">
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <User size={14} className="text-slate-400" /> Helpers
@@ -424,7 +414,6 @@ export default function StepStart({
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-slate-100">
           {!trip.startStepSubmitted && !editable && (
             <button
@@ -443,7 +432,7 @@ export default function StepStart({
                 if (editable && onCancel) onCancel();
                 else setIsLocalEditing(false);
               }}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95"
             >
               <X size={14} /> Cancel
             </button>
