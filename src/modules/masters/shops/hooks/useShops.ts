@@ -1,41 +1,111 @@
-// D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\masters\shops\hooks\useShops.ts
+import { useCallback, useEffect, useState } from "react";
 
-import { useState, useCallback, useEffect } from "react";
 import type { Shop } from "../types/shop";
-import { shopService } from "../services/shopService";
+import {
+  createShop,
+  deleteShop,
+  handleApiError,
+  loadShops,
+  refreshShops as refreshShopsFromApi,
+  updateShop,
+  type ShopInput,
+} from "../services/shopService";
 
+/**
+ * Shops page data hook — table state comes only from GET /api/masters/shops.
+ */
 export function useShops() {
   const [shops, setShops] = useState<Shop[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const refreshShops = useCallback(() => {
-    const data = shopService.getAll();
-    setShops(data);
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await loadShops();
+      setShops(data);
+      return data;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      setShops([]);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  /** Alias kept for ShopSalesPage and other consumers. */
+  const refreshShops = reload;
 
   useEffect(() => {
-    refreshShops();
-  }, [refreshShops]);
+    void reload().catch(() => {
+      /* error already captured in state */
+    });
+  }, [reload]);
 
-  const saveShops = useCallback((updatedList: Shop[]) => {
-    shopService.saveAll(updatedList);
-    setShops(updatedList);
+  const addShop = useCallback(async (input: ShopInput) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await createShop(input);
+      const data = await refreshShopsFromApi();
+      setShops(data);
+      return data;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      throw err;
+    } finally {
+      setSaving(false);
+    }
   }, []);
 
-  const addOrUpdateShop = useCallback((shopData: Omit<Shop, "id" | "shopNo"> & { id?: number }) => {
-    const updatedList = shopService.saveShop(shopData);
-    setShops(updatedList);
+  const editShop = useCallback(async (id: number, input: ShopInput) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await updateShop(id, input);
+      const data = await refreshShopsFromApi();
+      setShops(data);
+      return data;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      throw err;
+    } finally {
+      setSaving(false);
+    }
   }, []);
 
-  const deleteShop = useCallback((id: number) => {
-    const updatedList = shopService.deleteShop(id);
-    setShops(updatedList);
+  const removeShop = useCallback(async (id: number) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await deleteShop(id);
+      const data = await refreshShopsFromApi();
+      setShops(data);
+      return data;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      throw err;
+    } finally {
+      setSaving(false);
+    }
   }, []);
 
   return {
     shops,
-    saveShops,
-    addOrUpdateShop,
-    deleteShop,
+    loading,
+    saving,
+    error,
+    reload,
     refreshShops,
+    addShop,
+    editShop,
+    removeShop,
   };
 }
