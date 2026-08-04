@@ -7,7 +7,7 @@ interface Props {
   trip: Trip;
   setTrip: React.Dispatch<React.SetStateAction<Trip>>;
   updateTrip: (updates: Partial<Trip>) => void;
-  submitFarmStep: (data: Partial<Trip>) => boolean;
+  submitFarmStep: (data: Partial<Trip>) => boolean | Promise<boolean>;
   farms: any[];
   editable?: boolean;
   canEdit?: boolean;
@@ -197,7 +197,7 @@ export default function StepFarm({
     }
 
     setIsSubmitting(true);
-    const success = submitFarmStep({});
+    const success = await Promise.resolve(submitFarmStep({}));
     if (success) {
       setIsLocalEditing(false);
       notify("Destination details saved successfully.", "success");

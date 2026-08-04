@@ -1,4 +1,5 @@
 import type { Trip, ShopDelivery } from "../types/trip";
+import { tripService } from "./tripService";
 
 // =========================================================================
 // 🔹 NEW KPI CALCULATIONS (For the Step-by-Step Wizard)
@@ -163,12 +164,12 @@ export function generateTripNo(existingTrips: Trip[], date: string): string {
   return `TRP-${dateStr}-${seq}`;
 }
 
-// Renumber Pending Trips After Deletion
+// Renumber Pending Trips After Deletion (API cache only — no localStorage)
 export function renumberPendingTripsForDate(date: string): Trip[] {
-  const allTrips: Trip[] = JSON.parse(localStorage.getItem("vehicleTrips") || "[]");
+  const allTrips = tripService.getAll();
   const dateStr = date.replace(/-/g, "");
   const pendingTrips = allTrips
-    .filter((t) => t.tripDate === date && t.status === "Pending")
+    .filter((t) => t.tripDate === date && t.status === "Pending" && !t.deleted)
     .sort((a, b) => {
       const numA = parseInt(a.tripNo.split("-")[2] || "0", 10);
       const numB = parseInt(b.tripNo.split("-")[2] || "0", 10);
@@ -176,11 +177,10 @@ export function renumberPendingTripsForDate(date: string): Trip[] {
     });
   pendingTrips.forEach((trip, index) => {
     const newSeq = String(index + 1).padStart(3, "0");
-    const newTripNo = `TRP-${dateStr}-${newSeq}`;
-    trip.tripNo = newTripNo;
+    trip.tripNo = `TRP-${dateStr}-${newSeq}`;
+    tripService.update(trip);
   });
-  localStorage.setItem("vehicleTrips", JSON.stringify(allTrips));
-  return allTrips;
+  return tripService.getAll();
 }
 
 // Legacy Trip Validation (Used for the old single-page form)

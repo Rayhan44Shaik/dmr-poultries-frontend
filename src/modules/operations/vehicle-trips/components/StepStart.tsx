@@ -10,7 +10,7 @@ interface Props {
   trip: Trip;
   setTrip: React.Dispatch<React.SetStateAction<Trip>>;
   updateTrip: (updates: Partial<Trip>) => void;
-  submitStartStep: (data: Partial<Trip>) => boolean;
+  submitStartStep: (data: Partial<Trip>) => boolean | Promise<boolean>;
   vehicleOptions: { id: number; vehicleNumber: string }[];
   employeeOptions: { id: number; employeeName: string; department: string }[];
   editable?: boolean;
@@ -96,7 +96,7 @@ export default function StepStart({
   const handleSubmit = async () => {
     if (lastMeterError || advanceError) return;
     setIsSubmitting(true);
-    const success = submitStartStep({});
+    const success = await Promise.resolve(submitStartStep({}));
     if (success) {
       setIsLocalEditing(false);
     }

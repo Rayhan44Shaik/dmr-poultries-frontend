@@ -57,6 +57,10 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     isEditing,
     setIsEditing,
     endStepSubmitted,
+    saving,
+    loading: tripLoading,
+    error: tripError,
+    setError: setTripError,
     updateTrip,
     updateDeliveries,
     updateBoxDetails,
@@ -65,7 +69,10 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     submitPickupStep,
     submitDeliveriesStep,
     submitEndTrip,
+    saveDraft,
     loadTrip,
+    resumeDraft,
+    reloadCurrentTrip,
     clearTrip,
   } = useTripEntry(showNotification);
 
@@ -144,8 +151,40 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   }, [trip.deliveries, isEditing, trip.startStepSubmitted]);
 
   useEffect(() => {
-    refreshTrips();
-  }, [trip]);
+    void refreshTrips();
+  }, [trip.id, trip.updatedAt, trip.status, refreshTrips]);
+
+  // Resume latest Draft from PostgreSQL on first mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const draft = await resumeDraft();
+      if (cancelled || !draft) return;
+      setShowEntryPrompt(false);
+      let targetStep = 0;
+      if (
+        draft.status === "Completed" ||
+        draft.status === "Pending" ||
+        draft.endStepSubmitted ||
+        draft.expensesStepSubmitted
+      ) {
+        targetStep = 4;
+      } else if (draft.deliveryStepSubmitted) targetStep = 3;
+      else if (draft.pickupStepSubmitted) targetStep = 2;
+      else if (draft.farmStepSubmitted) targetStep = 1;
+      else if (draft.startStepSubmitted) targetStep = 0;
+      setViewStepIndex(targetStep);
+      setRows(draft.deliveries || []);
+      showNotification(
+        `📂 Resumed draft trip ${draft.tripNo} from PostgreSQL.`,
+        "info"
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const clearForm = () => {
     clearTrip();
@@ -303,6 +342,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           onCancel={onCancelEdit}
           {...({
             submitEndTrip,
+            submitExpensesStep: submitEndTrip,
             submitEndStep: submitEndTrip,
             onSubmit: submitEndTrip,
           } as any)}
@@ -332,7 +372,27 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
               </p>
             </div>
             <button
-              onClick={() => setShowEntryPrompt(false)}
+              onClick={async () => {
+                setShowEntryPrompt(false);
+                const draft = await resumeDraft();
+                if (draft) {
+                  let targetStep = 0;
+                  if (draft.deliveryStepSubmitted) targetStep = 3;
+                  else if (draft.pickupStepSubmitted) targetStep = 2;
+                  else if (draft.farmStepSubmitted) targetStep = 1;
+                  else if (draft.startStepSubmitted) targetStep = 0;
+                  setViewStepIndex(targetStep);
+                  setRows(draft.deliveries || []);
+                  showNotification(
+                    `📂 Resumed draft trip ${draft.tripNo}.`,
+                    "info"
+                  );
+                } else {
+                  clearTrip();
+                  setViewStepIndex(0);
+                  setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
+                }
+              }}
               className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"
             >
               <Plus size={18} />
@@ -341,6 +401,43 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           </div>
         ) : (
           <>
+            {(tripLoading || saving) && (
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                <div className="h-3.5 w-3.5 rounded-full border-2 border-slate-200 border-t-blue-600 animate-spin" />
+                {tripLoading ? "Loading trip..." : "Saving to PostgreSQL..."}
+              </div>
+            )}
+
+            {tripError && (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <span className="flex items-center gap-2">
+                  <AlertCircle size={16} />
+                  {tripError}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTripError(null);
+                    void (trip.id ? reloadCurrentTrip() : resumeDraft());
+                  }}
+                  className="shrink-0 text-xs font-bold underline"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => void saveDraft()}
+                disabled={saving || !trip.startStepSubmitted}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+              >
+                Save Draft
+              </button>
+            </div>
+
             <TripWizardStepper
               steps={["Start", "Farm", "Pickup", "Deliveries", "End"]}
               currentStep={isTripEnded ? 4 : currentStep}

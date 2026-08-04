@@ -15,7 +15,6 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { Trip, TripStatus } from "../../types/trip";
-import { tripService } from "../../services/tripService";
 import GeneralExpensesTable from "./GeneralExpensesTable";
 import DieselExpensesTable from "./DieselExpensesTable";
 import { fuelExpenseService } from "../../../fuel-expenses/services/fuelExpenseService";
@@ -252,9 +251,9 @@ export default function StepEnd({
     averageKmLtr = (totalDistanceCovered / totalDieselLiters).toFixed(2);
   }
 
-  // ─── Persist to storage helper ──────────────────────────────────
+  // ─── Persist to PostgreSQL helper ──────────────────────────────────
   const saveToStorage = useCallback(
-    (data: SheetData, stepSubmitted: boolean) => {
+    async (data: SheetData, stepSubmitted: boolean) => {
       const payload = {
         ...data,
         closingMeter: Number(data.endMeter) || 0,
@@ -262,11 +261,9 @@ export default function StepEnd({
         advanceAmount: data.advance === "" ? 0 : Number(data.advance),
         openingMeter: openingMeter,
         expensesStepSubmitted: stepSubmitted,
-        endStepSubmitted: stepSubmitted, // ✅ Ensure endStepSubmitted is set
-        status: stepSubmitted ? "Completed" : trip.status, // ✅ FIXED: Mark trip as Completed if step is submitted
+        endStepSubmitted: stepSubmitted,
+        status: stepSubmitted ? "Completed" : trip.status,
       };
-      const updatedTrip = { ...trip, ...payload };
-      tripService.update(updatedTrip);
       updateTrip(payload as any, true, true);
     },
     [trip, updateTrip, openingMeter]

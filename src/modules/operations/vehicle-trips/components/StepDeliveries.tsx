@@ -16,7 +16,7 @@ interface Props {
   birdTypes: any[];
   trip: Trip;
   updateDeliveries: (rows: ShopDelivery[], persistToStorage?: boolean, silent?: boolean) => void;
-  submitDeliveriesStep: () => boolean;
+  submitDeliveriesStep: () => boolean | Promise<boolean>;
   clearForm: () => void;
   readOnly?: boolean;
   editable?: boolean;
@@ -133,15 +133,15 @@ export default function StepDeliveries({
 
   const canLock = validationResult.valid;
 
-  const handleLockDeliveries = (): boolean => {
+  const handleLockDeliveries = async (): Promise<boolean> => {
     if (!canLock) {
       alert(`⚠️ ${validationResult.reason}`);
       return false;
     }
     setIsStepEditing(false);
     setEditingShopId(null);
-    updateDeliveries(rows, true, false);
-    return submitDeliveriesStep();
+    await Promise.resolve(updateDeliveries(rows, true, false));
+    return Promise.resolve(submitDeliveriesStep());
   };
 
   return (

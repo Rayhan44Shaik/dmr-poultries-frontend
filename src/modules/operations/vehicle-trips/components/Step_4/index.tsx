@@ -37,7 +37,7 @@ interface Props {
   onViewModeChange?: (mode: "shop" | "box") => void;
   stepNumber?: number | string;
   updateDeliveries?: (rows: ShopDelivery[], persist?: boolean, silent?: boolean) => void;
-  submitDeliveries?: () => boolean;
+  submitDeliveries?: () => boolean | Promise<boolean>;
   onClose?: () => void;
 }
 
@@ -472,13 +472,13 @@ export default function UnLoadingTable({
         confirmLabel: "Yes, Submit",
         cancelLabel: "Cancel",
         type: "info",
-        onConfirm: () => {
+        onConfirm: async () => {
           setConfirmation((prev) => ({ ...prev, isOpen: false }));
           let success = true;
           if (submitDeliveries) {
-            success = submitDeliveries() !== false;
+            success = (await Promise.resolve(submitDeliveries())) !== false;
           } else if (updateDeliveries) {
-            updateDeliveries(safeRows, true, false);
+            await Promise.resolve(updateDeliveries(safeRows, true, false));
           }
           if (success) {
             setHasBeenSubmitted(true);

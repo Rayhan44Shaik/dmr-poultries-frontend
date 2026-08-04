@@ -19,9 +19,9 @@ localforage.config({
 interface Props {
   trip: Trip;
   setTrip: React.Dispatch<React.SetStateAction<Trip>>;
-  updateTrip: (updates: Partial<Trip>) => void;
-  updateBoxDetails: (rows: BoxDetail[], persistToStorage?: boolean, silent?: boolean) => void;
-  submitPickupStep: (data: Partial<Trip>) => boolean;
+  submitPickupStep: (data: Partial<Trip>) => boolean | Promise<boolean>;
+  updateBoxDetails: (rows: BoxDetail[], persistToStorage?: boolean, silent?: boolean) => void | Promise<void>;
+  updateTrip: (updates: Partial<Trip>, persist?: boolean, silent?: boolean) => void;
   editable?: boolean;
   canEdit?: boolean;
   onCancel?: () => void;
@@ -322,6 +322,18 @@ export default function StepPickup({
   }, [rows]);
 
   // ─── Image upload handlers ──────────────────────────────────────────
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || "");
+        const base64 = result.includes(",") ? result.split(",")[1] : result;
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -337,9 +349,19 @@ export default function StepPickup({
 
     try {
       const key = `dc_photo_${trip.id || Date.now()}_${Date.now()}`;
+      // Temporary local backup while syncing; PostgreSQL is source of truth.
       await localforage.setItem(key, file);
+      const base64 = await fileToBase64(file);
       setImageKey(key);
-      updateTrip({ dcPhotoKey: key });
+      updateTrip(
+        {
+          dcPhotoKey: key,
+          dcPhotoData: base64,
+          dcPhotoMime: file.type || "image/jpeg",
+        } as Partial<Trip>,
+        Boolean(trip.id),
+        true
+      );
       setToast({ message: "Image uploaded successfully!", type: "success" });
     } catch (error) {
       console.error("Failed to upload image:", error);
@@ -461,7 +483,7 @@ export default function StepPickup({
       confirmLabel: isEditMode ? "Yes, Update" : "Yes, Submit",
       cancelLabel: "Cancel",
       type: isEditMode ? "info" : "warning",
-      onConfirm: () => {
+      onConfirm: async () => {
         setConfirmation((prev) => ({ ...prev, isOpen: false }));
         setIsSubmitting(true);
         if (autoSaveTimeout.current) {
@@ -469,13 +491,15 @@ export default function StepPickup({
           autoSaveTimeout.current = null;
           setIsAutoSaving(false);
         }
-        const success = submitPickupStep({
-          boxDetails: getBoxDetails(),
-          totalBirds: totals.totalBirds,
-          dcWeight: totals.dcWeight,
-          boxes: totals.boxes,
-          avgWeight: totals.avgWeight,
-        });
+        const success = await Promise.resolve(
+          submitPickupStep({
+            boxDetails: getBoxDetails(),
+            totalBirds: totals.totalBirds,
+            dcWeight: totals.dcWeight,
+            boxes: totals.boxes,
+            avgWeight: totals.avgWeight,
+          })
+        );
         if (success) {
           setIsLocalEditing(false);
           setToast({ message: "Pickup KPI updated successfully!", type: "success" });

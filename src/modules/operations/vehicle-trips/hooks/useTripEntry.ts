@@ -1,6 +1,15 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { Trip, ShopDelivery, BoxDetail, TripStatus } from "../types/trip";
-import { tripService } from "../services/tripService";
+import {
+  createTrip,
+  handleApiError,
+  loadLatestDraft,
+  loadTripById,
+  saveTrip,
+  submitTripStep,
+  tripService,
+  upsertTrip,
+} from "../services/tripService";
 import {
   generateTripNo,
   calculateAvgWeight,
@@ -8,11 +17,12 @@ import {
   validateFarmStep,
   validatePickupStep,
   validateEndStep,
-  validateFinalTrip
+  validateFinalTrip,
 } from "../services/tripFormService";
 
-export function useTripEntry(showNotification?: (msg: string, type?: "success" | "error" | "info") => void) {
-
+export function useTripEntry(
+  showNotification?: (msg: string, type?: "success" | "error" | "info") => void
+) {
   const emptyTrip = (): Trip => ({
     id: 0,
     tripNo: "",
@@ -66,19 +76,33 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     rateCompleted: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    // Legacy fields
     boxNo: 0,
     birds: 0,
-    weight: 0
+    weight: 0,
   });
 
   const [trip, setTrip] = useState<Trip>(emptyTrip());
   const [isEditing, setIsEditing] = useState(false);
-  const [endStepSubmitted, setEndStepSubmitted] = useState<boolean>(false);
+  const [endStepSubmitted, setEndStepSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Sync endStepSubmitted when trip changes
   const syncEndStep = (tripData: Trip) => {
-    setEndStepSubmitted(tripData.endStepSubmitted || false);
+    setEndStepSubmitted(Boolean(tripData.endStepSubmitted));
+  };
+
+  const applySaved = (saved: Trip) => {
+    setTrip({
+      ...saved,
+      helpers: saved.helpers || [],
+      loaders: saved.loaders || [],
+      deliveries: saved.deliveries || [],
+      boxDetails: saved.boxDetails || [],
+    });
+    syncEndStep(saved);
+    setError(null);
+    return saved;
   };
 
   const calculateDeliveryKPIs = (
@@ -91,66 +115,159 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     const totalDelBirds = deliveries.reduce((s, r) => s + r.birds, 0);
     const totalDelWeight = deliveries.reduce((s, r) => s + r.weight, 0);
     const totalShops = deliveries.length;
-    const lastShop = deliveries.length > 0 ? deliveries[deliveries.length - 1].shopName : "";
-
+    const lastShop =
+      deliveries.length > 0 ? deliveries[deliveries.length - 1].shopName : "";
     const mortalityWeight = Number((mortalityCount * avgWeight).toFixed(2));
-    const weightLoss = Number((dcWeight - totalDelWeight - mortalityWeight).toFixed(2));
-    const expectedBirds = totalDelBirds + mortalityCount;
-    const birdCountValid = expectedBirds === birds;
-    const survivalRate = birds > 0 ? Number(((1 - (mortalityCount / birds)) * 100).toFixed(1)) : 0;
+    const weightLoss = Number(
+      (dcWeight - totalDelWeight - mortalityWeight).toFixed(2)
+    );
+    const survivalRate =
+      birds > 0
+        ? Number(((1 - mortalityCount / birds) * 100).toFixed(1))
+        : 0;
 
-    return { totalDelBirds, totalDelWeight, totalShops, lastShop, mortalityWeight, weightLoss, birdCountValid, survivalRate };
+    return {
+      totalDelBirds,
+      totalDelWeight,
+      totalShops,
+      lastShop,
+      mortalityWeight,
+      weightLoss,
+      survivalRate,
+    };
   };
 
-  const submitStartStep = (data: Partial<Trip>): boolean => {
-    const updatedData = { ...trip, ...data, startTime: new Date().toLocaleString() };
+  /** Persist current trip to PostgreSQL without advancing a step flag. */
+  const persistTrip = useCallback(
+    async (
+      data: Partial<Trip> & Record<string, unknown>,
+      options?: { silent?: boolean }
+    ): Promise<Trip | null> => {
+      setSaving(true);
+      setError(null);
+      try {
+        const merged = { ...trip, ...data } as Trip & Record<string, unknown>;
+        const saved = await upsertTrip(merged);
+        applySaved(saved);
+        if (!options?.silent) {
+          showNotification?.("💾 Progress saved.", "info");
+        }
+        return saved;
+      } catch (err) {
+        const message = handleApiError(err);
+        setError(message);
+        showNotification?.(message, "error");
+        return null;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [trip, showNotification]
+  );
+
+  const submitStartStep = async (data: Partial<Trip>): Promise<boolean> => {
+    const updatedData = {
+      ...trip,
+      ...data,
+      startTime: trip.startTime || new Date().toLocaleString(),
+    };
     const validation = validateStartStep(updatedData as Trip);
     if (!validation.valid) {
       showNotification?.(validation.errors[0], "error");
       return false;
     }
 
-    let savedTrip: Trip;
-    if (isEditing) {
-      savedTrip = tripService.update({ ...updatedData, startStepSubmitted: true });
-      showNotification?.(`✅ Step 1 updated successfully.`, "success");
-    } else {
-      const existingTrips = tripService.getAll();
-      const tripNo = generateTripNo(existingTrips, updatedData.tripDate);
-      savedTrip = tripService.create({
-        ...updatedData,
-        id: Date.now(),
-        tripNo,
-        startStepSubmitted: true,
-        status: "Draft",
-        endStepSubmitted: false
-      });
-      showNotification?.(`✅ Step 1 completed successfully. Moving to Step 2...`, "success");
+    setSaving(true);
+    setError(null);
+    try {
+      let saved: Trip;
+      if (trip.id && trip.id > 0) {
+        saved = await submitTripStep(trip.id, "start", {
+          ...updatedData,
+          status: "Draft",
+        });
+        showNotification?.(`✅ Step 1 updated successfully.`, "success");
+      } else {
+        const existing = tripService.getAll();
+        const tripNo =
+          updatedData.tripNo ||
+          generateTripNo(existing, updatedData.tripDate);
+        // Create Draft in PostgreSQL, then mark start step submitted
+        const created = await createTrip({
+          ...updatedData,
+          tripNo,
+          status: "Draft",
+          startStepSubmitted: true,
+        });
+        saved = await submitTripStep(created.id, "start", {
+          ...updatedData,
+          tripNo: created.tripNo,
+          status: "Draft",
+        });
+        showNotification?.(
+          `✅ Step 1 completed successfully. Moving to Step 2...`,
+          "success"
+        );
+      }
+      applySaved(saved);
+      setIsEditing(true);
+      return true;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      showNotification?.(message, "error");
+      return false;
+    } finally {
+      setSaving(false);
     }
-    setTrip(savedTrip);
-    syncEndStep(savedTrip);
-    return true;
   };
 
-  const submitFarmStep = (data: Partial<Trip>): boolean => {
-    const reachedTime = trip.farmStepSubmitted ? trip.reachedTime : new Date().toLocaleString();
+  const submitFarmStep = async (data: Partial<Trip>): Promise<boolean> => {
+    if (!trip.id) {
+      showNotification?.("Trip not created yet. Complete Step 1 first.", "error");
+      return false;
+    }
+    const reachedTime = trip.farmStepSubmitted
+      ? trip.reachedTime
+      : new Date().toLocaleString();
     const updatedData = { ...trip, ...data, reachedTime };
-
     const validation = validateFarmStep(updatedData as Trip);
     if (!validation.valid) {
       showNotification?.(validation.errors[0], "error");
       return false;
     }
-    const savedTrip = tripService.update({ ...updatedData, farmStepSubmitted: true });
-    setTrip(savedTrip);
-    syncEndStep(savedTrip);
-    showNotification?.(isEditing ? `✅ Step 2 updated successfully.` : `✅ Step 2 completed successfully. Moving to Step 3...`, "success");
-    return true;
+
+    setSaving(true);
+    setError(null);
+    try {
+      const saved = await submitTripStep(trip.id, "farm", updatedData);
+      applySaved(saved);
+      showNotification?.(
+        isEditing
+          ? `✅ Step 2 updated successfully.`
+          : `✅ Step 2 completed successfully. Moving to Step 3...`,
+        "success"
+      );
+      return true;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      showNotification?.(message, "error");
+      return false;
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const updateBoxDetails = (rows: BoxDetail[], persistToStorage: boolean = false, silent: boolean = false) => {
+  const updateBoxDetails = async (
+    rows: BoxDetail[],
+    persistToStorage: boolean = false,
+    silent: boolean = false
+  ) => {
     const totalBirds = rows.reduce((sum, r) => sum + (r.birds || 0), 0);
-    const dcWeight = Number(rows.reduce((sum, r) => sum + (r.weight || 0), 0).toFixed(2));
+    const dcWeight = Number(
+      rows.reduce((sum, r) => sum + (r.weight || 0), 0).toFixed(2)
+    );
     const boxes = rows.length;
     const avgWeight = calculateAvgWeight(dcWeight, totalBirds);
 
@@ -160,15 +277,22 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
       totalBirds,
       dcWeight,
       boxes,
-      avgWeight
+      avgWeight,
     };
 
-    if (persistToStorage) {
-      const savedTrip = tripService.update(updatedTrip);
-      setTrip(savedTrip);
-      syncEndStep(savedTrip);
-      if (!silent) {
-        showNotification?.(`💾 Pickup progress saved.`, "info");
+    if (persistToStorage && trip.id) {
+      setSaving(true);
+      try {
+        const saved = await saveTrip(trip.id, updatedTrip);
+        applySaved(saved);
+        if (!silent) showNotification?.(`💾 Pickup progress saved.`, "info");
+      } catch (err) {
+        const message = handleApiError(err);
+        setError(message);
+        showNotification?.(message, "error");
+        setTrip(updatedTrip);
+      } finally {
+        setSaving(false);
       }
     } else {
       setTrip(updatedTrip);
@@ -176,60 +300,127 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     }
   };
 
-  const submitPickupStep = (data: Partial<Trip> = {}): boolean => {
-    const updatedData = { ...trip, ...data };
-
-    if (!updatedData.boxDetails || updatedData.boxDetails.length === 0) {
-      showNotification?.(`❌ Please add at least one box before submitting Pickup.`, "error");
+  const submitPickupStep = async (data: Partial<Trip> = {}): Promise<boolean> => {
+    if (!trip.id) {
+      showNotification?.("Trip not created yet. Complete Step 1 first.", "error");
       return false;
     }
-
+    const updatedData = { ...trip, ...data };
+    if (!updatedData.boxDetails || updatedData.boxDetails.length === 0) {
+      showNotification?.(
+        `❌ Please add at least one box before submitting Pickup.`,
+        "error"
+      );
+      return false;
+    }
     const validation = validatePickupStep(updatedData as Trip);
     if (!validation.valid) {
       showNotification?.(validation.errors[0], "error");
       return false;
     }
 
-    const avg = calculateAvgWeight(updatedData.dcWeight || 0, updatedData.totalBirds || 0);
-    const pickupLoadTime = trip.pickupStepSubmitted ? trip.pickupLoadTime : new Date().toLocaleString();
+    const avg = calculateAvgWeight(
+      updatedData.dcWeight || 0,
+      updatedData.totalBirds || 0
+    );
+    const pickupLoadTime = trip.pickupStepSubmitted
+      ? trip.pickupLoadTime
+      : new Date().toLocaleString();
 
-    const savedTrip = tripService.update({
-      ...updatedData,
-      avgWeight: avg,
-      pickupLoadTime,
-      pickupStepSubmitted: true
-    });
-    setTrip(savedTrip);
-    syncEndStep(savedTrip);
-
-    showNotification?.(isEditing ? `✅ Step 3 updated successfully.` : `✅ Step 3 completed successfully. Moving to Step 4...`, "success");
-    return true;
+    setSaving(true);
+    setError(null);
+    try {
+      const saved = await submitTripStep(trip.id, "pickup", {
+        ...updatedData,
+        avgWeight: avg,
+        pickupLoadTime,
+      });
+      applySaved(saved);
+      showNotification?.(
+        isEditing
+          ? `✅ Step 3 updated successfully.`
+          : `✅ Step 3 completed successfully. Moving to Step 4...`,
+        "success"
+      );
+      return true;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      showNotification?.(message, "error");
+      return false;
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const submitDeliveriesStep = (): boolean => {
-    if (trip.deliveries.length === 0) {
-      showNotification?.(`❌ Please add at least one shop delivery before proceeding.`, "error");
+  const submitDeliveriesStep = async (): Promise<boolean> => {
+    if (!trip.id) {
+      showNotification?.("Trip not created yet. Complete Step 1 first.", "error");
       return false;
     }
-    const savedTrip = tripService.update({
-      ...trip,
-      deliveryStepSubmitted: true
-    });
-    setTrip(savedTrip);
-    syncEndStep(savedTrip);
-    showNotification?.(`✅ Deliveries locked. Proceed to End Trip.`, "success");
-    return true;
-  };
+    if (trip.deliveries.length === 0) {
+      showNotification?.(
+        `❌ Please add at least one shop delivery before proceeding.`,
+        "error"
+      );
+      return false;
+    }
 
-  const updateTrip = (updates: Partial<Trip>) => {
-    setTrip(prev => ({ ...prev, ...updates }));
-    if (updates.endStepSubmitted !== undefined) {
-      setEndStepSubmitted(updates.endStepSubmitted);
+    setSaving(true);
+    setError(null);
+    try {
+      const saved = await submitTripStep(trip.id, "deliveries", trip);
+      applySaved(saved);
+      showNotification?.(`✅ Deliveries locked. Proceed to End Trip.`, "success");
+      return true;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      showNotification?.(message, "error");
+      return false;
+    } finally {
+      setSaving(false);
     }
   };
 
-  const updateDeliveries = (rows: ShopDelivery[], persistToStorage: boolean = true) => {
-    const totalMortalityCount = rows.reduce((sum, r) => sum + (r.mortality || 0), 0);
+  const updateTrip = (
+    updates: Partial<Trip>,
+    persist?: boolean,
+    silent?: boolean
+  ) => {
+    setTrip((prev) => {
+      const next = { ...prev, ...updates };
+      if (updates.endStepSubmitted !== undefined) {
+        setEndStepSubmitted(Boolean(updates.endStepSubmitted));
+      }
+      if (persist && prev.id) {
+        void (async () => {
+          setSaving(true);
+          try {
+            const saved = await saveTrip(prev.id, { ...prev, ...updates });
+            applySaved(saved);
+            if (!silent) showNotification?.("💾 Progress saved.", "info");
+          } catch (err) {
+            const message = handleApiError(err);
+            setError(message);
+            if (!silent) showNotification?.(message, "error");
+          } finally {
+            setSaving(false);
+          }
+        })();
+      }
+      return next;
+    });
+  };
+
+  const updateDeliveries = async (
+    rows: ShopDelivery[],
+    persistToStorage: boolean = true
+  ) => {
+    const totalMortalityCount = rows.reduce(
+      (sum, r) => sum + (r.mortality || 0),
+      0
+    );
     const kpis = calculateDeliveryKPIs(
       rows,
       trip.totalBirds,
@@ -248,70 +439,153 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
       totalMortalityWeight: kpis.mortalityWeight,
       weightLoss: kpis.weightLoss,
       survivalRate: kpis.survivalRate,
-      totalMortalityCount: totalMortalityCount,
+      totalMortalityCount,
       totalWeight: kpis.totalDelWeight,
-      totalMortality: totalMortalityCount
+      totalMortality: totalMortalityCount,
     };
 
-    if (persistToStorage) {
-      const savedTrip = tripService.update(updatedTrip);
-      setTrip(savedTrip);
-      syncEndStep(savedTrip);
+    if (persistToStorage && trip.id) {
+      setSaving(true);
+      try {
+        const saved = await saveTrip(trip.id, updatedTrip);
+        applySaved(saved);
+      } catch (err) {
+        const message = handleApiError(err);
+        setError(message);
+        showNotification?.(message, "error");
+        setTrip(updatedTrip);
+      } finally {
+        setSaving(false);
+      }
     } else {
       setTrip(updatedTrip);
       syncEndStep(updatedTrip);
     }
   };
 
-  const submitEndTrip = (): boolean => {
+  const submitEndTrip = async (
+    data: Partial<Trip> = {}
+  ): Promise<boolean> => {
+    if (!trip.id) {
+      showNotification?.("Trip not created yet.", "error");
+      return false;
+    }
     if (!trip.deliveryStepSubmitted) {
-      showNotification?.(`❌ You must complete and lock the Deliveries step first.`, "error");
+      showNotification?.(
+        `❌ You must complete and lock the Deliveries step first.`,
+        "error"
+      );
       return false;
     }
 
-    const endValidation = validateEndStep(trip);
+    const merged = { ...trip, ...data } as Trip;
+    const endValidation = validateEndStep(merged);
     if (!endValidation.valid) {
       showNotification?.(endValidation.errors[0], "error");
       return false;
     }
-
-    const finalValidation = validateFinalTrip(trip);
+    const finalValidation = validateFinalTrip(merged);
     if (!finalValidation.valid) {
       showNotification?.(finalValidation.errors[0], "error");
       return false;
     }
 
-    const totalKm = trip.closingMeter - trip.openingMeter;
-    const updatedTrip = {
-      ...trip,
-      totalKm,
-      endTime: new Date().toLocaleString(),
-      status: "Pending" as TripStatus,
-      endStepSubmitted: true,
-    };
+    const closingMeter = Number(
+      (data as any).closingMeter ??
+        (data as any).endMeter ??
+        merged.closingMeter
+    );
+    const totalKm = closingMeter - merged.openingMeter;
 
-    const savedTrip = tripService.update(updatedTrip);
-    setTrip(savedTrip);
-    setEndStepSubmitted(true);
-    showNotification?.(`✅ Trip ${savedTrip.tripNo} completed! Awaiting approval.`, "success");
-    return true;
+    setSaving(true);
+    setError(null);
+    try {
+      // Backend expenses step defaults to Completed; match existing StepEnd workflow.
+      const saved = await submitTripStep(trip.id, "expenses", {
+        ...merged,
+        ...data,
+        closingMeter,
+        endMeter: closingMeter,
+        totalKm,
+        endTime: new Date().toLocaleString(),
+        status: (data.status as TripStatus) || "Completed",
+        endStepSubmitted: true,
+        expensesStepSubmitted: true,
+      });
+      applySaved(saved);
+      setEndStepSubmitted(true);
+      showNotification?.(
+        `✅ Trip ${saved.tripNo} completed!`,
+        "success"
+      );
+      return true;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      showNotification?.(message, "error");
+      return false;
+    } finally {
+      setSaving(false);
+    }
   };
 
   const loadTrip = (tripToLoad: Trip) => {
-    setTrip({
-      ...tripToLoad,
-      helpers: tripToLoad.helpers || [],
-      deliveries: tripToLoad.deliveries || [],
-      boxDetails: tripToLoad.boxDetails || []
-    });
+    applySaved(tripToLoad);
     setIsEditing(true);
-    setEndStepSubmitted(tripToLoad.endStepSubmitted === true);
   };
+
+  const resumeDraft = useCallback(async (): Promise<Trip | null> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const draft = await loadLatestDraft();
+      if (draft) {
+        applySaved(draft);
+        setIsEditing(true);
+        return draft;
+      }
+      return null;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const reloadCurrentTrip = useCallback(async (): Promise<Trip | null> => {
+    if (!trip.id) return null;
+    setLoading(true);
+    setError(null);
+    try {
+      const fresh = await loadTripById(trip.id);
+      applySaved(fresh);
+      return fresh;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      showNotification?.(message, "error");
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [trip.id, showNotification]);
 
   const clearTrip = () => {
     setTrip(emptyTrip());
     setIsEditing(false);
     setEndStepSubmitted(false);
+    setError(null);
+  };
+
+  const saveDraft = async (): Promise<boolean> => {
+    if (!trip.id && !trip.startStepSubmitted) {
+      showNotification?.("Nothing to save yet.", "info");
+      return false;
+    }
+    const saved = await persistTrip({ ...trip, status: "Draft" }, { silent: false });
+    return Boolean(saved);
   };
 
   return {
@@ -320,6 +594,10 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     isEditing,
     setIsEditing,
     endStepSubmitted,
+    saving,
+    loading,
+    error,
+    setError,
     updateTrip,
     updateDeliveries,
     updateBoxDetails,
@@ -328,7 +606,11 @@ export function useTripEntry(showNotification?: (msg: string, type?: "success" |
     submitPickupStep,
     submitDeliveriesStep,
     submitEndTrip,
+    persistTrip,
+    saveDraft,
     loadTrip,
-    clearTrip
+    resumeDraft,
+    reloadCurrentTrip,
+    clearTrip,
   };
 }
