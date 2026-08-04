@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Frontend env (keep .env.example)
+.env
+.env.local
+.env.*.local
+
 # Backend / local secrets
 backend/.env
 backend/node_modules
