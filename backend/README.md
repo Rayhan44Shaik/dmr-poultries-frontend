@@ -1,5 +1,7 @@
 # DMR Poultries Backend — Local PostgreSQL (Phase 1)
 
+Location in monorepo: `DMR-Poultries-ERP/backend/`
+
 Backend API + PostgreSQL schema for **Masters**, **Trip Entry Steps 1–5**, and **Staff**.
 
 Designed for local use first; the same schema and API will move to cloud later. Mobile can talk to this API over LAN / tunnel.
@@ -13,26 +15,41 @@ Designed for local use first; the same schema and API will move to cloud later. 
 | Staff | duty planner, leave, salary, advance/loan, attendance |
 | Ops link | `fuel_expenses` table (ready for Step 5 diesel bills) |
 
-## Quick start (local PostgreSQL)
+## Quick start (from repo root)
 
 ```bash
-# 1) Start PostgreSQL (system or Docker)
-# System:
-sudo pg_ctlcluster 16 main start
+# From DMR-Poultries-ERP/
+npm run db:up              # Docker Postgres (or use local PG 16)
+npm run backend:install
+cp backend/.env.example backend/.env   # if needed
+npm run backend:migrate
+npm run backend:seed       # optional sample data
+npm run backend:dev        # http://localhost:4000
+```
 
-# Or Docker:
-cd backend && docker compose up -d
+## Quick start (from this folder)
 
-# 2) Install & migrate
+```bash
 cd backend
-cp .env.example .env   # if needed
+cp .env.example .env       # if needed
 npm install
+docker compose up -d       # optional — starts Postgres
 npm run db:migrate
-npm run db:seed        # optional sample data
-npm run dev            # http://localhost:4000
+npm run db:seed            # optional
+npm run dev                # http://localhost:4000
 ```
 
 Health check: `GET http://localhost:4000/api/health`
+
+## Environment
+
+`backend/.env` (see `.env.example`):
+
+```
+PORT=4000
+DATABASE_URL=postgresql://dmr:dmr_local_dev@localhost:5432/dmr_poultries
+CORS_ORIGIN=http://localhost:5173,http://localhost:4173
+```
 
 ## Trip step API map
 

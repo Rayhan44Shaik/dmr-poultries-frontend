@@ -11,11 +11,17 @@ node_modules
 dist
 dist-ssr
 *.local
+electron-dist
 
 # Backend / local secrets
 backend/.env
 backend/node_modules
 backend/dist
+
+# Frontend
+frontend/dmr-poultries-web/node_modules
+frontend/dmr-poultries-web/dist
+frontend/dmr-poultries-web/electron-dist
 
 # Editor directories and files
 .vscode/*
@@ -27,3 +33,9 @@ backend/dist
 *.njsproj
 *.sln
 *.sw?
+
+# Frontend TS/Vite build artifacts
+frontend/dmr-poultries-web/*.tsbuildinfo
+frontend/dmr-poultries-web/vite.config.js
+frontend/dmr-poultries-web/vite.config.d.ts
+
