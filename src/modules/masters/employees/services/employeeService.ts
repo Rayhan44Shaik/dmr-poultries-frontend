@@ -1,17 +1,15 @@
 // src/modules/masters/employees/services/employeeService.ts
 /**
- * Employees master — PostgreSQL via Axios API foundation.
- * localStorage removed for this module. Other modules may still call
- * getEmployees() which reads an in-memory cache filled by loadEmployees().
+ * Employees master — PostgreSQL via the shared Axios API foundation.
+ * No localStorage in this module.
  */
 
 import {
-  apiClient,
+  apiDelete,
   apiGet,
   apiPost,
   apiPut,
   handleApiError,
-  ApiError,
 } from "../../../../api";
 import type { Employee } from "../types/employee";
 
@@ -89,8 +87,8 @@ export function getEmployees(): Employee[] {
 }
 
 /**
- * @deprecated Prefer createEmployee / updateEmployee. Kept so other modules
- * that still call saveEmployees() do not break at import time.
+ * @deprecated Prefer createEmployee / updateEmployee / deleteEmployee.
+ * Kept so other modules that still call saveEmployees() do not break at import time.
  */
 export function saveEmployees(employees: Employee[]): void {
   employeesCache = employees;
@@ -132,30 +130,10 @@ export async function updateEmployee(
   return updated;
 }
 
-/**
- * DELETE /api/masters/employees/:id
- * Falls back to soft-delete (status Inactive) if the hard-delete route is absent.
- */
+/** DELETE /api/masters/employees/:id */
 export async function deleteEmployee(id: number): Promise<void> {
-  try {
-    // Raw client: missing DELETE route should soft-delete without helper error noise
-    await apiClient.delete(`${EMPLOYEES_PATH}/${id}`);
-    employeesCache = employeesCache.filter((e) => e.id !== id);
-  } catch (error) {
-    const apiError = error instanceof ApiError ? error : null;
-
-    if (apiError?.status === 404) {
-      const existing = employeesCache.find((e) => e.id === id);
-      if (!existing) {
-        throw new ApiError("Employee not found.", { code: "HTTP_404", status: 404 });
-      }
-      await updateEmployee(id, { ...existing, status: "Inactive" });
-      // Soft-deleted employees remain listed as Inactive (no DELETE route on API).
-      return;
-    }
-
-    throw error;
-  }
+  await apiDelete(`${EMPLOYEES_PATH}/${id}`);
+  employeesCache = employeesCache.filter((e) => e.id !== id);
 }
 
 /** Re-fetch list from PostgreSQL after mutations. */
