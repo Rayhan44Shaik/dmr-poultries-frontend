@@ -11,6 +11,9 @@ import {
   type EmployeeInput,
 } from "../services/employeeService";
 
+/**
+ * Employees page data hook — table state comes only from GET /api/masters/employees.
+ */
 export function useEmployees() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,6 +24,7 @@ export function useEmployees() {
     setLoading(true);
     setError(null);
     try {
+      // Sole population path for the Employees table
       const data = await loadEmployees();
       setEmployees(data);
       return data;
@@ -91,14 +95,6 @@ export function useEmployees() {
     }
   }, []);
 
-  /**
-   * Legacy bulk save — kept for API compatibility with older call sites.
-   * Prefer addEmployee / editEmployee / removeEmployee.
-   */
-  const saveEmployees = useCallback((data: Employee[]) => {
-    setEmployees(data);
-  }, []);
-
   return {
     employees,
     loading,
@@ -108,6 +104,5 @@ export function useEmployees() {
     addEmployee,
     editEmployee,
     removeEmployee,
-    saveEmployees,
   };
 }
