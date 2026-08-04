@@ -19,9 +19,10 @@ type ShopFormProps = {
     status: "Active" | "Inactive";
   }) => void;
   onCancel: () => void;
+  isSaving?: boolean;
 };
 
-function ShopForm({ shop, onSave, onCancel }: ShopFormProps) {
+function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
   const [shopName, setShopName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -118,7 +119,9 @@ function ShopForm({ shop, onSave, onCancel }: ShopFormProps) {
   const subtitle = isEditing ? "Update details" : "Fill in the information";
 
   const toggleStatus = () => {
-    setStatus(status === "Active" ? "Inactive" : "Active");
+    if (!isSaving) {
+      setStatus(status === "Active" ? "Inactive" : "Active");
+    }
   };
 
   return (
@@ -141,9 +144,10 @@ function ShopForm({ shop, onSave, onCancel }: ShopFormProps) {
           <button
             type="button"
             onClick={toggleStatus}
+            disabled={isSaving}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-200 ${
               status === "Active" ? "bg-emerald-500" : "bg-slate-300"
-            }`}
+            } ${isSaving ? "opacity-60 cursor-not-allowed" : ""}`}
           >
             <span
               className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -269,16 +273,29 @@ function ShopForm({ shop, onSave, onCancel }: ShopFormProps) {
           <button
             type="button"
             onClick={onCancel}
-            className="px-6 py-2.5 border-2 border-slate-300 rounded-xl hover:bg-slate-50/80 font-semibold text-base text-slate-700 transition-colors"
+            disabled={isSaving}
+            className="px-6 py-2.5 border-2 border-slate-300 rounded-xl hover:bg-slate-50/80 font-semibold text-base text-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleSubmit}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-base transition-colors"
+            disabled={isSaving}
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-base transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
           >
-            {isEditing ? "Update Shop" : "Save Shop"}
+            {isSaving && (
+              <svg
+                className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            )}
+            {isSaving ? "Saving..." : isEditing ? "Update Shop" : "Save Shop"}
           </button>
         </div>
       </div>
