@@ -6,7 +6,7 @@ import DashboardLayout from "../layouts/DashboardLayout/DashboardLayout";
 import LoginPage from "../modules/auth/LoginPage";
 
 // Dashboard
-import DashboardPage from "../modules/dashboard/DashboardPage";
+// import DashboardPage from "../modules/dashboard/DashboardPage";
 
 // Masters Module
 import MastersPage from "../modules/masters/pages/MastersPage";
@@ -40,6 +40,7 @@ function AppRoutes() {
       <Route path="/" element={<LoginPage />} />
 
       {/* ============ DASHBOARD ============ */}
+      {/* 
       <Route 
         path="/dashboard" 
         element={
@@ -47,7 +48,11 @@ function AppRoutes() {
             <DashboardPage />
           </DashboardLayout>
         } 
-      />
+      /> 
+      */}
+      
+      {/* Redirect dashboard to masters to make it the default landing page */}
+      <Route path="/dashboard" element={<Navigate to="/masters" replace />} />
 
       {/* ============ MASTERS ============ */}
       <Route path="/masters" element={<DashboardLayout><MastersPage /></DashboardLayout>} />
@@ -105,8 +110,11 @@ function AppRoutes() {
             <div className="text-center">
               <h1 className="text-6xl font-bold text-slate-800">404</h1>
               <p className="text-lg text-slate-600 mt-2">Page not found</p>
-              <a href="/dashboard" className="mt-4 inline-block text-blue-600 hover:underline">
+              {/* <a href="/dashboard" className="mt-4 inline-block text-blue-600 hover:underline">
                 Go to Dashboard
+              </a> */}
+              <a href="/masters" className="mt-4 inline-block text-blue-600 hover:underline">
+                Go to Masters
               </a>
             </div>
           </div>
