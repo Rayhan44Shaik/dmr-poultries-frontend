@@ -16,6 +16,12 @@ function EmployeeTable({ employees, onEdit, onDelete }: EmployeeTableProps) {
     }).format(amount);
   };
 
+  const sortedEmployees = [...employees].sort((a, b) => {
+    if (a.employeeNo < b.employeeNo) return -1;
+    if (a.employeeNo > b.employeeNo) return 1;
+    return 0;
+  });
+
   return (
     <div className="overflow-x-auto rounded-xl bg-white shadow-sm border border-slate-200">
       <table className="min-w-full divide-y divide-slate-200">
@@ -31,7 +37,7 @@ function EmployeeTable({ employees, onEdit, onDelete }: EmployeeTableProps) {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200 bg-white">
-          {employees.map((emp) => (
+          {sortedEmployees.map((emp) => (
             <tr key={emp.id} className="hover:bg-slate-50 transition-colors">
               <td className="px-4 py-3 text-sm text-slate-600">{emp.employeeNo}</td>
               <td className="px-4 py-3 text-sm font-medium text-slate-800">{emp.employeeName}</td>
@@ -71,7 +77,7 @@ function EmployeeTable({ employees, onEdit, onDelete }: EmployeeTableProps) {
               </td>
             </tr>
           ))}
-          {employees.length === 0 && (
+          {sortedEmployees.length === 0 && (
             <tr>
               <td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-500">
                 No employees found.
