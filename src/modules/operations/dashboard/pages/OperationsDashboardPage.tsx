@@ -187,7 +187,7 @@ function OperationsDashboardPage() {
   const [endDate, setEndDate] = useState<Date | undefined>(initialRange.endDate);
   const [comparisonPeriod] = useState<"7d" | "15d" | "30d">("7d");
 
-  const { data, previousData, isLoading } = useDashboardData(
+  const { data, previousData, isLoading, error, refetch } = useDashboardData(
     startDate ?? null,
     endDate ?? null,
     comparisonPeriod
@@ -238,6 +238,30 @@ function OperationsDashboardPage() {
         <p className="text-xs font-black uppercase tracking-widest text-slate-400 animate-pulse">
           Synchronizing Analytics Engine...
         </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-end">
+          <RangeDatePicker
+            startDate={startDate}
+            endDate={endDate}
+            onRangeChange={handleRangeChange}
+          />
+        </div>
+        <div className="flex flex-col items-center justify-center py-24 space-y-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm px-6">
+          <p className="text-sm font-semibold text-red-700 text-center">{error}</p>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="px-4 py-2 text-sm font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
