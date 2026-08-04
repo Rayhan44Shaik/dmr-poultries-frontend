@@ -1,26 +1,107 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { Vehicle } from "../types/vehicle";
-
 import {
-  getVehicles,
-  saveVehicles as persistVehicles,
+  createVehicle,
+  deleteVehicle,
+  handleApiError,
+  loadVehicles,
+  refreshVehicles,
+  updateVehicle,
+  type VehicleInput,
 } from "../services/vehicleService";
 
+/**
+ * Vehicles page data hook — table state comes only from GET /api/masters/vehicles.
+ */
 export function useVehicles() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setVehicles(getVehicles());
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await loadVehicles();
+      setVehicles(data);
+      return data;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      setVehicles([]);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const saveVehicles = (data: Vehicle[]) => {
-    setVehicles(data);
-    persistVehicles(data);
-  };
+  useEffect(() => {
+    void reload().catch(() => {
+      /* error already captured in state */
+    });
+  }, [reload]);
+
+  const addVehicle = useCallback(async (input: VehicleInput) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await createVehicle(input);
+      const data = await refreshVehicles();
+      setVehicles(data);
+      return data;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  const editVehicle = useCallback(async (id: number, input: VehicleInput) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await updateVehicle(id, input);
+      const data = await refreshVehicles();
+      setVehicles(data);
+      return data;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  const removeVehicle = useCallback(async (id: number) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await deleteVehicle(id);
+      const data = await refreshVehicles();
+      setVehicles(data);
+      return data;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  }, []);
 
   return {
     vehicles,
-    saveVehicles,
+    loading,
+    saving,
+    error,
+    reload,
+    addVehicle,
+    editVehicle,
+    removeVehicle,
   };
 }

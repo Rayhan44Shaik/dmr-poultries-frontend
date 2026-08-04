@@ -11,10 +11,11 @@ type BirdTypeFormProps = {
   birdType?: BirdType | null;
   onSave: (birdType: any) => void;
   onCancel: () => void;
+  isSaving?: boolean;
 };
 
-function BirdTypeForm({ birdType, onSave, onCancel }: BirdTypeFormProps) {
-const { showNotification } = useSafeNotification();
+function BirdTypeForm({ birdType, onSave, onCancel, isSaving = false }: BirdTypeFormProps) {
+  const { showNotification } = useSafeNotification();
   const [birdTypeName, setBirdTypeName] = useState("");
   const [averageWeight, setAverageWeight] = useState<number | "">("");
   const [description, setDescription] = useState("");
@@ -37,6 +38,8 @@ const { showNotification } = useSafeNotification();
   }, [birdType]);
 
   const handleSubmit = () => {
+    if (isSaving) return;
+
     if (!birdTypeName || averageWeight === "" || averageWeight <= 0) {
       showNotification("Please fill all required fields with valid values.", "error");
       return;
@@ -61,7 +64,9 @@ const { showNotification } = useSafeNotification();
   const subtitle = isEditing ? "Update details" : "Fill in the details";
 
   const toggleStatus = () => {
-    setStatus(status === "Active" ? "Inactive" : "Active");
+    if (!isSaving) {
+      setStatus(status === "Active" ? "Inactive" : "Active");
+    }
   };
 
   return (
@@ -84,9 +89,10 @@ const { showNotification } = useSafeNotification();
           <button
             type="button"
             onClick={toggleStatus}
+            disabled={isSaving}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-200 ${
               status === "Active" ? "bg-emerald-500" : "bg-slate-300"
-            }`}
+            } ${isSaving ? "opacity-60 cursor-not-allowed" : ""}`}
           >
             <span
               className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -119,6 +125,7 @@ const { showNotification } = useSafeNotification();
                 onChange={(e) => setBirdTypeName(e.target.value)}
                 placeholder="e.g., Broiler, Layer"
                 className={inputClass()}
+                disabled={isSaving}
               />
             </div>
           </div>
@@ -138,6 +145,7 @@ const { showNotification } = useSafeNotification();
                 onChange={(e) => setAverageWeight(e.target.value === "" ? "" : Number(e.target.value))}
                 placeholder="e.g., 1.5"
                 className={`${inputClass()} [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+                disabled={isSaving}
               />
             </div>
           </div>
@@ -155,6 +163,7 @@ const { showNotification } = useSafeNotification();
                 placeholder="Brief description"
                 rows={2}
                 className="w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition border-slate-200 bg-white resize-y"
+                disabled={isSaving}
               />
             </div>
           </div>
@@ -165,16 +174,29 @@ const { showNotification } = useSafeNotification();
           <button
             type="button"
             onClick={onCancel}
-            className="px-6 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition font-medium text-sm text-slate-700"
+            disabled={isSaving}
+            className="px-6 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition font-medium text-sm text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleSubmit}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition shadow-sm hover:shadow font-medium text-sm"
+            disabled={isSaving}
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition shadow-sm hover:shadow font-medium text-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
           >
-            {isEditing ? "Update Bird Type" : "Save Bird Type"}
+            {isSaving && (
+              <svg
+                className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            )}
+            {isSaving ? "Saving..." : isEditing ? "Update Bird Type" : "Save Bird Type"}
           </button>
         </div>
       </div>

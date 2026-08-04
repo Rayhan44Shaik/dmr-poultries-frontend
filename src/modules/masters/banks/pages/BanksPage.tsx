@@ -9,6 +9,8 @@ import { useBanks } from "../hooks/useBanks";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
+import { handleApiError } from "../services/bankService";
+import type { Bank } from "../types/bank";
 
 type BanksPageProps = { embedded?: boolean };
 
@@ -16,12 +18,22 @@ const ITEMS_PER_PAGE = 10;
 
 function BanksPage({ embedded = false }: BanksPageProps) {
   const [showDialog, setShowDialog] = useState(false);
-  const [editingBank, setEditingBank] = useState<any>(null);
+  const [editingBank, setEditingBank] = useState<Bank | null>(null);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const { showNotification } = useSafeNotification();
-  const { banks, saveBanks } = useBanks();
+  const {
+    banks,
+    loading,
+    saving,
+    error,
+    reload,
+    addBank,
+    editBank,
+    removeBank,
+  } = useBanks();
 
   // Reset to page 1 whenever search keyword changes
   const handleSearchChange = (value: string) => {
@@ -90,60 +102,103 @@ function BanksPage({ embedded = false }: BanksPageProps) {
     showNotification("Excel exported successfully!", "success");
   };
 
-  const handleSaveBank = (bank: any) => {
+  const validateBank = (bank: Partial<Bank>): string | null => {
+    const bankName = bank.bankName?.trim() ?? "";
+    const branch = bank.branch?.trim() ?? "";
+    const accountNumber = bank.accountNumber?.trim() ?? "";
+    const ifscCode = bank.ifscCode?.trim() ?? "";
+    const upiId = bank.upiId?.trim() ?? "";
+
+    if (!bankName || !branch || !accountNumber || !ifscCode) {
+      return "Please fill all required fields.";
+    }
+    if (!/^[A-Za-z0-9]{6,20}$/.test(accountNumber)) {
+      return "Account Number must be 6-20 alphanumeric characters.";
+    }
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscCode.toUpperCase())) {
+      return "IFSC must be 11 characters (e.g., SBIN0012345).";
+    }
+    if (upiId && !/^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$/.test(upiId)) {
+      return "UPI ID must be in format username@bank (e.g., user@hdfc).";
+    }
+
     const duplicate = banks.some(
       (b) =>
-        b.bankName.trim().toLowerCase() === bank.bankName.trim().toLowerCase() &&
+        b.bankName.trim().toLowerCase() === bankName.toLowerCase() &&
         b.id !== editingBank?.id
     );
     if (duplicate) {
-      showNotification("Bank Name already exists.", "error");
-      return;
+      return "Bank Name already exists.";
     }
 
     const duplicateAccount = banks.some(
-      (b) =>
-        b.accountNumber === bank.accountNumber &&
-        b.id !== editingBank?.id
+      (b) => b.accountNumber === accountNumber && b.id !== editingBank?.id
     );
     if (duplicateAccount) {
-      showNotification("Account Number already exists.", "error");
-      return;
+      return "Account Number already exists.";
     }
 
-    if (editingBank) {
-      saveBanks(
-        banks.map((b) =>
-          b.id === editingBank.id ? { ...b, ...bank } : b
-        )
-      );
-      logAuditEvent("UPDATE_BANK", "Banks", editingBank.id);
-      showNotification("Bank updated successfully!", "success");
-    } else {
-      const newBank = {
-        id: Date.now(),
-        bankNo: banks.length + 1,
-        ...bank,
-      };
-      saveBanks([...banks, newBank]);
-      logAuditEvent("CREATE_BANK", "Banks", newBank.id);
-      showNotification("Bank added successfully!", "success");
-    }
-
-    setEditingBank(null);
-    setShowDialog(false);
+    return null;
   };
 
-  const handleEditBank = (bank: any) => {
+  const handleSaveBank = async (bank: Partial<Bank>): Promise<boolean> => {
+    const validationError = validateBank(bank);
+    if (validationError) {
+      showNotification(validationError, "error");
+      return false;
+    }
+
+    const payload = {
+      bankName: bank.bankName!.trim(),
+      branch: bank.branch!.trim(),
+      accountNumber: bank.accountNumber!.trim(),
+      ifscCode: bank.ifscCode!.trim().toUpperCase(),
+      upiId: bank.upiId?.trim() ?? "",
+      status: bank.status ?? "Active",
+    };
+
+    try {
+      if (editingBank) {
+        await editBank(editingBank.id, { ...payload, bankNo: editingBank.bankNo });
+        logAuditEvent("UPDATE_BANK", "Banks", editingBank.id);
+        showNotification("Bank updated successfully!", "success");
+      } else {
+        const list = await addBank(payload);
+        const created = list.find(
+          (b) =>
+            b.bankName === payload.bankName &&
+            b.accountNumber === payload.accountNumber
+        );
+        logAuditEvent("CREATE_BANK", "Banks", created?.id);
+        showNotification("Bank added successfully!", "success");
+      }
+
+      setEditingBank(null);
+      setShowDialog(false);
+      return true;
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
+      return false;
+    }
+  };
+
+  const handleEditBank = (bank: Bank) => {
     setEditingBank(bank);
     setShowDialog(true);
   };
 
-  const handleDeleteBank = (id: number) => {
+  const handleDeleteBank = async (id: number) => {
     if (!window.confirm("Are you sure you want to delete this bank?")) return;
-    saveBanks(banks.filter((b) => b.id !== id));
-    logAuditEvent("DELETE_BANK", "Banks", id);
-    showNotification("Bank deleted successfully!", "success");
+    setDeletingId(id);
+    try {
+      await removeBank(id);
+      logAuditEvent("DELETE_BANK", "Banks", id);
+      showNotification("Bank deleted successfully!", "success");
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const content = (
@@ -173,6 +228,7 @@ function BanksPage({ embedded = false }: BanksPageProps) {
                   value={search}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   className="w-full pl-9 pr-4 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  disabled={loading}
                 />
                 <svg
                   className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
@@ -218,7 +274,8 @@ function BanksPage({ embedded = false }: BanksPageProps) {
                   setEditingBank(null);
                   setShowDialog(true);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm"
+                disabled={loading}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -238,26 +295,67 @@ function BanksPage({ embedded = false }: BanksPageProps) {
             <span className="px-2 py-0.5 font-semibold text-blue-700 bg-blue-50 border border-blue-200/60 rounded-full">
               {filteredBanks.length} records
             </span>
+            {(loading || saving || deletingId !== null) && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 font-medium text-slate-600 bg-slate-100 border border-slate-200 rounded-full">
+                <svg className="animate-spin h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                {loading ? "Loading..." : "Saving..."}
+              </span>
+            )}
           </div>
           <p className="text-slate-500 font-medium">
             Showing {paginatedBanks.length} of {filteredBanks.length} Banks (Page {currentPage} of {totalPages})
           </p>
         </div>
 
+        {error && !loading && (
+          <div className="mx-4 mt-3 px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-3">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => {
+                void reload().catch(() => undefined);
+              }}
+              className="shrink-0 text-xs font-semibold text-red-700 underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Table Content */}
-        <div className="p-0">
-          <BankTable
-            banks={paginatedBanks}
-            onEdit={handleEditBank}
-            onDelete={handleDeleteBank}
-          />
+        <div className="p-0 relative min-h-[120px]">
+          {loading && banks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
+              <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <p className="text-sm font-medium">Loading banks...</p>
+            </div>
+          ) : !loading && banks.length === 0 && !error ? (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
+              <p className="text-sm font-medium text-slate-700">No banks found.</p>
+              <p className="text-xs text-slate-500">Add a bank to get started.</p>
+            </div>
+          ) : (
+            <BankTable
+              banks={paginatedBanks}
+              onEdit={handleEditBank}
+              onDelete={(id) => {
+                void handleDeleteBank(id);
+              }}
+            />
+          )}
         </div>
 
         {/* Pagination Controls - Bottom Right Aligned */}
         <div className="px-4 py-2.5 bg-slate-50/60 border-t border-slate-100 flex items-center justify-end gap-2 text-xs">
           <button
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
+            disabled={currentPage === 1 || loading}
             className="px-2.5 py-1 rounded-md border border-slate-200 bg-white font-medium text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
           >
             Previous
@@ -268,6 +366,7 @@ function BanksPage({ embedded = false }: BanksPageProps) {
               <button
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
+                disabled={loading}
                 className={`w-7 h-7 rounded-md text-xs font-semibold flex items-center justify-center ${
                   currentPage === pageNum
                     ? "bg-blue-600 text-white shadow-sm"
@@ -281,7 +380,7 @@ function BanksPage({ embedded = false }: BanksPageProps) {
 
           <button
             onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
+            disabled={currentPage === totalPages || loading}
             className="px-2.5 py-1 rounded-md border border-slate-200 bg-white font-medium text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
           >
             Next

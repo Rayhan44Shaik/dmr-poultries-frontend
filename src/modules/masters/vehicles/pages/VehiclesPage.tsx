@@ -9,6 +9,8 @@ import { useVehicles } from "../hooks/useVehicles";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
+import { handleApiError } from "../services/vehicleService";
+import type { Vehicle } from "../types/vehicle";
 
 type MasterVehiclesPageProps = {
   embedded?: boolean;
@@ -18,12 +20,22 @@ const ITEMS_PER_PAGE = 10;
 
 function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
   const [showDialog, setShowDialog] = useState(false);
-  const [editingVehicle, setEditingVehicle] = useState<any>(null);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const { showNotification } = useSafeNotification();
-  const { vehicles, saveVehicles } = useVehicles();
+  const {
+    vehicles,
+    loading,
+    saving,
+    error,
+    reload,
+    addVehicle,
+    editVehicle,
+    removeVehicle,
+  } = useVehicles();
 
   // Reset to page 1 whenever search keyword changes
   const handleSearchChange = (value: string) => {
@@ -91,49 +103,115 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
     showNotification("Excel exported successfully!", "success");
   };
 
-  const handleSaveVehicle = (vehicle: any) => {
+  const validateVehicle = (vehicle: Partial<Vehicle> & { emiDay?: number; totalEMIs?: number }): string | null => {
+    const vehicleNumber = vehicle.vehicleNumber?.trim() ?? "";
+    const vehicleType = vehicle.vehicleType?.trim() ?? "";
+    const engineNumber = vehicle.engineNumber?.trim() ?? "";
+    const chassisNumber = vehicle.chassisNumber?.trim() ?? "";
+    const noOfBoxes = Number(vehicle.noOfBoxes);
+    const birdCapacity = Number(vehicle.birdCapacity);
+    const capacityKg = Number(vehicle.capacityKg);
+
+    if (!vehicleNumber || !vehicleType || Number.isNaN(noOfBoxes) || Number.isNaN(birdCapacity) || Number.isNaN(capacityKg)) {
+      return "Please fill all required fields.";
+    }
+    if (!engineNumber) {
+      return "Engine Number is required.";
+    }
+    if (!chassisNumber) {
+      return "Chassis Number is required.";
+    }
+    if (noOfBoxes <= 0 || birdCapacity <= 0 || capacityKg <= 0) {
+      return "Boxes, bird capacity, and capacity (kg) must be positive numbers.";
+    }
+
     const duplicate = vehicles.some(
       (v) =>
-        v.vehicleNumber?.trim().toLowerCase() === vehicle.vehicleNumber?.trim().toLowerCase() &&
+        v.vehicleNumber?.trim().toLowerCase() === vehicleNumber.toLowerCase() &&
         v.id !== editingVehicle?.id
     );
     if (duplicate) {
-      showNotification("Vehicle Number already exists.", "error");
-      return;
+      return "Vehicle Number already exists.";
     }
 
-    if (editingVehicle) {
-      saveVehicles(
-        vehicles.map((v) =>
-          v.id === editingVehicle.id ? { ...v, ...vehicle } : v
-        )
-      );
-      logAuditEvent("UPDATE_VEHICLE", "Vehicles", editingVehicle.id);
-      showNotification("Vehicle updated successfully!", "success");
-    } else {
-      const newVehicle = {
-        id: Date.now(),
-        vehicleNo: vehicles.length + 1,
-        ...vehicle,
-      };
-      saveVehicles([...vehicles, newVehicle]);
-      logAuditEvent("CREATE_VEHICLE", "Vehicles", newVehicle.id);
-      showNotification("Vehicle added successfully!", "success");
-    }
-    setEditingVehicle(null);
-    setShowDialog(false);
+    return null;
   };
 
-  const handleEditVehicle = (vehicle: any) => {
+  const handleSaveVehicle = async (
+    vehicle: Partial<Vehicle> & { emiDay?: number; totalEMIs?: number }
+  ): Promise<boolean> => {
+    const validationError = validateVehicle(vehicle);
+    if (validationError) {
+      showNotification(validationError, "error");
+      return false;
+    }
+
+    const payload = {
+      vehicleNumber: vehicle.vehicleNumber!.trim(),
+      vehicleType: vehicle.vehicleType!.trim(),
+      trackingId: vehicle.trackingId?.trim() ?? "",
+      noOfBoxes: Number(vehicle.noOfBoxes),
+      birdCapacity: Number(vehicle.birdCapacity),
+      capacityKg: Number(vehicle.capacityKg),
+      fastagBank: vehicle.fastagBank?.trim() ?? "",
+      engineNumber: vehicle.engineNumber!.trim(),
+      chassisNumber: vehicle.chassisNumber!.trim(),
+      insuranceExpiry: editingVehicle?.insuranceExpiry ?? "",
+      permitExpiry: editingVehicle?.permitExpiry ?? "",
+      fitnessExpiry: editingVehicle?.fitnessExpiry ?? "",
+      purchaseDate: vehicle.purchaseDate ?? "",
+      purchaseAmount: vehicle.purchaseAmount,
+      emiStartDate: editingVehicle?.emiStartDate,
+      emiDay: vehicle.emiDay,
+      totalEMIs: vehicle.totalEMIs,
+      rcDate: vehicle.rcDate ?? "",
+      status: vehicle.status ?? "Active",
+    };
+
+    try {
+      if (editingVehicle) {
+        await editVehicle(editingVehicle.id, {
+          ...payload,
+          vehicleNo: editingVehicle.vehicleNo,
+        });
+        logAuditEvent("UPDATE_VEHICLE", "Vehicles", editingVehicle.id);
+        showNotification("Vehicle updated successfully!", "success");
+      } else {
+        const list = await addVehicle(payload);
+        const created = list.find(
+          (v) =>
+            v.vehicleNumber === payload.vehicleNumber &&
+            v.engineNumber === payload.engineNumber
+        );
+        logAuditEvent("CREATE_VEHICLE", "Vehicles", created?.id);
+        showNotification("Vehicle added successfully!", "success");
+      }
+      setEditingVehicle(null);
+      setShowDialog(false);
+      return true;
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
+      return false;
+    }
+  };
+
+  const handleEditVehicle = (vehicle: Vehicle) => {
     setEditingVehicle(vehicle);
     setShowDialog(true);
   };
 
-  const handleDeleteVehicle = (id: number) => {
+  const handleDeleteVehicle = async (id: number) => {
     if (!window.confirm("Are you sure you want to delete this vehicle?")) return;
-    saveVehicles(vehicles.filter((v) => v.id !== id));
-    logAuditEvent("DELETE_VEHICLE", "Vehicles", id);
-    showNotification("Vehicle deleted successfully!", "success");
+    setDeletingId(id);
+    try {
+      await removeVehicle(id);
+      logAuditEvent("DELETE_VEHICLE", "Vehicles", id);
+      showNotification("Vehicle deleted successfully!", "success");
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const content = (
@@ -163,6 +241,7 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
                   value={search}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   className="w-full pl-9 pr-4 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  disabled={loading}
                 />
                 <svg
                   className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
@@ -208,7 +287,8 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
                   setEditingVehicle(null);
                   setShowDialog(true);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm"
+                disabled={loading}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -228,26 +308,67 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
             <span className="px-2 py-0.5 font-semibold text-blue-700 bg-blue-50 border border-blue-200/60 rounded-full">
               {filteredVehicles.length} records
             </span>
+            {(loading || saving || deletingId !== null) && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 font-medium text-slate-600 bg-slate-100 border border-slate-200 rounded-full">
+                <svg className="animate-spin h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                {loading ? "Loading..." : "Saving..."}
+              </span>
+            )}
           </div>
           <p className="text-slate-500 font-medium">
             Showing {paginatedVehicles.length} of {filteredVehicles.length} Vehicles (Page {currentPage} of {totalPages})
           </p>
         </div>
 
+        {error && !loading && (
+          <div className="mx-4 mt-3 px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-3">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => {
+                void reload().catch(() => undefined);
+              }}
+              className="shrink-0 text-xs font-semibold text-red-700 underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Table Content */}
-        <div className="p-0">
-          <VehicleTable
-            vehicles={paginatedVehicles}
-            onEdit={handleEditVehicle}
-            onDelete={handleDeleteVehicle}
-          />
+        <div className="p-0 relative min-h-[120px]">
+          {loading && vehicles.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
+              <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <p className="text-sm font-medium">Loading vehicles...</p>
+            </div>
+          ) : !loading && vehicles.length === 0 && !error ? (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
+              <p className="text-sm font-medium text-slate-700">No vehicles found.</p>
+              <p className="text-xs text-slate-500">Add a vehicle to get started.</p>
+            </div>
+          ) : (
+            <VehicleTable
+              vehicles={paginatedVehicles}
+              onEdit={handleEditVehicle}
+              onDelete={(id) => {
+                void handleDeleteVehicle(id);
+              }}
+            />
+          )}
         </div>
 
         {/* Pagination Controls - Bottom Right Aligned */}
         <div className="px-4 py-2.5 bg-slate-50/60 border-t border-slate-100 flex items-center justify-end gap-2 text-xs">
           <button
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
+            disabled={currentPage === 1 || loading}
             className="px-2.5 py-1 rounded-md border border-slate-200 bg-white font-medium text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
           >
             Previous
@@ -258,6 +379,7 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
               <button
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
+                disabled={loading}
                 className={`w-7 h-7 rounded-md text-xs font-semibold flex items-center justify-center ${
                   currentPage === pageNum
                     ? "bg-blue-600 text-white shadow-sm"
@@ -271,7 +393,7 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
 
           <button
             onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
+            disabled={currentPage === totalPages || loading}
             className="px-2.5 py-1 rounded-md border border-slate-200 bg-white font-medium text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
           >
             Next
