@@ -21,9 +21,10 @@ type VehicleFormProps = {
   vehicle?: Vehicle | null;
   onSave: (vehicle: any) => void;
   onCancel: () => void;
+  isSaving?: boolean;
 };
 
-function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
+function VehicleForm({ vehicle, onSave, onCancel, isSaving = false }: VehicleFormProps) {
   const { showNotification } = useSafeNotification();
 
   // Fields (in new order)
@@ -222,7 +223,9 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
   const subtitle = isEditing ? "Update information" : "Fill in the information";
 
   const toggleStatus = () => {
-    setStatus(status === "Active" ? "Inactive" : "Active");
+    if (!isSaving) {
+      setStatus(status === "Active" ? "Inactive" : "Active");
+    }
   };
 
   return (
@@ -243,9 +246,10 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
           <button
             type="button"
             onClick={toggleStatus}
+            disabled={isSaving}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-200 ${
               status === "Active" ? "bg-emerald-500" : "bg-slate-300"
-            }`}
+            } ${isSaving ? "opacity-60 cursor-not-allowed" : ""}`}
           >
             <span
               className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -511,16 +515,29 @@ function VehicleForm({ vehicle, onSave, onCancel }: VehicleFormProps) {
           <button
             type="button"
             onClick={onCancel}
-            className="px-8 py-3 border border-slate-300 rounded-xl hover:bg-slate-50 transition font-medium text-base text-slate-700"
+            disabled={isSaving}
+            className="px-8 py-3 border border-slate-300 rounded-xl hover:bg-slate-50 transition font-medium text-base text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleSubmit}
-            className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition shadow-sm hover:shadow font-medium text-base"
+            disabled={isSaving}
+            className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition shadow-sm hover:shadow font-medium text-base disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
           >
-            {isEditing ? "Update Vehicle" : "Save Vehicle"}
+            {isSaving && (
+              <svg
+                className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            )}
+            {isSaving ? "Saving..." : isEditing ? "Update Vehicle" : "Save Vehicle"}
           </button>
         </div>
       </div>
