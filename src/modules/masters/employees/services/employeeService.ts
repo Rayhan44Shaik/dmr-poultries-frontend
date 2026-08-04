@@ -1,52 +1,166 @@
 // src/modules/masters/employees/services/employeeService.ts
+/**
+ * Employees master — PostgreSQL via Axios API foundation.
+ * localStorage removed for this module. Other modules may still call
+ * getEmployees() which reads an in-memory cache filled by loadEmployees().
+ */
 
-import { initialEmployees } from "../data/employees";
+import {
+  apiClient,
+  apiGet,
+  apiPost,
+  apiPut,
+  handleApiError,
+  ApiError,
+} from "../../../../api";
 import type { Employee } from "../types/employee";
 
-const STORAGE_KEY = "dmr-employees";
+const EMPLOYEES_PATH = "/masters/employees";
 
-export function getEmployees(): Employee[] {
-  const data = localStorage.getItem(STORAGE_KEY);
+/** In-memory cache so legacy sync callers (other modules) keep working. */
+let employeesCache: Employee[] = [];
 
-  // If nothing is stored yet, initialize with the default list
-  if (!data) {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(initialEmployees)
-    );
-    return initialEmployees;
+export type EmployeeInput = Omit<Employee, "id" | "employeeNo"> & {
+  employeeNo?: number;
+};
+
+function normalizeDate(value: string | null | undefined): string {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
   }
+  return "";
+}
 
+function normalizeStatus(status: unknown): Employee["status"] {
+  return status === "Active" ? "Active" : "Inactive";
+}
+
+function mapEmployee(raw: Record<string, unknown>): Employee {
+  return {
+    id: Number(raw.id),
+    employeeNo: Number(raw.employeeNo ?? raw.employee_no ?? 0),
+    employeeName: String(raw.employeeName ?? raw.employee_name ?? ""),
+    department: String(raw.department ?? ""),
+    role: String(raw.role ?? ""),
+    phoneNumber: String(raw.phoneNumber ?? raw.phone_number ?? ""),
+    email: String(raw.email ?? ""),
+    address: String(raw.address ?? ""),
+    joiningDate: normalizeDate(
+      (raw.joiningDate ?? raw.joining_date) as string | null | undefined
+    ),
+    aadharNumber: raw.aadharNumber
+      ? String(raw.aadharNumber)
+      : raw.aadhar_number
+        ? String(raw.aadhar_number)
+        : undefined,
+    licenseNumber: raw.licenseNumber
+      ? String(raw.licenseNumber)
+      : raw.license_number
+        ? String(raw.license_number)
+        : undefined,
+    salary: Number(raw.salary ?? 0),
+    status: normalizeStatus(raw.status),
+  };
+}
+
+function toPayload(input: EmployeeInput | Partial<Employee>): Record<string, unknown> {
+  return {
+    employeeNo: input.employeeNo,
+    employeeName: input.employeeName?.trim(),
+    department: input.department,
+    role: input.role?.trim() ?? "",
+    phoneNumber: input.phoneNumber?.trim() ?? "",
+    email: input.email?.trim() ?? "",
+    address: input.address?.trim() ?? "",
+    joiningDate: input.joiningDate ? normalizeDate(input.joiningDate) || null : null,
+    aadharNumber: input.aadharNumber?.trim() || null,
+    licenseNumber: input.licenseNumber?.trim() || null,
+    salary: Number(input.salary ?? 0),
+    status: input.status ?? "Active",
+  };
+}
+
+/** Sync snapshot for other modules — does not hit the network. */
+export function getEmployees(): Employee[] {
+  return employeesCache;
+}
+
+/**
+ * @deprecated Prefer createEmployee / updateEmployee. Kept so other modules
+ * that still call saveEmployees() do not break at import time.
+ */
+export function saveEmployees(employees: Employee[]): void {
+  employeesCache = employees;
+}
+
+/** GET /api/masters/employees */
+export async function loadEmployees(department?: string): Promise<Employee[]> {
+  const { data } = await apiGet<Record<string, unknown>[]>(EMPLOYEES_PATH, {
+    params: department ? { department } : undefined,
+  });
+  employeesCache = (data ?? []).map(mapEmployee);
+  return employeesCache;
+}
+
+/** POST /api/masters/employees */
+export async function createEmployee(input: EmployeeInput): Promise<Employee> {
+  const { data } = await apiPost<Record<string, unknown>>(
+    EMPLOYEES_PATH,
+    toPayload(input)
+  );
+  const created = mapEmployee(data);
+  employeesCache = [...employeesCache, created].sort((a, b) =>
+    a.employeeName.localeCompare(b.employeeName)
+  );
+  return created;
+}
+
+/** PUT /api/masters/employees/:id */
+export async function updateEmployee(
+  id: number,
+  input: EmployeeInput | Partial<Employee>
+): Promise<Employee> {
+  const { data } = await apiPut<Record<string, unknown>>(
+    `${EMPLOYEES_PATH}/${id}`,
+    toPayload({ ...(input as EmployeeInput), employeeNo: input.employeeNo })
+  );
+  const updated = mapEmployee(data);
+  employeesCache = employeesCache.map((e) => (e.id === id ? updated : e));
+  return updated;
+}
+
+/**
+ * DELETE /api/masters/employees/:id
+ * Falls back to soft-delete (status Inactive) if the hard-delete route is absent.
+ */
+export async function deleteEmployee(id: number): Promise<void> {
   try {
-    const storedEmployees: Employee[] = JSON.parse(data);
+    // Raw client: missing DELETE route should soft-delete without helper error noise
+    await apiClient.delete(`${EMPLOYEES_PATH}/${id}`);
+    employeesCache = employeesCache.filter((e) => e.id !== id);
+  } catch (error) {
+    const apiError = error instanceof ApiError ? error : null;
 
-    // --- SCALABILITY SYNC MECHANISM ---
-    // Check if any new employees were added to initialEmployees file
-    // that don't exist in localStorage yet (matched by 'id').
-    const storedIds = new Set(storedEmployees.map(emp => emp.id));
-    const newEmployees = initialEmployees.filter(emp => !storedIds.has(emp.id));
-
-    if (newEmployees.length > 0) {
-      // Automatically merge new default rows while keeping existing data intact
-      const updatedEmployees = [...storedEmployees, ...newEmployees];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedEmployees));
-      return updatedEmployees;
+    if (apiError?.status === 404) {
+      const existing = employeesCache.find((e) => e.id === id);
+      if (!existing) {
+        throw new ApiError("Employee not found.", { code: "HTTP_404", status: 404 });
+      }
+      await updateEmployee(id, { ...existing, status: "Inactive" });
+      // Soft-deleted employees remain listed as Inactive (no DELETE route on API).
+      return;
     }
 
-    return storedEmployees;
-  } catch (error) {
-    // Fallback safety if localStorage JSON gets corrupted
-    console.error("Failed to parse employees from localStorage, resetting to defaults.", error);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initialEmployees));
-    return initialEmployees;
+    throw error;
   }
 }
 
-export function saveEmployees(
-  employees: Employee[]
-): void {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(employees)
-  );
+/** Re-fetch list from PostgreSQL after mutations. */
+export async function refreshEmployees(): Promise<Employee[]> {
+  return loadEmployees();
 }
+
+export { handleApiError };
