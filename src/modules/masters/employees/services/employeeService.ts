@@ -25,6 +25,7 @@ const LEGACY_STORAGE_KEYS = [
 let employeesCache: Employee[] = [];
 
 export type EmployeeInput = Omit<Employee, "id" | "employeeNo"> & {
+  id?: number;
   employeeNo?: number;
 };
 
@@ -49,7 +50,15 @@ function normalizeDate(value: string | null | undefined): string {
 }
 
 function normalizeStatus(status: unknown): Employee["status"] {
-  return status === "Active" ? "Active" : "Inactive";
+  if (
+    status === true ||
+    status === 1 ||
+    status === "Active" ||
+    status === "active"
+  ) {
+    return "Active";
+  }
+  return "Inactive";
 }
 
 function mapEmployee(raw: Record<string, unknown>): Employee {
@@ -80,8 +89,11 @@ function mapEmployee(raw: Record<string, unknown>): Employee {
   };
 }
 
-function toPayload(input: EmployeeInput | Partial<Employee>): Record<string, unknown> {
-  return {
+function toPayload(
+  input: (EmployeeInput | Partial<Employee>) & { id?: number }
+): Record<string, unknown> {
+  const salary = Number(input.salary ?? 0);
+  const payload: Record<string, unknown> = {
     employeeNo: input.employeeNo,
     employeeName: input.employeeName?.trim(),
     department: input.department,
@@ -89,12 +101,21 @@ function toPayload(input: EmployeeInput | Partial<Employee>): Record<string, unk
     phoneNumber: input.phoneNumber?.trim() ?? "",
     email: input.email?.trim() ?? "",
     address: input.address?.trim() ?? "",
-    joiningDate: input.joiningDate ? normalizeDate(input.joiningDate) || null : null,
+    joiningDate: input.joiningDate
+      ? normalizeDate(input.joiningDate) || null
+      : null,
     aadharNumber: input.aadharNumber?.trim() || null,
     licenseNumber: input.licenseNumber?.trim() || null,
-    salary: Number(input.salary ?? 0),
-    status: input.status ?? "Active",
+    salary: Number.isFinite(salary) ? salary : 0,
+    // Backend expects "Active" | "Inactive", never a boolean.
+    status: normalizeStatus(input.status ?? "Active"),
   };
+
+  if (input.id != null && !Number.isNaN(Number(input.id))) {
+    payload.id = Number(input.id);
+  }
+
+  return payload;
 }
 
 function setCacheFromApi(rows: Record<string, unknown>[] | null | undefined): Employee[] {
@@ -139,9 +160,14 @@ export async function updateEmployee(
   input: EmployeeInput | Partial<Employee>
 ): Promise<Employee> {
   clearLegacyEmployeeStorage();
+  // Send the complete employee object, including id, for the PUT body.
   const { data } = await apiPut<Record<string, unknown>>(
     `${EMPLOYEES_PATH}/${id}`,
-    toPayload({ ...(input as EmployeeInput), employeeNo: input.employeeNo })
+    toPayload({
+      ...(input as EmployeeInput),
+      id,
+      employeeNo: input.employeeNo,
+    })
   );
   return mapEmployee(data);
 }
