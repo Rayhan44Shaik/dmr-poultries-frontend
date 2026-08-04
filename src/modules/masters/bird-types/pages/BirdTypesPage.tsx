@@ -9,6 +9,8 @@ import { useBirdTypes } from "../hooks/useBirdTypes";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
+import { handleApiError } from "../services/birdTypeService";
+import type { BirdType } from "../types/birdType";
 
 type BirdTypesPageProps = { embedded?: boolean };
 
@@ -16,12 +18,22 @@ const ITEMS_PER_PAGE = 10;
 
 function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
   const [showDialog, setShowDialog] = useState(false);
-  const [editingBirdType, setEditingBirdType] = useState<any>(null);
+  const [editingBirdType, setEditingBirdType] = useState<BirdType | null>(null);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const { showNotification } = useSafeNotification();
-  const { birdTypes, saveBirdTypes } = useBirdTypes();
+  const {
+    birdTypes,
+    loading,
+    saving,
+    error,
+    reload,
+    addBirdType,
+    editBirdType,
+    removeBirdType,
+  } = useBirdTypes();
 
   // Reset to page 1 whenever search keyword changes
   const handleSearchChange = (value: string) => {
@@ -83,50 +95,83 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
     showNotification("Excel exported successfully!", "success");
   };
 
-  const handleSaveBirdType = (birdType: any) => {
+  const validateBirdType = (birdType: Partial<BirdType>): string | null => {
+    const name = birdType.birdType?.trim() ?? "";
+    const averageWeight = Number(birdType.averageWeight);
+
+    if (!name || Number.isNaN(averageWeight) || averageWeight <= 0) {
+      return "Please fill all required fields with valid values.";
+    }
+
     const duplicate = birdTypes.some(
       (bt) =>
-        bt.birdType.trim().toLowerCase() === birdType.birdType.trim().toLowerCase() &&
+        bt.birdType.trim().toLowerCase() === name.toLowerCase() &&
         bt.id !== editingBirdType?.id
     );
     if (duplicate) {
-      showNotification("Bird Type already exists.", "error");
-      return;
+      return "Bird Type already exists.";
     }
 
-    if (editingBirdType) {
-      saveBirdTypes(
-        birdTypes.map((bt) =>
-          bt.id === editingBirdType.id ? { ...bt, ...birdType } : bt
-        )
-      );
-      logAuditEvent("UPDATE_BIRD_TYPE", "BirdTypes", editingBirdType.id);
-      showNotification("Bird Type updated successfully!", "success");
-    } else {
-      const newBirdType = {
-        id: Date.now(),
-        birdTypeNo: birdTypes.length + 1,
-        ...birdType,
-      };
-      saveBirdTypes([...birdTypes, newBirdType]);
-      logAuditEvent("CREATE_BIRD_TYPE", "BirdTypes", newBirdType.id);
-      showNotification("Bird Type added successfully!", "success");
-    }
-
-    setEditingBirdType(null);
-    setShowDialog(false);
+    return null;
   };
 
-  const handleEditBirdType = (birdType: any) => {
+  const handleSaveBirdType = async (birdType: Partial<BirdType>): Promise<boolean> => {
+    const validationError = validateBirdType(birdType);
+    if (validationError) {
+      showNotification(validationError, "error");
+      return false;
+    }
+
+    const payload = {
+      birdType: birdType.birdType!.trim(),
+      averageWeight: Number(birdType.averageWeight),
+      description: birdType.description?.trim() ?? "",
+      status: birdType.status ?? "Active",
+    };
+
+    try {
+      if (editingBirdType) {
+        await editBirdType(editingBirdType.id, {
+          ...payload,
+          birdTypeNo: editingBirdType.birdTypeNo,
+        });
+        logAuditEvent("UPDATE_BIRD_TYPE", "BirdTypes", editingBirdType.id);
+        showNotification("Bird Type updated successfully!", "success");
+      } else {
+        const list = await addBirdType(payload);
+        const created = list.find(
+          (bt) => bt.birdType === payload.birdType
+        );
+        logAuditEvent("CREATE_BIRD_TYPE", "BirdTypes", created?.id);
+        showNotification("Bird Type added successfully!", "success");
+      }
+
+      setEditingBirdType(null);
+      setShowDialog(false);
+      return true;
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
+      return false;
+    }
+  };
+
+  const handleEditBirdType = (birdType: BirdType) => {
     setEditingBirdType(birdType);
     setShowDialog(true);
   };
 
-  const handleDeleteBirdType = (id: number) => {
+  const handleDeleteBirdType = async (id: number) => {
     if (!window.confirm("Are you sure you want to delete this bird type?")) return;
-    saveBirdTypes(birdTypes.filter((bt) => bt.id !== id));
-    logAuditEvent("DELETE_BIRD_TYPE", "BirdTypes", id);
-    showNotification("Bird Type deleted successfully!", "success");
+    setDeletingId(id);
+    try {
+      await removeBirdType(id);
+      logAuditEvent("DELETE_BIRD_TYPE", "BirdTypes", id);
+      showNotification("Bird Type deleted successfully!", "success");
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const content = (
@@ -156,6 +201,7 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
                   value={search}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   className="w-full pl-9 pr-4 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  disabled={loading}
                 />
                 <svg
                   className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
@@ -201,7 +247,8 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
                   setEditingBirdType(null);
                   setShowDialog(true);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm"
+                disabled={loading}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -221,26 +268,67 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
             <span className="px-2 py-0.5 font-semibold text-blue-700 bg-blue-50 border border-blue-200/60 rounded-full">
               {filteredBirdTypes.length} records
             </span>
+            {(loading || saving || deletingId !== null) && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 font-medium text-slate-600 bg-slate-100 border border-slate-200 rounded-full">
+                <svg className="animate-spin h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                {loading ? "Loading..." : "Saving..."}
+              </span>
+            )}
           </div>
           <p className="text-slate-500 font-medium">
             Showing {paginatedBirdTypes.length} of {filteredBirdTypes.length} Bird Types (Page {currentPage} of {totalPages})
           </p>
         </div>
 
+        {error && !loading && (
+          <div className="mx-4 mt-3 px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-3">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => {
+                void reload().catch(() => undefined);
+              }}
+              className="shrink-0 text-xs font-semibold text-red-700 underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Table Content */}
-        <div className="p-0">
-          <BirdTypeTable
-            birdTypes={paginatedBirdTypes}
-            onEdit={handleEditBirdType}
-            onDelete={handleDeleteBirdType}
-          />
+        <div className="p-0 relative min-h-[120px]">
+          {loading && birdTypes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
+              <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <p className="text-sm font-medium">Loading bird types...</p>
+            </div>
+          ) : !loading && birdTypes.length === 0 && !error ? (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
+              <p className="text-sm font-medium text-slate-700">No bird types found.</p>
+              <p className="text-xs text-slate-500">Add a bird type to get started.</p>
+            </div>
+          ) : (
+            <BirdTypeTable
+              birdTypes={paginatedBirdTypes}
+              onEdit={handleEditBirdType}
+              onDelete={(id) => {
+                void handleDeleteBirdType(id);
+              }}
+            />
+          )}
         </div>
 
         {/* Pagination Controls - Bottom Right Aligned */}
         <div className="px-4 py-2.5 bg-slate-50/60 border-t border-slate-100 flex items-center justify-end gap-2 text-xs">
           <button
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
+            disabled={currentPage === 1 || loading}
             className="px-2.5 py-1 rounded-md border border-slate-200 bg-white font-medium text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
           >
             Previous
@@ -251,6 +339,7 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
               <button
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
+                disabled={loading}
                 className={`w-7 h-7 rounded-md text-xs font-semibold flex items-center justify-center ${
                   currentPage === pageNum
                     ? "bg-blue-600 text-white shadow-sm"
@@ -264,7 +353,7 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
 
           <button
             onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
+            disabled={currentPage === totalPages || loading}
             className="px-2.5 py-1 rounded-md border border-slate-200 bg-white font-medium text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
           >
             Next
