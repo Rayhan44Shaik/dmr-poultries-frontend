@@ -3,13 +3,14 @@
 import React, { useState, useMemo } from "react";
 import DashboardLayout from "../../../../layouts/DashboardLayout/DashboardLayout";
 import PageLayout from "../../../../components/common/PageLayout";
-import FarmToolbar from "../components/FarmToolbar";
 import FarmTable from "../components/FarmTable";
 import FarmDialog from "../dialogs/FarmDialog";
 import { useFarms } from "../hooks/useFarms";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
+import { handleApiError } from "../services/farmService";
+import type { Farm } from "../types/farm";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -19,12 +20,22 @@ const ITEMS_PER_PAGE = 10;
 
 function FarmsPage({ embedded = false }: FarmsPageProps) {
   const [showDialog, setShowDialog] = useState(false);
-  const [editingFarm, setEditingFarm] = useState<any>(null);
+  const [editingFarm, setEditingFarm] = useState<Farm | null>(null);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const { showNotification } = useSafeNotification();
-  const { farms, saveFarms } = useFarms();
+  const {
+    farms,
+    loading,
+    saving,
+    error,
+    reload,
+    addFarm,
+    editFarm,
+    removeFarm,
+  } = useFarms();
 
   // Reset to page 1 whenever search keyword changes
   const handleSearchChange = (value: string) => {
@@ -164,60 +175,105 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
     showNotification("Excel exported successfully!", "success");
   };
 
-  const handleSaveFarm = (farm: any) => {
+  const validateFarm = (farm: Partial<Farm>): string | null => {
+    const farmName = farm.farmName?.trim() ?? "";
+    const ownerName = farm.ownerName?.trim() ?? "";
+    const supervisorName = farm.supervisorName?.trim() ?? "";
+    const phoneNumber = farm.phoneNumber?.trim() ?? "";
+    const village = farm.village?.trim() ?? "";
+    const capacity = Number(farm.capacity);
+
+    if (!farmName || !ownerName || !supervisorName || !phoneNumber || !village) {
+      return "Please fill all required fields (marked with *).";
+    }
+    if (ownerName.length < 3) {
+      return "Owner Name must contain at least 3 characters.";
+    }
+    if (!/^[0-9]{10}$/.test(phoneNumber)) {
+      return "Mobile Number must be exactly 10 digits.";
+    }
+    if (Number.isNaN(capacity) || capacity <= 0) {
+      return "Bird Capacity must be a positive number.";
+    }
+
     const duplicateFarm = farms.some(
       (f) =>
-        f.farmName.trim().toLowerCase() === farm.farmName.trim().toLowerCase() &&
+        f.farmName.trim().toLowerCase() === farmName.toLowerCase() &&
         f.id !== editingFarm?.id
     );
     if (duplicateFarm) {
-      showNotification("Farm Name already exists.", "error");
-      return;
+      return "Farm Name already exists.";
     }
 
     const duplicatePhone = farms.some(
-      (f) =>
-        f.phoneNumber === farm.phoneNumber &&
-        f.id !== editingFarm?.id
+      (f) => f.phoneNumber === phoneNumber && f.id !== editingFarm?.id
     );
     if (duplicatePhone) {
-      showNotification("Phone Number already exists.", "error");
-      return;
+      return "Phone Number already exists.";
     }
 
-    if (editingFarm) {
-      saveFarms(
-        farms.map((f) =>
-          f.id === editingFarm.id ? { ...f, ...farm } : f
-        )
-      );
-      logAuditEvent("UPDATE_FARM", "Farms", editingFarm.id);
-      showNotification("Farm updated successfully!", "success");
-    } else {
-      const newFarm = {
-        id: Date.now(),
-        farmNo: farms.length + 1,
-        ...farm,
-      };
-      saveFarms([...farms, newFarm]);
-      logAuditEvent("CREATE_FARM", "Farms", newFarm.id);
-      showNotification("Farm added successfully!", "success");
-    }
-
-    setEditingFarm(null);
-    setShowDialog(false);
+    return null;
   };
 
-  const handleEditFarm = (farm: any) => {
+  const handleSaveFarm = async (farm: Partial<Farm>): Promise<boolean> => {
+    const validationError = validateFarm(farm);
+    if (validationError) {
+      showNotification(validationError, "error");
+      return false;
+    }
+
+    const payload = {
+      farmName: farm.farmName!.trim(),
+      ownerName: farm.ownerName!.trim(),
+      supervisorName: farm.supervisorName!.trim(),
+      phoneNumber: farm.phoneNumber!.trim(),
+      village: farm.village!.trim(),
+      address: farm.address?.trim() ?? "",
+      capacity: Number(farm.capacity),
+      status: farm.status ?? "Active",
+    };
+
+    try {
+      if (editingFarm) {
+        await editFarm(editingFarm.id, { ...payload, farmNo: editingFarm.farmNo });
+        logAuditEvent("UPDATE_FARM", "Farms", editingFarm.id);
+        showNotification("Farm updated successfully!", "success");
+      } else {
+        const list = await addFarm(payload);
+        const created = list.find(
+          (f) =>
+            f.farmName === payload.farmName &&
+            f.phoneNumber === payload.phoneNumber
+        );
+        logAuditEvent("CREATE_FARM", "Farms", created?.id);
+        showNotification("Farm added successfully!", "success");
+      }
+      setEditingFarm(null);
+      setShowDialog(false);
+      return true;
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
+      return false;
+    }
+  };
+
+  const handleEditFarm = (farm: Farm) => {
     setEditingFarm(farm);
     setShowDialog(true);
   };
 
-  const handleDeleteFarm = (id: number) => {
+  const handleDeleteFarm = async (id: number) => {
     if (!window.confirm("Are you sure you want to delete this farm?")) return;
-    saveFarms(farms.filter((f) => f.id !== id));
-    logAuditEvent("DELETE_FARM", "Farms", id);
-    showNotification("Farm deleted successfully!", "success");
+    setDeletingId(id);
+    try {
+      await removeFarm(id);
+      logAuditEvent("DELETE_FARM", "Farms", id);
+      showNotification("Farm deleted successfully!", "success");
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const content = (
@@ -247,6 +303,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
                   value={search}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   className="w-full pl-9 pr-4 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  disabled={loading}
                 />
                 <svg
                   className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
@@ -292,7 +349,8 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
                   setEditingFarm(null);
                   setShowDialog(true);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm"
+                disabled={loading}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -312,26 +370,67 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
             <span className="px-2 py-0.5 font-semibold text-blue-700 bg-blue-50 border border-blue-200/60 rounded-full">
               {filteredFarms.length} records
             </span>
+            {(loading || saving || deletingId !== null) && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 font-medium text-slate-600 bg-slate-100 border border-slate-200 rounded-full">
+                <svg className="animate-spin h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                {loading ? "Loading..." : "Saving..."}
+              </span>
+            )}
           </div>
           <p className="text-slate-500 font-medium">
             Showing {paginatedFarms.length} of {filteredFarms.length} Farms (Page {currentPage} of {totalPages})
           </p>
         </div>
 
+        {error && !loading && (
+          <div className="mx-4 mt-3 px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-3">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => {
+                void reload().catch(() => undefined);
+              }}
+              className="shrink-0 text-xs font-semibold text-red-700 underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Table Content */}
-        <div className="p-0">
-          <FarmTable
-            farms={paginatedFarms}
-            onEdit={handleEditFarm}
-            onDelete={handleDeleteFarm}
-          />
+        <div className="p-0 relative min-h-[120px]">
+          {loading && farms.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
+              <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <p className="text-sm font-medium">Loading farms...</p>
+            </div>
+          ) : !loading && farms.length === 0 && !error ? (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
+              <p className="text-sm font-medium text-slate-700">No farms found.</p>
+              <p className="text-xs text-slate-500">Add a farm to get started.</p>
+            </div>
+          ) : (
+            <FarmTable
+              farms={paginatedFarms}
+              onEdit={handleEditFarm}
+              onDelete={(id) => {
+                void handleDeleteFarm(id);
+              }}
+            />
+          )}
         </div>
 
         {/* Pagination Controls - Bottom Right Aligned */}
         <div className="px-4 py-2.5 bg-slate-50/60 border-t border-slate-100 flex items-center justify-end gap-2 text-xs">
           <button
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
+            disabled={currentPage === 1 || loading}
             className="px-2.5 py-1 rounded-md border border-slate-200 bg-white font-medium text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
           >
             Previous
@@ -342,6 +441,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
               <button
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
+                disabled={loading}
                 className={`w-7 h-7 rounded-md text-xs font-semibold flex items-center justify-center ${
                   currentPage === pageNum
                     ? "bg-blue-600 text-white shadow-sm"
@@ -355,7 +455,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
 
           <button
             onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
+            disabled={currentPage === totalPages || loading}
             className="px-2.5 py-1 rounded-md border border-slate-200 bg-white font-medium text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
           >
             Next
