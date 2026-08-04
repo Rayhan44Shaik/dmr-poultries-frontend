@@ -6,7 +6,7 @@ import type { Employee } from "../types/employee";
 type EmployeeDialogProps = {
   open: boolean;
   onClose: () => void;
-  onSave: (employee: any) => void | Promise<void>;
+  onSave: (employee: any) => void | boolean | Promise<void | boolean>;
   employee?: Employee | null;
 };
 
@@ -18,12 +18,15 @@ function EmployeeDialog({ open, onClose, onSave, employee }: EmployeeDialogProps
   const handleSave = async (formData: any) => {
     setIsSaving(true);
     try {
-      await Promise.resolve(onSave(formData));
+      const result = await Promise.resolve(onSave(formData));
+      // Keep dialog open when parent signals validation/API failure (false)
+      if (result === false) return;
+      onClose();
     } catch (error) {
       console.error("Save failed", error);
+      // Keep dialog open so the user can fix and retry
     } finally {
       setIsSaving(false);
-      onClose();
     }
   };
 

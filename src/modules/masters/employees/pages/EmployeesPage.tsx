@@ -8,6 +8,8 @@ import { useEmployees } from "../hooks/useEmployees";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
+import { handleApiError } from "../services/employeeService";
+import type { Employee } from "../types/employee";
 
 type EmployeesPageProps = { embedded?: boolean };
 
@@ -15,17 +17,27 @@ const ITEMS_PER_PAGE = 10;
 
 function EmployeesPage({ embedded = false }: EmployeesPageProps) {
   const [showDialog, setShowDialog] = useState(false);
-  const [editingEmployee, setEditingEmployee] = useState<any>(null);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const { showNotification } = useSafeNotification();
-  const { employees, saveEmployees } = useEmployees();
+  const {
+    employees,
+    loading,
+    saving,
+    error,
+    reload,
+    addEmployee,
+    editEmployee,
+    removeEmployee,
+  } = useEmployees();
 
   // Get unique departments for filter dropdown
   const departments = useMemo(() => {
-    const depts = new Set(employees.map(emp => emp.department));
+    const depts = new Set(employees.map((emp) => emp.department));
     return Array.from(depts).sort();
   }, [employees]);
 
@@ -104,78 +116,128 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
     showNotification("Excel exported successfully!", "success");
   };
 
-  const handleSaveEmployee = (employee: any) => {
-    // Unique employee name within the same department
+  const validateEmployee = (employee: Partial<Employee>): string | null => {
+    const name = employee.employeeName?.trim() ?? "";
+    const department = employee.department?.trim() ?? "";
+    const phone = employee.phoneNumber?.trim() ?? "";
+    const email = employee.email?.trim() ?? "";
+    const salary = Number(employee.salary);
+
+    if (!name || !department || !phone || employee.salary === undefined || employee.salary === null) {
+      return "Please fill all required fields (marked with *).";
+    }
+    if (!/^[0-9]{10}$/.test(phone)) {
+      return "Mobile Number must be exactly 10 digits.";
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return "Please enter a valid email address.";
+    }
+    if (Number.isNaN(salary) || salary < 0) {
+      return "Salary must be a positive number.";
+    }
+    if (
+      (department === "Driver" || department === "Collection") &&
+      !employee.licenseNumber?.trim()
+    ) {
+      return "License Number is required for Driver and Collection departments.";
+    }
+    if (employee.aadharNumber && !/^[0-9]{12}$/.test(employee.aadharNumber.replace(/\s/g, ""))) {
+      return "Aadhar Number must be exactly 12 digits.";
+    }
+
     const duplicateName = employees.some(
       (e) =>
-        e.department === employee.department &&
-        e.employeeName.trim().toLowerCase() === employee.employeeName.trim().toLowerCase() &&
+        e.department === department &&
+        e.employeeName.trim().toLowerCase() === name.toLowerCase() &&
         e.id !== editingEmployee?.id
     );
     if (duplicateName) {
-      showNotification(
-        `An employee with the name "${employee.employeeName}" already exists in the ${employee.department} department.`,
-        "error"
-      );
-      return;
+      return `An employee with the name "${name}" already exists in the ${department} department.`;
     }
 
     const duplicatePhone = employees.some(
-      (e) =>
-        e.phoneNumber === employee.phoneNumber &&
-        e.id !== editingEmployee?.id
+      (e) => e.phoneNumber === phone && e.id !== editingEmployee?.id
     );
     if (duplicatePhone) {
-      showNotification("Phone Number already exists.", "error");
-      return;
+      return "Phone Number already exists.";
     }
 
-    const duplicateEmail = employee.email.trim()
-      ? employees.some(
-          (e) =>
-            e.email.trim().toLowerCase() === employee.email.trim().toLowerCase() &&
-            e.id !== editingEmployee?.id
-        )
-      : false;
-
-    if (duplicateEmail) {
-      showNotification("Email already exists.", "error");
-      return;
-    }
-
-    if (editingEmployee) {
-      saveEmployees(
-        employees.map((e) =>
-          e.id === editingEmployee.id ? { ...e, ...employee } : e
-        )
+    if (email) {
+      const duplicateEmail = employees.some(
+        (e) =>
+          e.email.trim().toLowerCase() === email.toLowerCase() &&
+          e.id !== editingEmployee?.id
       );
-      logAuditEvent("UPDATE_EMPLOYEE", "Employees", editingEmployee.id);
-      showNotification("Employee updated successfully!", "success");
-    } else {
-      const newEmployee = {
-        id: Date.now(),
-        employeeNo: employees.length + 1,
-        ...employee,
-      };
-      saveEmployees([...employees, newEmployee]);
-      logAuditEvent("CREATE_EMPLOYEE", "Employees", newEmployee.id);
-      showNotification("Employee added successfully!", "success");
+      if (duplicateEmail) {
+        return "Email already exists.";
+      }
     }
 
-    setEditingEmployee(null);
-    setShowDialog(false);
+    return null;
   };
 
-  const handleEditEmployee = (employee: any) => {
+  const handleSaveEmployee = async (employee: Partial<Employee>): Promise<boolean> => {
+    const validationError = validateEmployee(employee);
+    if (validationError) {
+      showNotification(validationError, "error");
+      return false;
+    }
+
+    const payload = {
+      employeeName: employee.employeeName!.trim(),
+      department: employee.department!,
+      role: employee.role?.trim() ?? "",
+      phoneNumber: employee.phoneNumber!.trim(),
+      email: employee.email?.trim() ?? "",
+      address: employee.address?.trim() ?? "",
+      joiningDate: employee.joiningDate ?? "",
+      aadharNumber: employee.aadharNumber?.replace(/\s/g, "") || undefined,
+      licenseNumber: employee.licenseNumber?.trim() || undefined,
+      salary: Number(employee.salary),
+      status: employee.status ?? "Active",
+    };
+
+    try {
+      if (editingEmployee) {
+        await editEmployee(editingEmployee.id, payload);
+        logAuditEvent("UPDATE_EMPLOYEE", "Employees", editingEmployee.id);
+        showNotification("Employee updated successfully!", "success");
+      } else {
+        const created = await addEmployee(payload);
+        const newId = created.find(
+          (e) =>
+            e.employeeName === payload.employeeName &&
+            e.phoneNumber === payload.phoneNumber
+        )?.id;
+        logAuditEvent("CREATE_EMPLOYEE", "Employees", newId);
+        showNotification("Employee added successfully!", "success");
+      }
+      setEditingEmployee(null);
+      setShowDialog(false);
+      return true;
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
+      return false;
+    }
+  };
+
+  const handleEditEmployee = (employee: Employee) => {
     setEditingEmployee(employee);
     setShowDialog(true);
   };
 
-  const handleDeleteEmployee = (id: number) => {
+  const handleDeleteEmployee = async (id: number) => {
     if (!window.confirm("Are you sure you want to delete this employee?")) return;
-    saveEmployees(employees.filter((e) => e.id !== id));
-    logAuditEvent("DELETE_EMPLOYEE", "Employees", id);
-    showNotification("Employee deleted successfully!", "success");
+    setDeletingId(id);
+    try {
+      await removeEmployee(id);
+      logAuditEvent("DELETE_EMPLOYEE", "Employees", id);
+      showNotification("Employee deleted successfully!", "success");
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const content = (
@@ -205,6 +267,7 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
                     value={search}
                     onChange={(e) => handleSearchChange(e.target.value)}
                     className="w-full pl-9 pr-4 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    disabled={loading}
                   />
                   <svg
                     className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
@@ -224,6 +287,7 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
                   value={selectedDepartment}
                   onChange={(e) => handleDepartmentChange(e.target.value)}
                   className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  disabled={loading}
                 >
                   <option value="">All</option>
                   {departments.map((dept) => (
@@ -253,7 +317,8 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
                   setEditingEmployee(null);
                   setShowDialog(true);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm"
+                disabled={loading}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -271,26 +336,62 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
             <span className="px-2 py-0.5 font-semibold text-blue-700 bg-blue-50 border border-blue-200/60 rounded-full">
               {filteredEmployees.length} records
             </span>
+            {(loading || saving || deletingId !== null) && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 font-medium text-slate-600 bg-slate-100 border border-slate-200 rounded-full">
+                <svg className="animate-spin h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                {loading ? "Loading..." : "Saving..."}
+              </span>
+            )}
           </div>
           <p className="text-slate-500 font-medium">
             Showing {paginatedEmployees.length} of {filteredEmployees.length} Employees (Page {currentPage} of {totalPages})
           </p>
         </div>
 
+        {error && !loading && (
+          <div className="mx-4 mt-3 px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-3">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => {
+                void reload().catch(() => undefined);
+              }}
+              className="shrink-0 text-xs font-semibold text-red-700 underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Table */}
-        <div className="p-0">
-          <EmployeeTable
-            employees={paginatedEmployees}
-            onEdit={handleEditEmployee}
-            onDelete={handleDeleteEmployee}
-          />
+        <div className="p-0 relative min-h-[120px]">
+          {loading && employees.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
+              <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <p className="text-sm font-medium">Loading employees from server...</p>
+            </div>
+          ) : (
+            <EmployeeTable
+              employees={paginatedEmployees}
+              onEdit={handleEditEmployee}
+              onDelete={(id) => {
+                void handleDeleteEmployee(id);
+              }}
+            />
+          )}
         </div>
 
         {/* Pagination */}
         <div className="px-4 py-2.5 bg-slate-50/60 border-t border-slate-100 flex items-center justify-end gap-2 text-xs">
           <button
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
+            disabled={currentPage === 1 || loading}
             className="px-2.5 py-1 rounded-md border border-slate-200 bg-white font-medium text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
           >
             Previous
@@ -300,6 +401,7 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
               <button
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
+                disabled={loading}
                 className={`w-7 h-7 rounded-md text-xs font-semibold flex items-center justify-center ${
                   currentPage === pageNum
                     ? "bg-blue-600 text-white shadow-sm"
@@ -312,7 +414,7 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
           </div>
           <button
             onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
+            disabled={currentPage === totalPages || loading}
             className="px-2.5 py-1 rounded-md border border-slate-200 bg-white font-medium text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
           >
             Next
