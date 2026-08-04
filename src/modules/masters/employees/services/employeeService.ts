@@ -1,7 +1,7 @@
 // src/modules/masters/employees/services/employeeService.ts
 /**
- * Employees master — PostgreSQL via the shared Axios API foundation.
- * No localStorage in this module.
+ * Employees master — PostgreSQL ONLY via shared Axios helpers.
+ * Static/mock arrays and localStorage are not used as a data source.
  */
 
 import {
@@ -15,12 +15,28 @@ import type { Employee } from "../types/employee";
 
 const EMPLOYEES_PATH = "/masters/employees";
 
-/** In-memory cache so legacy sync callers (other modules) keep working. */
+/** Legacy browser keys that previously held mock employee lists. */
+const LEGACY_STORAGE_KEYS = [
+  "dmr-employees",
+  "dmr_poultries_employees_master_data",
+] as const;
+
+/** Cache filled exclusively by GET /api/masters/employees (and mutations that reload). */
 let employeesCache: Employee[] = [];
 
 export type EmployeeInput = Omit<Employee, "id" | "employeeNo"> & {
   employeeNo?: number;
 };
+
+function clearLegacyEmployeeStorage(): void {
+  try {
+    for (const key of LEGACY_STORAGE_KEYS) {
+      localStorage.removeItem(key);
+    }
+  } catch {
+    /* ignore storage access errors */
+  }
+}
 
 function normalizeDate(value: string | null | undefined): string {
   if (!value) return "";
@@ -81,62 +97,62 @@ function toPayload(input: EmployeeInput | Partial<Employee>): Record<string, unk
   };
 }
 
-/** Sync snapshot for other modules — does not hit the network. */
+function setCacheFromApi(rows: Record<string, unknown>[] | null | undefined): Employee[] {
+  employeesCache = Array.isArray(rows) ? rows.map(mapEmployee) : [];
+  return employeesCache;
+}
+
+/** Sync snapshot for other modules — reflects last successful API load only. */
 export function getEmployees(): Employee[] {
   return employeesCache;
 }
 
 /**
- * @deprecated Prefer createEmployee / updateEmployee / deleteEmployee.
- * Kept so other modules that still call saveEmployees() do not break at import time.
+ * @deprecated Do not use for Employees UI. Mutations must go through API helpers.
  */
-export function saveEmployees(employees: Employee[]): void {
-  employeesCache = employees;
+export function saveEmployees(_employees: Employee[]): void {
+  // Intentionally no-op for Employees page data. Cache is API-owned.
 }
 
-/** GET /api/masters/employees */
+/** GET /api/masters/employees — sole source of truth for the Employees table. */
 export async function loadEmployees(department?: string): Promise<Employee[]> {
+  clearLegacyEmployeeStorage();
   const { data } = await apiGet<Record<string, unknown>[]>(EMPLOYEES_PATH, {
     params: department ? { department } : undefined,
   });
-  employeesCache = (data ?? []).map(mapEmployee);
-  return employeesCache;
+  return setCacheFromApi(data);
 }
 
-/** POST /api/masters/employees */
+/** POST /api/masters/employees then caller should reload via GET. */
 export async function createEmployee(input: EmployeeInput): Promise<Employee> {
+  clearLegacyEmployeeStorage();
   const { data } = await apiPost<Record<string, unknown>>(
     EMPLOYEES_PATH,
     toPayload(input)
   );
-  const created = mapEmployee(data);
-  employeesCache = [...employeesCache, created].sort((a, b) =>
-    a.employeeName.localeCompare(b.employeeName)
-  );
-  return created;
+  return mapEmployee(data);
 }
 
-/** PUT /api/masters/employees/:id */
+/** PUT /api/masters/employees/:id then caller should reload via GET. */
 export async function updateEmployee(
   id: number,
   input: EmployeeInput | Partial<Employee>
 ): Promise<Employee> {
+  clearLegacyEmployeeStorage();
   const { data } = await apiPut<Record<string, unknown>>(
     `${EMPLOYEES_PATH}/${id}`,
     toPayload({ ...(input as EmployeeInput), employeeNo: input.employeeNo })
   );
-  const updated = mapEmployee(data);
-  employeesCache = employeesCache.map((e) => (e.id === id ? updated : e));
-  return updated;
+  return mapEmployee(data);
 }
 
-/** DELETE /api/masters/employees/:id */
+/** DELETE /api/masters/employees/:id then caller should reload via GET. */
 export async function deleteEmployee(id: number): Promise<void> {
+  clearLegacyEmployeeStorage();
   await apiDelete(`${EMPLOYEES_PATH}/${id}`);
-  employeesCache = employeesCache.filter((e) => e.id !== id);
 }
 
-/** Re-fetch list from PostgreSQL after mutations. */
+/** Always re-fetch from PostgreSQL. */
 export async function refreshEmployees(): Promise<Employee[]> {
   return loadEmployees();
 }
