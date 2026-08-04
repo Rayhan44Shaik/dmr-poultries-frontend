@@ -194,12 +194,19 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
       aadharNumber: employee.aadharNumber?.replace(/\s/g, "") || undefined,
       licenseNumber: employee.licenseNumber?.trim() || undefined,
       salary: Number(employee.salary),
-      status: employee.status ?? "Active",
+      status: (employee.status === "Inactive" ? "Inactive" : "Active") as
+        | "Active"
+        | "Inactive",
     };
 
     try {
       if (editingEmployee) {
-        await editEmployee(editingEmployee.id, payload);
+        // PUT must send the complete employee object, including id + employeeNo.
+        await editEmployee(editingEmployee.id, {
+          ...payload,
+          id: editingEmployee.id,
+          employeeNo: editingEmployee.employeeNo,
+        });
         logAuditEvent("UPDATE_EMPLOYEE", "Employees", editingEmployee.id);
         showNotification("Employee updated successfully!", "success");
       } else {
