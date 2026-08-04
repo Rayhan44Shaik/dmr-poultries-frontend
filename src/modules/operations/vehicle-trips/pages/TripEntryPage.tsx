@@ -79,31 +79,70 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const [rows, setRows] = useState<ShopDelivery[]>([]);
   const [viewTrip, setViewTrip] = useState<Trip | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
+  
+  // ✅ FIX: This strictly represents the index of the screen currently being viewed (0 to 4)
   const [viewStepIndex, setViewStepIndex] = useState(0);
 
   const [showEntryPrompt, setShowEntryPrompt] = useState(true);
   const isManualSelect = useRef(false);
   const endStepJustSubmitted = useRef(false);
 
-  // ─── Handle status change with fuel bill validation ────────────
-  const handleStatusChange = (trip: Trip, status: "Pending" | "Completed") => {
-    // Only validate when moving to "Completed"
+  // ─── Automated Fuel Bill Generation & Approval ────────────
+  const handleStatusChange = (changedTrip: Trip, status: "Pending" | "Completed", approvedBy?: string) => {
     if (status === "Completed") {
-      // Check if there are any pending fuel bills for this trip
-      const bills = fuelExpenseService.getBillsForTrip(trip.vehicleId, trip.tripDate);
-      const pendingBills = bills.filter(b => b.status === "Pending");
+      const approverName = approvedBy || "Admin";
 
-      if (pendingBills.length > 0) {
-        const msg = pendingBills.length === 1
-          ? `⚠️ 1 fuel bill for this trip is not approved. Please approve it before completing the trip.`
-          : `⚠️ ${pendingBills.length} fuel bills for this trip are not approved. Please approve them before completing the trip.`;
-        showNotification(msg, "info"); // ✅ Changed from "warning" to "info"
-        return; // Do NOT change status
+      const existingBills = fuelExpenseService.getBillsForTrip(changedTrip.vehicleId, changedTrip.tripDate);
+      const alreadyGenerated = existingBills.some(b => b.remarks?.includes(changedTrip.tripNo));
+
+      if (!alreadyGenerated) {
+        let createdCount = 0;
+        const indices = new Set<string>();
+        Object.keys(changedTrip).forEach(key => {
+            if (key.startsWith("dieselLtr")) {
+                indices.add(key.replace("dieselLtr", ""));
+            }
+        });
+        
+        if (indices.size === 0 && (changedTrip.fuel || 0) > 0) {
+            indices.add("");
+        }
+
+        indices.forEach(idx => {
+            const tripAny = changedTrip as any;
+            const liters = Number(tripAny[`dieselLtr${idx}`]) || 0;
+            const rate = Number(tripAny[`dieselRate${idx}`]) || 0;
+            const baseAmount = idx === "" ? Number(changedTrip.fuel || 0) : 0;
+            const computedAmount = baseAmount > 0 ? baseAmount : (liters * rate);
+
+            if (liters > 0 || computedAmount > 0) {
+                fuelExpenseService.createAndApprove({
+                    date: changedTrip.tripDate,
+                    vehicleId: changedTrip.vehicleId,
+                    vehicleNo: changedTrip.vehicleNo,
+                    driverId: changedTrip.driverId,
+                    driverName: changedTrip.driverName,
+                    supervisorId: changedTrip.supervisorId,
+                    supervisorName: changedTrip.supervisorName,
+                    meterReading: Number(tripAny[`dieselMeter${idx}`]) || changedTrip.closingMeter || 0,
+                    amount: computedAmount,
+                    rate: rate,
+                    litres: liters,
+                    petrolBunk: tripAny[`dieselBunk${idx}`] || "Auto-Captured from Trip",
+                    remarks: `Auto-generated from Trip ${changedTrip.tripNo}`,
+                    image: tripAny[`dieselImage${idx}`] || ""
+                }, approverName);
+                createdCount++;
+            }
+        });
+
+        if (createdCount > 0) {
+          showNotification(`⛽ ${createdCount} fuel bill(s) auto-generated and approved.`, "success");
+        }
       }
     }
 
-    // If all checks pass, change the status
-    changeStatus(trip, status);
+    changeStatus(changedTrip, status, approvedBy);
   };
 
   const handleView = (selectedTrip: Trip) => {
@@ -115,11 +154,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setShowEntryPrompt(false);
     let targetStep = 0;
     
-    if (selectedTrip.status === "Completed" || selectedTrip.status === "Pending" || selectedTrip.endStepSubmitted || selectedTrip.expensesStepSubmitted) targetStep = 4;
-    else if (selectedTrip.deliveryStepSubmitted) targetStep = 3;
-    else if (selectedTrip.pickupStepSubmitted) targetStep = 2;
-    else if (selectedTrip.farmStepSubmitted) targetStep = 1;
-    else if (selectedTrip.startStepSubmitted) targetStep = 0;
+    // Determine highest uncompleted step to drop user in
+    if (selectedTrip.endStepSubmitted || selectedTrip.expensesStepSubmitted) targetStep = 4;
+    else if (selectedTrip.deliveryStepSubmitted) targetStep = 4;
+    else if (selectedTrip.pickupStepSubmitted) targetStep = 3;
+    else if (selectedTrip.farmStepSubmitted) targetStep = 2;
+    else if (selectedTrip.startStepSubmitted) targetStep = 1;
 
     setViewStepIndex(targetStep);
     loadTrip(selectedTrip);
@@ -154,7 +194,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     void refreshTrips();
   }, [trip.id, trip.updatedAt, trip.status, refreshTrips]);
 
-  // Resume latest Draft from PostgreSQL on first mount
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -162,17 +201,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       if (cancelled || !draft) return;
       setShowEntryPrompt(false);
       let targetStep = 0;
-      if (
-        draft.status === "Completed" ||
-        draft.status === "Pending" ||
-        draft.endStepSubmitted ||
-        draft.expensesStepSubmitted
-      ) {
-        targetStep = 4;
-      } else if (draft.deliveryStepSubmitted) targetStep = 3;
+      if (draft.endStepSubmitted || draft.expensesStepSubmitted) targetStep = 4;
+      else if (draft.deliveryStepSubmitted) targetStep = 3;
       else if (draft.pickupStepSubmitted) targetStep = 2;
       else if (draft.farmStepSubmitted) targetStep = 1;
       else if (draft.startStepSubmitted) targetStep = 0;
+      
       setViewStepIndex(targetStep);
       setRows(draft.deliveries || []);
       showNotification(
@@ -183,7 +217,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const clearForm = () => {
@@ -195,34 +228,35 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     showNotification("✨ Cleared.", "info");
   };
 
+  // ✅ FIX: Masks rely purely on the submission flags. 
   const isStartCompleted = Boolean(trip.startStepSubmitted);
   const isFarmCompleted = Boolean(trip.farmStepSubmitted);
   const isPickupCompleted = Boolean(trip.pickupStepSubmitted);
   const isDeliveryCompleted = Boolean(trip.deliveryStepSubmitted);
-  const isTripEnded = Boolean(
-    trip.endStepSubmitted || 
-    trip.expensesStepSubmitted || 
-    endStepSubmitted || 
-    trip.status === "Completed" || 
-    trip.status === "Pending"
-  );
+  const isEndCompleted = Boolean(trip.endStepSubmitted || trip.expensesStepSubmitted);
+  
+  // Note: isTripEnded is still used just to know if we are entirely finished to fire success toasts
+  const isTripEnded = Boolean(isEndCompleted || trip.status === "Completed" || trip.status === "Pending");
 
   const canEditTrip = trip.createdAt ? canEditItem(trip.createdAt) : false;
 
-  const currentStep = isTripEnded ? 4
-    : (isDeliveryCompleted ? 3
-      : (isPickupCompleted ? 2
-        : (isFarmCompleted ? 1
-          : (isStartCompleted ? 0 : 0))));
+  // Track the highest step completed to ensure user drops in the correct tab automatically
+  let farthestStep = 0;
+  if (isEndCompleted) farthestStep = 4;
+  else if (isDeliveryCompleted) farthestStep = 4;
+  else if (isPickupCompleted) farthestStep = 3;
+  else if (isFarmCompleted) farthestStep = 2;
+  else if (isStartCompleted) farthestStep = 1;
 
   const vehicleOpts = vehicles.map((v: any) => ({ id: v.id, vehicleNumber: v.vehicleNumber }));
   const employeeOpts = employees.map((e: any) => ({ id: e.id, employeeName: e.employeeName, department: e.department }));
 
   useEffect(() => {
-    if (currentStep > viewStepIndex && !isManualSelect.current) {
-      setViewStepIndex(currentStep);
+    // Only advance the view index if the user hasn't manually clicked another step
+    if (farthestStep > viewStepIndex && !isManualSelect.current) {
+      setViewStepIndex(farthestStep);
     }
-  }, [currentStep, viewStepIndex]);
+  }, [farthestStep, viewStepIndex]);
 
   useEffect(() => {
     isManualSelect.current = false;
@@ -231,7 +265,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   useEffect(() => {
     if (!isTripEnded && trip.status === "Pending") {
       setTrip((prev) => ({ ...prev, status: "Draft" as any }) as Trip);
-      showNotification?.("⏳ Trip is still in draft. Complete the End step to submit for approval.", "info");
+      showNotification?.("⏳ Trip is still in draft. Complete the End step to submit.", "info");
     }
   }, [isTripEnded, trip.status, setTrip, showNotification]);
 
@@ -253,7 +287,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       if (trip.status === "Completed") return false;
       return isEditing && canEditTrip;
     }
-    const isViewingActiveStep = !isTripEnded && viewStepIndex === currentStep;
+    const isViewingActiveStep = !isTripEnded && viewStepIndex === farthestStep;
     if (isViewingActiveStep && !stepCompleted) {
       return isNewTrip || (isEditing && canEditTrip);
     }
@@ -440,13 +474,13 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
             <TripWizardStepper
               steps={["Start", "Farm", "Pickup", "Deliveries", "End"]}
-              currentStep={isTripEnded ? 4 : currentStep}
+              currentStep={viewStepIndex} // ✅ FIX: currentStep strictly equals the active tab being edited/viewed
               completedMask={{
                 start: isStartCompleted,
                 farm: isFarmCompleted,
                 pickup: isPickupCompleted,
                 delivery: isDeliveryCompleted,
-                end: isTripEnded,
+                end: isEndCompleted, 
               } as any}
               onStepClick={(idx) => {
                 setViewStepIndex(idx);
@@ -466,7 +500,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         onView={handleView}
         onEdit={handleEdit}
         onDelete={(trip, reason) => deleteTrip(trip.id, reason)}
-        onStatusChange={handleStatusChange} // ✅ Pass the validated version
+        onStatusChange={handleStatusChange} 
       />
 
       <TripViewModal

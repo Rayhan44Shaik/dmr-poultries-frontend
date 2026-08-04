@@ -1,6 +1,6 @@
 // src/modules/operations/vehicle-trips/components/TripViewModal.tsx
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, FileText, Download, Pencil, UserCheck } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -27,28 +27,30 @@ interface Props {
 function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props) {
   const [viewStepIndex, setViewStepIndex] = useState(0);
 
-  // ─── Early return – ensures trip is never null after this ─────
+  // ✅ FIX: All masks rely purely on submission flags, disconnected from Trip Status
+  const isStartCompleted = trip ? Boolean(trip.startStepSubmitted) : false;
+  const isFarmCompleted = trip ? Boolean(trip.farmStepSubmitted) : false;
+  const isPickupCompleted = trip ? Boolean(trip.pickupStepSubmitted) : false;
+  const isDeliveryCompleted = trip ? Boolean(trip.deliveryStepSubmitted) : false;
+  const isEndCompleted = trip ? Boolean(trip.endStepSubmitted || trip.expensesStepSubmitted) : false;
+
+  // Defaults the initial view to the furthest completed data screen (capped at 4)
+  let defaultViewStep = 0;
+  if (isEndCompleted) defaultViewStep = 4;
+  else if (isDeliveryCompleted) defaultViewStep = 3;
+  else if (isPickupCompleted) defaultViewStep = 2;
+  else if (isFarmCompleted) defaultViewStep = 1;
+
+  useEffect(() => {
+    if (open && trip) {
+      setViewStepIndex(defaultViewStep);
+    }
+  }, [open, trip, defaultViewStep]);
+
   if (!open || !trip) return null;
 
-  // Now TypeScript knows trip is definitely a Trip object
   const totalKm = (trip.closingMeter || 0) - (trip.openingMeter || 0);
 
-  // ─── STEP STATE FLAGS ───
-  const isStartCompleted = trip.startStepSubmitted;
-  const isFarmCompleted = trip.farmStepSubmitted;
-  const isPickupCompleted = trip.pickupStepSubmitted;
-  const isDeliveryCompleted = trip.deliveryStepSubmitted;
-  const isEndCompleted = (trip as any).endStepSubmitted === true || trip.status === "Completed";
-  const isTripEnded = trip.status === "Completed";
-
-  const currentStep = isTripEnded ? 4
-    : (isEndCompleted ? 4
-      : (isDeliveryCompleted ? 3
-        : (isPickupCompleted ? 2
-          : (isFarmCompleted ? 1
-            : (isStartCompleted ? 0 : 0)))));
-
-  // ─── PDF download ──────────────────────────────────────────────
   const downloadPDF = () => {
     const doc = new jsPDF("p", "mm", "a4");
     const margin = 16;
@@ -102,7 +104,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
       row.shopName,
       row.birds.toString(),
       row.weight.toFixed(2),
-      row.remarks || "--", // ✅ Fixed: missing closing quote
+      row.remarks || "--", 
     ]);
 
     autoTable(doc, {
@@ -128,23 +130,21 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
     doc.save(`${trip.tripNo}_${safeVehicleNo}.pdf`);
   };
 
-  // ─── Dummy functions for read‑only steps ──────────────────────
   const noop = () => {};
   const noopDispatch = () => {};
 
-  // ─── Render the selected step ──────────────────────────────────
   const renderViewStep = () => {
     if (viewStepIndex === 0 && isStartCompleted) {
-      return <StepStart trip={trip} setTrip={noopDispatch} updateTrip={noop} submitStartStep={() => false} vehicleOptions={[]} employeeOptions={[]} />;
+      return <StepStart trip={trip} setTrip={noopDispatch} updateTrip={noop} submitStartStep={() => false} vehicleOptions={[]} employeeOptions={[]} editable={false} canEdit={false} />;
     }
     if (viewStepIndex === 1 && isFarmCompleted) {
-      return <StepFarm trip={trip} setTrip={noopDispatch} updateTrip={noop} submitFarmStep={() => false} farms={[]} />;
+      return <StepFarm trip={trip} setTrip={noopDispatch} updateTrip={noop} submitFarmStep={() => false} farms={[]} editable={false} canEdit={false} />;
     }
     if (viewStepIndex === 2 && isPickupCompleted) {
-      return <StepPickup trip={trip} setTrip={noopDispatch} updateTrip={noop} submitPickupStep={() => false} updateBoxDetails={noop} />;
+      return <StepPickup trip={trip} setTrip={noopDispatch} updateTrip={noop} submitPickupStep={() => false} updateBoxDetails={noop} editable={false} canEdit={false} />;
     }
     if (viewStepIndex === 3 && isDeliveryCompleted) {
-      return <StepDeliveries rows={trip.deliveries || []} setRows={noopDispatch} shops={shops} birdTypes={birdTypes} trip={trip} updateDeliveries={noop} submitDeliveriesStep={() => false} clearForm={noop} readOnly={true} />;
+      return <StepDeliveries rows={trip.deliveries || []} setRows={noopDispatch} shops={shops} birdTypes={birdTypes} trip={trip} updateDeliveries={noop} submitDeliveriesStep={() => false} clearForm={noop} readOnly={true} editable={false} canEdit={false} />;
     }
     if (viewStepIndex === 4 && isEndCompleted) {
       return (
@@ -152,12 +152,15 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
           trip={trip}
           setTrip={noopDispatch}
           updateTrip={noop}
-          submitExpensesStep={() => false}
-          submitStartStep={() => false}
           editable={false}
           canEdit={false}
           onCancel={noop}
-          clearForm={noop}
+          {...({
+            submitExpensesStep: () => false,
+            submitEndStep: () => false,
+            onSubmit: () => false,
+            clearForm: noop
+          } as any)}
         />
       );
     }
@@ -195,14 +198,14 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
           
           <TripWizardStepper
             steps={["Start", "Farm", "Pickup", "Deliveries", "End"]}
-            currentStep={currentStep}
+            currentStep={viewStepIndex} // ✅ FIX: currentStep strictly equals the active tab being edited/viewed
             completedMask={
               {
                 start: isStartCompleted,
                 farm: isFarmCompleted,
                 pickup: isPickupCompleted,
                 delivery: isDeliveryCompleted,
-                end: isEndCompleted,
+                end: isEndCompleted, 
               } as any
             }
             onStepClick={setViewStepIndex}

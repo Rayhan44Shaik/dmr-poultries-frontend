@@ -13,6 +13,7 @@ import {
   LogOut,
   CheckCircle,
   AlertCircle,
+  Receipt,
 } from "lucide-react";
 import type { Trip, TripStatus } from "../../types/trip";
 import GeneralExpensesTable from "./GeneralExpensesTable";
@@ -138,7 +139,6 @@ export default function StepEnd({
   onCancel,
   clearForm,
 }: Props) {
-  // ─── State ─────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -160,11 +160,14 @@ export default function StepEnd({
     onCancel: () => {},
   });
 
-  // ─── Local isSubmitted state ─────────────────────────────────────
   const [isSubmittedLocal, setIsSubmittedLocal] = useState(false);
-  const isSubmitted = Boolean((trip as any).expensesStepSubmitted || (trip as any).endStepSubmitted || isSubmittedLocal);
+  
+  const isSubmitted = Boolean(
+    (trip as any).expensesStepSubmitted || 
+    (trip as any).endStepSubmitted || 
+    isSubmittedLocal
+  );
 
-  // ─── Helper to build sheet data from trip ──────────────────────
   const buildSheetDataFromTrip = (tripData: Trip): SheetData => {
     const data: SheetData = {
       vehicleNo: tripData.vehicleNo || "",
@@ -185,7 +188,6 @@ export default function StepEnd({
       destinationTolls: (tripData as any).destinationTolls ?? (tripData as any).deliveryTolls ?? "",
       remarks: (tripData as any).remarks ?? "",
     };
-    // Copy all diesel fields from trip
     Object.keys(tripData).forEach(key => {
       if (key.startsWith("dieselLtr") || key.startsWith("dieselRate") || key.startsWith("dieselMeter") ||
           key.startsWith("dieselBunk") || key.startsWith("dieselImage") || key.startsWith("dieselImageName")) {
@@ -195,10 +197,8 @@ export default function StepEnd({
     return data;
   };
 
-  // ─── Sheet Data state ───────────────────────────────────────────
   const [sheetData, setSheetData] = useState<SheetData>(() => buildSheetDataFromTrip(trip));
 
-  // ─── Reset sheetData when trip changes ──────────────────────────
   const prevTripId = useRef<number>(trip.id);
   useEffect(() => {
     if (trip.id !== prevTripId.current) {
@@ -214,7 +214,6 @@ export default function StepEnd({
     }
   }, [trip.id, trip]);
 
-  // ─── Compute Distance & Average ──────────────────────────────────
   const openingMeter = trip.openingMeter || 0;
   const destMeter = trip.destMeter || 0;
   const endMeterNum = Number(sheetData.endMeter);
@@ -224,7 +223,6 @@ export default function StepEnd({
     totalDistanceCovered = endMeterNum - openingMeter;
   }
 
-  // ─── Dynamically compute diesel totals from all rows ────────────
   const getDieselIndices = (data: SheetData): number[] => {
     const indices: number[] = [];
     Object.keys(data).forEach(key => {
@@ -251,7 +249,6 @@ export default function StepEnd({
     averageKmLtr = (totalDistanceCovered / totalDieselLiters).toFixed(2);
   }
 
-  // ─── Persist to PostgreSQL helper ──────────────────────────────────
   const saveToStorage = useCallback(
     async (data: SheetData, stepSubmitted: boolean) => {
       const payload = {
@@ -262,14 +259,13 @@ export default function StepEnd({
         openingMeter: openingMeter,
         expensesStepSubmitted: stepSubmitted,
         endStepSubmitted: stepSubmitted,
-        status: stepSubmitted ? "Completed" : trip.status,
+        status: stepSubmitted && trip.status === "Draft" ? "Pending" : trip.status,
       };
       updateTrip(payload as any, true, true);
     },
     [trip, updateTrip, openingMeter]
   );
 
-  // ─── Auto‑save helpers ──────────────────────────────────────────
   const autoSaveTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const debouncedAutoSave = useCallback(
@@ -293,7 +289,6 @@ export default function StepEnd({
     [saveToStorage, isSubmitted]
   );
 
-  // ─── Handle field changes (debounced) ──────────────────────────
   const handleChange = (field: string, value: any) => {
     setErrorMsg("");
     const updated = { ...sheetData, [field]: value };
@@ -301,7 +296,6 @@ export default function StepEnd({
     debouncedAutoSave(updated);
   };
 
-  // ─── Compute derived values ──────────────────────────────────────
   const totalExpenses1 =
     Number(sheetData.meals || 0) +
     Number(sheetData.loading || 0) +
@@ -321,7 +315,6 @@ export default function StepEnd({
   const remainingBalance =
     Number(sheetData.advance || 0) - totalAllExpenses - totalDieselAmount;
 
-  // ─── Prepare final payload for submission ──────────────────────
   const prepareFinalPayload = (stepSubmitted = false) => {
     const existingTimestamp = (trip as any).submittedAtTimestamp || sheetData.submittedAtTimestamp;
     const capturedTimestamp = existingTimestamp || new Date().toLocaleString("en-IN", {
@@ -337,7 +330,7 @@ export default function StepEnd({
     let newStatus: TripStatus = trip.status || "Draft";
     if (stepSubmitted) {
       if (trip.status !== "Deleted") {
-        newStatus = "Completed"; // ✅ FIXED: End step signifies trip completion
+        newStatus = trip.status === "Completed" ? "Completed" : "Pending";
       } else {
         newStatus = "Deleted";
       }
@@ -355,12 +348,11 @@ export default function StepEnd({
       advanceAmount: sheetData.advance === "" ? 0 : Number(sheetData.advance),
       openingMeter: openingMeter,
       expensesStepSubmitted: stepSubmitted,
-      endStepSubmitted: stepSubmitted, // ✅ Explicitly set endStepSubmitted
+      endStepSubmitted: stepSubmitted,
       status: newStatus,
     };
   };
 
-  // ─── Sync fuel bills after submission ──────────────────────────
   const syncFuelBillsOnSubmit = useCallback((data: SheetData) => {
     const indices = getDieselIndices(data);
     if (indices.length === 0) return;
@@ -406,7 +398,6 @@ export default function StepEnd({
     });
   }, [trip]);
 
-  // ─── Save progress (manual) ──────────────────────────────────────
   const handleSaveProgress = () => {
     try {
       immediateSave(sheetData);
@@ -417,7 +408,6 @@ export default function StepEnd({
     }
   };
 
-  // ─── Initiate submit ──────────────────────────────────────────────
   const handleInitiateSubmit = () => {
     const endMeterNum = Number(sheetData.endMeter);
     if (sheetData.endMeter === "" || sheetData.endMeter === null || isNaN(endMeterNum)) {
@@ -463,7 +453,7 @@ export default function StepEnd({
       title: isSubmitted ? "Update Expenses Sheet" : "Submit Expenses Sheet",
       message: isSubmitted
         ? "Are you sure you want to update the submitted expenses sheet with recent changes?"
-        : "Are you sure you want to submit this expenses sheet? This will mark the trip as completed and lock current entries.",
+        : "Are you sure you want to submit this expenses sheet? This will mark the step as completed and move the trip to Pending for approval.",
       confirmLabel: isSubmitted ? "Yes, Update" : "Yes, Submit",
       cancelLabel: "Cancel",
       type: "info",
@@ -487,13 +477,12 @@ export default function StepEnd({
         if (result === false) success = false;
       }
       if (success) {
-        // ✅ Save and update parent state
         immediateSave(finalData as any);
         setSheetData(finalData as any);
         setIsLocalEditing(false);
         setIsSubmittedLocal(true);
         syncFuelBillsOnSubmit(finalData as any);
-        setToast({ message: "Expenses sheet submitted successfully! Trip marked as completed.", type: "success" });
+        setToast({ message: "Expenses sheet submitted successfully! Trip marked as Pending.", type: "success" });
       } else {
         setErrorMsg("Failed to save step details.");
         setToast({ message: "Failed to save step details.", type: "error" });
@@ -516,7 +505,40 @@ export default function StepEnd({
     }
   };
 
-  // ─── Render ──────────────────────────────────────────────────────
+  // ─── Generate Detailed Expenses Array (> 0) ───────────────────────
+  const getDetailedExpenses = () => {
+    const expenses = [
+      { label: "Meals", amount: Number(sheetData.meals || 0) },
+      { label: "Loading / Unloading", amount: Number(sheetData.loading || 0) },
+      { label: "Meals / Tiffin", amount: Number(sheetData.mealsTiffin || 0) },
+      { label: "Vehicle Maintenance", amount: Number(sheetData.vehicleMaintenance || 0) },
+      { label: "Others (RC)", amount: Number(sheetData.othersRC || 0) },
+      { label: "Others 1", amount: Number(sheetData.others1Amt || 0) },
+      { label: "Others 2", amount: Number(sheetData.others2Amt || 0) },
+      { label: "Others 3", amount: Number(sheetData.others3Amt || 0) },
+      { label: "Others 4", amount: Number(sheetData.others4Amt || 0) },
+      { label: "Others 5", amount: Number(sheetData.others5Amt || 0) },
+    ].filter(item => item.amount > 0);
+
+    const diesels = dieselIndices.map(idx => {
+      const ltr = Number(sheetData[`dieselLtr${idx}`] || 0);
+      const rate = Number(sheetData[`dieselRate${idx}`] || 0);
+      const amt = ltr * rate;
+      const bunk = sheetData[`dieselBunk${idx}`] || "Unknown Bunk";
+      return { label: `Diesel - ${bunk}`, amount: amt };
+    }).filter(item => item.amount > 0);
+
+    return [...expenses, ...diesels];
+  };
+
+  const detailedExpenses = getDetailedExpenses();
+
+  // ─── Chunk the array into pairs for a 2-column layout ────────────
+  const pairedExpenses = [];
+  for (let i = 0; i < detailedExpenses.length; i += 2) {
+    pairedExpenses.push([detailedExpenses[i], detailedExpenses[i + 1]]);
+  }
+
   return (
     <>
       <style>{`
@@ -529,7 +551,6 @@ export default function StepEnd({
       `}</style>
 
       {isSubmitted && !isLocalEditing ? (
-        // ─── Locked View ──────────────────────────────────────────────
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-3">
             <div className="flex items-center gap-2">
@@ -573,9 +594,48 @@ export default function StepEnd({
               <p className="text-xs font-semibold text-emerald-600 mt-0.5">₹{remainingBalance.toFixed(2)}</p>
             </div>
           </div>
+
+          {/* ─── Detailed Expenses Table (2-Column Layout) ─────────── */}
+          {detailedExpenses.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <div className="flex items-center gap-2 mb-3">
+                <Receipt className="w-4 h-4 text-slate-500" />
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Expense Breakdown</h3>
+              </div>
+              <div className="border border-slate-200 rounded-xl overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[500px]">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                    <tr className="divide-x divide-slate-200">
+                      <th className="px-4 py-2.5 w-1/4">Expense Category</th>
+                      <th className="px-4 py-2.5 text-right w-1/4">Amount (₹)</th>
+                      <th className="px-4 py-2.5 w-1/4">Expense Category</th>
+                      <th className="px-4 py-2.5 text-right w-1/4">Amount (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+                    {pairedExpenses.map((pair, i) => (
+                      <tr key={i} className="hover:bg-slate-50/50 transition-colors divide-x divide-slate-100">
+                        <td className="px-4 py-2">{pair[0].label}</td>
+                        <td className="px-4 py-2 text-right text-rose-600 font-semibold">₹{pair[0].amount.toFixed(2)}</td>
+                        <td className="px-4 py-2">{pair[1] ? pair[1].label : <span className="text-slate-300">-</span>}</td>
+                        <td className="px-4 py-2 text-right text-rose-600 font-semibold">
+                          {pair[1] ? `₹${pair[1].amount.toFixed(2)}` : <span className="text-slate-300">-</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-slate-50 border-t border-slate-200 font-bold text-slate-800">
+                    <tr>
+                      <td colSpan={3} className="px-4 py-2.5 text-right text-slate-600 border-r border-slate-200">Total Accounted Expenses</td>
+                      <td className="px-4 py-2.5 text-right text-rose-700 text-sm">₹{(totalAllExpenses + totalDieselAmount).toFixed(2)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
-        // ─── Editable View ────────────────────────────────────────────
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
             <div className="flex items-center gap-2">

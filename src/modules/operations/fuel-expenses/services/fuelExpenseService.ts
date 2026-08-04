@@ -51,6 +51,32 @@ function save(expense: Omit<FuelExpense, "id" | "billNo" | "createdDate" | "crea
   }
 }
 
+// ✅ NEW: Auto-creates and auto-approves a fuel bill silently from a completed trip
+function createAndApprove(
+  expense: Omit<FuelExpense, "id" | "billNo" | "createdDate" | "createdBy" | "status" | "approvedDate" | "approvedBy">,
+  approvedBy: string = "Admin"
+): boolean {
+  try {
+    const all = getData();
+    const newExpense: FuelExpense = {
+      // Use random suffix to prevent ID collision if multiple bills generate at the exact same millisecond
+      id: Date.now().toString() + Math.random().toString(36).substring(7),
+      billNo: generateBillNo(expense.date),
+      ...expense,
+      status: "Approved",
+      createdDate: new Date().toISOString(),
+      createdBy: "System Auto-Capture",
+      approvedDate: new Date().toISOString(),
+      approvedBy: approvedBy,
+    };
+    all.unshift(newExpense);
+    saveData(all);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function update(id: string, updates: Partial<FuelExpense>): boolean {
   const all = getData();
   const index = all.findIndex((e) => e.id === id);
@@ -81,7 +107,6 @@ function remove(id: string): boolean {
   return true;
 }
 
-// ✅ UPDATED: Accept approverName (default "Admin")
 function approve(id: string, approvedBy: string = "Admin"): boolean {
   const all = getData();
   const index = all.findIndex((e) => e.id === id);
@@ -92,7 +117,7 @@ function approve(id: string, approvedBy: string = "Admin"): boolean {
     ...existing,
     status: "Approved",
     approvedDate: new Date().toISOString(),
-    approvedBy: approvedBy, // Store the name string
+    approvedBy: approvedBy,
   };
   saveData(all);
   return true;
@@ -147,9 +172,10 @@ export const fuelExpenseService = {
   getAll,
   getById,
   save,
+  createAndApprove, // ✅ Exported here
   update,
   remove,
-  approve, // updated
+  approve,
   getRecent,
   getSummary,
   getLatestMeterReading,
