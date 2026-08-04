@@ -9,6 +9,8 @@ import { useShops } from "../hooks/useShops";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
+import { handleApiError } from "../services/shopService";
+import type { Shop } from "../types/shop";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -18,12 +20,22 @@ const ITEMS_PER_PAGE = 10;
 
 function ShopsPage({ embedded = false }: ShopsPageProps) {
   const [showDialog, setShowDialog] = useState(false);
-  const [editingShop, setEditingShop] = useState<any>(null);
+  const [editingShop, setEditingShop] = useState<Shop | null>(null);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const { showNotification } = useSafeNotification();
-  const { shops, saveShops } = useShops();
+  const {
+    shops,
+    loading,
+    saving,
+    error,
+    reload,
+    addShop,
+    editShop,
+    removeShop,
+  } = useShops();
 
   // Reset to page 1 whenever search keyword changes
   const handleSearchChange = (value: string) => {
@@ -160,58 +172,101 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     showNotification("Excel exported successfully!", "success");
   };
 
-  const handleSaveShop = (shop: any) => {
+  const validateShop = (shop: Partial<Shop>): string | null => {
+    const shopName = shop.shopName?.trim() ?? "";
+    const ownerName = shop.ownerName?.trim() ?? "";
+    const phoneNumber = shop.phoneNumber?.trim() ?? "";
+    const village = shop.village?.trim() ?? "";
+
+    if (!shopName || !ownerName || !phoneNumber || !village) {
+      return "Please fill all required fields (marked with *).";
+    }
+    if (shopName.length < 3) {
+      return "Shop Name must contain at least 3 characters.";
+    }
+    if (ownerName.length < 3) {
+      return "Owner Name must contain at least 3 characters.";
+    }
+    if (!/^[0-9]{10}$/.test(phoneNumber)) {
+      return "Mobile Number must be exactly 10 digits.";
+    }
+
     const duplicateShop = shops.some(
       (s) =>
-        s.shopName.trim().toLowerCase() === shop.shopName.trim().toLowerCase() &&
+        s.shopName.trim().toLowerCase() === shopName.toLowerCase() &&
         s.id !== editingShop?.id
     );
     if (duplicateShop) {
-      showNotification("Shop Name already exists.", "error");
-      return;
+      return "Shop Name already exists.";
     }
+
     const duplicatePhone = shops.some(
-      (s) =>
-        s.phoneNumber === shop.phoneNumber &&
-        s.id !== editingShop?.id
+      (s) => s.phoneNumber === phoneNumber && s.id !== editingShop?.id
     );
     if (duplicatePhone) {
-      showNotification("Phone Number already exists.", "error");
-      return;
+      return "Phone Number already exists.";
     }
 
-    if (editingShop) {
-      saveShops(
-        shops.map((s) =>
-          s.id === editingShop.id ? { ...s, ...shop } : s
-        )
-      );
-      logAuditEvent("UPDATE_SHOP", "Shops", editingShop.id);
-      showNotification("Shop updated successfully!", "success");
-    } else {
-      const newShop = {
-        id: Date.now(),
-        shopNo: shops.length + 1,
-        ...shop,
-      };
-      saveShops([...shops, newShop]);
-      logAuditEvent("CREATE_SHOP", "Shops", newShop.id);
-      showNotification("Shop added successfully!", "success");
-    }
-    setEditingShop(null);
-    setShowDialog(false);
+    return null;
   };
 
-  const handleEditShop = (shop: any) => {
+  const handleSaveShop = async (shop: Partial<Shop>): Promise<boolean> => {
+    const validationError = validateShop(shop);
+    if (validationError) {
+      showNotification(validationError, "error");
+      return false;
+    }
+
+    const payload = {
+      shopName: shop.shopName!.trim(),
+      ownerName: shop.ownerName!.trim(),
+      phoneNumber: shop.phoneNumber!.trim(),
+      village: shop.village!.trim(),
+      address: shop.address?.trim() ?? "",
+      status: shop.status ?? "Active",
+    };
+
+    try {
+      if (editingShop) {
+        await editShop(editingShop.id, { ...payload, shopNo: editingShop.shopNo });
+        logAuditEvent("UPDATE_SHOP", "Shops", editingShop.id);
+        showNotification("Shop updated successfully!", "success");
+      } else {
+        const list = await addShop(payload);
+        const created = list.find(
+          (s) =>
+            s.shopName === payload.shopName &&
+            s.phoneNumber === payload.phoneNumber
+        );
+        logAuditEvent("CREATE_SHOP", "Shops", created?.id);
+        showNotification("Shop added successfully!", "success");
+      }
+      setEditingShop(null);
+      setShowDialog(false);
+      return true;
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
+      return false;
+    }
+  };
+
+  const handleEditShop = (shop: Shop) => {
     setEditingShop(shop);
     setShowDialog(true);
   };
 
-  const handleDeleteShop = (id: number) => {
+  const handleDeleteShop = async (id: number) => {
     if (!window.confirm("Are you sure you want to delete this shop?")) return;
-    saveShops(shops.filter((shop) => shop.id !== id));
-    logAuditEvent("DELETE_SHOP", "Shops", id);
-    showNotification("Shop deleted successfully!", "success");
+    setDeletingId(id);
+    try {
+      await removeShop(id);
+      logAuditEvent("DELETE_SHOP", "Shops", id);
+      showNotification("Shop deleted successfully!", "success");
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const content = (
@@ -241,6 +296,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
                   value={search}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   className="w-full pl-9 pr-4 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  disabled={loading}
                 />
                 <svg
                   className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
@@ -286,7 +342,8 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
                   setEditingShop(null);
                   setShowDialog(true);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm"
+                disabled={loading}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -306,26 +363,67 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
             <span className="px-2 py-0.5 font-semibold text-blue-700 bg-blue-50 border border-blue-200/60 rounded-full">
               {filteredShops.length} records
             </span>
+            {(loading || saving || deletingId !== null) && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 font-medium text-slate-600 bg-slate-100 border border-slate-200 rounded-full">
+                <svg className="animate-spin h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                {loading ? "Loading..." : "Saving..."}
+              </span>
+            )}
           </div>
           <p className="text-slate-500 font-medium">
             Showing {paginatedShops.length} of {filteredShops.length} Shops (Page {currentPage} of {totalPages})
           </p>
         </div>
 
+        {error && !loading && (
+          <div className="mx-4 mt-3 px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-3">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => {
+                void reload().catch(() => undefined);
+              }}
+              className="shrink-0 text-xs font-semibold text-red-700 underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Table Content */}
-        <div className="p-0">
-          <ShopTable
-            shops={paginatedShops}
-            onEdit={handleEditShop}
-            onDelete={handleDeleteShop}
-          />
+        <div className="p-0 relative min-h-[120px]">
+          {loading && shops.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
+              <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <p className="text-sm font-medium">Loading shops...</p>
+            </div>
+          ) : !loading && shops.length === 0 && !error ? (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
+              <p className="text-sm font-medium text-slate-700">No shops found.</p>
+              <p className="text-xs text-slate-500">Add a shop to get started.</p>
+            </div>
+          ) : (
+            <ShopTable
+              shops={paginatedShops}
+              onEdit={handleEditShop}
+              onDelete={(id) => {
+                void handleDeleteShop(id);
+              }}
+            />
+          )}
         </div>
 
         {/* Pagination Controls - Bottom Right Aligned */}
         <div className="px-4 py-2.5 bg-slate-50/60 border-t border-slate-100 flex items-center justify-end gap-2 text-xs">
           <button
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
+            disabled={currentPage === 1 || loading}
             className="px-2.5 py-1 rounded-md border border-slate-200 bg-white font-medium text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
           >
             Previous
@@ -336,6 +434,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
               <button
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
+                disabled={loading}
                 className={`w-7 h-7 rounded-md text-xs font-semibold flex items-center justify-center ${
                   currentPage === pageNum
                     ? "bg-blue-600 text-white shadow-sm"
@@ -349,7 +448,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
 
           <button
             onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
+            disabled={currentPage === totalPages || loading}
             className="px-2.5 py-1 rounded-md border border-slate-200 bg-white font-medium text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
           >
             Next
