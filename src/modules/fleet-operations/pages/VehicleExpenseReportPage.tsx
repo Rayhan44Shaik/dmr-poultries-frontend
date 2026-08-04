@@ -211,27 +211,27 @@ const VehicleExpenseReportPage = () => {
 
 export default memo(VehicleExpenseReportPage);*/
 
-import { memo } from 'react';
+import React, { memo } from 'react';
 import ErrorBoundary from '../components/common/ErrorBoundary';
-import { FileText, MessageSquare } from 'lucide-react';
 
-const VehicleReportsPage = () => {
+interface VehicleReportsPageProps {
+  embedded?: boolean;
+}
+
+const VehicleReportsPage = ({ embedded = false }: VehicleReportsPageProps) => {
   return (
     <ErrorBoundary>
-      {/* 👇 Updated container with reduced horizontal padding and increased top spacing */}
-      <div className="px-1 md:px-3 py-6 md:py-8 space-y-6 max-w-7xl mx-auto bg-slate-50 min-h-screen">
-        <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center">
-          <div className="p-4 bg-purple-50 rounded-full mb-6">
-            <FileText className="w-12 h-12 text-purple-500" />
+      <div className={`w-full flex items-center justify-center animate-in fade-in duration-500 ${
+        embedded ? 'min-h-[60vh]' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
+      }`}>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center max-w-md w-full mx-4">
+          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 border border-blue-100 shadow-sm animate-bounce">
+            🚧
           </div>
-          {/* Heading removed */}
-          <p className="text-gray-500 max-w-md">
-            We're currently designing this module based on your feedback.
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Vehicle Reports - Coming Soon</h2>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            This module is currently being enhanced and will be made fully available after the upcoming updates.
           </p>
-          <div className="mt-4 flex items-center gap-2 text-sm text-gray-400">
-            <MessageSquare className="w-4 h-4" />
-            <span>Coming soon – stay tuned!</span>
-          </div>
         </div>
       </div>
     </ErrorBoundary>

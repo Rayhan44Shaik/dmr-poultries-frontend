@@ -20,8 +20,10 @@ import { format } from 'date-fns';
 import { summaryService } from '../services/summaryService';
 import { DatePicker } from '../../../components/common/DatePicker';
 import { exportPDF, exportExcel } from '../components/Summary';
+import { PaymentService } from '../services/PaymentService';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { WeeklyMetrics, ExpenseBreakdown } from '../types/summary.types';
+import type { Payment } from '../types/payment.types';
 
 // ---- Helpers ----
 const formatCurrency = (amount: number): string => {
@@ -153,7 +155,12 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
   // ---- Fetch data ----
   const trips = useMemo(() => summaryService.getCompletedTripsByDateRange(start, end), [start, end, refreshKey]);
   const collections = useMemo(() => summaryService.getApprovedCollectionsByDateRange(start, end), [start, end, refreshKey]);
-  const farmPayments = useMemo(() => summaryService.getFarmPaymentsByDateRange(start, end), [start, end, refreshKey]);
+  
+  // Fetch all payments from PaymentService for overriding Farm Payments
+  const allPayments = useMemo(() => {
+    const _trigger = refreshKey; // Trigger reactivity on storage updates
+    return PaymentService.getPayments();
+  }, [refreshKey]);
 
   // ---- Group trips into weeks or quarters ----
   const weeklyGroups = useMemo(() => {
@@ -239,14 +246,39 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
 
   // ✅ Combined Expenses mapping
   const weeklyExpenses: ExpenseBreakdown[] = useMemo(() => {
-    return weeklyGroups.map(group =>
-      summaryService.computeCombinedExpenses(group.trips, group.startDate, group.endDate, farmPayments)
-    );
-  }, [weeklyGroups, farmPayments]);
+    return weeklyGroups.map(group => {
+      // Pass an empty array to computeCombinedExpenses to prevent it from using old farm payment logic
+      const expenses = summaryService.computeCombinedExpenses(group.trips, group.startDate, group.endDate, []);
+      
+      // Compute Farm Payments from new PaymentService data
+      const groupFarmPayments = allPayments.filter(p => {
+        if (!p.paymentDate) return false;
+        const pDate = new Date(p.paymentDate);
+        const isFarm = p.paymentType?.toLowerCase().includes('farm');
+        return isFarm && pDate >= group.startDate && pDate <= group.endDate;
+      });
+
+      expenses.farm = groupFarmPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      
+      return expenses;
+    });
+  }, [weeklyGroups, allPayments]);
 
   const totalExpenses = useMemo<ExpenseBreakdown>(() => {
-    return summaryService.computeCombinedExpenses(trips, start, end, farmPayments);
-  }, [trips, start, end, farmPayments]);
+    const expenses = summaryService.computeCombinedExpenses(trips, start, end, []);
+    
+    // Compute Farm Payments from new PaymentService data for the total summary
+    const totalFarmPayments = allPayments.filter(p => {
+      if (!p.paymentDate) return false;
+      const pDate = new Date(p.paymentDate);
+      const isFarm = p.paymentType?.toLowerCase().includes('farm');
+      return isFarm && pDate >= start && pDate <= end;
+    });
+
+    expenses.farm = totalFarmPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    return expenses;
+  }, [trips, start, end, allPayments]);
 
   const totalMetrics = useMemo<WeeklyMetrics>(() => {
     const total = { trips: 0, birds: 0, weight: 0, mortality: 0, sales: 0, collection: 0, pending: 0 };

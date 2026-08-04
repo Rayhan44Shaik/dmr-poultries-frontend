@@ -1,5 +1,5 @@
 // src/modules/settings/pages/SettingsPage.tsx
-
+/*
 import React, { useState } from "react";
 import { 
   User, Lock, Globe, Sun, Moon, 
@@ -286,7 +286,7 @@ function SettingsPage() {
 
   return (
     <div className="w-full pt-4 pb-6 space-y-5">
-      {/* Full-width Tab Bar Container touching left & right edges */}
+      {--Full-width Tab Bar Container touching left & right edges }
       <div className="bg-white border-y sm:border border-slate-200/90 sm:rounded-xl shadow-sm px-4 sm:px-6 py-1.5 w-full">
         <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => {
@@ -315,7 +315,7 @@ function SettingsPage() {
         </div>
       </div>
 
-      {/* Content Area with matching Masters side padding & container styling */}
+      {-- Content Area with matching Masters side padding & container styling }
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="bg-white border border-slate-200/90 sm:rounded-xl shadow-sm p-6 min-h-[450px]">
           <h2 className="text-base font-bold text-slate-800 border-b border-slate-100 pb-3 mb-4">
@@ -328,4 +328,33 @@ function SettingsPage() {
   );
 }
 
-export default React.memo(SettingsPage);
+export default React.memo(SettingsPage);*/
+
+import React, { memo } from 'react';
+import ErrorBoundary from '../../../components/common/ErrorBoundary';
+
+interface SettingsPageProps {
+  embedded?: boolean;
+}
+
+const SettingsPage = ({ embedded = false }: SettingsPageProps) => {
+  return (
+    <ErrorBoundary>
+      <div className={`w-full flex items-center justify-center animate-in fade-in duration-500 ${
+        embedded ? 'min-h-[60vh]' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
+      }`}>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center max-w-md w-full mx-4">
+          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 border border-blue-100 shadow-sm animate-bounce">
+            🚧
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Settings - Coming Soon</h2>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            This module is currently being enhanced and will be made fully available after the upcoming updates.
+          </p>
+        </div>
+      </div>
+    </ErrorBoundary>
+  );
+};
+
+export default memo(SettingsPage);

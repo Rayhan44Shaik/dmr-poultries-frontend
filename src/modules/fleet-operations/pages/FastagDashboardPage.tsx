@@ -56,24 +56,27 @@ const FastagDashboardPage = () => {
 
 export default memo(FastagDashboardPage);*/
 
-import { memo } from 'react';
+import React, { memo } from 'react';
 import ErrorBoundary from '../components/common/ErrorBoundary';
-import { CreditCard, MessageSquare } from 'lucide-react';
 
-const FastagDashboardPage = () => {
+interface FastagDashboardPageProps {
+  embedded?: boolean;
+}
+
+const FastagDashboardPage = ({ embedded = false }: FastagDashboardPageProps) => {
   return (
     <ErrorBoundary>
-      <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center">
-        <div className="p-4 bg-blue-50 rounded-full mb-6">
-          <CreditCard className="w-12 h-12 text-blue-500" />
-        </div>
-        <h2 className="text-2xl font-semibold text-gray-800 mb-3">FASTag Dashboard</h2>
-        <p className="text-gray-500 max-w-md">
-          We're currently designing this module based on your feedback.
-        </p>
-        <div className="mt-4 flex items-center gap-2 text-sm text-gray-400">
-          <MessageSquare className="w-4 h-4" />
-          <span>Coming soon – stay tuned!</span>
+      <div className={`w-full flex items-center justify-center animate-in fade-in duration-500 ${
+        embedded ? 'min-h-[60vh]' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
+      }`}>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center max-w-md w-full mx-4">
+          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 border border-blue-100 shadow-sm animate-bounce">
+            🚧
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">FASTag Dashboard - Coming Soon</h2>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            This module is currently being enhanced and will be made fully available after the upcoming updates.
+          </p>
         </div>
       </div>
     </ErrorBoundary>

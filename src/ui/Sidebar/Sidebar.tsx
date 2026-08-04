@@ -41,7 +41,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {/* 1. Dashboard */}
+        {/* 1. Dashboard - Commented out for now
         <Link
           to="/dashboard"
           className={`mb-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
@@ -53,6 +53,7 @@ export default function Sidebar() {
           <LayoutDashboard size={18} />
           Dashboard
         </Link>
+        */}
 
         {/* 2. Masters */}
         <Link

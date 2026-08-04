@@ -8,7 +8,7 @@ import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { useFuelKMValidator } from "../../operations/fuel-expenses/hooks/useFuelKMValidator";
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import MaintenanceForm from '../components/maintenance/MaintenanceForm';
-import LatestMaintenanceTable from '../components/maintenance/LatestMaintenanceTable';
+import LatestMaintenanceTable, { ViewMode } from '../components/maintenance/LatestMaintenanceTable';
 import ViewModal from '../components/maintenance/ViewModal';
 import { MAINTENANCE_TYPES } from '../utils/constants';
 import type { MaintenanceEvent } from '../types';
@@ -21,7 +21,9 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
   const [loading, setLoading] = useState(false);
   const [selectKey, setSelectKey] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'active' | 'deleted'>('active');
+  
+  // Updated view mode to support Pending, Approved, and Deleted
+  const [viewMode, setViewMode] = useState<ViewMode>('pending');
 
   // --- Confirmation Dialog State ---
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -46,7 +48,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
     };
   }, []);
 
-  // --- Deleted records (unchanged) ---
+  // --- Deleted records ---
   const [deletedRecords, setDeletedRecords] = useState<MaintenanceEvent[]>([]);
   const refreshDeleted = useCallback(() => {
     setDeletedRecords(getDeletedMaintenance());
@@ -59,7 +61,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
 
-  // --- Form hook - MOVED UP before validator ---
+  // --- Form hook ---
   const {
     form,
     setFormData,
@@ -88,7 +90,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
     vehicles,
   });
 
-  // --- Get vehicle number for validator (NOW AFTER form is defined) ---
+  // --- Get vehicle number for validator ---
   const selectedVehicle = useMemo(
     () => vehicles.find((v: any) => String(v.id) === String(form.vehicleId)),
     [vehicles, form.vehicleId]
@@ -98,21 +100,24 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
   // --- Fuel KM Validator ---
   const validator = useFuelKMValidator(vehicleNumber);
   const pendingWarning = validator.getPendingWarning();
-  const latestApprovedKM = validator.latestApprovedKM;
 
-  // --- Active records: ONLY UNPAID (no grouping, no paid) ---
-  const activeUnpaid = useMemo(() => {
-    // filter all records where paymentStatus is NOT 'paid'
-    const unpaid = maintenance.filter(rec => rec.paymentStatus !== 'paid');
-    // sort by date descending (newest first)
-    return unpaid.sort((a, b) =>
-      safeDate(b.date).getTime() - safeDate(a.date).getTime()
-    );
+  // --- Record Filtering (Pending vs Approved vs Deleted) ---
+  const pendingRecords = useMemo(() => {
+    // Treat records without an explicit "approved" status as pending
+    const pending = maintenance.filter(rec => rec.paymentStatus !== 'approved');
+    return pending.sort((a, b) => safeDate(b.date).getTime() - safeDate(a.date).getTime());
+  }, [maintenance]);
+
+  const approvedRecords = useMemo(() => {
+    const approved = maintenance.filter(rec => rec.paymentStatus === 'approved');
+    return approved.sort((a, b) => safeDate(b.date).getTime() - safeDate(a.date).getTime());
   }, [maintenance]);
 
   const displayRecords = useMemo(() => {
-    return viewMode === 'active' ? activeUnpaid : deletedRecords;
-  }, [viewMode, activeUnpaid, deletedRecords]);
+    if (viewMode === 'pending') return pendingRecords;
+    if (viewMode === 'approved') return approvedRecords;
+    return deletedRecords;
+  }, [viewMode, pendingRecords, approvedRecords, deletedRecords]);
 
   const paginatedRecords = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -298,23 +303,19 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
 
   // ===== Validate pending fuel before save =====
   const validatePendingFuel = (): string | null => {
-    // Only block if there's a pending warning AND vehicle is selected
     if (pendingWarning && vehicleNumber) {
       return `Cannot save maintenance: ${pendingWarning}`;
     }
     return null;
   };
 
-  // ===== Override onSave to check all validations =====
   const onSave = async () => {
-    // Check for pending fuel bill first
     const pendingFuelError = validatePendingFuel();
     if (pendingFuelError) {
       showNotification(pendingFuelError, 'error');
       return;
     }
 
-    // Check KM validation
     const kmError = validateKM();
     if (kmError) {
       showNotification(kmError, 'error');
@@ -326,7 +327,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
     setLoading(false);
   };
 
-  const handleViewToggle = (mode: 'active' | 'deleted') => {
+  const handleViewToggle = (mode: ViewMode) => {
     setViewMode(mode);
     setCurrentPage(1);
     setSelectedId(null);
@@ -334,7 +335,6 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
 
   return (
     <ErrorBoundary>
-      {/* Removed the max-width constraints to match BanksPage uniform embedded sizing */}
       <div className="w-full space-y-4">
         {/* Form Card */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">

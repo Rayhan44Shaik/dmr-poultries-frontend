@@ -2,10 +2,12 @@ import { memo, useState, useMemo, useEffect, useRef } from 'react';
 import { Eye, Edit, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon, Search } from 'lucide-react';
 import type { MaintenanceEvent } from '../../types';
 
+export type ViewMode = 'pending' | 'approved' | 'deleted';
+
 interface LatestMaintenanceTableProps {
   records: MaintenanceEvent[];
   vehicles: any[];
-  viewMode: 'active' | 'deleted';
+  viewMode: ViewMode;
   onView: (record: MaintenanceEvent) => void;
   onEdit: (record: MaintenanceEvent) => void;
   onDelete: (record: MaintenanceEvent) => void;
@@ -13,7 +15,7 @@ interface LatestMaintenanceTableProps {
   currentPage: number;
   onPageChange: (page: number) => void;
   pageSize?: number;
-  onToggleView: (mode: 'active' | 'deleted') => void;
+  onToggleView: (mode: ViewMode) => void;
 }
 
 const LatestMaintenanceTable = ({
@@ -85,34 +87,57 @@ const LatestMaintenanceTable = ({
     return types || '-';
   };
 
+  const getHeaderText = () => {
+    if (viewMode === 'pending') return 'Pending Vehicle Bills';
+    if (viewMode === 'approved') return 'Approved Vehicle Bills';
+    return 'Deleted Records';
+  };
+
+  const getEmptyText = () => {
+    if (searchTerm) return 'No matching records found.';
+    if (viewMode === 'pending') return 'No pending bills.';
+    if (viewMode === 'approved') return 'No approved bills.';
+    return 'No deleted records.';
+  };
+
   return (
     <div ref={tableRef} className="bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden">
       {/* Header with toggle buttons */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 bg-slate-50/60 border-b border-slate-200/60">
         <div className="flex items-center gap-4">
           <h4 className="text-sm font-bold text-slate-700 tracking-wide">
-            {viewMode === 'active' ? 'Unpaid Vehicle Bills' : 'Deleted Records'}
+            {getHeaderText()}
           </h4>
           <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-200 rounded-full">
             {totalRecords}
           </span>
-          <div className="flex items-center gap-1 ml-2 border border-slate-200 rounded-lg overflow-hidden">
+          <div className="flex items-center p-0.5 ml-2 border border-slate-200 rounded-lg overflow-hidden bg-slate-100/50">
             <button
-              onClick={() => onToggleView('active')}
-              className={`px-3 py-1 text-xs font-semibold transition ${
-                viewMode === 'active'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-transparent text-slate-500 hover:bg-slate-100'
+              onClick={() => onToggleView('pending')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${
+                viewMode === 'pending'
+                  ? 'bg-blue-100 text-blue-700 shadow-sm'
+                  : 'bg-transparent text-slate-500 hover:text-slate-700'
               }`}
             >
-              Unpaid
+              Pending
+            </button>
+            <button
+              onClick={() => onToggleView('approved')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${
+                viewMode === 'approved'
+                  ? 'bg-green-100 text-green-700 shadow-sm'
+                  : 'bg-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Approved
             </button>
             <button
               onClick={() => onToggleView('deleted')}
-              className={`px-3 py-1 text-xs font-semibold transition ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${
                 viewMode === 'deleted'
-                  ? 'bg-amber-100 text-amber-700'
-                  : 'bg-transparent text-slate-500 hover:bg-slate-100'
+                  ? 'bg-amber-100 text-amber-700 shadow-sm'
+                  : 'bg-transparent text-slate-500 hover:text-slate-700'
               }`}
             >
               Deleted
@@ -131,7 +156,7 @@ const LatestMaintenanceTable = ({
               >
                 <Eye size={16} />
               </button>
-              {viewMode === 'active' && (
+              {viewMode !== 'deleted' && (
                 <>
                   <button
                     onClick={(e) => { e.stopPropagation(); onEdit(selectedRecord); }}
@@ -182,7 +207,7 @@ const LatestMaintenanceTable = ({
       {/* Table */}
       {totalRecords === 0 ? (
         <div className="text-center py-10 text-slate-400 text-sm">
-          {searchTerm ? 'No matching records found.' : (viewMode === 'active' ? 'No unpaid bills.' : 'No deleted records.')}
+          {getEmptyText()}
         </div>
       ) : (
         <>
@@ -211,8 +236,7 @@ const LatestMaintenanceTable = ({
                   const isSelected = selectedId === rec.id;
                   const firstType = getFirstMaintenanceType(rec.maintenanceType);
                   const allTypes = getAllMaintenanceTypes(rec.maintenanceType);
-                  // in active view all records are unpaid, so always orange
-                  const isPaid = rec.paymentStatus === 'paid';
+                  const isApproved = rec.paymentStatus === 'approved';
 
                   return (
                     <tr
@@ -224,7 +248,7 @@ const LatestMaintenanceTable = ({
                     >
                       <td className="px-3 py-2.5 text-sm text-slate-500">{startIndex + idx}</td>
                       <td className="px-3 py-2.5 text-sm font-medium">
-                        <span className={isPaid ? 'text-green-600' : 'text-orange-500'}>
+                        <span className={isApproved ? 'text-green-600' : 'text-orange-500'}>
                           {rec.billNumber || '-'}
                         </span>
                       </td>

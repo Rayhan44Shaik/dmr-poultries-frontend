@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+/*import { memo, useState } from 'react';
 import { useToast } from '../hooks/useToast';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import ReportCard from '../components/reports/ReportCard';
@@ -45,13 +45,13 @@ const VehicleReportsPage = ({ embedded = false }: VehicleReportsPageProps) => {
 
   return (
     <ErrorBoundary>
-      {/* Removed max-w constraints to perfectly adapt to embedded contexts */}
+      {-- Removed max-w constraints to perfectly adapt to embedded contexts }
       <div className={`w-full space-y-6 animate-in fade-in duration-500 ${
         embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
       }`}>
-        {/* Heading removed */}
+        {--Heading removed }
 
-        {/* Filters */}
+        {-- Filters }
         <ReportFilters
           fromDate={fromDate}
           toDate={toDate}
@@ -60,7 +60,7 @@ const VehicleReportsPage = ({ embedded = false }: VehicleReportsPageProps) => {
           onReset={handleReset}
         />
 
-        {/* Report Grid */}
+        {-- Report Grid }
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {reports.map((report) => (
             <ReportCard
@@ -72,6 +72,35 @@ const VehicleReportsPage = ({ embedded = false }: VehicleReportsPageProps) => {
               onExport={handleExport}
             />
           ))}
+        </div>
+      </div>
+    </ErrorBoundary>
+  );
+};
+
+export default memo(VehicleReportsPage);*/
+
+import React, { memo } from 'react';
+import ErrorBoundary from '../components/common/ErrorBoundary';
+
+interface VehicleReportsPageProps {
+  embedded?: boolean;
+}
+
+const VehicleReportsPage = ({ embedded = false }: VehicleReportsPageProps) => {
+  return (
+    <ErrorBoundary>
+      <div className={`w-full flex items-center justify-center animate-in fade-in duration-500 ${
+        embedded ? 'min-h-[60vh]' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
+      }`}>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center max-w-md w-full mx-4">
+          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 border border-blue-100 shadow-sm animate-bounce">
+            🚧
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Vehicle Reports - Coming Soon</h2>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            This module is currently being enhanced and will be made fully available after the upcoming updates.
+          </p>
         </div>
       </div>
     </ErrorBoundary>
