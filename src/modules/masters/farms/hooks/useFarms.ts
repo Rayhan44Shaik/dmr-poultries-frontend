@@ -1,26 +1,107 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { Farm } from "../types/farm";
-
 import {
-  getFarms,
-  saveFarms as persistFarms,
+  createFarm,
+  deleteFarm,
+  handleApiError,
+  loadFarms,
+  refreshFarms,
+  updateFarm,
+  type FarmInput,
 } from "../services/farmService";
 
+/**
+ * Farms page data hook — table state comes only from GET /api/masters/farms.
+ */
 export function useFarms() {
   const [farms, setFarms] = useState<Farm[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setFarms(getFarms());
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await loadFarms();
+      setFarms(data);
+      return data;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      setFarms([]);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const saveFarms = (data: Farm[]) => {
-    setFarms(data);
-    persistFarms(data);
-  };
+  useEffect(() => {
+    void reload().catch(() => {
+      /* error already captured in state */
+    });
+  }, [reload]);
+
+  const addFarm = useCallback(async (input: FarmInput) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await createFarm(input);
+      const data = await refreshFarms();
+      setFarms(data);
+      return data;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  const editFarm = useCallback(async (id: number, input: FarmInput) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await updateFarm(id, input);
+      const data = await refreshFarms();
+      setFarms(data);
+      return data;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  const removeFarm = useCallback(async (id: number) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await deleteFarm(id);
+      const data = await refreshFarms();
+      setFarms(data);
+      return data;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  }, []);
 
   return {
     farms,
-    saveFarms,
+    loading,
+    saving,
+    error,
+    reload,
+    addFarm,
+    editFarm,
+    removeFarm,
   };
 }

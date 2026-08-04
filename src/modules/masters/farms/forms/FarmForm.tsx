@@ -14,9 +14,10 @@ type FarmFormProps = {
     status: "Active" | "Inactive";
   }) => void;
   onCancel: () => void;
+  isSaving?: boolean;
 };
 
-function FarmForm({ farm, onSave, onCancel }: FarmFormProps) {
+function FarmForm({ farm, onSave, onCancel, isSaving = false }: FarmFormProps) {
   const [farmName, setFarmName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [supervisorName, setSupervisorName] = useState("");
@@ -182,10 +183,13 @@ function FarmForm({ farm, onSave, onCancel }: FarmFormProps) {
           <span className="text-sm font-medium text-slate-600">Status</span>
           <button
             type="button"
-            onClick={() => setStatus(status === "Active" ? "Inactive" : "Active")}
+            onClick={() => {
+              if (!isSaving) setStatus(status === "Active" ? "Inactive" : "Active");
+            }}
+            disabled={isSaving}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-200 ${
               status === "Active" ? "bg-emerald-500" : "bg-slate-300"
-            }`}
+            } ${isSaving ? "opacity-60 cursor-not-allowed" : ""}`}
           >
             <span
               className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -340,16 +344,29 @@ function FarmForm({ farm, onSave, onCancel }: FarmFormProps) {
           <button
             type="button"
             onClick={onCancel}
-            className="w-full rounded-lg border border-slate-200 bg-white px-6 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-100 sm:w-auto"
+            disabled={isSaving}
+            className="w-full rounded-lg border border-slate-200 bg-white px-6 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-100 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleSubmit}
-            className="w-full rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 sm:w-auto"
+            disabled={isSaving}
+            className="w-full rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 sm:w-auto disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
           >
-            {farm ? "Update Farm" : "Save Farm"}
+            {isSaving && (
+              <svg
+                className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            )}
+            {isSaving ? "Saving..." : farm ? "Update Farm" : "Save Farm"}
           </button>
         </div>
       </div>
