@@ -1,26 +1,68 @@
 // src/modules/operations/vehicle-trips/components/StepStart.tsx
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+  useSyncExternalStore,
+} from "react";
 import { Clock, User, Truck, Gauge, Wallet, Pencil, X, AlertCircle } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { fetchLastClosingMeter } from "../services/tripHeaderApiService";
 
+type VehicleOption = { id: number; vehicleNumber: string };
+type EmployeeOption = { id: number; employeeName: string; department: string };
+type SaveStatus = "idle" | "saving" | "saved";
+
 interface Props {
-  trip: Trip;
+  tripId: number;
+  startTime: string;
+  startStepSubmitted: boolean;
+  loadSnapshot: Trip;
   updateTrip: (updates: Partial<Trip>) => void;
   submitStartStep: (data: Partial<Trip>) => Promise<boolean>;
-  vehicleOptions: { id: number; vehicleNumber: string }[];
-  employeeOptions: { id: number; employeeName: string; department: string }[];
+  vehicleOptions: VehicleOption[];
+  employeeOptions: EmployeeOption[];
   editable?: boolean;
   canEdit?: boolean;
   onCancel?: () => void;
   clearForm?: () => void;
   headerLoading?: boolean;
-  headerSaveStatus?: "idle" | "saving" | "saved";
+  subscribeHeaderSaveStatus: (listener: () => void) => () => void;
+  getHeaderSaveStatus: () => SaveStatus;
 }
 
+type Step1FormState = {
+  vehicleId: number;
+  vehicleNo: string;
+  driverId: number;
+  driverName: string;
+  supervisorId: number;
+  supervisorName: string;
+  helpers: string[];
+  loaders: string[];
+  openingMeterText: string;
+  advanceText: string;
+};
+
 const FIELD_SYNC_DELAY_MS = 400;
+const MENU_PORTAL_TARGET = typeof document !== "undefined" ? document.body : null;
+
+const EMPTY_FORM: Step1FormState = {
+  vehicleId: 0,
+  vehicleNo: "",
+  driverId: 0,
+  driverName: "",
+  supervisorId: 0,
+  supervisorName: "",
+  helpers: [],
+  loaders: [],
+  openingMeterText: "",
+  advanceText: "",
+};
 
 function formatNumericField(value: number | undefined | null): string {
   if (value === undefined || value === null || value === 0) return "";
@@ -33,8 +75,55 @@ function parseNumericField(text: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-const selectStyles = {
-  menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
+function tripToForm(trip: Trip): Step1FormState {
+  return {
+    vehicleId: trip.vehicleId,
+    vehicleNo: trip.vehicleNo,
+    driverId: trip.driverId,
+    driverName: trip.driverName,
+    supervisorId: trip.supervisorId,
+    supervisorName: trip.supervisorName,
+    helpers: trip.helpers ? [...trip.helpers] : [],
+    loaders: trip.loaders ? [...trip.loaders] : [],
+    openingMeterText: formatNumericField(trip.openingMeter),
+    advanceText: formatNumericField(trip.advanceAmount),
+  };
+}
+
+function formHasEdits(form: Step1FormState): boolean {
+  return Boolean(
+    form.vehicleId ||
+    form.driverId ||
+    form.supervisorId ||
+    form.openingMeterText.trim() ||
+    form.advanceText.trim() ||
+    form.helpers.length ||
+    form.loaders.length
+  );
+}
+
+function formToTripPatch(form: Step1FormState): Partial<Trip> {
+  return {
+    vehicleId: form.vehicleId,
+    vehicleNo: form.vehicleNo,
+    driverId: form.driverId,
+    driverName: form.driverName,
+    supervisorId: form.supervisorId,
+    supervisorName: form.supervisorName,
+    helpers: form.helpers,
+    loaders: form.loaders,
+    openingMeter: parseNumericField(form.openingMeterText),
+    advanceAmount: parseNumericField(form.advanceText),
+  };
+}
+
+const getVehicleLabel = (option: VehicleOption) => option.vehicleNumber || "";
+const getVehicleValue = (option: VehicleOption) => String(option.id ?? "");
+const getEmployeeLabel = (option: EmployeeOption) => option.employeeName || "";
+const getEmployeeValue = (option: EmployeeOption) => option.employeeName || "";
+
+const selectStyles: any = {
+  menuPortal: (base: Record<string, unknown>) => ({ ...base, zIndex: 9999 }),
   control: (base: any, state: any) => ({
     ...base,
     minHeight: 42,
@@ -44,30 +133,30 @@ const selectStyles = {
     boxShadow: state.isFocused ? "0 0 0 2px rgba(37, 99, 235, 0.15)" : "none",
     "&:hover": { borderColor: "#cbd5e1" },
   }),
-  singleValue: (base: any) => ({
+  singleValue: (base: Record<string, unknown>) => ({
     ...base,
     color: "#0f172a",
     fontWeight: "500",
     fontSize: "14px",
   }),
-  multiValue: (base: any) => ({
+  multiValue: (base: Record<string, unknown>) => ({
     ...base,
     backgroundColor: "#f1f5f9",
     borderRadius: "0.375rem",
   }),
-  multiValueLabel: (base: any) => ({
+  multiValueLabel: (base: Record<string, unknown>) => ({
     ...base,
     color: "#0f172a",
     fontSize: "13px",
     paddingLeft: "6px",
     paddingRight: "6px",
   }),
-  multiValueRemove: (base: any) => ({
+  multiValueRemove: (base: Record<string, unknown>) => ({
     ...base,
     color: "#64748b",
     "&:hover": { backgroundColor: "#e2e8f0", color: "#0f172a" },
   }),
-  placeholder: (base: any) => ({
+  placeholder: (base: Record<string, unknown>) => ({
     ...base,
     color: "#94a3b8",
     fontSize: "14px",
@@ -79,7 +168,7 @@ const selectStyles = {
     fontSize: "13px",
     cursor: "pointer",
   }),
-  menu: (base: any) => ({
+  menu: (base: Record<string, unknown>) => ({
     ...base,
     backgroundColor: "#ffffff",
     border: "1px solid #e2e8f0",
@@ -87,12 +176,375 @@ const selectStyles = {
     maxHeight: 180,
     overflowY: "auto",
     scrollbarWidth: "none",
-    ":-webkit-scrollbar": { display: "none" },
   }),
 };
 
+const SaveStatusIndicator = React.memo(function SaveStatusIndicator({
+  subscribe,
+  getSnapshot,
+}: {
+  subscribe: (listener: () => void) => () => void;
+  getSnapshot: () => SaveStatus;
+}) {
+  const status = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  if (status === "saving") {
+    return <span className="text-[11px] text-slate-400">Saving...</span>;
+  }
+  if (status === "saved") {
+    return <span className="text-[11px] text-emerald-600">Saved</span>;
+  }
+  return null;
+});
+
+const StartTimeField = React.memo(function StartTimeField({ startTime }: { startTime: string }) {
+  return (
+    <div>
+      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+        <Clock size={14} className="text-slate-400" /> Start Time <span className="text-red-500">*</span>
+      </label>
+      <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
+        {startTime ? (
+          startTime
+        ) : (
+          <span className="text-slate-400 font-normal text-xs">Will be captured when trip starts</span>
+        )}
+      </div>
+    </div>
+  );
+});
+
+const VehicleField = React.memo(function VehicleField({
+  vehicleId,
+  options,
+  disabled,
+  onSelect,
+}: {
+  vehicleId: number;
+  options: VehicleOption[];
+  disabled: boolean;
+  onSelect: (vehicleId: number, vehicleNo: string) => void;
+}) {
+  const value = useMemo(
+    () => options.find((option) => option.id === vehicleId) || null,
+    [options, vehicleId]
+  );
+  const handleChange = useCallback(
+    (option: VehicleOption | null) => {
+      onSelect(option?.id || 0, option?.vehicleNumber || "");
+    },
+    [onSelect]
+  );
+
+  return (
+    <div>
+      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+        <Truck size={14} className="text-slate-400" /> Vehicle No. <span className="text-red-500">*</span>
+      </label>
+      <Select<VehicleOption, false>
+        options={options}
+        getOptionLabel={getVehicleLabel}
+        getOptionValue={getVehicleValue}
+        value={value}
+        onChange={handleChange}
+        className="mt-1 text-sm"
+        placeholder="Search Vehicle..."
+        isSearchable
+        isDisabled={disabled}
+        styles={selectStyles}
+        menuPortalTarget={MENU_PORTAL_TARGET}
+      />
+    </div>
+  );
+});
+
+const SupervisorField = React.memo(function SupervisorField({
+  supervisorName,
+  options,
+  disabled,
+  onSelect,
+}: {
+  supervisorName: string;
+  options: EmployeeOption[];
+  disabled: boolean;
+  onSelect: (supervisorId: number, supervisorName: string) => void;
+}) {
+  const value = useMemo(
+    () => options.find((option) => option.employeeName === supervisorName) || null,
+    [options, supervisorName]
+  );
+  const handleChange = useCallback(
+    (option: EmployeeOption | null) => {
+      onSelect(option?.id || 0, option?.employeeName || "");
+    },
+    [onSelect]
+  );
+
+  return (
+    <div>
+      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+        <User size={14} className="text-slate-400" /> Supervisor <span className="text-red-500">*</span>
+      </label>
+      <Select<EmployeeOption, false>
+        options={options}
+        getOptionLabel={getEmployeeLabel}
+        getOptionValue={getEmployeeValue}
+        value={value}
+        onChange={handleChange}
+        className="mt-1 text-sm"
+        placeholder="Search Supervisor..."
+        isSearchable
+        isDisabled={disabled}
+        styles={selectStyles}
+        menuPortalTarget={MENU_PORTAL_TARGET}
+      />
+    </div>
+  );
+});
+
+const DriverField = React.memo(function DriverField({
+  driverName,
+  options,
+  disabled,
+  onSelect,
+}: {
+  driverName: string;
+  options: EmployeeOption[];
+  disabled: boolean;
+  onSelect: (driverId: number, driverName: string) => void;
+}) {
+  const value = useMemo(
+    () => options.find((option) => option.employeeName === driverName) || null,
+    [options, driverName]
+  );
+  const handleChange = useCallback(
+    (option: EmployeeOption | null) => {
+      onSelect(option?.id || 0, option?.employeeName || "");
+    },
+    [onSelect]
+  );
+
+  return (
+    <div>
+      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+        <User size={14} className="text-slate-400" /> Driver <span className="text-red-500">*</span>
+      </label>
+      <Select<EmployeeOption, false>
+        options={options}
+        getOptionLabel={getEmployeeLabel}
+        getOptionValue={getEmployeeValue}
+        value={value}
+        onChange={handleChange}
+        className="mt-1 text-sm"
+        placeholder="Search Driver..."
+        isSearchable
+        isDisabled={disabled}
+        styles={selectStyles}
+        menuPortalTarget={MENU_PORTAL_TARGET}
+      />
+    </div>
+  );
+});
+
+const OpeningMeterField = React.memo(function OpeningMeterField({
+  value,
+  disabled,
+  lastKnownMeter,
+  lastMeterError,
+  onChange,
+}: {
+  value: string;
+  disabled: boolean;
+  lastKnownMeter: number | null;
+  lastMeterError: string | null;
+  onChange: (value: string) => void;
+}) {
+  const handleChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      onChange(event.target.value);
+    },
+    [onChange]
+  );
+  const handleWheel = useCallback((event: React.WheelEvent<HTMLInputElement>) => {
+    event.currentTarget.blur();
+  }, []);
+
+  return (
+    <div>
+      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+        <Gauge size={14} className="text-slate-400" /> Starting Meter (KM) <span className="text-red-500">*</span>
+      </label>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={value}
+        onChange={handleChange}
+        onWheel={handleWheel}
+        disabled={disabled}
+        className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
+          lastMeterError
+            ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
+            : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
+        }`}
+        placeholder="0.00"
+      />
+      {lastKnownMeter !== null && !lastMeterError && (
+        <p className="text-[11px] text-slate-400 mt-1">
+          Last recorded closing meter: <span className="text-slate-700 font-semibold">{lastKnownMeter} KM</span>
+        </p>
+      )}
+      {lastMeterError && (
+        <p className="text-[11px] text-red-500 mt-1 font-medium flex items-center gap-1">
+          <AlertCircle size={12} /> {lastMeterError}
+        </p>
+      )}
+    </div>
+  );
+});
+
+const AdvanceField = React.memo(function AdvanceField({
+  value,
+  disabled,
+  advanceError,
+  onChange,
+}: {
+  value: string;
+  disabled: boolean;
+  advanceError: string | null;
+  onChange: (value: string) => void;
+}) {
+  const handleChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      onChange(event.target.value);
+    },
+    [onChange]
+  );
+  const handleWheel = useCallback((event: React.WheelEvent<HTMLInputElement>) => {
+    event.currentTarget.blur();
+  }, []);
+
+  return (
+    <div>
+      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+        <Wallet size={14} className="text-slate-400" /> Advance / Expenses <span className="text-red-500">*</span>
+      </label>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={value}
+        onChange={handleChange}
+        onWheel={handleWheel}
+        disabled={disabled}
+        className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
+          advanceError
+            ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
+            : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
+        }`}
+        placeholder="0.00"
+      />
+      {advanceError && (
+        <p className="text-[11px] text-red-500 mt-1 font-medium flex items-center gap-1">
+          <AlertCircle size={12} /> {advanceError}
+        </p>
+      )}
+    </div>
+  );
+});
+
+const HelpersField = React.memo(function HelpersField({
+  helpers,
+  options,
+  disabled,
+  onChange,
+}: {
+  helpers: string[];
+  options: EmployeeOption[];
+  disabled: boolean;
+  onChange: (helpers: string[]) => void;
+}) {
+  const value = useMemo(
+    () => options.filter((option) => helpers.includes(option.employeeName)),
+    [options, helpers]
+  );
+  const handleChange = useCallback(
+    (selected: readonly EmployeeOption[] | null) => {
+      onChange(selected ? selected.map((option) => option.employeeName) : []);
+    },
+    [onChange]
+  );
+
+  return (
+    <div>
+      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+        <User size={14} className="text-slate-400" /> Helpers
+      </label>
+      <Select<EmployeeOption, true>
+        options={options}
+        getOptionLabel={getEmployeeLabel}
+        getOptionValue={getEmployeeValue}
+        value={value}
+        onChange={handleChange}
+        className="mt-1 text-sm"
+        placeholder="Select helpers..."
+        isMulti
+        isSearchable
+        isDisabled={disabled}
+        styles={selectStyles}
+        menuPortalTarget={MENU_PORTAL_TARGET}
+      />
+    </div>
+  );
+});
+
+const LoadersField = React.memo(function LoadersField({
+  loaders,
+  options,
+  disabled,
+  onChange,
+}: {
+  loaders: string[];
+  options: EmployeeOption[];
+  disabled: boolean;
+  onChange: (loaders: string[]) => void;
+}) {
+  const value = useMemo(
+    () => options.filter((option) => loaders.includes(option.employeeName)),
+    [options, loaders]
+  );
+  const handleChange = useCallback(
+    (selected: readonly EmployeeOption[] | null) => {
+      onChange(selected ? selected.map((option) => option.employeeName) : []);
+    },
+    [onChange]
+  );
+
+  return (
+    <div>
+      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+        <User size={14} className="text-amber-500" /> Loaders
+      </label>
+      <Select<EmployeeOption, true>
+        options={options}
+        getOptionLabel={getEmployeeLabel}
+        getOptionValue={getEmployeeValue}
+        value={value}
+        onChange={handleChange}
+        className="mt-1 text-sm"
+        placeholder="Select loaders..."
+        isMulti
+        isSearchable
+        isDisabled={disabled}
+        styles={selectStyles}
+        menuPortalTarget={MENU_PORTAL_TARGET}
+      />
+    </div>
+  );
+});
+
 function StepStart({
-  trip,
+  tripId,
+  startTime,
+  startStepSubmitted,
+  loadSnapshot,
   updateTrip,
   submitStartStep,
   vehicleOptions,
@@ -102,143 +554,102 @@ function StepStart({
   onCancel,
   clearForm,
   headerLoading = false,
-  headerSaveStatus = "idle",
+  subscribeHeaderSaveStatus,
+  getHeaderSaveStatus,
 }: Props) {
+  const [form, setForm] = useState<Step1FormState>(() => tripToForm(loadSnapshot));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(false);
   const [lastMeterError, setLastMeterError] = useState<string | null>(null);
   const [lastKnownMeter, setLastKnownMeter] = useState<number | null>(null);
   const [advanceError, setAdvanceError] = useState<string | null>(null);
-  const [openingMeterText, setOpeningMeterText] = useState(() => formatNumericField(trip.openingMeter));
-  const [advanceText, setAdvanceText] = useState(() => formatNumericField(trip.advanceAmount));
 
-  const loadedTripIdRef = useRef(trip.id);
-
-  const lastSyncedOpeningRef = useRef(trip.openingMeter);
-  const lastSyncedAdvanceRef = useRef(trip.advanceAmount);
+  const loadedTripIdRef = useRef(tripId);
+  const formRef = useRef(form);
+  formRef.current = form;
 
   const driverOptions = useMemo(
-    () => employeeOptions.filter((e) => e.department === "Driver"),
+    () => employeeOptions.filter((employee) => employee.department === "Driver"),
     [employeeOptions]
   );
   const supervisorOptions = useMemo(
-    () => employeeOptions.filter((e) => e.department === "Supervisor"),
+    () => employeeOptions.filter((employee) => employee.department === "Supervisor"),
     [employeeOptions]
   );
   const helperOptions = useMemo(
-    () => employeeOptions.filter((e) => e.department === "Helper" || e.department === "Labor"),
+    () => employeeOptions.filter((employee) => employee.department === "Helper" || employee.department === "Labor"),
     [employeeOptions]
   );
   const loaderOptions = useMemo(
-    () => employeeOptions.filter((e) => e.department === "Loader"),
+    () => employeeOptions.filter((employee) => employee.department === "Loader"),
     [employeeOptions]
   );
 
-  const selectedVehicle = useMemo(
-    () => vehicleOptions.find((o) => o.id === trip.vehicleId) || null,
-    [vehicleOptions, trip.vehicleId]
-  );
-  const selectedSupervisor = useMemo(
-    () => supervisorOptions.find((o) => o.employeeName === trip.supervisorName) || null,
-    [supervisorOptions, trip.supervisorName]
-  );
-  const selectedDriver = useMemo(
-    () => driverOptions.find((o) => o.employeeName === trip.driverName) || null,
-    [driverOptions, trip.driverName]
-  );
-  const selectedHelpers = useMemo(
-    () => helperOptions.filter((o) => trip.helpers?.includes(o.employeeName)),
-    [helperOptions, trip.helpers]
-  );
-  const selectedLoaders = useMemo(
-    () => loaderOptions.filter((o) => (trip as any).loaders?.includes(o.employeeName)),
-    [loaderOptions, trip.loaders]
-  );
+  useEffect(() => {
+    if (loadedTripIdRef.current === tripId) return;
+    const previousId = loadedTripIdRef.current;
+    loadedTripIdRef.current = tripId;
+
+    if (tripId === 0 && previousId !== 0) {
+      setForm(EMPTY_FORM);
+      return;
+    }
+
+    if (previousId === 0 && tripId !== 0 && formHasEdits(formRef.current)) {
+      return;
+    }
+
+    if (previousId !== tripId) {
+      setForm(tripToForm(loadSnapshot));
+    }
+  }, [tripId, loadSnapshot]);
 
   useEffect(() => {
-    if (loadedTripIdRef.current === trip.id) return;
-    loadedTripIdRef.current = trip.id;
-    setOpeningMeterText(formatNumericField(trip.openingMeter));
-    setAdvanceText(formatNumericField(trip.advanceAmount));
-    lastSyncedOpeningRef.current = trip.openingMeter;
-    lastSyncedAdvanceRef.current = trip.advanceAmount;
-  }, [trip.id, trip.openingMeter, trip.advanceAmount]);
-
-  useEffect(() => {
-    if (!trip.vehicleId) {
+    if (!form.vehicleId) {
       setLastKnownMeter(null);
       return;
     }
 
     let cancelled = false;
-
     void (async () => {
       try {
-        const last = await fetchLastClosingMeter(trip.vehicleId);
+        const last = await fetchLastClosingMeter(form.vehicleId);
         if (cancelled) return;
         setLastKnownMeter(last && last.closingMeter > 0 ? last.closingMeter : null);
       } catch {
-        if (!cancelled) {
-          setLastKnownMeter(null);
-        }
+        if (!cancelled) setLastKnownMeter(null);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [trip.vehicleId]);
+  }, [form.vehicleId]);
 
   useEffect(() => {
     if (lastKnownMeter === null) {
       setLastMeterError(null);
       return;
     }
-
-    const val = openingMeterText.trim();
+    const val = form.openingMeterText.trim();
     if (val === "") {
       setLastMeterError(null);
       return;
     }
-
     const parsed = Number(val);
     if (!Number.isFinite(parsed)) {
       setLastMeterError(null);
       return;
     }
-
     setLastMeterError(parsed < lastKnownMeter ? `Starting KM must be >= ${lastKnownMeter} KM` : null);
-  }, [openingMeterText, lastKnownMeter]);
+  }, [form.openingMeterText, lastKnownMeter]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const openingMeter = parseNumericField(openingMeterText);
-      if (openingMeter === lastSyncedOpeningRef.current) return;
-      lastSyncedOpeningRef.current = openingMeter;
-      updateTrip({ openingMeter });
-    }, FIELD_SYNC_DELAY_MS);
-
-    return () => clearTimeout(timer);
-  }, [openingMeterText, updateTrip]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const advanceAmount = parseNumericField(advanceText);
-      if (advanceAmount === lastSyncedAdvanceRef.current) return;
-      lastSyncedAdvanceRef.current = advanceAmount;
-      updateTrip({ advanceAmount });
-    }, FIELD_SYNC_DELAY_MS);
-
-    return () => clearTimeout(timer);
-  }, [advanceText, updateTrip]);
-
-  useEffect(() => {
-    if (advanceText.trim() === "") {
+    if (form.advanceText.trim() === "") {
       setAdvanceError("Advance amount is required");
       return;
     }
-
-    const amount = Number(advanceText);
+    const amount = Number(form.advanceText);
     if (!Number.isFinite(amount)) {
       setAdvanceError("Advance amount is required");
     } else if (amount < 0) {
@@ -246,47 +657,76 @@ function StepStart({
     } else {
       setAdvanceError(null);
     }
-  }, [advanceText]);
+  }, [form.advanceText]);
 
-  const handleHelpersChange = useCallback(
-    (selectedOptions: any) => {
-      const helpers = selectedOptions ? selectedOptions.map((opt: any) => opt.employeeName) : [];
-      updateTrip({ helpers });
-    },
-    [updateTrip]
-  );
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      updateTrip(formToTripPatch(formRef.current));
+    }, FIELD_SYNC_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [form, updateTrip]);
 
-  const handleLoadersChange = useCallback(
-    (selectedOptions: any) => {
-      const loaders = selectedOptions ? selectedOptions.map((opt: any) => opt.employeeName) : [];
-      updateTrip({ loaders } as Partial<Trip>);
-    },
-    [updateTrip]
-  );
+  const patchForm = useCallback((updates: Partial<Step1FormState>) => {
+    setForm((prev) => ({ ...prev, ...updates }));
+  }, []);
+
+  const handleVehicleSelect = useCallback((vehicleId: number, vehicleNo: string) => {
+    patchForm({ vehicleId, vehicleNo });
+  }, [patchForm]);
+
+  const handleSupervisorSelect = useCallback((supervisorId: number, supervisorName: string) => {
+    patchForm({ supervisorId, supervisorName });
+  }, [patchForm]);
+
+  const handleDriverSelect = useCallback((driverId: number, driverName: string) => {
+    patchForm({ driverId, driverName });
+  }, [patchForm]);
+
+  const handleHelpersChange = useCallback((helpers: string[]) => {
+    patchForm({ helpers });
+  }, [patchForm]);
+
+  const handleLoadersChange = useCallback((loaders: string[]) => {
+    patchForm({ loaders });
+  }, [patchForm]);
+
+  const handleOpeningMeterChange = useCallback((openingMeterText: string) => {
+    patchForm({ openingMeterText });
+  }, [patchForm]);
+
+  const handleAdvanceChange = useCallback((advanceText: string) => {
+    patchForm({ advanceText });
+  }, [patchForm]);
+
+  const handleFormKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter") return;
+    const target = event.target as HTMLElement;
+    if (target.tagName === "BUTTON") return;
+    event.preventDefault();
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    if (editable && onCancel) onCancel();
+    else setIsLocalEditing(false);
+  }, [editable, onCancel]);
 
   const inputsLocked = headerLoading || isSubmitting;
   const submitLabel = isSubmitting
     ? "Saving..."
-    : trip.startStepSubmitted
+    : startStepSubmitted
     ? "Update Start Details"
     : "Submit Start Details";
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (lastMeterError || advanceError) return;
     setIsSubmitting(true);
-    updateTrip({
-      openingMeter: parseNumericField(openingMeterText),
-      advanceAmount: parseNumericField(advanceText),
-    });
+    updateTrip(formToTripPatch(formRef.current));
     const success = await submitStartStep({});
-    if (success) {
-      setIsLocalEditing(false);
-    }
+    if (success) setIsLocalEditing(false);
     setIsSubmitting(false);
-  };
+  }, [advanceError, lastMeterError, submitStartStep, updateTrip]);
 
-  // ─── LOCKED VIEW ───────────────────────────────────────────────────
-  if (trip.startStepSubmitted && !editable && !isLocalEditing) {
+  if (startStepSubmitted && !editable && !isLocalEditing) {
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
@@ -294,13 +734,12 @@ function StepStart({
             <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
               1
             </span>
-            <h2 className="text-base font-bold text-slate-800 tracking-tight">
-              TRIP START (AT OFFICE)
-            </h2>
+            <h2 className="text-base font-bold text-slate-800 tracking-tight">TRIP START (AT OFFICE)</h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {canEdit && (
               <button
+                type="button"
                 onClick={() => setIsLocalEditing(true)}
                 className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
                 title="Edit Step"
@@ -319,71 +758,65 @@ function StepStart({
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Clock size={12} className="text-slate-500" /> Start Time
             </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{trip.startTime || "--"}</span>
+            <span className="text-xs font-bold text-slate-800 truncate">{startTime || "--"}</span>
           </div>
-
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Truck size={12} className="text-blue-500" /> Vehicle No.
             </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{trip.vehicleNo || "--"}</span>
+            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.vehicleNo || "--"}</span>
           </div>
-
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <User size={12} className="text-indigo-500" /> Supervisor
             </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{trip.supervisorName || "--"}</span>
+            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.supervisorName || "--"}</span>
           </div>
-
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <User size={12} className="text-emerald-500" /> Driver
             </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{trip.driverName || "--"}</span>
+            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.driverName || "--"}</span>
           </div>
-
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Gauge size={12} className="text-purple-500" /> Opening Meter
             </span>
-            <span className="text-xs font-bold text-slate-800">{trip.openingMeter ? `${trip.openingMeter} KM` : "--"}</span>
+            <span className="text-xs font-bold text-slate-800">
+              {loadSnapshot.openingMeter ? `${loadSnapshot.openingMeter} KM` : "--"}
+            </span>
           </div>
-
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Wallet size={12} className="text-amber-500" /> Advance / Expenses
             </span>
-            <span className="text-xs font-bold text-slate-800">₹{(trip.advanceAmount ?? 0).toLocaleString()}</span>
+            <span className="text-xs font-bold text-slate-800">
+              ₹{(loadSnapshot.advanceAmount ?? 0).toLocaleString()}
+            </span>
           </div>
-
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <User size={12} className="text-slate-500" /> Helpers
             </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{trip.helpers?.join(", ") || "--"}</span>
+            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.helpers?.join(", ") || "--"}</span>
           </div>
-
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <User size={12} className="text-amber-500" /> Loaders
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">
-              {(trip as any).loaders?.join(", ") || "--"}
+              {loadSnapshot.loaders?.join(", ") || "--"}
             </span>
           </div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-center justify-between">
-          <p className="text-xs text-slate-600 font-normal">
-            Start details submitted successfully.
-          </p>
+          <p className="text-xs text-slate-600 font-normal">Start details submitted successfully.</p>
         </div>
       </div>
     );
   }
 
-  // ─── EDIT / ACTIVE STATE ───────────────────────────────────────────
   return (
     <>
       <style>{`
@@ -391,27 +824,24 @@ function StepStart({
         .hide-spinner::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         .hide-spinner { -moz-appearance: textfield; appearance: none; }
       `}</style>
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
-        {headerLoading && (
-          <p className="text-xs text-slate-500">Loading trip header...</p>
-        )}
+      <div
+        className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm"
+        onKeyDown={handleFormKeyDown}
+      >
+        {headerLoading && <p className="text-xs text-slate-500">Loading trip header...</p>}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
           <div className="flex items-center gap-2.5">
             <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
               1
             </span>
-            <h2 className="text-base font-bold text-slate-800 tracking-tight">
-              TRIP START (AT OFFICE)
-            </h2>
+            <h2 className="text-base font-bold text-slate-800 tracking-tight">TRIP START (AT OFFICE)</h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {headerSaveStatus === "saving" && (
-              <span className="text-[11px] text-slate-400">Saving...</span>
-            )}
-            {headerSaveStatus === "saved" && (
-              <span className="text-[11px] text-emerald-600">Saved</span>
-            )}
-            {((editable && trip.startStepSubmitted) || isLocalEditing) && (
+            <SaveStatusIndicator
+              subscribe={subscribeHeaderSaveStatus}
+              getSnapshot={getHeaderSaveStatus}
+            />
+            {((editable && startStepSubmitted) || isLocalEditing) && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
                 Editable View
               </span>
@@ -420,178 +850,58 @@ function StepStart({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 sm:gap-x-6 gap-y-4 sm:gap-y-5">
-          <div>
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-              <Clock size={14} className="text-slate-400" /> Start Time <span className="text-red-500">*</span>
-            </label>
-            <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
-              {trip.startTime ? (
-                trip.startTime
-              ) : (
-                <span className="text-slate-400 font-normal text-xs">Will be captured when trip starts</span>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-              <Truck size={14} className="text-slate-400" /> Vehicle No. <span className="text-red-500">*</span>
-            </label>
-            <Select<{ id: number; vehicleNumber: string }, false>
-              options={vehicleOptions}
-              getOptionLabel={(e) => e?.vehicleNumber || ""}
-              getOptionValue={(e) => String(e?.id ?? "")}
-              value={selectedVehicle}
-              onChange={(e) => updateTrip({ vehicleId: e?.id || 0, vehicleNo: e?.vehicleNumber || "" })}
-              className="mt-1 text-sm"
-              placeholder="Search Vehicle..."
-              isSearchable
-              isDisabled={inputsLocked}
-              styles={selectStyles}
-              menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-              <User size={14} className="text-slate-400" /> Supervisor <span className="text-red-500">*</span>
-            </label>
-            <Select<{ id: number; employeeName: string; department: string }, false>
-              options={supervisorOptions}
-              getOptionLabel={(e) => e?.employeeName || ""}
-              getOptionValue={(e) => e?.employeeName || ""}
-              value={selectedSupervisor}
-              onChange={(e) => updateTrip({ supervisorId: e?.id || 0, supervisorName: e?.employeeName || "" })}
-              className="mt-1 text-sm"
-              placeholder="Search Supervisor..."
-              isSearchable
-              isDisabled={inputsLocked}
-              styles={selectStyles}
-              menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-              <User size={14} className="text-slate-400" /> Driver <span className="text-red-500">*</span>
-            </label>
-            <Select<{ id: number; employeeName: string; department: string }, false>
-              options={driverOptions}
-              getOptionLabel={(e) => e?.employeeName || ""}
-              getOptionValue={(e) => e?.employeeName || ""}
-              value={selectedDriver}
-              onChange={(e) => updateTrip({ driverId: e?.id || 0, driverName: e?.employeeName || "" })}
-              className="mt-1 text-sm"
-              placeholder="Search Driver..."
-              isSearchable
-              isDisabled={inputsLocked}
-              styles={selectStyles}
-              menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-              <Gauge size={14} className="text-slate-400" /> Starting Meter (KM) <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={openingMeterText}
-              onChange={(e) => setOpeningMeterText(e.target.value)}
-              onWheel={(e) => e.currentTarget.blur()}
-              disabled={inputsLocked}
-              className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
-                lastMeterError
-                  ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
-                  : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
-              }`}
-              placeholder="0.00"
-            />
-            {lastKnownMeter !== null && !lastMeterError && (
-              <p className="text-[11px] text-slate-400 mt-1">
-                Last recorded closing meter: <span className="text-slate-700 font-semibold">{lastKnownMeter} KM</span>
-              </p>
-            )}
-            {lastMeterError && (
-              <p className="text-[11px] text-red-500 mt-1 font-medium flex items-center gap-1">
-                <AlertCircle size={12} /> {lastMeterError}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-              <Wallet size={14} className="text-slate-400" /> Advance / Expenses <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={advanceText}
-              onChange={(e) => setAdvanceText(e.target.value)}
-              onWheel={(e) => e.currentTarget.blur()}
-              disabled={inputsLocked}
-              className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
-                advanceError
-                  ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
-                  : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
-              }`}
-              placeholder="0.00"
-            />
-            {advanceError && (
-              <p className="text-[11px] text-red-500 mt-1 font-medium flex items-center gap-1">
-                <AlertCircle size={12} /> {advanceError}
-              </p>
-            )}
-          </div>
-
+          <StartTimeField startTime={startTime} />
+          <VehicleField
+            vehicleId={form.vehicleId}
+            options={vehicleOptions}
+            disabled={inputsLocked}
+            onSelect={handleVehicleSelect}
+          />
+          <SupervisorField
+            supervisorName={form.supervisorName}
+            options={supervisorOptions}
+            disabled={inputsLocked}
+            onSelect={handleSupervisorSelect}
+          />
+          <DriverField
+            driverName={form.driverName}
+            options={driverOptions}
+            disabled={inputsLocked}
+            onSelect={handleDriverSelect}
+          />
+          <OpeningMeterField
+            value={form.openingMeterText}
+            disabled={inputsLocked}
+            lastKnownMeter={lastKnownMeter}
+            lastMeterError={lastMeterError}
+            onChange={handleOpeningMeterChange}
+          />
+          <AdvanceField
+            value={form.advanceText}
+            disabled={inputsLocked}
+            advanceError={advanceError}
+            onChange={handleAdvanceChange}
+          />
           <div className="col-span-1 sm:col-span-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-                  <User size={14} className="text-slate-400" /> Helpers
-                </label>
-                <Select
-                  options={helperOptions}
-                  getOptionLabel={(e) => e?.employeeName || ""}
-                  getOptionValue={(e) => e?.employeeName || ""}
-                  value={selectedHelpers}
-                  onChange={handleHelpersChange}
-                  className="mt-1 text-sm"
-                  placeholder="Select helpers..."
-                  isMulti
-                  isSearchable
-                  isDisabled={inputsLocked}
-                  styles={selectStyles}
-                  menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-                  <User size={14} className="text-amber-500" /> Loaders
-                </label>
-                <Select
-                  options={loaderOptions}
-                  getOptionLabel={(e) => e?.employeeName || ""}
-                  getOptionValue={(e) => e?.employeeName || ""}
-                  value={selectedLoaders}
-                  onChange={handleLoadersChange}
-                  className="mt-1 text-sm"
-                  placeholder="Select loaders..."
-                  isMulti
-                  isSearchable
-                  isDisabled={inputsLocked}
-                  styles={selectStyles}
-                  menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
-                />
-              </div>
+              <HelpersField
+                helpers={form.helpers}
+                options={helperOptions}
+                disabled={inputsLocked}
+                onChange={handleHelpersChange}
+              />
+              <LoadersField
+                loaders={form.loaders}
+                options={loaderOptions}
+                disabled={inputsLocked}
+                onChange={handleLoadersChange}
+              />
             </div>
           </div>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-slate-100">
-          {!trip.startStepSubmitted && !editable && (
+          {!startStepSubmitted && !editable && (
             <button
               type="button"
               onClick={clearForm}
@@ -605,10 +915,7 @@ function StepStart({
           {(editable || isLocalEditing) && (
             <button
               type="button"
-              onClick={() => {
-                if (editable && onCancel) onCancel();
-                else setIsLocalEditing(false);
-              }}
+              onClick={handleCancelEdit}
               className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95"
             >
               <X size={14} /> Cancel
@@ -629,4 +936,24 @@ function StepStart({
   );
 }
 
-export default React.memo(StepStart);
+function areStepStartPropsEqual(prev: Props, next: Props): boolean {
+  return (
+    prev.tripId === next.tripId &&
+    prev.startTime === next.startTime &&
+    prev.startStepSubmitted === next.startStepSubmitted &&
+    prev.editable === next.editable &&
+    prev.canEdit === next.canEdit &&
+    prev.headerLoading === next.headerLoading &&
+    prev.vehicleOptions === next.vehicleOptions &&
+    prev.employeeOptions === next.employeeOptions &&
+    prev.updateTrip === next.updateTrip &&
+    prev.submitStartStep === next.submitStartStep &&
+    prev.onCancel === next.onCancel &&
+    prev.clearForm === next.clearForm &&
+    prev.subscribeHeaderSaveStatus === next.subscribeHeaderSaveStatus &&
+    prev.getHeaderSaveStatus === next.getHeaderSaveStatus &&
+    prev.loadSnapshot === next.loadSnapshot
+  );
+}
+
+export default React.memo(StepStart, areStepStartPropsEqual);

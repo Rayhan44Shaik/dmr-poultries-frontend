@@ -1,6 +1,6 @@
 // src/modules/operations/vehicle-trips/pages/TripEntryPage.tsx
 
-import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AlertCircle, FileText, Plus } from "lucide-react";
 
@@ -61,7 +61,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setIsEditing,
     endStepSubmitted,
     headerLoading,
-    headerSaveStatus,
+    subscribeHeaderSaveStatus,
+    getHeaderSaveStatus,
     updateTrip,
     updateDeliveries,
     updateBoxDetails,
@@ -260,6 +261,27 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     [employees]
   );
 
+  const step1LoadSnapshot = useMemo(
+    () => trip,
+    [
+      trip.id,
+      trip.startTime,
+      trip.startStepSubmitted,
+      trip.vehicleId,
+      trip.vehicleNo,
+      trip.driverId,
+      trip.driverName,
+      trip.supervisorId,
+      trip.supervisorName,
+      trip.helpers,
+      trip.loaders,
+      trip.openingMeter,
+      trip.advanceAmount,
+    ]
+  );
+
+  const handleCancelEdit = useCallback(() => setIsEditing(false), [setIsEditing]);
+
   useEffect(() => {
     if (currentStep > viewStepIndex && !isManualSelect.current) {
       setViewStepIndex(currentStep);
@@ -288,6 +310,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     }
   }, [isTripEnded, trip.status, setTrip, showNotification]);
 
+  const createSaveStatus = useSyncExternalStore(
+    subscribeHeaderSaveStatus,
+    getHeaderSaveStatus,
+    getHeaderSaveStatus
+  );
+
   const isNewTrip = trip.id === 0 || !trip.tripNo;
 
   const isEditable = (stepCompleted: boolean) => {
@@ -303,22 +331,24 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   };
 
   const renderSelectedStep = () => {
-    const onCancelEdit = () => setIsEditing(false);
-
     if (viewStepIndex === 0) {
       return (
         <StepStart
-          trip={trip}
+          tripId={trip.id}
+          startTime={trip.startTime}
+          startStepSubmitted={trip.startStepSubmitted}
+          loadSnapshot={step1LoadSnapshot}
           updateTrip={updateStartTrip}
           submitStartStep={submitStartStep}
           vehicleOptions={vehicleOpts}
           employeeOptions={employeeOpts}
           editable={isEditable(isStartCompleted)}
           canEdit={canEditTrip}
-          onCancel={onCancelEdit}
+          onCancel={handleCancelEdit}
           clearForm={clearForm}
           headerLoading={headerLoading}
-          headerSaveStatus={headerSaveStatus}
+          subscribeHeaderSaveStatus={subscribeHeaderSaveStatus}
+          getHeaderSaveStatus={getHeaderSaveStatus}
         />
       );
     }
@@ -333,7 +363,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           farms={farms}
           editable={isEditable(isFarmCompleted)}
           canEdit={canEditTrip}
-          onCancel={onCancelEdit}
+          onCancel={handleCancelEdit}
         />
       );
     }
@@ -348,7 +378,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           updateBoxDetails={updateBoxDetails}
           editable={isEditable(isPickupCompleted)}
           canEdit={canEditTrip}
-          onCancel={onCancelEdit}
+          onCancel={handleCancelEdit}
           clearForm={clearForm}
         />
       );
@@ -368,7 +398,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           readOnly={!isEditable(isDeliveryCompleted)}
           editable={isEditable(isDeliveryCompleted)}
           canEdit={canEditTrip}
-          onCancel={onCancelEdit}
+          onCancel={handleCancelEdit}
           clearForm={clearForm}
         />
       );
@@ -382,7 +412,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           updateTrip={updateTrip}
           editable={isEditable(isTripEnded)}
           canEdit={canEditTrip}
-          onCancel={onCancelEdit}
+          onCancel={handleCancelEdit}
           {...({
             submitEndTrip,
             submitEndStep: submitEndTrip,
@@ -422,11 +452,11 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
                   setShowEntryPrompt(false);
                   void ensureDraft();
                 }}
-                disabled={headerSaveStatus === "saving"}
+                disabled={headerLoading || createSaveStatus === "saving"}
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-blue-300 disabled:to-indigo-300 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"
               >
                 <Plus size={18} />
-                {headerSaveStatus === "saving" ? "Creating..." : "Create New Trip"}
+                {createSaveStatus === "saving" ? "Creating..." : "Create New Trip"}
               </button>
             )}
           </div>

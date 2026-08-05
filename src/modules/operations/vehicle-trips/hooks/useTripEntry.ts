@@ -140,7 +140,9 @@ export function useTripEntry(showNotification?: NotificationFn) {
   const [isEditing, setIsEditing] = useState(false);
   const [endStepSubmitted, setEndStepSubmitted] = useState<boolean>(false);
   const [headerLoading, setHeaderLoading] = useState(false);
-  const [headerSaveStatus, setHeaderSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const headerSaveStatusRef = useRef<"idle" | "saving" | "saved">("idle");
+  const saveStatusListenersRef = useRef(new Set<() => void>());
+  const saveIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const tripRef = useRef(trip);
   tripRef.current = trip;
@@ -149,8 +151,20 @@ export function useTripEntry(showNotification?: NotificationFn) {
   const ensureDraftPromiseRef = useRef<Promise<number | null> | null>(null);
   const persistChainRef = useRef<Promise<Trip | null>>(Promise.resolve(null));
   const lastPersistedStep1Ref = useRef<Record<string, unknown> | null>(null);
-  const saveIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onTripIdAssignedRef = useRef<((id: number) => void) | null>(null);
+
+  const emitSaveStatus = useCallback(() => {
+    saveStatusListenersRef.current.forEach((listener) => listener());
+  }, []);
+
+  const subscribeHeaderSaveStatus = useCallback((listener: () => void) => {
+    saveStatusListenersRef.current.add(listener);
+    return () => {
+      saveStatusListenersRef.current.delete(listener);
+    };
+  }, []);
+
+  const getHeaderSaveStatus = useCallback(() => headerSaveStatusRef.current, []);
 
   const syncEndStep = (tripData: Trip) => {
     setEndStepSubmitted(tripData.endStepSubmitted || false);
@@ -168,27 +182,31 @@ export function useTripEntry(showNotification?: NotificationFn) {
       clearTimeout(saveIndicatorTimerRef.current);
       saveIndicatorTimerRef.current = null;
     }
-    setHeaderSaveStatus("saving");
-  }, []);
+    headerSaveStatusRef.current = "saving";
+    emitSaveStatus();
+  }, [emitSaveStatus]);
 
   const markSaved = useCallback(() => {
-    setHeaderSaveStatus("saved");
+    headerSaveStatusRef.current = "saved";
+    emitSaveStatus();
     if (saveIndicatorTimerRef.current) {
       clearTimeout(saveIndicatorTimerRef.current);
     }
     saveIndicatorTimerRef.current = setTimeout(() => {
-      setHeaderSaveStatus("idle");
+      headerSaveStatusRef.current = "idle";
+      emitSaveStatus();
       saveIndicatorTimerRef.current = null;
     }, SAVED_INDICATOR_MS);
-  }, []);
+  }, [emitSaveStatus]);
 
   const markSaveIdle = useCallback(() => {
     if (saveIndicatorTimerRef.current) {
       clearTimeout(saveIndicatorTimerRef.current);
       saveIndicatorTimerRef.current = null;
     }
-    setHeaderSaveStatus("idle");
-  }, []);
+    headerSaveStatusRef.current = "idle";
+    emitSaveStatus();
+  }, [emitSaveStatus]);
 
   /** Parent can register a callback to sync trip id into the URL for refresh resume. */
   const registerTripIdCallback = useCallback((cb: (id: number) => void) => {
@@ -373,14 +391,12 @@ export function useTripEntry(showNotification?: NotificationFn) {
     }, AUTOSAVE_DELAY_MS);
   }, [ensureDraft, queuePersist]);
 
-  /** Step 1 field updates — local state + debounced PostgreSQL autosave. */
+  /** Step 1 field updates — ref-only during editing to avoid parent/form rerenders. */
   const applyStartFieldChange = useCallback(
     (updater: Trip | ((prev: Trip) => Trip)) => {
-      setTrip((prev) => {
-        const next = typeof updater === "function" ? updater(prev) : { ...prev, ...updater };
-        tripRef.current = next;
-        return next;
-      });
+      const prev = tripRef.current;
+      const next = typeof updater === "function" ? updater(prev) : { ...prev, ...updater };
+      tripRef.current = next;
       scheduleAutosave();
     },
     [scheduleAutosave]
@@ -688,7 +704,8 @@ export function useTripEntry(showNotification?: NotificationFn) {
     }
     lastPersistedStep1Ref.current = null;
     persistChainRef.current = Promise.resolve(null);
-    setHeaderSaveStatus("idle");
+    headerSaveStatusRef.current = "idle";
+    emitSaveStatus();
     setTrip(emptyTrip());
     setIsEditing(false);
     setEndStepSubmitted(false);
@@ -701,7 +718,8 @@ export function useTripEntry(showNotification?: NotificationFn) {
     setIsEditing,
     endStepSubmitted,
     headerLoading,
-    headerSaveStatus,
+    subscribeHeaderSaveStatus,
+    getHeaderSaveStatus,
     updateTrip,
     updateDeliveries,
     updateBoxDetails,
