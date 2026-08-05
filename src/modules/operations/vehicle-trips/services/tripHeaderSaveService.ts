@@ -88,16 +88,6 @@ const DEFAULT_AUTOSAVE_DELAY_MS = 1500;
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_SAVED_INDICATOR_MS = 2000;
 
-function devLog(label: string, data?: unknown): void {
-  if (import.meta.env.DEV) {
-    if (data === undefined) {
-      console.log(`[Step1] ${label}`);
-    } else {
-      console.log(`[Step1] ${label}`, data);
-    }
-  }
-}
-
 function extractSyncMetadata(trip: Trip): SaveSyncMetadata {
   const rawVersion = (trip as Trip & { version?: unknown }).version;
   const version =
@@ -266,9 +256,7 @@ export function createStep1HeaderSaveService(
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        devLog("Autosave Payload", { tripId: id, diff });
         const saved = await saveStep1Header(id, localTrip, diff);
-        devLog("Autosave Response", saved);
         const sync = applyPersistSuccess(saved);
         markSaved();
         return { ok: true, kind, trip: saved, sync };
@@ -319,7 +307,6 @@ export function createStep1HeaderSaveService(
       try {
         const existing = await fetchLatestOpenStep1Draft(localTrip.tripDate);
         if (existing?.id) {
-          devLog("Resume Payload", existing);
           if (hasStep1LocalEdits(localTrip)) {
             const sync = extractSyncMetadata(existing);
             localTrip = { ...localTrip, ...sync, startTime: "" };
@@ -332,8 +319,6 @@ export function createStep1HeaderSaveService(
         }
 
         const saved = await createDraft(localTrip.tripDate);
-        devLog("Draft Created", saved);
-        devLog("Trip ID", saved.id);
         const sync = extractSyncMetadata(saved);
         localTrip = {
           ...localTrip,
@@ -444,7 +429,6 @@ export function createStep1HeaderSaveService(
     async loadById(id) {
       try {
         const loaded = await loadTripById(id);
-        devLog("Resume Payload", loaded);
         return applyFullLoad(loaded);
       } catch (err) {
         notify(handleApiError(err), "error");
@@ -455,7 +439,6 @@ export function createStep1HeaderSaveService(
     async resumeLatestDraft() {
       try {
         const draft = await fetchLatestOpenStep1Draft();
-        devLog("Resume Payload", draft);
         if (!draft?.id) return null;
         return applyFullLoad(draft);
       } catch (err) {
@@ -483,9 +466,7 @@ export function createStep1HeaderSaveService(
           ...localTrip,
           startTime: tripPatch.startTime || new Date().toLocaleString(),
         };
-        devLog("Submit Payload", { tripId, payload: submitPayload });
         const saved = await submitStep1(tripId, submitPayload);
-        devLog("Submit Response", saved);
         const submitted = normalizeLoadedStep1Trip({
           ...localTrip,
           ...saved,

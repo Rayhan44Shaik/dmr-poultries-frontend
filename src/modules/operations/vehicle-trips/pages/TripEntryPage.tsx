@@ -29,7 +29,6 @@ import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
 // --- Services ---
 import { fuelExpenseService } from "../../fuel-expenses/services/fuelExpenseService";
-import { tripService } from "../services/tripService";
 
 // --- Utils ---
 import { canEditItem } from "../../../../utils/dateUtils";
@@ -42,6 +41,8 @@ const getYesterday = () => {
   date.setDate(date.getDate() - 1);
   return date.toISOString().split("T")[0];
 };
+
+type EntryScreen = "loading" | "prompt" | "form";
 
 function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const location = useLocation();
@@ -87,7 +88,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const [viewOpen, setViewOpen] = useState(false);
   const [viewStepIndex, setViewStepIndex] = useState(0);
 
-  const [showEntryPrompt, setShowEntryPrompt] = useState(true);
+  const [entryScreen, setEntryScreen] = useState<EntryScreen>("loading");
   const isManualSelect = useRef(false);
   const endStepJustSubmitted = useRef(false);
   const skipAutoResumeRef = useRef(false);
@@ -118,37 +119,36 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     if (tripIdParam) {
       const id = Number(tripIdParam);
       if (!Number.isFinite(id) || id <= 0) {
-        setShowEntryPrompt(true);
+        setEntryScreen("prompt");
         return;
       }
       if (trip.id === id) {
-        setShowEntryPrompt(false);
+        setEntryScreen("form");
         return;
       }
 
       initialResumeDoneRef.current = true;
-      setShowEntryPrompt(false);
+      setEntryScreen("loading");
       void (async () => {
         const loaded = await loadTripFromApi(id);
-        if (!loaded) {
-          setShowEntryPrompt(true);
-          syncTripIdInUrl(0);
-        }
+        setEntryScreen(loaded ? "form" : "prompt");
+        if (!loaded) syncTripIdInUrl(0);
       })();
       return;
     }
 
     if (skipAutoResumeRef.current) {
-      setShowEntryPrompt(true);
+      setEntryScreen("prompt");
       return;
     }
 
     if (initialResumeDoneRef.current) return;
     initialResumeDoneRef.current = true;
 
+    setEntryScreen("loading");
     void (async () => {
       const resumed = await resumeLatestDraft();
-      setShowEntryPrompt(!resumed);
+      setEntryScreen(resumed ? "form" : "prompt");
     })();
   }, [location.search, loadTripFromApi, resumeLatestDraft, syncTripIdInUrl, trip.id]);
 
@@ -179,7 +179,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   };
 
   const handleEdit = (selectedTrip: Trip) => {
-    setShowEntryPrompt(false);
+    setEntryScreen("form");
     let targetStep = 0;
     
     if (selectedTrip.status === "Completed" || selectedTrip.status === "Pending" || selectedTrip.endStepSubmitted || selectedTrip.expensesStepSubmitted) targetStep = 4;
@@ -225,9 +225,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   useEffect(() => {
     refreshTrips();
-    if (import.meta.env.DEV) {
-      console.log("[Step1] Recent Trips Response", tripService.getRecent(5));
-    }
   }, [
     trip.id,
     trip.tripNo,
@@ -245,7 +242,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     initialResumeDoneRef.current = true;
     clearTrip();
     setRows([]);
-    setShowEntryPrompt(true);
+    setEntryScreen("prompt");
     setViewStepIndex(0);
     setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
     syncTripIdInUrl(0);
@@ -452,7 +449,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const content = (
     <div className="space-y-6">
       <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/80 shadow-xl shadow-slate-100/70 space-y-6">
-        {showEntryPrompt ? (
+        {entryScreen === "loading" ? (
+          <div className="flex flex-col items-center justify-center text-center py-16 space-y-4">
+            <div className="h-12 w-12 rounded-full border-2 border-blue-200 border-t-blue-600 animate-spin" />
+            <p className="text-sm text-slate-500">Loading trip...</p>
+          </div>
+        ) : entryScreen === "prompt" ? (
           <div className="flex flex-col items-center justify-center text-center py-16 space-y-6">
             <div className="h-20 w-20 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shadow-inner">
               <FileText size={36} />
@@ -463,22 +465,18 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
                 Start a new unloading trip by creating an entry, or view your recent trip activity below.
               </p>
             </div>
-            {headerLoading ? (
-              <p className="text-sm text-slate-500">Loading draft...</p>
-            ) : (
-              <button
-                onClick={() => {
-                  skipAutoResumeRef.current = false;
-                  setShowEntryPrompt(false);
-                  void ensureDraft();
-                }}
-                disabled={headerLoading || createSaveStatus === "saving"}
-                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-blue-300 disabled:to-indigo-300 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"
-              >
-                <Plus size={18} />
-                {createSaveStatus === "saving" ? "Creating..." : "Create New Trip"}
-              </button>
-            )}
+            <button
+              onClick={() => {
+                skipAutoResumeRef.current = false;
+                setEntryScreen("form");
+                void ensureDraft();
+              }}
+              disabled={createSaveStatus === "saving"}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-blue-300 disabled:to-indigo-300 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"
+            >
+              <Plus size={18} />
+              {createSaveStatus === "saving" ? "Creating..." : "Create New Trip"}
+            </button>
           </div>
         ) : (
           <>

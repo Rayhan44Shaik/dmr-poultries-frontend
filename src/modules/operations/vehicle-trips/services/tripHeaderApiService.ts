@@ -198,7 +198,7 @@ export function toStep1Payload(trip: Partial<Trip>): Record<string, unknown> {
     driverName: trip.driverName || null,
     supervisorId: trip.supervisorId || null,
     supervisorName: trip.supervisorName || null,
-    openingMeter: trip.openingMeter ?? null,
+    openingMeter: trip.openingMeter ?? 0,
     advanceAmount: trip.advanceAmount ?? 0,
     helpers: trip.helpers ?? [],
     loaders: trip.loaders ?? [],
