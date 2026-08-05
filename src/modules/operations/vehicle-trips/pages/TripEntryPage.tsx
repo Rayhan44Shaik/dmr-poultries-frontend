@@ -60,6 +60,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     isEditing,
     setIsEditing,
     endStepSubmitted,
+    headerLoading,
+    headerSaving,
     updateTrip,
     updateDeliveries,
     updateBoxDetails,
@@ -70,6 +72,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     submitEndTrip,
     loadTrip,
     loadTripFromApi,
+    resumeLatestDraft,
     clearTrip,
     ensureDraft,
     setStartTrip,
@@ -86,6 +89,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const isManualSelect = useRef(false);
   const endStepJustSubmitted = useRef(false);
   const resumeAttempted = useRef(false);
+  const skipAutoResumeRef = useRef(false);
 
   const syncTripIdInUrl = useCallback(
     (id: number) => {
@@ -106,18 +110,30 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   }, [registerTripIdCallback, syncTripIdInUrl]);
 
   useEffect(() => {
-    if (resumeAttempted.current) return;
     const params = new URLSearchParams(location.search);
     const tripIdParam = params.get("tripId");
-    if (!tripIdParam) return;
 
-    const id = Number(tripIdParam);
-    if (!Number.isFinite(id) || id <= 0) return;
+    if (tripIdParam) {
+      const id = Number(tripIdParam);
+      if (!Number.isFinite(id) || id <= 0) return;
+      if (trip.id === id) return;
 
+      resumeAttempted.current = true;
+      setShowEntryPrompt(false);
+      void loadTripFromApi(id);
+      return;
+    }
+
+    if (skipAutoResumeRef.current || resumeAttempted.current) return;
     resumeAttempted.current = true;
-    setShowEntryPrompt(false);
-    void loadTripFromApi(id);
-  }, [location.search, loadTripFromApi]);
+
+    void (async () => {
+      const resumed = await resumeLatestDraft();
+      if (resumed) {
+        setShowEntryPrompt(false);
+      }
+    })();
+  }, [location.search, loadTripFromApi, resumeLatestDraft, trip.id]);
 
   // ─── Handle status change with fuel bill validation ────────────
   const handleStatusChange = (trip: Trip, status: "Pending" | "Completed") => {
@@ -156,9 +172,15 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     else if (selectedTrip.startStepSubmitted) targetStep = 0;
 
     setViewStepIndex(targetStep);
-    loadTrip(selectedTrip);
-    setRows(selectedTrip.deliveries);
-    showNotification(`✏️ Trip ${selectedTrip.tripNo} loaded. Proceed to edit.`, "info");
+    setRows(selectedTrip.deliveries || []);
+
+    void (async () => {
+      const loadedFromApi = await loadTripFromApi(selectedTrip.id);
+      if (!loadedFromApi) {
+        loadTrip(selectedTrip);
+      }
+      showNotification(`✏️ Trip ${selectedTrip.tripNo} loaded. Proceed to edit.`, "info");
+    })();
   };
 
   const handleRefresh = () => {
@@ -189,6 +211,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   }, [trip]);
 
   const clearForm = () => {
+    skipAutoResumeRef.current = true;
     clearTrip();
     setRows([]);
     setShowEntryPrompt(true);
@@ -279,6 +302,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           canEdit={canEditTrip}
           onCancel={onCancelEdit}
           clearForm={clearForm}
+          headerLoading={headerLoading}
+          headerSaving={headerSaving}
         />
       );
     }
@@ -373,16 +398,22 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
                 Start a new unloading trip by creating an entry, or view your recent trip activity below.
               </p>
             </div>
-            <button
-              onClick={() => {
-                setShowEntryPrompt(false);
-                void ensureDraft();
-              }}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"
-            >
-              <Plus size={18} />
-              Create New Trip
-            </button>
+            {headerLoading ? (
+              <p className="text-sm text-slate-500">Loading draft...</p>
+            ) : (
+              <button
+                onClick={() => {
+                  skipAutoResumeRef.current = false;
+                  setShowEntryPrompt(false);
+                  void ensureDraft();
+                }}
+                disabled={headerSaving}
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-blue-300 disabled:to-indigo-300 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"
+              >
+                <Plus size={18} />
+                {headerSaving ? "Creating..." : "Create New Trip"}
+              </button>
+            )}
           </div>
         ) : (
           <>

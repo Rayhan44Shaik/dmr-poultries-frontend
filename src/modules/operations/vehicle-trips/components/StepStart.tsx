@@ -17,6 +17,8 @@ interface Props {
   canEdit?: boolean;
   onCancel?: () => void;
   clearForm?: () => void;
+  headerLoading?: boolean;
+  headerSaving?: boolean;
 }
 
 export default function StepStart({
@@ -30,6 +32,8 @@ export default function StepStart({
   canEdit = false,
   onCancel,
   clearForm,
+  headerLoading = false,
+  headerSaving = false,
 }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(false);
@@ -104,6 +108,17 @@ export default function StepStart({
     const loaders = selectedOptions ? selectedOptions.map((opt: any) => opt.employeeName) : [];
     updateTrip({ loaders } as Partial<Trip>);
   };
+
+  const isBusy = headerLoading || headerSaving || isSubmitting;
+  const submitLabel = headerLoading
+    ? "Loading..."
+    : isSubmitting
+    ? "Saving..."
+    : headerSaving
+    ? "Autosaving..."
+    : trip.startStepSubmitted
+    ? "Update Start Details"
+    : "Submit Start Details";
 
   const handleSubmit = async () => {
     if (lastMeterError || advanceError) return;
@@ -281,6 +296,9 @@ export default function StepStart({
         .hide-spinner { -moz-appearance: textfield; appearance: none; }
       `}</style>
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
+        {headerLoading && (
+          <p className="text-xs text-slate-500">Loading trip header...</p>
+        )}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
           <div className="flex items-center gap-2.5">
             <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
@@ -322,6 +340,7 @@ export default function StepStart({
               className="mt-1 text-sm"
               placeholder="Search Vehicle..."
               isSearchable
+              isDisabled={isBusy}
               styles={selectStyles}
               menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
             />
@@ -341,6 +360,7 @@ export default function StepStart({
               className="mt-1 text-sm"
               placeholder="Search Supervisor..."
               isSearchable
+              isDisabled={isBusy}
               styles={selectStyles}
               menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
             />
@@ -360,6 +380,7 @@ export default function StepStart({
               className="mt-1 text-sm"
               placeholder="Search Driver..."
               isSearchable
+              isDisabled={isBusy}
               styles={selectStyles}
               menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
             />
@@ -381,6 +402,7 @@ export default function StepStart({
                 updateTrip({ openingMeter: val === "" ? undefined : Number(val) });
               }}
               onWheel={(e) => e.currentTarget.blur()}
+              disabled={isBusy}
               className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
                 lastMeterError 
                   ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10" 
@@ -416,6 +438,7 @@ export default function StepStart({
                 updateTrip({ advanceAmount: val === "" ? 0 : Number(val) });
               }}
               onWheel={(e) => e.currentTarget.blur()}
+              disabled={isBusy}
               className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
                 advanceError 
                   ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10" 
@@ -447,6 +470,7 @@ export default function StepStart({
                   placeholder="Select helpers..."
                   isMulti
                   isSearchable
+                  isDisabled={isBusy}
                   styles={selectStyles}
                   menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
                 />
@@ -466,6 +490,7 @@ export default function StepStart({
                   placeholder="Select loaders..."
                   isMulti
                   isSearchable
+                  isDisabled={isBusy}
                   styles={selectStyles}
                   menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
                 />
@@ -501,14 +526,10 @@ export default function StepStart({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isSubmitting || !!lastMeterError || !!advanceError}
+            disabled={isBusy || !!lastMeterError || !!advanceError}
             className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed shadow-sm transition-all active:scale-95"
           >
-            {isSubmitting
-              ? "Saving..."
-              : trip.startStepSubmitted
-              ? "Update Start Details"
-              : "Submit Start Details"}
+            {submitLabel}
           </button>
         </div>
       </div>

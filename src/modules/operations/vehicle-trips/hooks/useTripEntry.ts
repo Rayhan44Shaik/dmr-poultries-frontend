@@ -6,8 +6,11 @@ import {
   loadTripById,
   saveStep1Header,
   submitStep1,
+  fetchLatestOpenStep1Draft,
   handleApiError,
   isConflictError,
+  toStep1Payload,
+  diffStep1Payload,
 } from "../services/tripHeaderApiService";
 import {
   calculateAvgWeight,
@@ -16,13 +19,22 @@ import {
   validatePickupStep,
   validateEndStep,
   validateFinalTrip,
-  generateTripNo,
 } from "../services/tripFormService";
 
 type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void;
 
 const AUTOSAVE_DELAY_MS = 800;
 const MAX_AUTOSAVE_RETRIES = 2;
+
+function mergeTripState(prev: Trip, saved: Trip): Trip {
+  return {
+    ...prev,
+    ...saved,
+    helpers: saved.helpers || [],
+    deliveries: saved.deliveries || [],
+    boxDetails: saved.boxDetails || [],
+  };
+}
 
 export function useTripEntry(showNotification?: NotificationFn) {
   const notify = showNotification;
@@ -90,21 +102,45 @@ export function useTripEntry(showNotification?: NotificationFn) {
   const [endStepSubmitted, setEndStepSubmitted] = useState<boolean>(false);
   const [headerLoading, setHeaderLoading] = useState(false);
   const [headerSaving, setHeaderSaving] = useState(false);
-  const [isApiBacked, setIsApiBacked] = useState(false);
 
   const tripRef = useRef(trip);
   tripRef.current = trip;
 
-  const isApiBackedRef = useRef(isApiBacked);
-  isApiBackedRef.current = isApiBacked;
-
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ensureDraftPromiseRef = useRef<Promise<number | null> | null>(null);
+  const persistChainRef = useRef<Promise<Trip | null>>(Promise.resolve(null));
+  const lastPersistedStep1Ref = useRef<Record<string, unknown> | null>(null);
+  const savingCountRef = useRef(0);
   const onTripIdAssignedRef = useRef<((id: number) => void) | null>(null);
 
   const syncEndStep = (tripData: Trip) => {
     setEndStepSubmitted(tripData.endStepSubmitted || false);
   };
+
+  const applyLoadedTrip = useCallback((loaded: Trip) => {
+    setTrip({
+      ...loaded,
+      helpers: loaded.helpers || [],
+      deliveries: loaded.deliveries || [],
+      boxDetails: loaded.boxDetails || [],
+    });
+    syncEndStep(loaded);
+    lastPersistedStep1Ref.current = toStep1Payload(loaded);
+  }, []);
+
+  const beginSaving = useCallback(() => {
+    savingCountRef.current += 1;
+    if (savingCountRef.current === 1) {
+      setHeaderSaving(true);
+    }
+  }, []);
+
+  const endSaving = useCallback(() => {
+    savingCountRef.current = Math.max(0, savingCountRef.current - 1);
+    if (savingCountRef.current === 0) {
+      setHeaderSaving(false);
+    }
+  }, []);
 
   /** Parent can register a callback to sync trip id into the URL for refresh resume. */
   const registerTripIdCallback = useCallback((cb: (id: number) => void) => {
@@ -130,7 +166,7 @@ export function useTripEntry(showNotification?: NotificationFn) {
     return { totalDelBirds, totalDelWeight, totalShops, lastShop, mortalityWeight, weightLoss, survivalRate };
   };
 
-  /** POST /api/trips — create Draft once; reuse the same trip id for all Step 1 saves. */
+  /** Idempotent draft — reuse latest open Step 1 draft for the trip date before POST. */
   const ensureDraft = useCallback(async (): Promise<number | null> => {
     if (tripRef.current.id > 0) {
       return tripRef.current.id;
@@ -141,73 +177,96 @@ export function useTripEntry(showNotification?: NotificationFn) {
     }
 
     ensureDraftPromiseRef.current = (async () => {
-      setHeaderSaving(true);
+      beginSaving();
       try {
+        const existing = await fetchLatestOpenStep1Draft(tripRef.current.tripDate);
+        if (existing?.id) {
+          applyLoadedTrip(existing);
+          setIsEditing(true);
+          onTripIdAssignedRef.current?.(existing.id);
+          return existing.id;
+        }
+
         const saved = await createDraft(tripRef.current.tripDate);
-        setTrip((prev) => ({ ...prev, ...saved }));
-        syncEndStep(saved);
-        setIsApiBacked(true);
+        applyLoadedTrip(saved);
         onTripIdAssignedRef.current?.(saved.id);
         return saved.id;
       } catch (err) {
         notify?.(handleApiError(err), "error");
         return null;
       } finally {
-        setHeaderSaving(false);
+        endSaving();
         ensureDraftPromiseRef.current = null;
       }
     })();
 
     return ensureDraftPromiseRef.current;
-  }, [notify]);
+  }, [applyLoadedTrip, beginSaving, endSaving, notify]);
 
   const persistHeaderWithRetry = useCallback(
-    async (payload: Partial<Trip>, attempt = 0): Promise<Trip | null> => {
+    async (changedFields: Record<string, unknown>): Promise<Trip | null> => {
       const id = tripRef.current.id;
-      if (!id) return null;
+      if (!id || Object.keys(changedFields).length === 0) return null;
 
+      beginSaving();
       try {
-        setHeaderSaving(true);
-        const saved = await saveStep1Header(id, { ...tripRef.current, ...payload });
-        setTrip((prev) => ({ ...prev, ...saved }));
-        syncEndStep(saved);
-        return saved;
-      } catch (err) {
-        if (isConflictError(err)) {
+        for (let attempt = 0; attempt <= MAX_AUTOSAVE_RETRIES; attempt++) {
           try {
-            const fresh = await loadTripById(id);
-            setTrip((prev) => ({
-              ...prev,
-              ...fresh,
-              helpers: fresh.helpers || [],
-              deliveries: fresh.deliveries || [],
-              boxDetails: fresh.boxDetails || [],
-            }));
-            syncEndStep(fresh);
-            notify?.("Conflict while saving. Please refresh and try again.", "error");
-          } catch {
-            notify?.(handleApiError(err), "error");
+            const saved = await saveStep1Header(id, tripRef.current, changedFields);
+            setTrip((prev) => mergeTripState(prev, saved));
+            syncEndStep(saved);
+            lastPersistedStep1Ref.current = toStep1Payload(saved);
+            return saved;
+          } catch (err) {
+            if (isConflictError(err)) {
+              try {
+                const fresh = await loadTripById(id);
+                applyLoadedTrip(fresh);
+                notify?.("Conflict while saving. Loaded the latest server copy.", "error");
+              } catch {
+                notify?.(handleApiError(err), "error");
+              }
+              return null;
+            }
+
+            const message = handleApiError(err);
+            const isNetwork =
+              err instanceof Error &&
+              (message.includes("reach the server") || message.includes("timed out"));
+
+            if (isNetwork && attempt < MAX_AUTOSAVE_RETRIES) {
+              await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+              continue;
+            }
+
+            notify?.(message, "error");
+            return null;
           }
-          return null;
         }
-
-        const message = handleApiError(err);
-        const isNetwork =
-          err instanceof Error &&
-          (message.includes("reach the server") || message.includes("timed out"));
-
-        if (isNetwork && attempt < MAX_AUTOSAVE_RETRIES) {
-          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-          return persistHeaderWithRetry(payload, attempt + 1);
-        }
-
-        notify?.(message, "error");
         return null;
       } finally {
-        setHeaderSaving(false);
+        endSaving();
       }
     },
-    [notify]
+    [applyLoadedTrip, beginSaving, endSaving, notify]
+  );
+
+  const queuePersist = useCallback(
+    (changedFields: Record<string, unknown> | null): Promise<Trip | null> => {
+      if (!changedFields) {
+        return persistChainRef.current;
+      }
+
+      const run = (): Promise<Trip | null> => {
+        const latestDiff = diffStep1Payload(tripRef.current, lastPersistedStep1Ref.current);
+        if (!latestDiff) return Promise.resolve(null);
+        return persistHeaderWithRetry(latestDiff);
+      };
+
+      persistChainRef.current = persistChainRef.current.then(run, run);
+      return persistChainRef.current;
+    },
+    [persistHeaderWithRetry]
   );
 
   const flushAutosave = useCallback(async () => {
@@ -215,26 +274,39 @@ export function useTripEntry(showNotification?: NotificationFn) {
       clearTimeout(autosaveTimerRef.current);
       autosaveTimerRef.current = null;
     }
-    if (tripRef.current.id <= 0) return;
-    await persistHeaderWithRetry({});
-  }, [persistHeaderWithRetry]);
+
+    if (tripRef.current.id <= 0) {
+      const id = await ensureDraft();
+      if (!id) return;
+    }
+
+    const diff = diffStep1Payload(tripRef.current, lastPersistedStep1Ref.current);
+    if (diff) {
+      await queuePersist(diff);
+    } else {
+      await persistChainRef.current;
+    }
+  }, [ensureDraft, queuePersist]);
 
   const scheduleAutosave = useCallback(
-    (nextTrip: Trip) => {
-      if (!isApiBackedRef.current) return;
-
+    (_nextTrip: Trip) => {
       if (autosaveTimerRef.current) {
         clearTimeout(autosaveTimerRef.current);
       }
+
       autosaveTimerRef.current = setTimeout(() => {
         void (async () => {
-          const id = nextTrip.id > 0 ? nextTrip.id : await ensureDraft();
+          const id = tripRef.current.id > 0 ? tripRef.current.id : await ensureDraft();
           if (!id) return;
-          await persistHeaderWithRetry(nextTrip);
+
+          const diff = diffStep1Payload(tripRef.current, lastPersistedStep1Ref.current);
+          if (!diff) return;
+
+          await queuePersist(diff);
         })();
       }, AUTOSAVE_DELAY_MS);
     },
-    [ensureDraft, persistHeaderWithRetry]
+    [ensureDraft, queuePersist]
   );
 
   /** Step 1 field updates — local state + debounced PostgreSQL autosave. */
@@ -269,15 +341,8 @@ export function useTripEntry(showNotification?: NotificationFn) {
       setHeaderLoading(true);
       try {
         const loaded = await loadTripById(id);
-        setTrip({
-          ...loaded,
-          helpers: loaded.helpers || [],
-          deliveries: loaded.deliveries || [],
-          boxDetails: loaded.boxDetails || [],
-        });
+        applyLoadedTrip(loaded);
         setIsEditing(true);
-        syncEndStep(loaded);
-        setIsApiBacked(true);
         onTripIdAssignedRef.current?.(loaded.id);
         return true;
       } catch (err) {
@@ -287,8 +352,27 @@ export function useTripEntry(showNotification?: NotificationFn) {
         setHeaderLoading(false);
       }
     },
-    [notify]
+    [applyLoadedTrip, notify]
   );
+
+  /** GET /api/trips?status=Draft — resume latest open Step 1 draft when no tripId exists. */
+  const resumeLatestDraft = useCallback(async (): Promise<boolean> => {
+    setHeaderLoading(true);
+    try {
+      const draft = await fetchLatestOpenStep1Draft();
+      if (!draft?.id) return false;
+
+      applyLoadedTrip(draft);
+      setIsEditing(true);
+      onTripIdAssignedRef.current?.(draft.id);
+      return true;
+    } catch (err) {
+      notify?.(handleApiError(err), "error");
+      return false;
+    } finally {
+      setHeaderLoading(false);
+    }
+  }, [applyLoadedTrip, notify]);
 
   const submitStartStep = async (data: Partial<Trip> = {}): Promise<boolean> => {
     const merged = {
@@ -302,35 +386,7 @@ export function useTripEntry(showNotification?: NotificationFn) {
       return false;
     }
 
-    if (!isApiBackedRef.current) {
-      let savedTrip: Trip;
-      if (isEditing) {
-        savedTrip = tripService.update({ ...merged, startStepSubmitted: true } as Trip);
-        notify?.(`✅ Step 1 updated successfully.`, "success");
-      } else {
-        const existingTrips = tripService.getAll();
-        const tripNo = generateTripNo(existingTrips, merged.tripDate);
-        savedTrip = tripService.create({
-          ...(merged as Trip),
-          id: Date.now(),
-          tripNo,
-          startStepSubmitted: true,
-          status: "Draft",
-          endStepSubmitted: false,
-        });
-        notify?.(`✅ Step 1 completed successfully. Moving to Step 2...`, "success");
-      }
-      setTrip(savedTrip);
-      syncEndStep(savedTrip);
-      return true;
-    }
-
-    if (autosaveTimerRef.current) {
-      clearTimeout(autosaveTimerRef.current);
-      autosaveTimerRef.current = null;
-    }
-
-    setHeaderSaving(true);
+    beginSaving();
     try {
       let tripId = tripRef.current.id;
       if (!tripId) {
@@ -338,9 +394,12 @@ export function useTripEntry(showNotification?: NotificationFn) {
       }
       if (!tripId) return false;
 
+      await flushAutosave();
+
       const saved = await submitStep1(tripId, merged);
-      setTrip((prev) => ({ ...prev, ...saved, startStepSubmitted: true }));
+      setTrip((prev) => mergeTripState(prev, { ...saved, startStepSubmitted: true }));
       syncEndStep(saved);
+      lastPersistedStep1Ref.current = toStep1Payload({ ...saved, startStepSubmitted: true });
       onTripIdAssignedRef.current?.(saved.id);
 
       notify?.(
@@ -354,8 +413,7 @@ export function useTripEntry(showNotification?: NotificationFn) {
       if (isConflictError(err) && tripRef.current.id) {
         try {
           const fresh = await loadTripById(tripRef.current.id);
-          setTrip((prev) => ({ ...prev, ...fresh }));
-          syncEndStep(fresh);
+          applyLoadedTrip(fresh);
         } catch {
           /* ignore reload failure */
         }
@@ -363,7 +421,7 @@ export function useTripEntry(showNotification?: NotificationFn) {
       notify?.(handleApiError(err), "error");
       return false;
     } finally {
-      setHeaderSaving(false);
+      endSaving();
     }
   };
 
@@ -540,7 +598,7 @@ export function useTripEntry(showNotification?: NotificationFn) {
       boxDetails: tripToLoad.boxDetails || []
     });
     setIsEditing(true);
-    setIsApiBacked(false);
+    lastPersistedStep1Ref.current = null;
     setEndStepSubmitted(tripToLoad.endStepSubmitted === true);
   };
 
@@ -549,9 +607,10 @@ export function useTripEntry(showNotification?: NotificationFn) {
       clearTimeout(autosaveTimerRef.current);
       autosaveTimerRef.current = null;
     }
+    lastPersistedStep1Ref.current = null;
+    persistChainRef.current = Promise.resolve(null);
     setTrip(emptyTrip());
     setIsEditing(false);
-    setIsApiBacked(false);
     setEndStepSubmitted(false);
   };
 
@@ -573,6 +632,7 @@ export function useTripEntry(showNotification?: NotificationFn) {
     submitEndTrip,
     loadTrip,
     loadTripFromApi,
+    resumeLatestDraft,
     clearTrip,
     ensureDraft,
     setStartTrip,
