@@ -191,7 +191,7 @@ export function toStep1Payload(trip: Partial<Trip>): Record<string, unknown> {
     tripDate: trip.tripDate,
     tripNo: trip.tripNo,
     status: trip.status ?? "Draft",
-    startTime: trip.startTime || null,
+    startTime: trip.startStepSubmitted ? (trip.startTime || null) : null,
     vehicleId: trip.vehicleId || null,
     vehicleNo: trip.vehicleNo || null,
     driverId: trip.driverId || null,

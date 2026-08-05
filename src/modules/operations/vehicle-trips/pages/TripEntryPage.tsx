@@ -1,6 +1,6 @@
 // src/modules/operations/vehicle-trips/pages/TripEntryPage.tsx
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AlertCircle, FileText, Plus } from "lucide-react";
 
@@ -61,7 +61,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setIsEditing,
     endStepSubmitted,
     headerLoading,
-    headerSaving,
+    headerSaveStatus,
     updateTrip,
     updateDeliveries,
     updateBoxDetails,
@@ -208,7 +208,17 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   useEffect(() => {
     refreshTrips();
-  }, [trip]);
+  }, [
+    trip.id,
+    trip.tripNo,
+    trip.status,
+    trip.startStepSubmitted,
+    trip.farmStepSubmitted,
+    trip.pickupStepSubmitted,
+    trip.deliveryStepSubmitted,
+    trip.endStepSubmitted,
+    refreshTrips,
+  ]);
 
   const clearForm = () => {
     skipAutoResumeRef.current = true;
@@ -241,8 +251,14 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         : (isFarmCompleted ? 1
           : (isStartCompleted ? 0 : 0))));
 
-  const vehicleOpts = vehicles.map((v: any) => ({ id: v.id, vehicleNumber: v.vehicleNumber }));
-  const employeeOpts = employees.map((e: any) => ({ id: e.id, employeeName: e.employeeName, department: e.department }));
+  const vehicleOpts = useMemo(
+    () => vehicles.map((v: any) => ({ id: v.id, vehicleNumber: v.vehicleNumber })),
+    [vehicles]
+  );
+  const employeeOpts = useMemo(
+    () => employees.map((e: any) => ({ id: e.id, employeeName: e.employeeName, department: e.department })),
+    [employees]
+  );
 
   useEffect(() => {
     if (currentStep > viewStepIndex && !isManualSelect.current) {
@@ -293,7 +309,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       return (
         <StepStart
           trip={trip}
-          setTrip={setStartTrip}
           updateTrip={updateStartTrip}
           submitStartStep={submitStartStep}
           vehicleOptions={vehicleOpts}
@@ -303,7 +318,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           onCancel={onCancelEdit}
           clearForm={clearForm}
           headerLoading={headerLoading}
-          headerSaving={headerSaving}
+          headerSaveStatus={headerSaveStatus}
         />
       );
     }
@@ -407,11 +422,11 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
                   setShowEntryPrompt(false);
                   void ensureDraft();
                 }}
-                disabled={headerSaving}
+                disabled={headerSaveStatus === "saving"}
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-blue-300 disabled:to-indigo-300 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"
               >
                 <Plus size={18} />
-                {headerSaving ? "Creating..." : "Create New Trip"}
+                {headerSaveStatus === "saving" ? "Creating..." : "Create New Trip"}
               </button>
             )}
           </div>

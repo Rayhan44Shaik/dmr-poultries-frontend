@@ -135,7 +135,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
   // ─── Render the selected step ──────────────────────────────────
   const renderViewStep = () => {
     if (viewStepIndex === 0 && isStartCompleted) {
-      return <StepStart trip={trip} setTrip={noopDispatch} updateTrip={noop} submitStartStep={async () => false} vehicleOptions={[]} employeeOptions={[]} />;
+      return <StepStart trip={trip} updateTrip={noop} submitStartStep={async () => false} vehicleOptions={[]} employeeOptions={[]} />;
     }
     if (viewStepIndex === 1 && isFarmCompleted) {
       return <StepFarm trip={trip} setTrip={noopDispatch} updateTrip={noop} submitFarmStep={() => false} farms={[]} />;

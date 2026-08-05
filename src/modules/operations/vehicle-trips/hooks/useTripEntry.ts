@@ -23,17 +23,56 @@ import {
 
 type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void;
 
-const AUTOSAVE_DELAY_MS = 800;
+const AUTOSAVE_DELAY_MS = 1500;
 const MAX_AUTOSAVE_RETRIES = 2;
+const SAVED_INDICATOR_MS = 2000;
 
-function mergeTripState(prev: Trip, saved: Trip): Trip {
+/** After autosave, patch only server metadata — never overwrite in-progress form fields. */
+function patchTripMetadata(prev: Trip, saved: Trip): Trip {
+  const nextId = saved.id || prev.id;
+  const nextTripNo = saved.tripNo || prev.tripNo;
+  const nextUpdatedAt = saved.updatedAt || prev.updatedAt;
+  const nextCreatedAt = saved.createdAt || prev.createdAt;
+
+  if (
+    prev.id === nextId &&
+    prev.tripNo === nextTripNo &&
+    prev.updatedAt === nextUpdatedAt &&
+    prev.createdAt === nextCreatedAt
+  ) {
+    return prev;
+  }
+
   return {
     ...prev,
-    ...saved,
-    helpers: saved.helpers || [],
-    deliveries: saved.deliveries || [],
-    boxDetails: saved.boxDetails || [],
+    id: nextId,
+    tripNo: nextTripNo,
+    updatedAt: nextUpdatedAt,
+    createdAt: nextCreatedAt,
   };
+}
+
+function normalizeLoadedStep1Trip(loaded: Trip): Trip {
+  return {
+    ...loaded,
+    helpers: loaded.helpers || [],
+    deliveries: loaded.deliveries || [],
+    boxDetails: loaded.boxDetails || [],
+    startTime: loaded.startStepSubmitted ? loaded.startTime : "",
+  };
+}
+
+function hasStep1LocalEdits(trip: Trip): boolean {
+  return Boolean(
+    trip.vehicleId ||
+    trip.driverId ||
+    trip.supervisorId ||
+    trip.openingMeter ||
+    trip.advanceAmount ||
+    (trip.helpers?.length ?? 0) > 0 ||
+    (trip.loaders?.length ?? 0) > 0 ||
+    trip.remarks
+  );
 }
 
 export function useTripEntry(showNotification?: NotificationFn) {
@@ -101,7 +140,7 @@ export function useTripEntry(showNotification?: NotificationFn) {
   const [isEditing, setIsEditing] = useState(false);
   const [endStepSubmitted, setEndStepSubmitted] = useState<boolean>(false);
   const [headerLoading, setHeaderLoading] = useState(false);
-  const [headerSaving, setHeaderSaving] = useState(false);
+  const [headerSaveStatus, setHeaderSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
   const tripRef = useRef(trip);
   tripRef.current = trip;
@@ -110,7 +149,7 @@ export function useTripEntry(showNotification?: NotificationFn) {
   const ensureDraftPromiseRef = useRef<Promise<number | null> | null>(null);
   const persistChainRef = useRef<Promise<Trip | null>>(Promise.resolve(null));
   const lastPersistedStep1Ref = useRef<Record<string, unknown> | null>(null);
-  const savingCountRef = useRef(0);
+  const saveIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onTripIdAssignedRef = useRef<((id: number) => void) | null>(null);
 
   const syncEndStep = (tripData: Trip) => {
@@ -118,28 +157,37 @@ export function useTripEntry(showNotification?: NotificationFn) {
   };
 
   const applyLoadedTrip = useCallback((loaded: Trip) => {
-    setTrip({
-      ...loaded,
-      helpers: loaded.helpers || [],
-      deliveries: loaded.deliveries || [],
-      boxDetails: loaded.boxDetails || [],
-    });
-    syncEndStep(loaded);
-    lastPersistedStep1Ref.current = toStep1Payload(loaded);
+    const normalized = normalizeLoadedStep1Trip(loaded);
+    setTrip(normalized);
+    syncEndStep(normalized);
+    lastPersistedStep1Ref.current = toStep1Payload(normalized);
   }, []);
 
-  const beginSaving = useCallback(() => {
-    savingCountRef.current += 1;
-    if (savingCountRef.current === 1) {
-      setHeaderSaving(true);
+  const markSaving = useCallback(() => {
+    if (saveIndicatorTimerRef.current) {
+      clearTimeout(saveIndicatorTimerRef.current);
+      saveIndicatorTimerRef.current = null;
     }
+    setHeaderSaveStatus("saving");
   }, []);
 
-  const endSaving = useCallback(() => {
-    savingCountRef.current = Math.max(0, savingCountRef.current - 1);
-    if (savingCountRef.current === 0) {
-      setHeaderSaving(false);
+  const markSaved = useCallback(() => {
+    setHeaderSaveStatus("saved");
+    if (saveIndicatorTimerRef.current) {
+      clearTimeout(saveIndicatorTimerRef.current);
     }
+    saveIndicatorTimerRef.current = setTimeout(() => {
+      setHeaderSaveStatus("idle");
+      saveIndicatorTimerRef.current = null;
+    }, SAVED_INDICATOR_MS);
+  }, []);
+
+  const markSaveIdle = useCallback(() => {
+    if (saveIndicatorTimerRef.current) {
+      clearTimeout(saveIndicatorTimerRef.current);
+      saveIndicatorTimerRef.current = null;
+    }
+    setHeaderSaveStatus("idle");
   }, []);
 
   /** Parent can register a callback to sync trip id into the URL for refresh resume. */
@@ -177,45 +225,60 @@ export function useTripEntry(showNotification?: NotificationFn) {
     }
 
     ensureDraftPromiseRef.current = (async () => {
-      beginSaving();
+      markSaving();
       try {
         const existing = await fetchLatestOpenStep1Draft(tripRef.current.tripDate);
         if (existing?.id) {
-          applyLoadedTrip(existing);
+          if (hasStep1LocalEdits(tripRef.current)) {
+            setTrip((prev) => {
+              const next = { ...patchTripMetadata(prev, existing), startTime: "" };
+              tripRef.current = next;
+              return next;
+            });
+          } else {
+            applyLoadedTrip(existing);
+          }
           setIsEditing(true);
           onTripIdAssignedRef.current?.(existing.id);
           return existing.id;
         }
 
         const saved = await createDraft(tripRef.current.tripDate);
-        applyLoadedTrip(saved);
+        setTrip((prev) => {
+          const next = { ...patchTripMetadata(prev, saved), startTime: "" };
+          tripRef.current = next;
+          return next;
+        });
+        if (!lastPersistedStep1Ref.current) {
+          lastPersistedStep1Ref.current = toStep1Payload(tripRef.current);
+        }
         onTripIdAssignedRef.current?.(saved.id);
         return saved.id;
       } catch (err) {
         notify?.(handleApiError(err), "error");
         return null;
       } finally {
-        endSaving();
+        markSaved();
         ensureDraftPromiseRef.current = null;
       }
     })();
 
     return ensureDraftPromiseRef.current;
-  }, [applyLoadedTrip, beginSaving, endSaving, notify]);
+  }, [applyLoadedTrip, markSaved, markSaving, notify]);
 
   const persistHeaderWithRetry = useCallback(
     async (changedFields: Record<string, unknown>): Promise<Trip | null> => {
       const id = tripRef.current.id;
       if (!id || Object.keys(changedFields).length === 0) return null;
 
-      beginSaving();
+      markSaving();
       try {
         for (let attempt = 0; attempt <= MAX_AUTOSAVE_RETRIES; attempt++) {
           try {
             const saved = await saveStep1Header(id, tripRef.current, changedFields);
-            setTrip((prev) => mergeTripState(prev, saved));
-            syncEndStep(saved);
-            lastPersistedStep1Ref.current = toStep1Payload(saved);
+            setTrip((prev) => patchTripMetadata(prev, saved));
+            lastPersistedStep1Ref.current = toStep1Payload(tripRef.current);
+            markSaved();
             return saved;
           } catch (err) {
             if (isConflictError(err)) {
@@ -226,6 +289,7 @@ export function useTripEntry(showNotification?: NotificationFn) {
               } catch {
                 notify?.(handleApiError(err), "error");
               }
+              markSaveIdle();
               return null;
             }
 
@@ -240,15 +304,18 @@ export function useTripEntry(showNotification?: NotificationFn) {
             }
 
             notify?.(message, "error");
+            markSaveIdle();
             return null;
           }
         }
+        markSaveIdle();
         return null;
-      } finally {
-        endSaving();
+      } catch {
+        markSaveIdle();
+        return null;
       }
     },
-    [applyLoadedTrip, beginSaving, endSaving, notify]
+    [applyLoadedTrip, markSaveIdle, markSaved, markSaving, notify]
   );
 
   const queuePersist = useCallback(
@@ -288,35 +355,33 @@ export function useTripEntry(showNotification?: NotificationFn) {
     }
   }, [ensureDraft, queuePersist]);
 
-  const scheduleAutosave = useCallback(
-    (_nextTrip: Trip) => {
-      if (autosaveTimerRef.current) {
-        clearTimeout(autosaveTimerRef.current);
-      }
+  const scheduleAutosave = useCallback(() => {
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
 
-      autosaveTimerRef.current = setTimeout(() => {
-        void (async () => {
-          const id = tripRef.current.id > 0 ? tripRef.current.id : await ensureDraft();
-          if (!id) return;
+    autosaveTimerRef.current = setTimeout(() => {
+      void (async () => {
+        const id = tripRef.current.id > 0 ? tripRef.current.id : await ensureDraft();
+        if (!id) return;
 
-          const diff = diffStep1Payload(tripRef.current, lastPersistedStep1Ref.current);
-          if (!diff) return;
+        const diff = diffStep1Payload(tripRef.current, lastPersistedStep1Ref.current);
+        if (!diff) return;
 
-          await queuePersist(diff);
-        })();
-      }, AUTOSAVE_DELAY_MS);
-    },
-    [ensureDraft, queuePersist]
-  );
+        await queuePersist(diff);
+      })();
+    }, AUTOSAVE_DELAY_MS);
+  }, [ensureDraft, queuePersist]);
 
   /** Step 1 field updates — local state + debounced PostgreSQL autosave. */
   const applyStartFieldChange = useCallback(
     (updater: Trip | ((prev: Trip) => Trip)) => {
       setTrip((prev) => {
         const next = typeof updater === "function" ? updater(prev) : { ...prev, ...updater };
-        scheduleAutosave(next);
+        tripRef.current = next;
         return next;
       });
+      scheduleAutosave();
     },
     [scheduleAutosave]
   );
@@ -378,7 +443,6 @@ export function useTripEntry(showNotification?: NotificationFn) {
     const merged = {
       ...tripRef.current,
       ...data,
-      startTime: new Date().toLocaleString(),
     };
     const validation = validateStartStep(merged as Trip);
     if (!validation.valid) {
@@ -386,7 +450,7 @@ export function useTripEntry(showNotification?: NotificationFn) {
       return false;
     }
 
-    beginSaving();
+    markSaving();
     try {
       let tripId = tripRef.current.id;
       if (!tripId) {
@@ -396,10 +460,21 @@ export function useTripEntry(showNotification?: NotificationFn) {
 
       await flushAutosave();
 
-      const saved = await submitStep1(tripId, merged);
-      setTrip((prev) => mergeTripState(prev, { ...saved, startStepSubmitted: true }));
-      syncEndStep(saved);
-      lastPersistedStep1Ref.current = toStep1Payload({ ...saved, startStepSubmitted: true });
+      const submitPayload = {
+        ...merged,
+        startTime: new Date().toLocaleString(),
+      };
+      const saved = await submitStep1(tripId, submitPayload);
+      const submittedTrip = normalizeLoadedStep1Trip({
+        ...tripRef.current,
+        ...saved,
+        startTime: saved.startTime || submitPayload.startTime,
+        startStepSubmitted: true,
+      });
+
+      setTrip(submittedTrip);
+      syncEndStep(submittedTrip);
+      lastPersistedStep1Ref.current = toStep1Payload(submittedTrip);
       onTripIdAssignedRef.current?.(saved.id);
 
       notify?.(
@@ -408,6 +483,7 @@ export function useTripEntry(showNotification?: NotificationFn) {
           : `✅ Step 1 completed successfully. Moving to Step 2...`,
         "success"
       );
+      markSaved();
       return true;
     } catch (err) {
       if (isConflictError(err) && tripRef.current.id) {
@@ -419,9 +495,8 @@ export function useTripEntry(showNotification?: NotificationFn) {
         }
       }
       notify?.(handleApiError(err), "error");
+      markSaveIdle();
       return false;
-    } finally {
-      endSaving();
     }
   };
 
@@ -607,8 +682,13 @@ export function useTripEntry(showNotification?: NotificationFn) {
       clearTimeout(autosaveTimerRef.current);
       autosaveTimerRef.current = null;
     }
+    if (saveIndicatorTimerRef.current) {
+      clearTimeout(saveIndicatorTimerRef.current);
+      saveIndicatorTimerRef.current = null;
+    }
     lastPersistedStep1Ref.current = null;
     persistChainRef.current = Promise.resolve(null);
+    setHeaderSaveStatus("idle");
     setTrip(emptyTrip());
     setIsEditing(false);
     setEndStepSubmitted(false);
@@ -621,7 +701,7 @@ export function useTripEntry(showNotification?: NotificationFn) {
     setIsEditing,
     endStepSubmitted,
     headerLoading,
-    headerSaving,
+    headerSaveStatus,
     updateTrip,
     updateDeliveries,
     updateBoxDetails,

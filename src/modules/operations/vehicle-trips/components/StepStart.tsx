@@ -1,6 +1,6 @@
 // src/modules/operations/vehicle-trips/components/StepStart.tsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Clock, User, Truck, Gauge, Wallet, Pencil, X, AlertCircle } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
@@ -8,7 +8,6 @@ import { fetchLastClosingMeter } from "../services/tripHeaderApiService";
 
 interface Props {
   trip: Trip;
-  setTrip: React.Dispatch<React.SetStateAction<Trip>>;
   updateTrip: (updates: Partial<Trip>) => void;
   submitStartStep: (data: Partial<Trip>) => Promise<boolean>;
   vehicleOptions: { id: number; vehicleNumber: string }[];
@@ -18,12 +17,82 @@ interface Props {
   onCancel?: () => void;
   clearForm?: () => void;
   headerLoading?: boolean;
-  headerSaving?: boolean;
+  headerSaveStatus?: "idle" | "saving" | "saved";
 }
 
-export default function StepStart({
+const FIELD_SYNC_DELAY_MS = 400;
+
+function formatNumericField(value: number | undefined | null): string {
+  if (value === undefined || value === null || value === 0) return "";
+  return String(value);
+}
+
+function parseNumericField(text: string): number {
+  if (text.trim() === "") return 0;
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+const selectStyles = {
+  menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
+  control: (base: any, state: any) => ({
+    ...base,
+    minHeight: 42,
+    borderRadius: "0.75rem",
+    borderColor: state.isFocused ? "#2563eb" : "#e2e8f0",
+    backgroundColor: "#ffffff",
+    boxShadow: state.isFocused ? "0 0 0 2px rgba(37, 99, 235, 0.15)" : "none",
+    "&:hover": { borderColor: "#cbd5e1" },
+  }),
+  singleValue: (base: any) => ({
+    ...base,
+    color: "#0f172a",
+    fontWeight: "500",
+    fontSize: "14px",
+  }),
+  multiValue: (base: any) => ({
+    ...base,
+    backgroundColor: "#f1f5f9",
+    borderRadius: "0.375rem",
+  }),
+  multiValueLabel: (base: any) => ({
+    ...base,
+    color: "#0f172a",
+    fontSize: "13px",
+    paddingLeft: "6px",
+    paddingRight: "6px",
+  }),
+  multiValueRemove: (base: any) => ({
+    ...base,
+    color: "#64748b",
+    "&:hover": { backgroundColor: "#e2e8f0", color: "#0f172a" },
+  }),
+  placeholder: (base: any) => ({
+    ...base,
+    color: "#94a3b8",
+    fontSize: "14px",
+  }),
+  option: (base: any, { isFocused, isSelected }: any) => ({
+    ...base,
+    backgroundColor: isSelected ? "#2563eb" : isFocused ? "#f8fafc" : "#ffffff",
+    color: isSelected ? "#ffffff" : "#1e293b",
+    fontSize: "13px",
+    cursor: "pointer",
+  }),
+  menu: (base: any) => ({
+    ...base,
+    backgroundColor: "#ffffff",
+    border: "1px solid #e2e8f0",
+    borderRadius: "0.75rem",
+    maxHeight: 180,
+    overflowY: "auto",
+    scrollbarWidth: "none",
+    ":-webkit-scrollbar": { display: "none" },
+  }),
+};
+
+function StepStart({
   trip,
-  setTrip,
   updateTrip,
   submitStartStep,
   vehicleOptions,
@@ -33,23 +102,71 @@ export default function StepStart({
   onCancel,
   clearForm,
   headerLoading = false,
-  headerSaving = false,
+  headerSaveStatus = "idle",
 }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(false);
   const [lastMeterError, setLastMeterError] = useState<string | null>(null);
   const [lastKnownMeter, setLastKnownMeter] = useState<number | null>(null);
   const [advanceError, setAdvanceError] = useState<string | null>(null);
+  const [openingMeterText, setOpeningMeterText] = useState(() => formatNumericField(trip.openingMeter));
+  const [advanceText, setAdvanceText] = useState(() => formatNumericField(trip.advanceAmount));
 
-  const driverOptions = employeeOptions.filter((e) => e.department === "Driver");
-  const supervisorOptions = employeeOptions.filter((e) => e.department === "Supervisor");
-  const helperOptions = employeeOptions.filter((e) => e.department === "Helper" || e.department === "Labor");
-  const loaderOptions = employeeOptions.filter((e) => e.department === "Loader");
+  const loadedTripIdRef = useRef(trip.id);
+
+  const lastSyncedOpeningRef = useRef(trip.openingMeter);
+  const lastSyncedAdvanceRef = useRef(trip.advanceAmount);
+
+  const driverOptions = useMemo(
+    () => employeeOptions.filter((e) => e.department === "Driver"),
+    [employeeOptions]
+  );
+  const supervisorOptions = useMemo(
+    () => employeeOptions.filter((e) => e.department === "Supervisor"),
+    [employeeOptions]
+  );
+  const helperOptions = useMemo(
+    () => employeeOptions.filter((e) => e.department === "Helper" || e.department === "Labor"),
+    [employeeOptions]
+  );
+  const loaderOptions = useMemo(
+    () => employeeOptions.filter((e) => e.department === "Loader"),
+    [employeeOptions]
+  );
+
+  const selectedVehicle = useMemo(
+    () => vehicleOptions.find((o) => o.id === trip.vehicleId) || null,
+    [vehicleOptions, trip.vehicleId]
+  );
+  const selectedSupervisor = useMemo(
+    () => supervisorOptions.find((o) => o.employeeName === trip.supervisorName) || null,
+    [supervisorOptions, trip.supervisorName]
+  );
+  const selectedDriver = useMemo(
+    () => driverOptions.find((o) => o.employeeName === trip.driverName) || null,
+    [driverOptions, trip.driverName]
+  );
+  const selectedHelpers = useMemo(
+    () => helperOptions.filter((o) => trip.helpers?.includes(o.employeeName)),
+    [helperOptions, trip.helpers]
+  );
+  const selectedLoaders = useMemo(
+    () => loaderOptions.filter((o) => (trip as any).loaders?.includes(o.employeeName)),
+    [loaderOptions, trip.loaders]
+  );
+
+  useEffect(() => {
+    if (loadedTripIdRef.current === trip.id) return;
+    loadedTripIdRef.current = trip.id;
+    setOpeningMeterText(formatNumericField(trip.openingMeter));
+    setAdvanceText(formatNumericField(trip.advanceAmount));
+    lastSyncedOpeningRef.current = trip.openingMeter;
+    lastSyncedAdvanceRef.current = trip.advanceAmount;
+  }, [trip.id, trip.openingMeter, trip.advanceAmount]);
 
   useEffect(() => {
     if (!trip.vehicleId) {
       setLastKnownMeter(null);
-      setLastMeterError(null);
       return;
     }
 
@@ -59,26 +176,10 @@ export default function StepStart({
       try {
         const last = await fetchLastClosingMeter(trip.vehicleId);
         if (cancelled) return;
-
-        if (last && last.closingMeter > 0) {
-          setLastKnownMeter(last.closingMeter);
-          if (trip.openingMeter !== undefined && trip.openingMeter !== null && trip.openingMeter !== 0) {
-            if (trip.openingMeter < last.closingMeter) {
-              setLastMeterError(`Starting KM must be >= ${last.closingMeter} KM`);
-            } else {
-              setLastMeterError(null);
-            }
-          } else {
-            setLastMeterError(null);
-          }
-        } else {
-          setLastKnownMeter(null);
-          setLastMeterError(null);
-        }
+        setLastKnownMeter(last && last.closingMeter > 0 ? last.closingMeter : null);
       } catch {
         if (!cancelled) {
           setLastKnownMeter(null);
-          setLastMeterError(null);
         }
       }
     })();
@@ -86,36 +187,86 @@ export default function StepStart({
     return () => {
       cancelled = true;
     };
-  }, [trip.vehicleId, trip.openingMeter, trip.id]);
+  }, [trip.vehicleId]);
 
   useEffect(() => {
-    const amount = trip.advanceAmount;
-    if (amount === undefined || amount === null || isNaN(amount)) {
+    if (lastKnownMeter === null) {
+      setLastMeterError(null);
+      return;
+    }
+
+    const val = openingMeterText.trim();
+    if (val === "") {
+      setLastMeterError(null);
+      return;
+    }
+
+    const parsed = Number(val);
+    if (!Number.isFinite(parsed)) {
+      setLastMeterError(null);
+      return;
+    }
+
+    setLastMeterError(parsed < lastKnownMeter ? `Starting KM must be >= ${lastKnownMeter} KM` : null);
+  }, [openingMeterText, lastKnownMeter]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const openingMeter = parseNumericField(openingMeterText);
+      if (openingMeter === lastSyncedOpeningRef.current) return;
+      lastSyncedOpeningRef.current = openingMeter;
+      updateTrip({ openingMeter });
+    }, FIELD_SYNC_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  }, [openingMeterText, updateTrip]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const advanceAmount = parseNumericField(advanceText);
+      if (advanceAmount === lastSyncedAdvanceRef.current) return;
+      lastSyncedAdvanceRef.current = advanceAmount;
+      updateTrip({ advanceAmount });
+    }, FIELD_SYNC_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  }, [advanceText, updateTrip]);
+
+  useEffect(() => {
+    if (advanceText.trim() === "") {
+      setAdvanceError("Advance amount is required");
+      return;
+    }
+
+    const amount = Number(advanceText);
+    if (!Number.isFinite(amount)) {
       setAdvanceError("Advance amount is required");
     } else if (amount < 0) {
       setAdvanceError("Advance amount cannot be negative");
     } else {
       setAdvanceError(null);
     }
-  }, [trip.advanceAmount]);
+  }, [advanceText]);
 
-  const handleHelpersChange = (selectedOptions: any) => {
-    const helpers = selectedOptions ? selectedOptions.map((opt: any) => opt.employeeName) : [];
-    updateTrip({ helpers });
-  };
+  const handleHelpersChange = useCallback(
+    (selectedOptions: any) => {
+      const helpers = selectedOptions ? selectedOptions.map((opt: any) => opt.employeeName) : [];
+      updateTrip({ helpers });
+    },
+    [updateTrip]
+  );
 
-  const handleLoadersChange = (selectedOptions: any) => {
-    const loaders = selectedOptions ? selectedOptions.map((opt: any) => opt.employeeName) : [];
-    updateTrip({ loaders } as Partial<Trip>);
-  };
+  const handleLoadersChange = useCallback(
+    (selectedOptions: any) => {
+      const loaders = selectedOptions ? selectedOptions.map((opt: any) => opt.employeeName) : [];
+      updateTrip({ loaders } as Partial<Trip>);
+    },
+    [updateTrip]
+  );
 
-  const isBusy = headerLoading || headerSaving || isSubmitting;
-  const submitLabel = headerLoading
-    ? "Loading..."
-    : isSubmitting
+  const inputsLocked = headerLoading || isSubmitting;
+  const submitLabel = isSubmitting
     ? "Saving..."
-    : headerSaving
-    ? "Autosaving..."
     : trip.startStepSubmitted
     ? "Update Start Details"
     : "Submit Start Details";
@@ -123,69 +274,15 @@ export default function StepStart({
   const handleSubmit = async () => {
     if (lastMeterError || advanceError) return;
     setIsSubmitting(true);
+    updateTrip({
+      openingMeter: parseNumericField(openingMeterText),
+      advanceAmount: parseNumericField(advanceText),
+    });
     const success = await submitStartStep({});
     if (success) {
       setIsLocalEditing(false);
     }
     setIsSubmitting(false);
-  };
-
-  const selectStyles = {
-    menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
-    control: (base: any, state: any) => ({
-      ...base,
-      minHeight: 42,
-      borderRadius: "0.75rem",
-      borderColor: state.isFocused ? "#2563eb" : "#e2e8f0",
-      backgroundColor: "#ffffff",
-      boxShadow: state.isFocused ? "0 0 0 2px rgba(37, 99, 235, 0.15)" : "none",
-      "&:hover": { borderColor: "#cbd5e1" },
-    }),
-    singleValue: (base: any) => ({
-      ...base,
-      color: "#0f172a",
-      fontWeight: "500",
-      fontSize: "14px",
-    }),
-    multiValue: (base: any) => ({
-      ...base,
-      backgroundColor: "#f1f5f9",
-      borderRadius: "0.375rem",
-    }),
-    multiValueLabel: (base: any) => ({
-      ...base,
-      color: "#0f172a",
-      fontSize: "13px",
-      paddingLeft: "6px",
-      paddingRight: "6px",
-    }),
-    multiValueRemove: (base: any) => ({
-      ...base,
-      color: "#64748b",
-      "&:hover": { backgroundColor: "#e2e8f0", color: "#0f172a" },
-    }),
-    placeholder: (base: any) => ({
-      ...base,
-      color: "#94a3b8",
-      fontSize: "14px",
-    }),
-    option: (base: any, { isFocused, isSelected }: any) => ({
-      ...base,
-      backgroundColor: isSelected ? "#2563eb" : isFocused ? "#f8fafc" : "#ffffff",
-      color: isSelected ? "#ffffff" : "#1e293b",
-      fontSize: "13px",
-      cursor: "pointer",
-    }),
-    menu: (base: any) => ({
-      ...base,
-      backgroundColor: "#ffffff",
-      border: "1px solid #e2e8f0",
-      borderRadius: "0.75rem",
-      maxHeight: 180,
-      overflowY: "auto",
-      scrollbarWidth: "none",
-      ":-webkit-scrollbar": { display: "none" },
-    }),
   };
 
   // ─── LOCKED VIEW ───────────────────────────────────────────────────
@@ -260,7 +357,6 @@ export default function StepStart({
             <span className="text-xs font-bold text-slate-800">₹{(trip.advanceAmount ?? 0).toLocaleString()}</span>
           </div>
 
-          {/* ─── Helpers & Loaders side‑by‑side ────────────────────── */}
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <User size={12} className="text-slate-500" /> Helpers
@@ -308,25 +404,35 @@ export default function StepStart({
               TRIP START (AT OFFICE)
             </h2>
           </div>
-          {((editable && trip.startStepSubmitted) || isLocalEditing) && (
-            <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
-              Editable View
-            </span>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {headerSaveStatus === "saving" && (
+              <span className="text-[11px] text-slate-400">Saving...</span>
+            )}
+            {headerSaveStatus === "saved" && (
+              <span className="text-[11px] text-emerald-600">Saved</span>
+            )}
+            {((editable && trip.startStepSubmitted) || isLocalEditing) && (
+              <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
+                Editable View
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 sm:gap-x-6 gap-y-4 sm:gap-y-5">
-          {/* Start Time */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Clock size={14} className="text-slate-400" /> Start Time <span className="text-red-500">*</span>
             </label>
             <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
-              {trip.startTime ? trip.startTime : <span className="text-slate-400 font-normal text-xs">Auto-captured on submit</span>}
+              {trip.startTime ? (
+                trip.startTime
+              ) : (
+                <span className="text-slate-400 font-normal text-xs">Will be captured when trip starts</span>
+              )}
             </div>
           </div>
 
-          {/* Vehicle */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Truck size={14} className="text-slate-400" /> Vehicle No. <span className="text-red-500">*</span>
@@ -334,19 +440,18 @@ export default function StepStart({
             <Select<{ id: number; vehicleNumber: string }, false>
               options={vehicleOptions}
               getOptionLabel={(e) => e?.vehicleNumber || ""}
-              getOptionValue={(e) => e?.vehicleNumber || ""}
-              value={vehicleOptions.find((o) => o.id === trip.vehicleId) || null}
-              onChange={(e) => setTrip((prev) => ({ ...prev, vehicleId: e?.id || 0, vehicleNo: e?.vehicleNumber || "" }))}
+              getOptionValue={(e) => String(e?.id ?? "")}
+              value={selectedVehicle}
+              onChange={(e) => updateTrip({ vehicleId: e?.id || 0, vehicleNo: e?.vehicleNumber || "" })}
               className="mt-1 text-sm"
               placeholder="Search Vehicle..."
               isSearchable
-              isDisabled={isBusy}
+              isDisabled={inputsLocked}
               styles={selectStyles}
               menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
             />
           </div>
 
-          {/* Supervisor */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <User size={14} className="text-slate-400" /> Supervisor <span className="text-red-500">*</span>
@@ -355,18 +460,17 @@ export default function StepStart({
               options={supervisorOptions}
               getOptionLabel={(e) => e?.employeeName || ""}
               getOptionValue={(e) => e?.employeeName || ""}
-              value={supervisorOptions.find((o) => o.employeeName === trip.supervisorName) || null}
-              onChange={(e) => setTrip((prev) => ({ ...prev, supervisorId: e?.id || 0, supervisorName: e?.employeeName || "" }))}
+              value={selectedSupervisor}
+              onChange={(e) => updateTrip({ supervisorId: e?.id || 0, supervisorName: e?.employeeName || "" })}
               className="mt-1 text-sm"
               placeholder="Search Supervisor..."
               isSearchable
-              isDisabled={isBusy}
+              isDisabled={inputsLocked}
               styles={selectStyles}
               menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
             />
           </div>
 
-          {/* Driver */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <User size={14} className="text-slate-400" /> Driver <span className="text-red-500">*</span>
@@ -375,37 +479,31 @@ export default function StepStart({
               options={driverOptions}
               getOptionLabel={(e) => e?.employeeName || ""}
               getOptionValue={(e) => e?.employeeName || ""}
-              value={driverOptions.find((o) => o.employeeName === trip.driverName) || null}
-              onChange={(e) => setTrip((prev) => ({ ...prev, driverId: e?.id || 0, driverName: e?.employeeName || "" }))}
+              value={selectedDriver}
+              onChange={(e) => updateTrip({ driverId: e?.id || 0, driverName: e?.employeeName || "" })}
               className="mt-1 text-sm"
               placeholder="Search Driver..."
               isSearchable
-              isDisabled={isBusy}
+              isDisabled={inputsLocked}
               styles={selectStyles}
               menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
             />
           </div>
 
-          {/* Starting Meter */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Gauge size={14} className="text-slate-400" /> Starting Meter (KM) <span className="text-red-500">*</span>
             </label>
             <input
-              type="number"
+              type="text"
               inputMode="decimal"
-              step="0.01"
-              min="0"
-              value={trip.openingMeter === 0 ? "" : trip.openingMeter ?? ""}
-              onChange={(e) => {
-                const val = e.target.value;
-                updateTrip({ openingMeter: val === "" ? undefined : Number(val) });
-              }}
+              value={openingMeterText}
+              onChange={(e) => setOpeningMeterText(e.target.value)}
               onWheel={(e) => e.currentTarget.blur()}
-              disabled={isBusy}
+              disabled={inputsLocked}
               className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
-                lastMeterError 
-                  ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10" 
+                lastMeterError
+                  ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
                   : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
               }`}
               placeholder="0.00"
@@ -422,26 +520,20 @@ export default function StepStart({
             )}
           </div>
 
-          {/* Advance Amount */}
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <Wallet size={14} className="text-slate-400" /> Advance / Expenses <span className="text-red-500">*</span>
             </label>
             <input
-              type="number"
+              type="text"
               inputMode="decimal"
-              step="0.01"
-              min="0"
-              value={trip.advanceAmount === 0 ? "" : trip.advanceAmount ?? ""}
-              onChange={(e) => {
-                const val = e.target.value;
-                updateTrip({ advanceAmount: val === "" ? 0 : Number(val) });
-              }}
+              value={advanceText}
+              onChange={(e) => setAdvanceText(e.target.value)}
               onWheel={(e) => e.currentTarget.blur()}
-              disabled={isBusy}
+              disabled={inputsLocked}
               className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
-                advanceError 
-                  ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10" 
+                advanceError
+                  ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
                   : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
               }`}
               placeholder="0.00"
@@ -453,7 +545,6 @@ export default function StepStart({
             )}
           </div>
 
-          {/* ─── Helpers & Loaders side‑by‑side ────────────────────── */}
           <div className="col-span-1 sm:col-span-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -464,13 +555,13 @@ export default function StepStart({
                   options={helperOptions}
                   getOptionLabel={(e) => e?.employeeName || ""}
                   getOptionValue={(e) => e?.employeeName || ""}
-                  value={helperOptions.filter((o) => trip.helpers?.includes(o.employeeName)) || []}
+                  value={selectedHelpers}
                   onChange={handleHelpersChange}
                   className="mt-1 text-sm"
                   placeholder="Select helpers..."
                   isMulti
                   isSearchable
-                  isDisabled={isBusy}
+                  isDisabled={inputsLocked}
                   styles={selectStyles}
                   menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
                 />
@@ -484,13 +575,13 @@ export default function StepStart({
                   options={loaderOptions}
                   getOptionLabel={(e) => e?.employeeName || ""}
                   getOptionValue={(e) => e?.employeeName || ""}
-                  value={loaderOptions.filter((o) => (trip as any).loaders?.includes(o.employeeName)) || []}
+                  value={selectedLoaders}
                   onChange={handleLoadersChange}
                   className="mt-1 text-sm"
                   placeholder="Select loaders..."
                   isMulti
                   isSearchable
-                  isDisabled={isBusy}
+                  isDisabled={inputsLocked}
                   styles={selectStyles}
                   menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
                 />
@@ -504,6 +595,7 @@ export default function StepStart({
             <button
               type="button"
               onClick={clearForm}
+              disabled={inputsLocked}
               className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all active:scale-95"
             >
               Clear Form
@@ -526,7 +618,7 @@ export default function StepStart({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isBusy || !!lastMeterError || !!advanceError}
+            disabled={inputsLocked || !!lastMeterError || !!advanceError}
             className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed shadow-sm transition-all active:scale-95"
           >
             {submitLabel}
@@ -536,3 +628,5 @@ export default function StepStart({
     </>
   );
 }
+
+export default React.memo(StepStart);
