@@ -4,13 +4,13 @@ import React, { useState, useEffect } from "react";
 import { Clock, User, Truck, Gauge, Wallet, Pencil, X, AlertCircle } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
-import { tripService } from "../services/tripService";
+import { fetchLastClosingMeter } from "../services/tripHeaderApiService";
 
 interface Props {
   trip: Trip;
   setTrip: React.Dispatch<React.SetStateAction<Trip>>;
   updateTrip: (updates: Partial<Trip>) => void;
-  submitStartStep: (data: Partial<Trip>) => boolean;
+  submitStartStep: (data: Partial<Trip>) => Promise<boolean>;
   vehicleOptions: { id: number; vehicleNumber: string }[];
   employeeOptions: { id: number; employeeName: string; department: string }[];
   editable?: boolean;
@@ -48,28 +48,40 @@ export default function StepStart({
       setLastMeterError(null);
       return;
     }
-    const allTrips = tripService.getAll();
-    const vehicleTrips = allTrips
-      .filter((t) => t.vehicleId === trip.vehicleId && t.id !== trip.id && t.closingMeter > 0)
-      .sort((a, b) => new Date(b.tripDate).getTime() - new Date(a.tripDate).getTime());
 
-    if (vehicleTrips.length > 0) {
-      const lastTrip = vehicleTrips[0];
-      const lastMeter = lastTrip.closingMeter;
-      setLastKnownMeter(lastMeter);
-      if (trip.openingMeter !== undefined && trip.openingMeter !== null && trip.openingMeter !== 0) {
-        if (trip.openingMeter < lastMeter) {
-          setLastMeterError(`Starting KM must be >= ${lastMeter} KM`);
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const last = await fetchLastClosingMeter(trip.vehicleId);
+        if (cancelled) return;
+
+        if (last && last.closingMeter > 0) {
+          setLastKnownMeter(last.closingMeter);
+          if (trip.openingMeter !== undefined && trip.openingMeter !== null && trip.openingMeter !== 0) {
+            if (trip.openingMeter < last.closingMeter) {
+              setLastMeterError(`Starting KM must be >= ${last.closingMeter} KM`);
+            } else {
+              setLastMeterError(null);
+            }
+          } else {
+            setLastMeterError(null);
+          }
         } else {
+          setLastKnownMeter(null);
           setLastMeterError(null);
         }
-      } else {
-        setLastMeterError(null);
+      } catch {
+        if (!cancelled) {
+          setLastKnownMeter(null);
+          setLastMeterError(null);
+        }
       }
-    } else {
-      setLastKnownMeter(null);
-      setLastMeterError(null);
-    }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [trip.vehicleId, trip.openingMeter, trip.id]);
 
   useEffect(() => {
@@ -96,7 +108,7 @@ export default function StepStart({
   const handleSubmit = async () => {
     if (lastMeterError || advanceError) return;
     setIsSubmitting(true);
-    const success = submitStartStep({});
+    const success = await submitStartStep({});
     if (success) {
       setIsLocalEditing(false);
     }

@@ -1,6 +1,7 @@
 // src/modules/operations/vehicle-trips/pages/TripEntryPage.tsx
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AlertCircle, FileText, Plus } from "lucide-react";
 
 // --- Components ---
@@ -42,6 +43,8 @@ const getYesterday = () => {
 };
 
 function TripEntryPage({ embedded = false }: TripEntryPageProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { vehicles } = useVehicles();
   const { employees } = useEmployees();
   const { farms } = useFarms();
@@ -66,7 +69,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     submitDeliveriesStep,
     submitEndTrip,
     loadTrip,
+    loadTripFromApi,
     clearTrip,
+    ensureDraft,
+    setStartTrip,
+    updateStartTrip,
+    registerTripIdCallback,
   } = useTripEntry(showNotification);
 
   const [rows, setRows] = useState<ShopDelivery[]>([]);
@@ -77,6 +85,39 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const [showEntryPrompt, setShowEntryPrompt] = useState(true);
   const isManualSelect = useRef(false);
   const endStepJustSubmitted = useRef(false);
+  const resumeAttempted = useRef(false);
+
+  const syncTripIdInUrl = useCallback(
+    (id: number) => {
+      const params = new URLSearchParams(location.search);
+      params.set("tab", "trip-entry");
+      if (id > 0) {
+        params.set("tripId", String(id));
+      } else {
+        params.delete("tripId");
+      }
+      navigate(`/operations?${params.toString()}`, { replace: true });
+    },
+    [location.search, navigate]
+  );
+
+  useEffect(() => {
+    registerTripIdCallback(syncTripIdInUrl);
+  }, [registerTripIdCallback, syncTripIdInUrl]);
+
+  useEffect(() => {
+    if (resumeAttempted.current) return;
+    const params = new URLSearchParams(location.search);
+    const tripIdParam = params.get("tripId");
+    if (!tripIdParam) return;
+
+    const id = Number(tripIdParam);
+    if (!Number.isFinite(id) || id <= 0) return;
+
+    resumeAttempted.current = true;
+    setShowEntryPrompt(false);
+    void loadTripFromApi(id);
+  }, [location.search, loadTripFromApi]);
 
   // ─── Handle status change with fuel bill validation ────────────
   const handleStatusChange = (trip: Trip, status: "Pending" | "Completed") => {
@@ -153,6 +194,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setShowEntryPrompt(true);
     setViewStepIndex(0);
     setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
+    syncTripIdInUrl(0);
     showNotification("✨ Cleared.", "info");
   };
 
@@ -228,8 +270,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       return (
         <StepStart
           trip={trip}
-          setTrip={setTrip}
-          updateTrip={updateTrip}
+          setTrip={setStartTrip}
+          updateTrip={updateStartTrip}
           submitStartStep={submitStartStep}
           vehicleOptions={vehicleOpts}
           employeeOptions={employeeOpts}
@@ -332,7 +374,10 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
               </p>
             </div>
             <button
-              onClick={() => setShowEntryPrompt(false)}
+              onClick={() => {
+                setShowEntryPrompt(false);
+                void ensureDraft();
+              }}
               className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"
             >
               <Plus size={18} />
