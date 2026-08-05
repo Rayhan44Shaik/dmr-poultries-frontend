@@ -17,12 +17,14 @@ import {
 
 type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void;
 
-/** After autosave, patch only server metadata — never overwrite in-progress form fields. */
+/**
+ * Patch identity metadata only. `updatedAt` lives in the save service snapshot;
+ * putting it into React state on every autosave would rerender the entire page.
+ */
 function patchTripMetadata(prev: Trip, sync: SaveSyncMetadata): Trip {
   if (
     prev.id === sync.id &&
     prev.tripNo === sync.tripNo &&
-    prev.updatedAt === sync.updatedAt &&
     prev.createdAt === sync.createdAt
   ) {
     return prev;
@@ -32,14 +34,18 @@ function patchTripMetadata(prev: Trip, sync: SaveSyncMetadata): Trip {
     ...prev,
     id: sync.id || prev.id,
     tripNo: sync.tripNo || prev.tripNo,
-    updatedAt: sync.updatedAt || prev.updatedAt,
     createdAt: sync.createdAt || prev.createdAt,
   };
 }
 
-export function useTripEntry(showNotification?: NotificationFn) {
+export function useTripEntry(
+  showNotification?: NotificationFn,
+  onTripsChanged?: () => void
+) {
   const notifyRef = useRef(showNotification);
   notifyRef.current = showNotification;
+  const onTripsChangedRef = useRef(onTripsChanged);
+  onTripsChangedRef.current = onTripsChanged;
 
   const emptyTrip = (): Trip => ({
     id: 0,
@@ -118,6 +124,7 @@ export function useTripEntry(showNotification?: NotificationFn) {
       onMetadataSaved: (metadata) => {
         setTrip((prev) => {
           const patched = patchTripMetadata(prev, metadata);
+          if (patched === prev) return prev;
           if (!prev.startStepSubmitted) {
             return { ...patched, startTime: "" };
           }
@@ -130,6 +137,7 @@ export function useTripEntry(showNotification?: NotificationFn) {
         saveServiceRef.current?.setPersistSnapshotFromTrip(loaded);
         if (loaded.id > 0) {
           tripService.upsert(loaded);
+          onTripsChangedRef.current?.();
         }
       },
     });

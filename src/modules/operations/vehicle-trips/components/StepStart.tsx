@@ -349,18 +349,32 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
   value,
   disabled,
   lastKnownMeter,
-  lastMeterError,
   onChange,
+  onValidationChange,
 }: {
   value: string;
   disabled: boolean;
   lastKnownMeter: number | null;
-  lastMeterError: string | null;
   onChange: (value: string) => void;
+  onValidationChange: (error: string | null) => void;
 }) {
+  const [text, setText] = useState(value);
+  useEffect(() => setText(value), [value]);
+  const error = useMemo(() => {
+    if (text.trim() === "") return "Opening KM is required";
+    const parsed = Number(text);
+    if (!Number.isFinite(parsed)) return "Valid Opening KM is required";
+    if (lastKnownMeter !== null && parsed < lastKnownMeter) {
+      return `Starting KM must be >= ${lastKnownMeter} KM`;
+    }
+    return null;
+  }, [lastKnownMeter, text]);
+  useEffect(() => onValidationChange(error), [error, onValidationChange]);
   const handleChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
-      onChange(event.target.value);
+      const next = event.target.value;
+      setText(next);
+      onChange(next);
     },
     [onChange]
   );
@@ -376,25 +390,25 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
       <input
         type="text"
         inputMode="decimal"
-        value={value}
+        value={text}
         onChange={handleChange}
         onWheel={handleWheel}
         disabled={disabled}
         className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
-          lastMeterError
+          error
             ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
             : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
         }`}
         placeholder="0.00"
       />
-      {lastKnownMeter !== null && !lastMeterError && (
+      {lastKnownMeter !== null && !error && (
         <p className="text-[11px] text-slate-400 mt-1">
           Last recorded closing meter: <span className="text-slate-700 font-semibold">{lastKnownMeter} KM</span>
         </p>
       )}
-      {lastMeterError && (
+      {error && (
         <p className="text-[11px] text-red-500 mt-1 font-medium flex items-center gap-1">
-          <AlertCircle size={12} /> {lastMeterError}
+          <AlertCircle size={12} /> {error}
         </p>
       )}
     </div>
@@ -404,17 +418,29 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
 const AdvanceField = React.memo(function AdvanceField({
   value,
   disabled,
-  advanceError,
   onChange,
+  onValidationChange,
 }: {
   value: string;
   disabled: boolean;
-  advanceError: string | null;
   onChange: (value: string) => void;
+  onValidationChange: (error: string | null) => void;
 }) {
+  const [text, setText] = useState(value);
+  useEffect(() => setText(value), [value]);
+  const error = useMemo(() => {
+    if (text.trim() === "") return "Advance amount is required";
+    const amount = Number(text);
+    if (!Number.isFinite(amount)) return "Valid Advance amount is required";
+    if (amount < 0) return "Advance amount cannot be negative";
+    return null;
+  }, [text]);
+  useEffect(() => onValidationChange(error), [error, onValidationChange]);
   const handleChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
-      onChange(event.target.value);
+      const next = event.target.value;
+      setText(next);
+      onChange(next);
     },
     [onChange]
   );
@@ -430,20 +456,20 @@ const AdvanceField = React.memo(function AdvanceField({
       <input
         type="text"
         inputMode="decimal"
-        value={value}
+        value={text}
         onChange={handleChange}
         onWheel={handleWheel}
         disabled={disabled}
         className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
-          advanceError
+          error
             ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
             : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
         }`}
         placeholder="0.00"
       />
-      {advanceError && (
+      {error && (
         <p className="text-[11px] text-red-500 mt-1 font-medium flex items-center gap-1">
-          <AlertCircle size={12} /> {advanceError}
+          <AlertCircle size={12} /> {error}
         </p>
       )}
     </div>
@@ -560,13 +586,13 @@ function StepStart({
   const [form, setForm] = useState<Step1FormState>(() => tripToForm(loadSnapshot));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(false);
-  const [lastMeterError, setLastMeterError] = useState<string | null>(null);
   const [lastKnownMeter, setLastKnownMeter] = useState<number | null>(null);
-  const [advanceError, setAdvanceError] = useState<string | null>(null);
 
   const loadedTripIdRef = useRef(tripId);
   const formRef = useRef(form);
-  formRef.current = form;
+  const openingErrorRef = useRef<string | null>("Opening KM is required");
+  const advanceErrorRef = useRef<string | null>("Advance amount is required");
+  const numericSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const driverOptions = useMemo(
     () => employeeOptions.filter((employee) => employee.department === "Driver"),
@@ -591,6 +617,7 @@ function StepStart({
     loadedTripIdRef.current = tripId;
 
     if (tripId === 0 && previousId !== 0) {
+      formRef.current = EMPTY_FORM;
       setForm(EMPTY_FORM);
       return;
     }
@@ -600,7 +627,9 @@ function StepStart({
     }
 
     if (previousId !== tripId) {
-      setForm(tripToForm(loadSnapshot));
+      const loadedForm = tripToForm(loadSnapshot);
+      formRef.current = loadedForm;
+      setForm(loadedForm);
     }
   }, [tripId, loadSnapshot]);
 
@@ -627,39 +656,6 @@ function StepStart({
   }, [form.vehicleId]);
 
   useEffect(() => {
-    if (lastKnownMeter === null) {
-      setLastMeterError(null);
-      return;
-    }
-    const val = form.openingMeterText.trim();
-    if (val === "") {
-      setLastMeterError(null);
-      return;
-    }
-    const parsed = Number(val);
-    if (!Number.isFinite(parsed)) {
-      setLastMeterError(null);
-      return;
-    }
-    setLastMeterError(parsed < lastKnownMeter ? `Starting KM must be >= ${lastKnownMeter} KM` : null);
-  }, [form.openingMeterText, lastKnownMeter]);
-
-  useEffect(() => {
-    if (form.advanceText.trim() === "") {
-      setAdvanceError("Advance amount is required");
-      return;
-    }
-    const amount = Number(form.advanceText);
-    if (!Number.isFinite(amount)) {
-      setAdvanceError("Advance amount is required");
-    } else if (amount < 0) {
-      setAdvanceError("Advance amount cannot be negative");
-    } else {
-      setAdvanceError(null);
-    }
-  }, [form.advanceText]);
-
-  useEffect(() => {
     const timer = setTimeout(() => {
       updateTrip(formToTripPatch(formRef.current));
     }, FIELD_SYNC_DELAY_MS);
@@ -667,8 +663,29 @@ function StepStart({
   }, [form, updateTrip]);
 
   const patchForm = useCallback((updates: Partial<Step1FormState>) => {
-    setForm((prev) => ({ ...prev, ...updates }));
+    const next = { ...formRef.current, ...updates };
+    formRef.current = next;
+    setForm(next);
   }, []);
+
+  const patchNumericField = useCallback(
+    (updates: Partial<Step1FormState>) => {
+      formRef.current = { ...formRef.current, ...updates };
+      if (numericSyncTimerRef.current) clearTimeout(numericSyncTimerRef.current);
+      numericSyncTimerRef.current = setTimeout(() => {
+        updateTrip(formToTripPatch(formRef.current));
+        numericSyncTimerRef.current = null;
+      }, FIELD_SYNC_DELAY_MS);
+    },
+    [updateTrip]
+  );
+
+  useEffect(
+    () => () => {
+      if (numericSyncTimerRef.current) clearTimeout(numericSyncTimerRef.current);
+    },
+    []
+  );
 
   const handleVehicleSelect = useCallback((vehicleId: number, vehicleNo: string) => {
     patchForm({ vehicleId, vehicleNo });
@@ -691,12 +708,20 @@ function StepStart({
   }, [patchForm]);
 
   const handleOpeningMeterChange = useCallback((openingMeterText: string) => {
-    patchForm({ openingMeterText });
-  }, [patchForm]);
+    patchNumericField({ openingMeterText });
+  }, [patchNumericField]);
 
   const handleAdvanceChange = useCallback((advanceText: string) => {
-    patchForm({ advanceText });
-  }, [patchForm]);
+    patchNumericField({ advanceText });
+  }, [patchNumericField]);
+
+  const handleOpeningValidation = useCallback((error: string | null) => {
+    openingErrorRef.current = error;
+  }, []);
+
+  const handleAdvanceValidation = useCallback((error: string | null) => {
+    advanceErrorRef.current = error;
+  }, []);
 
   const handleFormKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "Enter") return;
@@ -718,13 +743,17 @@ function StepStart({
     : "Submit Start Details";
 
   const handleSubmit = useCallback(async () => {
-    if (lastMeterError || advanceError) return;
+    if (openingErrorRef.current || advanceErrorRef.current) return;
+    if (numericSyncTimerRef.current) {
+      clearTimeout(numericSyncTimerRef.current);
+      numericSyncTimerRef.current = null;
+    }
     setIsSubmitting(true);
     updateTrip(formToTripPatch(formRef.current));
     const success = await submitStartStep({});
     if (success) setIsLocalEditing(false);
     setIsSubmitting(false);
-  }, [advanceError, lastMeterError, submitStartStep, updateTrip]);
+  }, [submitStartStep, updateTrip]);
 
   if (startStepSubmitted && !editable && !isLocalEditing) {
     return (
@@ -873,14 +902,14 @@ function StepStart({
             value={form.openingMeterText}
             disabled={inputsLocked}
             lastKnownMeter={lastKnownMeter}
-            lastMeterError={lastMeterError}
             onChange={handleOpeningMeterChange}
+            onValidationChange={handleOpeningValidation}
           />
           <AdvanceField
             value={form.advanceText}
             disabled={inputsLocked}
-            advanceError={advanceError}
             onChange={handleAdvanceChange}
+            onValidationChange={handleAdvanceValidation}
           />
           <div className="col-span-1 sm:col-span-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -925,7 +954,7 @@ function StepStart({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={inputsLocked || !!lastMeterError || !!advanceError}
+            disabled={inputsLocked}
             className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed shadow-sm transition-all active:scale-95"
           >
             {submitLabel}

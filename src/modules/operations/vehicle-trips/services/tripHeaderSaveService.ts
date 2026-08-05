@@ -224,10 +224,16 @@ export function createStep1HeaderSaveService(
     options.onNotify?.(message, type);
   };
 
-  const applyPersistSuccess = (saved: Trip): SaveSyncMetadata => {
+  const applyPersistSuccess = (
+    saved: Trip,
+    persistedDiff: Record<string, unknown>
+  ): SaveSyncMetadata => {
     const sync = extractSyncMetadata(saved);
     persistSnapshot = {
-      payload: toStep1Payload(localTrip),
+      payload: {
+        ...(persistSnapshot?.payload ?? {}),
+        ...persistedDiff,
+      },
       updatedAt: sync.updatedAt || null,
       version: sync.version,
     };
@@ -256,8 +262,9 @@ export function createStep1HeaderSaveService(
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        const saved = await saveStep1Header(id, localTrip, diff);
-        const sync = applyPersistSuccess(saved);
+        const tripAtRequestTime = { ...localTrip };
+        const saved = await saveStep1Header(id, tripAtRequestTime, diff);
+        const sync = applyPersistSuccess(saved, diff);
         markSaved();
         return { ok: true, kind, trip: saved, sync };
       } catch (err) {

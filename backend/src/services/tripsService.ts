@@ -369,6 +369,33 @@ async function findOpenStep1Draft(client: Client, tripDate: string) {
   return result.rowCount ? result.rows[0] : null;
 }
 
+function validateStartStepPayload(body: Partial<Trip> & Record<string, unknown>): void {
+  const missing: string[] = [];
+  if (!body.vehicleId || !body.vehicleNo) missing.push("Vehicle");
+  if (!body.driverId || !body.driverName) missing.push("Driver");
+  if (!body.supervisorId || !body.supervisorName) missing.push("Supervisor");
+  if (!Array.isArray(body.helpers) || body.helpers.length === 0) missing.push("Helper");
+  if (!Array.isArray(body.loaders) || body.loaders.length === 0) missing.push("Loader");
+  if (
+    !hasOwn(body, "openingMeter") ||
+    body.openingMeter == null ||
+    !Number.isFinite(Number(body.openingMeter))
+  ) {
+    missing.push("Opening KM");
+  }
+  if (
+    !hasOwn(body, "advanceAmount") ||
+    body.advanceAmount == null ||
+    !Number.isFinite(Number(body.advanceAmount)) ||
+    Number(body.advanceAmount) < 0
+  ) {
+    missing.push("Advance");
+  }
+  if (missing.length > 0) {
+    throw new AppError(400, `Missing or invalid Step 1 fields: ${missing.join(", ")}`);
+  }
+}
+
 async function replaceBoxes(client: Client, tripId: number, boxes: BoxDetail[] = []) {
   await client.query(`DELETE FROM trip_boxes WHERE trip_id = $1`, [tripId]);
   for (const box of boxes) {
@@ -653,6 +680,10 @@ export const tripsService = {
     step: "start" | "farm" | "pickup" | "deliveries" | "expenses",
     body: Partial<Trip> & Record<string, unknown>
   ) {
+    if (step === "start") {
+      validateStartStepPayload(body);
+    }
+
     const flags: Record<string, Partial<Trip>> = {
       start: { startStepSubmitted: true, status: (body.status as TripStatus) ?? "Draft" },
       farm: { farmStepSubmitted: true },

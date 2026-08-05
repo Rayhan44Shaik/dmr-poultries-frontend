@@ -81,7 +81,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setStartTrip,
     updateStartTrip,
     registerTripIdCallback,
-  } = useTripEntry(showNotification);
+  } = useTripEntry(showNotification, refreshTrips);
 
   const [rows, setRows] = useState<ShopDelivery[]>([]);
   const [viewTrip, setViewTrip] = useState<Trip | null>(null);
