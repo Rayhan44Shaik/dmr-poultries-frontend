@@ -29,6 +29,7 @@ import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
 // --- Services ---
 import { fuelExpenseService } from "../../fuel-expenses/services/fuelExpenseService";
+import { tripService } from "../services/tripService";
 
 // --- Utils ---
 import { canEditItem } from "../../../../utils/dateUtils";
@@ -89,8 +90,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const [showEntryPrompt, setShowEntryPrompt] = useState(true);
   const isManualSelect = useRef(false);
   const endStepJustSubmitted = useRef(false);
-  const resumeAttempted = useRef(false);
   const skipAutoResumeRef = useRef(false);
+  const initialResumeDoneRef = useRef(false);
 
   const syncTripIdInUrl = useCallback(
     (id: number) => {
@@ -116,25 +117,40 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
     if (tripIdParam) {
       const id = Number(tripIdParam);
-      if (!Number.isFinite(id) || id <= 0) return;
-      if (trip.id === id) return;
+      if (!Number.isFinite(id) || id <= 0) {
+        setShowEntryPrompt(true);
+        return;
+      }
+      if (trip.id === id) {
+        setShowEntryPrompt(false);
+        return;
+      }
 
-      resumeAttempted.current = true;
+      initialResumeDoneRef.current = true;
       setShowEntryPrompt(false);
-      void loadTripFromApi(id);
+      void (async () => {
+        const loaded = await loadTripFromApi(id);
+        if (!loaded) {
+          setShowEntryPrompt(true);
+          syncTripIdInUrl(0);
+        }
+      })();
       return;
     }
 
-    if (skipAutoResumeRef.current || resumeAttempted.current) return;
-    resumeAttempted.current = true;
+    if (skipAutoResumeRef.current) {
+      setShowEntryPrompt(true);
+      return;
+    }
+
+    if (initialResumeDoneRef.current) return;
+    initialResumeDoneRef.current = true;
 
     void (async () => {
       const resumed = await resumeLatestDraft();
-      if (resumed) {
-        setShowEntryPrompt(false);
-      }
+      setShowEntryPrompt(!resumed);
     })();
-  }, [location.search, loadTripFromApi, resumeLatestDraft, trip.id]);
+  }, [location.search, loadTripFromApi, resumeLatestDraft, syncTripIdInUrl, trip.id]);
 
   // ─── Handle status change with fuel bill validation ────────────
   const handleStatusChange = (trip: Trip, status: "Pending" | "Completed") => {
@@ -209,6 +225,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   useEffect(() => {
     refreshTrips();
+    if (import.meta.env.DEV) {
+      console.log("[Step1] Recent Trips Response", tripService.getRecent(5));
+    }
   }, [
     trip.id,
     trip.tripNo,
@@ -223,6 +242,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   const clearForm = () => {
     skipAutoResumeRef.current = true;
+    initialResumeDoneRef.current = true;
     clearTrip();
     setRows([]);
     setShowEntryPrompt(true);
