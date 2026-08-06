@@ -75,10 +75,19 @@ export function validateStartStep(trip: Trip): { valid: boolean; errors: string[
   if (!trip.driverId || !trip.driverName) errors.push("Please select a Driver.");
   if (!trip.supervisorId || !trip.supervisorName) errors.push("Please select a Supervisor.");
   if (!trip.helpers || trip.helpers.length === 0) errors.push("Please add at least one Helper.");
+  if (!trip.loaders || trip.loaders.length === 0) errors.push("Please add at least one Loader.");
   
   // 🔹 UPDATED: Allows 0.00 to pass. The validation logic is now handled in the component's useEffect.
   if (trip.openingMeter === undefined || trip.openingMeter === null || isNaN(trip.openingMeter)) {
     errors.push("Valid Opening Meter reading is required.");
+  }
+  if (
+    trip.advanceAmount === undefined ||
+    trip.advanceAmount === null ||
+    isNaN(trip.advanceAmount) ||
+    trip.advanceAmount < 0
+  ) {
+    errors.push("Valid Advance amount is required.");
   }
   return { valid: errors.length === 0, errors };
 }

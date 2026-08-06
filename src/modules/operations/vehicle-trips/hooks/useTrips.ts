@@ -1,6 +1,6 @@
 // src/modules/operations/vehicle-trips/hooks/useTrips.ts
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { Trip } from "../types/trip";
 import { tripService } from "../services/tripService";
 import { renumberPendingTripsForDate } from "../services/tripFormService";
@@ -8,7 +8,13 @@ import { renumberPendingTripsForDate } from "../services/tripFormService";
 type NotificationFn = (message: string, type?: "success" | "error" | "info") => void;
 
 export default function useTrips(showNotification?: NotificationFn) {
-  const notify = showNotification || ((msg: string) => alert(msg));
+  const notifyRef = useRef(showNotification);
+  notifyRef.current = showNotification;
+  const notify = useCallback(
+    (message: string, type?: "success" | "error" | "info") =>
+      notifyRef.current ? notifyRef.current(message, type) : alert(message),
+    []
+  );
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All");
@@ -24,7 +30,23 @@ export default function useTrips(showNotification?: NotificationFn) {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  const refreshTrips = () => setTrips(tripService.getAll() || []);
+  const refreshTrips = useCallback(() => {
+    const next = tripService.getAll() || [];
+    setTrips((previous) => {
+      if (
+        previous.length === next.length &&
+        previous.every(
+          (trip, index) =>
+            trip.id === next[index]?.id &&
+            trip.updatedAt === next[index]?.updatedAt &&
+            trip.status === next[index]?.status
+        )
+      ) {
+        return previous;
+      }
+      return next;
+    });
+  }, []);
 
   const resetFilters = () => {
     setSearch("");

@@ -1,6 +1,6 @@
 // src/modules/operations/vehicle-trips/components/TripViewModal.tsx
 
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { X, FileText, Download, Pencil, UserCheck } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -132,10 +132,26 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
   const noop = () => {};
   const noopDispatch = () => {};
 
+  const noopSubscribeSaveStatus = useCallback((_listener: () => void) => () => {}, []);
+  const getIdleSaveStatus = useCallback(() => "idle" as const, []);
+
   // ─── Render the selected step ──────────────────────────────────
   const renderViewStep = () => {
     if (viewStepIndex === 0 && isStartCompleted) {
-      return <StepStart trip={trip} setTrip={noopDispatch} updateTrip={noop} submitStartStep={() => false} vehicleOptions={[]} employeeOptions={[]} />;
+      return (
+        <StepStart
+          tripId={trip.id}
+          startTime={trip.startTime}
+          startStepSubmitted={trip.startStepSubmitted}
+          loadSnapshot={trip}
+          updateTrip={noop}
+          submitStartStep={async () => false}
+          vehicleOptions={[]}
+          employeeOptions={[]}
+          subscribeHeaderSaveStatus={noopSubscribeSaveStatus}
+          getHeaderSaveStatus={getIdleSaveStatus}
+        />
+      );
     }
     if (viewStepIndex === 1 && isFarmCompleted) {
       return <StepFarm trip={trip} setTrip={noopDispatch} updateTrip={noop} submitFarmStep={() => false} farms={[]} />;

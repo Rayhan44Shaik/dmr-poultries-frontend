@@ -99,6 +99,35 @@ export const tripService = {
   },
 
   /* ================================
+     Upsert Trip (create or replace by id)
+  ================================ */
+
+  upsert(trip: Trip): Trip {
+    const trips = loadTrips();
+    const index = trips.findIndex((existing) => existing.id === trip.id);
+    const now = new Date().toISOString();
+
+    if (index === -1) {
+      const created: Trip = {
+        ...trip,
+        createdAt: trip.createdAt ?? now,
+        updatedAt: trip.updatedAt ?? now,
+      };
+      trips.push(created);
+      saveTrips(trips);
+      return created;
+    }
+
+    trips[index] = {
+      ...trips[index],
+      ...trip,
+      updatedAt: trip.updatedAt ?? now,
+    };
+    saveTrips(trips);
+    return trips[index];
+  },
+
+  /* ================================
      Update Trip
   ================================ */
 

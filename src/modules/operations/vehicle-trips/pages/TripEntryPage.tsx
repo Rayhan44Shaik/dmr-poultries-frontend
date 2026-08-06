@@ -1,6 +1,7 @@
 // src/modules/operations/vehicle-trips/pages/TripEntryPage.tsx
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AlertCircle, FileText, Plus } from "lucide-react";
 
 // --- Components ---
@@ -41,7 +42,11 @@ const getYesterday = () => {
   return date.toISOString().split("T")[0];
 };
 
+type EntryScreen = "loading" | "prompt" | "form";
+
 function TripEntryPage({ embedded = false }: TripEntryPageProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { vehicles } = useVehicles();
   const { employees } = useEmployees();
   const { farms } = useFarms();
@@ -57,6 +62,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     isEditing,
     setIsEditing,
     endStepSubmitted,
+    headerLoading,
+    subscribeHeaderSaveStatus,
+    getHeaderSaveStatus,
     updateTrip,
     updateDeliveries,
     updateBoxDetails,
@@ -66,17 +74,82 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     submitDeliveriesStep,
     submitEndTrip,
     loadTrip,
+    loadTripFromApi,
+    restoreLocalDraft,
     clearTrip,
-  } = useTripEntry(showNotification);
+    setStartTrip,
+    updateStartTrip,
+    registerTripIdCallback,
+  } = useTripEntry(showNotification, refreshTrips);
 
   const [rows, setRows] = useState<ShopDelivery[]>([]);
   const [viewTrip, setViewTrip] = useState<Trip | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
   const [viewStepIndex, setViewStepIndex] = useState(0);
 
-  const [showEntryPrompt, setShowEntryPrompt] = useState(true);
+  const [entryScreen, setEntryScreen] = useState<EntryScreen>("loading");
   const isManualSelect = useRef(false);
   const endStepJustSubmitted = useRef(false);
+  const skipAutoResumeRef = useRef(false);
+  const initialResumeDoneRef = useRef(false);
+
+  const syncTripIdInUrl = useCallback(
+    (id: number) => {
+      const params = new URLSearchParams(location.search);
+      params.set("tab", "trip-entry");
+      if (id > 0) {
+        params.set("tripId", String(id));
+      } else {
+        params.delete("tripId");
+      }
+      navigate(`/operations?${params.toString()}`, { replace: true });
+    },
+    [location.search, navigate]
+  );
+
+  useEffect(() => {
+    registerTripIdCallback(syncTripIdInUrl);
+  }, [registerTripIdCallback, syncTripIdInUrl]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tripIdParam = params.get("tripId");
+
+    if (tripIdParam) {
+      const id = Number(tripIdParam);
+      if (!Number.isFinite(id) || id <= 0) {
+        setEntryScreen("prompt");
+        return;
+      }
+      if (trip.id === id) {
+        setEntryScreen("form");
+        return;
+      }
+
+      initialResumeDoneRef.current = true;
+      setEntryScreen("loading");
+      void (async () => {
+        const loaded = await loadTripFromApi(id);
+        setEntryScreen(loaded ? "form" : "prompt");
+        if (!loaded) syncTripIdInUrl(0);
+      })();
+      return;
+    }
+
+    if (skipAutoResumeRef.current) {
+      setEntryScreen("prompt");
+      return;
+    }
+
+    if (initialResumeDoneRef.current) return;
+    initialResumeDoneRef.current = true;
+
+    setEntryScreen("loading");
+    void (async () => {
+      const restored = restoreLocalDraft();
+      setEntryScreen(restored ? "form" : "prompt");
+    })();
+  }, [location.search, loadTripFromApi, restoreLocalDraft, syncTripIdInUrl, trip.id]);
 
   // ─── Handle status change with fuel bill validation ────────────
   const handleStatusChange = (trip: Trip, status: "Pending" | "Completed") => {
@@ -105,7 +178,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   };
 
   const handleEdit = (selectedTrip: Trip) => {
-    setShowEntryPrompt(false);
+    setEntryScreen("form");
     let targetStep = 0;
     
     if (selectedTrip.status === "Completed" || selectedTrip.status === "Pending" || selectedTrip.endStepSubmitted || selectedTrip.expensesStepSubmitted) targetStep = 4;
@@ -115,9 +188,15 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     else if (selectedTrip.startStepSubmitted) targetStep = 0;
 
     setViewStepIndex(targetStep);
-    loadTrip(selectedTrip);
-    setRows(selectedTrip.deliveries);
-    showNotification(`✏️ Trip ${selectedTrip.tripNo} loaded. Proceed to edit.`, "info");
+    setRows(selectedTrip.deliveries || []);
+
+    void (async () => {
+      const loadedFromApi = await loadTripFromApi(selectedTrip.id);
+      if (!loadedFromApi) {
+        loadTrip(selectedTrip);
+      }
+      showNotification(`✏️ Trip ${selectedTrip.tripNo} loaded. Proceed to edit.`, "info");
+    })();
   };
 
   const handleRefresh = () => {
@@ -145,14 +224,27 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   useEffect(() => {
     refreshTrips();
-  }, [trip]);
+  }, [
+    trip.id,
+    trip.tripNo,
+    trip.status,
+    trip.startStepSubmitted,
+    trip.farmStepSubmitted,
+    trip.pickupStepSubmitted,
+    trip.deliveryStepSubmitted,
+    trip.endStepSubmitted,
+    refreshTrips,
+  ]);
 
   const clearForm = () => {
+    skipAutoResumeRef.current = true;
+    initialResumeDoneRef.current = true;
     clearTrip();
     setRows([]);
-    setShowEntryPrompt(true);
+    setEntryScreen("prompt");
     setViewStepIndex(0);
     setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
+    syncTripIdInUrl(0);
     showNotification("✨ Cleared.", "info");
   };
 
@@ -176,8 +268,35 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         : (isFarmCompleted ? 1
           : (isStartCompleted ? 0 : 0))));
 
-  const vehicleOpts = vehicles.map((v: any) => ({ id: v.id, vehicleNumber: v.vehicleNumber }));
-  const employeeOpts = employees.map((e: any) => ({ id: e.id, employeeName: e.employeeName, department: e.department }));
+  const vehicleOpts = useMemo(
+    () => vehicles.map((v: any) => ({ id: v.id, vehicleNumber: v.vehicleNumber })),
+    [vehicles]
+  );
+  const employeeOpts = useMemo(
+    () => employees.map((e: any) => ({ id: e.id, employeeName: e.employeeName, department: e.department })),
+    [employees]
+  );
+
+  const step1LoadSnapshot = useMemo(
+    () => trip,
+    [
+      trip.id,
+      trip.startTime,
+      trip.startStepSubmitted,
+      trip.vehicleId,
+      trip.vehicleNo,
+      trip.driverId,
+      trip.driverName,
+      trip.supervisorId,
+      trip.supervisorName,
+      trip.helpers,
+      trip.loaders,
+      trip.openingMeter,
+      trip.advanceAmount,
+    ]
+  );
+
+  const handleCancelEdit = useCallback(() => setIsEditing(false), [setIsEditing]);
 
   useEffect(() => {
     if (currentStep > viewStepIndex && !isManualSelect.current) {
@@ -207,6 +326,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     }
   }, [isTripEnded, trip.status, setTrip, showNotification]);
 
+  const createSaveStatus = useSyncExternalStore(
+    subscribeHeaderSaveStatus,
+    getHeaderSaveStatus,
+    getHeaderSaveStatus
+  );
+
   const isNewTrip = trip.id === 0 || !trip.tripNo;
 
   const isEditable = (stepCompleted: boolean) => {
@@ -222,21 +347,24 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   };
 
   const renderSelectedStep = () => {
-    const onCancelEdit = () => setIsEditing(false);
-
     if (viewStepIndex === 0) {
       return (
         <StepStart
-          trip={trip}
-          setTrip={setTrip}
-          updateTrip={updateTrip}
+          tripId={trip.id}
+          startTime={trip.startTime}
+          startStepSubmitted={trip.startStepSubmitted}
+          loadSnapshot={step1LoadSnapshot}
+          updateTrip={updateStartTrip}
           submitStartStep={submitStartStep}
           vehicleOptions={vehicleOpts}
           employeeOptions={employeeOpts}
           editable={isEditable(isStartCompleted)}
           canEdit={canEditTrip}
-          onCancel={onCancelEdit}
+          onCancel={handleCancelEdit}
           clearForm={clearForm}
+          headerLoading={headerLoading}
+          subscribeHeaderSaveStatus={subscribeHeaderSaveStatus}
+          getHeaderSaveStatus={getHeaderSaveStatus}
         />
       );
     }
@@ -251,7 +379,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           farms={farms}
           editable={isEditable(isFarmCompleted)}
           canEdit={canEditTrip}
-          onCancel={onCancelEdit}
+          onCancel={handleCancelEdit}
         />
       );
     }
@@ -266,7 +394,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           updateBoxDetails={updateBoxDetails}
           editable={isEditable(isPickupCompleted)}
           canEdit={canEditTrip}
-          onCancel={onCancelEdit}
+          onCancel={handleCancelEdit}
           clearForm={clearForm}
         />
       );
@@ -286,7 +414,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           readOnly={!isEditable(isDeliveryCompleted)}
           editable={isEditable(isDeliveryCompleted)}
           canEdit={canEditTrip}
-          onCancel={onCancelEdit}
+          onCancel={handleCancelEdit}
           clearForm={clearForm}
         />
       );
@@ -300,7 +428,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           updateTrip={updateTrip}
           editable={isEditable(isTripEnded)}
           canEdit={canEditTrip}
-          onCancel={onCancelEdit}
+          onCancel={handleCancelEdit}
           {...({
             submitEndTrip,
             submitEndStep: submitEndTrip,
@@ -320,7 +448,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const content = (
     <div className="space-y-6">
       <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/80 shadow-xl shadow-slate-100/70 space-y-6">
-        {showEntryPrompt ? (
+        {entryScreen === "loading" ? (
+          <div className="flex flex-col items-center justify-center text-center py-16 space-y-4">
+            <div className="h-12 w-12 rounded-full border-2 border-blue-200 border-t-blue-600 animate-spin" />
+            <p className="text-sm text-slate-500">Loading trip...</p>
+          </div>
+        ) : entryScreen === "prompt" ? (
           <div className="flex flex-col items-center justify-center text-center py-16 space-y-6">
             <div className="h-20 w-20 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shadow-inner">
               <FileText size={36} />
@@ -332,11 +465,15 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
               </p>
             </div>
             <button
-              onClick={() => setShowEntryPrompt(false)}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"
+              onClick={() => {
+                skipAutoResumeRef.current = false;
+                setEntryScreen("form");
+              }}
+              disabled={createSaveStatus === "saving"}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-blue-300 disabled:to-indigo-300 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"
             >
               <Plus size={18} />
-              Create New Trip
+              {createSaveStatus === "saving" ? "Creating..." : "Create New Trip"}
             </button>
           </div>
         ) : (
