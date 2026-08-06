@@ -11,7 +11,6 @@ import React, {
 import { Clock, User, Truck, Gauge, Wallet, Pencil, X, AlertCircle } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
-import { fetchLastClosingMeter } from "../services/tripHeaderApiService";
 
 type VehicleOption = { id: number; vehicleNumber: string };
 type EmployeeOption = { id: number; employeeName: string; department: string };
@@ -348,13 +347,11 @@ const DriverField = React.memo(function DriverField({
 const OpeningMeterField = React.memo(function OpeningMeterField({
   value,
   disabled,
-  lastKnownMeter,
   onChange,
   onValidationChange,
 }: {
   value: string;
   disabled: boolean;
-  lastKnownMeter: number | null;
   onChange: (value: string) => void;
   onValidationChange: (error: string | null) => void;
 }) {
@@ -364,11 +361,8 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
     if (text.trim() === "") return "Opening KM is required";
     const parsed = Number(text);
     if (!Number.isFinite(parsed)) return "Valid Opening KM is required";
-    if (lastKnownMeter !== null && parsed < lastKnownMeter) {
-      return `Starting KM must be >= ${lastKnownMeter} KM`;
-    }
     return null;
-  }, [lastKnownMeter, text]);
+  }, [text]);
   useEffect(() => onValidationChange(error), [error, onValidationChange]);
   const handleChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -401,11 +395,6 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
         }`}
         placeholder="0.00"
       />
-      {lastKnownMeter !== null && !error && (
-        <p className="text-[11px] text-slate-400 mt-1">
-          Last recorded closing meter: <span className="text-slate-700 font-semibold">{lastKnownMeter} KM</span>
-        </p>
-      )}
       {error && (
         <p className="text-[11px] text-red-500 mt-1 font-medium flex items-center gap-1">
           <AlertCircle size={12} /> {error}
@@ -586,7 +575,6 @@ function StepStart({
   const [form, setForm] = useState<Step1FormState>(() => tripToForm(loadSnapshot));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(false);
-  const [lastKnownMeter, setLastKnownMeter] = useState<number | null>(null);
 
   const loadedTripIdRef = useRef(tripId);
   const formRef = useRef(form);
@@ -632,28 +620,6 @@ function StepStart({
       setForm(loadedForm);
     }
   }, [tripId, loadSnapshot]);
-
-  useEffect(() => {
-    if (!form.vehicleId) {
-      setLastKnownMeter(null);
-      return;
-    }
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const last = await fetchLastClosingMeter(form.vehicleId);
-        if (cancelled) return;
-        setLastKnownMeter(last && last.closingMeter > 0 ? last.closingMeter : null);
-      } catch {
-        if (!cancelled) setLastKnownMeter(null);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [form.vehicleId]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -901,7 +867,6 @@ function StepStart({
           <OpeningMeterField
             value={form.openingMeterText}
             disabled={inputsLocked}
-            lastKnownMeter={lastKnownMeter}
             onChange={handleOpeningMeterChange}
             onValidationChange={handleOpeningValidation}
           />

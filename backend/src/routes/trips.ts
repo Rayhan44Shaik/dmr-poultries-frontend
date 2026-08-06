@@ -33,17 +33,11 @@ tripsRouter.get(
   })
 );
 
+/** Final Step 1 submission. Browser drafts are never sent to the backend. */
 tripsRouter.post(
-  "/",
+  "/steps/start",
   asyncHandler(async (req, res) => {
-    res.status(201).json(await tripsService.createDraft(req.body));
-  })
-);
-
-tripsRouter.put(
-  "/:id",
-  asyncHandler(async (req, res) => {
-    res.json(await tripsService.save(Number(req.params.id), req.body));
+    res.status(201).json(await tripsService.createSubmittedStartStep(req.body));
   })
 );
 
@@ -53,6 +47,9 @@ tripsRouter.post(
     const step = req.params.step;
     if (!["start", "farm", "pickup", "deliveries", "expenses"].includes(step)) {
       throw new AppError(400, "Invalid step. Use start|farm|pickup|deliveries|expenses");
+    }
+    if (step === "start") {
+      throw new AppError(410, "Step 1 is submitted only through POST /api/trips/steps/start");
     }
     res.json(
       await tripsService.submitStep(

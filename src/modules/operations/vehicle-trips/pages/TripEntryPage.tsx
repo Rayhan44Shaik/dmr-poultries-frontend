@@ -75,9 +75,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     submitEndTrip,
     loadTrip,
     loadTripFromApi,
-    resumeLatestDraft,
+    restoreLocalDraft,
     clearTrip,
-    ensureDraft,
     setStartTrip,
     updateStartTrip,
     registerTripIdCallback,
@@ -147,10 +146,10 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
     setEntryScreen("loading");
     void (async () => {
-      const resumed = await resumeLatestDraft();
-      setEntryScreen(resumed ? "form" : "prompt");
+      const restored = restoreLocalDraft();
+      setEntryScreen(restored ? "form" : "prompt");
     })();
-  }, [location.search, loadTripFromApi, resumeLatestDraft, syncTripIdInUrl, trip.id]);
+  }, [location.search, loadTripFromApi, restoreLocalDraft, syncTripIdInUrl, trip.id]);
 
   // ─── Handle status change with fuel bill validation ────────────
   const handleStatusChange = (trip: Trip, status: "Pending" | "Completed") => {
@@ -469,7 +468,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
               onClick={() => {
                 skipAutoResumeRef.current = false;
                 setEntryScreen("form");
-                void ensureDraft();
               }}
               disabled={createSaveStatus === "saving"}
               className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-blue-300 disabled:to-indigo-300 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"

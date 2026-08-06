@@ -1,11 +1,7 @@
-import { useState, useRef, useCallback, useEffect, type Dispatch, type SetStateAction } from "react";
+import { useState, useRef, useCallback, type Dispatch, type SetStateAction } from "react";
 import type { Trip, ShopDelivery, BoxDetail, TripStatus } from "../types/trip";
 import { tripService } from "../services/tripService";
-import {
-  createStep1HeaderSaveService,
-  type Step1HeaderSaveService,
-  type SaveSyncMetadata,
-} from "../services/tripHeaderSaveService";
+import { handleApiError, loadTripById, submitStep1 } from "../services/tripHeaderApiService";
 import {
   calculateAvgWeight,
   validateStartStep,
@@ -16,27 +12,7 @@ import {
 } from "../services/tripFormService";
 
 type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void;
-
-/**
- * Patch identity metadata only. `updatedAt` lives in the save service snapshot;
- * putting it into React state on every autosave would rerender the entire page.
- */
-function patchTripMetadata(prev: Trip, sync: SaveSyncMetadata): Trip {
-  if (
-    prev.id === sync.id &&
-    prev.tripNo === sync.tripNo &&
-    prev.createdAt === sync.createdAt
-  ) {
-    return prev;
-  }
-
-  return {
-    ...prev,
-    id: sync.id || prev.id,
-    tripNo: sync.tripNo || prev.tripNo,
-    createdAt: sync.createdAt || prev.createdAt,
-  };
-}
+const STEP1_DRAFT_KEY = "trip-step1-draft";
 
 export function useTripEntry(
   showNotification?: NotificationFn,
@@ -105,69 +81,60 @@ export function useTripEntry(
     weight: 0
   });
 
-  const [trip, setTrip] = useState<Trip>(emptyTrip());
+  const readLocalDraft = (): Trip => {
+    try {
+      const stored = localStorage.getItem(STEP1_DRAFT_KEY);
+      if (!stored) return emptyTrip();
+      const parsed = JSON.parse(stored) as Partial<Trip>;
+      return {
+        ...emptyTrip(),
+        ...parsed,
+        id: 0,
+        tripNo: "",
+        startTime: "",
+        startStepSubmitted: false,
+        helpers: parsed.helpers ?? [],
+        loaders: parsed.loaders ?? [],
+      };
+    } catch {
+      return emptyTrip();
+    }
+  };
+
+  const writeLocalDraft = (next: Trip) => {
+    localStorage.setItem(
+      STEP1_DRAFT_KEY,
+      JSON.stringify({
+        ...next,
+        id: 0,
+        tripNo: "",
+        startTime: "",
+        startStepSubmitted: false,
+      })
+    );
+  };
+
+  const [trip, setTrip] = useState<Trip>(readLocalDraft);
   const [isEditing, setIsEditing] = useState(false);
   const [endStepSubmitted, setEndStepSubmitted] = useState<boolean>(false);
   const [headerLoading, setHeaderLoading] = useState(false);
 
   const onTripIdAssignedRef = useRef<((id: number) => void) | null>(null);
-  const saveServiceRef = useRef<Step1HeaderSaveService | null>(null);
 
   const syncEndStep = (tripData: Trip) => {
     setEndStepSubmitted(tripData.endStepSubmitted || false);
   };
 
-  if (!saveServiceRef.current) {
-    saveServiceRef.current = createStep1HeaderSaveService(emptyTrip(), {
-      onNotify: (message, type) => notifyRef.current?.(message, type),
-      onTripIdAssigned: (id) => onTripIdAssignedRef.current?.(id),
-      onMetadataSaved: (metadata) => {
-        setTrip((prev) => {
-          const patched = patchTripMetadata(prev, metadata);
-          if (patched === prev) return prev;
-          if (!prev.startStepSubmitted) {
-            return { ...patched, startTime: "" };
-          }
-          return patched;
-        });
-      },
-      onTripLoaded: (loaded) => {
-        setTrip(loaded);
-        syncEndStep(loaded);
-        saveServiceRef.current?.setPersistSnapshotFromTrip(loaded);
-        if (loaded.id > 0) {
-          tripService.upsert(loaded);
-          onTripsChangedRef.current?.();
-        }
-      },
-    });
-  }
-
-  const saveService = saveServiceRef.current;
-
-  useEffect(() => {
-    saveService.updateLocalTrip((prev) =>
-      prev.tripDate === trip.tripDate ? prev : { ...prev, tripDate: trip.tripDate }
-    );
-  }, [trip.tripDate, saveService]);
-
-  useEffect(() => {
-    return () => {
-      saveService.dispose();
-    };
-  }, [saveService]);
-
-  /** Parent can register a callback to sync trip id into the URL for refresh resume. */
+  /** URL synchronization is only used after a successful permanent submission. */
   const registerTripIdCallback = useCallback((cb: (id: number) => void) => {
     onTripIdAssignedRef.current = cb;
   }, []);
 
-  const subscribeHeaderSaveStatus = useCallback(
-    (listener: () => void) => saveService.subscribeStatus(listener),
-    [saveService]
+  const subscribeHeaderSaveStatus = useCallback(() => () => {}, []);
+  const getHeaderSaveStatus = useCallback(
+    (): "idle" | "saving" | "saved" => "idle",
+    []
   );
-
-  const getHeaderSaveStatus = useCallback(() => saveService.getStatus(), [saveService]);
 
   const calculateDeliveryKPIs = (
     deliveries: ShopDelivery[],
@@ -188,25 +155,17 @@ export function useTripEntry(
     return { totalDelBirds, totalDelWeight, totalShops, lastShop, mortalityWeight, weightLoss, survivalRate };
   };
 
-  const ensureDraft = useCallback(async (): Promise<number | null> => {
-    const id = await saveService.ensureDraft();
-    if (id) setIsEditing(true);
-    return id;
-  }, [saveService]);
-
-  const flushAutosave = useCallback(async () => {
-    await saveService.flushAutosave();
-  }, [saveService]);
-
-  /** Step 1 field updates — local save service state + debounced autosave queue. */
+  /** Step 1 edits persist only to browser localStorage until final submission. */
   const applyStartFieldChange = useCallback(
     (updater: Trip | ((prev: Trip) => Trip)) => {
-      saveService.updateLocalTrip((prev) =>
-        typeof updater === "function" ? updater(prev) : { ...prev, ...updater }
-      );
-      saveService.scheduleAutosave();
+      setTrip((previous) => {
+        const next =
+          typeof updater === "function" ? updater(previous) : { ...previous, ...updater };
+        writeLocalDraft(next);
+        return next;
+      });
     },
-    [saveService]
+    []
   );
 
   const setStartTrip: Dispatch<SetStateAction<Trip>> = useCallback(
@@ -227,34 +186,44 @@ export function useTripEntry(
     async (id: number): Promise<boolean> => {
       setHeaderLoading(true);
       try {
-        const loaded = await saveService.loadById(id);
-        if (!loaded) return false;
+        const loaded = await loadTripById(id);
+        setTrip(loaded);
+        syncEndStep(loaded);
         setIsEditing(true);
         onTripIdAssignedRef.current?.(loaded.id);
         return true;
+      } catch (error) {
+        notifyRef.current?.(handleApiError(error), "error");
+        return false;
       } finally {
         setHeaderLoading(false);
       }
     },
-    [saveService]
+    []
   );
 
-  const resumeLatestDraft = useCallback(async (): Promise<boolean> => {
-    setHeaderLoading(true);
-    try {
-      const draft = await saveService.resumeLatestDraft();
-      if (!draft?.id) return false;
+  const restoreLocalDraft = useCallback((): boolean => {
+    const restored = readLocalDraft();
+    const hasDraft = Boolean(
+      restored.vehicleId ||
+        restored.driverId ||
+        restored.supervisorId ||
+        restored.helpers.length ||
+        (restored.loaders?.length ?? 0) ||
+        restored.openingMeter ||
+        restored.advanceAmount ||
+        restored.remarks
+    );
+    if (hasDraft) {
+      setTrip(restored);
       setIsEditing(true);
-      onTripIdAssignedRef.current?.(draft.id);
-      return true;
-    } finally {
-      setHeaderLoading(false);
     }
-  }, [saveService]);
+    return hasDraft;
+  }, []);
 
   const submitStartStep = async (data: Partial<Trip> = {}): Promise<boolean> => {
     const merged = {
-      ...saveService.getLocalTrip(),
+      ...trip,
       ...data,
     };
     const validation = validateStartStep(merged as Trip);
@@ -263,22 +232,28 @@ export function useTripEntry(
       return false;
     }
 
-    const result = await saveService.submitStep({
-      ...data,
-      startTime: new Date().toLocaleString(),
-    });
-
-    if (result.ok) {
+    setHeaderLoading(true);
+    try {
+      const submitted = await submitStep1({
+        ...merged,
+        startTime: new Date().toLocaleString(),
+      });
+      localStorage.removeItem(STEP1_DRAFT_KEY);
+      setTrip(submitted);
+      tripService.upsert(submitted);
+      onTripsChangedRef.current?.();
+      onTripIdAssignedRef.current?.(submitted.id);
       notifyRef.current?.(
-        isEditing
-          ? `✅ Step 1 updated successfully.`
-          : `✅ Step 1 completed successfully. Moving to Step 2...`,
+        `✅ Step 1 completed successfully. Moving to Step 2...`,
         "success"
       );
       return true;
+    } catch (error) {
+      notifyRef.current?.(handleApiError(error), "error");
+      return false;
+    } finally {
+      setHeaderLoading(false);
     }
-
-    return false;
   };
 
   const submitFarmStep = (data: Partial<Trip>): boolean => {
@@ -454,16 +429,13 @@ export function useTripEntry(
       boxDetails: tripToLoad.boxDetails || []
     };
     setTrip(normalized);
-    saveService.setLocalTrip(normalized);
-    saveService.clearPersistSnapshot();
     setIsEditing(true);
     setEndStepSubmitted(tripToLoad.endStepSubmitted === true);
   };
 
   const clearTrip = () => {
-    saveService.reset();
     const fresh = emptyTrip();
-    saveService.setLocalTrip(fresh);
+    localStorage.removeItem(STEP1_DRAFT_KEY);
     setTrip(fresh);
     setIsEditing(false);
     setEndStepSubmitted(false);
@@ -488,12 +460,10 @@ export function useTripEntry(
     submitEndTrip,
     loadTrip,
     loadTripFromApi,
-    resumeLatestDraft,
+    restoreLocalDraft,
     clearTrip,
-    ensureDraft,
     setStartTrip,
     updateStartTrip,
-    flushAutosave,
     registerTripIdCallback,
   };
 }

@@ -6,9 +6,7 @@
 import {
   apiGet,
   apiPost,
-  apiPut,
   handleApiError,
-  ApiError,
 } from "../../../../api";
 import type { Trip, TripStatus } from "../types/trip";
 
@@ -207,111 +205,21 @@ export function toStep1Payload(trip: Partial<Trip>): Record<string, unknown> {
   };
 }
 
-function arraysEqual(a: unknown, b: unknown): boolean {
-  if (!Array.isArray(a) || !Array.isArray(b)) return a === b;
-  if (a.length !== b.length) return false;
-  return a.every((value, index) => value === b[index]);
-}
-
-/** Return only Step 1 fields that differ from the last persisted snapshot. */
-export function diffStep1Payload(
-  trip: Partial<Trip>,
-  lastPersisted: Record<string, unknown> | null
-): Record<string, unknown> | null {
-  const current = toStep1Payload(trip);
-  if (!lastPersisted) return current;
-
-  const diff: Record<string, unknown> = {};
-  let hasChanges = false;
-
-  for (const [key, value] of Object.entries(current)) {
-    const previous = lastPersisted[key];
-    if (Array.isArray(value) || Array.isArray(previous)) {
-      if (!arraysEqual(value, previous)) {
-        diff[key] = value;
-        hasChanges = true;
-      }
-      continue;
-    }
-    if (value !== previous) {
-      diff[key] = value;
-      hasChanges = true;
-    }
-  }
-
-  return hasChanges ? diff : null;
-}
-
-function normalizeTripsList(data: unknown): ApiTripRecord[] {
-  if (Array.isArray(data)) return data;
-  if (data && typeof data === "object") {
-    const record = data as Record<string, unknown>;
-    if (Array.isArray(record.data)) return record.data as ApiTripRecord[];
-    if (Array.isArray(record.trips)) return record.trips as ApiTripRecord[];
-  }
-  return [];
-}
-
-function sortTripsNewestFirst(trips: Trip[]): Trip[] {
-  return [...trips].sort((a, b) => {
-    const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
-    const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
-    return bTime - aTime;
-  });
-}
-
-/** GET /api/trips?status=Draft — list open drafts (optional trip-date filter). */
-export async function fetchDraftTrips(tripDate?: string): Promise<Trip[]> {
-  const params = new URLSearchParams({ status: "Draft" });
-  if (tripDate) {
-    params.set("fromDate", tripDate);
-    params.set("toDate", tripDate);
-  }
-  const { data } = await apiGet<unknown>(`${TRIPS_PATH}?${params.toString()}`);
-  return normalizeTripsList(data).map((record) => mapApiTripToTrip(record));
-}
-
-/** Resume the most recent Draft whose Step 1 is not yet submitted. */
-export async function fetchLatestOpenStep1Draft(tripDate?: string): Promise<Trip | null> {
-  const drafts = await fetchDraftTrips(tripDate);
-  const open = sortTripsNewestFirst(
-    drafts.filter((trip) => trip.status === "Draft" && !trip.startStepSubmitted)
-  );
-  return open[0] ?? null;
-}
-
-/** POST /api/trips — create empty Draft; backend assigns trip_no and id. */
-export async function createDraft(tripDate: string): Promise<Trip> {
-  const { data } = await apiPost<ApiTripRecord>(TRIPS_PATH, { tripDate });
-  return mapApiTripToTrip(data);
-}
-
 /** GET /api/trips/:id — load full trip (Step 1 resume). */
 export async function loadTripById(id: number): Promise<Trip> {
   const { data } = await apiGet<ApiTripRecord>(`${TRIPS_PATH}/${id}`);
   return mapApiTripToTrip(data);
 }
 
-/** PUT /api/trips/:id — autosave changed Step 1 header fields on existing draft. */
-export async function saveStep1Header(
-  id: number,
-  trip: Partial<Trip>,
-  changedFields?: Record<string, unknown> | null
-): Promise<Trip> {
-  const payload = changedFields ?? toStep1Payload(trip);
-  const { data } = await apiPut<ApiTripRecord>(`${TRIPS_PATH}/${id}`, payload);
-  return mapApiTripToTrip(data, trip as Trip);
-}
-
-/** POST /api/trips/:id/steps/start — validate & lock Step 1. */
-export async function submitStep1(id: number, trip: Partial<Trip>): Promise<Trip> {
+/** Single final Step 1 submission. No draft is created or updated before this request. */
+export async function submitStep1(trip: Partial<Trip>): Promise<Trip> {
   const payload = {
     ...toStep1Payload(trip),
     startStepSubmitted: true,
     startTime: trip.startTime || new Date().toISOString(),
     status: "Draft" as TripStatus,
   };
-  const { data } = await apiPost<ApiTripRecord>(`${TRIPS_PATH}/${id}/steps/start`, payload);
+  const { data } = await apiPost<ApiTripRecord>(`${TRIPS_PATH}/steps/start`, payload);
   return mapApiTripToTrip(data, trip as Trip);
 }
 
@@ -322,10 +230,6 @@ export async function fetchLastClosingMeter(vehicleId: number): Promise<LastClos
   );
   if (!data || data.closingMeter == null) return null;
   return data;
-}
-
-export function isConflictError(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 409;
 }
 
 export { handleApiError };

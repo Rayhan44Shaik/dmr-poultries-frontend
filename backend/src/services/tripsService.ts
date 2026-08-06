@@ -355,20 +355,6 @@ async function applyTripPatch(
   await client.query(`UPDATE trips SET ${setParts.join(", ")} WHERE id = $1`, params);
 }
 
-async function findOpenStep1Draft(client: Client, tripDate: string) {
-  const result = await client.query(
-    `SELECT * FROM trips
-     WHERE trip_date = $1
-       AND status = 'Draft'
-       AND start_step_submitted = FALSE
-       AND deleted = FALSE
-     ORDER BY updated_at DESC NULLS LAST, id DESC
-     LIMIT 1`,
-    [tripDate]
-  );
-  return result.rowCount ? result.rows[0] : null;
-}
-
 function validateStartStepPayload(body: Partial<Trip> & Record<string, unknown>): void {
   const missing: string[] = [];
   if (!body.vehicleId || !body.vehicleNo) missing.push("Vehicle");
@@ -592,28 +578,24 @@ export const tripsService = {
     });
   },
 
-  async createDraft(body: Partial<Trip> = {}) {
-    return withTransaction(async (client) => {
-      const tripDate =
-        dateOnly(body.tripDate) ??
-        new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-
-      await client.query(`SELECT pg_advisory_xact_lock(hashtext('create_draft_' || $1))`, [
-        tripDate,
-      ]);
-
-      const existing = await findOpenStep1Draft(client, tripDate);
-      if (existing) {
-        return hydrateTrip(client, existing);
-      }
-
-      const tripNo = body.tripNo || (await generateTripNo(client, tripDate));
-
-      const inserted = await client.query(
-        `INSERT INTO trips (trip_no, trip_date, status) VALUES ($1,$2,'Draft') RETURNING *`,
-        [tripNo, tripDate]
+  /** Persist a complete, validated Step 1 as one permanent transaction. */
+  async createSubmittedStartStep(body: Partial<Trip> & Record<string, unknown>) {
+    validateStartStepPayload(body);
+    const previousMeter = await this.lastClosingMeter(Number(body.vehicleId));
+    if (
+      previousMeter &&
+      Number(body.openingMeter) < previousMeter.closingMeter
+    ) {
+      throw new AppError(
+        400,
+        `Starting KM must be >= ${previousMeter.closingMeter} KM`
       );
-      return hydrateTrip(client, inserted.rows[0]);
+    }
+    return this.save(null, {
+      ...body,
+      startStepSubmitted: true,
+      startTime: body.startTime ?? new Date().toISOString(),
+      status: (body.status as TripStatus) ?? "Draft",
     });
   },
 
