@@ -24,7 +24,9 @@ function FarmTable({ farms, onEdit, onDelete }: FarmTableProps) {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200 bg-white">
-          {farms.map((farm) => (
+          {[...farms]
+            .sort((a, b) => (a.farmNo > b.farmNo ? 1 : -1))
+            .map((farm) => (
             <tr key={farm.id} className="hover:bg-slate-50 transition-colors">
               <td className="px-4 py-3 text-sm text-slate-600">{farm.farmNo}</td>
               <td className="px-4 py-3 text-sm font-medium text-slate-800">{farm.farmName}</td>

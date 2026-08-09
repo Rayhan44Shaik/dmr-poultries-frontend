@@ -24,7 +24,9 @@ function BankTable({ banks, onEdit, onDelete }: BankTableProps) {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200 bg-white">
-          {banks.map((bank) => (
+          {[...banks]
+            .sort((a, b) => (a.bankNo > b.bankNo ? 1 : -1))
+            .map((bank) => (
             <tr key={bank.id} className="hover:bg-slate-50 transition-colors">
               <td className="px-4 py-3 text-sm text-slate-600">{bank.bankNo}</td>
               <td className="px-4 py-3 text-sm font-medium text-slate-800">{bank.bankName}</td>

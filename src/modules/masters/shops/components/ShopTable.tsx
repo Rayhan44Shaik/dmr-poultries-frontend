@@ -23,7 +23,9 @@ function ShopTable({ shops, onEdit, onDelete }: ShopTableProps) {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200 bg-white">
-          {shops.map((shop) => (
+          {[...shops]
+            .sort((a, b) => (a.shopNo > b.shopNo ? 1 : -1))
+            .map((shop) => (
             <tr key={shop.id} className="hover:bg-slate-50 transition-colors">
               <td className="px-4 py-3 text-sm text-slate-600">{shop.shopNo}</td>
               <td className="px-4 py-3 text-sm font-medium text-slate-800">{shop.shopName}</td>
