@@ -1,9 +1,9 @@
 import { useState, useRef, useCallback, type Dispatch, type SetStateAction } from "react";
 import type { Trip, ShopDelivery, BoxDetail, TripStatus } from "../types/trip";
-import { tripService } from "../services/tripService";
 import {
   handleApiError,
   loadTripById,
+  saveTripStepProgress,
   submitStep1,
   submitTripStep,
 } from "../services/tripHeaderApiService";
@@ -87,6 +87,7 @@ export function useTripEntry(
   });
 
   const [trip, setTrip] = useState<Trip>(emptyTrip);
+  const [savedTrip, setSavedTrip] = useState<Trip>(emptyTrip);
   const tripRef = useRef(trip);
   tripRef.current = trip;
 
@@ -168,6 +169,7 @@ export function useTripEntry(
     try {
       const loaded = await loadTripById(id);
       setTrip(loaded);
+      setSavedTrip(loaded);
       tripRef.current = loaded;
       syncEndStep(loaded);
       setIsEditing(true);
@@ -181,12 +183,12 @@ export function useTripEntry(
     }
   }, []);
 
-  const applySubmittedTrip = (submitted: Trip) => {
-    setTrip(submitted);
-    tripRef.current = submitted;
-    syncEndStep(submitted);
+  const applySavedTrip = (saved: Trip) => {
+    setTrip(saved);
+    setSavedTrip(saved);
+    tripRef.current = saved;
+    syncEndStep(saved);
     setIsEditing(true);
-    tripService.upsert(submitted);
     onTripsChangedRef.current?.();
   };
 
@@ -207,15 +209,11 @@ export function useTripEntry(
         startTime: new Date().toLocaleString(),
       });
 
-      applySubmittedTrip(submitted);
+      applySavedTrip(submitted);
       onStep1SuccessRef.current?.(submitted);
-      notifyRef.current?.(
-        `✅ Step 1 completed successfully. Moving to Step 2...`,
-        "success"
-      );
       return true;
     } catch (error) {
-      notifyRef.current?.(handleApiError(error), "error");
+      console.error("Unable to submit start details:", error);
       return false;
     } finally {
       setHeaderLoading(false);
@@ -246,16 +244,73 @@ export function useTripEntry(
         ...updatedData,
         farmStepSubmitted: true,
       });
-      applySubmittedTrip(submitted);
-      notifyRef.current?.(`✅ Step 2 completed successfully. Moving to Step 3...`, "success");
+      applySavedTrip(submitted);
       return true;
     } catch (error) {
-      notifyRef.current?.(handleApiError(error), "error");
+      console.error("Unable to submit farm details:", error);
       return false;
     } finally {
       setHeaderLoading(false);
     }
   };
+
+  const saveStepProgress = async (
+    step: "start" | "farm" | "pickup" | "deliveries" | "expenses",
+    data: Partial<Trip> = {}
+  ): Promise<boolean> => {
+    const current = { ...tripRef.current, ...data } as Trip;
+    if (!current.id) {
+      notifyRef.current?.("Submit Start Details before saving later progress.", "error");
+      return false;
+    }
+
+    const validation =
+      step === "start"
+        ? validateStartStep(current)
+        : step === "farm"
+          ? validateFarmStep(current)
+          : step === "pickup"
+            ? validatePickupStep(current)
+            : step === "expenses"
+              ? validateEndStep(current)
+              : { valid: Boolean(current.deliveries?.length), errors: ["Please add at least one delivery."] };
+    if (!validation.valid) {
+      notifyRef.current?.(validation.errors[0], "error");
+      return false;
+    }
+
+    const label = {
+      start: "Start",
+      farm: "Farm",
+      pickup: "Pickup",
+      deliveries: "Delivery",
+      expenses: "End",
+    }[step];
+    setHeaderLoading(true);
+    try {
+      const saved = await saveTripStepProgress(current.id, step, current);
+      applySavedTrip(saved);
+      return true;
+    } catch (error) {
+      console.error(`Unable to save ${label.toLowerCase()} details:`, error);
+      return false;
+    } finally {
+      setHeaderLoading(false);
+    }
+  };
+
+  const saveStartProgress = (data: Partial<Trip> = {}) =>
+    saveStepProgress("start", data);
+  const saveFarmProgress = (data: Partial<Trip> = {}) =>
+    saveStepProgress("farm", data);
+  const savePickupProgress = (data: Partial<Trip> = {}) =>
+    saveStepProgress("pickup", data);
+  const saveDeliveriesProgress = (rows: ShopDelivery[]) => {
+    updateDeliveries(rows);
+    return saveStepProgress("deliveries", { deliveries: rows });
+  };
+  const saveEndProgress = (data: Partial<Trip> = {}) =>
+    saveStepProgress("expenses", data);
 
   /** Pickup edits stay in React state until Submit — no localStorage, no backend. */
   const updateBoxDetails = (
@@ -316,11 +371,10 @@ export function useTripEntry(
         pickupLoadTime,
         pickupStepSubmitted: true,
       });
-      applySubmittedTrip(submitted);
-      notifyRef.current?.(`✅ Step 3 completed successfully. Moving to Step 4...`, "success");
+      applySavedTrip(submitted);
       return true;
     } catch (error) {
-      notifyRef.current?.(handleApiError(error), "error");
+      console.error("Unable to submit pickup details:", error);
       return false;
     } finally {
       setHeaderLoading(false);
@@ -347,11 +401,10 @@ export function useTripEntry(
         ...current,
         deliveryStepSubmitted: true,
       });
-      applySubmittedTrip(submitted);
-      notifyRef.current?.(`✅ Deliveries locked. Proceed to End Trip.`, "success");
+      applySavedTrip(submitted);
       return true;
     } catch (error) {
-      notifyRef.current?.(handleApiError(error), "error");
+      console.error("Unable to submit delivery details:", error);
       return false;
     } finally {
       setHeaderLoading(false);
@@ -443,15 +496,11 @@ export function useTripEntry(
         endStepSubmitted: true,
         expensesStepSubmitted: true,
       });
-      applySubmittedTrip(submitted);
+      applySavedTrip(submitted);
       setEndStepSubmitted(true);
-      notifyRef.current?.(
-        `✅ Trip ${submitted.tripNo} completed! Awaiting approval.`,
-        "success"
-      );
       return true;
     } catch (error) {
-      notifyRef.current?.(handleApiError(error), "error");
+      console.error("Unable to submit end details:", error);
       return false;
     } finally {
       setHeaderLoading(false);
@@ -466,6 +515,7 @@ export function useTripEntry(
       boxDetails: tripToLoad.boxDetails || [],
     };
     setTrip(normalized);
+    setSavedTrip(normalized);
     tripRef.current = normalized;
     setIsEditing(true);
     setEndStepSubmitted(tripToLoad.endStepSubmitted === true);
@@ -474,6 +524,7 @@ export function useTripEntry(
   const clearTrip = () => {
     const fresh = emptyTrip();
     setTrip(fresh);
+    setSavedTrip(fresh);
     tripRef.current = fresh;
     setIsEditing(false);
     setEndStepSubmitted(false);
@@ -481,6 +532,7 @@ export function useTripEntry(
 
   return {
     trip,
+    savedTrip,
     setTrip,
     isEditing,
     setIsEditing,
@@ -492,10 +544,15 @@ export function useTripEntry(
     updateDeliveries,
     updateBoxDetails,
     submitStartStep,
+    saveStartProgress,
     submitFarmStep,
+    saveFarmProgress,
     submitPickupStep,
+    savePickupProgress,
     submitDeliveriesStep,
+    saveDeliveriesProgress,
     submitEndTrip,
+    saveEndProgress,
     loadTrip,
     loadTripFromApi,
     clearTrip,

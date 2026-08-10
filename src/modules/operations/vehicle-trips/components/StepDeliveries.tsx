@@ -17,6 +17,7 @@ interface Props {
   trip: Trip;
   updateDeliveries: (rows: ShopDelivery[], persistToStorage?: boolean, silent?: boolean) => void;
   submitDeliveriesStep: () => boolean | Promise<boolean>;
+  saveDeliveriesProgress?: (rows: ShopDelivery[]) => Promise<boolean>;
   clearForm: () => void;
   readOnly?: boolean;
   editable?: boolean;
@@ -33,6 +34,7 @@ export default function StepDeliveries({
   trip,
   updateDeliveries,
   submitDeliveriesStep,
+  saveDeliveriesProgress,
   clearForm,
   readOnly = false,
   editable = false,
@@ -232,6 +234,13 @@ export default function StepDeliveries({
           supervisorPhone=""
           tripDate={trip.tripDate}
           updateDeliveries={updateDeliveries}
+          saveDeliveries={saveDeliveriesProgress ? async () => {
+            if (!canLock) {
+              alert(`⚠️ ${validationResult.reason}`);
+              return false;
+            }
+            return saveDeliveriesProgress(rows);
+          } : undefined}
           submitDeliveries={handleLockDeliveries}
           onClose={handleCancelWizard}
         />

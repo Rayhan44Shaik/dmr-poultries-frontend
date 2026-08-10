@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from "react";
-import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Pencil, X, Loader2, Scale, Check, AlertTriangle } from "lucide-react";
+import React, { useState } from "react";
+import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Pencil, Loader2, Scale } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
+import { WizardActionBar, WizardStepNotice } from "./WizardStepUI";
 
 interface Props {
   trip: Trip;
   setTrip: React.Dispatch<React.SetStateAction<Trip>>;
   updateTrip: (updates: Partial<Trip>) => void;
   submitFarmStep: (data: Partial<Trip>) => boolean | Promise<boolean>;
+  saveFarmProgress?: (data: Partial<Trip>) => Promise<boolean>;
+  hasUnsavedChanges?: boolean;
   farms: any[];
   editable?: boolean;
   canEdit?: boolean;
@@ -15,31 +18,13 @@ interface Props {
   showNotification?: (message: string, type?: "info" | "success" | "error" | "warning") => void;
 }
 
-// ─── Toast notification ──────────────────────────────────────────────
-function Toast({ message, type = "success", onClose }: { message: string; type?: "success" | "error" | "warning"; onClose: () => void }) {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 2500);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-
-  const bgColor = type === "success" ? "bg-slate-800" : type === "warning" ? "bg-amber-600" : "bg-red-600";
-  const icon = type === "success" ? <Check size={18} className="text-white" /> : <AlertTriangle size={18} className="text-white" />;
-
-  return (
-    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
-      <div className={`${bgColor} text-white px-6 py-3 rounded-2xl shadow-lg flex items-center gap-3 border border-white/20`}>
-        {icon}
-        <span className="font-medium text-sm">{message}</span>
-      </div>
-    </div>
-  );
-}
-
 export default function StepFarm({
   trip,
   setTrip,
   updateTrip,
   submitFarmStep,
+  saveFarmProgress,
+  hasUnsavedChanges = false,
   farms,
   editable = false,
   canEdit = false,
@@ -188,10 +173,21 @@ export default function StepFarm({
       const success = await submitFarmStep({});
       if (success) {
         setIsLocalEditing(false);
-        notify("Destination details saved successfully.", "success");
+        notify("Farm details submitted successfully.", "success");
       } else {
         notify("Submission failed. Please try again.", "error");
       }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveProgress = async () => {
+    if (!saveFarmProgress) return;
+    setIsSubmitting(true);
+    try {
+      const success = await saveFarmProgress({});
+      if (success) notify("Farm details saved successfully.", "success");
     } finally {
       setIsSubmitting(false);
     }
@@ -453,52 +449,20 @@ export default function StepFarm({
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-slate-100">
-          {(!trip.farmStepSubmitted || editable || isLocalEditing) && (
-            <button
-              type="button"
-              onClick={() => {
-                if (!trip.farmStepSubmitted && onCancel) onCancel();
-                else if (editable && onCancel) onCancel();
-                else setIsLocalEditing(false);
-              }}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5"
-            >
-              <X size={14} /> Cancel
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={
-              isSubmitting ||
-              !!destMeterError ||
-              !trip.sourceFarmId ||
-              !(trip as any).avgBirdWeight ||
-              (trip as any).avgBirdWeight <= 0
-            }
-            className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold text-white transition-all active:scale-95 ${
-              isSubmitting ||
-              !!destMeterError ||
-              !trip.sourceFarmId ||
-              !(trip as any).avgBirdWeight ||
-              (trip as any).avgBirdWeight <= 0
-                ? "bg-blue-400 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-700 shadow-sm"
-            }`}
-          >
-            {isSubmitting
-              ? "Saving..."
-              : trip.farmStepSubmitted
-              ? "Update Destination Details"
-              : "Submit Destination Details"}
-          </button>
-        </div>
+        <WizardStepNotice
+          notice={toast ? { type: toast.type === "warning" ? "info" : toast.type, message: toast.message } : null}
+          dirty={hasUnsavedChanges}
+        />
+        <WizardActionBar
+          onCancel={() => onCancel?.()}
+          onSave={saveFarmProgress ? handleSaveProgress : undefined}
+          onSubmit={handleSubmit}
+          busy={isSubmitting}
+          saveDisabled={!hasUnsavedChanges}
+          submitDisabled={!!destMeterError || !trip.sourceFarmId || !(trip as any).avgBirdWeight}
+          submitLabel={trip.farmStepSubmitted ? "Update Farm Details" : "Submit Farm Details"}
+        />
       </div>
-
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </>
   );
 }
