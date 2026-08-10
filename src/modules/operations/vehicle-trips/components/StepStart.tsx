@@ -8,9 +8,10 @@ import React, {
   useCallback,
   useSyncExternalStore,
 } from "react";
-import { Clock, User, Truck, Gauge, Wallet, Pencil, X, AlertCircle } from "lucide-react";
+import { Clock, User, Truck, Gauge, Wallet, Pencil, X } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
+import { validateStartStep } from "../services/tripFormService";
 
 type VehicleOption = { id: number; vehicleNumber: string };
 type EmployeeOption = { id: number; employeeName: string; department: string };
@@ -47,7 +48,6 @@ type Step1FormState = {
   advanceText: string;
 };
 
-const FIELD_SYNC_DELAY_MS = 400;
 const MENU_PORTAL_TARGET = typeof document !== "undefined" ? document.body : null;
 
 const EMPTY_FORM: Step1FormState = {
@@ -212,15 +212,36 @@ const StartTimeField = React.memo(function StartTimeField({ startTime }: { start
   );
 });
 
+function buildSelectStyles(invalid: boolean): any {
+  return {
+    ...selectStyles,
+    control: (base: any, state: any) => ({
+      ...selectStyles.control(base, state),
+      borderColor: invalid
+        ? "#ef4444"
+        : state.isFocused
+          ? "#2563eb"
+          : "#e2e8f0",
+      boxShadow: invalid
+        ? "0 0 0 2px rgba(239, 68, 68, 0.1)"
+        : state.isFocused
+          ? "0 0 0 2px rgba(37, 99, 235, 0.15)"
+          : "none",
+    }),
+  };
+}
+
 const VehicleField = React.memo(function VehicleField({
   vehicleId,
   options,
   disabled,
+  invalid,
   onSelect,
 }: {
   vehicleId: number;
   options: VehicleOption[];
   disabled: boolean;
+  invalid?: boolean;
   onSelect: (vehicleId: number, vehicleNo: string) => void;
 }) {
   const value = useMemo(
@@ -233,6 +254,7 @@ const VehicleField = React.memo(function VehicleField({
     },
     [onSelect]
   );
+  const styles = useMemo(() => buildSelectStyles(Boolean(invalid)), [invalid]);
 
   return (
     <div>
@@ -249,7 +271,7 @@ const VehicleField = React.memo(function VehicleField({
         placeholder="Search Vehicle..."
         isSearchable
         isDisabled={disabled}
-        styles={selectStyles}
+        styles={styles}
         menuPortalTarget={MENU_PORTAL_TARGET}
       />
     </div>
@@ -260,11 +282,13 @@ const SupervisorField = React.memo(function SupervisorField({
   supervisorName,
   options,
   disabled,
+  invalid,
   onSelect,
 }: {
   supervisorName: string;
   options: EmployeeOption[];
   disabled: boolean;
+  invalid?: boolean;
   onSelect: (supervisorId: number, supervisorName: string) => void;
 }) {
   const value = useMemo(
@@ -277,6 +301,7 @@ const SupervisorField = React.memo(function SupervisorField({
     },
     [onSelect]
   );
+  const styles = useMemo(() => buildSelectStyles(Boolean(invalid)), [invalid]);
 
   return (
     <div>
@@ -293,7 +318,7 @@ const SupervisorField = React.memo(function SupervisorField({
         placeholder="Search Supervisor..."
         isSearchable
         isDisabled={disabled}
-        styles={selectStyles}
+        styles={styles}
         menuPortalTarget={MENU_PORTAL_TARGET}
       />
     </div>
@@ -304,11 +329,13 @@ const DriverField = React.memo(function DriverField({
   driverName,
   options,
   disabled,
+  invalid,
   onSelect,
 }: {
   driverName: string;
   options: EmployeeOption[];
   disabled: boolean;
+  invalid?: boolean;
   onSelect: (driverId: number, driverName: string) => void;
 }) {
   const value = useMemo(
@@ -321,6 +348,7 @@ const DriverField = React.memo(function DriverField({
     },
     [onSelect]
   );
+  const styles = useMemo(() => buildSelectStyles(Boolean(invalid)), [invalid]);
 
   return (
     <div>
@@ -337,7 +365,7 @@ const DriverField = React.memo(function DriverField({
         placeholder="Search Driver..."
         isSearchable
         isDisabled={disabled}
-        styles={selectStyles}
+        styles={styles}
         menuPortalTarget={MENU_PORTAL_TARGET}
       />
     </div>
@@ -347,28 +375,17 @@ const DriverField = React.memo(function DriverField({
 const OpeningMeterField = React.memo(function OpeningMeterField({
   value,
   disabled,
+  invalid,
   onChange,
-  onValidationChange,
 }: {
   value: string;
   disabled: boolean;
+  invalid?: boolean;
   onChange: (value: string) => void;
-  onValidationChange: (error: string | null) => void;
 }) {
-  const [text, setText] = useState(value);
-  useEffect(() => setText(value), [value]);
-  const error = useMemo(() => {
-    if (text.trim() === "") return "Opening KM is required";
-    const parsed = Number(text);
-    if (!Number.isFinite(parsed)) return "Valid Opening KM is required";
-    return null;
-  }, [text]);
-  useEffect(() => onValidationChange(error), [error, onValidationChange]);
   const handleChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
-      const next = event.target.value;
-      setText(next);
-      onChange(next);
+      onChange(event.target.value);
     },
     [onChange]
   );
@@ -384,22 +401,17 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
       <input
         type="text"
         inputMode="decimal"
-        value={text}
+        value={value}
         onChange={handleChange}
         onWheel={handleWheel}
         disabled={disabled}
         className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
-          error
+          invalid
             ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
             : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
         }`}
         placeholder="0.00"
       />
-      {error && (
-        <p className="text-[11px] text-red-500 mt-1 font-medium flex items-center gap-1">
-          <AlertCircle size={12} /> {error}
-        </p>
-      )}
     </div>
   );
 });
@@ -407,29 +419,17 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
 const AdvanceField = React.memo(function AdvanceField({
   value,
   disabled,
+  invalid,
   onChange,
-  onValidationChange,
 }: {
   value: string;
   disabled: boolean;
+  invalid?: boolean;
   onChange: (value: string) => void;
-  onValidationChange: (error: string | null) => void;
 }) {
-  const [text, setText] = useState(value);
-  useEffect(() => setText(value), [value]);
-  const error = useMemo(() => {
-    if (text.trim() === "") return "Advance amount is required";
-    const amount = Number(text);
-    if (!Number.isFinite(amount)) return "Valid Advance amount is required";
-    if (amount < 0) return "Advance amount cannot be negative";
-    return null;
-  }, [text]);
-  useEffect(() => onValidationChange(error), [error, onValidationChange]);
   const handleChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
-      const next = event.target.value;
-      setText(next);
-      onChange(next);
+      onChange(event.target.value);
     },
     [onChange]
   );
@@ -445,22 +445,17 @@ const AdvanceField = React.memo(function AdvanceField({
       <input
         type="text"
         inputMode="decimal"
-        value={text}
+        value={value}
         onChange={handleChange}
         onWheel={handleWheel}
         disabled={disabled}
         className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
-          error
+          invalid
             ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
             : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
         }`}
         placeholder="0.00"
       />
-      {error && (
-        <p className="text-[11px] text-red-500 mt-1 font-medium flex items-center gap-1">
-          <AlertCircle size={12} /> {error}
-        </p>
-      )}
     </div>
   );
 });
@@ -469,11 +464,13 @@ const HelpersField = React.memo(function HelpersField({
   helpers,
   options,
   disabled,
+  invalid,
   onChange,
 }: {
   helpers: string[];
   options: EmployeeOption[];
   disabled: boolean;
+  invalid?: boolean;
   onChange: (helpers: string[]) => void;
 }) {
   const value = useMemo(
@@ -486,11 +483,12 @@ const HelpersField = React.memo(function HelpersField({
     },
     [onChange]
   );
+  const styles = useMemo(() => buildSelectStyles(Boolean(invalid)), [invalid]);
 
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-slate-400" /> Helpers
+        <User size={14} className="text-slate-400" /> Helpers <span className="text-red-500">*</span>
       </label>
       <Select<EmployeeOption, true>
         options={options}
@@ -503,7 +501,7 @@ const HelpersField = React.memo(function HelpersField({
         isMulti
         isSearchable
         isDisabled={disabled}
-        styles={selectStyles}
+        styles={styles}
         menuPortalTarget={MENU_PORTAL_TARGET}
       />
     </div>
@@ -514,11 +512,13 @@ const LoadersField = React.memo(function LoadersField({
   loaders,
   options,
   disabled,
+  invalid,
   onChange,
 }: {
   loaders: string[];
   options: EmployeeOption[];
   disabled: boolean;
+  invalid?: boolean;
   onChange: (loaders: string[]) => void;
 }) {
   const value = useMemo(
@@ -531,11 +531,12 @@ const LoadersField = React.memo(function LoadersField({
     },
     [onChange]
   );
+  const styles = useMemo(() => buildSelectStyles(Boolean(invalid)), [invalid]);
 
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-amber-500" /> Loaders
+        <User size={14} className="text-amber-500" /> Loaders <span className="text-red-500">*</span>
       </label>
       <Select<EmployeeOption, true>
         options={options}
@@ -548,7 +549,7 @@ const LoadersField = React.memo(function LoadersField({
         isMulti
         isSearchable
         isDisabled={disabled}
-        styles={selectStyles}
+        styles={styles}
         menuPortalTarget={MENU_PORTAL_TARGET}
       />
     </div>
@@ -575,12 +576,11 @@ function StepStart({
   const [form, setForm] = useState<Step1FormState>(() => tripToForm(loadSnapshot));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
 
   const loadedTripIdRef = useRef(tripId);
   const formRef = useRef(form);
-  const openingErrorRef = useRef<string | null>("Opening KM is required");
-  const advanceErrorRef = useRef<string | null>("Advance amount is required");
-  const numericSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  formRef.current = form;
 
   const driverOptions = useMemo(
     () => employeeOptions.filter((employee) => employee.department === "Driver"),
@@ -622,36 +622,16 @@ function StepStart({
   }, [tripId, loadSnapshot]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      updateTrip(formToTripPatch(formRef.current));
-    }, FIELD_SYNC_DELAY_MS);
-    return () => clearTimeout(timer);
+    updateTrip(formToTripPatch(form));
   }, [form, updateTrip]);
 
   const patchForm = useCallback((updates: Partial<Step1FormState>) => {
-    const next = { ...formRef.current, ...updates };
-    formRef.current = next;
-    setForm(next);
+    setForm((prev) => {
+      const next = { ...prev, ...updates };
+      formRef.current = next;
+      return next;
+    });
   }, []);
-
-  const patchNumericField = useCallback(
-    (updates: Partial<Step1FormState>) => {
-      formRef.current = { ...formRef.current, ...updates };
-      if (numericSyncTimerRef.current) clearTimeout(numericSyncTimerRef.current);
-      numericSyncTimerRef.current = setTimeout(() => {
-        updateTrip(formToTripPatch(formRef.current));
-        numericSyncTimerRef.current = null;
-      }, FIELD_SYNC_DELAY_MS);
-    },
-    [updateTrip]
-  );
-
-  useEffect(
-    () => () => {
-      if (numericSyncTimerRef.current) clearTimeout(numericSyncTimerRef.current);
-    },
-    []
-  );
 
   const handleVehicleSelect = useCallback((vehicleId: number, vehicleNo: string) => {
     patchForm({ vehicleId, vehicleNo });
@@ -674,20 +654,39 @@ function StepStart({
   }, [patchForm]);
 
   const handleOpeningMeterChange = useCallback((openingMeterText: string) => {
-    patchNumericField({ openingMeterText });
-  }, [patchNumericField]);
+    patchForm({ openingMeterText });
+  }, [patchForm]);
 
   const handleAdvanceChange = useCallback((advanceText: string) => {
-    patchNumericField({ advanceText });
-  }, [patchNumericField]);
+    patchForm({ advanceText });
+  }, [patchForm]);
 
-  const handleOpeningValidation = useCallback((error: string | null) => {
-    openingErrorRef.current = error;
-  }, []);
-
-  const handleAdvanceValidation = useCallback((error: string | null) => {
-    advanceErrorRef.current = error;
-  }, []);
+  const fieldInvalid = useMemo(() => {
+    if (!showErrors) {
+      return {
+        vehicle: false,
+        supervisor: false,
+        driver: false,
+        openingMeter: false,
+        advance: false,
+        helpers: false,
+        loaders: false,
+      };
+    }
+    const patch = formToTripPatch(form);
+    return {
+      vehicle: !patch.vehicleId || !patch.vehicleNo,
+      supervisor: !patch.supervisorId || !patch.supervisorName,
+      driver: !patch.driverId || !patch.driverName,
+      openingMeter: form.openingMeterText.trim() === "" || !Number.isFinite(Number(form.openingMeterText)),
+      advance:
+        form.advanceText.trim() === "" ||
+        !Number.isFinite(Number(form.advanceText)) ||
+        Number(form.advanceText) < 0,
+      helpers: !patch.helpers || patch.helpers.length === 0,
+      loaders: !patch.loaders || patch.loaders.length === 0,
+    };
+  }, [form, showErrors]);
 
   const handleFormKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "Enter") return;
@@ -697,9 +696,14 @@ function StepStart({
   }, []);
 
   const handleCancelEdit = useCallback(() => {
-    if (editable && onCancel) onCancel();
-    else setIsLocalEditing(false);
-  }, [editable, onCancel]);
+    if (!startStepSubmitted && clearForm) {
+      clearForm();
+    } else if (editable && onCancel) {
+      onCancel();
+    } else {
+      setIsLocalEditing(false);
+    }
+  }, [startStepSubmitted, clearForm, editable, onCancel]);
 
   const inputsLocked = headerLoading || isSubmitting;
   const submitLabel = isSubmitting
@@ -709,17 +713,30 @@ function StepStart({
     : "Submit Start Details";
 
   const handleSubmit = useCallback(async () => {
-    if (openingErrorRef.current || advanceErrorRef.current) return;
-    if (numericSyncTimerRef.current) {
-      clearTimeout(numericSyncTimerRef.current);
-      numericSyncTimerRef.current = null;
+    const patch = formToTripPatch(formRef.current);
+    const candidate = {
+      ...loadSnapshot,
+      ...patch,
+      tripDate: loadSnapshot.tripDate,
+      startStepSubmitted: false,
+    } as Trip;
+    const validation = validateStartStep(candidate);
+    if (!validation.valid) {
+      setShowErrors(true);
+      return;
     }
+
+    setShowErrors(false);
     setIsSubmitting(true);
-    updateTrip(formToTripPatch(formRef.current));
-    const success = await submitStartStep({});
-    if (success) setIsLocalEditing(false);
+    updateTrip(patch);
+    const success = await submitStartStep(patch);
+    if (success) {
+      setIsLocalEditing(false);
+      setForm(EMPTY_FORM);
+      formRef.current = EMPTY_FORM;
+    }
     setIsSubmitting(false);
-  }, [submitStartStep, updateTrip]);
+  }, [loadSnapshot, submitStartStep, updateTrip]);
 
   if (startStepSubmitted && !editable && !isLocalEditing) {
     return (
@@ -850,31 +867,34 @@ function StepStart({
             vehicleId={form.vehicleId}
             options={vehicleOptions}
             disabled={inputsLocked}
+            invalid={fieldInvalid.vehicle}
             onSelect={handleVehicleSelect}
           />
           <SupervisorField
             supervisorName={form.supervisorName}
             options={supervisorOptions}
             disabled={inputsLocked}
+            invalid={fieldInvalid.supervisor}
             onSelect={handleSupervisorSelect}
           />
           <DriverField
             driverName={form.driverName}
             options={driverOptions}
             disabled={inputsLocked}
+            invalid={fieldInvalid.driver}
             onSelect={handleDriverSelect}
           />
           <OpeningMeterField
             value={form.openingMeterText}
             disabled={inputsLocked}
+            invalid={fieldInvalid.openingMeter}
             onChange={handleOpeningMeterChange}
-            onValidationChange={handleOpeningValidation}
           />
           <AdvanceField
             value={form.advanceText}
             disabled={inputsLocked}
+            invalid={fieldInvalid.advance}
             onChange={handleAdvanceChange}
-            onValidationChange={handleAdvanceValidation}
           />
           <div className="col-span-1 sm:col-span-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -882,12 +902,14 @@ function StepStart({
                 helpers={form.helpers}
                 options={helperOptions}
                 disabled={inputsLocked}
+                invalid={fieldInvalid.helpers}
                 onChange={handleHelpersChange}
               />
               <LoadersField
                 loaders={form.loaders}
                 options={loaderOptions}
                 disabled={inputsLocked}
+                invalid={fieldInvalid.loaders}
                 onChange={handleLoadersChange}
               />
             </div>

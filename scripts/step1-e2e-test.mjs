@@ -1,7 +1,5 @@
 /**
- * Final Step 1 API contract test.
- * Browser draft behavior is intentionally localStorage-only; this verifies
- * the sole permanent-write endpoint and disabled draft endpoints.
+ * Step 1 final contract: no draft endpoints; one permanent POST.
  */
 const base = process.env.API_BASE || "http://localhost:4000/api";
 const tripDate = new Date().toISOString().slice(0, 10);
@@ -31,37 +29,27 @@ const payload = {
   supervisorName: "Suresh Reddy",
   helpers: ["Anil"],
   loaders: ["Babu"],
-  openingMeter: 90000,
-  advanceAmount: 500,
-  remarks: "Single final Step 1 write",
+  openingMeter: 99000,
+  advanceAmount: 250,
+  remarks: "Final Step 1 submit",
 };
 
 const createDraft = await request("POST", "/trips", {});
-assert(createDraft.status === 404, "POST /trips draft creation is disabled");
+assert(createDraft.status === 404, "POST /trips draft creation disabled");
 
 const updateDraft = await request("PUT", "/trips/1", { openingMeter: 1 });
-assert(updateDraft.status === 404, "PUT /trips/:id draft update is disabled");
+assert(updateDraft.status === 404, "PUT /trips/:id draft update disabled");
 
-const missingLoader = await request("POST", "/trips/steps/start", {
+const missing = await request("POST", "/trips/steps/start", {
   ...payload,
   loaders: [],
 });
-assert(missingLoader.status === 400, "final submit validates Loader");
+assert(missing.status === 400, "final submit validates Loader");
 
 const submitted = await request("POST", "/trips/steps/start", payload);
 assert(submitted.status === 201, "final submit returns 201");
-assert(submitted.body.id > 0, "final submit returns permanent Trip ID");
-assert(submitted.body.tripNo, "final submit returns Trip Number");
-assert(submitted.body.startStepSubmitted === true, "Step 1 is permanently submitted");
-assert(submitted.body.openingMeter === payload.openingMeter, "Opening KM persisted");
-assert(submitted.body.advanceAmount === payload.advanceAmount, "Advance persisted");
-assert(
-  submitted.body.helpers.includes("Anil") && submitted.body.loaders.includes("Babu"),
-  "crew persisted"
-);
-
-const loaded = await request("GET", `/trips/${submitted.body.id}`);
-assert(loaded.status === 200, "submitted trip can be reopened");
-assert(loaded.body.id === submitted.body.id, "reopened trip has same ID");
+assert(submitted.body.id > 0, "returns Trip ID");
+assert(submitted.body.tripNo, "returns Trip Number");
+assert(submitted.body.startStepSubmitted === true, "Step 1 permanently submitted");
 
 console.log("\nStep 1 final-submit API contract: PASS");

@@ -22,7 +22,9 @@ function BirdTypeTable({ birdTypes, onEdit, onDelete }: BirdTypeTableProps) {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200 bg-white">
-          {birdTypes.map((bt) => (
+          {[...birdTypes]
+            .sort((a, b) => (a.birdTypeNo > b.birdTypeNo ? 1 : -1))
+            .map((bt) => (
             <tr key={bt.id} className="hover:bg-slate-50 transition-colors">
               <td className="px-4 py-3 text-sm text-slate-600">{bt.birdTypeNo}</td>
               <td className="px-4 py-3 text-sm font-medium text-slate-800">{bt.birdType}</td>
