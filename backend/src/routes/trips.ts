@@ -26,18 +26,18 @@ tripsRouter.get(
   })
 );
 
-tripsRouter.get(
-  "/:id",
-  asyncHandler(async (req, res) => {
-    res.json(await tripsService.getById(Number(req.params.id)));
-  })
-);
-
-/** Final Step 1 submission. Browser drafts are never sent to the backend. */
+/** Final Step 1 submission — must be registered before /:id. */
 tripsRouter.post(
   "/steps/start",
   asyncHandler(async (req, res) => {
     res.status(201).json(await tripsService.createSubmittedStartStep(req.body));
+  })
+);
+
+tripsRouter.get(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    res.json(await tripsService.getById(Number(req.params.id)));
   })
 );
 

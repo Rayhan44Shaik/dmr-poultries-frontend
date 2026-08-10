@@ -12,7 +12,6 @@ import {
 } from "../services/tripFormService";
 
 type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void;
-const STEP1_DRAFT_KEY = "trip-step1-draft";
 
 export function useTripEntry(
   showNotification?: NotificationFn,
@@ -35,6 +34,7 @@ export function useTripEntry(
     supervisorId: 0,
     supervisorName: "",
     helpers: [],
+    loaders: [],
     openingMeter: 0,
     advanceAmount: 0,
     startStepSubmitted: false,
@@ -78,56 +78,32 @@ export function useTripEntry(
     updatedAt: new Date().toISOString(),
     boxNo: 0,
     birds: 0,
-    weight: 0
+    weight: 0,
   });
 
-  const readLocalDraft = (): Trip => {
-    try {
-      const stored = localStorage.getItem(STEP1_DRAFT_KEY);
-      if (!stored) return emptyTrip();
-      const parsed = JSON.parse(stored) as Partial<Trip>;
-      return {
-        ...emptyTrip(),
-        ...parsed,
-        id: 0,
-        tripNo: "",
-        startTime: "",
-        startStepSubmitted: false,
-        helpers: parsed.helpers ?? [],
-        loaders: parsed.loaders ?? [],
-      };
-    } catch {
-      return emptyTrip();
-    }
-  };
+  const [trip, setTrip] = useState<Trip>(emptyTrip);
+  const tripRef = useRef(trip);
+  tripRef.current = trip;
 
-  const writeLocalDraft = (next: Trip) => {
-    localStorage.setItem(
-      STEP1_DRAFT_KEY,
-      JSON.stringify({
-        ...next,
-        id: 0,
-        tripNo: "",
-        startTime: "",
-        startStepSubmitted: false,
-      })
-    );
-  };
-
-  const [trip, setTrip] = useState<Trip>(readLocalDraft);
   const [isEditing, setIsEditing] = useState(false);
   const [endStepSubmitted, setEndStepSubmitted] = useState<boolean>(false);
   const [headerLoading, setHeaderLoading] = useState(false);
 
   const onTripIdAssignedRef = useRef<((id: number) => void) | null>(null);
+  const onStep1SuccessRef = useRef<((trip: Trip) => void) | null>(null);
 
   const syncEndStep = (tripData: Trip) => {
     setEndStepSubmitted(tripData.endStepSubmitted || false);
   };
 
-  /** URL synchronization is only used after a successful permanent submission. */
+  /** URL synchronization is only used after loading an existing permanent trip. */
   const registerTripIdCallback = useCallback((cb: (id: number) => void) => {
     onTripIdAssignedRef.current = cb;
+  }, []);
+
+  /** Parent registers post-submit UI reset (Recent Trips already refreshed via onTripsChanged). */
+  const registerStep1SuccessCallback = useCallback((cb: (trip: Trip) => void) => {
+    onStep1SuccessRef.current = cb;
   }, []);
 
   const subscribeHeaderSaveStatus = useCallback(() => () => {}, []);
@@ -150,18 +126,18 @@ export function useTripEntry(
 
     const mortalityWeight = Number((mortalityCount * avgWeight).toFixed(2));
     const weightLoss = Number((dcWeight - totalDelWeight - mortalityWeight).toFixed(2));
-    const survivalRate = birds > 0 ? Number(((1 - (mortalityCount / birds)) * 100).toFixed(1)) : 0;
+    const survivalRate = birds > 0 ? Number(((1 - mortalityCount / birds) * 100).toFixed(1)) : 0;
 
     return { totalDelBirds, totalDelWeight, totalShops, lastShop, mortalityWeight, weightLoss, survivalRate };
   };
 
-  /** Step 1 edits persist only to browser localStorage until final submission. */
+  /** Step 1 edits update React state only — no localStorage, no backend. */
   const applyStartFieldChange = useCallback(
     (updater: Trip | ((prev: Trip) => Trip)) => {
       setTrip((previous) => {
         const next =
           typeof updater === "function" ? updater(previous) : { ...previous, ...updater };
-        writeLocalDraft(next);
+        tripRef.current = next;
         return next;
       });
     },
@@ -182,53 +158,31 @@ export function useTripEntry(
     [applyStartFieldChange]
   );
 
-  const loadTripFromApi = useCallback(
-    async (id: number): Promise<boolean> => {
-      setHeaderLoading(true);
-      try {
-        const loaded = await loadTripById(id);
-        setTrip(loaded);
-        syncEndStep(loaded);
-        setIsEditing(true);
-        onTripIdAssignedRef.current?.(loaded.id);
-        return true;
-      } catch (error) {
-        notifyRef.current?.(handleApiError(error), "error");
-        return false;
-      } finally {
-        setHeaderLoading(false);
-      }
-    },
-    []
-  );
-
-  const restoreLocalDraft = useCallback((): boolean => {
-    const restored = readLocalDraft();
-    const hasDraft = Boolean(
-      restored.vehicleId ||
-        restored.driverId ||
-        restored.supervisorId ||
-        restored.helpers.length ||
-        (restored.loaders?.length ?? 0) ||
-        restored.openingMeter ||
-        restored.advanceAmount ||
-        restored.remarks
-    );
-    if (hasDraft) {
-      setTrip(restored);
+  const loadTripFromApi = useCallback(async (id: number): Promise<boolean> => {
+    setHeaderLoading(true);
+    try {
+      const loaded = await loadTripById(id);
+      setTrip(loaded);
+      tripRef.current = loaded;
+      syncEndStep(loaded);
       setIsEditing(true);
+      onTripIdAssignedRef.current?.(loaded.id);
+      return true;
+    } catch (error) {
+      notifyRef.current?.(handleApiError(error), "error");
+      return false;
+    } finally {
+      setHeaderLoading(false);
     }
-    return hasDraft;
   }, []);
 
   const submitStartStep = async (data: Partial<Trip> = {}): Promise<boolean> => {
     const merged = {
-      ...trip,
+      ...tripRef.current,
       ...data,
     };
     const validation = validateStartStep(merged as Trip);
     if (!validation.valid) {
-      notifyRef.current?.(validation.errors[0], "error");
       return false;
     }
 
@@ -238,15 +192,18 @@ export function useTripEntry(
         ...merged,
         startTime: new Date().toLocaleString(),
       });
-      localStorage.removeItem(STEP1_DRAFT_KEY);
-      setTrip(submitted);
+
       tripService.upsert(submitted);
       onTripsChangedRef.current?.();
-      onTripIdAssignedRef.current?.(submitted.id);
-      notifyRef.current?.(
-        `✅ Step 1 completed successfully. Moving to Step 2...`,
-        "success"
-      );
+
+      const fresh = emptyTrip();
+      setTrip(fresh);
+      tripRef.current = fresh;
+      setIsEditing(false);
+      setEndStepSubmitted(false);
+
+      onStep1SuccessRef.current?.(submitted);
+      notifyRef.current?.(`✅ Trip ${submitted.tripNo} created successfully.`, "success");
       return true;
     } catch (error) {
       notifyRef.current?.(handleApiError(error), "error");
@@ -268,11 +225,20 @@ export function useTripEntry(
     const savedTrip = tripService.update({ ...updatedData, farmStepSubmitted: true });
     setTrip(savedTrip);
     syncEndStep(savedTrip);
-    notifyRef.current?.(isEditing ? `✅ Step 2 updated successfully.` : `✅ Step 2 completed successfully. Moving to Step 3...`, "success");
+    notifyRef.current?.(
+      isEditing
+        ? `✅ Step 2 updated successfully.`
+        : `✅ Step 2 completed successfully. Moving to Step 3...`,
+      "success"
+    );
     return true;
   };
 
-  const updateBoxDetails = (rows: BoxDetail[], persistToStorage: boolean = false, silent: boolean = false) => {
+  const updateBoxDetails = (
+    rows: BoxDetail[],
+    persistToStorage: boolean = false,
+    silent: boolean = false
+  ) => {
     const totalBirds = rows.reduce((sum, r) => sum + (r.birds || 0), 0);
     const dcWeight = Number(rows.reduce((sum, r) => sum + (r.weight || 0), 0).toFixed(2));
     const boxes = rows.length;
@@ -284,7 +250,7 @@ export function useTripEntry(
       totalBirds,
       dcWeight,
       boxes,
-      avgWeight
+      avgWeight,
     };
 
     if (persistToStorage) {
@@ -315,29 +281,39 @@ export function useTripEntry(
     }
 
     const avg = calculateAvgWeight(updatedData.dcWeight || 0, updatedData.totalBirds || 0);
-    const pickupLoadTime = trip.pickupStepSubmitted ? trip.pickupLoadTime : new Date().toLocaleString();
+    const pickupLoadTime = trip.pickupStepSubmitted
+      ? trip.pickupLoadTime
+      : new Date().toLocaleString();
 
     const savedTrip = tripService.update({
       ...updatedData,
       avgWeight: avg,
       pickupLoadTime,
-      pickupStepSubmitted: true
+      pickupStepSubmitted: true,
     });
     setTrip(savedTrip);
     syncEndStep(savedTrip);
 
-    notifyRef.current?.(isEditing ? `✅ Step 3 updated successfully.` : `✅ Step 3 completed successfully. Moving to Step 4...`, "success");
+    notifyRef.current?.(
+      isEditing
+        ? `✅ Step 3 updated successfully.`
+        : `✅ Step 3 completed successfully. Moving to Step 4...`,
+      "success"
+    );
     return true;
   };
 
   const submitDeliveriesStep = (): boolean => {
     if (trip.deliveries.length === 0) {
-      notifyRef.current?.(`❌ Please add at least one shop delivery before proceeding.`, "error");
+      notifyRef.current?.(
+        `❌ Please add at least one shop delivery before proceeding.`,
+        "error"
+      );
       return false;
     }
     const savedTrip = tripService.update({
       ...trip,
-      deliveryStepSubmitted: true
+      deliveryStepSubmitted: true,
     });
     setTrip(savedTrip);
     syncEndStep(savedTrip);
@@ -346,7 +322,11 @@ export function useTripEntry(
   };
 
   const updateTrip = (updates: Partial<Trip>) => {
-    setTrip(prev => ({ ...prev, ...updates }));
+    setTrip((prev) => {
+      const next = { ...prev, ...updates };
+      tripRef.current = next;
+      return next;
+    });
     if (updates.endStepSubmitted !== undefined) {
       setEndStepSubmitted(updates.endStepSubmitted);
     }
@@ -374,7 +354,7 @@ export function useTripEntry(
       survivalRate: kpis.survivalRate,
       totalMortalityCount: totalMortalityCount,
       totalWeight: kpis.totalDelWeight,
-      totalMortality: totalMortalityCount
+      totalMortality: totalMortalityCount,
     };
 
     if (persistToStorage) {
@@ -389,7 +369,10 @@ export function useTripEntry(
 
   const submitEndTrip = (): boolean => {
     if (!trip.deliveryStepSubmitted) {
-      notifyRef.current?.(`❌ You must complete and lock the Deliveries step first.`, "error");
+      notifyRef.current?.(
+        `❌ You must complete and lock the Deliveries step first.`,
+        "error"
+      );
       return false;
     }
 
@@ -426,17 +409,18 @@ export function useTripEntry(
       ...tripToLoad,
       helpers: tripToLoad.helpers || [],
       deliveries: tripToLoad.deliveries || [],
-      boxDetails: tripToLoad.boxDetails || []
+      boxDetails: tripToLoad.boxDetails || [],
     };
     setTrip(normalized);
+    tripRef.current = normalized;
     setIsEditing(true);
     setEndStepSubmitted(tripToLoad.endStepSubmitted === true);
   };
 
   const clearTrip = () => {
     const fresh = emptyTrip();
-    localStorage.removeItem(STEP1_DRAFT_KEY);
     setTrip(fresh);
+    tripRef.current = fresh;
     setIsEditing(false);
     setEndStepSubmitted(false);
   };
@@ -460,10 +444,10 @@ export function useTripEntry(
     submitEndTrip,
     loadTrip,
     loadTripFromApi,
-    restoreLocalDraft,
     clearTrip,
     setStartTrip,
     updateStartTrip,
     registerTripIdCallback,
+    registerStep1SuccessCallback,
   };
 }
