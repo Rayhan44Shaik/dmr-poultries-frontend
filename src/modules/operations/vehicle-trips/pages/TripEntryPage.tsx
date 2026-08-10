@@ -56,6 +56,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   const {
     trip,
+    savedTrip,
     setTrip,
     isEditing,
     setIsEditing,
@@ -67,10 +68,15 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     updateDeliveries,
     updateBoxDetails,
     submitStartStep,
+    saveStartProgress,
     submitFarmStep,
+    saveFarmProgress,
     submitPickupStep,
+    savePickupProgress,
     submitDeliveriesStep,
+    saveDeliveriesProgress,
     submitEndTrip,
+    saveEndProgress,
     loadTrip,
     loadTripFromApi,
     clearTrip,
@@ -138,10 +144,10 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     let targetStep = 0;
 
     if (selectedTrip.status === "Completed" || selectedTrip.status === "Pending" || selectedTrip.endStepSubmitted || selectedTrip.expensesStepSubmitted) targetStep = 4;
-    else if (selectedTrip.deliveryStepSubmitted) targetStep = 3;
-    else if (selectedTrip.pickupStepSubmitted) targetStep = 2;
-    else if (selectedTrip.farmStepSubmitted) targetStep = 1;
-    else if (selectedTrip.startStepSubmitted) targetStep = 0;
+    else if (selectedTrip.deliveryStepSubmitted) targetStep = 4;
+    else if (selectedTrip.pickupStepSubmitted) targetStep = 3;
+    else if (selectedTrip.farmStepSubmitted) targetStep = 2;
+    else if (selectedTrip.startStepSubmitted) targetStep = 1;
 
     setViewStepIndex(targetStep);
     setRows(selectedTrip.deliveries || []);
@@ -322,6 +328,18 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           loadSnapshot={step1LoadSnapshot}
           updateTrip={updateStartTrip}
           submitStartStep={submitStartStep}
+          saveStartProgress={saveStartProgress}
+          hasUnsavedChanges={JSON.stringify({
+            vehicleId: trip.vehicleId, vehicleNo: trip.vehicleNo, driverId: trip.driverId,
+            driverName: trip.driverName, supervisorId: trip.supervisorId,
+            supervisorName: trip.supervisorName, helpers: trip.helpers, loaders: trip.loaders,
+            openingMeter: trip.openingMeter, advanceAmount: trip.advanceAmount,
+          }) !== JSON.stringify({
+            vehicleId: savedTrip.vehicleId, vehicleNo: savedTrip.vehicleNo, driverId: savedTrip.driverId,
+            driverName: savedTrip.driverName, supervisorId: savedTrip.supervisorId,
+            supervisorName: savedTrip.supervisorName, helpers: savedTrip.helpers, loaders: savedTrip.loaders,
+            openingMeter: savedTrip.openingMeter, advanceAmount: savedTrip.advanceAmount,
+          })}
           vehicleOptions={vehicleOpts}
           employeeOptions={employeeOpts}
           editable={isEditable(isStartCompleted)}
@@ -342,6 +360,16 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           setTrip={setTrip}
           updateTrip={updateTrip}
           submitFarmStep={submitFarmStep}
+          saveFarmProgress={saveFarmProgress}
+          hasUnsavedChanges={JSON.stringify({
+            sourceFarmId: trip.sourceFarmId, sourceFarm: trip.sourceFarm, farmAddress: trip.farmAddress,
+            destMeter: trip.destMeter, pickupTolls: trip.pickupTolls, avgBirdWeight: (trip as any).avgBirdWeight,
+            remarks: trip.remarks,
+          }) !== JSON.stringify({
+            sourceFarmId: savedTrip.sourceFarmId, sourceFarm: savedTrip.sourceFarm, farmAddress: savedTrip.farmAddress,
+            destMeter: savedTrip.destMeter, pickupTolls: savedTrip.pickupTolls, avgBirdWeight: (savedTrip as any).avgBirdWeight,
+            remarks: savedTrip.remarks,
+          })}
           farms={farms}
           editable={isEditable(isFarmCompleted)}
           canEdit={canEditTrip}
@@ -357,6 +385,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           setTrip={setTrip}
           updateTrip={updateTrip}
           submitPickupStep={submitPickupStep}
+          savePickupProgress={savePickupProgress}
           updateBoxDetails={updateBoxDetails}
           editable={isEditable(isPickupCompleted)}
           canEdit={canEditTrip}
@@ -376,6 +405,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           trip={trip}
           updateDeliveries={updateDeliveries}
           submitDeliveriesStep={submitDeliveriesStep}
+          saveDeliveriesProgress={saveDeliveriesProgress}
           boxDetails={trip.boxDetails || []}
           readOnly={!isEditable(isDeliveryCompleted)}
           editable={isEditable(isDeliveryCompleted)}
@@ -397,6 +427,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           onCancel={clearForm}
           clearForm={clearForm}
           submitExpensesStep={submitEndTrip}
+          saveEndProgress={saveEndProgress}
         />
       );
     }

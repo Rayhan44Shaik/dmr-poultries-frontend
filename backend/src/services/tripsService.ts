@@ -110,6 +110,12 @@ async function loadTripExtras(client: Client, tripId: number) {
     `SELECT * FROM trip_diesel_entries WHERE trip_id = $1 ORDER BY row_index`,
     [tripId]
   );
+  const media = await client.query(
+    `SELECT media_key, mime_type, data_base64
+     FROM trip_media WHERE trip_id = $1 AND media_type = 'image'
+     ORDER BY created_at DESC LIMIT 1`,
+    [tripId]
+  );
   const deliveryBoxes = await client.query(
     `SELECT db.* FROM trip_delivery_boxes db
      JOIN trip_deliveries d ON d.id = db.delivery_id
@@ -193,7 +199,17 @@ async function loadTripExtras(client: Client, tripId: number) {
     imageName: r.image_name == null ? null : str(r.image_name),
   }));
 
-  return { helpers, loaders, boxDetails, deliveries: mappedDeliveries, dieselEntries };
+  const dcPhoto = media.rows[0];
+  return {
+    helpers,
+    loaders,
+    boxDetails,
+    deliveries: mappedDeliveries,
+    dieselEntries,
+    dcPhotoKey: dcPhoto?.media_key ?? null,
+    dcPhotoMime: dcPhoto?.mime_type ?? null,
+    dcPhotoData: dcPhoto?.data_base64 ?? null,
+  };
 }
 
 async function hydrateTrip(client: Client, row: Record<string, unknown>): Promise<Trip> {
@@ -379,6 +395,46 @@ function validateStartStepPayload(body: Partial<Trip> & Record<string, unknown>)
   }
   if (missing.length > 0) {
     throw new AppError(400, `Missing or invalid Step 1 fields: ${missing.join(", ")}`);
+  }
+}
+
+function validateWizardStepPayload(
+  step: "start" | "farm" | "pickup" | "deliveries" | "expenses",
+  body: Partial<Trip> & Record<string, unknown>
+): void {
+  if (step === "start") {
+    validateStartStepPayload(body);
+    return;
+  }
+  if (step === "farm") {
+    if (!Number(body.sourceFarmId) || !str(body.sourceFarm)) {
+      throw new AppError(400, "Farm is required");
+    }
+    if (!Number(body.destMeter) || Number(body.destMeter) <= Number(body.openingMeter ?? 0)) {
+      throw new AppError(400, "Destination meter must be greater than the opening meter");
+    }
+    if (Number(body.avgBirdWeight) <= 0) {
+      throw new AppError(400, "Average bird weight must be greater than zero");
+    }
+    return;
+  }
+  if (step === "pickup") {
+    const boxes = Array.isArray(body.boxDetails) ? body.boxDetails : [];
+    if (!boxes.length || boxes.some((box) => Number(box.birds) <= 0 || Number(box.weight) <= 0)) {
+      throw new AppError(400, "At least one complete pickup box is required");
+    }
+    return;
+  }
+  if (step === "deliveries") {
+    const deliveries = Array.isArray(body.deliveries) ? body.deliveries : [];
+    if (!deliveries.length) {
+      throw new AppError(400, "At least one delivery is required");
+    }
+    return;
+  }
+  const closingMeter = Number(body.closingMeter ?? body.endMeter ?? 0);
+  if (!closingMeter || closingMeter <= Number(body.openingMeter ?? 0)) {
+    throw new AppError(400, "End meter must be greater than the opening meter");
   }
 }
 
@@ -657,13 +713,18 @@ export const tripsService = {
     });
   },
 
-  async submitStep(
+  async saveWizardStep(
     id: number,
     step: "start" | "farm" | "pickup" | "deliveries" | "expenses",
-    body: Partial<Trip> & Record<string, unknown>
+    body: Partial<Trip> & Record<string, unknown>,
+    mode: "save" | "submit"
   ) {
-    if (step === "start") {
-      validateStartStepPayload(body);
+    validateWizardStepPayload(step, body);
+
+    const payload = { ...body };
+    delete payload.mode;
+    if (mode === "save") {
+      return this.save(id, payload);
     }
 
     const flags: Record<string, Partial<Trip>> = {
@@ -679,7 +740,7 @@ export const tripsService = {
       },
     };
 
-    return this.save(id, { ...body, ...flags[step] });
+    return this.save(id, { ...payload, ...flags[step] });
   },
 
   async softDelete(id: number, reason?: string) {

@@ -1,20 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Lock, Scale, Bird, Box, Gauge, Clock, Pencil, X, CheckCircle,
-  Plus, Trash2, Save, FileText, Loader2, AlertTriangle, Check, Camera, Download
+  Plus, Trash2, FileText, Loader2, AlertTriangle, Camera, Download
 } from "lucide-react";
 import type { Trip, BoxDetail } from "../types/trip";
 import { getVehicles } from "../../../masters/vehicles/services/vehicleService";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import localforage from "localforage";
-
-// Configure localforage
-localforage.config({
-  name: "DMRPoultry",
-  storeName: "dc_photos",
-  description: "DC Photo storage",
-});
+import { WizardActionBar, WizardStepNotice } from "./WizardStepUI";
 
 interface Props {
   trip: Trip;
@@ -22,6 +15,7 @@ interface Props {
   updateTrip: (updates: Partial<Trip>) => void;
   updateBoxDetails: (rows: BoxDetail[], persistToStorage?: boolean, silent?: boolean) => void;
   submitPickupStep: (data: Partial<Trip>) => boolean | Promise<boolean>;
+  savePickupProgress?: (data: Partial<Trip>) => Promise<boolean>;
   editable?: boolean;
   canEdit?: boolean;
   onCancel?: () => void;
@@ -104,32 +98,13 @@ function ConfirmationModal({
   );
 }
 
-// ─── Toast notification ──────────────────────────────────────────────
-function Toast({ message, type = "success", onClose }: { message: string; type?: "success" | "error"; onClose: () => void }) {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 2500);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-
-  const bgColor = type === "success" ? "bg-slate-800" : "bg-red-600";
-  const icon = type === "success" ? <Check size={18} className="text-white" /> : <AlertTriangle size={18} className="text-white" />;
-
-  return (
-    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
-      <div className={`${bgColor} text-white px-6 py-3 rounded-2xl shadow-lg flex items-center gap-3 border border-white/20`}>
-        {icon}
-        <span className="font-medium text-sm">{message}</span>
-      </div>
-    </div>
-  );
-}
-
 export default function StepPickup({
   trip,
   setTrip,
   updateTrip,
   updateBoxDetails,
   submitPickupStep,
+  savePickupProgress,
   editable = false,
   canEdit = false,
   onCancel,
@@ -160,6 +135,7 @@ export default function StepPickup({
   // ─── Image upload state ────────────────────────────────────────────
   const [imageKey, setImageKey] = useState<string | null>(trip.dcPhotoKey || null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const savedPhotoKeyRef = useRef<string | null>(trip.dcPhotoKey || null);
   const [isImageLoading, setIsImageLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -184,46 +160,16 @@ export default function StepPickup({
     onCancel: () => {},
   });
 
-  const autoSaveTimeout = useRef<NodeJS.Timeout | null>(null);
-  const [isAutoSaving, setIsAutoSaving] = useState(false);
-  const isSavingRef = useRef(false);
-
   const hasUnsavedChanges = useMemo(() => {
     const currentBoxes = rows.map(({ uid, ...rest }) => rest);
     const savedBoxes = trip.boxDetails || [];
-    return JSON.stringify(currentBoxes) !== JSON.stringify(savedBoxes);
-  }, [rows, trip.boxDetails]);
+    return JSON.stringify(currentBoxes) !== JSON.stringify(savedBoxes) ||
+      imageKey !== savedPhotoKeyRef.current;
+  }, [rows, trip.boxDetails, imageKey]);
 
-  // ─── Load image from IndexedDB when key changes ────────────────────
   useEffect(() => {
-    const loadImage = async () => {
-      if (!imageKey) {
-        setImagePreview(null);
-        return;
-      }
-      try {
-        setIsImageLoading(true);
-        const blob = await localforage.getItem<Blob>(imageKey);
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          setImagePreview(url);
-        } else {
-          setImagePreview(null);
-        }
-      } catch (error) {
-        console.error("Failed to load image:", error);
-        setImagePreview(null);
-      } finally {
-        setIsImageLoading(false);
-      }
-    };
-    loadImage();
-    return () => {
-      if (imagePreview && imagePreview.startsWith("blob:")) {
-        URL.revokeObjectURL(imagePreview);
-      }
-    };
-  }, [imageKey]);
+    setImagePreview(trip.dcPhotoData || null);
+  }, [trip.dcPhotoData, imageKey]);
 
   // ─── Sync imageKey with trip.dcPhotoKey ────────────────────────────
   useEffect(() => {
@@ -248,33 +194,6 @@ export default function StepPickup({
     const avgWeight = dcWeight > 0 && totalBirds > 0 ? Number((dcWeight / totalBirds).toFixed(3)) : 0;
     return { totalBirds, dcWeight, boxes, avgWeight };
   }, [rows]);
-
-  // ─── Auto‑save (silent) ────────────────────────────────────────────
-  const triggerAutoSave = useCallback(() => {
-    if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current);
-    if (isSavingRef.current || trip.pickupStepSubmitted) {
-      setIsAutoSaving(false);
-      return;
-    }
-    setIsAutoSaving(true);
-    autoSaveTimeout.current = setTimeout(() => {
-      if (!isSavingRef.current && !trip.pickupStepSubmitted) {
-        const boxDetails = rows.map(({ uid, ...rest }) => rest);
-        updateBoxDetails(boxDetails, true, true);
-      }
-      setIsAutoSaving(false);
-      autoSaveTimeout.current = null;
-    }, 800);
-  }, [rows, updateBoxDetails, trip.pickupStepSubmitted]);
-
-  useEffect(() => {
-    if (!isSubmitting && !trip.pickupStepSubmitted) {
-      triggerAutoSave();
-    }
-    return () => {
-      if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current);
-    };
-  }, [rows, triggerAutoSave, isSubmitting, trip.pickupStepSubmitted]);
 
   // ─── Row operations with Max Box Limit Check ───────────────────────
   const addRow = () => {
@@ -336,14 +255,22 @@ export default function StepPickup({
     }
 
     try {
-      const key = `dc_photo_${trip.id || Date.now()}_${Date.now()}`;
-      await localforage.setItem(key, file);
+      setIsImageLoading(true);
+      const data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const key = `dc_photo_${trip.id}_${Date.now()}`;
       setImageKey(key);
-      updateTrip({ dcPhotoKey: key });
-      setToast({ message: "Image uploaded successfully!", type: "success" });
+      setImagePreview(data);
+      updateTrip({ dcPhotoKey: key, dcPhotoMime: file.type, dcPhotoData: data });
     } catch (error) {
-      console.error("Failed to upload image:", error);
-      setToast({ message: "Failed to upload image. Please try again.", type: "error" });
+      console.error("Failed to read image:", error);
+      setToast({ message: "Failed to read image. Please try again.", type: "error" });
+    } finally {
+      setIsImageLoading(false);
     }
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -352,36 +279,22 @@ export default function StepPickup({
 
   const removeImage = async () => {
     if (imageKey) {
-      try {
-        await localforage.removeItem(imageKey);
-        setImageKey(null);
-        updateTrip({ dcPhotoKey: undefined });
-        setImagePreview(null);
-        setToast({ message: "Image removed.", type: "success" });
-      } catch (error) {
-        console.error("Failed to remove image:", error);
-        setToast({ message: "Failed to remove image.", type: "error" });
-      }
+      setImageKey(null);
+      updateTrip({ dcPhotoKey: undefined, dcPhotoMime: undefined, dcPhotoData: undefined });
+      setImagePreview(null);
     }
   };
 
   // ─── Download Image ──────────────────────────────────────────────────
   const downloadImage = async () => {
-    if (!imageKey) return;
+    if (!imagePreview) return;
     try {
-      const blob = await localforage.getItem<Blob>(imageKey);
-      if (!blob) {
-        setToast({ message: "Image not found.", type: "error" });
-        return;
-      }
-      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = url;
+      link.href = imagePreview;
       link.download = `DC_Photo_${trip.tripNo || "trip"}.jpg`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Failed to download image:", error);
       setToast({ message: "Failed to download image.", type: "error" });
@@ -389,22 +302,24 @@ export default function StepPickup({
   };
 
   // ─── Manual Save ────────────────────────────────────────────────
-  const handleSaveProgress = () => {
-    if (isSavingRef.current) return;
-    isSavingRef.current = true;
+  const handleSaveProgress = async () => {
+    if (!savePickupProgress) return;
     setIsSaving(true);
-    if (autoSaveTimeout.current) {
-      clearTimeout(autoSaveTimeout.current);
-      autoSaveTimeout.current = null;
-      setIsAutoSaving(false);
-    }
-    const boxDetails = rows.map(({ uid, ...rest }) => rest);
-    updateBoxDetails(boxDetails, true, true);
+    const success = await savePickupProgress({
+      boxDetails: getBoxDetails(),
+      totalBirds: totals.totalBirds,
+      dcWeight: totals.dcWeight,
+      boxes: totals.boxes,
+      avgWeight: totals.avgWeight,
+      dcPhotoKey: imageKey || undefined,
+      dcPhotoMime: trip.dcPhotoMime,
+      dcPhotoData: trip.dcPhotoData,
+    });
+    setToast(success
+      ? { message: "Pickup details saved successfully.", type: "success" }
+      : { message: "Unable to save pickup details. Please try again.", type: "error" });
+    if (success) savedPhotoKeyRef.current = imageKey;
     setIsSaving(false);
-    setTimeout(() => {
-      isSavingRef.current = false;
-    }, 100);
-    setToast({ message: "Progress saved successfully!", type: "success" });
   };
 
   // ─── Cancel discards unsaved Step 3 fields (no API / no draft) ─────
@@ -448,11 +363,6 @@ export default function StepPickup({
         setConfirmation((prev) => ({ ...prev, isOpen: false }));
         void (async () => {
           setIsSubmitting(true);
-          if (autoSaveTimeout.current) {
-            clearTimeout(autoSaveTimeout.current);
-            autoSaveTimeout.current = null;
-            setIsAutoSaving(false);
-          }
           try {
             const success = await submitPickupStep({
               boxDetails: getBoxDetails(),
@@ -460,10 +370,15 @@ export default function StepPickup({
               dcWeight: totals.dcWeight,
               boxes: totals.boxes,
               avgWeight: totals.avgWeight,
+              dcPhotoKey: imageKey || undefined,
+              dcPhotoMime: trip.dcPhotoMime,
+              dcPhotoData: trip.dcPhotoData,
             });
             if (success) {
               setIsLocalEditing(false);
-              setToast({ message: "Pickup KPI updated successfully!", type: "success" });
+              setToast({ message: "Pickup details submitted successfully.", type: "success" });
+            } else {
+              setToast({ message: "Unable to submit pickup details. Please try again.", type: "error" });
             }
           } finally {
             setIsSubmitting(false);
@@ -827,18 +742,6 @@ export default function StepPickup({
           opacity: 0.3;
           cursor: not-allowed;
         }
-        .auto-save-indicator {
-          font-size: 0.65rem;
-          color: #2563eb;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          animation: pulse 1.5s ease-in-out infinite;
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
       `}</style>
 
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
@@ -853,12 +756,6 @@ export default function StepPickup({
             </h2>
           </div>
           <div className="flex items-center gap-3">
-            {isAutoSaving && (
-              <span className="auto-save-indicator">
-                <Loader2 size={12} className="animate-spin" />
-                Saving...
-              </span>
-            )}
             {(isEditMode || isLocalEditing) && trip.pickupStepSubmitted && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
                 Editable View
@@ -1073,68 +970,20 @@ export default function StepPickup({
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-slate-100">
-          {/* Close */}
-          {isEditMode && (
-            <button
-              onClick={handleClose}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5"
-            >
-              <X size={14} /> Close
-            </button>
-          )}
-
-          {/* Save Progress */}
-          {(!trip.pickupStepSubmitted || isEditMode) && (
-            <button
-              onClick={handleSaveProgress}
-              disabled={isSaving || isSavingRef.current || rows.length === 0}
-              className={`w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 ${
-                isSaving || isSavingRef.current || rows.length === 0
-                  ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 shadow-xs"
-              }`}
-            >
-              <Save size={14} />
-              {isSaving ? "Saving..." : "Save Progress"}
-            </button>
-          )}
-
-          {/* Cancel active wizard step */}
-          {!trip.pickupStepSubmitted && clearForm && (
-            <button
-              onClick={clearForm}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all active:scale-95"
-            >
-              Cancel
-            </button>
-          )}
-
-          {/* Update / Submit */}
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting || !canSubmit || (trip.pickupStepSubmitted && !isEditMode)}
-            className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold text-white transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
-              isSubmitting || !canSubmit || (trip.pickupStepSubmitted && !isEditMode)
-                ? "bg-blue-400 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-700 shadow-sm"
-            }`}
-          >
-            <CheckCircle size={14} />
-            {isSubmitting
-              ? "Submitting..."
-              : isEditMode
-              ? "Update Pickup"
-              : trip.pickupStepSubmitted
-              ? "Submitted"
-              : "Submit Pickup"}
-          </button>
-        </div>
+        <WizardStepNotice
+          notice={toast ? { type: toast.type, message: toast.message } : null}
+          dirty={hasUnsavedChanges}
+        />
+        <WizardActionBar
+          onCancel={handleClose}
+          onSave={savePickupProgress ? handleSaveProgress : undefined}
+          onSubmit={handleSubmit}
+          busy={isSaving || isSubmitting}
+          saveDisabled={!hasUnsavedChanges || !canSubmit}
+          submitDisabled={!canSubmit || (trip.pickupStepSubmitted && !isEditMode)}
+          submitLabel={isEditMode ? "Update Pickup" : "Submit Pickup"}
+        />
       </div>
-
-      {/* Toast Notification */}
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       {/* Confirmation Modal */}
       <ConfirmationModal

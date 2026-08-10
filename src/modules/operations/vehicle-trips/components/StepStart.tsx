@@ -6,12 +6,12 @@ import React, {
   useMemo,
   useRef,
   useCallback,
-  useSyncExternalStore,
 } from "react";
-import { Clock, User, Truck, Gauge, Wallet, Pencil, X } from "lucide-react";
+import { Clock, User, Truck, Gauge, Wallet, Pencil } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { validateStartStep } from "../services/tripFormService";
+import { WizardActionBar, WizardStepNotice, type WizardNoticeState } from "./WizardStepUI";
 
 type VehicleOption = { id: number; vehicleNumber: string };
 type EmployeeOption = { id: number; employeeName: string; department: string };
@@ -24,6 +24,8 @@ interface Props {
   loadSnapshot: Trip;
   updateTrip: (updates: Partial<Trip>) => void;
   submitStartStep: (data: Partial<Trip>) => Promise<boolean>;
+  saveStartProgress?: (data: Partial<Trip>) => Promise<boolean>;
+  hasUnsavedChanges?: boolean;
   vehicleOptions: VehicleOption[];
   employeeOptions: EmployeeOption[];
   editable?: boolean;
@@ -177,23 +179,6 @@ const selectStyles: any = {
     scrollbarWidth: "none",
   }),
 };
-
-const SaveStatusIndicator = React.memo(function SaveStatusIndicator({
-  subscribe,
-  getSnapshot,
-}: {
-  subscribe: (listener: () => void) => () => void;
-  getSnapshot: () => SaveStatus;
-}) {
-  const status = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  if (status === "saving") {
-    return <span className="text-[11px] text-slate-400">Saving...</span>;
-  }
-  if (status === "saved") {
-    return <span className="text-[11px] text-emerald-600">Saved</span>;
-  }
-  return null;
-});
 
 const StartTimeField = React.memo(function StartTimeField({ startTime }: { startTime: string }) {
   return (
@@ -563,6 +548,8 @@ function StepStart({
   loadSnapshot,
   updateTrip,
   submitStartStep,
+  saveStartProgress,
+  hasUnsavedChanges = false,
   vehicleOptions,
   employeeOptions,
   editable = false,
@@ -577,6 +564,7 @@ function StepStart({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
+  const [notice, setNotice] = useState<WizardNoticeState>(null);
 
   const loadedTripIdRef = useRef(tripId);
   const formRef = useRef(form);
@@ -706,9 +694,7 @@ function StepStart({
   }, [startStepSubmitted, clearForm, editable, onCancel]);
 
   const inputsLocked = headerLoading || isSubmitting;
-  const submitLabel = isSubmitting
-    ? "Saving..."
-    : startStepSubmitted
+  const submitLabel = startStepSubmitted
     ? "Update Start Details"
     : "Submit Start Details";
 
@@ -729,14 +715,37 @@ function StepStart({
     setShowErrors(false);
     setIsSubmitting(true);
     updateTrip(patch);
-    const success = await submitStartStep(patch);
+    const success = tripId > 0 && startStepSubmitted && saveStartProgress
+      ? await saveStartProgress(patch)
+      : await submitStartStep(patch);
     if (success) {
       // Keep form values so the form→trip sync effect cannot wipe the submitted trip
       // while the parent advances to Step 2.
       setIsLocalEditing(false);
+      setNotice({ type: "success", message: "Start details submitted successfully." });
+    } else {
+      setNotice({ type: "error", message: "Unable to save start details. Please try again." });
     }
     setIsSubmitting(false);
-  }, [loadSnapshot, submitStartStep, updateTrip]);
+  }, [loadSnapshot, saveStartProgress, startStepSubmitted, submitStartStep, tripId, updateTrip]);
+
+  const handleSaveProgress = useCallback(async () => {
+    if (!saveStartProgress || !tripId) return;
+    const patch = formToTripPatch(formRef.current);
+    const candidate = { ...loadSnapshot, ...patch } as Trip;
+    const validation = validateStartStep(candidate);
+    if (!validation.valid) {
+      setShowErrors(true);
+      setNotice({ type: "error", message: validation.errors[0] || "Please complete required fields." });
+      return;
+    }
+    setIsSubmitting(true);
+    const success = await saveStartProgress(patch);
+    setNotice(success
+      ? { type: "success", message: "Start details saved successfully." }
+      : { type: "error", message: "Unable to save. Please try again." });
+    setIsSubmitting(false);
+  }, [loadSnapshot, saveStartProgress, tripId]);
 
   if (startStepSubmitted && !editable && !isLocalEditing) {
     return (
@@ -849,10 +858,6 @@ function StepStart({
             <h2 className="text-base font-bold text-slate-800 tracking-tight">TRIP START (AT OFFICE)</h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <SaveStatusIndicator
-              subscribe={subscribeHeaderSaveStatus}
-              getSnapshot={getHeaderSaveStatus}
-            />
             {((editable && startStepSubmitted) || isLocalEditing) && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
                 Editable View
@@ -916,37 +921,15 @@ function StepStart({
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-slate-100">
-          {!startStepSubmitted && !editable && (
-            <button
-              type="button"
-              onClick={clearForm}
-              disabled={inputsLocked}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all active:scale-95"
-            >
-              Clear Form
-            </button>
-          )}
-
-          {(editable || isLocalEditing) && (
-            <button
-              type="button"
-              onClick={handleCancelEdit}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95"
-            >
-              <X size={14} /> Cancel
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={inputsLocked}
-            className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed shadow-sm transition-all active:scale-95"
-          >
-            {submitLabel}
-          </button>
-        </div>
+        <WizardStepNotice notice={notice} dirty={hasUnsavedChanges} />
+        <WizardActionBar
+          onCancel={handleCancelEdit}
+          onSave={tripId > 0 && saveStartProgress ? handleSaveProgress : undefined}
+          onSubmit={handleSubmit}
+          busy={inputsLocked}
+          saveDisabled={!hasUnsavedChanges}
+          submitLabel={submitLabel}
+        />
       </div>
     </>
   );
@@ -964,6 +947,8 @@ function areStepStartPropsEqual(prev: Props, next: Props): boolean {
     prev.employeeOptions === next.employeeOptions &&
     prev.updateTrip === next.updateTrip &&
     prev.submitStartStep === next.submitStartStep &&
+    prev.saveStartProgress === next.saveStartProgress &&
+    prev.hasUnsavedChanges === next.hasUnsavedChanges &&
     prev.onCancel === next.onCancel &&
     prev.clearForm === next.clearForm &&
     prev.subscribeHeaderSaveStatus === next.subscribeHeaderSaveStatus &&

@@ -48,14 +48,16 @@ tripsRouter.post(
     if (!["start", "farm", "pickup", "deliveries", "expenses"].includes(step)) {
       throw new AppError(400, "Invalid step. Use start|farm|pickup|deliveries|expenses");
     }
-    if (step === "start") {
-      throw new AppError(410, "Step 1 is submitted only through POST /api/trips/steps/start");
+    const mode = req.body?.mode === "save" ? "save" : "submit";
+    if (step === "start" && mode === "submit") {
+      throw new AppError(410, "New Step 1 submissions use POST /api/trips/steps/start");
     }
     res.json(
-      await tripsService.submitStep(
+      await tripsService.saveWizardStep(
         Number(req.params.id),
         step as "start" | "farm" | "pickup" | "deliveries" | "expenses",
-        req.body
+        req.body,
+        mode
       )
     );
   })

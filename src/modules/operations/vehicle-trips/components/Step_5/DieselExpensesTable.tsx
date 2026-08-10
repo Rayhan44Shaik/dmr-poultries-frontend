@@ -6,7 +6,6 @@ import { Upload, X, MapPin, AlertTriangle, CheckCircle2, Plus, CircleX, Pencil, 
 interface DieselExpensesTableProps {
   sheetData: any;
   handleChange: (field: string, value: any) => void;
-  immediateSave?: (data: any) => void;
   dieselAmounts: number[];
   totalDieselAmount: number;
   showNotification?: (message: string, type?: "info" | "success" | "error" | "warning") => void;
@@ -16,7 +15,6 @@ interface DieselExpensesTableProps {
 export default function DieselExpensesTable({
   sheetData,
   handleChange,
-  immediateSave,
   dieselAmounts,
   totalDieselAmount,
   showNotification,
@@ -78,20 +76,16 @@ export default function DieselExpensesTable({
     }
   };
 
-  // ─── Helper: update a single field (debounced) ──────────────────
+  // ─── Helper: update a single field in React state ───────────────
   const handleFieldChange = (field: string, num: number, value: any) => {
     handleChange(field, value);
   };
 
-  // ─── Helper: apply batch updates and save immediately ──────────
+  // ─── Helper: apply batch updates in React state ─────────────────
   const applyBatchUpdates = (updates: Record<string, any>) => {
-    const updated = { ...sheetData, ...updates };
     Object.keys(updates).forEach(key => {
       handleChange(key, updates[key]);
     });
-    if (immediateSave) {
-      immediateSave(updated);
-    }
   };
 
   const handleAddRow = () => {
@@ -296,9 +290,6 @@ export default function DieselExpensesTable({
     if (meterErrors[num]) {
       notifyUser(`Please resolve the reading error in Row ${num} before submitting.`, "error");
       return;
-    }
-    if (immediateSave) {
-      immediateSave(sheetData);
     }
     notifyUser(`Row ${num} submitted successfully!`, "success");
   };
