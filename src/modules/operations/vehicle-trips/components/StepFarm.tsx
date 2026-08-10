@@ -7,7 +7,7 @@ interface Props {
   trip: Trip;
   setTrip: React.Dispatch<React.SetStateAction<Trip>>;
   updateTrip: (updates: Partial<Trip>) => void;
-  submitFarmStep: (data: Partial<Trip>) => boolean;
+  submitFarmStep: (data: Partial<Trip>) => boolean | Promise<boolean>;
   farms: any[];
   editable?: boolean;
   canEdit?: boolean;
@@ -161,19 +161,6 @@ export default function StepFarm({
     }
   };
 
-  const handleClear = () => {
-    updateTrip({
-      sourceFarmId: 0,
-      sourceFarm: "",
-      destMeter: 0,
-      pickupTolls: 0,
-      remarks: "",
-      farmAddress: "",
-      avgBirdWeight: 0,
-    } as any);
-    setDestMeterError(null);
-  };
-
   const handleSubmit = async () => {
     if (!trip.sourceFarmId || !trip.sourceFarm) {
       notify("Please select a Destination / Farm.", "warning");
@@ -197,14 +184,17 @@ export default function StepFarm({
     }
 
     setIsSubmitting(true);
-    const success = submitFarmStep({});
-    if (success) {
-      setIsLocalEditing(false);
-      notify("Destination details saved successfully.", "success");
-    } else {
-      notify("Submission failed. Please try again.", "error");
+    try {
+      const success = await submitFarmStep({});
+      if (success) {
+        setIsLocalEditing(false);
+        notify("Destination details saved successfully.", "success");
+      } else {
+        notify("Submission failed. Please try again.", "error");
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
   // ─── LOCKED VIEW ───────────────────────────────────────────────────
@@ -465,21 +455,12 @@ export default function StepFarm({
 
         {/* Actions */}
         <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-slate-100">
-          {!trip.farmStepSubmitted && !editable && (
-            <button
-              type="button"
-              onClick={handleClear}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all active:scale-95"
-            >
-              Clear Form
-            </button>
-          )}
-
-          {(editable || isLocalEditing) && (
+          {(!trip.farmStepSubmitted || editable || isLocalEditing) && (
             <button
               type="button"
               onClick={() => {
-                if (editable && onCancel) onCancel();
+                if (!trip.farmStepSubmitted && onCancel) onCancel();
+                else if (editable && onCancel) onCancel();
                 else setIsLocalEditing(false);
               }}
               className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all active:scale-95 flex items-center justify-center gap-1.5"
