@@ -731,9 +731,9 @@ function StepStart({
     updateTrip(patch);
     const success = await submitStartStep(patch);
     if (success) {
+      // Keep form values so the form→trip sync effect cannot wipe the submitted trip
+      // while the parent advances to Step 2.
       setIsLocalEditing(false);
-      setForm(EMPTY_FORM);
-      formRef.current = EMPTY_FORM;
     }
     setIsSubmitting(false);
   }, [loadSnapshot, submitStartStep, updateTrip]);

@@ -37,7 +37,7 @@ interface Props {
   onViewModeChange?: (mode: "shop" | "box") => void;
   stepNumber?: number | string;
   updateDeliveries?: (rows: ShopDelivery[], persist?: boolean, silent?: boolean) => void;
-  submitDeliveries?: () => boolean;
+  submitDeliveries?: () => boolean | Promise<boolean>;
   onClose?: () => void;
 }
 
@@ -474,23 +474,20 @@ export default function UnLoadingTable({
         type: "info",
         onConfirm: () => {
           setConfirmation((prev) => ({ ...prev, isOpen: false }));
-          let success = true;
-          if (submitDeliveries) {
-            success = submitDeliveries() !== false;
-          } else if (updateDeliveries) {
-            updateDeliveries(safeRows, true, false);
-          }
-          if (success) {
-            setHasBeenSubmitted(true);
-            setToast({ message: "Deliveries submitted successfully!", type: "success" });
-            if (showForm) {
-              closeForm();
-            } else if (onClose) {
-              onClose();
-            } else if (onCancelEdit) {
-              onCancelEdit();
+          void (async () => {
+            let success = true;
+            if (submitDeliveries) {
+              success = (await submitDeliveries()) !== false;
+            } else if (updateDeliveries) {
+              updateDeliveries(safeRows);
             }
-          }
+            if (success) {
+              setHasBeenSubmitted(true);
+              setToast({ message: "Deliveries submitted successfully!", type: "success" });
+              if (showForm) closeForm();
+              // Do not call onClose — parent advances to Step 5 with the same trip.
+            }
+          })();
         },
         onCancel: () => setConfirmation((prev) => ({ ...prev, isOpen: false })),
       });
@@ -522,25 +519,14 @@ export default function UnLoadingTable({
     }
   };
 
-  // ─── Close Action Handler ───────────────────────────────────────
+  // ─── Close / Cancel — discard unsaved step (no draft / no API) ───
   const handleCloseView = () => {
     if (showForm) {
+      closeForm();
       if (hasBeenSubmitted) {
-        closeForm();
         setToast({ message: "Edit cancelled. Details locked to previously submitted state.", type: "info" });
-      } else {
-        if (updateDeliveries && safeRows.length > 0) {
-          updateDeliveries(safeRows, true, true);
-        }
-        closeForm();
-        setToast({ message: "Progress saved automatically before closing.", type: "success" });
       }
       return;
-    }
-
-    if (!hasBeenSubmitted && updateDeliveries && safeRows.length > 0) {
-      updateDeliveries(safeRows, true, true);
-      setToast({ message: "Progress saved automatically before closing.", type: "success" });
     }
 
     if (onClose) {

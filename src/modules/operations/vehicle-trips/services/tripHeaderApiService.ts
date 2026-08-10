@@ -1,6 +1,8 @@
 /**
- * Trip Entry Step 1 (header) — PostgreSQL via shared Axios helpers.
- * Steps 2–5 continue to use localStorage through tripService until migrated.
+ * Trip Entry wizard — PostgreSQL via shared Axios helpers.
+ * Step 1: POST /trips/steps/start
+ * Steps 2–5: POST /trips/:id/steps/:step
+ * No draft/localStorage persistence for the active wizard session.
  */
 
 import {
@@ -220,6 +222,24 @@ export async function submitStep1(trip: Partial<Trip>): Promise<Trip> {
     status: "Draft" as TripStatus,
   };
   const { data } = await apiPost<ApiTripRecord>(`${TRIPS_PATH}/steps/start`, payload);
+  return mapApiTripToTrip(data, trip as Trip);
+}
+
+export type TripWizardStep = "farm" | "pickup" | "deliveries" | "expenses";
+
+/**
+ * Submit a later wizard step against an existing trip ID.
+ * Uses POST /api/trips/:id/steps/:step — one request per submit.
+ */
+export async function submitTripStep(
+  tripId: number,
+  step: TripWizardStep,
+  trip: Partial<Trip>
+): Promise<Trip> {
+  const { data } = await apiPost<ApiTripRecord>(
+    `${TRIPS_PATH}/${tripId}/steps/${step}`,
+    trip
+  );
   return mapApiTripToTrip(data, trip as Trip);
 }
 
