@@ -697,9 +697,14 @@ function StepStart({
   }, []);
 
   const handleCancelEdit = useCallback(() => {
-    if (editable && onCancel) onCancel();
-    else setIsLocalEditing(false);
-  }, [editable, onCancel]);
+    if (!startStepSubmitted && clearForm) {
+      clearForm();
+    } else if (editable && onCancel) {
+      onCancel();
+    } else {
+      setIsLocalEditing(false);
+    }
+  }, [startStepSubmitted, clearForm, editable, onCancel]);
 
   const inputsLocked = headerLoading || isSubmitting;
   const submitLabel = isSubmitting
