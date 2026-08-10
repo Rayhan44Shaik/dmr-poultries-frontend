@@ -1,3 +1,5 @@
+// src/modules/operations/vehicle-trips/components/Step_5/StepEnd.tsx
+
 import React, { useState, useMemo } from "react";
 import {
   Pencil,
@@ -91,23 +93,29 @@ export default function StepDeliveries({
   const validationResult = useMemo(() => {
     if (rows.length === 0)
       return { valid: false, reason: "Please add at least one shop delivery." };
-    if ((trip.dcWeight || 0) <= 0)
+    
+    const tripDcWeight = Number(trip.dcWeight) || 0;
+    const tripTotalBirds = Number(trip.totalBirds) || 0;
+
+    if (tripDcWeight <= 0)
       return { valid: false, reason: "DC Weight must be greater than 0." };
 
+    // Strictly parse as Numbers to prevent string concatenation or NaN errors
     const totalMortalityCount = rows.reduce(
-      (sum, r) => sum + (r.mortality || 0),
+      (sum, r) => sum + (Number(r.mortality) || Number((r as any).mortalityCount) || 0),
       0
     );
-    const totalDelBirds = rows.reduce((sum, r) => sum + (r.birds || 0), 0);
-    const totalDelWeight = rows.reduce((sum, r) => sum + (r.weight || 0), 0);
-    const avgWeight = trip.totalBirds > 0 ? trip.dcWeight / trip.totalBirds : 0;
+    const totalDelBirds = rows.reduce((sum, r) => sum + (Number(r.birds) || 0), 0);
+    const totalDelWeight = rows.reduce((sum, r) => sum + (Number(r.weight) || 0), 0);
+    
+    const avgWeight = tripTotalBirds > 0 ? tripDcWeight / tripTotalBirds : 0;
 
     const explicitMortalityWeight = rows.reduce((sum, r) => {
       const extra = r as ShopDelivery & {
         mortalityWeight?: number;
         mortalityKg?: number;
       };
-      return sum + (extra.mortalityWeight ?? extra.mortalityKg ?? 0);
+      return sum + (Number(extra.mortalityWeight) || Number(extra.mortalityKg) || 0);
     }, 0);
 
     const mortalityWeight =
@@ -116,20 +124,19 @@ export default function StepDeliveries({
         : totalMortalityCount * avgWeight;
 
     const totalOutWeight = totalDelWeight + mortalityWeight;
+    const computedTotal = totalDelBirds + totalMortalityCount;
 
-    if (trip.totalBirds !== totalDelBirds + totalMortalityCount) {
+    if (tripTotalBirds !== computedTotal) {
       return {
         valid: false,
-        reason: `Bird count mismatch! Farm (${trip.totalBirds}) != Delivered (${totalDelBirds}) + Mor (${totalMortalityCount})`,
+        reason: `Bird Count Mismatch: Trip Birds (${tripTotalBirds}) must equal Delivered (${totalDelBirds}) + Mortality (${totalMortalityCount}) = ${computedTotal}.`,
       };
     }
 
-    if (totalOutWeight - trip.dcWeight > 0.05) {
+    if (totalOutWeight - tripDcWeight > 0.05) {
       return {
         valid: false,
-        reason: `Total weight (${totalOutWeight.toFixed(
-          2
-        )} Kg) exceeds DC Weight (${trip.dcWeight.toFixed(2)} Kg)`,
+        reason: `Total weight (${totalOutWeight.toFixed(2)} Kg) exceeds DC Weight (${tripDcWeight.toFixed(2)} Kg)`,
       };
     }
 
