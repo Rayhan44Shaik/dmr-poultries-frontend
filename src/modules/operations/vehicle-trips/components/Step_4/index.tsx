@@ -5,8 +5,8 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { 
   Plus, Clock, Building2, Users, Scale, AlertCircle, Search, X, 
-  LayoutGrid, BarChart2, Save, Send, Loader2, 
-  AlertTriangle, Package, RefreshCw, LogOut, CheckCircle
+  LayoutGrid, BarChart2,
+  AlertTriangle, Package
 } from "lucide-react";
 import jsPDF from "jspdf";
 import TripPagination from "../TripPagination";
@@ -15,6 +15,7 @@ import ShopDeliveryForm from "./ShopDeliveryForm";
 import ShopDeliveryCard from "./ShopDeliveryCard";
 import { generateShopPDF } from "../../utils/generateShopPDF";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
+import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 
 interface Props {
   rows: ShopDelivery[];
@@ -37,6 +38,7 @@ interface Props {
   onViewModeChange?: (mode: "shop" | "box") => void;
   stepNumber?: number | string;
   updateDeliveries?: (rows: ShopDelivery[], persist?: boolean, silent?: boolean) => void;
+  saveDeliveries?: () => Promise<boolean>;
   submitDeliveries?: () => boolean | Promise<boolean>;
   onClose?: () => void;
 }
@@ -106,54 +108,6 @@ function ConfirmationModal({
   );
 }
 
-// ─── Toast Notification Component ─────────────────────────────────────
-function Toast({ 
-  message, 
-  type = "success", 
-  onClose 
-}: { 
-  message: string; 
-  type?: "success" | "error" | "warning" | "info"; 
-  onClose: () => void 
-}) {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 4000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-
-  const styles = {
-    success: "bg-emerald-50 border-emerald-300 text-emerald-900 shadow-emerald-100/50",
-    warning: "bg-amber-50 border-amber-300 text-amber-900 shadow-amber-100/50",
-    info: "bg-blue-50 border-blue-300 text-blue-900 shadow-blue-100/50",
-    error: "bg-rose-50 border-rose-300 text-rose-900 shadow-rose-100/50",
-  }[type];
-
-  const icon = type === "success" ? (
-    <CheckCircle size={18} className="text-emerald-600 flex-shrink-0" />
-  ) : type === "warning" ? (
-    <AlertTriangle size={18} className="text-amber-600 flex-shrink-0" />
-  ) : type === "info" ? (
-    <AlertCircle size={18} className="text-blue-600 flex-shrink-0" />
-  ) : (
-    <AlertTriangle size={18} className="text-rose-600 flex-shrink-0" />
-  );
-
-  return (
-    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
-      <div className={`px-5 py-3 rounded-2xl shadow-lg flex items-center gap-3 border text-xs sm:text-sm font-semibold ${styles}`}>
-        {icon}
-        <span>{message}</span>
-        <button 
-          onClick={onClose} 
-          className="ml-2 opacity-60 hover:opacity-100 transition-opacity"
-        >
-          <X size={15} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export default function UnLoadingTable({
   rows,
   setRows,
@@ -175,6 +129,7 @@ export default function UnLoadingTable({
   onViewModeChange,
   stepNumber = 4,
   updateDeliveries,
+  saveDeliveries,
   submitDeliveries,
   onClose,
 }: Props) {
@@ -200,10 +155,9 @@ export default function UnLoadingTable({
 
   // ─── Saving & Toast State ─────────────────────────────────────────
   const [isSaving, setIsSaving] = useState(false);
-  const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null);
-  const autoSaveTimeout = useRef<NodeJS.Timeout | null>(null);
-  const isSavingRef = useRef(false);
+  const savedRowsRef = useRef(JSON.stringify(rows ?? []));
+  const hasUnsavedChanges = JSON.stringify(safeRows) !== savedRowsRef.current;
 
   // ─── Confirmation Modal State ────────────────────────────────────
   const [confirmation, setConfirmation] = useState<{
@@ -402,61 +356,23 @@ export default function UnLoadingTable({
     setToast({ message: "Pending Boxes PDF generated successfully!", type: "success" });
   };
 
-  // ─── Auto-Save Trigger ────────────────────────────────────────────────────────
-  const triggerAutoSave = useCallback(() => {
-    if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current);
-    
-    if (isSavingRef.current || readOnly || !updateDeliveries) {
-      setIsAutoSaving(false);
-      return;
-    }
-
-    setIsAutoSaving(true);
-    autoSaveTimeout.current = setTimeout(() => {
-      if (!isSavingRef.current && !readOnly && updateDeliveries) {
-        updateDeliveries(safeRows, true, true);
-      }
-      setIsAutoSaving(false);
-      autoSaveTimeout.current = null;
-    }, 1000);
-  }, [safeRows, updateDeliveries, readOnly]);
-
-  useEffect(() => {
-    if (!readOnly && safeRows.length > 0) {
-      triggerAutoSave();
-    } else {
-      setIsAutoSaving(false);
-    }
-    return () => {
-      if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current);
-    };
-  }, [safeRows, triggerAutoSave, readOnly]);
-
   // ─── Manual Save Progress Handler ──────────────────────────────
-  const handleSaveProgress = () => {
-    if (isSavingRef.current || readOnly) return;
-    isSavingRef.current = true;
+  const handleSaveProgress = async () => {
+    if (readOnly || !saveDeliveries) return;
     setIsSaving(true);
-
-    if (autoSaveTimeout.current) {
-      clearTimeout(autoSaveTimeout.current);
-      autoSaveTimeout.current = null;
-      setIsAutoSaving(false);
-    }
-
     try {
-      if (updateDeliveries) {
-        updateDeliveries(safeRows, true, false);
+      const success = await saveDeliveries();
+      if (success) {
+        savedRowsRef.current = JSON.stringify(safeRows);
+        setToast({ message: "Delivery details saved successfully.", type: "success" });
+      } else {
+        setToast({ message: "Unable to save delivery details. Please try again.", type: "error" });
       }
-      setToast({ message: "Deliveries progress saved successfully!", type: "success" });
     } catch (error) {
       console.error("Save progress error:", error);
-      setToast({ message: "Failed to save progress. Please try again.", type: "error" });
+      setToast({ message: "Unable to save delivery details. Please try again.", type: "error" });
     } finally {
       setIsSaving(false);
-      setTimeout(() => {
-        isSavingRef.current = false;
-      }, 100);
     }
   };
 
@@ -486,6 +402,8 @@ export default function UnLoadingTable({
               setToast({ message: "Deliveries submitted successfully!", type: "success" });
               if (showForm) closeForm();
               // Do not call onClose — parent advances to Step 5 with the same trip.
+            } else {
+              setToast({ message: "Unable to submit delivery details. Please try again.", type: "error" });
             }
           })();
         },
@@ -501,18 +419,15 @@ export default function UnLoadingTable({
         type: "info",
         onConfirm: () => {
           setConfirmation((prev) => ({ ...prev, isOpen: false }));
-          if (updateDeliveries) {
-            updateDeliveries(safeRows, true, false);
-          }
-          setHasBeenSubmitted(true);
-          setToast({ message: "Deliveries updated successfully!", type: "success" });
-          if (showForm) {
-            closeForm();
-          } else if (onClose) {
-            onClose();
-          } else if (onCancelEdit) {
-            onCancelEdit();
-          }
+          void (async () => {
+            const success = submitDeliveries ? (await submitDeliveries()) !== false : false;
+            if (success) {
+              savedRowsRef.current = JSON.stringify(safeRows);
+              setHasBeenSubmitted(true);
+              setToast({ message: "Delivery details submitted successfully.", type: "success" });
+              if (showForm) closeForm();
+            }
+          })();
         },
         onCancel: () => setConfirmation((prev) => ({ ...prev, isOpen: false })),
       });
@@ -871,18 +786,6 @@ export default function UnLoadingTable({
     <div className="w-full space-y-4">
       <style>{`
         .no-spinner::-webkit-inner-spin-button,.no-spinner::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.no-spinner{-moz-appearance:textfield}
-        .auto-save-indicator {
-          font-size: 0.65rem;
-          color: #059669;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          animation: pulse 1.5s ease-in-out infinite;
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
       `}</style>
 
       {/* ─── SEARCH & ACTION HEADER ─── */}
@@ -940,13 +843,6 @@ export default function UnLoadingTable({
 
         {/* Right Side Header Actions */}
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-          {!readOnly && isAutoSaving && (
-            <span className="auto-save-indicator mr-1 text-emerald-600 text-xs flex items-center gap-1">
-              <Loader2 size={12} className="animate-spin" />
-              Saving...
-            </span>
-          )}
-
           <button
             onClick={handleDownloadPendingBoxesPDF}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 text-emerald-800 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
@@ -1116,54 +1012,20 @@ export default function UnLoadingTable({
       {/* ─── BOTTOM ACTION CONTROL BAR (ONLY VISIBLE IN UNLOCKED/EDIT MODE) ─── */}
       {!showForm && !readOnly && (
         <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xs">
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={handleCloseView}
-              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded-xl transition-all border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 active:scale-95 shadow-xs"
-            >
-              <LogOut size={15} className="text-slate-500" />
-              <span>Close</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSaveProgress}
-              disabled={isSaving || safeRows.length === 0}
-              className={`inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded-xl transition-all border shadow-xs active:scale-95 ${
-                isSaving || safeRows.length === 0
-                  ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              <Save size={15} />
-              <span>{isSaving ? "Saving..." : "Save Progress"}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSubmitOrUpdateDeliveries}
-              disabled={safeRows.length === 0}
-              className={`inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded-xl shadow-xs transition-all active:scale-95 text-white ${
-                safeRows.length === 0
-                  ? "bg-emerald-300 cursor-not-allowed"
-                  : "bg-emerald-600 hover:bg-emerald-700"
-              }`}
-            >
-              {hasBeenSubmitted ? <RefreshCw size={15} /> : <Send size={15} />}
-              <span>{hasBeenSubmitted ? "Update Deliveries" : "Submit Deliveries"}</span>
-            </button>
-          </div>
+          <WizardStepNotice
+            notice={toast ? { type: toast.type === "warning" ? "info" : toast.type, message: toast.message } : null}
+            dirty={hasUnsavedChanges}
+          />
+          <WizardActionBar
+            onCancel={handleCloseView}
+            onSave={saveDeliveries ? handleSaveProgress : undefined}
+            onSubmit={handleSubmitOrUpdateDeliveries}
+            busy={isSaving}
+            saveDisabled={!hasUnsavedChanges || safeRows.length === 0}
+            submitDisabled={safeRows.length === 0}
+            submitLabel={hasBeenSubmitted ? "Update Deliveries" : "Submit Deliveries"}
+          />
         </div>
-      )}
-
-      {/* Toast Notification */}
-      {toast && (
-        <Toast 
-          message={toast.message} 
-          type={toast.type} 
-          onClose={() => setToast(null)} 
-        />
       )}
 
       {/* Confirmation Modal */}

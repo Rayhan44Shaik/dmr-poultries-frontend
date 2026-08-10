@@ -1,9 +1,10 @@
 // src/modules/operations/vehicle-trips/hooks/useTrips.ts
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Trip } from "../types/trip";
 import { tripService } from "../services/tripService";
 import { renumberPendingTripsForDate } from "../services/tripFormService";
+import { listTrips } from "../services/tripHeaderApiService";
 
 type NotificationFn = (message: string, type?: "success" | "error" | "info") => void;
 
@@ -25,28 +26,22 @@ export default function useTrips(showNotification?: NotificationFn) {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
-  const [trips, setTrips] = useState<Trip[]>(tripService.getAll() || []);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  const refreshTrips = useCallback(() => {
-    const next = tripService.getAll() || [];
-    setTrips((previous) => {
-      if (
-        previous.length === next.length &&
-        previous.every(
-          (trip, index) =>
-            trip.id === next[index]?.id &&
-            trip.updatedAt === next[index]?.updatedAt &&
-            trip.status === next[index]?.status
-        )
-      ) {
-        return previous;
-      }
-      return next;
-    });
+  const refreshTrips = useCallback(async () => {
+    try {
+      setTrips(await listTrips());
+    } catch {
+      notifyRef.current?.("Unable to load trips from the server.", "error");
+    }
   }, []);
+
+  useEffect(() => {
+    void refreshTrips();
+  }, [refreshTrips]);
 
   const resetFilters = () => {
     setSearch("");
@@ -113,7 +108,7 @@ export default function useTrips(showNotification?: NotificationFn) {
     updateTrip(updatedTrip);
   };
 
-  const recentTrips = useMemo(() => tripService.getRecent(5) || [], [trips]);
+  const recentTrips = useMemo(() => trips.slice(0, 5), [trips]);
 
   const filteredTrips = useMemo(() => {
     return (trips || []).filter((trip) => {

@@ -3,56 +3,14 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Pencil,
-  X,
-  CheckCircle2,
-  Save,
-  Send,
-  Loader2,
   AlertTriangle,
-  RefreshCw,
-  LogOut,
-  CheckCircle,
-  AlertCircle,
 } from "lucide-react";
 import type { Trip, TripStatus } from "../../types/trip";
+import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 import GeneralExpensesTable from "./GeneralExpensesTable";
 import DieselExpensesTable from "./DieselExpensesTable";
 import { fuelExpenseService } from "../../../fuel-expenses/services/fuelExpenseService";
 import type { FuelExpense } from "../../../fuel-expenses/types/fuelExpense";
-
-// ─── Toast Component ──────────────────────────────────────────────
-function Toast({ message, type = "success", onClose }: {
-  message: string;
-  type?: "success" | "error" | "warning" | "info";
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 4000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-
-  const styles = {
-    success: "bg-emerald-50 border-emerald-300 text-emerald-900 shadow-emerald-100/50",
-    warning: "bg-amber-50 border-amber-300 text-amber-900 shadow-amber-100/50",
-    info: "bg-blue-50 border-blue-300 text-blue-900 shadow-blue-100/50",
-    error: "bg-rose-50 border-rose-300 text-rose-900 shadow-rose-100/50",
-  }[type];
-
-  const icon = type === "success" ? <CheckCircle size={18} className="text-emerald-600 flex-shrink-0" />
-    : type === "warning" ? <AlertTriangle size={18} className="text-amber-600 flex-shrink-0" />
-    : type === "info" ? <AlertCircle size={18} className="text-blue-600 flex-shrink-0" />
-    : <AlertTriangle size={18} className="text-rose-600 flex-shrink-0" />;
-
-  return (
-    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
-      <div className={`px-5 py-3 rounded-2xl shadow-lg flex items-center gap-3 border text-xs sm:text-sm font-semibold ${styles}`}>
-        {icon}
-        <span>{message}</span>
-        <button onClick={onClose} className="ml-2 opacity-60 hover:opacity-100 transition-opacity"><X size={15} /></button>
-      </div>
-    </div>
-  );
-}
 
 // ─── ConfirmationModal ────────────────────────────────────────────
 function ConfirmationModal({ isOpen, title, message, confirmLabel = "Yes, Proceed", cancelLabel = "Cancel", onConfirm, onCancel, type = "warning" }: {
@@ -121,6 +79,7 @@ interface Props {
   setTrip?: React.Dispatch<React.SetStateAction<Trip>>;
   updateTrip: (updates: Partial<Trip>, persist?: boolean, silent?: boolean) => void;
   submitExpensesStep?: (data: Partial<Trip>) => boolean | Promise<boolean>;
+  saveEndProgress?: (data: Partial<Trip>) => Promise<boolean>;
   submitStartStep?: (data: Partial<Trip>) => boolean | Promise<boolean>;
   editable?: boolean;
   canEdit?: boolean;
@@ -132,6 +91,7 @@ export default function StepEnd({
   trip,
   updateTrip,
   submitExpensesStep,
+  saveEndProgress,
   submitStartStep,
   editable = false,
   canEdit = true,
@@ -205,10 +165,6 @@ export default function StepEnd({
       prevTripId.current = trip.id;
       setSheetData(buildSheetDataFromTrip(trip));
       setIsSubmittedLocal(false);
-      if (autoSaveTimeout.current) {
-        clearTimeout(autoSaveTimeout.current);
-        autoSaveTimeout.current = null;
-      }
       setErrorMsg("");
       setIsLocalEditing(false);
     }
@@ -251,54 +207,14 @@ export default function StepEnd({
     averageKmLtr = (totalDistanceCovered / totalDieselLiters).toFixed(2);
   }
 
-  // ─── React-state only while editing (no localStorage / no API) ──
-  const saveToStorage = useCallback(
-    (data: SheetData, stepSubmitted: boolean) => {
-      const payload = {
-        ...data,
-        closingMeter: Number(data.endMeter) || 0,
-        deliveryTolls: data.destinationTolls === "" ? 0 : Number(data.destinationTolls),
-        advanceAmount: data.advance === "" ? 0 : Number(data.advance),
-        openingMeter: openingMeter,
-        expensesStepSubmitted: stepSubmitted,
-        endStepSubmitted: stepSubmitted,
-        status: stepSubmitted ? "Pending" : trip.status,
-      };
-      updateTrip(payload as any);
-    },
-    [trip.status, updateTrip, openingMeter]
-  );
+  const savedSheetRef = useRef(JSON.stringify(buildSheetDataFromTrip(trip)));
+  const hasUnsavedChanges = JSON.stringify(sheetData) !== savedSheetRef.current;
 
-  // ─── Auto‑save helpers ──────────────────────────────────────────
-  const autoSaveTimeout = useRef<NodeJS.Timeout | null>(null);
-
-  const debouncedAutoSave = useCallback(
-    (data: SheetData) => {
-      if (autoSaveTimeout.current) clearTimeout(autoSaveTimeout.current);
-      autoSaveTimeout.current = setTimeout(() => {
-        saveToStorage(data, isSubmitted);
-      }, 800);
-    },
-    [saveToStorage, isSubmitted]
-  );
-
-  const immediateSave = useCallback(
-    (data: SheetData) => {
-      if (autoSaveTimeout.current) {
-        clearTimeout(autoSaveTimeout.current);
-        autoSaveTimeout.current = null;
-      }
-      saveToStorage(data, isSubmitted);
-    },
-    [saveToStorage, isSubmitted]
-  );
-
-  // ─── Handle field changes (debounced) ──────────────────────────
+  // ─── Handle field changes in React state only ──────────────────
   const handleChange = (field: string, value: any) => {
     setErrorMsg("");
     const updated = { ...sheetData, [field]: value };
     setSheetData(updated);
-    debouncedAutoSave(updated);
   };
 
   // ─── Compute derived values ──────────────────────────────────────
@@ -407,14 +323,18 @@ export default function StepEnd({
   }, [trip]);
 
   // ─── Save progress (manual) ──────────────────────────────────────
-  const handleSaveProgress = () => {
-    try {
-      immediateSave(sheetData);
-      setToast({ message: "Expenses saved successfully!", type: "success" });
-    } catch (error) {
-      console.error("Save error:", error);
-      setToast({ message: "Failed to save progress.", type: "error" });
+  const handleSaveProgress = async () => {
+    if (!saveEndProgress) return;
+    setIsSubmitting(true);
+    const payload = prepareFinalPayload(false);
+    const success = await saveEndProgress(payload as Partial<Trip>);
+    if (success) {
+      savedSheetRef.current = JSON.stringify(sheetData);
+      setToast({ message: "End details saved successfully.", type: "success" });
+    } else {
+      setToast({ message: "Unable to save end details. Please try again.", type: "error" });
     }
+    setIsSubmitting(false);
   };
 
   // ─── Initiate submit ──────────────────────────────────────────────
@@ -487,14 +407,13 @@ export default function StepEnd({
         if (result === false) success = false;
       }
       if (success) {
-        immediateSave(finalData as any);
         setSheetData(finalData as any);
         setIsLocalEditing(false);
         setIsSubmittedLocal(true);
         syncFuelBillsOnSubmit(finalData as any);
-        setToast({ message: "Expenses sheet submitted successfully! Trip marked as completed.", type: "success" });
+        setToast({ message: "End details submitted successfully.", type: "success" });
         // Final step complete → return to Create New Trip (no resume).
-        clearForm?.();
+        if (clearForm) window.setTimeout(clearForm, 700);
       } else {
         setErrorMsg("Failed to save step details.");
         setToast({ message: "Failed to save step details.", type: "error" });
@@ -612,7 +531,6 @@ export default function StepEnd({
             key={`diesel-${trip.id}`}
             sheetData={sheetData}
             handleChange={handleChange}
-            immediateSave={immediateSave}
             dieselAmounts={dieselAmounts}
             totalDieselAmount={totalDieselAmount}
             destMeter={destMeter}
@@ -627,7 +545,6 @@ export default function StepEnd({
                 const val = e.target.value;
                 const updated = { ...sheetData, remarks: val };
                 setSheetData(updated);
-                debouncedAutoSave(updated);
               }}
               placeholder="Enter optional trip notes or destination remarks..."
               className="w-full text-xs font-medium text-slate-800 outline-none bg-transparent resize-none placeholder:text-slate-400 text-left"
@@ -640,18 +557,20 @@ export default function StepEnd({
             <div>Balance Remaining: <span className="text-emerald-600">₹{remainingBalance.toFixed(2)}</span></div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
-            <button onClick={handleCloseView} className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95"><LogOut size={15} className="text-slate-500" /><span>Close</span></button>
-            <button onClick={handleSaveProgress} className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95"><Save size={15} /><span>Save Progress</span></button>
-            <button onClick={handleInitiateSubmit} disabled={isSubmitting} className={`w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5 ${isSubmitted ? "bg-emerald-600 hover:bg-emerald-700" : "bg-emerald-600 hover:bg-emerald-700"}`}>
-              {isSubmitted ? <RefreshCw size={15} /> : <Send size={15} />}
-              <span>{isSubmitting ? "Processing..." : isSubmitted ? "Update Expenses Sheet" : "Submit Expenses Sheet"}</span>
-            </button>
-          </div>
+          <WizardStepNotice
+            notice={toast ? { type: toast.type === "warning" ? "info" : toast.type, message: toast.message } : null}
+            dirty={hasUnsavedChanges}
+          />
+          <WizardActionBar
+            onCancel={handleCloseView}
+            onSave={saveEndProgress ? handleSaveProgress : undefined}
+            onSubmit={handleInitiateSubmit}
+            busy={isSubmitting}
+            saveDisabled={!hasUnsavedChanges}
+            submitLabel={isSubmitted ? "Update End Details" : "Submit End Details"}
+          />
         </div>
       )}
-
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       <ConfirmationModal
         isOpen={confirmation.isOpen}

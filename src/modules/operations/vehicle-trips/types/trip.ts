@@ -46,6 +46,7 @@ export interface Trip {
   pickupTolls: number;  
   farmStepSubmitted: boolean;
   farmAddress?: string;
+  avgBirdWeight?: number;
 
   dcWeight: number;
   totalBirds: number;
@@ -64,6 +65,18 @@ export interface Trip {
   closingMeter: number;
   endTime: string;
   deliveryTolls: number;
+  destinationTolls?: number;
+  meals?: number;
+  loading?: number;
+  mealsTiffin?: number;
+  vehicleMaintenance?: number;
+  othersRC?: number;
+  others1Amt?: number;
+  others2Amt?: number;
+  others3Amt?: number;
+  others4Amt?: number;
+  others5Amt?: number;
+  submittedAtTimestamp?: string;
   endStepSubmitted?: boolean;
   expensesStepSubmitted?: boolean;
 
@@ -91,6 +104,8 @@ export interface Trip {
   deleted?: boolean;
   deletedReason?: string;
   dcPhotoKey?: string;
+  dcPhotoMime?: string;
+  dcPhotoData?: string;
   approvedBy?: string;
 }
 

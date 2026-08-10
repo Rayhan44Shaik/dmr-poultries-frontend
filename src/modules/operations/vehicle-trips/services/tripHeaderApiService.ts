@@ -124,6 +124,7 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
 
   return {
     ...defaults,
+    ...raw,
     id: num(raw.id, defaults.id),
     tripNo: str(raw.tripNo ?? raw.trip_no, defaults.tripNo),
     tripDate: normalizeDate(raw.tripDate ?? raw.trip_date) || defaults.tripDate,
@@ -178,7 +179,22 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     destMeter: numOrZero(raw.destMeter ?? raw.dest_meter ?? defaults.destMeter),
     pickupTolls: num(raw.pickupTolls ?? raw.pickup_tolls, defaults.pickupTolls),
     farmAddress: raw.farmAddress != null ? str(raw.farmAddress) : raw.farm_address != null ? str(raw.farm_address) : defaults.farmAddress,
+    avgBirdWeight: num(raw.avgBirdWeight ?? raw.avg_bird_weight, defaults.avgBirdWeight),
     dcPhotoKey: raw.dcPhotoKey != null ? str(raw.dcPhotoKey) : raw.dc_photo_key != null ? str(raw.dc_photo_key) : defaults.dcPhotoKey,
+    dcPhotoMime: raw.dcPhotoMime != null ? str(raw.dcPhotoMime) : defaults.dcPhotoMime,
+    dcPhotoData: raw.dcPhotoData != null ? str(raw.dcPhotoData) : defaults.dcPhotoData,
+    destinationTolls: num(raw.destinationTolls ?? raw.destination_tolls, defaults.destinationTolls),
+    meals: num(raw.meals, defaults.meals),
+    loading: num(raw.loading, defaults.loading),
+    mealsTiffin: num(raw.mealsTiffin ?? raw.meals_tiffin, defaults.mealsTiffin),
+    vehicleMaintenance: num(raw.vehicleMaintenance ?? raw.vehicle_maintenance, defaults.vehicleMaintenance),
+    othersRC: num(raw.othersRC ?? raw.others_rc, defaults.othersRC),
+    others1Amt: num(raw.others1Amt ?? raw.others1_amt, defaults.others1Amt),
+    others2Amt: num(raw.others2Amt ?? raw.others2_amt, defaults.others2Amt),
+    others3Amt: num(raw.others3Amt ?? raw.others3_amt, defaults.others3Amt),
+    others4Amt: num(raw.others4Amt ?? raw.others4_amt, defaults.others4Amt),
+    others5Amt: num(raw.others5Amt ?? raw.others5_amt, defaults.others5Amt),
+    submittedAtTimestamp: str(raw.submittedAtTimestamp, defaults.submittedAtTimestamp),
     deleted: Boolean(raw.deleted ?? defaults.deleted),
     deletedReason: raw.deletedReason != null ? str(raw.deletedReason) : defaults.deletedReason,
     approvedBy: raw.approvedBy != null ? str(raw.approvedBy) : defaults.approvedBy,
@@ -213,6 +229,12 @@ export async function loadTripById(id: number): Promise<Trip> {
   return mapApiTripToTrip(data);
 }
 
+/** GET /api/trips — PostgreSQL-backed Recent Trips. */
+export async function listTrips(): Promise<Trip[]> {
+  const { data } = await apiGet<ApiTripRecord[]>(TRIPS_PATH);
+  return data.map((trip) => mapApiTripToTrip(trip));
+}
+
 /** Single final Step 1 submission. No draft is created or updated before this request. */
 export async function submitStep1(trip: Partial<Trip>): Promise<Trip> {
   const payload = {
@@ -225,7 +247,7 @@ export async function submitStep1(trip: Partial<Trip>): Promise<Trip> {
   return mapApiTripToTrip(data, trip as Trip);
 }
 
-export type TripWizardStep = "farm" | "pickup" | "deliveries" | "expenses";
+export type TripWizardStep = "start" | "farm" | "pickup" | "deliveries" | "expenses";
 
 /**
  * Submit a later wizard step against an existing trip ID.
@@ -238,7 +260,20 @@ export async function submitTripStep(
 ): Promise<Trip> {
   const { data } = await apiPost<ApiTripRecord>(
     `${TRIPS_PATH}/${tripId}/steps/${step}`,
-    trip
+    { ...trip, mode: "submit" }
+  );
+  return mapApiTripToTrip(data, trip as Trip);
+}
+
+/** Explicitly persist a valid step without submitting/locking it. */
+export async function saveTripStepProgress(
+  tripId: number,
+  step: TripWizardStep,
+  trip: Partial<Trip>
+): Promise<Trip> {
+  const { data } = await apiPost<ApiTripRecord>(
+    `${TRIPS_PATH}/${tripId}/steps/${step}`,
+    { ...trip, mode: "save" }
   );
   return mapApiTripToTrip(data, trip as Trip);
 }
