@@ -15,7 +15,6 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { Trip, TripStatus } from "../../types/trip";
-import { tripService } from "../../services/tripService";
 import GeneralExpensesTable from "./GeneralExpensesTable";
 import DieselExpensesTable from "./DieselExpensesTable";
 import { fuelExpenseService } from "../../../fuel-expenses/services/fuelExpenseService";
@@ -252,7 +251,7 @@ export default function StepEnd({
     averageKmLtr = (totalDistanceCovered / totalDieselLiters).toFixed(2);
   }
 
-  // ─── Persist to storage helper ──────────────────────────────────
+  // ─── React-state only while editing (no localStorage / no API) ──
   const saveToStorage = useCallback(
     (data: SheetData, stepSubmitted: boolean) => {
       const payload = {
@@ -262,14 +261,12 @@ export default function StepEnd({
         advanceAmount: data.advance === "" ? 0 : Number(data.advance),
         openingMeter: openingMeter,
         expensesStepSubmitted: stepSubmitted,
-        endStepSubmitted: stepSubmitted, // ✅ Ensure endStepSubmitted is set
-        status: stepSubmitted ? "Completed" : trip.status, // ✅ FIXED: Mark trip as Completed if step is submitted
+        endStepSubmitted: stepSubmitted,
+        status: stepSubmitted ? "Pending" : trip.status,
       };
-      const updatedTrip = { ...trip, ...payload };
-      tripService.update(updatedTrip);
-      updateTrip(payload as any, true, true);
+      updateTrip(payload as any);
     },
-    [trip, updateTrip, openingMeter]
+    [trip.status, updateTrip, openingMeter]
   );
 
   // ─── Auto‑save helpers ──────────────────────────────────────────
@@ -490,13 +487,14 @@ export default function StepEnd({
         if (result === false) success = false;
       }
       if (success) {
-        // ✅ Save and update parent state
         immediateSave(finalData as any);
         setSheetData(finalData as any);
         setIsLocalEditing(false);
         setIsSubmittedLocal(true);
         syncFuelBillsOnSubmit(finalData as any);
         setToast({ message: "Expenses sheet submitted successfully! Trip marked as completed.", type: "success" });
+        // Final step complete → return to Create New Trip (no resume).
+        clearForm?.();
       } else {
         setErrorMsg("Failed to save step details.");
         setToast({ message: "Failed to save step details.", type: "error" });
@@ -514,9 +512,14 @@ export default function StepEnd({
     if (isLocalEditing) {
       setIsLocalEditing(false);
       setToast({ message: "Edit cancelled.", type: "info" });
-    } else if (onCancel) {
-      onCancel();
+      return;
     }
+    // Cancel active wizard — discard unsaved Step 5 only.
+    if (clearForm) {
+      clearForm();
+      return;
+    }
+    onCancel?.();
   };
 
   // ─── Render ──────────────────────────────────────────────────────

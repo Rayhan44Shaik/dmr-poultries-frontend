@@ -21,7 +21,7 @@ interface Props {
   setTrip: React.Dispatch<React.SetStateAction<Trip>>;
   updateTrip: (updates: Partial<Trip>) => void;
   updateBoxDetails: (rows: BoxDetail[], persistToStorage?: boolean, silent?: boolean) => void;
-  submitPickupStep: (data: Partial<Trip>) => boolean;
+  submitPickupStep: (data: Partial<Trip>) => boolean | Promise<boolean>;
   editable?: boolean;
   canEdit?: boolean;
   onCancel?: () => void;
@@ -407,34 +407,17 @@ export default function StepPickup({
     setToast({ message: "Progress saved successfully!", type: "success" });
   };
 
-  // ─── Close with unsaved check ──────────────────────────────────────
+  // ─── Cancel discards unsaved Step 3 fields (no API / no draft) ─────
   const handleClose = () => {
-    if (hasUnsavedChanges) {
-      setConfirmation({
-        isOpen: true,
-        title: "Unsaved Changes",
-        message: "You have unsaved changes. Would you like to save them before closing?",
-        confirmLabel: "Save & Close",
-        cancelLabel: "Discard",
-        type: "warning",
-        onConfirm: () => {
-          handleSaveProgress();
-          setConfirmation((prev) => ({ ...prev, isOpen: false }));
-          setTimeout(() => {
-            if (editable && onCancel) onCancel();
-            else setIsLocalEditing(false);
-          }, 200);
-        },
-        onCancel: () => {
-          setConfirmation((prev) => ({ ...prev, isOpen: false }));
-          if (editable && onCancel) onCancel();
-          else setIsLocalEditing(false);
-        },
-      });
-    } else {
-      if (editable && onCancel) onCancel();
-      else setIsLocalEditing(false);
+    if (clearForm && !trip.pickupStepSubmitted) {
+      clearForm();
+      return;
     }
+    if (onCancel) {
+      onCancel();
+      return;
+    }
+    setIsLocalEditing(false);
   };
 
   // ─── Submit / Update with confirmation ─────────────────────────────
@@ -463,24 +446,29 @@ export default function StepPickup({
       type: isEditMode ? "info" : "warning",
       onConfirm: () => {
         setConfirmation((prev) => ({ ...prev, isOpen: false }));
-        setIsSubmitting(true);
-        if (autoSaveTimeout.current) {
-          clearTimeout(autoSaveTimeout.current);
-          autoSaveTimeout.current = null;
-          setIsAutoSaving(false);
-        }
-        const success = submitPickupStep({
-          boxDetails: getBoxDetails(),
-          totalBirds: totals.totalBirds,
-          dcWeight: totals.dcWeight,
-          boxes: totals.boxes,
-          avgWeight: totals.avgWeight,
-        });
-        if (success) {
-          setIsLocalEditing(false);
-          setToast({ message: "Pickup KPI updated successfully!", type: "success" });
-        }
-        setIsSubmitting(false);
+        void (async () => {
+          setIsSubmitting(true);
+          if (autoSaveTimeout.current) {
+            clearTimeout(autoSaveTimeout.current);
+            autoSaveTimeout.current = null;
+            setIsAutoSaving(false);
+          }
+          try {
+            const success = await submitPickupStep({
+              boxDetails: getBoxDetails(),
+              totalBirds: totals.totalBirds,
+              dcWeight: totals.dcWeight,
+              boxes: totals.boxes,
+              avgWeight: totals.avgWeight,
+            });
+            if (success) {
+              setIsLocalEditing(false);
+              setToast({ message: "Pickup KPI updated successfully!", type: "success" });
+            }
+          } finally {
+            setIsSubmitting(false);
+          }
+        })();
       },
       onCancel: () => {
         setConfirmation((prev) => ({ ...prev, isOpen: false }));
@@ -1113,13 +1101,13 @@ export default function StepPickup({
             </button>
           )}
 
-          {/* Clear */}
-          {!trip.pickupStepSubmitted && !isEditMode && clearForm && (
+          {/* Cancel active wizard step */}
+          {!trip.pickupStepSubmitted && clearForm && (
             <button
               onClick={clearForm}
               className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all active:scale-95"
             >
-              Clear
+              Cancel
             </button>
           )}
 
