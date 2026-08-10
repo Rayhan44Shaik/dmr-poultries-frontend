@@ -6,6 +6,7 @@ import {
   Phone,
   MapPin,
   Home,
+  IndianRupee,
 } from "lucide-react";
 
 type ShopFormProps = {
@@ -17,6 +18,7 @@ type ShopFormProps = {
     village: string;
     address: string;
     status: "Active" | "Inactive";
+    openingBalance: number;
   }) => void;
   onCancel: () => void;
   isSaving?: boolean;
@@ -28,6 +30,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [village, setVillage] = useState("");
   const [address, setAddress] = useState("");
+  const [openingBalance, setOpeningBalance] = useState("0.00");
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
 
   const [errors, setErrors] = useState({
@@ -35,6 +38,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
     ownerName: "",
     phoneNumber: "",
     village: "",
+    openingBalance: "",
   });
 
   const isEditing = !!shop;
@@ -46,6 +50,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       setPhoneNumber(shop.phoneNumber);
       setVillage(shop.village);
       setAddress(shop.address ?? "");
+      setOpeningBalance(shop.openingBalance !== undefined ? String(shop.openingBalance) : "0.00");
       setStatus(shop.status);
     } else {
       setShopName("");
@@ -53,6 +58,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       setPhoneNumber("");
       setVillage("");
       setAddress("");
+      setOpeningBalance("0.00");
       setStatus("Active");
     }
     setErrors({
@@ -60,6 +66,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       ownerName: "",
       phoneNumber: "",
       village: "",
+      openingBalance: "",
     });
   }, [shop]);
 
@@ -69,6 +76,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       ownerName: "",
       phoneNumber: "",
       village: "",
+      openingBalance: "",
     };
 
     if (shopName.trim().length < 3) {
@@ -83,6 +91,11 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
     if (village.trim() === "") {
       newErrors.village = "Village is required.";
     }
+    
+    const parsedBalance = parseFloat(openingBalance);
+    if (openingBalance.trim() === "" || isNaN(parsedBalance)) {
+      newErrors.openingBalance = "Opening Balance is required and must be a valid number.";
+    }
 
     setErrors(newErrors);
 
@@ -90,7 +103,8 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       newErrors.shopName ||
       newErrors.ownerName ||
       newErrors.phoneNumber ||
-      newErrors.village
+      newErrors.village ||
+      newErrors.openingBalance
     ) {
       return;
     }
@@ -102,6 +116,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       village,
       address,
       status,
+      openingBalance: parsedBalance,
     });
   };
 
@@ -113,9 +128,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
   const iconWrapperClass =
     "absolute left-3 top-1/2 -translate-y-1/2 bg-blue-50 p-2 rounded-full text-blue-600";
 
-  // ✅ Title changed to "Edit Shop" when editing
   const title = isEditing ? "Edit Shop" : "Add Shop";
-  // ✅ Subtitle changed to "Update details" when editing
   const subtitle = isEditing ? "Update details" : "Fill in the information";
 
   const toggleStatus = () => {
@@ -246,6 +259,28 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
             </div>
             {errors.village && (
               <p className="text-red-600 text-sm mt-1">{errors.village}</p>
+            )}
+          </div>
+
+          <div className="relative">
+            <label className="block mb-2 text-sm font-semibold text-slate-700">
+              Opening Balance <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <div className={iconWrapperClass}>
+                <IndianRupee size={18} />
+              </div>
+              <input
+                type="number"
+                step="0.01"
+                value={openingBalance}
+                onChange={(e) => setOpeningBalance(e.target.value)}
+                placeholder="0.00"
+                className={inputClass(!!errors.openingBalance)}
+              />
+            </div>
+            {errors.openingBalance && (
+              <p className="text-red-600 text-sm mt-1">{errors.openingBalance}</p>
             )}
           </div>
 

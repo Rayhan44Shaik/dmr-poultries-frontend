@@ -52,6 +52,7 @@ function mapShop(raw: Record<string, unknown>): Shop {
     village: String(raw.village ?? ""),
     address: String(raw.address ?? ""),
     status: normalizeStatus(raw.status),
+    openingBalance: Number(raw.openingBalance ?? raw.opening_balance ?? 0),
   };
 }
 
@@ -64,6 +65,7 @@ function toPayload(input: ShopInput | Partial<Shop>): Record<string, unknown> {
     village: input.village?.trim() ?? "",
     address: input.address?.trim() ?? "",
     status: input.status ?? "Active",
+    openingBalance: Number(input.openingBalance ?? 0),
   };
 }
 
@@ -106,6 +108,17 @@ export async function createShop(input: ShopInput): Promise<Shop> {
   return mapShop(data);
 }
 
+/** POST /api/masters/shops/bulk — Upload multiple shops from Excel */
+export async function bulkCreateShops(inputs: ShopInput[]): Promise<Shop[]> {
+  clearLegacyShopStorage();
+  const payload = inputs.map(toPayload);
+  const { data } = await apiPost<Record<string, unknown>[]>(
+    `${SHOPS_PATH}/bulk`,
+    payload
+  );
+  return Array.isArray(data) ? data.map(mapShop) : [];
+}
+
 /** PUT /api/masters/shops/:id */
 export async function updateShop(
   id: number,
@@ -134,6 +147,7 @@ export async function refreshShops(): Promise<Shop[]> {
 export const shopService = {
   getAll,
   saveAll,
+  bulkCreateShops,
 };
 
 export { handleApiError };

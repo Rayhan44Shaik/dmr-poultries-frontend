@@ -2,10 +2,20 @@ import { useState } from "react";
 import type { Shop } from "../types/shop";
 import ShopForm from "../forms/ShopForm";
 
+type ShopPayload = {
+  shopName: string;
+  ownerName: string;
+  phoneNumber: string;
+  village: string;
+  address: string;
+  status: "Active" | "Inactive";
+  openingBalance: number;
+};
+
 type ShopDialogProps = {
   open: boolean;
   onClose: () => void;
-  onSave: (shop: any) => void | boolean | Promise<void | boolean>;
+  onSave: (shop: ShopPayload) => void | boolean | Promise<void | boolean>;
   shop?: Shop | null;
 };
 
@@ -14,7 +24,7 @@ function ShopDialog({ open, onClose, onSave, shop }: ShopDialogProps) {
 
   if (!open) return null;
 
-  const handleSave = async (formData: any) => {
+  const handleSave = async (formData: ShopPayload) => {
     setIsSaving(true);
     try {
       const result = await Promise.resolve(onSave(formData));

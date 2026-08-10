@@ -1,6 +1,6 @@
 // D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\masters\shops\pages\ShopsPage.tsx
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import DashboardLayout from "../../../../layouts/DashboardLayout/DashboardLayout";
 import PageLayout from "../../../../components/common/PageLayout";
 import ShopTable from "../components/ShopTable";
@@ -11,8 +11,10 @@ import { exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/shopService";
 import type { Shop } from "../types/shop";
+import type { ShopInput } from "../services/shopService";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 type ShopsPageProps = { embedded?: boolean };
 
@@ -24,6 +26,8 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { showNotification } = useSafeNotification();
   const {
@@ -33,6 +37,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     error,
     reload,
     addShop,
+    addShopsBulk,
     editShop,
     removeShop,
   } = useShops();
@@ -74,17 +79,18 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     const usableWidth = pageWidth - (margin * 2);
 
     // Adjusted weights to ensure total sum maps precisely to usableWidth without clipping right borders
-    // [Shop No, Shop Name, Owner, Village, Phone, Status]
-    const relativeWeights = [0.10, 0.26, 0.20, 0.22, 0.12, 0.10];
+    // [Shop No, Shop Name, Owner, Village, Phone, Balance, Status]
+    const relativeWeights = [0.08, 0.22, 0.18, 0.18, 0.12, 0.12, 0.10];
     const columnStylesConfig: { [key: number]: { cellWidth: number; halign?: "center" | "left" | "right" } } = {};
 
-    const headers = ["Shop No", "Shop Name", "Owner", "Village", "Phone", "Status"];
+    const headers = ["Shop No", "Shop Name", "Owner", "Village", "Phone", "Balance", "Status"];
     headers.forEach((_, index) => {
       const computedWidth = usableWidth * relativeWeights[index];
       const isCentered = index === 0 || index === headers.length - 1;
+      const isRightAligned = index === 5; // Balance
       columnStylesConfig[index] = {
         cellWidth: computedWidth,
-        halign: isCentered ? "center" : "left",
+        halign: isRightAligned ? "right" : isCentered ? "center" : "left",
       };
     });
 
@@ -103,6 +109,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       shop.ownerName,
       shop.village,
       shop.phoneNumber,
+      `Rs. ${Number(shop.openingBalance || 0).toFixed(2)}`,
       shop.status,
     ]);
 
@@ -156,13 +163,14 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       showNotification("No data to export.", "error");
       return;
     }
-    const headers = ["Shop No", "Shop Name", "Owner", "Village", "Phone", "Status"];
+    const headers = ["Shop No", "Shop Name", "Owner", "Village", "Phone", "Opening Balance", "Status"];
     const rows = filteredShops.map((shop) => [
       shop.shopNo.toString(),
       shop.shopName,
       shop.ownerName,
       shop.village,
       shop.phoneNumber,
+      shop.openingBalance,
       shop.status,
     ]);
     const filename = `Shops_${new Date().toISOString().split("T")[0]}`;
@@ -170,6 +178,45 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     exportToExcel("Shops - Master List", headers, rows, filename);
     logAuditEvent("EXPORT_EXCEL", "Shops", undefined, { count: filteredShops.length });
     showNotification("Excel exported successfully!", "success");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = event.target?.result;
+        const workbook = XLSX.read(data, { type: "binary" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        
+        const parsedShops: ShopInput[] = jsonData.map((row: any) => ({
+          shopNo: Number(row["Shop No"]) || 0,
+          shopName: String(row["Shop Name"] || ""),
+          ownerName: String(row["Owner Name"] || ""),
+          phoneNumber: String(row["Phone"] || row["Mobile Number"] || row["Phone Number"] || ""),
+          village: String(row["Village"] || ""),
+          address: String(row["Address"] || ""),
+          status: (row["Status"] === "Inactive" ? "Inactive" : "Active") as "Active" | "Inactive",
+          openingBalance: Number(row["Opening Balance"] || row["Balance"]) || 0,
+        }));
+
+        await addShopsBulk(parsedShops);
+        showNotification("Shops uploaded successfully!", "success");
+      } catch (err) {
+        showNotification("Failed to upload shops.", "error");
+      }
+    };
+    
+    reader.readAsBinaryString(file);
+    
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const validateShop = (shop: Partial<Shop>): string | null => {
@@ -191,6 +238,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       return "Mobile Number must be exactly 10 digits.";
     }
 
+    // ONLY Shop Name needs to be unique now (Owner & Phone can be duplicates for multiple branches)
     const duplicateShop = shops.some(
       (s) =>
         s.shopName.trim().toLowerCase() === shopName.toLowerCase() &&
@@ -198,13 +246,6 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     );
     if (duplicateShop) {
       return "Shop Name already exists.";
-    }
-
-    const duplicatePhone = shops.some(
-      (s) => s.phoneNumber === phoneNumber && s.id !== editingShop?.id
-    );
-    if (duplicatePhone) {
-      return "Phone Number already exists.";
     }
 
     return null;
@@ -217,13 +258,14 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       return false;
     }
 
-    const payload = {
+    const payload: ShopInput = {
       shopName: shop.shopName!.trim(),
       ownerName: shop.ownerName!.trim(),
       phoneNumber: shop.phoneNumber!.trim(),
       village: shop.village!.trim(),
       address: shop.address?.trim() ?? "",
       status: shop.status ?? "Active",
+      openingBalance: shop.openingBalance ?? 0,
     };
 
     try {
@@ -233,10 +275,9 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
         showNotification("Shop updated successfully!", "success");
       } else {
         const list = await addShop(payload);
+        // Find the newly created shop by its unique Shop Name
         const created = list.find(
-          (s) =>
-            s.shopName === payload.shopName &&
-            s.phoneNumber === payload.phoneNumber
+          (s) => s.shopName === payload.shopName
         );
         logAuditEvent("CREATE_SHOP", "Shops", created?.id);
         showNotification("Shop added successfully!", "success");
@@ -336,13 +377,31 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
                 </svg>
                 Excel
               </button>
+
+              <input
+                type="file"
+                accept=".xlsx, .xls"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={saving}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Upload
+              </button>
               
               <button
                 onClick={() => {
                   setEditingShop(null);
                   setShowDialog(true);
                 }}
-                disabled={loading}
+                disabled={loading || saving}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
