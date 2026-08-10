@@ -1,8 +1,8 @@
 // src/modules/operations/vehicle-trips/pages/TripEntryPage.tsx
 
-import React, { useEffect, useState, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { AlertCircle, FileText, Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 
 // --- Components ---
 import UnLoadingTable from "../components/Step_4";
@@ -75,11 +75,11 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     submitEndTrip,
     loadTrip,
     loadTripFromApi,
-    restoreLocalDraft,
     clearTrip,
     setStartTrip,
     updateStartTrip,
     registerTripIdCallback,
+    registerStep1SuccessCallback,
   } = useTripEntry(showNotification, refreshTrips);
 
   const [rows, setRows] = useState<ShopDelivery[]>([]);
@@ -112,6 +112,15 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   }, [registerTripIdCallback, syncTripIdInUrl]);
 
   useEffect(() => {
+    registerStep1SuccessCallback(() => {
+      setRows([]);
+      setViewStepIndex(0);
+      setEntryScreen("prompt");
+      syncTripIdInUrl(0);
+    });
+  }, [registerStep1SuccessCallback, syncTripIdInUrl]);
+
+  useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tripIdParam = params.get("tripId");
 
@@ -136,20 +145,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       return;
     }
 
-    if (skipAutoResumeRef.current) {
+    // No draft resume. Fresh Step 1 until Create New Trip.
+    if (!initialResumeDoneRef.current) {
+      initialResumeDoneRef.current = true;
       setEntryScreen("prompt");
-      return;
     }
-
-    if (initialResumeDoneRef.current) return;
-    initialResumeDoneRef.current = true;
-
-    setEntryScreen("loading");
-    void (async () => {
-      const restored = restoreLocalDraft();
-      setEntryScreen(restored ? "form" : "prompt");
-    })();
-  }, [location.search, loadTripFromApi, restoreLocalDraft, syncTripIdInUrl, trip.id]);
+  }, [location.search, loadTripFromApi, syncTripIdInUrl, trip.id]);
 
   // ─── Handle status change with fuel bill validation ────────────
   const handleStatusChange = (trip: Trip, status: "Pending" | "Completed") => {
@@ -245,7 +246,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setViewStepIndex(0);
     setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
     syncTripIdInUrl(0);
-    showNotification("✨ Cleared.", "info");
   };
 
   const isStartCompleted = Boolean(trip.startStepSubmitted);
@@ -325,12 +325,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       endStepJustSubmitted.current = false;
     }
   }, [isTripEnded, trip.status, setTrip, showNotification]);
-
-  const createSaveStatus = useSyncExternalStore(
-    subscribeHeaderSaveStatus,
-    getHeaderSaveStatus,
-    getHeaderSaveStatus
-  );
 
   const isNewTrip = trip.id === 0 || !trip.tripNo;
 
@@ -467,13 +461,17 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
             <button
               onClick={() => {
                 skipAutoResumeRef.current = false;
+                clearTrip();
+                setRows([]);
+                setViewStepIndex(0);
+                setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
+                syncTripIdInUrl(0);
                 setEntryScreen("form");
               }}
-              disabled={createSaveStatus === "saving"}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-blue-300 disabled:to-indigo-300 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"
             >
               <Plus size={18} />
-              {createSaveStatus === "saving" ? "Creating..." : "Create New Trip"}
+              Create New Trip
             </button>
           </div>
         ) : (
