@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import UnLoadingTable from "./Step_4";
 import BoxWeightAnalysis from "./Step_4/BoxWeightAnalysis";
+import ConfirmDialog from "./ConfirmDialog";
 import type { ShopDelivery, Trip, BoxDetail } from "../types/trip";
 
 interface Props {
@@ -85,7 +86,14 @@ export default function StepDeliveries({
     setEditingShopId(null);
   };
 
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
   const handleCancelWizard = () => {
+    // Guard against discarding an in-progress delivery step.
+    if (!trip.deliveryStepSubmitted && rows.length > 0) {
+      setShowCancelConfirm(true);
+      return;
+    }
     clearForm();
   };
 
@@ -157,7 +165,8 @@ export default function StepDeliveries({
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
+    <>
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3">
         <div className="flex items-center gap-2.5">
@@ -263,6 +272,21 @@ export default function StepDeliveries({
           tripDate={trip.tripDate}
         />
       )}
-    </div>
+      </div>
+
+      <ConfirmDialog
+        isOpen={showCancelConfirm}
+        title="Discard unsaved changes?"
+        message="You have unsubmitted delivery entries. Leaving will discard this session."
+        confirmLabel="Yes, Discard"
+        cancelLabel="Keep Editing"
+        type="warning"
+        onConfirm={() => {
+          setShowCancelConfirm(false);
+          clearForm();
+        }}
+        onCancel={() => setShowCancelConfirm(false)}
+      />
+    </>
   );
 }

@@ -38,6 +38,7 @@ export interface Trip {
   loaders?: string[];
   openingMeter: number;
   startStepSubmitted: boolean;
+  startStepSubmittedAt?: string;
 
   sourceFarmId: number;
   sourceFarm: string;
@@ -45,6 +46,7 @@ export interface Trip {
   destMeter: number;
   pickupTolls: number;  
   farmStepSubmitted: boolean;
+  farmStepSubmittedAt?: string;
   farmAddress?: string;
   avgBirdWeight?: number;
 
@@ -54,6 +56,7 @@ export interface Trip {
   avgWeight: number;
   pickupLoadTime: string;
   pickupStepSubmitted: boolean; 
+  pickupStepSubmittedAt?: string;
   boxNo: number;
   birds: number;
   weight: number; 
@@ -61,6 +64,7 @@ export interface Trip {
 
   deliveries: ShopDelivery[];
   deliveryStepSubmitted: boolean;
+  deliveriesStepSubmittedAt?: string;
 
   closingMeter: number;
   endTime: string;
@@ -79,6 +83,7 @@ export interface Trip {
   submittedAtTimestamp?: string;
   endStepSubmitted?: boolean;
   expensesStepSubmitted?: boolean;
+  expensesStepSubmittedAt?: string;
 
   totalKm: number;
   totalShops: number;

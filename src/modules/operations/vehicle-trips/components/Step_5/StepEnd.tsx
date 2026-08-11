@@ -1,6 +1,6 @@
 // src/modules/operations/vehicle-trips/components/Step_5/StepEnd.tsx
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Pencil,
   AlertTriangle,
@@ -9,8 +9,6 @@ import type { Trip, TripStatus } from "../../types/trip";
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 import GeneralExpensesTable from "./GeneralExpensesTable";
 import DieselExpensesTable from "./DieselExpensesTable";
-import { fuelExpenseService } from "../../../fuel-expenses/services/fuelExpenseService";
-import type { FuelExpense } from "../../../fuel-expenses/types/fuelExpense";
 
 // ─── ConfirmationModal ────────────────────────────────────────────
 function ConfirmationModal({ isOpen, title, message, confirmLabel = "Yes, Proceed", cancelLabel = "Cancel", onConfirm, onCancel, type = "warning" }: {
@@ -128,7 +126,7 @@ export default function StepEnd({
   const buildSheetDataFromTrip = (tripData: Trip): SheetData => {
     const data: SheetData = {
       vehicleNo: tripData.vehicleNo || "",
-      submittedAtTimestamp: (tripData as any).submittedAtTimestamp || (tripData as any).submittedAt || "",
+      submittedAtTimestamp: (tripData as any).expensesStepSubmittedAt || (tripData as any).submittedAtTimestamp || (tripData as any).submittedAt || "",
       advance: tripData.advanceAmount ?? "",
       meals: (tripData as any).meals ?? "",
       loading: (tripData as any).loading ?? "",
@@ -239,7 +237,7 @@ export default function StepEnd({
 
   // ─── Prepare final payload for submission ──────────────────────
   const prepareFinalPayload = (stepSubmitted = false) => {
-    const existingTimestamp = (trip as any).submittedAtTimestamp || sheetData.submittedAtTimestamp;
+    const existingTimestamp = (trip as any).expensesStepSubmittedAt || (trip as any).submittedAtTimestamp || sheetData.submittedAtTimestamp;
     const capturedTimestamp = existingTimestamp || new Date().toLocaleString("en-IN", {
       day: "2-digit",
       month: "2-digit",
@@ -275,52 +273,6 @@ export default function StepEnd({
       status: newStatus,
     };
   };
-
-  // ─── Sync fuel bills after submission ──────────────────────────
-  const syncFuelBillsOnSubmit = useCallback((data: SheetData) => {
-    const indices = getDieselIndices(data);
-    if (indices.length === 0) return;
-
-    const existingBills = fuelExpenseService.getBillsForTrip(trip.vehicleId, trip.tripDate);
-    const existingKeys = new Set<string>();
-    existingBills.forEach(b => {
-      const key = `${b.amount}-${b.meterReading}-${b.petrolBunk}`;
-      existingKeys.add(key);
-    });
-
-    indices.forEach(idx => {
-      const ltr = Number(data[`dieselLtr${idx}`] || 0);
-      const rate = Number(data[`dieselRate${idx}`] || 0);
-      const meter = Number(data[`dieselMeter${idx}`] || 0);
-      const bunk = data[`dieselBunk${idx}`] || "";
-      const image = data[`dieselImage${idx}`] || "";
-      if (!ltr || !rate || !meter || !bunk) return;
-
-      const amount = ltr * rate;
-      const key = `${amount}-${meter}-${bunk}`;
-      if (existingKeys.has(key)) return;
-
-      const fuelBill: Omit<FuelExpense, "id" | "billNo" | "createdDate" | "createdBy" | "status"> = {
-        date: trip.tripDate,
-        vehicleId: trip.vehicleId,
-        vehicleNo: trip.vehicleNo,
-        driverId: trip.driverId,
-        driverName: trip.driverName,
-        supervisorId: trip.supervisorId,
-        supervisorName: trip.supervisorName,
-        meterReading: meter,
-        amount: amount,
-        rate: rate,
-        litres: ltr,
-        petrolBunk: bunk,
-        remarks: `Auto-created from trip ${trip.tripNo}`,
-        image: image,
-        synced: true,
-      };
-
-      fuelExpenseService.save(fuelBill);
-    });
-  }, [trip]);
 
   // ─── Save progress (manual) ──────────────────────────────────────
   const handleSaveProgress = async () => {
@@ -408,9 +360,11 @@ export default function StepEnd({
       }
       if (success) {
         setSheetData(finalData as any);
+        savedSheetRef.current = JSON.stringify(finalData as any);
         setIsLocalEditing(false);
         setIsSubmittedLocal(true);
-        syncFuelBillsOnSubmit(finalData as any);
+        // Diesel → Fuel Expense sync is handled server-side (syncDieselToFuelExpenses),
+        // so Step 5 submission never writes duplicate fuel records on the client.
         setToast({ message: "End details submitted successfully.", type: "success" });
         // Final step complete → return to Create New Trip (no resume).
         if (clearForm) window.setTimeout(clearForm, 700);
@@ -433,7 +387,24 @@ export default function StepEnd({
       setToast({ message: "Edit cancelled.", type: "info" });
       return;
     }
-    // Cancel active wizard — discard unsaved Step 5 only.
+    // Cancel active wizard — protect unsaved Step 5 edits.
+    if (hasUnsavedChanges) {
+      setConfirmation({
+        isOpen: true,
+        title: "Discard unsaved changes?",
+        message: "You have unsaved changes in the expenses sheet. Leaving now will discard them.",
+        confirmLabel: "Yes, Discard",
+        cancelLabel: "Keep Editing",
+        type: "warning",
+        onConfirm: () => {
+          setConfirmation((prev) => ({ ...prev, isOpen: false }));
+          if (clearForm) clearForm();
+          else onCancel?.();
+        },
+        onCancel: () => setConfirmation((prev) => ({ ...prev, isOpen: false })),
+      });
+      return;
+    }
     if (clearForm) {
       clearForm();
       return;

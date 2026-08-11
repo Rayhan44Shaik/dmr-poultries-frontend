@@ -8,6 +8,7 @@ import { getVehicles } from "../../../masters/vehicles/services/vehicleService";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { WizardActionBar, WizardStepNotice } from "./WizardStepUI";
+import ConfirmDialog from "./ConfirmDialog";
 
 interface Props {
   trip: Trip;
@@ -323,7 +324,13 @@ export default function StepPickup({
   };
 
   // ─── Cancel discards unsaved Step 3 fields (no API / no draft) ─────
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
   const handleClose = () => {
+    if (hasUnsavedChanges && clearForm && !trip.pickupStepSubmitted) {
+      setShowCancelConfirm(true);
+      return;
+    }
     if (clearForm && !trip.pickupStepSubmitted) {
       clearForm();
       return;
@@ -995,6 +1002,20 @@ export default function StepPickup({
         type={confirmation.type}
         onConfirm={confirmation.onConfirm}
         onCancel={confirmation.onCancel || (() => setConfirmation((prev) => ({ ...prev, isOpen: false })))}
+      />
+
+      <ConfirmDialog
+        isOpen={showCancelConfirm}
+        title="Discard unsaved changes?"
+        message="You have unsaved pickup details. Leaving will discard them."
+        confirmLabel="Yes, Discard"
+        cancelLabel="Keep Editing"
+        type="warning"
+        onConfirm={() => {
+          setShowCancelConfirm(false);
+          if (clearForm) clearForm();
+        }}
+        onCancel={() => setShowCancelConfirm(false)}
       />
     </>
   );

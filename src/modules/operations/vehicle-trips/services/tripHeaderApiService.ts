@@ -8,6 +8,8 @@
 import {
   apiGet,
   apiPost,
+  apiPatch,
+  apiDelete,
   handleApiError,
 } from "../../../../api";
 import type { Trip, TripStatus } from "../types/trip";
@@ -141,12 +143,17 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     openingMeter: numOrZero(raw.openingMeter ?? raw.opening_meter ?? defaults.openingMeter),
     advanceAmount: num(raw.advanceAmount ?? raw.advance_amount, defaults.advanceAmount),
     startStepSubmitted: Boolean(raw.startStepSubmitted ?? raw.start_step_submitted ?? defaults.startStepSubmitted),
+    startStepSubmittedAt: formatStartTimeForDisplay(raw.startStepSubmittedAt ?? raw.start_step_submitted_at) || defaults.startStepSubmittedAt,
     remarks: str(raw.remarks, defaults.remarks),
     farmStepSubmitted: Boolean(raw.farmStepSubmitted ?? raw.farm_step_submitted ?? defaults.farmStepSubmitted),
+    farmStepSubmittedAt: formatStartTimeForDisplay(raw.farmStepSubmittedAt ?? raw.farm_step_submitted_at) || defaults.farmStepSubmittedAt,
     pickupStepSubmitted: Boolean(raw.pickupStepSubmitted ?? raw.pickup_step_submitted ?? defaults.pickupStepSubmitted),
+    pickupStepSubmittedAt: formatStartTimeForDisplay(raw.pickupStepSubmittedAt ?? raw.pickup_step_submitted_at) || defaults.pickupStepSubmittedAt,
     deliveryStepSubmitted: Boolean(raw.deliveryStepSubmitted ?? raw.delivery_step_submitted ?? defaults.deliveryStepSubmitted),
+    deliveriesStepSubmittedAt: formatStartTimeForDisplay(raw.deliveriesStepSubmittedAt ?? raw.deliveries_step_submitted_at) || defaults.deliveriesStepSubmittedAt,
     endStepSubmitted: Boolean(raw.endStepSubmitted ?? raw.end_step_submitted ?? defaults.endStepSubmitted),
     expensesStepSubmitted: Boolean(raw.expensesStepSubmitted ?? raw.expenses_step_submitted ?? defaults.expensesStepSubmitted),
+    expensesStepSubmittedAt: formatStartTimeForDisplay(raw.expensesStepSubmittedAt ?? raw.expenses_step_submitted_at) || defaults.expensesStepSubmittedAt,
     dcWeight: num(raw.dcWeight ?? raw.dc_weight, defaults.dcWeight),
     totalBirds: num(raw.totalBirds ?? raw.total_birds, defaults.totalBirds),
     boxes: num(raw.boxes, defaults.boxes),
@@ -285,6 +292,24 @@ export async function fetchLastClosingMeter(vehicleId: number): Promise<LastClos
   );
   if (!data || data.closingMeter == null) return null;
   return data;
+}
+
+/** DELETE /api/trips/:id — server-side soft delete (Recent Trips). */
+export async function deleteTripOnServer(id: number, reason?: string): Promise<void> {
+  await apiDelete(`${TRIPS_PATH}/${id}`, { params: { reason } });
+}
+
+/** PATCH /api/trips/:id/status — server-side lifecycle transition (Recent Trips). */
+export async function changeTripStatusOnServer(
+  id: number,
+  status: TripStatus,
+  approvedBy?: string
+): Promise<Trip> {
+  const { data } = await apiPatch<ApiTripRecord>(`${TRIPS_PATH}/${id}/status`, {
+    status,
+    approvedBy,
+  });
+  return mapApiTripToTrip(data);
 }
 
 export { handleApiError };

@@ -4,7 +4,7 @@ import { Check } from "lucide-react";
 interface Props {
   currentStep: number;
   steps: string[];
-  completedMask: { start: boolean; farm: boolean; pickup: boolean; delivery: boolean };
+  completedMask: { start: boolean; farm: boolean; pickup: boolean; delivery: boolean; end: boolean };
   onStepClick?: (index: number) => void;
 }
 
@@ -13,7 +13,6 @@ export default function TripWizardStepper({ currentStep, steps, completedMask, o
   const stepStatus = [0, 1, 2, 3, 4].map((index) => {
     const stepNames = ["start", "farm", "pickup", "delivery", "end"];
     const key = stepNames[index];
-    if (key === "end") return false; 
     return completedMask[key as keyof typeof completedMask];
   });
 
@@ -28,7 +27,7 @@ export default function TripWizardStepper({ currentStep, steps, completedMask, o
         const circleClasses = `
           relative z-10 rounded-full flex items-center justify-center font-bold transition-all duration-300 border-2 shadow-sm
           w-8 h-8 text-xs md:w-10 md:h-10 md:text-sm
-          ${isCompleted ? "bg-blue-600 border-blue-600 text-white" : isActive ? "bg-white border-blue-600 text-blue-600 ring-4 ring-blue-50" : "bg-slate-100 border-slate-300 text-slate-400"}
+          ${isCompleted ? "bg-emerald-600 border-emerald-600 text-white" : isActive ? "bg-white border-blue-600 text-blue-600 ring-4 ring-blue-50" : "bg-slate-100 border-slate-300 text-slate-400"}
           ${isClickable ? "cursor-pointer hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2" : ""}
         `.trim();
 
@@ -39,7 +38,7 @@ export default function TripWizardStepper({ currentStep, steps, completedMask, o
               <div
                 // Responsive top positioning to align perfectly with shrinking/growing circles
                 className={`absolute top-4 md:top-5 left-[50%] w-full h-[2px] -z-10 transition-colors duration-500 ${
-                  isCompleted || (index < currentStep && stepStatus[index]) ? "bg-blue-600" : "bg-slate-200"
+                  isCompleted || (index < currentStep && stepStatus[index]) ? "bg-emerald-600" : "bg-slate-200"
                 }`}
               />
             )}
@@ -62,7 +61,7 @@ export default function TripWizardStepper({ currentStep, steps, completedMask, o
 
             {/* Label */}
             <div className="mt-2 md:mt-3 text-[10px] md:text-[11px] lg:text-xs font-bold tracking-wide text-center px-1">
-              <span className={`block transition-colors duration-300 ${isCompleted ? "text-blue-700" : isActive ? "text-slate-900" : "text-slate-400"}`}>
+              <span className={`block transition-colors duration-300 ${isCompleted ? "text-emerald-700" : isActive ? "text-slate-900" : "text-slate-400"}`}>
                 {label}
               </span>
               {/* Hide "Completed" on mobile to prevent overlapping text, show on tablets/laptops */}

@@ -12,6 +12,7 @@ import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { validateStartStep } from "../services/tripFormService";
 import { WizardActionBar, WizardStepNotice, type WizardNoticeState } from "./WizardStepUI";
+import ConfirmDialog from "./ConfirmDialog";
 
 type VehicleOption = { id: number; vehicleNumber: string };
 type EmployeeOption = { id: number; employeeName: string; department: string };
@@ -565,6 +566,7 @@ function StepStart({
   const [isLocalEditing, setIsLocalEditing] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [notice, setNotice] = useState<WizardNoticeState>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const loadedTripIdRef = useRef(tripId);
   const formRef = useRef(form);
@@ -684,6 +686,22 @@ function StepStart({
   }, []);
 
   const handleCancelEdit = useCallback(() => {
+    const isDestructive = (!startStepSubmitted && clearForm) || (editable && onCancel);
+    if (isDestructive && hasUnsavedChanges) {
+      setShowCancelConfirm(true);
+      return;
+    }
+    if (!startStepSubmitted && clearForm) {
+      clearForm();
+    } else if (editable && onCancel) {
+      onCancel();
+    } else {
+      setIsLocalEditing(false);
+    }
+  }, [startStepSubmitted, clearForm, editable, onCancel, hasUnsavedChanges]);
+
+  const handleCancelConfirm = useCallback(() => {
+    setShowCancelConfirm(false);
     if (!startStepSubmitted && clearForm) {
       clearForm();
     } else if (editable && onCancel) {
@@ -931,6 +949,17 @@ function StepStart({
           submitLabel={submitLabel}
         />
       </div>
+
+      <ConfirmDialog
+        isOpen={showCancelConfirm}
+        title="Discard unsaved changes?"
+        message="You have unsaved start details. Leaving will discard them."
+        confirmLabel="Yes, Discard"
+        cancelLabel="Keep Editing"
+        type="warning"
+        onConfirm={handleCancelConfirm}
+        onCancel={() => setShowCancelConfirm(false)}
+      />
     </>
   );
 }

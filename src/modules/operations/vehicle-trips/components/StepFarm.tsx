@@ -3,6 +3,7 @@ import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Pencil, Loader2, Sc
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { WizardActionBar, WizardStepNotice } from "./WizardStepUI";
+import ConfirmDialog from "./ConfirmDialog";
 
 interface Props {
   trip: Trip;
@@ -36,6 +37,15 @@ export default function StepFarm({
   const [destMeterError, setDestMeterError] = useState<string | null>(null);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" } | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
+  const handleCancel = () => {
+    if (hasUnsavedChanges) {
+      setShowCancelConfirm(true);
+      return;
+    }
+    onCancel?.();
+  };
 
   const notify = (msg: string, type: "success" | "error" | "warning" = "success") => {
     if (showNotification) {
@@ -454,7 +464,7 @@ export default function StepFarm({
           dirty={hasUnsavedChanges}
         />
         <WizardActionBar
-          onCancel={() => onCancel?.()}
+          onCancel={handleCancel}
           onSave={saveFarmProgress ? handleSaveProgress : undefined}
           onSubmit={handleSubmit}
           busy={isSubmitting}
@@ -463,6 +473,20 @@ export default function StepFarm({
           submitLabel={trip.farmStepSubmitted ? "Update Farm Details" : "Submit Farm Details"}
         />
       </div>
+
+      <ConfirmDialog
+        isOpen={showCancelConfirm}
+        title="Discard unsaved changes?"
+        message="You have unsaved farm details. Leaving will discard them."
+        confirmLabel="Yes, Discard"
+        cancelLabel="Keep Editing"
+        type="warning"
+        onConfirm={() => {
+          setShowCancelConfirm(false);
+          onCancel?.();
+        }}
+        onCancel={() => setShowCancelConfirm(false)}
+      />
     </>
   );
 }

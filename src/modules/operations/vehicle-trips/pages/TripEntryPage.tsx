@@ -25,9 +25,6 @@ import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useBirdTypes } from "../../../masters/bird-types/hooks/useBirdTypes";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
-// --- Services ---
-import { fuelExpenseService } from "../../fuel-expenses/services/fuelExpenseService";
-
 // --- Utils ---
 import { canEditItem } from "../../../../utils/dateUtils";
 import type { Trip, ShopDelivery } from "../types/trip";
@@ -116,22 +113,11 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     });
   }, [registerStep1SuccessCallback, setIsEditing]);
 
-  // ─── Handle status change with fuel bill validation ────────────
-  const handleStatusChange = (trip: Trip, status: "Pending" | "Completed") => {
-    if (status === "Completed") {
-      const bills = fuelExpenseService.getBillsForTrip(trip.vehicleId, trip.tripDate);
-      const pendingBills = bills.filter(b => b.status === "Pending");
-
-      if (pendingBills.length > 0) {
-        const msg = pendingBills.length === 1
-          ? `⚠️ 1 fuel bill for this trip is not approved. Please approve it before completing the trip.`
-          : `⚠️ ${pendingBills.length} fuel bills for this trip are not approved. Please approve them before completing the trip.`;
-        showNotification(msg, "info");
-        return;
-      }
-    }
-
-    changeStatus(trip, status);
+  // ─── Handle status change (server-side, transaction-safe) ─────────
+  // Diesel bills synced to fuel_expenses are approved atomically when the
+  // trip completes (PATCH /trips/:id/status → tripsService.updateStatus).
+  const handleStatusChange = (trip: Trip, status: "Pending" | "Completed", approvedBy?: string) => {
+    changeStatus(trip, status, approvedBy);
   };
 
   const handleView = (selectedTrip: Trip) => {
