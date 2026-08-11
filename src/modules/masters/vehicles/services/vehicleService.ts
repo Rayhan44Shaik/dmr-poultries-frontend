@@ -145,6 +145,17 @@ export async function createVehicle(input: VehicleInput): Promise<Vehicle> {
   return mapVehicle(data);
 }
 
+/** POST /api/masters/vehicles/bulk — Upload multiple vehicles from Excel */
+export async function bulkCreateVehicles(inputs: VehicleInput[]): Promise<Vehicle[]> {
+  clearLegacyVehicleStorage();
+  const payload = inputs.map(toPayload);
+  const { data } = await apiPost<Record<string, unknown>[]>(
+    `${VEHICLES_PATH}/bulk`,
+    payload
+  );
+  return Array.isArray(data) ? data.map(mapVehicle) : [];
+}
+
 /** PUT /api/masters/vehicles/:id */
 export async function updateVehicle(
   id: number,

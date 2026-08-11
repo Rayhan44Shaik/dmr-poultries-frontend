@@ -188,12 +188,12 @@ function BanksPage({ embedded = false }: BanksPageProps) {
   };
 
   const handleDeleteBank = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this bank?")) return;
+    if (!window.confirm("Deactivate this bank? It will be marked Inactive (history is kept).")) return;
     setDeletingId(id);
     try {
       await removeBank(id);
-      logAuditEvent("DELETE_BANK", "Banks", id);
-      showNotification("Bank deleted successfully!", "success");
+      logAuditEvent("DEACTIVATE_BANK", "Banks", id);
+      showNotification("Bank deactivated successfully!", "success");
     } catch (err) {
       showNotification(handleApiError(err), "error");
     } finally {

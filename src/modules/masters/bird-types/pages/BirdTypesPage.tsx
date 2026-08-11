@@ -11,6 +11,8 @@ import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/birdTypeService";
 import type { BirdType } from "../types/birdType";
+import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
+import { buildBirdTypeBulkImportConfig } from "../bulkImportConfig";
 
 type BirdTypesPageProps = { embedded?: boolean };
 
@@ -18,6 +20,7 @@ const ITEMS_PER_PAGE = 10;
 
 function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
   const [showDialog, setShowDialog] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingBirdType, setEditingBirdType] = useState<BirdType | null>(null);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -31,9 +34,15 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
     error,
     reload,
     addBirdType,
+    addBirdTypesBulk,
     editBirdType,
     removeBirdType,
   } = useBirdTypes();
+
+  const birdTypeBulkImportConfig = useMemo(
+    () => buildBirdTypeBulkImportConfig({ addBirdTypesBulk, reload }),
+    [addBirdTypesBulk, reload]
+  );
 
   // Reset to page 1 whenever search keyword changes
   const handleSearchChange = (value: string) => {
@@ -161,12 +170,12 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
   };
 
   const handleDeleteBirdType = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this bird type?")) return;
+    if (!window.confirm("Deactivate this bird type? It will be marked Inactive (history is kept).")) return;
     setDeletingId(id);
     try {
       await removeBirdType(id);
-      logAuditEvent("DELETE_BIRD_TYPE", "BirdTypes", id);
-      showNotification("Bird Type deleted successfully!", "success");
+      logAuditEvent("DEACTIVATE_BIRD_TYPE", "BirdTypes", id);
+      showNotification("Bird Type deactivated successfully!", "success");
     } catch (err) {
       showNotification(handleApiError(err), "error");
     } finally {
@@ -239,7 +248,18 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M2 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V4zm6 0a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1H9a1 1 0 01-1-1V4zm6 0a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                 </svg>
-                Excel
+Excel
+              </button>
+               
+              <button
+                onClick={() => setShowBulkImport(true)}
+                disabled={loading || saving}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Bulk Import
               </button>
               
               <button
@@ -370,6 +390,21 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
         }}
         onSave={handleSaveBirdType}
         birdType={editingBirdType}
+      />
+      <BulkImportDialog
+        open={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        config={birdTypeBulkImportConfig}
+        existing={birdTypes}
+        onImported={(result) => {
+          logAuditEvent("BULK_IMPORT", "BirdTypes", undefined, {
+            count: result.imported,
+          });
+          showNotification(
+            `Imported ${result.imported} of ${result.total} bird types.`,
+            result.failed === 0 ? "success" : "error"
+          );
+        }}
       />
     </div>
   );

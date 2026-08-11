@@ -16,6 +16,7 @@ import VehiclesPage from "../modules/masters/vehicles/pages/VehiclesPage";
 import EmployeesPage from "../modules/masters/employees/pages/EmployeesPage";
 import BanksPage from "../modules/masters/banks/pages/BanksPage";
 import BirdTypesPage from "../modules/masters/bird-types/pages/BirdTypesPage";
+import RoutesPage from "../modules/masters/routes/pages/RoutesPage";
 
 // Operations Module
 import OperationsPages from "../modules/operations/pages/OperationsPages";
@@ -62,6 +63,7 @@ function AppRoutes() {
       <Route path="/masters/employees" element={<DashboardLayout><EmployeesPage /></DashboardLayout>} />
       <Route path="/masters/banks" element={<DashboardLayout><BanksPage /></DashboardLayout>} />
       <Route path="/masters/bird-types" element={<DashboardLayout><BirdTypesPage /></DashboardLayout>} />
+      <Route path="/masters/routes" element={<DashboardLayout><RoutesPage /></DashboardLayout>} />
 
       {/* ============ OPERATIONS ============ */}
       <Route path="/operations" element={<DashboardLayout><OperationsPages /></DashboardLayout>} />

@@ -9,6 +9,7 @@ import {
   Users,
   Landmark,
   Bird,
+  Map,
 } from "lucide-react";
 
 import ShopsPage from "../shops/pages/ShopsPage";
@@ -17,6 +18,7 @@ import VehiclesPage from "../vehicles/pages/VehiclesPage";
 import EmployeesPage from "../employees/pages/EmployeesPage";
 import BanksPage from "../banks/pages/BanksPage";
 import BirdTypesPage from "../bird-types/pages/BirdTypesPage";
+import RoutesPage from "../routes/pages/RoutesPage";
 
 // Tabs with distinct icon colours
 const tabs = [
@@ -26,6 +28,7 @@ const tabs = [
   { key: "employees", label: "Employees", icon: Users, color: "text-orange-600", component: EmployeesPage },
   { key: "banks", label: "Banks", icon: Landmark, color: "text-amber-600", component: BanksPage },
   { key: "birdTypes", label: "Bird Types", icon: Bird, color: "text-rose-600", component: BirdTypesPage },
+  { key: "routes", label: "Routes", icon: Map, color: "text-cyan-600", component: RoutesPage },
 ];
 
 function MastersPage() {

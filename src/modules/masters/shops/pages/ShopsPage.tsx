@@ -1,6 +1,6 @@
 // D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\masters\shops\pages\ShopsPage.tsx
 
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo } from "react";
 import DashboardLayout from "../../../../layouts/DashboardLayout/DashboardLayout";
 import PageLayout from "../../../../components/common/PageLayout";
 import ShopTable from "../components/ShopTable";
@@ -12,9 +12,10 @@ import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/shopService";
 import type { Shop } from "../types/shop";
 import type { ShopInput } from "../services/shopService";
+import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
+import { buildShopBulkImportConfig } from "../bulkImportConfig";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
 
 type ShopsPageProps = { embedded?: boolean };
 
@@ -22,12 +23,11 @@ const ITEMS_PER_PAGE = 10;
 
 function ShopsPage({ embedded = false }: ShopsPageProps) {
   const [showDialog, setShowDialog] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { showNotification } = useSafeNotification();
   const {
@@ -180,44 +180,10 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     showNotification("Excel exported successfully!", "success");
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const data = event.target?.result;
-        const workbook = XLSX.read(data, { type: "binary" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
-        
-        const parsedShops: ShopInput[] = jsonData.map((row: any) => ({
-          shopNo: Number(row["Shop No"]) || 0,
-          shopName: String(row["Shop Name"] || ""),
-          ownerName: String(row["Owner Name"] || ""),
-          phoneNumber: String(row["Phone"] || row["Mobile Number"] || row["Phone Number"] || ""),
-          village: String(row["Village"] || ""),
-          address: String(row["Address"] || ""),
-          status: (row["Status"] === "Inactive" ? "Inactive" : "Active") as "Active" | "Inactive",
-          openingBalance: Number(row["Opening Balance"] || row["Balance"]) || 0,
-        }));
-
-        await addShopsBulk(parsedShops);
-        showNotification("Shops uploaded successfully!", "success");
-      } catch (err) {
-        showNotification("Failed to upload shops.", "error");
-      }
-    };
-    
-    reader.readAsBinaryString(file);
-    
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
+  const shopBulkImportConfig = useMemo(
+    () => buildShopBulkImportConfig({ addShopsBulk, reload }),
+    [addShopsBulk, reload]
+  );
 
   const validateShop = (shop: Partial<Shop>): string | null => {
     const shopName = shop.shopName?.trim() ?? "";
@@ -297,12 +263,12 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   };
 
   const handleDeleteShop = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this shop?")) return;
+    if (!window.confirm("Deactivate this shop? It will be marked Inactive (history is kept).")) return;
     setDeletingId(id);
     try {
       await removeShop(id);
-      logAuditEvent("DELETE_SHOP", "Shops", id);
-      showNotification("Shop deleted successfully!", "success");
+      logAuditEvent("DEACTIVATE_SHOP", "Shops", id);
+      showNotification("Shop deactivated successfully!", "success");
     } catch (err) {
       showNotification(handleApiError(err), "error");
     } finally {
@@ -378,23 +344,16 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
                 Excel
               </button>
 
-              <input
-                type="file"
-                accept=".xlsx, .xls"
-                className="hidden"
-                ref={fileInputRef}
-                onChange={handleFileUpload}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={saving}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-all"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-                Upload
-              </button>
+<button
+                  onClick={() => setShowBulkImport(true)}
+                  disabled={loading || saving}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-all"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Bulk Import
+                </button>
               
               <button
                 onClick={() => {
@@ -524,6 +483,21 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
         }}
         onSave={handleSaveShop}
         shop={editingShop}
+      />
+      <BulkImportDialog
+        open={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        config={shopBulkImportConfig}
+        existing={shops}
+        onImported={(result) => {
+          logAuditEvent("BULK_IMPORT", "Shops", undefined, {
+            count: result.imported,
+          });
+          showNotification(
+            `Imported ${result.imported} of ${result.total} shops.`,
+            result.failed === 0 ? "success" : "error"
+          );
+        }}
       />
     </div>
   );

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { Shop } from "../types/shop";
 import {
+  bulkCreateShops,
   createShop,
   deleteShop,
   handleApiError,
@@ -63,17 +64,13 @@ export function useShops() {
     }
   }, []);
 
-  // CHANGED: This now loops and uses the single createShop API 
-  // to avoid the 404 "Not Found" error on the bulk route.
+  // Uses the real transactional POST /api/masters/shops/bulk endpoint.
+  // If ANY row is invalid/duplicate the backend rejects the whole batch (400/409).
   const addShopsBulk = useCallback(async (inputs: ShopInput[]) => {
     setSaving(true);
     setError(null);
     try {
-      // Loop through each shop from the excel file and save it one by one
-      for (const input of inputs) {
-        await createShop(input);
-      }
-      
+      await bulkCreateShops(inputs);
       const data = await refreshShopsFromApi();
       setShops(data);
       return data;
