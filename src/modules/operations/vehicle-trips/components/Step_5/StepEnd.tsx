@@ -1,16 +1,13 @@
-// src/modules/operations/vehicle-trips/components/Step_5/StepEnd.tsx
-
 import React, { useState, useEffect, useRef } from "react";
 import {
   Pencil,
   AlertTriangle,
 } from "lucide-react";
-import type { Trip, TripStatus } from "../../types/trip";
+import type { Trip } from "../../types/trip";
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 import GeneralExpensesTable from "./GeneralExpensesTable";
 import DieselExpensesTable from "./DieselExpensesTable";
 
-// ─── ConfirmationModal ────────────────────────────────────────────
 function ConfirmationModal({ isOpen, title, message, confirmLabel = "Yes, Proceed", cancelLabel = "Cancel", onConfirm, onCancel, type = "warning" }: {
   isOpen: boolean;
   title: string;
@@ -49,8 +46,6 @@ function ConfirmationModal({ isOpen, title, message, confirmLabel = "Yes, Procee
     </div>
   );
 }
-
-// ─── Main Component ──────────────────────────────────────────────────
 
 interface SheetData extends Record<string, any> {
   vehicleNo: string;
@@ -96,7 +91,6 @@ export default function StepEnd({
   onCancel,
   clearForm,
 }: Props) {
-  // ─── State ─────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -118,15 +112,12 @@ export default function StepEnd({
     onCancel: () => {},
   });
 
-  // ─── Local isSubmitted state ─────────────────────────────────────
-  const [isSubmittedLocal, setIsSubmittedLocal] = useState(false);
-  const isSubmitted = Boolean((trip as any).expensesStepSubmitted || (trip as any).endStepSubmitted || isSubmittedLocal);
+  const isSubmitted = Boolean((trip as any).expensesStepSubmitted || (trip as any).endStepSubmitted);
 
-  // ─── Helper to build sheet data from trip ──────────────────────
   const buildSheetDataFromTrip = (tripData: Trip): SheetData => {
     const data: SheetData = {
       vehicleNo: tripData.vehicleNo || "",
-      submittedAtTimestamp: (tripData as any).expensesStepSubmittedAt || (tripData as any).submittedAtTimestamp || (tripData as any).submittedAt || "",
+      submittedAtTimestamp: (tripData as any).expensesStepSubmittedAt || "",
       advance: tripData.advanceAmount ?? "",
       meals: (tripData as any).meals ?? "",
       loading: (tripData as any).loading ?? "",
@@ -143,7 +134,6 @@ export default function StepEnd({
       destinationTolls: (tripData as any).destinationTolls ?? (tripData as any).deliveryTolls ?? "",
       remarks: (tripData as any).remarks ?? "",
     };
-    // Copy all diesel fields from trip
     Object.keys(tripData).forEach(key => {
       if (key.startsWith("dieselLtr") || key.startsWith("dieselRate") || key.startsWith("dieselMeter") ||
           key.startsWith("dieselBunk") || key.startsWith("dieselImage") || key.startsWith("dieselImageName")) {
@@ -153,22 +143,18 @@ export default function StepEnd({
     return data;
   };
 
-  // ─── Sheet Data state ───────────────────────────────────────────
   const [sheetData, setSheetData] = useState<SheetData>(() => buildSheetDataFromTrip(trip));
 
-  // ─── Reset sheetData when trip changes ──────────────────────────
   const prevTripId = useRef<number>(trip.id);
   useEffect(() => {
     if (trip.id !== prevTripId.current) {
       prevTripId.current = trip.id;
       setSheetData(buildSheetDataFromTrip(trip));
-      setIsSubmittedLocal(false);
       setErrorMsg("");
       setIsLocalEditing(false);
     }
   }, [trip.id, trip]);
 
-  // ─── Compute Distance & Average ──────────────────────────────────
   const openingMeter = trip.openingMeter || 0;
   const destMeter = trip.destMeter || 0;
   const endMeterNum = Number(sheetData.endMeter);
@@ -178,7 +164,6 @@ export default function StepEnd({
     totalDistanceCovered = endMeterNum - openingMeter;
   }
 
-  // ─── Dynamically compute diesel totals from all rows ────────────
   const getDieselIndices = (data: SheetData): number[] => {
     const indices: number[] = [];
     Object.keys(data).forEach(key => {
@@ -208,14 +193,12 @@ export default function StepEnd({
   const savedSheetRef = useRef(JSON.stringify(buildSheetDataFromTrip(trip)));
   const hasUnsavedChanges = JSON.stringify(sheetData) !== savedSheetRef.current;
 
-  // ─── Handle field changes in React state only ──────────────────
   const handleChange = (field: string, value: any) => {
     setErrorMsg("");
     const updated = { ...sheetData, [field]: value };
     setSheetData(updated);
   };
 
-  // ─── Compute derived values ──────────────────────────────────────
   const totalExpenses1 =
     Number(sheetData.meals || 0) +
     Number(sheetData.loading || 0) +
@@ -235,31 +218,9 @@ export default function StepEnd({
   const remainingBalance =
     Number(sheetData.advance || 0) - totalAllExpenses - totalDieselAmount;
 
-  // ─── Prepare final payload for submission ──────────────────────
   const prepareFinalPayload = (stepSubmitted = false) => {
-    const existingTimestamp = (trip as any).expensesStepSubmittedAt || (trip as any).submittedAtTimestamp || sheetData.submittedAtTimestamp;
-    const capturedTimestamp = existingTimestamp || new Date().toLocaleString("en-IN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true,
-    });
-
-    let newStatus: TripStatus = trip.status || "Draft";
-    if (stepSubmitted) {
-      if (trip.status !== "Deleted") {
-        newStatus = "Completed"; // ✅ FIXED: End step signifies trip completion
-      } else {
-        newStatus = "Deleted";
-      }
-    }
-
-    return {
+    const payload: any = {
       ...sheetData,
-      submittedAtTimestamp: capturedTimestamp,
       totalExpenses: totalAllExpenses,
       totalDieselAmount,
       remainingBalance,
@@ -269,12 +230,17 @@ export default function StepEnd({
       advanceAmount: sheetData.advance === "" ? 0 : Number(sheetData.advance),
       openingMeter: openingMeter,
       expensesStepSubmitted: stepSubmitted,
-      endStepSubmitted: stepSubmitted, // ✅ Explicitly set endStepSubmitted
-      status: newStatus,
+      endStepSubmitted: stepSubmitted, 
     };
+
+    // Ensure no frontend-generated status or timestamps override the backend
+    delete payload.status;
+    delete payload.submittedAtTimestamp;
+    delete payload.expensesStepSubmittedAt;
+
+    return payload;
   };
 
-  // ─── Save progress (manual) ──────────────────────────────────────
   const handleSaveProgress = async () => {
     if (!saveEndProgress) return;
     setIsSubmitting(true);
@@ -289,7 +255,6 @@ export default function StepEnd({
     setIsSubmitting(false);
   };
 
-  // ─── Initiate submit ──────────────────────────────────────────────
   const handleInitiateSubmit = () => {
     const endMeterNum = Number(sheetData.endMeter);
     if (sheetData.endMeter === "" || sheetData.endMeter === null || isNaN(endMeterNum)) {
@@ -335,7 +300,7 @@ export default function StepEnd({
       title: isSubmitted ? "Update Expenses Sheet" : "Submit Expenses Sheet",
       message: isSubmitted
         ? "Are you sure you want to update the submitted expenses sheet with recent changes?"
-        : "Are you sure you want to submit this expenses sheet? This will mark the trip as completed and lock current entries.",
+        : "This will submit the End details and lock the current Step 5 entries.",
       confirmLabel: isSubmitted ? "Yes, Update" : "Yes, Submit",
       cancelLabel: "Cancel",
       type: "info",
@@ -356,15 +321,8 @@ export default function StepEnd({
       if (typeof submitFn === "function") {
         const result = await submitFn(finalData as any);
         if (result === true) {
-          setSheetData(finalData as any);
-          savedSheetRef.current = JSON.stringify(finalData as any);
           setIsLocalEditing(false);
-          setIsSubmittedLocal(true);
-          // Diesel → Fuel Expense sync is handled server-side (syncDieselToFuelExpenses),
-          // so Step 5 submission never writes duplicate fuel records on the client.
           setToast({ message: "End details submitted successfully.", type: "success" });
-          // Final step complete → return to Create New Trip (no resume).
-          if (clearForm) window.setTimeout(clearForm, 700);
         } else {
           setErrorMsg(result);
           setToast({ message: result, type: "error" });
@@ -385,7 +343,6 @@ export default function StepEnd({
       setToast({ message: "Edit cancelled.", type: "info" });
       return;
     }
-    // Cancel active wizard — protect unsaved Step 5 edits.
     if (hasUnsavedChanges) {
       setConfirmation({
         isOpen: true,
@@ -410,7 +367,6 @@ export default function StepEnd({
     onCancel?.();
   };
 
-  // ─── Render ──────────────────────────────────────────────────────
   return (
     <>
       <style>{`
@@ -423,7 +379,6 @@ export default function StepEnd({
       `}</style>
 
       {isSubmitted && !isLocalEditing ? (
-        // ─── Locked View ──────────────────────────────────────────────
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-3">
             <div className="flex items-center gap-2">
@@ -469,7 +424,6 @@ export default function StepEnd({
           </div>
         </div>
       ) : (
-        // ─── Editable View ────────────────────────────────────────────
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
             <div className="flex items-center gap-2">

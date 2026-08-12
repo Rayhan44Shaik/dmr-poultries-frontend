@@ -32,7 +32,6 @@ const makeRow = (boxNo: number): Row => ({
   weight: 0,
 });
 
-// ─── Confirmation Modal ──────────────────────────────────────────────
 interface ConfirmationModalProps {
   isOpen: boolean;
   title: string;
@@ -119,7 +118,6 @@ export default function StepPickup({
     return details.length > 0 ? details.map((d) => ({ ...d, uid: generateUid() })) : [makeRow(1)];
   });
 
-  // ─── Fetch Vehicle Max Box Limit ───────────────────────────────────
   const maxBoxes = useMemo(() => {
     try {
       const vehicles = getVehicles();
@@ -127,23 +125,20 @@ export default function StepPickup({
         (v) =>
           v.vehicleNumber?.trim().toLowerCase() === trip.vehicleNo?.trim().toLowerCase()
       );
-      return matched?.noOfBoxes ?? 85; // Default max limit fallback if not specified
+      return matched?.noOfBoxes ?? 85; 
     } catch {
       return 85;
     }
   }, [trip.vehicleNo]);
 
-  // ─── Image upload state ────────────────────────────────────────────
   const [imageKey, setImageKey] = useState<string | null>(trip.dcPhotoKey || null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const savedPhotoKeyRef = useRef<string | null>(trip.dcPhotoKey || null);
   const [isImageLoading, setIsImageLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ─── Toast state ────────────────────────────────────────────────────
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
-  // ─── Confirmation state ─────────────────────────────────────────────
   const [confirmation, setConfirmation] = useState<{
     isOpen: boolean;
     title: string;
@@ -172,7 +167,6 @@ export default function StepPickup({
     setImagePreview(trip.dcPhotoData || null);
   }, [trip.dcPhotoData, imageKey]);
 
-  // ─── Sync imageKey with trip.dcPhotoKey ────────────────────────────
   useEffect(() => {
     if (trip.dcPhotoKey !== imageKey) {
       setImageKey(trip.dcPhotoKey || null);
@@ -196,7 +190,6 @@ export default function StepPickup({
     return { totalBirds, dcWeight, boxes, avgWeight };
   }, [rows]);
 
-  // ─── Row operations with Max Box Limit Check ───────────────────────
   const addRow = () => {
     if (rows.length >= maxBoxes) {
       setToast({
@@ -241,7 +234,6 @@ export default function StepPickup({
     return lastRow.birds > 0 && lastRow.weight > 0;
   }, [rows]);
 
-  // ─── Image upload handlers ──────────────────────────────────────────
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -286,7 +278,6 @@ export default function StepPickup({
     }
   };
 
-  // ─── Download Image ──────────────────────────────────────────────────
   const downloadImage = async () => {
     if (!imagePreview) return;
     try {
@@ -302,7 +293,6 @@ export default function StepPickup({
     }
   };
 
-  // ─── Manual Save ────────────────────────────────────────────────
   const handleSaveProgress = async () => {
     if (!savePickupProgress) return;
     setIsSaving(true);
@@ -325,7 +315,6 @@ export default function StepPickup({
     setIsSaving(false);
   };
 
-  // ─── Cancel discards unsaved Step 3 fields (no API / no draft) ─────
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const handleClose = () => {
@@ -344,7 +333,6 @@ export default function StepPickup({
     setIsLocalEditing(false);
   };
 
-  // ─── Submit / Update with confirmation ─────────────────────────────
   const handleSubmit = () => {
     if (rows.length === 0) return;
     if (isSubmitting) return;
@@ -402,7 +390,6 @@ export default function StepPickup({
 
   const canSubmit = rows.length > 0 && totals.totalBirds > 0 && totals.dcWeight > 0 && imageKey !== null;
 
-  // ─── PDF Generation ─────────────────────────────────────────────────
   const generatePDF = () => {
     if (!trip.pickupStepSubmitted) return;
     try {
@@ -516,7 +503,6 @@ export default function StepPickup({
     }
   };
 
-  // ─── LOCKED VIEW ───────────────────────────────────────────────────
   if (trip.pickupStepSubmitted && !editable && !isLocalEditing) {
     const grouped = trip.boxDetails?.reduce((acc: BoxDetail[][], _, i, arr) => {
       if (i % 3 === 0) acc.push(arr.slice(i, i + 3));
@@ -525,7 +511,6 @@ export default function StepPickup({
 
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
           <div className="flex items-center gap-2.5">
             <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
@@ -551,7 +536,6 @@ export default function StepPickup({
           </div>
         </div>
 
-        {/* 5 Column Compact Deliveries-Style KPI Cards Grid */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-2">
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
@@ -585,7 +569,6 @@ export default function StepPickup({
           </div>
         </div>
 
-        {/* DC Photo Status Card */}
         {imageKey && (
           <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center gap-2 text-xs font-medium text-slate-700">
             <Camera size={16} className="text-slate-400" />
@@ -593,7 +576,6 @@ export default function StepPickup({
           </div>
         )}
 
-        {/* Box Table */}
         {trip.boxDetails && trip.boxDetails.length > 0 && (
           <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto max-h-96 overflow-y-auto">
             <table className="w-full table-fixed border-collapse text-xs">
@@ -653,7 +635,6 @@ export default function StepPickup({
           </div>
         )}
 
-        {/* Bottom Banner with Actions */}
         <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-center justify-between flex-wrap gap-2">
           <p className="text-xs text-slate-600 font-normal">
             Pickup KPI details submitted successfully.
@@ -681,7 +662,6 @@ export default function StepPickup({
     );
   }
 
-  // ─── EDIT / ENTRY VIEW ──────────────────────────────────────────────────
   const groupedRows = rows.reduce((acc: Row[][], _, i, arr) => {
     if (i % 3 === 0) acc.push(arr.slice(i, i + 3));
     return acc;
@@ -754,7 +734,6 @@ export default function StepPickup({
       `}</style>
 
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
           <div className="flex items-center gap-2.5">
             <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
@@ -773,13 +752,11 @@ export default function StepPickup({
           </div>
         </div>
 
-        {/* Auto time */}
         <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
           <Clock size={14} className="text-slate-400" />
           <span>{trip.pickupLoadTime || "Auto time on submit"}</span>
         </div>
 
-        {/* Image Upload Section */}
         <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50">
           <div className="flex items-start gap-4">
             <div className="flex-1">
@@ -825,7 +802,6 @@ export default function StepPickup({
           </div>
         </div>
 
-        {/* Entry Table Container */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-slate-600">
@@ -949,7 +925,6 @@ export default function StepPickup({
           </p>
         </div>
 
-        {/* Totals Summary Bar - Deliveries Style KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
@@ -994,7 +969,6 @@ export default function StepPickup({
         />
       </div>
 
-      {/* Confirmation Modal */}
       <ConfirmationModal
         isOpen={confirmation.isOpen}
         title={confirmation.title}

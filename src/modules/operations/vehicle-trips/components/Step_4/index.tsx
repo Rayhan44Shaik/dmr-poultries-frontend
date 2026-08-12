@@ -1,7 +1,3 @@
-// src/modules/operations/vehicle-trips/utils/generateShopPDF.ts
-// (Referenced helper or included components as part of UnLoadingTable module)
-
-// src/modules/operations/vehicle-trips/components/Step_4/UnLoadingTable.tsx
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { 
   Plus, Clock, Building2, Users, Scale, AlertCircle, Search, X, 
@@ -38,7 +34,7 @@ interface Props {
   onViewModeChange?: (mode: "shop" | "box") => void;
   stepNumber?: number | string;
   updateDeliveries?: (rows: ShopDelivery[], persist?: boolean, silent?: boolean) => void;
-  saveDeliveries?: () => Promise<true | string>;
+  saveDeliveries?: (rows?: ShopDelivery[]) => Promise<true | string>;
   submitDeliveries?: () => Promise<true | string>;
   onClose?: () => void;
 }
@@ -361,7 +357,8 @@ export default function UnLoadingTable({
     if (readOnly || !saveDeliveries) return;
     setIsSaving(true);
     try {
-      const result = await saveDeliveries();
+      if (updateDeliveries) updateDeliveries(safeRows, false, true); // Sync React state first
+      const result = await saveDeliveries(safeRows);
       if (result === true) {
         savedRowsRef.current = JSON.stringify(safeRows);
         setToast({ message: "Delivery details saved successfully.", type: "success" });
@@ -392,16 +389,14 @@ export default function UnLoadingTable({
           setConfirmation((prev) => ({ ...prev, isOpen: false }));
           void (async () => {
             let result: true | string = true;
+            if (updateDeliveries) updateDeliveries(safeRows); // Force context sync
             if (submitDeliveries) {
               result = await submitDeliveries();
-            } else if (updateDeliveries) {
-              updateDeliveries(safeRows);
             }
             if (result === true) {
               setHasBeenSubmitted(true);
               setToast({ message: "Deliveries submitted successfully!", type: "success" });
               if (showForm) closeForm();
-              // Do not call onClose — parent advances to Step 5 with the same trip.
             } else {
               setToast({ message: result, type: "error" });
             }
@@ -420,6 +415,7 @@ export default function UnLoadingTable({
         onConfirm: () => {
           setConfirmation((prev) => ({ ...prev, isOpen: false }));
           void (async () => {
+            if (updateDeliveries) updateDeliveries(safeRows); // Force context sync
             const result = submitDeliveries ? await submitDeliveries() : "Unable to submit delivery details.";
             if (result === true) {
               savedRowsRef.current = JSON.stringify(safeRows);

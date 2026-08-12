@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, type Dispatch, type SetStateAction } from "react";
-import type { Trip, ShopDelivery, BoxDetail, TripStatus } from "../types/trip";
+import type { Trip, ShopDelivery, BoxDetail } from "../types/trip";
 import {
   handleApiError,
   loadTripById,
@@ -57,9 +57,12 @@ const STEP_FIELDS: Record<StepKey, string[]> = {
 function pickStepFields(trip: Partial<Trip>, fields: string[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const source = trip as Record<string, unknown>;
-  for (const field of fields) {
-    const value = source[field];
-    if (value !== undefined) out[field] = value;
+  for (const key of Object.keys(source)) {
+    // Preserve expected fields AND any dynamically generated diesel fields for Step 5
+    if (fields.includes(key) || key.startsWith("diesel")) {
+      const value = source[key];
+      if (value !== undefined) out[key] = value;
+    }
   }
   return out;
 }
@@ -253,10 +256,6 @@ export function useTripEntry(
     inFlightRef.current = true;
     setHeaderLoading(true);
     try {
-      // The server trip ID is the source of truth for create vs. update:
-      //  - id === 0 (no trip row yet)  → POST /trips/steps/start creates + locks Step 1.
-      //  - id > 0 (already submitted)   → re-submit the SAME trip (no new row, no new tripNo).
-      // Never infer "new trip" from a possibly-stale local object.
       const isNewTrip = !merged.id || merged.id <= 0;
       const submitted = isNewTrip
         ? await submitStep1({
@@ -328,8 +327,6 @@ export function useTripEntry(
     if (inFlightRef.current) return "A save is already in progress. Please wait.";
     const current = { ...tripRef.current, ...data } as Trip;
 
-    // Step 1 has no row until it is saved for the first time — POST /trips
-    // creates the Draft row with the partial start data (no strict validation).
     if (!current.id && step === "start") {
       inFlightRef.current = true;
       setHeaderLoading(true);
@@ -354,8 +351,6 @@ export function useTripEntry(
       return msg;
     }
 
-    // Save Progress is a permissive autosave: persist whatever is on screen
-    // without strict/lock step validation (backend skips it for mode: "save").
     const label = {
       start: "Start",
       farm: "Farm",
@@ -390,14 +385,18 @@ export function useTripEntry(
     saveStepProgress("farm", data);
   const savePickupProgress = (data: Partial<Trip> = {}) =>
     saveStepProgress("pickup", data);
-  const saveDeliveriesProgress = (rows: ShopDelivery[]) => {
-    updateDeliveries(rows);
-    return saveStepProgress("deliveries", { deliveries: rows });
+    
+  const saveDeliveriesProgress = (rows?: ShopDelivery[]) => {
+    const dataToSave = rows || tripRef.current.deliveries;
+    if (rows) {
+      updateDeliveries(rows);
+    }
+    return saveStepProgress("deliveries", { deliveries: dataToSave });
   };
+  
   const saveEndProgress = (data: Partial<Trip> = {}) =>
     saveStepProgress("expenses", data);
 
-  /** Pickup edits stay in React state until Submit — no localStorage, no backend. */
   const updateBoxDetails = (
     rows: BoxDetail[],
     _persistToStorage: boolean = false,
@@ -543,7 +542,6 @@ export function useTripEntry(
       totalMortality: totalMortalityCount,
     };
 
-    // Wizard edits stay in React state until Submit.
     setTrip(updatedTrip);
     tripRef.current = updatedTrip;
     syncEndStep(updatedTrip);
@@ -590,12 +588,10 @@ export function useTripEntry(
         closingMeter,
         totalKm,
         endTime: current.endTime || new Date().toLocaleString(),
-        status: "Pending" as TripStatus,
         endStepSubmitted: true,
         expensesStepSubmitted: true,
       });
       applySavedTrip(submitted);
-      setEndStepSubmitted(true);
       return true;
     } catch (error) {
       const msg = handleApiError(error);

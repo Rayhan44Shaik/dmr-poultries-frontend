@@ -147,17 +147,26 @@ export default function StepFarm({
   };
 
   const handleDestMeterChange = (value: string) => {
-    const num = value === "" ? 0 : Number(value);
-    updateTrip({ destMeter: num });
-    if (num > 0 && trip.openingMeter > 0 && num <= trip.openingMeter) {
+    const num = value === "" ? undefined : Number(value);
+    updateTrip({ destMeter: num as any });
+    if (num !== undefined && num > 0 && trip.openingMeter > 0 && num <= trip.openingMeter) {
       setDestMeterError(`Destination Meter must be greater than Start Meter (${trip.openingMeter} KM)`);
     } else {
       setDestMeterError(null);
     }
   };
 
+  // Explicitly nullify unused numeric fields to drop them from payload
+  const cleanPayload = {
+    farmBirdTypeId: undefined,
+    farmBirdCount: undefined,
+    farmLoadWeight: undefined,
+    farmRate: undefined,
+    farmAmount: undefined,
+  } as any;
+
   const handleSubmit = async () => {
-    if (!trip.sourceFarmId || !trip.sourceFarm) {
+    if (!trip.sourceFarmId || trip.sourceFarmId <= 0 || !trip.sourceFarm) {
       notify("Please select a Destination / Farm.", "warning");
       return;
     }
@@ -180,7 +189,7 @@ export default function StepFarm({
 
     setIsSubmitting(true);
     try {
-      const result = await submitFarmStep({});
+      const result = await submitFarmStep(cleanPayload);
       if (result === true) {
         setIsLocalEditing(false);
         notify("Farm details submitted successfully.", "success");
@@ -196,7 +205,7 @@ export default function StepFarm({
     if (!saveFarmProgress) return;
     setIsSubmitting(true);
     try {
-      const result = await saveFarmProgress({});
+      const result = await saveFarmProgress(cleanPayload);
       if (result === true) {
         notify("Farm details saved successfully.", "success");
       } else {
@@ -343,7 +352,7 @@ export default function StepFarm({
               onChange={(e) =>
                 setTrip((prev) => ({
                   ...prev,
-                  sourceFarmId: e?.value || 0,
+                  sourceFarmId: (e?.value || undefined) as unknown as number,
                   sourceFarm: e?.label || "",
                 }))
               }
@@ -393,7 +402,7 @@ export default function StepFarm({
               inputMode="decimal"
               step="0.01"
               min="0"
-              value={trip.destMeter === 0 ? "" : trip.destMeter ?? ""}
+              value={trip.destMeter === 0 || trip.destMeter === undefined ? "" : trip.destMeter}
               onChange={(e) => handleDestMeterChange(e.target.value)}
               onWheel={(e) => e.currentTarget.blur()}
               className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border ${
@@ -418,9 +427,9 @@ export default function StepFarm({
               type="number"
               inputMode="numeric"
               min="0"
-              value={trip.pickupTolls === 0 ? "" : trip.pickupTolls ?? ""}
+              value={trip.pickupTolls === 0 || trip.pickupTolls === undefined ? "" : trip.pickupTolls}
               onChange={(e) =>
-                updateTrip({ pickupTolls: e.target.value === "" ? 0 : Number(e.target.value) })
+                updateTrip({ pickupTolls: e.target.value === "" ? undefined : Number(e.target.value) } as any)
               }
               onWheel={(e) => e.currentTarget.blur()}
               className="hide-spinner w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-400"
@@ -438,9 +447,9 @@ export default function StepFarm({
               inputMode="decimal"
               step="0.01"
               min="0"
-              value={avgBirdWeight === 0 ? "" : avgBirdWeight}
+              value={avgBirdWeight === 0 || avgBirdWeight === undefined ? "" : avgBirdWeight}
               onChange={(e) => {
-                const val = e.target.value === "" ? 0 : Number(e.target.value);
+                const val = e.target.value === "" ? undefined : Number(e.target.value);
                 updateTrip({ avgBirdWeight: val } as any);
               }}
               onWheel={(e) => e.currentTarget.blur()}
