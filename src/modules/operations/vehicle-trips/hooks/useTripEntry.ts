@@ -253,10 +253,20 @@ export function useTripEntry(
     inFlightRef.current = true;
     setHeaderLoading(true);
     try {
-      const submitted = await submitStep1({
-        ...merged,
-        startTime: new Date().toLocaleString(),
-      });
+      // The server trip ID is the source of truth for create vs. update:
+      //  - id === 0 (no trip row yet)  → POST /trips/steps/start creates + locks Step 1.
+      //  - id > 0 (already submitted)   → re-submit the SAME trip (no new row, no new tripNo).
+      // Never infer "new trip" from a possibly-stale local object.
+      const isNewTrip = !merged.id || merged.id <= 0;
+      const submitted = isNewTrip
+        ? await submitStep1({
+            ...merged,
+            startTime: new Date().toLocaleString(),
+          })
+        : await submitTripStep(merged.id, "start", {
+            ...pickStepFields(merged, STEP_FIELDS.start),
+            startStepSubmitted: true,
+          });
 
       applySavedTrip(submitted);
       onStep1SuccessRef.current?.(submitted);

@@ -318,6 +318,10 @@ export async function listTrips(): Promise<Trip[]> {
 export async function submitStep1(trip: Partial<Trip>): Promise<Trip> {
   const payload = {
     ...toStep1Payload(trip),
+    // A brand-new trip has no server-assigned number yet. The backend ALWAYS
+    // generates the Trip No on create; never forward a stale client-side value
+    // here because it would collide with trips_trip_no_key ("Duplicate record").
+    tripNo: "",
     startStepSubmitted: true,
     startTime: trip.startTime || new Date().toISOString(),
     status: "Draft" as TripStatus,

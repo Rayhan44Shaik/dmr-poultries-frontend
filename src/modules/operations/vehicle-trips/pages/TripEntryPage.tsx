@@ -65,7 +65,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     updateDeliveries,
     updateBoxDetails,
     submitStartStep,
-    saveStartProgress,
     submitFarmStep,
     saveFarmProgress,
     submitPickupStep,
@@ -394,7 +393,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           loadSnapshot={step1LoadSnapshot}
           updateTrip={updateStartTrip}
           submitStartStep={wrapSubmit(submitStartStep)}
-          saveStartProgress={saveStartProgress}
           hasUnsavedChanges={JSON.stringify({
             vehicleId: trip.vehicleId, vehicleNo: trip.vehicleNo, driverId: trip.driverId,
             driverName: trip.driverName, supervisorId: trip.supervisorId,

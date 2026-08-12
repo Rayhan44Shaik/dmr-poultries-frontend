@@ -27,6 +27,10 @@ interface Props {
 function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props) {
   const [viewStepIndex, setViewStepIndex] = useState(0);
 
+  // ─── HOOKS MUST BE CALLED BEFORE EARLY RETURNS ─────────────────
+  const noopSubscribeSaveStatus = useCallback((_listener: () => void) => () => {}, []);
+  const getIdleSaveStatus = useCallback(() => "idle" as const, []);
+
   // ─── Early return – ensures trip is never null after this ─────
   if (!open || !trip) return null;
 
@@ -131,9 +135,6 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
   // ─── Dummy functions for read‑only steps ──────────────────────
   const noop = () => {};
   const noopDispatch = () => {};
-
-  const noopSubscribeSaveStatus = useCallback((_listener: () => void) => () => {}, []);
-  const getIdleSaveStatus = useCallback(() => "idle" as const, []);
 
   // ─── Render the selected step ──────────────────────────────────
   const renderViewStep = () => {

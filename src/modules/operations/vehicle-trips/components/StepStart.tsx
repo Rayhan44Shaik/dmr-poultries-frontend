@@ -25,7 +25,6 @@ interface Props {
   loadSnapshot: Trip;
   updateTrip: (updates: Partial<Trip>) => void;
   submitStartStep: (data: Partial<Trip>) => Promise<true | string>;
-  saveStartProgress?: (data: Partial<Trip>) => Promise<true | string>;
   hasUnsavedChanges?: boolean;
   vehicleOptions: VehicleOption[];
   employeeOptions: EmployeeOption[];
@@ -549,7 +548,6 @@ function StepStart({
   loadSnapshot,
   updateTrip,
   submitStartStep,
-  saveStartProgress,
   hasUnsavedChanges = false,
   vehicleOptions,
   employeeOptions,
@@ -571,6 +569,9 @@ function StepStart({
   const loadedTripIdRef = useRef(tripId);
   const formRef = useRef(form);
   formRef.current = form;
+  // Synchronous guard so a rapid double-click can never fire two Step 1
+  // requests (the isSubmitting state is async; the ref is sync).
+  const submitLockRef = useRef(false);
 
   const driverOptions = useMemo(
     () => employeeOptions.filter((employee) => employee.department === "Driver"),
@@ -717,6 +718,7 @@ function StepStart({
     : "Submit Start Details";
 
   const handleSubmit = useCallback(async () => {
+    if (submitLockRef.current) return;
     const patch = formToTripPatch(formRef.current);
     const candidate = {
       ...loadSnapshot,
@@ -732,31 +734,26 @@ function StepStart({
 
     setShowErrors(false);
     setIsSubmitting(true);
+    submitLockRef.current = true;
     updateTrip(patch);
-    const result = tripId > 0 && startStepSubmitted && saveStartProgress
-      ? await saveStartProgress(patch)
-      : await submitStartStep(patch);
-    if (result === true) {
-      // Keep form values so the form→trip sync effect cannot wipe the submitted trip
-      // while the parent advances to Step 2.
-      setIsLocalEditing(false);
-      setNotice({ type: "success", message: "Start details submitted successfully." });
-    } else {
-      setNotice({ type: "error", message: result });
+    // Step 1 has a single action: submit. The hook decides create vs. update
+    // using the server trip ID, so this is never routed through a Save Progress /
+    // save path and can never create a second trip.
+    try {
+      const result = await submitStartStep(patch);
+      if (result === true) {
+        // Keep form values so the form→trip sync effect cannot wipe the submitted trip
+        // while the parent advances to Step 2.
+        setIsLocalEditing(false);
+        setNotice({ type: "success", message: "Start details submitted successfully." });
+      } else {
+        setNotice({ type: "error", message: result });
+      }
+    } finally {
+      submitLockRef.current = false;
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
-  }, [loadSnapshot, saveStartProgress, startStepSubmitted, submitStartStep, tripId, updateTrip]);
-
-  const handleSaveProgress = useCallback(async () => {
-    if (!saveStartProgress) return;
-    const patch = formToTripPatch(formRef.current);
-    setIsSubmitting(true);
-    const result = await saveStartProgress(patch);
-    setNotice(result === true
-      ? { type: "success", message: "Start details saved successfully." }
-      : { type: "error", message: result });
-    setIsSubmitting(false);
-  }, [saveStartProgress]);
+  }, [loadSnapshot, submitStartStep, updateTrip]);
 
   if (startStepSubmitted && !editable && !isLocalEditing) {
     return (
@@ -935,10 +932,8 @@ function StepStart({
         <WizardStepNotice notice={notice} dirty={hasUnsavedChanges} />
         <WizardActionBar
           onCancel={handleCancelEdit}
-          onSave={saveStartProgress ? handleSaveProgress : undefined}
           onSubmit={handleSubmit}
           busy={inputsLocked}
-          saveDisabled={!hasUnsavedChanges}
           submitLabel={submitLabel}
         />
       </div>
@@ -969,7 +964,6 @@ function areStepStartPropsEqual(prev: Props, next: Props): boolean {
     prev.employeeOptions === next.employeeOptions &&
     prev.updateTrip === next.updateTrip &&
     prev.submitStartStep === next.submitStartStep &&
-    prev.saveStartProgress === next.saveStartProgress &&
     prev.hasUnsavedChanges === next.hasUnsavedChanges &&
     prev.onCancel === next.onCancel &&
     prev.clearForm === next.clearForm &&

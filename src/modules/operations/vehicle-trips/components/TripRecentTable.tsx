@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Eye, Pencil, RefreshCw, History, Trash2, Clock, Layers, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
-import type { Trip, TripStepStatus } from "../types/trip";
+import type { Trip } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
 
 interface Props {
@@ -13,7 +13,6 @@ interface Props {
   /** Open a SPECIFIC wizard step: completed step → EDIT, next step → NEW ENTRY. */
   onResume?: (trip: Trip, stepIndex: number) => void;
   onDelete?: (trip: Trip, reason: string) => void;
-  // ✅ Updated: accept optional approvedBy parameter
   onStatusChange?: (trip: Trip, status: "Pending" | "Completed", approvedBy?: string) => void;
 }
 
@@ -40,7 +39,6 @@ function TripRecentTable({
 
   const tableRef = useRef<HTMLDivElement>(null);
 
-  // ✅ Get current user name (or fallback to "Admin")
   const getCurrentUser = () => {
     try {
       const user = localStorage.getItem("user");
@@ -107,6 +105,7 @@ function TripRecentTable({
 
   const selectedTrip = safeTrips.find((t) => t.id === selectedTripId) || null;
 
+  const canView = !!selectedTrip;
   const canEdit = selectedTrip
     ? canEditItem(selectedTrip.createdAt || "") && !selectedTrip.deleted
     : false;
@@ -145,58 +144,27 @@ function TripRecentTable({
     setDeleteReason("");
   };
 
+  // ✅ Updated Status Badge logic: Just says "Step 1", "Step 2", etc.
   const getStepBadge = (trip: Trip) => {
     if (trip.status === "Completed") {
-      return { label: "Completed", color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={12} /> };
+      return { label: "Completed", color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={12} />, stepIndex: -1 };
     }
     if (!trip.startStepSubmitted) {
-      return { label: "Step 1", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <FileText size={12} /> };
+      return { label: "Step 1", color: "bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 cursor-pointer active:scale-95 transition-all", icon: <FileText size={12} />, stepIndex: 0 };
     }
     if (trip.startStepSubmitted && !trip.farmStepSubmitted) {
-      return { label: "Step 2", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <FileText size={12} /> };
+      return { label: "Step 2", color: "bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 cursor-pointer active:scale-95 transition-all", icon: <FileText size={12} />, stepIndex: 1 };
     }
     if (trip.farmStepSubmitted && !trip.pickupStepSubmitted) {
-      return { label: "Step 3", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <FileText size={12} /> };
+      return { label: "Step 3", color: "bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 cursor-pointer active:scale-95 transition-all", icon: <FileText size={12} />, stepIndex: 2 };
     }
     if (trip.pickupStepSubmitted && !trip.deliveryStepSubmitted) {
-      return { label: "Step 4", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <FileText size={12} /> };
+      return { label: "Step 4", color: "bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 cursor-pointer active:scale-95 transition-all", icon: <FileText size={12} />, stepIndex: 3 };
     }
     if (trip.deliveryStepSubmitted && !trip.endStepSubmitted) {
-      return { label: "Step 5 (End)", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <FileText size={12} /> };
+      return { label: "Step 5", color: "bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 cursor-pointer active:scale-95 transition-all", icon: <FileText size={12} />, stepIndex: 4 };
     }
-    return { label: "Pending", color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} /> };
-  };
-
-  // 3-state step model driven by persisted server state (stepStatuses).
-  const STEP_ORDER = ["start", "farm", "pickup", "deliveries", "expenses"] as const;
-
-  const stepStateAt = (trip: Trip, i: number): TripStepStatus => {
-    const ss = trip.stepStatuses;
-    if (ss) return ss[STEP_ORDER[i]] ?? "not_started";
-    // Fallback (older payloads): completed via submitted flags, else not started.
-    const done = [
-      Boolean(trip.startStepSubmitted),
-      Boolean(trip.farmStepSubmitted),
-      Boolean(trip.pickupStepSubmitted),
-      Boolean(trip.deliveryStepSubmitted),
-      Boolean(trip.expensesStepSubmitted || trip.endStepSubmitted),
-    ];
-    return done[i] ? "completed" : "not_started";
-  };
-
-  const stepChipClass = (state: TripStepStatus): string => {
-    if (state === "completed")
-      return "bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600";
-    if (state === "saved")
-      return "bg-orange-400 text-white border-orange-400 hover:bg-orange-500";
-    return "bg-white text-slate-400 border-slate-300 hover:border-blue-400 hover:text-blue-600";
-  };
-
-  const stepChipTitle = (trip: Trip, i: number, state: TripStepStatus): string => {
-    const label = `Step ${i + 1}`;
-    if (state === "completed") return `${label} — Edit (already submitted)`;
-    if (state === "saved") return `${label} — Continue Entry (Save Progress / Submit)`;
-    return `${label} — New Entry (Save Progress / Submit)`;
+    return { label: "Pending", color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, stepIndex: -1 };
   };
 
   const dayLabel = (dateStr?: string): string => {
@@ -206,12 +174,6 @@ function TripRecentTable({
     return d.toLocaleDateString("en-GB", { weekday: "short" }).toUpperCase();
   };
 
-  const openStep = (trip: Trip, stepIndex: number) => {
-    if (onResume) onResume(trip, stepIndex);
-    else if (onEdit) onEdit(trip);
-  };
-
-  // ✅ Handle status change with approver name
   const handleStatusChange = (trip: Trip, newStatus: "Pending" | "Completed") => {
     if (newStatus === "Completed") {
       const approver = getCurrentUser();
@@ -224,22 +186,27 @@ function TripRecentTable({
   return (
     <>
       <div ref={tableRef} className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden mt-8 transition-all duration-300">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
-          <div className="flex items-center gap-3">
+        
+        {/* Header Options */}
+        <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
+          
+          <div className="flex items-center gap-3 shrink-0">
             <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-inner">
               <History className="w-5 h-5" />
             </div>
             <h3 className="text-base font-bold text-slate-800 tracking-tight">Recent Trip Activity</h3>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <div className="relative">
+          <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto xl:ml-auto">
+            
+            {/* Search */}
+            <div className="relative shrink-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input type="text" placeholder="Search trips..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-48 pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" />
             </div>
 
-            <div className="bg-slate-100/80 p-1 rounded-xl flex items-center gap-1 border border-slate-200/60">
+            {/* Status Tabs */}
+            <div className="bg-slate-100/80 p-1 rounded-xl flex items-center gap-1 border border-slate-200/60 shrink-0">
               {(["Draft", "Pending", "Deleted", "All"] as const).map((tab) => {
                 const isActive = statusFilter === tab;
                 let count = 0, Icon = Layers;
@@ -257,67 +224,79 @@ function TripRecentTable({
               })}
             </div>
 
-            <div className="h-5 w-px bg-slate-200 hidden sm:block" />
+            <div className="h-5 w-px bg-slate-200 hidden sm:block mx-1" />
 
-            <div className="flex items-center gap-1">
+            {/* Actions: View, Edit, Delete, Refresh */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button onClick={() => selectedTrip && onView(selectedTrip)} disabled={!canView} className={`h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canView ? "bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title="View selected trip">
+                <Eye size={13} />
+                <span className="hidden md:inline">View</span>
+              </button>
+              
               <button onClick={handleEditClick} disabled={!canEdit} className={`h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canEdit ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title="Edit selected trip">
                 <Pencil size={13} />
                 <span className="hidden md:inline">Edit</span>
               </button>
+              
               <button onClick={openDeleteModal} disabled={!canDelete} className={`h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canDelete ? "bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title="Delete selected trip">
                 <Trash2 size={13} />
                 <span className="hidden md:inline">Delete</span>
               </button>
+              
               <button onClick={() => onRefresh()} className="h-8 w-8 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-all shadow-sm active:scale-95 hover:border-slate-300" title="Refresh list">
                 <RefreshCw size={13} className="text-slate-600 transition-transform active:rotate-180" />
               </button>
             </div>
+            
           </div>
         </div>
 
-        {/* Table */}
+        {/* Table - Enforced single row styling with whitespace-nowrap and Steps/View columns removed */}
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm text-left border-collapse">
             <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
               <tr>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Trip No</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Day</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Vehicle</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Driver</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Supervisor</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Source Farm</th>
-                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Shops</th>
-                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Birds</th>
-                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Weight (KG)</th>
-                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Mortality</th>
-                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Steps</th>
-                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">View</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">Trip No</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">Day</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">Vehicle</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">Driver</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">Supervisor</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">Source Farm</th>
+                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">Shops</th>
+                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">Birds</th>
+                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">Weight (KG)</th>
+                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">Mortality</th>
+                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedTrips.length === 0 ? (
-                <tr><td colSpan={12} className="py-16 text-center text-slate-400"><History size={24} className="mx-auto mb-2" /> No trips found.</td></tr>
+                <tr><td colSpan={11} className="py-16 text-center text-slate-400"><History size={24} className="mx-auto mb-2" /> No trips found.</td></tr>
               ) : (
                 paginatedTrips.map((trip) => {
                   const isSelected = trip.id === selectedTripId;
                   const isDeleted = trip.deleted === true;
                   const isApproved = trip.status === "Completed";
                   const showDropdown = !isDeleted && onStatusChange && trip.endStepSubmitted && !isApproved;
+                  
+                  const badge = getStepBadge(trip);
+                  const isResumable = badge.stepIndex >= 0;
 
                   return (
                     <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
-                      <td className="px-4 py-3 font-bold text-emerald-700 text-xs"><span className={`bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100/80 ${isDeleted ? "opacity-60 line-through" : ""}`}>{trip.tripNo}</span></td>
-                      <td className="px-4 py-3 text-xs font-medium text-slate-600">{dayLabel(trip.tripDate)}</td>
-                      <td className="px-4 py-3 text-xs font-medium text-slate-700">{trip.vehicleNo}</td>
-                      <td className="px-4 py-3 text-xs text-slate-600">{trip.driverName}</td>
-                      <td className="px-4 py-3 text-xs text-slate-600">{trip.supervisorName}</td>
-                      <td className="px-4 py-3 text-xs text-slate-600 font-medium">{trip.sourceFarm}</td>
-                      <td className="px-4 py-3 text-center text-xs font-bold text-slate-700">{trip.totalShops}</td>
-                      <td className="px-4 py-3 text-center text-xs font-bold text-blue-700">{trip.totalBirds.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-center text-xs font-bold text-amber-600">{trip.totalWeight.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-center text-xs font-bold text-rose-600">{trip.totalMortality}</td>
-                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-4 py-3 font-bold text-emerald-700 text-xs whitespace-nowrap">
+                        <span className={`bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100/80 ${isDeleted ? "opacity-60 line-through" : ""}`}>{trip.tripNo}</span>
+                      </td>
+                      <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{dayLabel(trip.tripDate)}</td>
+                      <td className="px-4 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">{trip.vehicleNo}</td>
+                      <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">{trip.driverName}</td>
+                      <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">{trip.supervisorName}</td>
+                      <td className="px-4 py-3 text-xs text-slate-600 font-medium whitespace-nowrap">{trip.sourceFarm}</td>
+                      <td className="px-4 py-3 text-center text-xs font-bold text-slate-700 whitespace-nowrap">{trip.totalShops}</td>
+                      <td className="px-4 py-3 text-center text-xs font-bold text-blue-700 whitespace-nowrap">{trip.totalBirds.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-center text-xs font-bold text-amber-600 whitespace-nowrap">{trip.totalWeight.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-center text-xs font-bold text-rose-600 whitespace-nowrap">{trip.totalMortality}</td>
+                      <td className="px-4 py-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         {isDeleted ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-rose-100 text-rose-700 border border-rose-200/80"><AlertCircle size={12} /> Deleted</span>
                         ) : showDropdown ? (
@@ -340,39 +319,27 @@ function TripRecentTable({
                               </svg>
                             </div>
                           </div>
+                        ) : isResumable ? (
+                          // ✅ Status pill acts as a clickable button routing straight to the pending step
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onResume) onResume(trip, badge.stepIndex);
+                              else if (onEdit) onEdit(trip);
+                            }}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm border ${badge.color}`}
+                            title={`Click to open Step ${badge.stepIndex + 1}`}
+                          >
+                            {badge.icon}
+                            {badge.label}
+                          </button>
                         ) : (
-                          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm border ${getStepBadge(trip).color}`}>
-                            {getStepBadge(trip).icon}
-                            {getStepBadge(trip).label}
+                          // ✅ Standard Status span for states like Completed/Pending
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm border ${badge.color}`}>
+                            {badge.icon}
+                            {badge.label}
                           </span>
                         )}
-                      </td>
-                      {/* Steps: ONE horizontal row, one chip per wizard step.
-                          GREEN=submitted, ORANGE=saved/partial, WHITE=not started.
-                          Click opens that exact step (edit / continue / new). */}
-                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-center gap-1 whitespace-nowrap">
-                          {STEP_ORDER.map((_, i) => {
-                            const state = isDeleted ? "not_started" as const : stepStateAt(trip, i);
-                            return (
-                              <button
-                                key={i}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (isDeleted) return;
-                                  openStep(trip, i);
-                                }}
-                                title={stepChipTitle(trip, i, state)}
-                                className={`h-6 w-6 rounded-md text-[11px] font-bold border transition-all shadow-sm hover:scale-110 active:scale-95 flex items-center justify-center ${stepChipClass(state)}`}
-                              >
-                                {i + 1}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </td>
-                      <td className="text-center px-4 py-3">
-                        <button onClick={(e) => { e.stopPropagation(); onView(trip); }} className="h-8 w-8 rounded-xl bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95 group-hover:border-blue-200" title="View Trip Details"><Eye size={14} /></button>
                       </td>
                     </tr>
                   );
