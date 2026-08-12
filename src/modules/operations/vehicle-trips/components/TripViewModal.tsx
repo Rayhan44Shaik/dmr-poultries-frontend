@@ -145,7 +145,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
           startStepSubmitted={trip.startStepSubmitted}
           loadSnapshot={trip}
           updateTrip={noop}
-          submitStartStep={async () => false}
+          submitStartStep={async () => "View only mode."}
           vehicleOptions={[]}
           employeeOptions={[]}
           subscribeHeaderSaveStatus={noopSubscribeSaveStatus}
@@ -154,13 +154,13 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
       );
     }
     if (viewStepIndex === 1 && isFarmCompleted) {
-      return <StepFarm trip={trip} setTrip={noopDispatch} updateTrip={noop} submitFarmStep={() => false} farms={[]} />;
+      return <StepFarm trip={trip} setTrip={noopDispatch} updateTrip={noop} submitFarmStep={async () => "View only mode."} farms={[]} />;
     }
     if (viewStepIndex === 2 && isPickupCompleted) {
-      return <StepPickup trip={trip} setTrip={noopDispatch} updateTrip={noop} submitPickupStep={() => false} updateBoxDetails={noop} />;
+      return <StepPickup trip={trip} setTrip={noopDispatch} updateTrip={noop} submitPickupStep={async () => "View only mode."} updateBoxDetails={noop} />;
     }
     if (viewStepIndex === 3 && isDeliveryCompleted) {
-      return <StepDeliveries rows={trip.deliveries || []} setRows={noopDispatch} shops={shops} birdTypes={birdTypes} trip={trip} updateDeliveries={noop} submitDeliveriesStep={() => false} clearForm={noop} readOnly={true} />;
+      return <StepDeliveries rows={trip.deliveries || []} setRows={noopDispatch} shops={shops} birdTypes={birdTypes} trip={trip} updateDeliveries={noop} submitDeliveriesStep={async () => "View only mode."} clearForm={noop} readOnly={true} />;
     }
     if (viewStepIndex === 4 && isEndCompleted) {
       return (
@@ -168,8 +168,8 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
           trip={trip}
           setTrip={noopDispatch}
           updateTrip={noop}
-          submitExpensesStep={() => false}
-          submitStartStep={() => false}
+          submitExpensesStep={async () => "View only mode."}
+          submitStartStep={async () => "View only mode."}
           editable={false}
           canEdit={false}
           onCancel={noop}

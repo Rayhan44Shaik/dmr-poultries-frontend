@@ -9,8 +9,8 @@ interface Props {
   trip: Trip;
   setTrip: React.Dispatch<React.SetStateAction<Trip>>;
   updateTrip: (updates: Partial<Trip>) => void;
-  submitFarmStep: (data: Partial<Trip>) => boolean | Promise<boolean>;
-  saveFarmProgress?: (data: Partial<Trip>) => Promise<boolean>;
+  submitFarmStep: (data: Partial<Trip>) => Promise<true | string>;
+  saveFarmProgress?: (data: Partial<Trip>) => Promise<true | string>;
   hasUnsavedChanges?: boolean;
   farms: any[];
   editable?: boolean;
@@ -180,12 +180,12 @@ export default function StepFarm({
 
     setIsSubmitting(true);
     try {
-      const success = await submitFarmStep({});
-      if (success) {
+      const result = await submitFarmStep({});
+      if (result === true) {
         setIsLocalEditing(false);
         notify("Farm details submitted successfully.", "success");
       } else {
-        notify("Submission failed. Please try again.", "error");
+        notify(result, "error");
       }
     } finally {
       setIsSubmitting(false);
@@ -196,8 +196,12 @@ export default function StepFarm({
     if (!saveFarmProgress) return;
     setIsSubmitting(true);
     try {
-      const success = await saveFarmProgress({});
-      if (success) notify("Farm details saved successfully.", "success");
+      const result = await saveFarmProgress({});
+      if (result === true) {
+        notify("Farm details saved successfully.", "success");
+      } else {
+        notify(result, "error");
+      }
     } finally {
       setIsSubmitting(false);
     }

@@ -19,8 +19,8 @@ interface Props {
   birdTypes: any[];
   trip: Trip;
   updateDeliveries: (rows: ShopDelivery[], persistToStorage?: boolean, silent?: boolean) => void;
-  submitDeliveriesStep: () => boolean | Promise<boolean>;
-  saveDeliveriesProgress?: (rows: ShopDelivery[]) => Promise<boolean>;
+  submitDeliveriesStep: () => Promise<true | string>;
+  saveDeliveriesProgress?: (rows: ShopDelivery[]) => Promise<true | string>;
   clearForm: () => void;
   readOnly?: boolean;
   editable?: boolean;
@@ -153,10 +153,10 @@ export default function StepDeliveries({
 
   const canLock = validationResult.valid;
 
-  const handleLockDeliveries = async (): Promise<boolean> => {
+  const handleLockDeliveries = async (): Promise<true | string> => {
     if (!canLock) {
       alert(`⚠️ ${validationResult.reason}`);
-      return false;
+      return validationResult.reason;
     }
     setIsStepEditing(false);
     setEditingShopId(null);
@@ -250,13 +250,7 @@ export default function StepDeliveries({
           supervisorPhone=""
           tripDate={trip.tripDate}
           updateDeliveries={updateDeliveries}
-          saveDeliveries={saveDeliveriesProgress ? async () => {
-            if (!canLock) {
-              alert(`⚠️ ${validationResult.reason}`);
-              return false;
-            }
-            return saveDeliveriesProgress(rows);
-          } : undefined}
+          saveDeliveries={saveDeliveriesProgress ? async () => saveDeliveriesProgress(rows) : undefined}
           submitDeliveries={handleLockDeliveries}
           onClose={handleCancelWizard}
         />

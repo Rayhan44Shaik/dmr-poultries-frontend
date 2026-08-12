@@ -12,7 +12,7 @@ import {
   apiDelete,
   handleApiError,
 } from "../../../../api";
-import type { Trip, TripStatus } from "../types/trip";
+import type { Trip, TripStatus, TripStepStatus, TripStepStatuses } from "../types/trip";
 
 const TRIPS_PATH = "/trips";
 
@@ -69,8 +69,7 @@ function normalizeDate(value: unknown): string {
 }
 
 /** Map backend trip JSON onto the frontend Trip model. */
-export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
-  const defaults: Trip = existing ?? {
+export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {  const defaults: Trip = existing ?? {
     id: 0,
     tripNo: "",
     tripDate: "",
@@ -124,7 +123,7 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     rateCompleted: false,
   };
 
-  return {
+  const mapped: Trip = {
     ...defaults,
     ...raw,
     id: num(raw.id, defaults.id),
@@ -206,6 +205,79 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     deletedReason: raw.deletedReason != null ? str(raw.deletedReason) : defaults.deletedReason,
     approvedBy: raw.approvedBy != null ? str(raw.approvedBy) : defaults.approvedBy,
   };
+
+  const serverStatuses =
+    raw.stepStatuses && typeof raw.stepStatuses === "object"
+      ? (raw.stepStatuses as TripStepStatuses)
+      : undefined;
+
+  return {
+    ...mapped,
+    stepStatuses: serverStatuses ?? deriveStepStatuses(mapped),
+  };
+}
+
+/** Fallback 3-state derivation when the backend hasn't supplied stepStatuses. */
+export function deriveStepStatuses(t: Trip): TripStepStatuses {
+  const status = (submitted: boolean, saved: boolean): TripStepStatus =>
+    submitted ? "completed" : saved ? "saved" : "not_started";
+  const any = (value?: number | null) => Boolean(value && value > 0);
+  const extras = t as Trip & Record<string, unknown>;
+
+  return {
+    start: status(
+      Boolean(t.startStepSubmitted),
+      Boolean(t.vehicleId || t.driverId || any(t.openingMeter) || any(t.advanceAmount) || t.startTime)
+    ),
+    farm: status(
+      Boolean(t.farmStepSubmitted),
+      Boolean(
+        t.sourceFarmId ||
+          any(t.destMeter) ||
+          t.reachedTime ||
+          any(t.pickupTolls) ||
+          any(extras.farmBirdTypeId as number) ||
+          any(extras.farmBirdCount as number) ||
+          t.farmAddress ||
+          any(extras.avgBirdWeight as number)
+      )
+    ),
+    pickup: status(
+      Boolean(t.pickupStepSubmitted),
+      Boolean(
+        any(t.dcWeight) ||
+          any(t.totalBirds) ||
+          any(t.boxes) ||
+          t.dcPhotoKey ||
+          (t.boxDetails || []).length > 0
+      )
+    ),
+    deliveries: status(
+      Boolean(t.deliveryStepSubmitted),
+      Boolean((t.deliveries || []).length > 0 || any(t.totalShops))
+    ),
+    expenses: status(
+      Boolean(t.endStepSubmitted || t.expensesStepSubmitted),
+      Boolean(
+        any(t.closingMeter) ||
+          any(extras.endMeter as number) ||
+          t.endTime ||
+          any(t.deliveryTolls) ||
+          any(extras.destinationTolls as number) ||
+          any(extras.meals as number) ||
+          any(extras.mealsTiffin as number) ||
+          any(extras.loading as number) ||
+          any(extras.vehicleMaintenance as number) ||
+          any(extras.othersRC as number) ||
+          any(extras.others1Amt as number) ||
+          any(extras.others2Amt as number) ||
+          any(extras.others3Amt as number) ||
+          any(extras.others4Amt as number) ||
+          any(extras.others5Amt as number) ||
+          t.remarks
+      )
+    ),
+  };
 }
 
 /** Step 1 payload sent to PUT /trips/:id and POST /trips/:id/steps/start */
@@ -255,6 +327,18 @@ export async function submitStep1(trip: Partial<Trip>): Promise<Trip> {
 }
 
 export type TripWizardStep = "start" | "farm" | "pickup" | "deliveries" | "expenses";
+
+/**
+ * Save partial Step 1 on a brand-new trip (no row yet). POST /trips creates a
+ * Draft row and persists whatever start fields were entered — no validation.
+ */
+export async function saveNewStart(trip: Partial<Trip>): Promise<Trip> {
+  const { data } = await apiPost<ApiTripRecord>(TRIPS_PATH, {
+    ...toStep1Payload(trip),
+    status: "Draft" as TripStatus,
+  });
+  return mapApiTripToTrip(data, trip as Trip);
+}
 
 /**
  * Submit a later wizard step against an existing trip ID.

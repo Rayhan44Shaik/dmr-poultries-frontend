@@ -125,28 +125,79 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setViewOpen(true);
   };
 
-  const handleEdit = (selectedTrip: Trip) => {
+  // Index of the highest completed wizard step (for "Edit Trip").
+  const getLatestSubmittedStepIndex = (selectedTrip: Trip): number => {
+    if (
+      selectedTrip.endStepSubmitted ||
+      selectedTrip.expensesStepSubmitted ||
+      selectedTrip.status === "Completed" ||
+      selectedTrip.status === "Pending"
+    ) {
+      return 4;
+    }
+    if (selectedTrip.deliveryStepSubmitted) return 3;
+    if (selectedTrip.pickupStepSubmitted) return 2;
+    if (selectedTrip.farmStepSubmitted) return 1;
+    if (selectedTrip.startStepSubmitted) return 0;
+    return 0;
+  };
+
+  // Index of the first incomplete wizard step (for "Resume" from Recent Trips).
+  const getResumeStepIndex = (selectedTrip: Trip): number => {
+    if (
+      selectedTrip.status === "Completed" ||
+      selectedTrip.status === "Deleted" ||
+      (selectedTrip.endStepSubmitted && selectedTrip.status === "Pending")
+    ) {
+      return 4;
+    }
+    if (!selectedTrip.startStepSubmitted) return 0;
+    if (!selectedTrip.farmStepSubmitted) return 1;
+    if (!selectedTrip.pickupStepSubmitted) return 2;
+    if (!selectedTrip.deliveryStepSubmitted) return 3;
+    return 4;
+  };
+
+  // Shared loader: open the wizard positioned on a chosen step without letting
+  // the auto-advance effect move away from it.
+  const openTrip = (selectedTrip: Trip, targetStep: number, message: string) => {
     setEntryScreen("form");
-    let targetStep = 0;
-
-    if (selectedTrip.status === "Completed" || selectedTrip.status === "Pending" || selectedTrip.endStepSubmitted || selectedTrip.expensesStepSubmitted) targetStep = 4;
-    else if (selectedTrip.deliveryStepSubmitted) targetStep = 4;
-    else if (selectedTrip.pickupStepSubmitted) targetStep = 3;
-    else if (selectedTrip.farmStepSubmitted) targetStep = 2;
-    else if (selectedTrip.startStepSubmitted) targetStep = 1;
-
     setViewStepIndex(targetStep);
     setRows(selectedTrip.deliveries || []);
     setIsEditing(true);
     isManualSelect.current = true;
-
     void (async () => {
       const loadedFromApi = await loadTripFromApi(selectedTrip.id);
       if (!loadedFromApi) {
         loadTrip(selectedTrip);
       }
-      showNotification(`✏️ Trip ${selectedTrip.tripNo} loaded. Proceed to edit.`, "info");
+      showNotification(message, "info");
     })();
+  };
+
+  const handleEdit = (selectedTrip: Trip) => {
+    openTrip(
+      selectedTrip,
+      getLatestSubmittedStepIndex(selectedTrip),
+      `✏️ Trip ${selectedTrip.tripNo} loaded. Proceed to edit.`
+    );
+  };
+
+  /**
+   * Step-badge / stepper click → open a SPECIFIC step.
+   * An explicit stepIndex ALWAYS opens that exact step (edit / continue / new),
+   * even for Completed/Pending trips. Only badge clicks (no index) fall back to
+   * the resume/review target.
+   */
+  const handleResume = (selectedTrip: Trip, stepIndex?: number) => {
+    const isReview = !stepIndex && (selectedTrip.status === "Completed" || selectedTrip.status === "Pending");
+    const target = stepIndex ?? getResumeStepIndex(selectedTrip);
+    const message = stepIndex
+      ? `📋 Trip ${selectedTrip.tripNo} opened at Step ${target + 1}.`
+      : isReview
+        ? `👁️ Trip ${selectedTrip.tripNo} loaded for review.`
+        : `💾 Trip ${selectedTrip.tripNo} resumed at Step ${target + 1}.`;
+    openTrip(selectedTrip, target, message);
   };
 
   const handleRefresh = () => {
@@ -268,9 +319,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     }
   }, [currentStep, viewStepIndex]);
 
-  useEffect(() => {
-    isManualSelect.current = false;
-  }, [trip.id]);
+  // isManualSelect is cleared explicitly (after a successful submit or when
+  // starting a fresh trip) so a trip load never yanks the user off the step
+  // they explicitly navigated to.
 
   useEffect(() => {
     if (!isTripEnded && trip.status === "Pending" && entryScreen === "form") {
@@ -291,18 +342,47 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   const isNewTrip = trip.id === 0 || !trip.tripNo;
 
-  const isEditable = (stepCompleted: boolean) => {
-    if (viewStepIndex === 4) {
-      if (trip.status === "Completed") return false;
-      return isEditing && (canEditTrip || trip.status === "Draft" || trip.status === "Pending");
+  /**
+   * A step is editable when:
+   *  - it is the current active (first incomplete) step → NEW ENTRY, or
+   *  - it is a completed step the user explicitly opened → EDIT (re-submit), or
+   *  - it is the End step on a Draft/Pending trip within the edit window.
+   * Completed trips are always read-only.
+   */
+  const isEditable = (stepIndex: number, stepCompleted: boolean) => {
+    if (trip.status === "Completed") return false;
+    if (!isEditing) return false;
+    if (!isTripEnded && trip.status === "Draft" && !canEditTrip) return false;
+
+    if (stepIndex === 4) {
+      if (trip.status === "Deleted") return false;
+      return canEditTrip || trip.status === "Draft" || trip.status === "Pending";
     }
-    const isViewingActiveStep = !isTripEnded && viewStepIndex === currentStep;
-    if (isViewingActiveStep && !stepCompleted) {
-      // Active wizard step is always editable in-session.
-      return isNewTrip || isEditing || trip.status === "Draft";
+
+    // Active wizard step (first incomplete) is always editable in-session.
+    if (!isTripEnded && stepIndex === currentStep) return true;
+
+    // Completed steps are re-openable for edit (EDIT mode re-submit).
+    if (stepCompleted && !isTripEnded) {
+      return isNewTrip || canEditTrip || trip.status === "Draft" || trip.status === "Pending";
     }
+
+    // Brand-new session: any step of a fresh draft is editable as NEW ENTRY.
+    if (isNewTrip && !isTripEnded) return true;
     return false;
   };
+
+  // After a successful submit, clear the manual navigation lock so the next
+  // incomplete step becomes active automatically.
+  const wrapSubmit =
+    <A extends unknown[]>(fn: (...args: A) => Promise<true | string>) =>
+    async (...args: A): Promise<true | string> => {
+      const ok = await fn(...args);
+      if (ok === true) {
+        isManualSelect.current = false;
+      }
+      return ok;
+    };
 
   const renderSelectedStep = () => {
     if (viewStepIndex === 0) {
@@ -313,7 +393,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           startStepSubmitted={trip.startStepSubmitted}
           loadSnapshot={step1LoadSnapshot}
           updateTrip={updateStartTrip}
-          submitStartStep={submitStartStep}
+          submitStartStep={wrapSubmit(submitStartStep)}
           saveStartProgress={saveStartProgress}
           hasUnsavedChanges={JSON.stringify({
             vehicleId: trip.vehicleId, vehicleNo: trip.vehicleNo, driverId: trip.driverId,
@@ -328,7 +408,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           })}
           vehicleOptions={vehicleOpts}
           employeeOptions={employeeOpts}
-          editable={isEditable(isStartCompleted)}
+          editable={isEditable(0, isStartCompleted)}
           canEdit={canEditTrip}
           onCancel={clearForm}
           clearForm={clearForm}
@@ -345,7 +425,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           trip={trip}
           setTrip={setTrip}
           updateTrip={updateTrip}
-          submitFarmStep={submitFarmStep}
+          submitFarmStep={wrapSubmit(submitFarmStep)}
           saveFarmProgress={saveFarmProgress}
           hasUnsavedChanges={JSON.stringify({
             sourceFarmId: trip.sourceFarmId, sourceFarm: trip.sourceFarm, farmAddress: trip.farmAddress,
@@ -357,7 +437,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
             remarks: savedTrip.remarks,
           })}
           farms={farms}
-          editable={isEditable(isFarmCompleted)}
+          editable={isEditable(1, isFarmCompleted)}
           canEdit={canEditTrip}
           onCancel={clearForm}
         />
@@ -370,10 +450,10 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           trip={trip}
           setTrip={setTrip}
           updateTrip={updateTrip}
-          submitPickupStep={submitPickupStep}
+          submitPickupStep={wrapSubmit(submitPickupStep)}
           savePickupProgress={savePickupProgress}
           updateBoxDetails={updateBoxDetails}
-          editable={isEditable(isPickupCompleted)}
+          editable={isEditable(2, isPickupCompleted)}
           canEdit={canEditTrip}
           onCancel={clearForm}
           clearForm={clearForm}
@@ -390,11 +470,11 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           birdTypes={birdTypes}
           trip={trip}
           updateDeliveries={updateDeliveries}
-          submitDeliveriesStep={submitDeliveriesStep}
+          submitDeliveriesStep={wrapSubmit(submitDeliveriesStep)}
           saveDeliveriesProgress={saveDeliveriesProgress}
           boxDetails={trip.boxDetails || []}
-          readOnly={!isEditable(isDeliveryCompleted)}
-          editable={isEditable(isDeliveryCompleted)}
+          readOnly={!isEditable(3, isDeliveryCompleted)}
+          editable={isEditable(3, isDeliveryCompleted)}
           canEdit={canEditTrip}
           onCancel={clearForm}
           clearForm={clearForm}
@@ -408,11 +488,11 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           trip={trip}
           setTrip={setTrip}
           updateTrip={updateTrip}
-          editable={isEditable(isTripEnded)}
+          editable={isEditable(4, isTripEnded)}
           canEdit={canEditTrip}
           onCancel={clearForm}
           clearForm={clearForm}
-          submitExpensesStep={submitEndTrip}
+          submitExpensesStep={wrapSubmit(submitEndTrip)}
           saveEndProgress={saveEndProgress}
         />
       );
@@ -476,6 +556,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         onRefresh={handleRefresh}
         onView={handleView}
         onEdit={handleEdit}
+        onResume={handleResume}
         onDelete={(trip, reason) => deleteTrip(trip.id, reason)}
         onStatusChange={handleStatusChange}
       />

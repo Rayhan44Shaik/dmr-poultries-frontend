@@ -1,8 +1,8 @@
 // src/modules/operations/vehicle-trips/components/TripRecentTable.tsx
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Eye, Pencil, RefreshCw, History, Trash2, Clock, Layers, AlertCircle, Search, FileText, CheckCircle, UserCheck } from "lucide-react";
-import type { Trip } from "../types/trip";
+import { Eye, Pencil, RefreshCw, History, Trash2, Clock, Layers, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
+import type { Trip, TripStepStatus } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
 
 interface Props {
@@ -10,6 +10,8 @@ interface Props {
   onRefresh: () => void;
   onView: (trip: Trip) => void;
   onEdit: (trip: Trip) => void;
+  /** Open a SPECIFIC wizard step: completed step → EDIT, next step → NEW ENTRY. */
+  onResume?: (trip: Trip, stepIndex: number) => void;
   onDelete?: (trip: Trip, reason: string) => void;
   // ✅ Updated: accept optional approvedBy parameter
   onStatusChange?: (trip: Trip, status: "Pending" | "Completed", approvedBy?: string) => void;
@@ -20,6 +22,7 @@ function TripRecentTable({
   onRefresh,
   onView,
   onEdit,
+  onResume,
   onDelete,
   onStatusChange,
 }: Props) {
@@ -164,6 +167,50 @@ function TripRecentTable({
     return { label: "Pending", color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} /> };
   };
 
+  // 3-state step model driven by persisted server state (stepStatuses).
+  const STEP_ORDER = ["start", "farm", "pickup", "deliveries", "expenses"] as const;
+
+  const stepStateAt = (trip: Trip, i: number): TripStepStatus => {
+    const ss = trip.stepStatuses;
+    if (ss) return ss[STEP_ORDER[i]] ?? "not_started";
+    // Fallback (older payloads): completed via submitted flags, else not started.
+    const done = [
+      Boolean(trip.startStepSubmitted),
+      Boolean(trip.farmStepSubmitted),
+      Boolean(trip.pickupStepSubmitted),
+      Boolean(trip.deliveryStepSubmitted),
+      Boolean(trip.expensesStepSubmitted || trip.endStepSubmitted),
+    ];
+    return done[i] ? "completed" : "not_started";
+  };
+
+  const stepChipClass = (state: TripStepStatus): string => {
+    if (state === "completed")
+      return "bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600";
+    if (state === "saved")
+      return "bg-orange-400 text-white border-orange-400 hover:bg-orange-500";
+    return "bg-white text-slate-400 border-slate-300 hover:border-blue-400 hover:text-blue-600";
+  };
+
+  const stepChipTitle = (trip: Trip, i: number, state: TripStepStatus): string => {
+    const label = `Step ${i + 1}`;
+    if (state === "completed") return `${label} — Edit (already submitted)`;
+    if (state === "saved") return `${label} — Continue Entry (Save Progress / Submit)`;
+    return `${label} — New Entry (Save Progress / Submit)`;
+  };
+
+  const dayLabel = (dateStr?: string): string => {
+    if (!dateStr) return "-";
+    const d = new Date(`${dateStr}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-GB", { weekday: "short" }).toUpperCase();
+  };
+
+  const openStep = (trip: Trip, stepIndex: number) => {
+    if (onResume) onResume(trip, stepIndex);
+    else if (onEdit) onEdit(trip);
+  };
+
   // ✅ Handle status change with approver name
   const handleStatusChange = (trip: Trip, newStatus: "Pending" | "Completed") => {
     if (newStatus === "Completed") {
@@ -234,7 +281,7 @@ function TripRecentTable({
             <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
               <tr>
                 <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Trip No</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Date</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Day</th>
                 <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Vehicle</th>
                 <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Driver</th>
                 <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Supervisor</th>
@@ -244,13 +291,13 @@ function TripRecentTable({
                 <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Weight (KG)</th>
                 <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Mortality</th>
                 <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Approved By</th>
+                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Steps</th>
                 <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">View</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedTrips.length === 0 ? (
-                <tr><td colSpan={13} className="py-16 text-center text-slate-400"><History size={24} className="mx-auto mb-2" /> No trips found.</td></tr>
+                <tr><td colSpan={12} className="py-16 text-center text-slate-400"><History size={24} className="mx-auto mb-2" /> No trips found.</td></tr>
               ) : (
                 paginatedTrips.map((trip) => {
                   const isSelected = trip.id === selectedTripId;
@@ -261,7 +308,7 @@ function TripRecentTable({
                   return (
                     <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
                       <td className="px-4 py-3 font-bold text-emerald-700 text-xs"><span className={`bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100/80 ${isDeleted ? "opacity-60 line-through" : ""}`}>{trip.tripNo}</span></td>
-                      <td className="px-4 py-3 text-xs font-medium text-slate-600">{trip.tripDate}</td>
+                      <td className="px-4 py-3 text-xs font-medium text-slate-600">{dayLabel(trip.tripDate)}</td>
                       <td className="px-4 py-3 text-xs font-medium text-slate-700">{trip.vehicleNo}</td>
                       <td className="px-4 py-3 text-xs text-slate-600">{trip.driverName}</td>
                       <td className="px-4 py-3 text-xs text-slate-600">{trip.supervisorName}</td>
@@ -294,26 +341,35 @@ function TripRecentTable({
                             </div>
                           </div>
                         ) : (
-                          (() => {
-                            const badge = getStepBadge(trip);
-                            return (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (onEdit) onEdit(trip);
-                                }}
-                                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm border cursor-pointer hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-200 ${badge.color}`}
-                              >
-                                {badge.icon}
-                                {badge.label}
-                              </button>
-                            );
-                          })()
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm border ${getStepBadge(trip).color}`}>
+                            {getStepBadge(trip).icon}
+                            {getStepBadge(trip).label}
+                          </span>
                         )}
                       </td>
-                      {/* ✅ Approved By column */}
-                      <td className="px-4 py-3 text-center text-xs font-medium text-slate-600">
-                        {trip.status === "Completed" && (trip as any).approvedBy ? (trip as any).approvedBy : "-"}
+                      {/* Steps: ONE horizontal row, one chip per wizard step.
+                          GREEN=submitted, ORANGE=saved/partial, WHITE=not started.
+                          Click opens that exact step (edit / continue / new). */}
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1 whitespace-nowrap">
+                          {STEP_ORDER.map((_, i) => {
+                            const state = isDeleted ? "not_started" as const : stepStateAt(trip, i);
+                            return (
+                              <button
+                                key={i}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (isDeleted) return;
+                                  openStep(trip, i);
+                                }}
+                                title={stepChipTitle(trip, i, state)}
+                                className={`h-6 w-6 rounded-md text-[11px] font-bold border transition-all shadow-sm hover:scale-110 active:scale-95 flex items-center justify-center ${stepChipClass(state)}`}
+                              >
+                                {i + 1}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </td>
                       <td className="text-center px-4 py-3">
                         <button onClick={(e) => { e.stopPropagation(); onView(trip); }} className="h-8 w-8 rounded-xl bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95 group-hover:border-blue-200" title="View Trip Details"><Eye size={14} /></button>

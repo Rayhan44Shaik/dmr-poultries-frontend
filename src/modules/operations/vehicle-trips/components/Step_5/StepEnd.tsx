@@ -76,9 +76,9 @@ interface Props {
   trip: Trip;
   setTrip?: React.Dispatch<React.SetStateAction<Trip>>;
   updateTrip: (updates: Partial<Trip>, persist?: boolean, silent?: boolean) => void;
-  submitExpensesStep?: (data: Partial<Trip>) => boolean | Promise<boolean>;
-  saveEndProgress?: (data: Partial<Trip>) => Promise<boolean>;
-  submitStartStep?: (data: Partial<Trip>) => boolean | Promise<boolean>;
+  submitExpensesStep?: (data: Partial<Trip>) => Promise<true | string>;
+  saveEndProgress?: (data: Partial<Trip>) => Promise<true | string>;
+  submitStartStep?: (data: Partial<Trip>) => Promise<true | string>;
   editable?: boolean;
   canEdit?: boolean;
   onCancel?: () => void;
@@ -279,12 +279,12 @@ export default function StepEnd({
     if (!saveEndProgress) return;
     setIsSubmitting(true);
     const payload = prepareFinalPayload(false);
-    const success = await saveEndProgress(payload as Partial<Trip>);
-    if (success) {
+    const result = await saveEndProgress(payload as Partial<Trip>);
+    if (result === true) {
       savedSheetRef.current = JSON.stringify(sheetData);
       setToast({ message: "End details saved successfully.", type: "success" });
     } else {
-      setToast({ message: "Unable to save end details. Please try again.", type: "error" });
+      setToast({ message: result, type: "error" });
     }
     setIsSubmitting(false);
   };
@@ -352,25 +352,23 @@ export default function StepEnd({
     setErrorMsg("");
     try {
       const finalData = prepareFinalPayload(true);
-      let success = true;
       const submitFn = submitExpensesStep || submitStartStep;
       if (typeof submitFn === "function") {
         const result = await submitFn(finalData as any);
-        if (result === false) success = false;
-      }
-      if (success) {
-        setSheetData(finalData as any);
-        savedSheetRef.current = JSON.stringify(finalData as any);
-        setIsLocalEditing(false);
-        setIsSubmittedLocal(true);
-        // Diesel → Fuel Expense sync is handled server-side (syncDieselToFuelExpenses),
-        // so Step 5 submission never writes duplicate fuel records on the client.
-        setToast({ message: "End details submitted successfully.", type: "success" });
-        // Final step complete → return to Create New Trip (no resume).
-        if (clearForm) window.setTimeout(clearForm, 700);
-      } else {
-        setErrorMsg("Failed to save step details.");
-        setToast({ message: "Failed to save step details.", type: "error" });
+        if (result === true) {
+          setSheetData(finalData as any);
+          savedSheetRef.current = JSON.stringify(finalData as any);
+          setIsLocalEditing(false);
+          setIsSubmittedLocal(true);
+          // Diesel → Fuel Expense sync is handled server-side (syncDieselToFuelExpenses),
+          // so Step 5 submission never writes duplicate fuel records on the client.
+          setToast({ message: "End details submitted successfully.", type: "success" });
+          // Final step complete → return to Create New Trip (no resume).
+          if (clearForm) window.setTimeout(clearForm, 700);
+        } else {
+          setErrorMsg(result);
+          setToast({ message: result, type: "error" });
+        }
       }
     } catch (err: any) {
       console.error("Submit error:", err);

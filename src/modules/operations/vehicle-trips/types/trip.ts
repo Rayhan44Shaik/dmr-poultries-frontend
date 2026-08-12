@@ -21,6 +21,16 @@ export interface ShopDelivery {
 
 export type TripStatus = "Draft" | "Pending" | "Completed" | "Deleted";
 
+export type TripStepStatus = "completed" | "saved" | "not_started";
+
+export interface TripStepStatuses {
+  start: TripStepStatus;
+  farm: TripStepStatus;
+  pickup: TripStepStatus;
+  deliveries: TripStepStatus;
+  expenses: TripStepStatus;
+}
+
 export interface Trip {
   id: number;
   tripNo: string;
@@ -112,6 +122,7 @@ export interface Trip {
   dcPhotoMime?: string;
   dcPhotoData?: string;
   approvedBy?: string;
+  stepStatuses?: TripStepStatuses;
 }
 
 export interface BoxDetail {

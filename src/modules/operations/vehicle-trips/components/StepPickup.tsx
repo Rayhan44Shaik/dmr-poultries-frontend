@@ -15,8 +15,8 @@ interface Props {
   setTrip: React.Dispatch<React.SetStateAction<Trip>>;
   updateTrip: (updates: Partial<Trip>) => void;
   updateBoxDetails: (rows: BoxDetail[], persistToStorage?: boolean, silent?: boolean) => void;
-  submitPickupStep: (data: Partial<Trip>) => boolean | Promise<boolean>;
-  savePickupProgress?: (data: Partial<Trip>) => Promise<boolean>;
+  submitPickupStep: (data: Partial<Trip>) => Promise<true | string>;
+  savePickupProgress?: (data: Partial<Trip>) => Promise<true | string>;
   editable?: boolean;
   canEdit?: boolean;
   onCancel?: () => void;
@@ -306,7 +306,7 @@ export default function StepPickup({
   const handleSaveProgress = async () => {
     if (!savePickupProgress) return;
     setIsSaving(true);
-    const success = await savePickupProgress({
+    const result = await savePickupProgress({
       boxDetails: getBoxDetails(),
       totalBirds: totals.totalBirds,
       dcWeight: totals.dcWeight,
@@ -316,10 +316,12 @@ export default function StepPickup({
       dcPhotoMime: trip.dcPhotoMime,
       dcPhotoData: trip.dcPhotoData,
     });
-    setToast(success
-      ? { message: "Pickup details saved successfully.", type: "success" }
-      : { message: "Unable to save pickup details. Please try again.", type: "error" });
-    if (success) savedPhotoKeyRef.current = imageKey;
+    if (result === true) {
+      setToast({ message: "Pickup details saved successfully.", type: "success" });
+      savedPhotoKeyRef.current = imageKey;
+    } else {
+      setToast({ message: result, type: "error" });
+    }
     setIsSaving(false);
   };
 
@@ -371,7 +373,7 @@ export default function StepPickup({
         void (async () => {
           setIsSubmitting(true);
           try {
-            const success = await submitPickupStep({
+            const result = await submitPickupStep({
               boxDetails: getBoxDetails(),
               totalBirds: totals.totalBirds,
               dcWeight: totals.dcWeight,
@@ -381,11 +383,11 @@ export default function StepPickup({
               dcPhotoMime: trip.dcPhotoMime,
               dcPhotoData: trip.dcPhotoData,
             });
-            if (success) {
+            if (result === true) {
               setIsLocalEditing(false);
               setToast({ message: "Pickup details submitted successfully.", type: "success" });
             } else {
-              setToast({ message: "Unable to submit pickup details. Please try again.", type: "error" });
+              setToast({ message: result, type: "error" });
             }
           } finally {
             setIsSubmitting(false);
@@ -986,7 +988,7 @@ export default function StepPickup({
           onSave={savePickupProgress ? handleSaveProgress : undefined}
           onSubmit={handleSubmit}
           busy={isSaving || isSubmitting}
-          saveDisabled={!hasUnsavedChanges || !canSubmit}
+          saveDisabled={!hasUnsavedChanges}
           submitDisabled={!canSubmit || (trip.pickupStepSubmitted && !isEditMode)}
           submitLabel={isEditMode ? "Update Pickup" : "Submit Pickup"}
         />

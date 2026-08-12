@@ -24,8 +24,8 @@ interface Props {
   startStepSubmitted: boolean;
   loadSnapshot: Trip;
   updateTrip: (updates: Partial<Trip>) => void;
-  submitStartStep: (data: Partial<Trip>) => Promise<boolean>;
-  saveStartProgress?: (data: Partial<Trip>) => Promise<boolean>;
+  submitStartStep: (data: Partial<Trip>) => Promise<true | string>;
+  saveStartProgress?: (data: Partial<Trip>) => Promise<true | string>;
   hasUnsavedChanges?: boolean;
   vehicleOptions: VehicleOption[];
   employeeOptions: EmployeeOption[];
@@ -733,37 +733,30 @@ function StepStart({
     setShowErrors(false);
     setIsSubmitting(true);
     updateTrip(patch);
-    const success = tripId > 0 && startStepSubmitted && saveStartProgress
+    const result = tripId > 0 && startStepSubmitted && saveStartProgress
       ? await saveStartProgress(patch)
       : await submitStartStep(patch);
-    if (success) {
+    if (result === true) {
       // Keep form values so the form→trip sync effect cannot wipe the submitted trip
       // while the parent advances to Step 2.
       setIsLocalEditing(false);
       setNotice({ type: "success", message: "Start details submitted successfully." });
     } else {
-      setNotice({ type: "error", message: "Unable to save start details. Please try again." });
+      setNotice({ type: "error", message: result });
     }
     setIsSubmitting(false);
   }, [loadSnapshot, saveStartProgress, startStepSubmitted, submitStartStep, tripId, updateTrip]);
 
   const handleSaveProgress = useCallback(async () => {
-    if (!saveStartProgress || !tripId) return;
+    if (!saveStartProgress) return;
     const patch = formToTripPatch(formRef.current);
-    const candidate = { ...loadSnapshot, ...patch } as Trip;
-    const validation = validateStartStep(candidate);
-    if (!validation.valid) {
-      setShowErrors(true);
-      setNotice({ type: "error", message: validation.errors[0] || "Please complete required fields." });
-      return;
-    }
     setIsSubmitting(true);
-    const success = await saveStartProgress(patch);
-    setNotice(success
+    const result = await saveStartProgress(patch);
+    setNotice(result === true
       ? { type: "success", message: "Start details saved successfully." }
-      : { type: "error", message: "Unable to save. Please try again." });
+      : { type: "error", message: result });
     setIsSubmitting(false);
-  }, [loadSnapshot, saveStartProgress, tripId]);
+  }, [saveStartProgress]);
 
   if (startStepSubmitted && !editable && !isLocalEditing) {
     return (
@@ -942,7 +935,7 @@ function StepStart({
         <WizardStepNotice notice={notice} dirty={hasUnsavedChanges} />
         <WizardActionBar
           onCancel={handleCancelEdit}
-          onSave={tripId > 0 && saveStartProgress ? handleSaveProgress : undefined}
+          onSave={saveStartProgress ? handleSaveProgress : undefined}
           onSubmit={handleSubmit}
           busy={inputsLocked}
           saveDisabled={!hasUnsavedChanges}

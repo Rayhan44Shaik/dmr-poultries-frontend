@@ -159,38 +159,9 @@ export function calculateKM(openingMeter: number, closingMeter: number) {
   return closingMeter - openingMeter;
 }
 
-// Generate Sequential Trip Number
-export function generateTripNo(existingTrips: Trip[], date: string): string {
-  const dateStr = date.replace(/-/g, ""); // YYYYMMDD
-  const tripsOnDate = existingTrips.filter((t) => t.tripDate === date);
-  const count = tripsOnDate.length + 1;
-  if (count > 999) {
-    const ts = Date.now().toString().slice(-4);
-    return `TRP-${dateStr}-${ts}`;
-  }
-  const seq = String(count).padStart(3, "0");
-  return `TRP-${dateStr}-${seq}`;
-}
-
-// Renumber Pending Trips After Deletion
-export function renumberPendingTripsForDate(date: string): Trip[] {
-  const allTrips: Trip[] = JSON.parse(localStorage.getItem("vehicleTrips") || "[]");
-  const dateStr = date.replace(/-/g, "");
-  const pendingTrips = allTrips
-    .filter((t) => t.tripDate === date && t.status === "Pending")
-    .sort((a, b) => {
-      const numA = parseInt(a.tripNo.split("-")[2] || "0", 10);
-      const numB = parseInt(b.tripNo.split("-")[2] || "0", 10);
-      return numA - numB;
-    });
-  pendingTrips.forEach((trip, index) => {
-    const newSeq = String(index + 1).padStart(3, "0");
-    const newTripNo = `TRP-${dateStr}-${newSeq}`;
-    trip.tripNo = newTripNo;
-  });
-  localStorage.setItem("vehicleTrips", JSON.stringify(allTrips));
-  return allTrips;
-}
+// Trip numbers are generated server-side only (TR-YYYYMMDD-###, advisory-lock
+// guarded). The legacy TRP-/localStorage generators were removed so the client
+// never competes with PostgreSQL numbering.
 
 // Legacy Trip Validation (Used for the old single-page form)
 export function validateTrip(trip: Trip) {
