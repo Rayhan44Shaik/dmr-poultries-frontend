@@ -64,12 +64,6 @@ export default function TripWizardStepper({ currentStep, steps, completedMask, o
               <span className={`block transition-colors duration-300 ${isCompleted ? "text-emerald-700" : isActive ? "text-slate-900" : "text-slate-400"}`}>
                 {label}
               </span>
-              {/* Hide "Completed" on mobile to prevent overlapping text, show on tablets/laptops */}
-              {isCompleted && (
-                <span className="hidden md:block text-[9px] md:text-[10px] text-emerald-600 mt-0.5">
-                  Completed
-                </span>
-              )}
             </div>
           </div>
         );

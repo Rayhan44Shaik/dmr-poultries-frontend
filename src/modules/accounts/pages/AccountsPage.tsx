@@ -15,7 +15,6 @@ import {
 import { PaymentBookPage } from './PaymentBookPage';
 import { FarmerPaymentPage } from './FarmPaymentPage';
 import { NewPaymentPage } from './NewPaymentPage';
-import MarketRatePage from './MarketRatePage';
 import SummaryPage from './SummaryPage';
 
 // ---- Reusable "Coming Soon" Component ----
@@ -38,7 +37,6 @@ const VehiclePaymentPage = () => <ComingSoonTab title="Vehicle Payment" />;
 
 const tabs = [
   { key: 'paid-payments', label: 'Paid Payments', icon: CheckCircle, color: 'text-emerald-600', component: PaymentBookPage },
-  { key: 'market-rate', label: 'Market Rate', icon: TrendingUp, color: 'text-indigo-600', component: MarketRatePage },
   { key: 'summary', label: 'Summary', icon: BarChart3, color: 'text-rose-600', component: SummaryPage },
   { key: 'farm-payment', label: 'Farm Payment', icon: Sprout, color: 'text-green-600', component: FarmerPaymentPage },
   { key: 'new-payments', label: 'New Payments', icon: PlusCircle, color: 'text-blue-600', component: NewPaymentPage },

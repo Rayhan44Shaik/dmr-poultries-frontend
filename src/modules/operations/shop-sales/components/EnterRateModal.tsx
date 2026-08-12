@@ -26,7 +26,7 @@ export default function EnterRateModal({ open, trip, onClose, onSave }: Props) {
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // ─── MARKET RATES STATE (READ-ONLY REFERENCE) ───
+  // ─── MARKET RATES STATE (READ-ONLY REFERENCE FROM MASTERS) ───
   const [showMarketRates, setShowMarketRates] = useState(true);
   const [referenceDays, setReferenceDays] = useState<Array<{ label: string; dateStr: string }>>([]);
   const [tableOneData, setTableOneData] = useState<Record<string, Record<string, string>>>({});
@@ -61,16 +61,18 @@ export default function EnterRateModal({ open, trip, onClose, onSave }: Props) {
     }
     setReferenceDays(days);
 
-    // Load persistent rates (Read-only)
-    const savedYearlyRates = localStorage.getItem("yearly_market_rates_store");
-    if (savedYearlyRates) {
+    // Load persistent rates from Masters module (Read-only)
+    // Checking potential keys where Masters module might be saving the market rates
+    const savedMasterRates = localStorage.getItem("market_rates_store") || localStorage.getItem("master_market_rates") || localStorage.getItem("market_rates");
+    
+    if (savedMasterRates) {
       try {
-        const parsed = JSON.parse(savedYearlyRates);
+        const parsed = JSON.parse(savedMasterRates);
         setTableOneData(parsed.tableOne || {});
         setTableTwoData(parsed.tableTwo || {});
         setSummaryData(parsed.summary || {});
       } catch (e) {
-        console.error("Error loading stored rates", e);
+        console.error("Error loading stored market rates from Master module", e);
       }
     }
   }, [trip]);
@@ -214,7 +216,7 @@ export default function EnterRateModal({ open, trip, onClose, onSave }: Props) {
                   <span>3-Day Market Rates Reference</span>
                 </div>
                 <div className="hidden sm:flex items-center gap-1 text-[10px] bg-slate-200/60 text-slate-600 px-2 py-0.5 rounded-full font-medium">
-                  <Info size={12} /> Syncs automatically from Accounts
+                  <Info size={12} /> Syncs automatically from Masters
                 </div>
               </div>
               <span className="text-xs font-medium text-slate-600 bg-white px-3 py-1 rounded-md border border-slate-200 shadow-sm">

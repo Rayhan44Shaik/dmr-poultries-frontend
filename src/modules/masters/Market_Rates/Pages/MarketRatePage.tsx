@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Save, Tag, ChevronLeft, ChevronRight, CheckCircle2, X, RefreshCw } from 'lucide-react';
-import { DatePicker } from '../../../components/common/DatePicker';
-import { useSafeNotification } from '../../../hooks/useSafeNotification';
+import { DatePicker } from '../../../../components/common/DatePicker';
+import { useSafeNotification } from '../../../../hooks/useSafeNotification';
 
 interface MarketRatePageProps {
   embedded?: boolean;
