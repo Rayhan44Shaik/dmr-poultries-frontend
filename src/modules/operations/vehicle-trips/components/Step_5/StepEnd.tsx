@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Pencil,
   AlertTriangle,
+  Lock,
 } from "lucide-react";
 import type { Trip } from "../../types/trip";
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
@@ -129,7 +130,7 @@ export default function StepEnd({
       others3Amt: (tripData as any).others3Amt ?? "",
       others4Amt: (tripData as any).others4Amt ?? "",
       others5Amt: (tripData as any).others5Amt ?? "",
-      startMeter: tripData.openingMeter || 0,
+      startMeter: tripData.openingMeter !== undefined && tripData.openingMeter !== null ? tripData.openingMeter : 0,
       endMeter: (tripData as any).endMeter ?? (tripData as any).closingMeter ?? "",
       destinationTolls: (tripData as any).destinationTolls ?? (tripData as any).deliveryTolls ?? "",
       remarks: (tripData as any).remarks ?? "",
@@ -155,12 +156,14 @@ export default function StepEnd({
     }
   }, [trip.id, trip]);
 
-  const openingMeter = trip.openingMeter || 0;
-  const destMeter = trip.destMeter || 0;
+  // Derived Meters
+  const openingMeter = trip.openingMeter !== undefined && trip.openingMeter !== null ? Number(trip.openingMeter) : 0;
+  const destMeter = trip.destMeter !== undefined && trip.destMeter !== null ? Number(trip.destMeter) : 0;
   const endMeterNum = Number(sheetData.endMeter);
+  const hasEndMeter = sheetData.endMeter !== undefined && sheetData.endMeter !== null && sheetData.endMeter !== "";
 
   let totalDistanceCovered = 0;
-  if (openingMeter > 0 && endMeterNum > 0 && endMeterNum > openingMeter) {
+  if (hasEndMeter && openingMeter >= 0 && endMeterNum >= openingMeter) {
     totalDistanceCovered = endMeterNum - openingMeter;
   }
 
@@ -218,6 +221,20 @@ export default function StepEnd({
   const remainingBalance =
     Number(sheetData.advance || 0) - totalAllExpenses - totalDieselAmount;
 
+  // Filter general expenses > 0 for submitted view
+  const generalExpensesList = [
+    { label: "Meals", value: Number(sheetData.meals) || 0 },
+    { label: "Tea", value: Number(sheetData.othersRC) || 0 },
+    { label: "Loading", value: Number(sheetData.loading) || 0 },
+    { label: "Meals / Tiffin", value: Number(sheetData.mealsTiffin) || 0 },
+    { label: "Vehicle Maintenance", value: Number(sheetData.vehicleMaintenance) || 0 },
+    { label: "Driver", value: Number(sheetData.others1Amt) || 0 },
+    { label: "Supervisor", value: Number(sheetData.others2Amt) || 0 },
+    { label: "Helper & loader", value: Number(sheetData.others3Amt) || 0 },
+    { label: "Others 1", value: Number(sheetData.others4Amt) || 0 },
+    { label: "Others 2", value: Number(sheetData.others5Amt) || 0 },
+  ].filter(exp => exp.value > 0);
+
   const prepareFinalPayload = (stepSubmitted = false) => {
     const payload: any = {
       ...sheetData,
@@ -233,7 +250,6 @@ export default function StepEnd({
       endStepSubmitted: stepSubmitted, 
     };
 
-    // Ensure no frontend-generated status or timestamps override the backend
     delete payload.status;
     delete payload.submittedAtTimestamp;
     delete payload.expensesStepSubmittedAt;
@@ -256,14 +272,12 @@ export default function StepEnd({
   };
 
   const handleInitiateSubmit = () => {
-    const endMeterNum = Number(sheetData.endMeter);
-    if (sheetData.endMeter === "" || sheetData.endMeter === null || isNaN(endMeterNum)) {
+    if (!hasEndMeter || isNaN(endMeterNum)) {
       setErrorMsg("End Meter Reading is required.");
       setToast({ message: "End Meter Reading is required.", type: "warning" });
       return;
     }
 
-    const actualDestMeter = destMeter || 0;
     let highestDieselMeter = 0;
     Object.keys(sheetData).forEach((key) => {
       if (key.startsWith("dieselMeter")) {
@@ -271,11 +285,12 @@ export default function StepEnd({
         if (!isNaN(val) && val > highestDieselMeter) highestDieselMeter = val;
       }
     });
+    
     let requiredMinMeter = openingMeter;
     let requiredMinLabel = `Start Meter (${openingMeter})`;
-    if (actualDestMeter > requiredMinMeter) {
-      requiredMinMeter = actualDestMeter;
-      requiredMinLabel = `Dest Meter (${actualDestMeter})`;
+    if (destMeter > requiredMinMeter) {
+      requiredMinMeter = destMeter;
+      requiredMinLabel = `Dest Meter (${destMeter})`;
     }
     if (highestDieselMeter > requiredMinMeter) {
       requiredMinMeter = highestDieselMeter;
@@ -379,8 +394,9 @@ export default function StepEnd({
       `}</style>
 
       {isSubmitted && !isLocalEditing ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3 shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-3">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3 mb-4">
             <div className="flex items-center gap-2">
               <span className="bg-blue-600 text-white w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0">5</span>
               <h2 className="text-sm font-bold text-slate-800 tracking-tight">EXPENSES SHEET (SUBMITTED)</h2>
@@ -395,31 +411,91 @@ export default function StepEnd({
                   <Pencil size={14} />
                 </button>
               )}
-              <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap">
+              <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap flex items-center gap-1">
+                <Lock size={12} />
                 Submitted & Locked
               </span>
             </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
+
+          {/* Top Meta Summary */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pb-4 border-b border-slate-100">
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">Date & Time</p>
-              <p className="text-xs font-semibold text-slate-900 mt-0.5">{sheetData.submittedAtTimestamp || "--"}</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Date & Time</p>
+              <p className="text-xs font-semibold text-slate-900 truncate">{sheetData.submittedAtTimestamp || "--"}</p>
             </div>
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">Vehicle No</p>
-              <p className="text-xs font-semibold text-slate-900 mt-0.5">{sheetData.vehicleNo || "--"}</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Vehicle No</p>
+              <p className="text-xs font-semibold text-slate-900 truncate">{sheetData.vehicleNo || "--"}</p>
             </div>
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">Total Expenses</p>
-              <p className="text-xs font-semibold text-red-600 mt-0.5">₹{totalAllExpenses.toFixed(2)}</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Total Expenses</p>
+              <p className="text-xs font-bold text-red-600 truncate">₹{totalAllExpenses.toFixed(2)}</p>
             </div>
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">Total Diesel</p>
-              <p className="text-xs font-semibold text-blue-600 mt-0.5">₹{totalDieselAmount.toFixed(2)}</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Total Diesel</p>
+              <p className="text-xs font-bold text-blue-600 truncate">₹{totalDieselAmount.toFixed(2)}</p>
             </div>
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">Remaining Balance</p>
-              <p className="text-xs font-semibold text-emerald-600 mt-0.5">₹{remainingBalance.toFixed(2)}</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Remaining Balance</p>
+              <p className="text-xs font-bold text-emerald-600 truncate">₹{remainingBalance.toFixed(2)}</p>
+            </div>
+          </div>
+
+          {/* Trip Metrics */}
+          <div className="py-4 border-b border-slate-100">
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Trip Metrics</h3>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div>
+                <p className="text-[10px] text-slate-500 font-medium mb-0.5">Start Meter</p>
+                <p className="text-xs font-semibold text-slate-800">{openingMeter >= 0 ? `${openingMeter} KM` : "--"}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-500 font-medium mb-0.5">Destination Meter</p>
+                <p className="text-xs font-semibold text-slate-800">{destMeter > 0 ? `${destMeter} KM` : "--"}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-500 font-medium mb-0.5">End Meter</p>
+                <p className="text-xs font-semibold text-slate-800">{hasEndMeter ? `${endMeterNum} KM` : "--"}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-500 font-medium mb-0.5">Distance Covered</p>
+                <p className="text-xs font-semibold text-slate-800">{hasEndMeter && totalDistanceCovered >= 0 ? `${totalDistanceCovered} KM` : "--"}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-500 font-medium mb-0.5">Average Mileage</p>
+                <p className="text-xs font-semibold text-blue-600">{hasEndMeter && totalDistanceCovered > 0 && totalDieselLiters > 0 ? `${averageKmLtr} KM/Ltr` : "--"}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Expenses Incurred */}
+          <div className="py-4 border-b border-slate-100">
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Expenses Incurred</h3>
+            {generalExpensesList.length > 0 ? (
+              <div className="space-y-2 max-w-sm">
+                {generalExpensesList.map((exp, i) => (
+                  <div key={i} className="flex justify-between items-center text-xs">
+                    <span className="text-slate-600 font-medium">{exp.label}</span>
+                    <span className="text-slate-800 font-semibold">₹{exp.value.toFixed(2)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between items-center text-xs pt-2 mt-2 border-t border-slate-100">
+                  <span className="text-slate-800 font-bold">General Expenses Total</span>
+                  <span className="text-red-600 font-bold">₹{totalAllExpenses.toFixed(2)}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic">No general expenses recorded.</p>
+            )}
+          </div>
+
+          {/* Diesel */}
+          <div className="pt-4">
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Diesel</h3>
+            <div className="flex justify-between items-center text-xs max-w-sm">
+              <span className="text-slate-600 font-medium">Total Diesel Expense</span>
+              <span className="text-blue-600 font-bold">₹{totalDieselAmount.toFixed(2)}</span>
             </div>
           </div>
         </div>

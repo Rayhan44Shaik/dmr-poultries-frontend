@@ -1,6 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import type { MaintenanceEvent } from '../../types';
+import MaintenanceDocuments from './MaintenanceDocuments';
 
 interface BillDetailsModalProps {
   isOpen: boolean;
@@ -13,7 +14,7 @@ const BillDetailsModal: React.FC<BillDetailsModalProps> = ({ isOpen, bill, vehic
   if (!isOpen || !bill) return null;
 
   const vehicle = vehicles.find((v: any) => String(v.id) === String(bill.vehicleId));
-  const isPaid = bill.paymentStatus === 'paid';
+  const isPaid = bill.paymentStatus === 'approved';
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -145,6 +146,16 @@ const BillDetailsModal: React.FC<BillDetailsModalProps> = ({ isOpen, bill, vehic
             <div className="border-t border-slate-200 pt-4 flex justify-between items-center">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Cost</p>
               <p className="text-xl font-bold text-blue-600">₹{bill.totalCost.toFixed(2)}</p>
+            </div>
+          )}
+
+          {/* Bill / Spare-part Documents */}
+          {bill.documents && bill.documents.length > 0 && (
+            <div className="border-t border-slate-200 pt-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                Documents ({bill.documents.length})
+              </p>
+              <MaintenanceDocuments maintenanceId={bill.id || ''} documents={bill.documents} />
             </div>
           )}
 

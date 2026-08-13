@@ -13,6 +13,7 @@ import {
   Tag,
 } from "lucide-react";
 import BoxSelector from "./BoxSelector";
+import { formatCaptureTime } from "./formatCaptureTime";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
 
 export interface Props {
@@ -143,7 +144,7 @@ export default function ShopDeliveryForm({
           </h3>
           <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
             <Clock size={12} className="text-slate-400" />
-            Auto-Captured: <span className="font-medium text-slate-600">{autoCaptureTime}</span>
+            Auto-Captured: <span className="font-medium text-slate-600">{formatCaptureTime(autoCaptureTime)}</span>
           </p>
         </div>
         <button

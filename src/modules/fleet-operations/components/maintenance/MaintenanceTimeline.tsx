@@ -1,6 +1,6 @@
 import { memo, useState } from 'react';
 import { format } from 'date-fns';
-import { MapPin, Calendar, Wrench, Battery, Disc, Settings, Activity, Hash } from 'lucide-react';
+import { MapPin, Calendar, Wrench, Battery, Disc, Settings, Activity, Hash, Paperclip } from 'lucide-react';
 import type { MaintenanceEvent } from '../../types';
 import BillDetailsModal from './BillDetailsModal';
 
@@ -16,8 +16,8 @@ const MaintenanceTimeline = ({ events, vehicles, selectedVehicleId }: Maintenanc
 
   // Filter: Only show PAID records
   const filteredEvents = events.filter(event => {
-    // Must be paid
-    if (event.paymentStatus !== 'paid') return false;
+    // Must be paid (approved)
+    if (event.paymentStatus !== 'approved') return false;
     
     // Apply vehicle filter if selected
     if (!selectedVehicleId || selectedVehicleId === 'all') return true;
@@ -67,9 +67,7 @@ const MaintenanceTimeline = ({ events, vehicles, selectedVehicleId }: Maintenanc
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
           .map((event) => {
             const matchedVehicle = vehicles.find(v => String(v.id) === String(event.vehicleId));
-            // All events here are paid by filter
-            const isPaid = true;
-            
+
             return (
               <div key={event.id} className="relative pl-10 border-l border-slate-200 pb-6 last:border-l-0 last:pb-2">
                 
@@ -99,6 +97,17 @@ const MaintenanceTimeline = ({ events, vehicles, selectedVehicleId }: Maintenanc
                         >
                           <Hash className="w-3 h-3" />
                           {event.billNumber}
+                        </button>
+                      )}
+                      {/* Attached documents */}
+                      {Array.isArray(event.documents) && event.documents.length > 0 && (
+                        <button
+                          onClick={() => handleBillClick(event)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-colors cursor-pointer"
+                          title={`${event.documents.length} document${event.documents.length > 1 ? 's' : ''} attached`}
+                        >
+                          <Paperclip className="w-3 h-3" />
+                          {event.documents.length}
                         </button>
                       )}
                     </div>

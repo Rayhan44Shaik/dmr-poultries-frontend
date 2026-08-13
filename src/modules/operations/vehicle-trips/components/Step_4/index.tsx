@@ -10,6 +10,7 @@ import { useShopDeliveryForm } from "./useShopDeliveryForm";
 import ShopDeliveryForm from "./ShopDeliveryForm";
 import ShopDeliveryCard from "./ShopDeliveryCard";
 import { generateShopPDF } from "../../utils/generateShopPDF";
+import { formatCaptureTime, toIsoOrNow } from "./formatCaptureTime";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 
@@ -461,7 +462,11 @@ export default function UnLoadingTable({
   const openAddForm = () => {
     setEditingId(null);
     setMode("box");
-    setAutoCaptureTime(new Date().toLocaleString());
+    // Captured once, here, when the delivery is first created. Stored as a
+    // canonical ISO string (safe for the backend's TIMESTAMPTZ column and
+    // for re-parsing later) — only ever formatted to "M/D/YYYY, h:mm:ss
+    // AM/PM" at display time, never persisted in that display format.
+    setAutoCaptureTime(new Date().toISOString());
     setFormData({
       shopId: 0,
       shopName: "",
@@ -482,7 +487,11 @@ export default function UnLoadingTable({
     const rowWithExtra = row as any;
     setEditingId(row.id);
     setMode(rowWithExtra.deliveryMode || "box");
-    setAutoCaptureTime(rowWithExtra.autoCaptureTime || new Date().toLocaleString());
+    // Preserve the original capture instant during edit — re-normalize
+    // whatever is currently stored (ISO from the backend, or an older
+    // display-formatted string from before this fix) back to canonical ISO
+    // so it round-trips safely to the backend again on update.
+    setAutoCaptureTime(toIsoOrNow(rowWithExtra.autoCaptureTime));
     setFormData({
       shopId: row.shopId,
       shopName: row.shopName,
@@ -623,7 +632,7 @@ export default function UnLoadingTable({
       farmWeight: farmWeightVal,
       mortKg: mortKgVal,
       perBoxData: perBoxData,
-      autoCaptureTime: autoCaptureTime || new Date().toLocaleString(),
+      autoCaptureTime: toIsoOrNow(autoCaptureTime),
     };
 
     if (editingId !== null) {
@@ -720,7 +729,7 @@ export default function UnLoadingTable({
       weight: totalWeight,
       mortality: totalMortality,
       mortKg: totalMortKg,
-      lastCaptureTime: latestCaptured || new Date().toLocaleString(),
+      lastCaptureTime: formatCaptureTime(latestCaptured) || formatCaptureTime(new Date()),
     };
   }, [safeRows]);
 

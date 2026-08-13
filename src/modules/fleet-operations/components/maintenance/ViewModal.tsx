@@ -1,5 +1,6 @@
 import React from 'react';
 import type { MaintenanceEvent } from '../../types';
+import MaintenanceDocuments from './MaintenanceDocuments';
 
 interface ViewModalProps {
   record: MaintenanceEvent;
@@ -99,6 +100,16 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose }) => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Bill / Spare-part Documents */}
+          {record.documents && record.documents.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                Documents ({record.documents.length})
+              </p>
+              <MaintenanceDocuments maintenanceId={record.id || ''} documents={record.documents} />
             </div>
           )}
 

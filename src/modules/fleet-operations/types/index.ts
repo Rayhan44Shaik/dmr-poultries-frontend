@@ -32,6 +32,17 @@ export const PartItemSchema = z.object({
   amount: z.number().nonnegative(),
 });
 
+/** Bill / spare-part document attached to a maintenance entry (metadata only —
+ * binary contents are served by the backend, never stored in the browser). */
+export const MaintenanceDocumentSchema = z.object({
+  id: z.number(),
+  maintenanceId: z.number().optional(),
+  fileName: z.string(),
+  mimeType: z.string(),
+  fileSize: z.number().optional(),
+  createdAt: z.string().optional(),
+});
+
 export const MaintenanceEventSchema = z.object({
   id: z.string().optional(),
   vehicleId: z.string().min(1, 'Vehicle required'),
@@ -52,6 +63,8 @@ export const MaintenanceEventSchema = z.object({
   deletedAt: z.string().datetime().optional(),
   // CHANGED: Replaced 'paid' with 'approved' to match the new UI logic
   paymentStatus: z.enum(['pending', 'approved']).default('pending').optional(),
+  // Bill / spare-part documents attached to the maintenance entry (metadata only).
+  documents: z.array(MaintenanceDocumentSchema).optional(),
 });
 
 export const VehicleDocumentSchema = z.object({
@@ -97,6 +110,7 @@ export const EMIRecordSchema = z.object({
 
 // ---------- Types ----------
 export type PartItem = z.infer<typeof PartItemSchema>;
+export type MaintenanceDocument = z.infer<typeof MaintenanceDocumentSchema>;
 export type MaintenanceEvent = z.infer<typeof MaintenanceEventSchema>;
 export type VehicleDocument = z.infer<typeof VehicleDocumentSchema>;
 export type FASTag = z.infer<typeof FASTagSchema>;

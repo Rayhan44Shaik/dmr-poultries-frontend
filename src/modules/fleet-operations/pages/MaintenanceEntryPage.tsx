@@ -3,7 +3,7 @@ import { useEmployees } from '../../masters/employees/hooks/useEmployees';
 import { useMaintenanceData } from '../hooks/useMaintenanceData';
 import { useMaintenanceForm } from '../hooks/useMaintenanceForm';
 import { isEditable, safeDate } from '../utils/maintenanceHelpers';
-import { softDeleteMaintenance, getDeletedMaintenance } from '../services/storage';
+import { maintenanceApi } from '../services/maintenanceApi';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { useFuelKMValidator } from "../../operations/fuel-expenses/hooks/useFuelKMValidator";
 import ErrorBoundary from '../components/common/ErrorBoundary';
@@ -17,7 +17,7 @@ import { RotateCcw, Save, Wrench, AlertTriangle, X, AlertCircle } from 'lucide-r
 const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
   const { employees } = useEmployees();
   const { showNotification } = useSafeNotification();
-  const { vehicles, maintenance, refresh: refreshMaintenance } = useMaintenanceData();
+  const { vehicles, maintenance, deletedRecords, refresh: refreshMaintenance } = useMaintenanceData();
   const [loading, setLoading] = useState(false);
   const [selectKey, setSelectKey] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -48,16 +48,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
     };
   }, []);
 
-  // --- Deleted records ---
-  const [deletedRecords, setDeletedRecords] = useState<MaintenanceEvent[]>([]);
-  const refreshDeleted = useCallback(() => {
-    setDeletedRecords(getDeletedMaintenance());
-  }, []);
-
-  useEffect(() => {
-    refreshDeleted();
-  }, [refreshDeleted]);
-
+  // --- Deleted records (soft-deleted from backend, exposed by the hook) ---
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
 
@@ -80,14 +71,17 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
     setDriverId,
     setNextServiceKM,
     setRemarks,
+    documents,
+    addDocumentFiles,
+    removeDocument,
+    markDocumentRemoval,
+    setExistingDocuments,
   } = useMaintenanceForm({
     onSuccess: () => {
       refreshMaintenance();
-      refreshDeleted();
       setCurrentPage(1);
       setSelectedId(null);
     },
-    vehicles,
   });
 
   // --- Get vehicle number for validator ---
@@ -201,6 +195,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
       createdAt: record.createdAt || '',
     });
     setPartsData(record.parts || [{ name: '', specification: '', quantity: 1, rate: 0, amount: 0 }]);
+    setExistingDocuments(record.documents || []);
     setSelectKey(prev => prev + 1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     showNotification('Edit mode – update the details and save.', 'info');
@@ -251,23 +246,18 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
     }, 1000);
   };
 
-  const performDeletion = (id: string) => {
+  const performDeletion = async (id: string) => {
     try {
-      const deleted = softDeleteMaintenance(id);
-      if (deleted) {
-        showNotification('Record moved to deleted list.', 'success');
-        refreshMaintenance();
-        refreshDeleted();
-        setSelectedId(null);
-        const remaining = displayRecords.length - 1;
-        const maxPage = Math.ceil(remaining / pageSize);
-        if (currentPage > maxPage && maxPage > 0) {
-          setCurrentPage(maxPage);
-        } else if (remaining === 0) {
-          setCurrentPage(1);
-        }
-      } else {
-        showNotification('Delete failed – record not found.', 'error');
+      await maintenanceApi.remove(id);
+      showNotification('Record deleted.', 'success');
+      refreshMaintenance();
+      setSelectedId(null);
+      const remaining = displayRecords.length - 1;
+      const maxPage = Math.ceil(remaining / pageSize);
+      if (currentPage > maxPage && maxPage > 0) {
+        setCurrentPage(maxPage);
+      } else if (remaining === 0) {
+        setCurrentPage(1);
       }
     } catch (err) {
       showNotification(String(err), 'error');
@@ -385,6 +375,10 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
               onMaintenanceChange={handleMaintenanceChange}
               setFormField={setFormField}
               selectKey={selectKey}
+              documents={documents}
+              onAddDocuments={addDocumentFiles}
+              onRemoveDocument={removeDocument}
+              onMarkDocumentRemoval={markDocumentRemoval}
             />
           </div>
         </div>

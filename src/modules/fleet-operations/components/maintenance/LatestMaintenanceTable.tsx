@@ -1,5 +1,5 @@
 import { memo, useState, useMemo, useEffect, useRef } from 'react';
-import { Eye, Edit, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon, Search } from 'lucide-react';
+import { Eye, Edit, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon, Search, Paperclip } from 'lucide-react';
 import type { MaintenanceEvent } from '../../types';
 
 export type ViewMode = 'pending' | 'approved' | 'deleted';
@@ -217,6 +217,7 @@ const LatestMaintenanceTable = ({
                 <tr>
                   <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">#</th>
                   <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Bill No.</th>
+                  <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Docs</th>
                   <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Vehicle</th>
                   <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Date</th>
                   <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Maintenance Details</th>
@@ -251,6 +252,18 @@ const LatestMaintenanceTable = ({
                         <span className={isApproved ? 'text-green-600' : 'text-orange-500'}>
                           {rec.billNumber || '-'}
                         </span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {Array.isArray(rec.documents) && rec.documents.length > 0 && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onView(rec); }}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition"
+                            title={`${rec.documents.length} document${rec.documents.length > 1 ? 's' : ''} attached`}
+                          >
+                            <Paperclip size={12} />
+                            {rec.documents.length}
+                          </button>
+                        )}
                       </td>
                       <td className="px-3 py-2.5 text-sm font-medium text-slate-800">
                         {vehicle?.vehicleNumber || 'Unknown'}

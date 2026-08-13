@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
 
 export type ShopDeliveryWithExtra = ShopDelivery & {
@@ -51,16 +51,6 @@ export function useShopDeliveryForm(
     mortWeight: 0,
     remarks: "",
     perBoxData: [],
-  });
-
-  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({
-    birdsExceed: false,
-    birdsMismatch: false,
-    weightMismatch: false,
-    birdsExceedFarm: false,
-    weightExceedFarm: false,
-    perBoxBirdsErrors: [],
-    perBoxWeightErrors: [],
   });
 
   // ─── Compute used box numbers ──────────────────────────────────
@@ -128,7 +118,11 @@ export function useShopDeliveryForm(
   }, [mode, farmWeight, weightModeTotals.weight, formData.mortWeight]);
 
   // ─── Validation ──────────────────────────────────────────────────
-  const validate = useCallback(() => {
+  // Derived reactively from current inputs (not imperative setState) so
+  // correcting a value — e.g. Delivered Weight 51 -> 49 kg — clears the
+  // error and re-enables Submit/Update on the very next render, with no
+  // stale error left over from a previous failed attempt.
+  const validationErrors = useMemo<ValidationErrors>(() => {
     let birdsExceed = false;
     let birdsMismatch = false;
     let weightMismatch = false;
@@ -140,9 +134,8 @@ export function useShopDeliveryForm(
     if (mode === "box") {
       birdsExceed = formData.mortality > farmBirds && farmBirds > 0;
     } else {
+      // Farm Birds must equal Delivered Birds + Mortality exactly.
       const totalBirds = weightModeTotals.birds + formData.mortality;
-      const totalWeight = weightModeTotals.weight + mortKg;
-
       if (farmBirds > 0) {
         if (totalBirds > farmBirds) {
           birdsExceedFarm = true;
@@ -150,10 +143,12 @@ export function useShopDeliveryForm(
           birdsMismatch = true;
         }
       }
-      if (farmWeight > 0) {
-        if (totalWeight > farmWeight) {
-          weightExceedFarm = true;
-        }
+
+      // Delivered Weight alone must not exceed Farm Weight. Mortality
+      // Weight is optional and is intentionally excluded from this check —
+      // it must never block Submit/Update.
+      if (farmWeight > 0 && weightModeTotals.weight > farmWeight) {
+        weightExceedFarm = true;
       }
 
       formData.perBoxData.forEach((item, index) => {
@@ -168,7 +163,7 @@ export function useShopDeliveryForm(
       });
     }
 
-    setValidationErrors({
+    return {
       birdsExceed,
       birdsMismatch,
       weightMismatch,
@@ -176,17 +171,17 @@ export function useShopDeliveryForm(
       weightExceedFarm,
       perBoxBirdsErrors,
       perBoxWeightErrors,
-    });
-    return (
-      !birdsExceed &&
-      !birdsMismatch &&
-      !weightMismatch &&
-      !birdsExceedFarm &&
-      !weightExceedFarm &&
-      !perBoxBirdsErrors.some((err) => err) &&
-      !perBoxWeightErrors.some((err) => err)
-    );
-  }, [mode, farmBirds, farmWeight, formData.mortality, formData.mortWeight, weightModeTotals, mortKg, formData.perBoxData, availableBoxDetails]);
+    };
+  }, [mode, farmBirds, farmWeight, formData.mortality, weightModeTotals, formData.perBoxData, availableBoxDetails]);
+
+  const validate = () =>
+    !validationErrors.birdsExceed &&
+    !validationErrors.birdsMismatch &&
+    !validationErrors.weightMismatch &&
+    !validationErrors.birdsExceedFarm &&
+    !validationErrors.weightExceedFarm &&
+    !validationErrors.perBoxBirdsErrors.some((err) => err) &&
+    !validationErrors.perBoxWeightErrors.some((err) => err);
 
   // ─── Auto-initialise perBoxData when switching to weight mode ──
   useEffect(() => {
@@ -226,7 +221,6 @@ export function useShopDeliveryForm(
     formData,
     setFormData,
     validationErrors,
-    setValidationErrors,
     usedBoxIds,
     availableBoxDetails,
     farmBirds,

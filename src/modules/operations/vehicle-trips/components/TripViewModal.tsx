@@ -1,7 +1,7 @@
 // src/modules/operations/vehicle-trips/components/TripViewModal.tsx
 
 import React, { useState, useCallback } from "react";
-import { X, FileText, Download, Pencil, UserCheck } from "lucide-react";
+import { X, FileText, Download, Pencil, UserCheck, Box, Users, Scale, Clock, Store, AlertTriangle } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Trip } from "../types/trip";
@@ -10,8 +10,6 @@ import type { Trip } from "../types/trip";
 import TripWizardStepper from "./TripWizardStepper";
 import StepStart from "./StepStart";
 import StepFarm from "./StepFarm";
-import StepPickup from "./StepPickup";
-import StepDeliveries from "./StepDeliveries";
 import StepEnd from "./Step_5/StepEnd";
 import TripFinalKPI from "./TripFinalKPI";
 
@@ -106,7 +104,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
       row.shopName,
       row.birds.toString(),
       row.weight.toFixed(2),
-      row.remarks || "--", // ✅ Fixed: missing closing quote
+      row.remarks || "--", 
     ]);
 
     autoTable(doc, {
@@ -136,6 +134,201 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
   const noop = () => {};
   const noopDispatch = () => {};
 
+  // ─── Custom Read-Only Views for Pickup and Deliveries ─────────
+  const renderReadOnlyPickup = () => {
+    const boxes = trip.boxDetails || [];
+    const dcWeight = (trip as any).dcWeight || trip.totalWeight || 0;
+    
+    return (
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-2">
+            <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">3</span>
+            <h3 className="text-base font-bold text-slate-800">PICKUP DETAILS</h3>
+          </div>
+          <span className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full text-xs font-semibold border border-emerald-200">
+            Completed & Locked
+          </span>
+        </div>
+
+        {/* Pickup KPIs */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl">
+            <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1 mb-1">
+              <Clock size={12} className="text-slate-500" /> Time
+            </span>
+            <span className="text-sm font-bold text-slate-800">{trip.pickupLoadTime || "--"}</span>
+          </div>
+          <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl">
+            <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1 mb-1">
+              <Scale size={12} className="text-emerald-500" /> DC Wt
+            </span>
+            <span className="text-sm font-bold text-slate-800">{dcWeight.toFixed(2)} KG</span>
+          </div>
+          <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl">
+            <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1 mb-1">
+              <Users size={12} className="text-blue-500" /> Birds
+            </span>
+            <span className="text-sm font-bold text-slate-800">{trip.totalBirds}</span>
+          </div>
+          <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl">
+            <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1 mb-1">
+              <Box size={12} className="text-amber-500" /> Boxes
+            </span>
+            <span className="text-sm font-bold text-slate-800">{trip.boxes || boxes.length}</span>
+          </div>
+          <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl">
+            <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1 mb-1">
+              <AlertTriangle size={12} className="text-purple-500" /> Avg Wt
+            </span>
+            <span className="text-sm font-bold text-slate-800">
+              {trip.avgWeight ? trip.avgWeight.toFixed(3) : (trip.totalBirds > 0 ? (dcWeight / trip.totalBirds).toFixed(3) : "0.000")} KG
+            </span>
+          </div>
+        </div>
+
+        {/* Box Wise Data Table */}
+        <div className="border border-slate-200 rounded-xl overflow-hidden">
+          <table className="min-w-full text-sm text-left">
+            <thead className="bg-slate-100/60 border-b border-slate-200 text-slate-600">
+              <tr>
+                <th className="px-4 py-3 font-bold uppercase text-[11px] tracking-wider">Box Number</th>
+                <th className="px-4 py-3 font-bold uppercase text-[11px] tracking-wider text-center">Birds</th>
+                <th className="px-4 py-3 font-bold uppercase text-[11px] tracking-wider text-center">Weight (KG)</th>
+                <th className="px-4 py-3 font-bold uppercase text-[11px] tracking-wider text-center">Avg Bird Wt</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {boxes.map((b, i) => {
+                const avg = b.birds > 0 ? (b.weight / b.birds).toFixed(3) : "0.000";
+                return (
+                  <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-4 py-3 font-semibold text-slate-700">Box {b.boxNo || i + 1}</td>
+                    <td className="px-4 py-3 text-center font-bold text-blue-600">{b.birds}</td>
+                    <td className="px-4 py-3 text-center font-bold text-emerald-600">{b.weight?.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-center text-slate-600">{avg} KG</td>
+                  </tr>
+                );
+              })}
+              {boxes.length === 0 && (
+                <tr><td colSpan={4} className="text-center py-6 text-slate-400">No box details recorded for this trip.</td></tr>
+              )}
+            </tbody>
+            <tfoot className="bg-slate-50 border-t border-slate-200 font-bold text-slate-800">
+              <tr>
+                <td className="px-4 py-3 text-right text-xs uppercase tracking-wider">TOTAL</td>
+                <td className="px-4 py-3 text-center text-blue-700">{trip.totalBirds}</td>
+                <td className="px-4 py-3 text-center text-emerald-700">{dcWeight.toFixed(2)} KG</td>
+                <td className="px-4 py-3 text-center text-slate-700">
+                  {trip.avgWeight ? trip.avgWeight.toFixed(3) : (trip.totalBirds > 0 ? (dcWeight / trip.totalBirds).toFixed(3) : "0.000")} KG
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  const renderReadOnlyDeliveries = () => {
+    const deliveries = trip.deliveries || [];
+    const totalDeliveredWeight = (trip as any).totalDeliveredWeight ?? trip.totalWeight ?? 0;
+    const totalDeliveredBirds = (trip as any).totalBirdsDelivered ?? trip.totalBirds ?? 0;
+    const totalMortality = (trip as any).totalMortalityCount ?? trip.totalMortality ?? 0;
+
+    return (
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-2">
+            <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">4</span>
+            <h3 className="text-base font-bold text-slate-800">SHOP DELIVERIES</h3>
+          </div>
+          <span className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full text-xs font-semibold border border-emerald-200">
+            Completed & Locked
+          </span>
+        </div>
+
+        {/* Delivery KPIs */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl">
+            <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1 mb-1">
+              <Store size={12} className="text-blue-500" /> Total Shops
+            </span>
+            <span className="text-sm font-bold text-slate-800">{trip.totalShops || deliveries.length}</span>
+          </div>
+          <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl">
+            <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1 mb-1">
+              <Users size={12} className="text-indigo-500" /> Delivered Birds
+            </span>
+            <span className="text-sm font-bold text-slate-800">{totalDeliveredBirds}</span>
+          </div>
+          <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl">
+            <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1 mb-1">
+              <Scale size={12} className="text-emerald-500" /> Delivered Weight
+            </span>
+            <span className="text-sm font-bold text-slate-800">{totalDeliveredWeight.toFixed(2)} KG</span>
+          </div>
+          <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl">
+            <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1 mb-1">
+              <AlertTriangle size={12} className="text-rose-500" /> Mortality
+            </span>
+            <span className="text-sm font-bold text-slate-800">{totalMortality}</span>
+          </div>
+        </div>
+
+        {/* Deliveries Table (Scrollable for 20+ shops) */}
+        <div className="border border-slate-200 rounded-xl overflow-hidden max-h-[450px] overflow-y-auto">
+          <table className="min-w-full text-sm text-left relative">
+            <thead className="bg-slate-100/90 border-b border-slate-200 text-slate-600 sticky top-0 z-10 backdrop-blur-sm">
+              <tr className="whitespace-nowrap">
+                <th className="px-4 py-3 font-bold uppercase text-[11px] tracking-wider">S.No</th>
+                <th className="px-4 py-3 font-bold uppercase text-[11px] tracking-wider">Box No</th>
+                <th className="px-4 py-3 font-bold uppercase text-[11px] tracking-wider">Shop Name</th>
+                <th className="px-4 py-3 font-bold uppercase text-[11px] tracking-wider">Bird Type</th>
+                <th className="px-4 py-3 font-bold uppercase text-[11px] tracking-wider text-center">Birds</th>
+                <th className="px-4 py-3 font-bold uppercase text-[11px] tracking-wider text-center">Weight (KG)</th>
+                <th className="px-4 py-3 font-bold uppercase text-[11px] tracking-wider text-center">Rate</th>
+                <th className="px-4 py-3 font-bold uppercase text-[11px] tracking-wider text-center">Amount</th>
+                <th className="px-4 py-3 font-bold uppercase text-[11px] tracking-wider text-center">Mortality</th>
+                <th className="px-4 py-3 font-bold uppercase text-[11px] tracking-wider">Remarks</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {deliveries.map((d, i) => (
+                <tr key={d.id || i} className="hover:bg-slate-50/60 transition-colors whitespace-nowrap">
+                  <td className="px-4 py-3 text-slate-500 font-medium">{i + 1}</td>
+                  <td className="px-4 py-3 font-semibold text-slate-700">{d.boxNo || "--"}</td>
+                  <td className="px-4 py-3 font-bold text-slate-800">{d.shopName || "Unknown Shop"}</td>
+                  <td className="px-4 py-3 text-slate-600">{d.birdType || "--"}</td>
+                  <td className="px-4 py-3 text-center text-blue-600 font-bold">{d.birds}</td>
+                  <td className="px-4 py-3 text-center text-emerald-600 font-bold">{d.weight?.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-center text-slate-600">{d.rate ? `₹${d.rate}` : "--"}</td>
+                  <td className="px-4 py-3 text-center text-emerald-700 font-bold">{d.amount ? `₹${d.amount}` : "--"}</td>
+                  <td className="px-4 py-3 text-center text-rose-600 font-bold">{d.mortality || 0}</td>
+                  <td className="px-4 py-3 text-slate-500 truncate max-w-[150px]" title={d.remarks}>{d.remarks || "--"}</td>
+                </tr>
+              ))}
+              {deliveries.length === 0 && (
+                <tr><td colSpan={10} className="text-center py-8 text-slate-400">No deliveries recorded for this trip.</td></tr>
+              )}
+            </tbody>
+            <tfoot className="bg-slate-50 border-t border-slate-200 font-bold text-slate-800 sticky bottom-0 z-10">
+              <tr>
+                <td colSpan={4} className="px-4 py-3 text-right text-xs uppercase tracking-wider">TOTAL</td>
+                <td className="px-4 py-3 text-center text-blue-700">{totalDeliveredBirds}</td>
+                <td className="px-4 py-3 text-center text-emerald-700">{totalDeliveredWeight.toFixed(2)} KG</td>
+                <td className="px-4 py-3 text-center text-slate-400">--</td>
+                <td className="px-4 py-3 text-center text-slate-400">--</td>
+                <td className="px-4 py-3 text-center text-rose-600">{totalMortality}</td>
+                <td className="px-4 py-3"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   // ─── Render the selected step ──────────────────────────────────
   const renderViewStep = () => {
     if (viewStepIndex === 0 && isStartCompleted) {
@@ -158,10 +351,12 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
       return <StepFarm trip={trip} setTrip={noopDispatch} updateTrip={noop} submitFarmStep={async () => "View only mode."} farms={[]} />;
     }
     if (viewStepIndex === 2 && isPickupCompleted) {
-      return <StepPickup trip={trip} setTrip={noopDispatch} updateTrip={noop} submitPickupStep={async () => "View only mode."} updateBoxDetails={noop} />;
+      // ✅ Render custom detailed Read-Only Pickup View
+      return renderReadOnlyPickup();
     }
     if (viewStepIndex === 3 && isDeliveryCompleted) {
-      return <StepDeliveries rows={trip.deliveries || []} setRows={noopDispatch} shops={shops} birdTypes={birdTypes} trip={trip} updateDeliveries={noop} submitDeliveriesStep={async () => "View only mode."} clearForm={noop} readOnly={true} />;
+      // ✅ Render custom detailed Read-Only Deliveries View
+      return renderReadOnlyDeliveries();
     }
     if (viewStepIndex === 4 && isEndCompleted) {
       return (
@@ -183,9 +378,10 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col">
+      {/* Expanded Modal Width to max-w-7xl to prevent cramped KPIs */}
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-7xl max-h-[92vh] overflow-hidden flex flex-col">
         
-        <div className="flex items-center justify-between px-10 py-6 border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80">
+        <div className="flex items-center justify-between px-10 py-6 border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80 shrink-0">
           <div className="flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white">
               <FileText className="w-7 h-7" />
@@ -208,7 +404,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
           </div>
         </div>
 
-        <div className="py-8 px-10 overflow-y-auto space-y-6 flex-1">
+        <div className="py-8 px-10 overflow-y-auto space-y-6 flex-1 bg-slate-50/30">
           
           <TripWizardStepper
             steps={["Start", "Farm", "Pickup", "Deliveries", "End"]}
@@ -232,7 +428,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
           <TripFinalKPI trip={trip} deliveries={trip.deliveries} />
         </div>
 
-        <div className="px-10 py-5 border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 flex items-center justify-end gap-3">
+        <div className="px-10 py-5 border-t border-slate-100 bg-white flex items-center justify-end gap-3 shrink-0">
           {onEdit && (
             <button onClick={() => onEdit(trip)} className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-md shadow-blue-500/20 transition-all active:scale-95">
               <Pencil size={15} />

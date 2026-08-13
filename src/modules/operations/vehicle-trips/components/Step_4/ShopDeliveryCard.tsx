@@ -2,6 +2,7 @@ import React from "react";
 import { Check, Box, Users, Scale, Clock, Pencil, FileText, Package, AlertCircle } from "lucide-react";
 import type { ShopDelivery } from "../../types/trip";
 import type { ShopDeliveryWithExtra } from "./useShopDeliveryForm";
+import { formatCaptureTime } from "./formatCaptureTime";
 
 interface Props {
   row: ShopDeliveryWithExtra;
@@ -141,7 +142,7 @@ export default function ShopDeliveryCard({
       <div className="flex items-center justify-between pt-0.5 text-[11px] text-slate-400 font-medium">
         <div className="flex items-center gap-1">
           <Clock size={12} className="text-slate-400 stroke-[2]" />
-          <span>{row.autoCaptureTime || "Just now"}</span>
+          <span>{formatCaptureTime(row.autoCaptureTime) || "Just now"}</span>
         </div>
         {row.birdType && (
           <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded-md text-[10px] border border-blue-100">

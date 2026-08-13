@@ -1,11 +1,9 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { startOfYear, endOfYear, isWithinInterval } from 'date-fns';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
 import { useFuelExpenses } from '../../operations/fuel-expenses/hooks/useFuelExpenses';
-import { getMaintenance } from '../services/storage';
+import { maintenanceApi, mapMaintenanceToEvent } from '../services/maintenanceApi';
 import type { MaintenanceEvent } from '../types';
-
-// We no longer need a custom MaintenanceRecord interface – we use MaintenanceEvent from types.
 
 interface UpcomingService {
   vehicle: any;
@@ -21,15 +19,40 @@ export function useMaintenanceData() {
   const dummyNotify = () => {};
   const { filteredData: fuelExpenses } = useFuelExpenses(dummyNotify);
 
-  // State to trigger re‑fetch
   const [refreshKey, setRefreshKey] = useState(0);
+  const [maintenance, setMaintenance] = useState<MaintenanceEvent[]>([]);
+  const [deletedRecords, setDeletedRecords] = useState<MaintenanceEvent[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const maintenance = useMemo(() => {
-    const raw = getMaintenance();
-    return raw.map((item: any) => ({
-      ...item,
-      nextServiceKM: item.nextServiceKM ?? 0,
-    })) as MaintenanceEvent[];
+  // Active + soft-deleted maintenance come from the backend (PostgreSQL).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const [activeData, allData] = await Promise.all([
+          maintenanceApi.list(),
+          maintenanceApi.list({ includeDeleted: true }),
+        ]);
+        if (cancelled) return;
+        const activeList = Array.isArray(activeData) ? activeData : (activeData?.data ?? []);
+        const allList = Array.isArray(allData) ? allData : (allData?.data ?? []);
+        const active: MaintenanceEvent[] = activeList.map(mapMaintenanceToEvent);
+        const all: MaintenanceEvent[] = allList.map(mapMaintenanceToEvent);
+        setMaintenance(active);
+        setDeletedRecords(all.filter((m) => Boolean(m.deletedAt)));
+      } catch {
+        if (!cancelled) {
+          setMaintenance([]);
+          setDeletedRecords([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [refreshKey]);
 
   const [selectedVehicle, setSelectedVehicle] = useState<string>('all');
@@ -106,6 +129,8 @@ export function useMaintenanceData() {
     upcomingServices,
     selectedVehicle,
     setSelectedVehicle,
+    deletedRecords,
+    loading,
     refresh,
   };
 }

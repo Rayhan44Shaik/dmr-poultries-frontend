@@ -12,7 +12,6 @@ export const DOCUMENT_LABELS: Record<string, string> = {
 };
 
 export const DOCUMENT_TYPE_ORDER = ['rc', 'insurance', 'fitness', 'permit', 'puc'] as const;
-export type DocumentType = typeof DOCUMENT_TYPE_ORDER[number];
 
 export const FASTAG_STATUSES = [...FastagStatusEnum] as string[];
 export const FASTAG_STATUS_LABELS: Record<string, string> = {
