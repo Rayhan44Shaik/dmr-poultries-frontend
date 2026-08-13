@@ -1,10 +1,13 @@
-import { Fuel, IndianRupee, FileText, CheckCircle, TrendingUp } from "lucide-react";
+import { Fuel, IndianRupee, FileText, CheckCircle, XCircle, TrendingUp, Route, ClipboardList } from "lucide-react";
 
 interface Props {
   totalLitres: number;
   totalAmount: number;
   pendingCount: number;
   approvedCount: number;
+  rejectedCount?: number;
+  tripCount?: number;
+  manualCount?: number;
   avgMileage: number | null;
   recentTripMileage: number | null;
 }
@@ -14,6 +17,9 @@ export function FuelKPICards({
   totalAmount,
   pendingCount,
   approvedCount,
+  rejectedCount = 0,
+  tripCount = 0,
+  manualCount = 0,
   avgMileage,
   recentTripMileage,
 }: Props) {
@@ -47,6 +53,27 @@ export function FuelKPICards({
       text: "text-emerald-700",
     },
     {
+      title: "Rejected Bills",
+      value: rejectedCount,
+      icon: <XCircle size={20} />,
+      bg: "bg-red-50",
+      text: "text-red-700",
+    },
+    {
+      title: "Trip Fuel",
+      value: tripCount,
+      icon: <Route size={20} />,
+      bg: "bg-indigo-50",
+      text: "text-indigo-700",
+    },
+    {
+      title: "Manual Fuel",
+      value: manualCount,
+      icon: <ClipboardList size={20} />,
+      bg: "bg-slate-100",
+      text: "text-slate-700",
+    },
+    {
       title: "Avg Efficiency (KM/L)",
       value: avgMileage !== null ? avgMileage.toFixed(2) : "—",
       icon: <TrendingUp size={20} />,
@@ -66,10 +93,9 @@ export function FuelKPICards({
   ] : [];
 
   const allCards = [...baseCards, ...extraCards];
-  const gridCols = allCards.length === 5 ? "lg:grid-cols-5" : "lg:grid-cols-6";
 
   return (
-    <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${gridCols}`}>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {allCards.map((card) => (
         <div
           key={card.title}

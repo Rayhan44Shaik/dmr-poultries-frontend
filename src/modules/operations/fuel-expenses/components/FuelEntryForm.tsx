@@ -4,13 +4,12 @@ import { useState, useEffect, useImperativeHandle, forwardRef, useRef } from "re
 import Select from "react-select";
 import { MapPin, Upload, X, Loader2 } from "lucide-react";
 import { fuelExpenseService } from "../services/fuelExpenseService";
-import type { FuelExpense } from "../types/fuelExpense";
-import { useFuelKMValidator } from "../../../operations/fuel-expenses/hooks/useFuelKMValidator";
+import type { FuelExpense, FuelExpenseInput } from "../types/fuelExpense";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
 interface Props {
-  onSave: (data: Omit<FuelExpense, "id" | "billNo" | "createdDate" | "createdBy" | "status">) => void;
-  onUpdate: (id: string, updates: Partial<FuelExpense>) => void;
+  onSave: (data: FuelExpenseInput) => Promise<boolean> | boolean;
+  onUpdate: (id: string, updates: Partial<FuelExpenseInput>) => Promise<boolean> | boolean;
   editingId?: string | null;
   initialData?: FuelExpense | null;
   vehicles: any[];
@@ -45,47 +44,41 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   const [supervisorName, setSupervisorName] = useState("");
   const [meterReading, setMeterReading] = useState<number>(0);
   const [minMeterReading, setMinMeterReading] = useState<number>(0);
-  const [amount, setAmount] = useState<number>(0);
   const [rate, setRate] = useState<number>(0);
   const [litres, setLitres] = useState<number>(0);
   const [petrolBunk, setPetrolBunk] = useState("");
+  const [bunkAddress, setBunkAddress] = useState("");
   const [remarks, setRemarks] = useState("");
   const [image, setImage] = useState<string>("");
+  const [imageName, setImageName] = useState<string>("");
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const activeVehicles = vehicles.filter(v => (v.status?.toLowerCase() === "active"));
 
-  // ✅ Still use validator for min meter reading, but we don't show the warning banner
-  const validator = useFuelKMValidator(vehicleNo);
-  const latestApprovedKM = validator.latestApprovedKM;
+  // Amount is always derived — liters × rate — never a free-typed field.
+  const amount = Number((litres * rate).toFixed(2));
 
   useEffect(() => {
     if (initialData && editingId) {
-      setDate(initialData.date);
-      setVehicleId(initialData.vehicleId);
-      setVehicleNo(initialData.vehicleNo);
-      setDriverId(initialData.driverId);
-      setDriverName(initialData.driverName);
-      setSupervisorId(initialData.supervisorId);
-      setSupervisorName(initialData.supervisorName);
-      setMeterReading(initialData.meterReading);
-      setMinMeterReading(initialData.meterReading);
-      setAmount(initialData.amount);
-      setRate(initialData.rate);
-      setLitres(initialData.litres);
-      setPetrolBunk(initialData.petrolBunk);
+      setDate(initialData.billDate);
+      setVehicleId(initialData.vehicleId ?? 0);
+      setVehicleNo(initialData.vehicleNo ?? "");
+      setDriverId(initialData.driverId ?? 0);
+      setDriverName(initialData.driverName ?? "");
+      setSupervisorId(initialData.supervisorId ?? 0);
+      setSupervisorName(initialData.supervisorName ?? "");
+      setMeterReading(initialData.currentMeter);
+      setMinMeterReading(initialData.currentMeter);
+      setRate(initialData.fuelRate);
+      setLitres(initialData.liters);
+      setPetrolBunk(initialData.pumpName);
+      setBunkAddress(initialData.bunkAddress || "");
       setRemarks(initialData.remarks || "");
-      setImage(initialData.image || "");
+      setImage(initialData.imageData || "");
+      setImageName(initialData.imageName || "");
     }
   }, [initialData, editingId]);
-
-  useEffect(() => {
-    if (amount > 0 && rate > 0) {
-      setLitres(parseFloat((amount / rate).toFixed(2)));
-    } else {
-      setLitres(0);
-    }
-  }, [amount, rate]);
 
   const resetForm = () => {
     setDate(new Date().toISOString().split("T")[0]);
@@ -97,12 +90,13 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
     setSupervisorName("");
     setMeterReading(0);
     setMinMeterReading(0);
-    setAmount(0);
     setRate(0);
     setLitres(0);
     setPetrolBunk("");
+    setBunkAddress("");
     setRemarks("");
     setImage("");
+    setImageName("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -132,20 +126,12 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
     menu: (base: any) => ({ ...base, zIndex: 50 }),
   };
 
-  const handleVehicleChange = (selected: any) => {
+  const handleVehicleChange = async (selected: any) => {
     const v = activeVehicles.find((x) => x.id === selected?.value);
     if (v) {
       setVehicleId(v.id);
       setVehicleNo(v.vehicleNumber);
-      const allBills = fuelExpenseService.getAll();
-      const approvedBills = allBills.filter(b =>
-        b.vehicleId === v.id &&
-        b.status === "Approved" &&
-        (editingId ? b.id !== editingId : true)
-      );
-      const latestApproved = approvedBills.length > 0
-        ? approvedBills.sort((a, b) => b.createdDate.localeCompare(a.createdDate))[0].meterReading
-        : 0;
+      const latestApproved = await fuelExpenseService.getLatestMeterReading(v.id);
       setMinMeterReading(latestApproved);
       if (!editingId) {
         setMeterReading(latestApproved);
@@ -159,6 +145,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       const reader = new FileReader();
       reader.onloadend = () => {
         setImage(reader.result as string);
+        setImageName(file.name);
       };
       reader.readAsDataURL(file);
     }
@@ -166,6 +153,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
 
   const removeImage = () => {
     setImage("");
+    setImageName("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -184,12 +172,12 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           );
           const data = await response.json();
           if (data && data.display_name) {
-            setPetrolBunk(data.display_name);
+            setBunkAddress(data.display_name);
           } else {
-            setPetrolBunk(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+            setBunkAddress(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
           }
         } catch {
-          setPetrolBunk(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+          setBunkAddress(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
         } finally {
           setIsFetchingLocation(false);
         }
@@ -202,8 +190,8 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
     );
   };
 
-  const handleSubmit = () => {
-    if (!date || !vehicleId || !driverId || !supervisorId || amount <= 0 || rate <= 0 || !petrolBunk.trim()) {
+  const handleSubmit = async () => {
+    if (!date || !vehicleId || !driverId || !supervisorId || litres <= 0 || rate <= 0 || !petrolBunk.trim()) {
       showNotification("Please fill all required fields.", "error");
       return;
     }
@@ -212,27 +200,35 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       return;
     }
 
-    const data = {
-      date,
+    const data: FuelExpenseInput = {
+      billDate: date,
       vehicleId,
       vehicleNo,
       driverId,
       driverName,
       supervisorId,
       supervisorName,
-      meterReading,
-      amount,
-      rate,
-      litres,
-      petrolBunk,
+      currentMeter: meterReading,
+      fuelRate: rate,
+      liters: litres,
+      pumpName: petrolBunk,
+      bunkAddress,
       remarks,
-      image,
+      imageData: image || null,
+      imageName: imageName || null,
     };
-    if (editingId) {
-      onUpdate(editingId, data);
-    } else {
-      onSave(data);
-      resetForm();
+
+    setSubmitting(true);
+    try {
+      let ok: boolean;
+      if (editingId) {
+        ok = Boolean(await onUpdate(editingId, data));
+      } else {
+        ok = Boolean(await onSave(data));
+        if (ok) resetForm();
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -253,64 +249,56 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
         <h3 className="text-sm font-semibold text-slate-700">
           {editingId ? "Edit Fuel Bill" : "Add Fuel Bill"}
         </h3>
-
-        {/* ✅ Removed the pending warning banner */}
+        <p className="text-xs text-slate-400">
+          Manual entries are submitted as <span className="font-semibold text-amber-600">PENDING</span> and require Accounts/Admin approval.
+        </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Date */}
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Date <span className="text-red-500">*</span></label>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" />
           </div>
 
-          {/* Vehicle */}
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Vehicle <span className="text-red-500">*</span></label>
             <Select options={vehicleOptions} value={vehicleOptions.find((opt) => opt.value === vehicleId) || null} onChange={handleVehicleChange} isSearchable placeholder="Select Vehicle" styles={selectStyles} />
           </div>
 
-          {/* Driver */}
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Driver <span className="text-red-500">*</span></label>
             <Select options={driverOptions} value={driverOptions.find((opt) => opt.value === driverId) || null} onChange={(selected) => { const d = drivers.find((x) => x.id === selected?.value); if (d) { setDriverId(d.id); setDriverName(d.employeeName); } }} isSearchable placeholder="Select Driver" styles={selectStyles} />
           </div>
 
-          {/* Supervisor */}
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Supervisor <span className="text-red-500">*</span></label>
             <Select options={supervisorOptions} value={supervisorOptions.find((opt) => opt.value === supervisorId) || null} onChange={(selected) => { const s = supervisors.find((x) => x.id === selected?.value); if (s) { setSupervisorId(s.id); setSupervisorName(s.employeeName); } }} isSearchable placeholder="Select Supervisor" styles={selectStyles} />
           </div>
 
-          {/* Meter Reading */}
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Meter Reading (KM) <span className="text-red-500">*</span></label>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Current Meter Reading (KM) <span className="text-red-500">*</span></label>
             <input type="number" value={meterReading || ""} onChange={(e) => setMeterReading(Number(e.target.value))} className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" placeholder="0" />
             {minMeterReading > 0 && (
               <div className="text-[10px] text-slate-400 mt-0.5">Minimum allowed: {minMeterReading} KM</div>
             )}
           </div>
 
-          {/* Amount */}
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Fuel Amount (₹) <span className="text-red-500">*</span></label>
-            <input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" placeholder="0.00" />
+            <label className="text-xs font-medium text-slate-500 block mb-1">Fuel Quantity (Litres) <span className="text-red-500">*</span></label>
+            <input type="number" step="0.01" value={litres || ""} onChange={(e) => setLitres(Number(e.target.value))} className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" placeholder="0.00" />
           </div>
 
-          {/* Rate */}
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Fuel Rate (₹/Litre) <span className="text-red-500">*</span></label>
             <input type="number" step="0.01" value={rate || ""} onChange={(e) => setRate(Number(e.target.value))} className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" placeholder="0.00" />
           </div>
 
-          {/* Litres (read-only) */}
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Fuel Quantity (Litres)</label>
-            <input type="number" step="0.01" value={litres} readOnly className="no-spinner w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700" />
+            <label className="text-xs font-medium text-slate-500 block mb-1">Amount (₹) — auto-calculated</label>
+            <input type="text" value={amount ? `₹ ${amount.toFixed(2)}` : ""} readOnly className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700" />
           </div>
 
-          {/* Petrol Bunk with GPS button */}
           <div className="lg:col-span-2">
-            <label className="text-xs font-medium text-slate-500 block mb-1">Petrol Bunk <span className="text-red-500">*</span></label>
+            <label className="text-xs font-medium text-slate-500 block mb-1">Petrol Bunk Name <span className="text-red-500">*</span></label>
             <div className="flex items-center gap-2">
               <input type="text" value={petrolBunk} onChange={(e) => setPetrolBunk(e.target.value)} className="flex-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" placeholder="Enter bunk name" />
               <button
@@ -318,6 +306,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
                 onClick={fetchGPSLocation}
                 disabled={isFetchingLocation}
                 className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg border border-blue-200 text-sm font-medium hover:bg-blue-100 transition disabled:opacity-60"
+                title="Fill Petrol Bunk Address via GPS"
               >
                 {isFetchingLocation ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
                 <span className="hidden sm:inline">GPS</span>
@@ -325,7 +314,11 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
             </div>
           </div>
 
-          {/* Image Upload */}
+          <div className="lg:col-span-3">
+            <label className="text-xs font-medium text-slate-500 block mb-1">Petrol Bunk Address</label>
+            <input type="text" value={bunkAddress} onChange={(e) => setBunkAddress(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" placeholder="Address / GPS location" />
+          </div>
+
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Bill Image</label>
             <div className="flex items-center gap-2">
@@ -350,7 +343,6 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
             )}
           </div>
 
-          {/* Remarks */}
           <div className="lg:col-span-3">
             <label className="text-xs font-medium text-slate-500 block mb-1">Remarks (Optional)</label>
             <input type="text" value={remarks} onChange={(e) => setRemarks(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" placeholder="Any remarks..." />
@@ -363,8 +355,8 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
               Cancel
             </button>
           )}
-          <button onClick={handleSubmit} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium shadow-sm transition active:scale-95">
-            {editingId ? "Update Bill" : "Save Bill"}
+          <button onClick={handleSubmit} disabled={submitting} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium shadow-sm transition active:scale-95 disabled:opacity-60">
+            {submitting ? "Saving..." : editingId ? "Update Bill" : "Save Bill"}
           </button>
         </div>
       </div>

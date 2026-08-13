@@ -37,15 +37,15 @@ export function useFuelKMValidator(vehicleNumber: string): FuelKMValidator {
   const latestApprovedKM = useMemo(() => {
     const approved = vehicleExpenses.filter((e: FuelExpense) => e.status === 'Approved');
     if (approved.length === 0) return null;
-    // Get the one with the highest meterReading (or latest date)
+    // Get the one with the highest currentMeter reading
     return approved.reduce((max: number, e: FuelExpense) =>
-      e.meterReading > max ? e.meterReading : max, 0
+      e.currentMeter > max ? e.currentMeter : max, 0
     );
   }, [vehicleExpenses]);
 
   // Check for pending bills
   const hasPendingFuel = useMemo(() => {
-    return vehicleExpenses.some((e: FuelExpense) => e.status === 'Pending');
+    return vehicleExpenses.some((e: FuelExpense) => e.status === 'Pending Approval' || e.status === 'Draft');
   }, [vehicleExpenses]);
 
   // Validation function

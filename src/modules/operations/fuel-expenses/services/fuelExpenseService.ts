@@ -1,158 +1,97 @@
 // src/modules/operations/fuel-expenses/services/fuelExpenseService.ts
+//
+// Real PostgreSQL-backed API client for /api/operations/fuel-expenses.
+// Replaces the previous localStorage-only implementation, which is why
+// Trip Step 5 fuel never appeared here even though the backend was already
+// syncing it into the fuel_expenses table.
 
-import type { FuelExpense } from "../types/fuelExpense";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut, handleApiError } from "../../../../api";
+import type { FuelExpense, FuelExpenseFilters, FuelExpenseInput } from "../types/fuelExpense";
 
-const STORAGE_KEY = "dmr-fuel-expenses";
+const BASE = "/operations/fuel-expenses";
 
-function getData(): FuelExpense[] {
+function toQuery(filters: FuelExpenseFilters = {}): Record<string, string | number> {
+  const params: Record<string, string | number> = {};
+  if (filters.fromDate) params.fromDate = filters.fromDate;
+  if (filters.toDate) params.toDate = filters.toDate;
+  if (filters.vehicleId) params.vehicleId = filters.vehicleId;
+  if (filters.driverId) params.driverId = filters.driverId;
+  if (filters.sourceType && filters.sourceType !== "ALL") params.sourceType = filters.sourceType;
+  if (filters.status && filters.status !== "ALL") params.status = filters.status;
+  if (filters.search) params.search = filters.search;
+  return params;
+}
+
+async function getAll(filters: FuelExpenseFilters = {}): Promise<FuelExpense[]> {
+  const result = await apiGet<FuelExpense[]>(BASE, { params: toQuery(filters) });
+  return Array.isArray(result.data) ? result.data : [];
+}
+
+async function getById(id: string): Promise<FuelExpense | null> {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  } catch {
-    return [];
+    const result = await apiGet<FuelExpense>(`${BASE}/${id}`);
+    return result.data;
+  } catch (error) {
+    handleApiError(error);
+    return null;
   }
 }
 
-function saveData(expenses: FuelExpense[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+async function create(payload: FuelExpenseInput): Promise<FuelExpense> {
+  const result = await apiPost<FuelExpense, FuelExpenseInput>(BASE, payload);
+  return result.data;
 }
 
-function generateBillNo(date: string): string {
-  const dateStr = date.replace(/-/g, "");
-  const existing = getData().filter((e) => e.date === date);
-  const seq = String(existing.length + 1).padStart(3, "0");
-  return `BILL-${dateStr}-${seq}`;
+async function update(id: string, payload: Partial<FuelExpenseInput>): Promise<FuelExpense> {
+  const result = await apiPut<FuelExpense, Partial<FuelExpenseInput>>(`${BASE}/${id}`, payload);
+  return result.data;
 }
 
-// ----- CRUD -----
-function getAll(): FuelExpense[] {
-  return getData();
+async function approve(id: string, approvedBy?: string): Promise<FuelExpense> {
+  const result = await apiPost<FuelExpense>(`${BASE}/${id}/approve`, { approvedBy });
+  return result.data;
 }
 
-function getById(id: string): FuelExpense | undefined {
-  return getData().find((e) => e.id === id);
+async function reject(id: string, reason: string, rejectedBy?: string): Promise<FuelExpense> {
+  const result = await apiPost<FuelExpense>(`${BASE}/${id}/reject`, { reason, rejectedBy });
+  return result.data;
 }
 
-function save(expense: Omit<FuelExpense, "id" | "billNo" | "createdDate" | "createdBy" | "status">): boolean {
+async function remove(id: string, reason?: string): Promise<void> {
+  await apiDelete(`${BASE}/${id}`, { params: reason ? { reason } : undefined });
+}
+
+// Legacy helper kept for FuelKMValidator — no longer localStorage, fetches
+// the vehicle's approved bills from the API instead.
+async function getLatestMeterReading(vehicleId: number): Promise<number> {
   try {
-    const all = getData();
-    const newExpense: FuelExpense = {
-      id: Date.now().toString(),
-      billNo: generateBillNo(expense.date),
-      ...expense,
-      status: "Pending",
-      createdDate: new Date().toISOString(),
-      createdBy: "Admin",
-    };
-    all.unshift(newExpense);
-    saveData(all);
-    return true;
-  } catch {
-    return false;
+    const result = await apiGet<FuelExpense[]>(BASE, {
+      params: { vehicleId, status: "Approved" },
+    });
+    const bills = Array.isArray(result.data) ? result.data : [];
+    if (!bills.length) return 0;
+    const sorted = [...bills].sort((a, b) => (b.billDate || "").localeCompare(a.billDate || ""));
+    return sorted[0].currentMeter ?? 0;
+  } catch (error) {
+    handleApiError(error);
+    return 0;
   }
 }
 
-function update(id: string, updates: Partial<FuelExpense>): boolean {
-  const all = getData();
-  const index = all.findIndex((e) => e.id === id);
-  if (index === -1) return false;
-  const existing = all[index];
-  if (existing.status === "Approved") return false;
-  const created = new Date(existing.createdDate);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays > 10) return false;
-  all[index] = { ...existing, ...updates, updatedDate: new Date().toISOString() };
-  saveData(all);
-  return true;
-}
-
-function remove(id: string): boolean {
-  const all = getData();
-  const index = all.findIndex((e) => e.id === id);
-  if (index === -1) return false;
-  const existing = all[index];
-  if (existing.status === "Approved") return false;
-  const created = new Date(existing.createdDate);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays > 10) return false;
-  all.splice(index, 1);
-  saveData(all);
-  return true;
-}
-
-// ✅ UPDATED: Accept approverName (default "Admin")
-function approve(id: string, approvedBy: string = "Admin"): boolean {
-  const all = getData();
-  const index = all.findIndex((e) => e.id === id);
-  if (index === -1) return false;
-  const existing = all[index];
-  if (existing.status === "Approved") return false;
-  all[index] = {
-    ...existing,
-    status: "Approved",
-    approvedDate: new Date().toISOString(),
-    approvedBy: approvedBy, // Store the name string
-  };
-  saveData(all);
-  return true;
-}
-
-function getRecent(count: number = 5): FuelExpense[] {
-  return getData().sort((a, b) => b.createdDate.localeCompare(a.createdDate)).slice(0, count);
-}
-
-function getSummary() {
-  const all = getData();
-  return {
-    totalLitres: all.reduce((sum, e) => sum + e.litres, 0),
-    totalAmount: all.reduce((sum, e) => sum + e.amount, 0),
-    pendingCount: all.filter((e) => e.status === "Pending").length,
-    approvedCount: all.filter((e) => e.status === "Approved").length,
-  };
-}
-
-function getLatestMeterReading(vehicleId: number): number {
-  const all = getData();
-  const filtered = all
-    .filter((e) => e.vehicleId === vehicleId)
-    .sort((a, b) => b.createdDate.localeCompare(a.createdDate));
-  return filtered.length > 0 ? filtered[0].meterReading : 0;
-}
-
-function getTotalMileage(): number {
-  const all = getData();
-  const vehicleMap = new Map<number, { min: number; max: number }>();
-  all.forEach((e) => {
-    if (!vehicleMap.has(e.vehicleId)) {
-      vehicleMap.set(e.vehicleId, { min: e.meterReading, max: e.meterReading });
-    } else {
-      const entry = vehicleMap.get(e.vehicleId)!;
-      if (e.meterReading < entry.min) entry.min = e.meterReading;
-      if (e.meterReading > entry.max) entry.max = e.meterReading;
-    }
-  });
-  let total = 0;
-  vehicleMap.forEach((v) => {
-    total += v.max - v.min;
-  });
-  return total;
-}
-
-function getBillsForTrip(vehicleId: number, date: string): FuelExpense[] {
-  return getData().filter((e) => e.vehicleId === vehicleId && e.date === date);
+// Deprecated no-op kept only so anything still importing apiPatch-based
+// status changes fails loudly instead of silently hitting a removed route.
+async function updateStatus(): Promise<never> {
+  throw new Error("fuelExpenseService.updateStatus is removed — use approve()/reject() instead.");
 }
 
 export const fuelExpenseService = {
   getAll,
   getById,
-  save,
+  create,
   update,
+  approve,
+  reject,
   remove,
-  approve, // updated
-  getRecent,
-  getSummary,
   getLatestMeterReading,
-  getTotalMileage,
-  getBillsForTrip,
+  updateStatus,
 };
