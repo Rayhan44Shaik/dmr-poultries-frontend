@@ -1,360 +1,75 @@
-// src/modules/settings/pages/SettingsPage.tsx
-/*
-import React, { useState } from "react";
-import { 
-  User, Lock, Globe, Sun, Moon, 
-  Users, Shield, Info, Eye, EyeOff, 
-  CheckCircle2, Pencil, Trash2 
-} from "lucide-react";
-import { getCurrentUser, getUsers } from "../services";
+import React, { useEffect, useMemo, useState } from "react";
+import { Activity, Bell, Check, CheckCircle2, ChevronRight, CircleHelp, Cpu, Database, Eye, Info, Languages, Lock, Palette, Pencil, Plus, RefreshCw, Save, Shield, ShieldCheck, SlidersHorizontal, Sparkles, Sun, Moon, Trash2, User, Users, X, Zap } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { defaultSettings, formatCurrency, getCurrentUser, getServerSettings, getSettings, getUsers, saveSettings, testAiConnection } from "../services";
+import type { Permission, SettingsState, SettingsTab, SystemUser } from "../types";
 
-type TabKey = "profile" | "password" | "language" | "appearance" | "users" | "permissions" | "about";
-
-interface TabItem {
-  key: TabKey;
-  label: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  color: string;
-}
-
-// Tabs matching MastersPage styling with distinct icon colors
+type TabItem = { key: SettingsTab; label: string; description: string; icon: LucideIcon };
 const tabs: TabItem[] = [
-  { key: "profile", label: "Profile", icon: User, color: "text-blue-600" },
-  { key: "password", label: "Password & Security", icon: Lock, color: "text-purple-600" },
-  { key: "language", label: "Language", icon: Globe, color: "text-emerald-600" },
-  { key: "appearance", label: "Appearance", icon: Sun, color: "text-amber-600" },
-  { key: "users", label: "Users", icon: Users, color: "text-orange-600" },
-  { key: "permissions", label: "Permissions", icon: Shield, color: "text-indigo-600" },
-  { key: "about", label: "About ERP", icon: Info, color: "text-rose-600" },
+  { key: "general", label: "General", description: "Business and regional defaults", icon: SlidersHorizontal },
+  { key: "profile", label: "My Profile", description: "Your account details", icon: User },
+  { key: "security", label: "Security", description: "Password and sessions", icon: ShieldCheck },
+  { key: "appearance", label: "Appearance", description: "Theme and table behaviour", icon: Palette },
+  { key: "language", label: "Language", description: "Language and formats", icon: Languages },
+  { key: "notifications", label: "Notifications", description: "Alerts and reminders", icon: Bell },
+  { key: "users", label: "Users", description: "Manage ERP users", icon: Users },
+  { key: "permissions", label: "Permissions", description: "Role access matrix", icon: Lock },
+  { key: "ai", label: "AI & DeepSeek", description: "AI features and usage", icon: Sparkles },
+  { key: "about", label: "About ERP", description: "System information", icon: Info },
 ];
+const permissionModules = ["Dashboard", "Masters", "Operations", "Vehicles", "Staff", "Accounts", "Reports", "Settings"];
+const initialPermissions: Permission[] = permissionModules.map((module) => ({ module, view: true, add: !["Dashboard", "Reports"].includes(module), edit: !["Dashboard", "Reports"].includes(module), delete: ["Operations", "Accounts", "Settings"].includes(module), approve: ["Accounts", "Vehicles", "Operations"].includes(module), export: ["Reports", "Accounts", "Vehicles"].includes(module) }));
+const card = "rounded-2xl border border-slate-200 bg-white shadow-sm";
+const input = "w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100";
+const label = "mb-1.5 block text-xs font-semibold text-slate-600";
 
-function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<TabKey>("profile");
-  const [showPass, setShowPass] = useState({ current: false, new: false, confirm: false });
-
-  const user = getCurrentUser();
-  const users = getUsers();
-
-  const renderContent = () => {
-    switch (activeTab) {
-      case "profile":
-        return (
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="flex flex-col items-center gap-3 w-full md:w-32 shrink-0">
-                <div className="h-24 w-24 rounded-full bg-slate-100 border-4 border-white shadow-md flex items-center justify-center text-slate-400">
-                  <User size={40} />
-                </div>
-                <button className="border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 w-full transition-colors shadow-sm">
-                  Change Photo
-                </button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Full Name</label>
-                  <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-medium text-slate-800">{user?.name || "N/A"}</div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Department</label>
-                  <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-medium text-slate-800">{user?.department || "N/A"}</div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Email</label>
-                  <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-medium text-slate-800">{user?.email || "N/A"}</div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Designation</label>
-                  <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-medium text-slate-800">{user?.role || "N/A"}</div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Mobile Number</label>
-                  <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-medium text-slate-800">{user?.mobile || "N/A"}</div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Username</label>
-                  <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-medium text-slate-800">rubullaadmin</div>
-                </div>
-              </div>
-            </div>
-            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setActiveTab("profile")} className="px-5 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition-colors">
-                Cancel
-              </button>
-              <button className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md transition-all">
-                Save Changes
-              </button>
-            </div>
-          </div>
-        );
-
-      case "password":
-        return (
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="flex items-center justify-center w-full md:w-1/3 shrink-0 relative text-purple-600 py-6">
-                <Lock size={80} className="opacity-90 drop-shadow-sm" />
-                <div className="absolute right-12 bottom-4 bg-white rounded-full p-1 shadow-md border border-slate-100">
-                  <CheckCircle2 size={24} className="text-emerald-500" />
-                </div>
-              </div>
-              <div className="flex-1 flex flex-col gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Current Password</label>
-                  <div className="relative">
-                    <input type={showPass.current ? "text" : "password"} placeholder="Enter current password" className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 pr-10 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white transition-all" />
-                    <button type="button" onClick={() => setShowPass(p => ({...p, current: !p.current}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                      {showPass.current ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">New Password</label>
-                  <div className="relative">
-                    <input type={showPass.new ? "text" : "password"} placeholder="Enter new password" className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 pr-10 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white transition-all" />
-                    <button type="button" onClick={() => setShowPass(p => ({...p, new: !p.new}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                      {showPass.new ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Confirm New Password</label>
-                  <div className="relative">
-                    <input type={showPass.confirm ? "text" : "password"} placeholder="Confirm new password" className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 pr-10 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white transition-all" />
-                    <button type="button" onClick={() => setShowPass(p => ({...p, confirm: !p.confirm}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                      {showPass.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setActiveTab("profile")} className="px-5 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition-colors">
-                Cancel
-              </button>
-              <button className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md transition-all">
-                Update Password
-              </button>
-            </div>
-          </div>
-        );
-
-      case "language":
-        return (
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="flex items-center justify-center w-full md:w-1/3 py-4"><span className="text-6xl">🌍</span></div>
-              <div className="flex-1 space-y-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Default Language</label>
-                  <select className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white">
-                    <option>English</option>
-                    <option>Telugu</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setActiveTab("profile")} className="px-5 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition-colors">
-                Cancel
-              </button>
-              <button className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md transition-all">
-                Save Language
-              </button>
-            </div>
-          </div>
-        );
-
-      case "appearance":
-        return (
-          <div className="flex flex-col gap-6">
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600 mb-2 block">Theme</label>
-                <div className="flex gap-3">
-                  <div className="flex items-center justify-center gap-2 border-2 border-blue-600 bg-blue-50/50 rounded-xl py-2.5 px-4 w-32 cursor-pointer font-medium text-blue-700 text-sm">
-                    <Sun size={18} className="text-blue-600" /> Light
-                  </div>
-                  <div className="flex items-center justify-center gap-2 border border-slate-200 rounded-xl py-2.5 px-4 w-32 cursor-pointer font-medium text-slate-600 text-sm hover:bg-slate-50">
-                    <Moon size={18} className="text-slate-500" /> Dark
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setActiveTab("profile")} className="px-5 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition-colors">
-                Cancel
-              </button>
-              <button className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md transition-all">
-                Apply Changes
-              </button>
-            </div>
-          </div>
-        );
-
-      case "users":
-        return (
-          <div className="flex flex-col gap-6">
-            <div className="flex justify-end">
-              <button className="text-xs font-semibold text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-lg transition-all shadow-sm">
-                + Add User
-              </button>
-            </div>
-            <div className="overflow-x-auto border border-slate-100 rounded-xl">
-              <table className="w-full text-xs text-left">
-                <thead className="text-[10px] font-bold text-slate-500 uppercase bg-slate-50/80 border-b border-slate-100">
-                  <tr>
-                    <th className="py-2.5 px-3 w-8">#</th>
-                    <th className="py-2.5 px-3">Name</th>
-                    <th className="py-2.5 px-3">Username</th>
-                    <th className="py-2.5 px-3">Role</th>
-                    <th className="py-2.5 px-3 text-center">Status</th>
-                    <th className="py-2.5 px-3 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {users?.map((u: any) => (
-                    <tr key={u.id} className="hover:bg-slate-50/50">
-                      <td className="py-3 px-3 text-center text-slate-500">{u.id}</td>
-                      <td className="py-3 px-3 font-semibold text-slate-800">{u.name}</td>
-                      <td className="py-3 px-3 text-slate-600">{u.username}</td>
-                      <td className="py-3 px-3 text-slate-600">{u.role}</td>
-                      <td className="py-3 px-3 text-center">
-                        <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold px-2.5 py-0.5 rounded-full">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-center flex justify-center gap-2">
-                        <button className="text-blue-600 hover:text-blue-800 p-1 rounded"><Pencil size={14} /></button>
-                        <button className="text-rose-500 hover:text-rose-700 p-1 rounded"><Trash2 size={14} /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-
-      case "permissions":
-        return (
-          <div className="flex flex-col gap-6">
-            <div className="overflow-x-auto border border-slate-100 rounded-xl">
-              <table className="w-full text-xs text-left">
-                <thead className="text-[10px] font-bold text-slate-500 uppercase bg-slate-50/80 border-b border-slate-100">
-                  <tr>
-                    <th className="py-2.5 px-3">Module</th>
-                    <th className="py-2.5 px-3 text-center">View</th>
-                    <th className="py-2.5 px-3 text-center">Add</th>
-                    <th className="py-2.5 px-3 text-center">Edit</th>
-                    <th className="py-2.5 px-3 text-center">Delete</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {["Dashboard", "Operations", "Accounts", "Reports", "Settings"].map((mod, i) => (
-                    <tr key={i} className="hover:bg-slate-50/50">
-                      <td className="py-2.5 px-3 font-semibold text-slate-800">{mod}</td>
-                      {["View", "Add", "Edit", "Delete"].map(p => (
-                        <td key={p} className="py-2.5 px-3 text-center">
-                          <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" defaultChecked={p !== "Add"} />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-
-      case "about":
-        return (
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col items-center gap-3 pb-2">
-              <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl shadow-inner text-5xl">🐔</div>
-              <div className="text-center">
-                <h3 className="text-lg font-bold text-slate-900 tracking-tight">DMR Poultries ERP</h3>
-                <p className="text-xs text-slate-500 max-w-xs leading-relaxed mt-1">A complete ERP solution for poultry farming operations.</p>
-              </div>
-            </div>
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <div className="w-full pt-4 pb-6 space-y-5">
-      {--Full-width Tab Bar Container touching left & right edges }
-      <div className="bg-white border-y sm:border border-slate-200/90 sm:rounded-xl shadow-sm px-4 sm:px-6 py-1.5 w-full">
-        <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`
-                  flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200
-                  ${isActive
-                    ? "bg-blue-50 text-blue-700 font-semibold"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                  }
-                `}
-              >
-                <Icon
-                  size={18}
-                  className={isActive ? "text-blue-700" : tab.color}
-                />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {-- Content Area with matching Masters side padding & container styling }
-      <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="bg-white border border-slate-200/90 sm:rounded-xl shadow-sm p-6 min-h-[450px]">
-          <h2 className="text-base font-bold text-slate-800 border-b border-slate-100 pb-3 mb-4">
-            {tabs.find((t) => t.key === activeTab)?.label}
-          </h2>
-          {renderContent()}
-        </div>
-      </div>
-    </div>
-  );
+function Toggle({ checked, onChange, label: toggleLabel, description }: { checked: boolean; onChange: (value: boolean) => void; label: string; description?: string }) {
+  return <button type="button" onClick={() => onChange(!checked)} className="flex w-full items-center justify-between gap-4 rounded-xl border border-slate-100 px-3.5 py-3 text-left hover:bg-slate-50"><span><span className="block text-sm font-semibold text-slate-800">{toggleLabel}</span>{description && <span className="mt-0.5 block text-xs text-slate-500">{description}</span>}</span><span className={`relative h-6 w-11 shrink-0 rounded-full transition ${checked ? "bg-blue-600" : "bg-slate-300"}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition ${checked ? "left-6" : "left-1"}`} /></span></button>;
 }
+function SectionHeader({ icon: Icon, title, description }: { icon: LucideIcon; title: string; description: string }) { return <div className="mb-5 flex items-start gap-3 border-b border-slate-100 pb-4"><div className="rounded-xl bg-blue-50 p-2.5 text-blue-600"><Icon size={19} /></div><div><h2 className="text-base font-bold text-slate-900">{title}</h2><p className="mt-0.5 text-xs text-slate-500">{description}</p></div></div>; }
+function SaveBar({ saving, onSave, onReset }: { saving: boolean; onSave: () => void; onReset: () => void }) { return <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4"><button type="button" onClick={onReset} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"><RefreshCw size={14} /> Reset section</button><button type="button" onClick={onSave} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60">{saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}{saving ? "Saving…" : "Save Changes"}</button></div>; }
 
-export default React.memo(SettingsPage);*/
+export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+  const [settings, setSettings] = useState<SettingsState>(() => getSettings());
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [users, setUsers] = useState<SystemUser[]>(() => getUsers());
+  const [permissions, setPermissions] = useState<Permission[]>(initialPermissions);
+  const [profile, setProfile] = useState(getCurrentUser());
+  const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
+  const [showPassword, setShowPassword] = useState({ current: false, next: false, confirm: false });
+  const [aiTesting, setAiTesting] = useState(false);
+  const [aiTestMessage, setAiTestMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [serverSync, setServerSync] = useState("Local settings");
 
-import React, { memo } from 'react';
-import ErrorBoundary from '../../../components/common/ErrorBoundary';
+  useEffect(() => { let mounted = true; getServerSettings().then((server) => { if (mounted && server) { setSettings(server); setServerSync("Backend synced"); } }); return () => { mounted = false; }; }, []);
+  useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(null), 3200); return () => window.clearTimeout(timer); }, [notice]);
+  const active = useMemo(() => tabs.find((tab) => tab.key === activeTab) ?? tabs[0], [activeTab]);
+  const updateSettings = <K extends keyof SettingsState>(section: K, value: Partial<SettingsState[K]>) => setSettings((previous) => ({ ...previous, [section]: { ...previous[section], ...value } }));
+  const persist = async () => { setSaving(true); await saveSettings(settings); setSaving(false); setServerSync(import.meta.env.VITE_SETTINGS_API_ENABLED === "true" ? "Saved locally + API" : "Saved locally"); setNotice({ type: "success", text: "Settings saved successfully." }); };
+  const resetSection = (section: keyof SettingsState) => { setSettings((previous) => ({ ...previous, [section]: defaultSettings[section] })); setNotice({ type: "success", text: `${active.label} restored to defaults. Save to keep it.` }); };
 
-interface SettingsPageProps {
-  embedded?: boolean;
+  const renderGeneral = () => <div className={card + " p-5"}><SectionHeader icon={SlidersHorizontal} title="General Settings" description="Core business defaults used throughout the ERP." /><div className="grid grid-cols-1 gap-4 md:grid-cols-2"><div><label className={label}>Business Name</label><input className={input} value={settings.general.businessName} onChange={(e) => updateSettings("general", { businessName: e.target.value })} /></div><div><label className={label}>Currency</label><select className={input} value={settings.general.currency} onChange={(e) => updateSettings("general", { currency: e.target.value })}><option value="INR">INR — Indian Rupee</option><option value="USD">USD — US Dollar</option></select></div><div><label className={label}>Financial Year Starts</label><select className={input} value={settings.general.financialYearStart} onChange={(e) => updateSettings("general", { financialYearStart: e.target.value })}><option value="04-01">1 April</option><option value="01-01">1 January</option></select><p className="mt-1 text-[11px] text-slate-400">DMR financial year is currently April–March.</p></div><div><label className={label}>Timezone</label><select className={input} value={settings.general.timezone} onChange={(e) => updateSettings("general", { timezone: e.target.value })}><option value="Asia/Kolkata">Asia/Kolkata (IST)</option><option value="UTC">UTC</option></select></div><div><label className={label}>Date Format</label><select className={input} value={settings.general.dateFormat} onChange={(e) => updateSettings("general", { dateFormat: e.target.value })}><option>DD/MM/YYYY</option><option>DD-MM-YYYY</option><option>YYYY-MM-DD</option></select></div><div><label className={label}>Week Starts On</label><select className={input} value={settings.general.firstDayOfWeek} onChange={(e) => updateSettings("general", { firstDayOfWeek: e.target.value as "monday" | "sunday" })}><option value="monday">Monday</option><option value="sunday">Sunday</option></select></div></div><SaveBar saving={saving} onSave={persist} onReset={() => resetSection("general")} /></div>;
+
+  const renderProfile = () => <div className={card + " p-5"}><SectionHeader icon={User} title="My Profile" description="Personal information for the currently signed-in ERP account." /><div className="flex flex-col gap-6 md:flex-row"><div className="flex w-full flex-col items-center md:w-36"><div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-2xl font-bold text-white shadow-lg">{profile.name.slice(0, 1).toUpperCase()}</div><button type="button" className="mt-3 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Change Photo</button></div><div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2">{([["Full Name", "name"], ["Email", "email"], ["Mobile Number", "mobile"]] as const).map(([title, key]) => <div key={key}><label className={label}>{title}</label><input className={input} value={profile[key]} onChange={(e) => setProfile({ ...profile, [key]: e.target.value })} /></div>)}{[["Username", profile.username], ["Department", profile.department], ["Designation", profile.role], ["Employee ID", profile.employeeId], ["Date Joined", profile.dateJoined]].map(([title, value]) => <div key={title}><label className={label}>{title}</label><input className={input + " bg-slate-100"} value={value} readOnly /></div>)}</div></div><div className="mt-5 flex justify-end border-t border-slate-100 pt-4"><button type="button" onClick={() => setNotice({ type: "success", text: "Profile changes are ready for backend persistence." })} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"><Save size={14} /> Save Profile</button></div></div>;
+
+  const renderSecurity = () => <div className="space-y-5"><div className={card + " p-5"}><SectionHeader icon={Lock} title="Change Password" description="Password values are never stored in frontend settings." /><div className="grid grid-cols-1 gap-4 md:grid-cols-3">{(["current", "next", "confirm"] as const).map((key) => <div key={key}><label className={label}>{key === "current" ? "Current Password" : key === "next" ? "New Password" : "Confirm New Password"}</label><div className="relative"><input className={input + " pr-10"} type={showPassword[key] ? "text" : "password"} value={passwords[key]} onChange={(e) => setPasswords({ ...passwords, [key]: e.target.value })} placeholder="••••••••" /><button type="button" onClick={() => setShowPassword({ ...showPassword, [key]: !showPassword[key] })} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><Eye size={16} /></button></div></div>)}</div><div className="mt-4 flex justify-end"><button type="button" onClick={() => { if (!passwords.current || !passwords.next || passwords.next !== passwords.confirm) { setNotice({ type: "error", text: "Enter all passwords and make sure the new passwords match." }); return; } setPasswords({ current: "", next: "", confirm: "" }); setNotice({ type: "success", text: "Password request validated. Backend update endpoint will complete the change." }); }} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"><Lock size={14} /> Update Password</button></div></div><div className={card + " p-5"}><SectionHeader icon={Shield} title="Session Security" description="Controls for protecting ERP access on shared office systems." /><div className="space-y-2"><Toggle checked label="Require secure sessions" description="Reject insecure browser requests when deployed behind HTTPS." onChange={() => setNotice({ type: "success", text: "Session policy is ready for backend enforcement." })} /><Toggle checked label="Show login activity" description="Keep recent sign-in timestamps visible to administrators." onChange={() => {}} /></div></div></div>;
+
+  const renderAppearance = () => <div className={card + " p-5"}><SectionHeader icon={Palette} title="Appearance" description="Keep the ERP comfortable for long accounting and operations sessions." /><label className={label}>Theme</label><div className="grid max-w-xl grid-cols-3 gap-3">{(["light", "dark", "system"] as const).map((theme) => <button key={theme} type="button" onClick={() => updateSettings("appearance", { theme })} className={`rounded-xl border-2 p-4 text-left transition ${settings.appearance.theme === theme ? "border-blue-600 bg-blue-50" : "border-slate-200 hover:border-slate-300"}`}><div className="mb-2 text-slate-700">{theme === "light" ? <Sun size={18} /> : theme === "dark" ? <Moon size={18} /> : <Palette size={18} />}</div><span className="text-sm font-semibold capitalize text-slate-800">{theme}</span></button>)}</div><div className="mt-5 space-y-2"><Toggle checked={settings.appearance.compactTables} label="Compact tables" description="Show more rows in operational and accounting tables." onChange={(value) => updateSettings("appearance", { compactTables: value })} /><Toggle checked={settings.appearance.showAnimations} label="UI animations" description="Keep small transitions and loading animations enabled." onChange={(value) => updateSettings("appearance", { showAnimations: value })} /></div><SaveBar saving={saving} onSave={persist} onReset={() => resetSection("appearance")} /></div>;
+
+  const renderLanguage = () => <div className={card + " p-5"}><SectionHeader icon={Languages} title="Language & Regional Format" description="These values control labels, dates and presentation defaults." /><div className="grid max-w-2xl grid-cols-1 gap-4 md:grid-cols-2"><div><label className={label}>Application Language</label><select className={input} value={settings.language.language} onChange={(e) => updateSettings("language", { language: e.target.value as "en" | "te" })}><option value="en">English</option><option value="te">Telugu</option></select></div><div><label className={label}>Date Format</label><div className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700">{settings.general.dateFormat}</div></div></div><div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-800"><strong>Note:</strong> Full Telugu translation requires the translation catalog to be enabled across every module. The setting is persisted now without changing existing module labels unexpectedly.</div><SaveBar saving={saving} onSave={persist} onReset={() => resetSection("language")} /></div>;
+
+  const renderNotifications = () => <div className={card + " p-5"}><SectionHeader icon={Bell} title="Notifications" description="Choose which operational and financial events should create alerts." /><div className="grid grid-cols-1 gap-2 md:grid-cols-2"><Toggle checked={settings.notifications.browser} label="Browser notifications" description="Show alerts while the ERP is open." onChange={(value) => updateSettings("notifications", { browser: value })} /><Toggle checked={settings.notifications.email} label="Email notifications" description="Send configured alerts to the account email." onChange={(value) => updateSettings("notifications", { email: value })} /><Toggle checked={settings.notifications.vehicleExpiry} label="Vehicle expiry reminders" description="Permit, fitness and insurance expiry alerts." onChange={(value) => updateSettings("notifications", { vehicleExpiry: value })} /><Toggle checked={settings.notifications.emiDue} label="EMI due reminders" description="Upcoming vehicle finance payment alerts." onChange={(value) => updateSettings("notifications", { emiDue: value })} /><Toggle checked={settings.notifications.pendingCollections} label="Pending collection alerts" description="Highlight overdue shop collections." onChange={(value) => updateSettings("notifications", { pendingCollections: value })} /><Toggle checked={settings.notifications.expenseApproval} label="Expense approval alerts" description="Notify administrators about pending expenses." onChange={(value) => updateSettings("notifications", { expenseApproval: value })} /><Toggle checked={settings.notifications.dailySummary} label="Daily summary" description="Receive an end-of-day operational summary." onChange={(value) => updateSettings("notifications", { dailySummary: value })} /></div><SaveBar saving={saving} onSave={persist} onReset={() => resetSection("notifications")} /></div>;
+
+  const renderUsers = () => <div className={card + " overflow-hidden"}><div className="flex items-center justify-between border-b border-slate-100 p-5"><div><h2 className="text-base font-bold text-slate-900">ERP Users</h2><p className="text-xs text-slate-500">Manage who can access DMR Poultries ERP.</p></div><button type="button" onClick={() => setNotice({ type: "success", text: "Add User flow is ready for the backend user endpoint." })} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-700"><Plus size={14} /> Add User</button></div><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">User</th><th className="px-4 py-3">Department</th><th className="px-4 py-3">Role</th><th className="px-4 py-3">Last Login</th><th className="px-4 py-3">Status</th><th className="px-5 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y divide-slate-100">{users.map((user) => <tr key={user.id} className="hover:bg-slate-50/70"><td className="px-5 py-3"><div className="flex items-center gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 font-bold text-blue-700">{user.name.slice(0, 1)}</div><div><div className="font-semibold text-slate-800">{user.name}</div><div className="text-[11px] text-slate-400">@{user.username}</div></div></div></td><td className="px-4 py-3 text-slate-600">{user.department}</td><td className="px-4 py-3 text-slate-600">{user.role}</td><td className="px-4 py-3 text-slate-500">{user.lastLogin}</td><td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${user.status === "Active" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-500"}`}>{user.status}</span></td><td className="px-5 py-3 text-right"><button type="button" onClick={() => setNotice({ type: "success", text: `Edit flow selected for ${user.name}.` })} className="mr-1 rounded-lg p-1.5 text-blue-600 hover:bg-blue-50"><Pencil size={14} /></button><button type="button" onClick={() => setUsers((current) => current.filter((item) => item.id !== user.id))} className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50"><Trash2 size={14} /></button></td></tr>)}</tbody></table></div></div>;
+
+  const renderPermissions = () => { const togglePermission = (module: string, key: keyof Permission) => setPermissions((current) => current.map((item) => item.module === module ? { ...item, [key]: !item[key] } : item)); return <div className={card + " overflow-hidden"}><div className="border-b border-slate-100 p-5"><h2 className="text-base font-bold text-slate-900">Permission Matrix</h2><p className="mt-0.5 text-xs text-slate-500">Fine-grained access model for department-based ERP roles.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-xs"><thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3 text-left">Module</th>{["view", "add", "edit", "delete", "approve", "export"].map((key) => <th key={key} className="px-3 py-3 text-center">{key}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{permissions.map((permission) => <tr key={permission.module}><td className="px-5 py-3 font-semibold text-slate-800">{permission.module}</td>{(["view", "add", "edit", "delete", "approve", "export"] as const).map((key) => <td key={key} className="px-3 py-3 text-center"><button type="button" onClick={() => togglePermission(permission.module, key)} className={`mx-auto flex h-7 w-7 items-center justify-center rounded-lg border ${permission[key] ? "border-emerald-200 bg-emerald-50 text-emerald-600" : "border-slate-200 bg-white text-slate-300"}`}>{permission[key] ? <Check size={14} /> : <X size={14} />}</button></td>)}</tr>)}</tbody></table></div><div className="flex items-center justify-between border-t border-slate-100 p-4"><p className="text-[11px] text-slate-400">Backend enforcement must mirror this matrix; frontend visibility alone is not a security boundary.</p><button type="button" onClick={() => setNotice({ type: "success", text: "Permission matrix prepared for backend persistence." })} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"><Save size={14} /> Save Permissions</button></div></div>; };
+
+  const renderAi = () => { const ai = settings.ai; const used = 0.84; const remaining = Math.max(ai.monthlyBudgetUsd - used, 0); const usagePercent = Math.min((used / Math.max(ai.monthlyBudgetUsd, 0.01)) * 100, 100); return <div className="space-y-5"><div className={card + " overflow-hidden"}><div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 p-5 text-white"><div className="flex flex-col justify-between gap-4 md:flex-row md:items-center"><div><div className="mb-2 flex items-center gap-2"><span className="rounded-lg bg-white/10 p-2"><Sparkles size={18} /></span><span className="text-xs font-semibold uppercase tracking-widest text-indigo-200">AI Control Center</span></div><h2 className="text-xl font-bold">DeepSeek for DMR Poultries</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-slate-300">Use AI for analytics explanations, report summaries and operational anomaly detection without exposing the provider key to the browser.</p></div><div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3"><div className="flex items-center gap-2 text-xs font-bold text-emerald-300"><span className="h-2 w-2 rounded-full bg-emerald-400" /> Provider configured</div><div className="mt-1 text-[11px] text-slate-300">Key is stored server-side</div></div></div></div><div className="p-5"><div className="grid grid-cols-1 gap-4 md:grid-cols-3"><div><label className={label}>Provider</label><input className={input + " bg-slate-100"} value="DeepSeek" readOnly /></div><div><label className={label}>Model / Harness Alias</label><input className={input} value={ai.model} onChange={(e) => updateSettings("ai", { model: e.target.value })} /></div><div><label className={label}>Monthly Budget (USD)</label><input className={input} type="number" min="0" step="0.5" value={ai.monthlyBudgetUsd} onChange={(e) => updateSettings("ai", { monthlyBudgetUsd: Number(e.target.value) })} /></div></div><div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2"><div><label className={label}>Temperature</label><input className="w-full accent-blue-600" type="range" min="0" max="1" step="0.05" value={ai.temperature} onChange={(e) => updateSettings("ai", { temperature: Number(e.target.value) })} /><div className="flex justify-between text-[11px] text-slate-400"><span>Precise</span><strong className="text-slate-600">{ai.temperature.toFixed(2)}</strong><span>Creative</span></div></div><div><label className={label}>Max Output Tokens</label><input className={input} type="number" min="100" max="8000" step="100" value={ai.maxOutputTokens} onChange={(e) => updateSettings("ai", { maxOutputTokens: Number(e.target.value) })} /></div></div><div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800"><strong>Security rule:</strong> never place the DeepSeek API key in Vite environment variables exposed to React. The browser should call the DMR backend, and the backend should call DeepSeek.</div></div></div><div className="grid grid-cols-1 gap-5 lg:grid-cols-3"><div className={card + " p-5 lg:col-span-2"}><SectionHeader icon={Zap} title="AI Features" description="Choose where AI is allowed to operate inside the ERP." /><div className="space-y-2"><Toggle checked={ai.enabled} label="Enable AI features" description="Master switch for all AI-powered ERP features." onChange={(value) => updateSettings("ai", { enabled: value })} /><Toggle checked={ai.analyticsEnabled} label="Vehicle & business analytics" description="Generate explanations, trends and anomaly summaries from ERP data." onChange={(value) => updateSettings("ai", { analyticsEnabled: value })} /><Toggle checked={ai.reportSummariesEnabled} label="Report summaries" description="Create concise explanations for weekly and financial reports." onChange={(value) => updateSettings("ai", { reportSummariesEnabled: value })} /><Toggle checked={ai.anomalyDetectionEnabled} label="Anomaly detection" description="Flag unusual expenses, mortality, collection delays or vehicle costs." onChange={(value) => updateSettings("ai", { anomalyDetectionEnabled: value })} /></div></div><div className={card + " p-5"}><div className="flex items-center justify-between"><div><p className="text-xs font-semibold text-slate-500">Monthly usage</p><p className="mt-1 text-2xl font-bold text-slate-900">{formatCurrency(used, "USD")}</p></div><div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-600"><Activity size={19} /></div></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${usagePercent}%` }} /></div><div className="mt-2 flex justify-between text-[11px] text-slate-500"><span>{usagePercent.toFixed(0)}% used</span><span>{formatCurrency(remaining, "USD")} remaining</span></div><div className="mt-5 rounded-xl bg-slate-50 p-3"><div className="flex items-center justify-between text-xs"><span className="text-slate-500">Configured limit</span><strong className="text-slate-800">{formatCurrency(ai.monthlyBudgetUsd, "USD")}</strong></div><p className="mt-2 text-[11px] leading-4 text-slate-400">Usage shown here is a UI placeholder until the backend usage endpoint is connected.</p></div></div></div><div className={card + " p-5"}><SectionHeader icon={Cpu} title="Connection & Diagnostics" description="Verify the server-side AI integration without exposing credentials." /><div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div className="flex items-center gap-3"><div className="rounded-xl bg-emerald-50 p-3 text-emerald-600"><CheckCircle2 size={20} /></div><div><p className="text-sm font-bold text-slate-800">API key status: configured</p><p className="text-xs text-slate-500">The key value is intentionally hidden from the frontend.</p></div></div><button type="button" disabled={aiTesting} onClick={async () => { setAiTesting(true); setAiTestMessage(null); const result = await testAiConnection(); setAiTesting(false); setAiTestMessage({ ok: result.ok, text: result.message }); }} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">{aiTesting ? <RefreshCw size={14} className="animate-spin" /> : <Activity size={14} />} Test Backend Connection</button></div>{aiTestMessage && <div className={`mt-4 rounded-xl border p-3 text-xs ${aiTestMessage.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>{aiTestMessage.text}</div>}<div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3"><div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] uppercase text-slate-400">Provider</p><p className="mt-1 text-sm font-bold text-slate-800">DeepSeek</p></div><div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] uppercase text-slate-400">Model</p><p className="mt-1 text-sm font-bold text-slate-800">{ai.model}</p></div><div className="rounded-xl bg-slate-50 p-3"><p className="text-[10px] uppercase text-slate-400">Budget</p><p className="mt-1 text-sm font-bold text-slate-800">{formatCurrency(ai.monthlyBudgetUsd, "USD")}/month</p></div></div><SaveBar saving={saving} onSave={persist} onReset={() => resetSection("ai")} /></div></div>; };
+
+  const renderAbout = () => <div className="space-y-5"><div className={card + " p-6"}><div className="flex flex-col gap-5 md:flex-row md:items-center"><div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg"><Database size={30} /></div><div><h2 className="text-xl font-bold text-slate-900">DMR Poultries ERP</h2><p className="mt-1 text-sm text-slate-500">Internal business management platform for poultry trading operations.</p><div className="mt-2 flex flex-wrap gap-2"><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">Production-ready architecture</span><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700">PostgreSQL backend</span><span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-700">React + TypeScript</span></div></div></div></div><div className="grid grid-cols-1 gap-5 md:grid-cols-3">{[["Version", "1.0.0"], ["Frontend", "React + Vite"], ["Backend", "Node.js + PostgreSQL"]].map(([title, value]) => <div key={title} className={card + " p-5"}><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{title}</p><p className="mt-2 text-sm font-bold text-slate-800">{value}</p></div>)}</div><div className={card + " p-5"}><h3 className="text-sm font-bold text-slate-900">Settings architecture</h3><p className="mt-2 text-xs leading-5 text-slate-500">The Settings UI is designed so local persistence works immediately while server persistence can be enabled without changing the screen. Security-sensitive values such as AI provider keys remain backend-only.</p></div></div>;
+
+  const renderContent = { general: renderGeneral, profile: renderProfile, security: renderSecurity, appearance: renderAppearance, language: renderLanguage, notifications: renderNotifications, users: renderUsers, permissions: renderPermissions, ai: renderAi, about: renderAbout }[activeTab];
+  return <div className="min-h-[calc(100vh-64px)] bg-slate-50 px-4 py-5 md:px-6 lg:px-7"><div className="mx-auto max-w-[1500px]"><div className="mb-5 flex flex-col justify-between gap-3 md:flex-row md:items-end"><div><div className="flex items-center gap-2 text-xs font-semibold text-slate-400"><span>System</span><ChevronRight size={13} /><span className="text-blue-600">Settings</span></div><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Settings</h1><p className="mt-1 text-xs text-slate-500">Configure DMR Poultries ERP behaviour, access, notifications and AI.</p></div><div className="flex items-center gap-2"><span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-semibold text-slate-500"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> {serverSync}</span><span className="hidden rounded-full bg-blue-50 px-3 py-1.5 text-[10px] font-semibold text-blue-700 md:inline-flex">Administrator</span></div></div><div className="grid grid-cols-1 gap-5 lg:grid-cols-[260px_minmax(0,1fr)]"><aside className={`${card} h-fit overflow-hidden lg:sticky lg:top-4`}><div className="border-b border-slate-100 px-4 py-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white"><SlidersHorizontal size={18} /></div><div><p className="text-sm font-bold text-slate-900">System Settings</p><p className="text-[10px] text-slate-400">DMR Poultries</p></div></div></div><nav className="max-h-[calc(100vh-190px)] overflow-y-auto p-2">{tabs.map((tab) => { const Icon = tab.icon; const selected = tab.key === activeTab; return <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)} className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${selected ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"}`}><Icon size={17} className={selected ? "text-white" : "text-slate-400 group-hover:text-blue-600"} /><span className="min-w-0 flex-1"><span className="block text-xs font-semibold">{tab.label}</span><span className={`mt-0.5 block truncate text-[10px] ${selected ? "text-blue-100" : "text-slate-400"}`}>{tab.description}</span></span>{selected && <ChevronRight size={14} />}</button>; })}</nav></aside><main className="min-w-0"><div className="mb-4 flex items-center justify-between"><div><h2 className="text-lg font-bold text-slate-900">{active.label}</h2><p className="text-xs text-slate-500">{active.description}</p></div>{activeTab === "ai" && <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[10px] font-bold text-indigo-700"><Sparkles size={12} /> AI-enabled</span>}</div>{renderContent()}</main></div></div>{notice && <div className={`fixed bottom-5 right-5 z-50 flex max-w-sm items-start gap-3 rounded-xl border px-4 py-3 shadow-xl ${notice.type === "success" ? "border-emerald-200 bg-white" : "border-rose-200 bg-white"}`}><div className={`mt-0.5 rounded-full p-1 ${notice.type === "success" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}>{notice.type === "success" ? <CheckCircle2 size={15} /> : <CircleHelp size={15} />}</div><p className="text-xs font-semibold text-slate-700">{notice.text}</p><button type="button" onClick={() => setNotice(null)} className="text-slate-400"><X size={14} /></button></div>}</div>;
 }
-
-const SettingsPage = ({ embedded = false }: SettingsPageProps) => {
-  return (
-    <ErrorBoundary>
-      <div className={`w-full flex items-center justify-center animate-in fade-in duration-500 ${
-        embedded ? 'min-h-[60vh]' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
-      }`}>
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center max-w-md w-full mx-4">
-          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 border border-blue-100 shadow-sm animate-bounce">
-            🚧
-          </div>
-          <h2 className="text-xl font-bold text-slate-800 mb-2">Settings - Coming Soon</h2>
-          <p className="text-sm text-slate-500 leading-relaxed">
-            This module is currently being enhanced and will be made fully available after the upcoming updates.
-          </p>
-        </div>
-      </div>
-    </ErrorBoundary>
-  );
-};
-
-export default memo(SettingsPage);
