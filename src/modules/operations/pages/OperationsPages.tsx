@@ -1,6 +1,6 @@
 // src/modules/operations/pages/OperationsPages.tsx
 
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Sparkles,
@@ -12,8 +12,10 @@ import {
   Clock,
   FileText,
   Fuel,
+  Bird,
 } from "lucide-react";
 
+import ModuleTabs, { type ModuleTab } from "../../../ui/ModuleTabs";
 import OperationsDashboardPage from "../dashboard/pages/OperationsDashboardPage";
 import TripEntryPage from "../vehicle-trips/pages/TripEntryPage";
 import TripListPage from "../vehicle-trips/pages/TripListPage";
@@ -23,24 +25,39 @@ import CollectionEntryPage from "../collections/pages/CollectionEntryPage";
 import PendingCollectionsPage from "../collections/pages/PendingCollectionsPage";
 import CollectionReportPage from "../collections/pages/CollectionReportPage";
 import FuelExpensesPage from "../fuel-expenses/pages/FuelExpensesPage";
+import MortalityEntryPage from "../mortality/pages/MortalityEntryPage";
 
 // Tabs configuration with Overview back as default
-const tabs = [
-  { key: "overview", label: "Overview", icon: Sparkles, color: "text-amber-500", component: OperationsDashboardPage },
-  { key: "trip-entry", label: "Trip Entry", icon: ClipboardList, color: "text-blue-500", component: TripEntryPage },
-  { key: "trip-list", label: "Trip List", icon: List, color: "text-emerald-500", component: TripListPage },
-  { key: "rate-entry", label: "Rate Entry", icon: DollarSign, color: "text-purple-500", component: RatesEntryPage },
-  { key: "shop-sales", label: "Shop Sales", icon: ShoppingBag, color: "text-amber-500", component: ShopSalesPage },
-  { key: "collection", label: "Collection", icon: CreditCard, color: "text-teal-500", component: CollectionEntryPage },
-  { key: "pending-collections", label: "Pending Collections", icon: Clock, color: "text-rose-500", component: PendingCollectionsPage },
-  { key: "collection-report", label: "Collection Report", icon: FileText, color: "text-indigo-500", component: CollectionReportPage },
-  { key: "fuel-expenses", label: "Fuel Expenses", icon: Fuel, color: "text-orange-500", component: FuelExpensesPage },
+const tabs: ModuleTab[] = [
+  { key: "overview", label: "Daily Report", icon: Sparkles, color: "text-amber-500" },
+  { key: "trip-entry", label: "Trip Entry", icon: ClipboardList, color: "text-emerald-500" },
+  { key: "trip-list", label: "Trip List", icon: List, color: "text-sky-500" },
+  { key: "rate-entry", label: "Rate Entry", icon: DollarSign, color: "text-violet-500" },
+  { key: "shop-sales", label: "Shop Sales", icon: ShoppingBag, color: "text-amber-500" },
+  { key: "collection", label: "Collection Entry", icon: CreditCard, color: "text-teal-500" },
+  { key: "pending-collections", label: "Pending Collections", icon: Clock, color: "text-rose-500" },
+  { key: "collection-report", label: "Collection Report", icon: FileText, color: "text-indigo-500" },
+  { key: "mortality", label: "Mortality Entry", icon: Bird, color: "text-rose-500" },
+  { key: "fuel-expenses", label: "Fuel Expenses", icon: Fuel, color: "text-orange-500" },
 ];
+
+// Map tab keys to their components
+const tabComponents: Record<string, React.ComponentType<{ embedded?: boolean }>> = {
+  overview: OperationsDashboardPage,
+  "trip-entry": TripEntryPage,
+  "trip-list": TripListPage,
+  "rate-entry": RatesEntryPage,
+  "shop-sales": ShopSalesPage,
+  collection: CollectionEntryPage,
+  "pending-collections": PendingCollectionsPage,
+  "collection-report": CollectionReportPage,
+  mortality: MortalityEntryPage,
+  "fuel-expenses": FuelExpensesPage,
+};
 
 function OperationsPages() {
   const location = useLocation();
   const navigate = useNavigate();
-  const tabsContainerRef = useRef<HTMLDivElement>(null);
 
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
 
@@ -57,6 +74,7 @@ function OperationsPages() {
     if (pathname.includes("collections/entry")) return "collection";
     if (pathname.includes("collections/pending")) return "pending-collections";
     if (pathname.includes("collections/report")) return "collection-report";
+    if (pathname.includes("mortality")) return "mortality";
     if (pathname.includes("fuel-expenses")) return "fuel-expenses";
 
     return "overview"; // Default tab
@@ -69,23 +87,8 @@ function OperationsPages() {
     }
   }, [location.pathname, searchParams, navigate]);
 
-  // Automatically scroll active tab into view when it changes
-  useEffect(() => {
-    if (tabsContainerRef.current) {
-      const activeElement = tabsContainerRef.current.querySelector(`[data-tab-key="${activeTab}"]`);
-      if (activeElement) {
-        activeElement.scrollIntoView({
-          behavior: "smooth",
-          inline: "nearest",
-          block: "nearest",
-        });
-      }
-    }
-  }, [activeTab]);
-
   const ActiveComponent = useMemo(() => {
-    const found = tabs.find((tab) => tab.key === activeTab);
-    return found ? found.component : OperationsDashboardPage;
+    return tabComponents[activeTab] ?? OperationsDashboardPage;
   }, [activeTab]);
 
   const handleTabChange = (tabKey: string) => {
@@ -93,42 +96,8 @@ function OperationsPages() {
   };
 
   return (
-    <div className="w-full pt-3 pb-6 space-y-4">
-      {/* Sticky Tab Navigation Bar */}
-      <div className="sticky top-0 z-30 bg-slate-50/90 backdrop-blur-md pt-1 pb-2 w-full">
-        <div className="bg-white border-y sm:border border-slate-200/90 sm:rounded-xl shadow-sm p-1.5 w-full">
-          <div
-            ref={tabsContainerRef}
-            className="flex items-center gap-2 overflow-x-auto scrollbar-none [ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden w-full scroll-smooth"
-          >
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  data-tab-key={tab.key}
-                  type="button"
-                  onClick={() => handleTabChange(tab.key)}
-                  className={`
-                    flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 shrink-0
-                    ${isActive
-                      ? "bg-blue-50 text-blue-700 font-semibold shadow-xs"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                    }
-                  `}
-                >
-                  <Icon
-                    size={18}
-                    className={isActive ? "text-blue-700" : tab.color}
-                  />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+    <div className="mx-auto w-full max-w-[1480px] space-y-4 pb-6">
+      <ModuleTabs tabs={tabs} activeKey={activeTab} onChange={handleTabChange} className="px-4 pt-3 sm:px-6 lg:px-8" />
 
       {/* Embedded Sub-Component */}
       <div className="w-full px-4 sm:px-6 lg:px-8">

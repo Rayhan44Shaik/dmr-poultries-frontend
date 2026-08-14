@@ -7,4 +7,13 @@ export default defineConfig({
         react(),
         tailwindcss(),
     ],
+    server: {
+        host: true,
+        // Allow the sandbox preview host (e.g. <port>-<id>.e2b.app) to connect.
+        allowedHosts: true,
+    },
+    preview: {
+        host: true,
+        allowedHosts: true,
+    },
 });

@@ -42,8 +42,8 @@ const getTripDetails = (payment: Payment): { tripNo: string; amount: number }[] 
     const farmPayment = FarmPaymentService.getPaymentById(paymentId);
     if (farmPayment) {
       tripDetails.push({
-        tripNo: farmPayment.tripNo,
-        amount: farmPayment.amount,
+        tripNo: farmPayment.tripId,
+        amount: farmPayment.totalAmount ?? farmPayment.balance ?? 0,
       });
     }
   }

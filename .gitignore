@@ -32,3 +32,8 @@ backend/dist
 *.njsproj
 *.sln
 *.sw?
+
+# TypeScript build artifacts
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts

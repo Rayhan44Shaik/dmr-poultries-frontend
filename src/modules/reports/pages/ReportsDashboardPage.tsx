@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { format, subDays } from 'date-fns';
-import { TrendingUp, Truck, ShoppingBag, CreditCard, BookOpen, FileText } from 'lucide-react';
+import { Truck, ShoppingBag, CreditCard, BookOpen, FileText, CalendarDays } from 'lucide-react';
 import type { ReportFilters, ReportType } from '../types/reportTypes';
 import { getReportData } from '../services/reportService';
 import ReportFiltersComponent from '../components/ReportFilters';
 import ReportCard from '../components/ReportCard';
 import ShopLedgerPage from './ShopLedgerPage';
+import ModuleTabs, { type ModuleTab } from '../../../ui/ModuleTabs';
 
 // ========== IMPORTS ==========
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
@@ -16,9 +17,13 @@ import { useShops } from '../../masters/shops/hooks/useShops';
 import { exportToPDF, exportToExcel } from '../../../utils/exportUtils';
 
 // ========== REPORT CONFIGURATIONS & ICONS ==========
-const tabs = [
-  { key: 'shopLedger', label: 'Shop Ledger', icon: BookOpen, color: 'text-purple-500', component: ShopLedgerPage },
-  // Other reports can be mapped here as well when active
+const tabs: ModuleTab[] = [
+  { key: 'shopLedger', label: 'Shop Ledger', icon: BookOpen, color: 'text-violet-500' },
+  { key: 'weekly', label: 'Weekly Report', icon: CalendarDays, color: 'text-emerald-500' },
+  { key: 'shopSales', label: 'Shop Sales', icon: ShoppingBag, color: 'text-amber-500' },
+  { key: 'collection', label: 'Collections', icon: CreditCard, color: 'text-teal-500' },
+  { key: 'vehicle', label: 'Vehicle Reports', icon: Truck, color: 'text-sky-500' },
+  { key: 'expenses', label: 'Expenses', icon: FileText, color: 'text-rose-500' },
 ] as const;
 
 const REPORT_LABELS: Record<ReportType, string> = {
@@ -107,7 +112,7 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
   const vehicleOptions = useMemo(
     () => [
       { value: 'All Vehicles', label: 'All Vehicles' },
-      ...vehicles.map((v: any) => ({ value: v.vehicleNumber, label: v.vehicleNumber })),
+      ...vehicles.map((v) => ({ value: v.vehicleNumber, label: v.vehicleNumber })),
     ],
     [vehicles]
   );
@@ -116,8 +121,8 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
     () => [
       { value: 'All Drivers', label: 'All Drivers' },
       ...employees
-        .filter((e: any) => e.department === 'Driver')
-        .map((e: any) => ({ value: e.employeeName, label: e.employeeName })),
+        .filter((e) => e.department === 'Driver')
+        .map((e) => ({ value: e.employeeName, label: e.employeeName })),
     ],
     [employees]
   );
@@ -126,8 +131,8 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
     () => [
       { value: 'All Collectors', label: 'All Collectors' },
       ...employees
-        .filter((e: any) => e.department === 'Collection')
-        .map((e: any) => ({ value: e.employeeName, label: e.employeeName })),
+        .filter((e) => e.department === 'Collection')
+        .map((e) => ({ value: e.employeeName, label: e.employeeName })),
     ],
     [employees]
   );
@@ -135,7 +140,7 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
   const shopOptions = useMemo(
     () => [
       { value: 'All Shops', label: 'All Shops' },
-      ...shops.map((s: any) => ({ value: s.shopName, label: s.shopName })),
+      ...shops.map((s) => ({ value: s.shopName, label: s.shopName })),
     ],
     [shops]
   );
@@ -192,34 +197,13 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
   );
 
   const content = (
-    <div className="w-full pt-3 pb-6 space-y-4">
-      {/* Tab Navigation Container */}
-      <div className="bg-white border-y sm:border border-slate-200/90 sm:rounded-xl shadow-sm px-4 sm:px-6 py-1.5 w-full">
-        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none [ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => handleTabChange(tab.key)}
-                className={`
-                  flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 cursor-pointer
-                  ${
-                    isActive
-                      ? "bg-blue-50 text-blue-700 font-semibold"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                  }
-                `}
-              >
-                <Icon size={18} className={isActive ? "text-blue-700" : tab.color} />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+    <div className="mx-auto w-full max-w-[1480px] space-y-4 pb-6">
+      <ModuleTabs
+        tabs={[...tabs]}
+        activeKey={activeTab}
+        onChange={handleTabChange}
+        className="px-4 pt-3 sm:px-6 lg:px-8"
+      />
 
       {/* Main Content Area */}
       <div className="w-full px-4 sm:px-6 lg:px-8 space-y-6">

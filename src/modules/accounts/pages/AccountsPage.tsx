@@ -16,17 +16,19 @@ import { PaymentBookPage } from './PaymentBookPage';
 import { FarmerPaymentPage } from './FarmPaymentPage';
 import { NewPaymentPage } from './NewPaymentPage';
 import SummaryPage from './SummaryPage';
+import ModuleTabs, { type ModuleTab } from '../../../ui/ModuleTabs';
+import { MarketRatePage } from '../../masters/Market_Rates/Pages/MarketRatePage';
 
 // ---- Reusable "Coming Soon" Component ----
 const ComingSoonTab = ({ title }: { title: string }) => (
-  <div className="w-full flex items-center justify-center animate-in fade-in duration-500 min-h-[60vh]">
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center max-w-md w-full mx-4">
-      <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 border border-blue-100 shadow-sm animate-bounce">
-        🚧
+  <div className="w-full flex items-center justify-center animate-fade-in min-h-[50vh]">
+    <div className="bg-white rounded-xl border border-slate-200/80 shadow-card p-12 text-center max-w-md w-full mx-4">
+      <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center mx-auto mb-4">
+        <BarChart3 size={24} />
       </div>
-      <h2 className="text-xl font-bold text-slate-800 mb-2">{title} - Coming Soon</h2>
+      <h2 className="text-lg font-bold text-slate-800 mb-2">{title}</h2>
       <p className="text-sm text-slate-500 leading-relaxed">
-        This payment configuration module is currently being enhanced and will be made fully available after the upcoming updates.
+        This module is being finalised and will be available in an upcoming update.
       </p>
     </div>
   </div>
@@ -35,14 +37,25 @@ const ComingSoonTab = ({ title }: { title: string }) => (
 const FuelPaymentPage = () => <ComingSoonTab title="Fuel Payment" />;
 const VehiclePaymentPage = () => <ComingSoonTab title="Vehicle Payment" />;
 
-const tabs = [
-  { key: 'paid-payments', label: 'Paid Payments', icon: CheckCircle, color: 'text-emerald-600', component: PaymentBookPage },
-  { key: 'summary', label: 'Summary', icon: BarChart3, color: 'text-rose-600', component: SummaryPage },
-  { key: 'farm-payment', label: 'Farm Payment', icon: Sprout, color: 'text-green-600', component: FarmerPaymentPage },
-  { key: 'new-payments', label: 'New Payments', icon: PlusCircle, color: 'text-blue-600', component: NewPaymentPage },
-  { key: 'fuel-payment', label: 'Fuel Payment', icon: Fuel, color: 'text-amber-600', component: FuelPaymentPage },
-  { key: 'vehicle-payment', label: 'Vehicle Payment', icon: Truck, color: 'text-purple-600', component: VehiclePaymentPage },
+const tabs: ModuleTab[] = [
+  { key: 'paid-payments', label: 'Collection Register', icon: CheckCircle, color: 'text-emerald-500' },
+  { key: 'market-rate', label: 'Market Rate', icon: TrendingUp, color: 'text-indigo-500' },
+  { key: 'summary', label: 'Accounts Summary', icon: BarChart3, color: 'text-rose-500' },
+  { key: 'farm-payment', label: 'Farm Payment', icon: Sprout, color: 'text-green-500' },
+  { key: 'new-payments', label: 'New Payments', icon: PlusCircle, color: 'text-sky-500' },
+  { key: 'fuel-payment', label: 'Fuel Payment', icon: Fuel, color: 'text-amber-500' },
+  { key: 'vehicle-payment', label: 'Vehicle Payment', icon: Truck, color: 'text-violet-500' },
 ];
+
+const tabComponents: Record<string, React.ComponentType<{ embedded?: boolean }>> = {
+  'paid-payments': PaymentBookPage,
+  'market-rate': MarketRatePage,
+  'summary': SummaryPage,
+  'farm-payment': FarmerPaymentPage,
+  'new-payments': NewPaymentPage,
+  'fuel-payment': FuelPaymentPage,
+  'vehicle-payment': VehiclePaymentPage,
+};
 
 function AccountsPage() {
   const location = useLocation();
@@ -57,8 +70,7 @@ function AccountsPage() {
   }, [location.search, navigate, searchParams]);
 
   const ActiveComponent = useMemo(() => {
-    const found = tabs.find((tab) => tab.key === activeTab);
-    return found ? found.component : PaymentBookPage;
+    return tabComponents[activeTab] ?? PaymentBookPage;
   }, [activeTab]);
 
   const handleTabChange = (tabKey: string) => {
@@ -66,32 +78,8 @@ function AccountsPage() {
   };
 
   return (
-    <div className="w-full pt-4 pb-6 space-y-5">
-      {/* Tab Bar */}
-      <div className="bg-white border-y sm:border border-slate-200/90 sm:rounded-xl shadow-sm px-4 sm:px-6 py-1.5 w-full">
-        <div
-          className="flex items-center gap-1 overflow-x-auto hide-scrollbar"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
-        >
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => handleTabChange(tab.key)}
-                className={`
-                  flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 flex-shrink-0
-                  ${isActive ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'}
-                `}
-              >
-                <Icon size={18} className={isActive ? 'text-blue-700' : tab.color} />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+    <div className="mx-auto w-full max-w-[1480px] space-y-4 pb-6">
+      <ModuleTabs tabs={tabs} activeKey={activeTab} onChange={handleTabChange} className="px-4 pt-3 sm:px-6 lg:px-8" />
 
       {/* Content */}
       <div className="w-full px-4 sm:px-6 lg:px-8">

@@ -80,7 +80,7 @@ export interface DutyAssignment {
   employeeName: string;
   department: string;
   role: string;
-  dutyType: 'Driver' | 'Delivery' | 'Rest' | 'Repair' | 'Office' | 'WeeklyOff';
+  dutyType: 'Driver' | 'Delivery' | 'Rest' | 'Repair' | 'Office' | 'OfficeDuty' | 'Collection' | 'WeeklyOff';
   date: string; // YYYY-MM-DD
   vehicleId?: number;
   vehicleNo?: string;
@@ -338,3 +338,21 @@ export type StaffPage =
   | 'driver-performance'
   | 'supervisor-performance'
   | 'reports';
+// ============================================================
+// DUTY PLANNER (PostgreSQL-backed via backend /staff/duty-planner)
+// ============================================================
+export type DutyType = 'Delivery' | 'Repair' | 'OfficeDuty' | 'Office' | 'Collection' | 'WeeklyOff' | 'Driver' | 'Rest';
+export interface DutyWeekInfo {
+  weekStart: string; weekEnd: string; status: 'Draft' | 'Open' | 'Submitted' | 'Locked';
+  days: { date: string; weekday: string }[];
+  assignments: DutyAssignment[];
+  employees: { id: number; employeeNo: number; name: string; department: string; role: string; active: boolean; onApprovedLeave: string[] }[];
+  perEmployee: Record<number, { worked: number; delivery: number; repair: number; office: number; collection: number; weeklyOff: number; leave: number; weekOffDay: string | null }>;
+  saturday: { required: number; assigned: number; shortage: number; status: string }
+  validation: { ok: boolean; problems: string[] },
+}
+export interface AutoAssignmentPreview {
+  employeesAffected: number; delivery: number; repair: number; office: number; collection: number; weeklyOff: number;
+  saturdayRequired: number; saturdayAssigned: number; saturdayShortage: number; conflicts: string[];
+  rows: { employeeId: number; employeeName: string; department: string; role: string; date: string; dutyType: DutyType; vehicleId?: number | null; vehicleNo?: string | null }[];
+}

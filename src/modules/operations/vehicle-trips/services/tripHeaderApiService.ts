@@ -314,8 +314,23 @@ export async function loadTripById(id: number): Promise<Trip> {
 
 /** GET /api/trips — PostgreSQL-backed Recent Trips. */
 export async function listTrips(): Promise<Trip[]> {
-  const { data } = await apiGet<ApiTripRecord[]>(TRIPS_PATH);
-  return data.map((trip) => mapApiTripToTrip(trip));
+  try {
+    const { data } = await apiGet<ApiTripRecord[]>(TRIPS_PATH);
+    return data.map((trip) => mapApiTripToTrip(trip));
+  } catch (error) {
+    // Offline fallback: the original localStorage trip store (the same data
+    // source the executive dashboard reads) keeps the trip list usable when
+    // the local PostgreSQL backend is not running.
+    try {
+      const raw = localStorage.getItem("vehicleTrips");
+      if (!raw) throw error;
+      const stored = JSON.parse(raw) as Trip[];
+      if (!Array.isArray(stored)) throw error;
+      return stored.sort((a, b) => new Date(b.tripDate).getTime() - new Date(a.tripDate).getTime());
+    } catch {
+      throw error;
+    }
+  }
 }
 
 /** Single final Step 1 submission. No draft is created or updated before this request. */

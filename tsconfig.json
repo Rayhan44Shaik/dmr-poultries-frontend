@@ -21,5 +21,6 @@
     "allowJs": true
   },
   "include": ["src"],
+  "exclude": ["src/deleted_files_backup"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import type { Vehicle } from "../types/vehicle";
+import type { VehicleInput } from "../services/vehicleService";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import {
   Truck,
@@ -17,9 +18,19 @@ import {
 } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 
+// The form collects the vehicle fields it owns; insurance/permit/fitness
+// expiries are managed on the fleet documents pages.
+type VehicleFormSave = Omit<VehicleInput, "insuranceExpiry" | "permitExpiry" | "fitnessExpiry"> & {
+  emiDay?: number;
+  totalEMIs?: number;
+};
+
+/** Master record plus the extra EMI fields the backend payload accepts. */
+type VehicleModel = Vehicle & { emiDay?: number; totalEMIs?: number };
+
 type VehicleFormProps = {
   vehicle?: Vehicle | null;
-  onSave: (vehicle: any) => void;
+  onSave: (vehicle: VehicleFormSave) => void;
   onCancel: () => void;
   isSaving?: boolean;
 };
@@ -73,11 +84,12 @@ function VehicleForm({ vehicle, onSave, onCancel, isSaving = false }: VehicleFor
       setPurchaseDate(vehicle.purchaseDate ?? "");
       setPurchaseAmount(vehicle.purchaseAmount ?? "");
       setPurchaseAmountRaw(vehicle.purchaseAmount ? String(vehicle.purchaseAmount) : "");
-      setEmiDay((vehicle as any).emiDay ?? "");
-      setTotalEMIs((vehicle as any).totalEMIs ?? "");
+      const model = vehicle as VehicleModel;
+      setEmiDay(model.emiDay ?? "");
+      setTotalEMIs(model.totalEMIs ?? "");
       setEngineNumber(vehicle.engineNumber ?? "");
       setChassisNumber(vehicle.chassisNumber ?? "");
-      setRcDate((vehicle as any).rcDate ?? "");
+      setRcDate(vehicle.rcDate ?? "");
       setStatus(vehicle.status);
     } else {
       // Reset all

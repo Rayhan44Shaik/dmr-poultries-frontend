@@ -76,7 +76,7 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
   const [selectedBill, setSelectedBill] = useState<MaintenanceEvent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Sort by the actual maintenance date, newest first (never by the MNT number).
+// Sort by the actual maintenance date, newest first (never by the MNT number).
   const timelineEvents = useMemo(() => {
     return (events || [])
       .filter((event) => event.paymentStatus === 'approved')

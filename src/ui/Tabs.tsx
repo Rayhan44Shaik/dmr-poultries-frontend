@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 
 interface Tab {
   id: string;
@@ -9,9 +9,10 @@ interface Tab {
 interface TabsProps {
   tabs: Tab[];
   defaultTab?: string;
+  onChange?: (id: string) => void;
 }
 
-export const Tabs: React.FC<TabsProps> = ({ tabs, defaultTab }) => {
+export const Tabs: React.FC<TabsProps> = ({ tabs, defaultTab, onChange }) => {
   const [activeId, setActiveId] = useState(defaultTab || tabs[0]?.id);
   const activeTab = tabs.find((t) => t.id === activeId);
 
@@ -21,14 +22,20 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, defaultTab }) => {
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveId(tab.id)}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
+            onClick={() => {
+              setActiveId(tab.id);
+              onChange?.(tab.id);
+            }}
+            className={`relative px-3.5 py-2 text-[13px] font-medium transition-colors ${
               activeId === tab.id
-                ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400'
-                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                ? "text-brand-700 dark:text-brand-300"
+                : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
             }`}
           >
             {tab.label}
+            {activeId === tab.id && (
+              <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand-600" />
+            )}
           </button>
         ))}
       </div>

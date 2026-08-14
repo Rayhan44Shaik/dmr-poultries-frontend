@@ -1,12 +1,12 @@
 import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout/DashboardLayout";
 
 // Auth
 import LoginPage from "../modules/auth/LoginPage";
 
 // Dashboard
-// import DashboardPage from "../modules/dashboard/DashboardPage";
+import DashboardPage from "../modules/dashboard/DashboardPage";
 
 // Masters Module
 import MastersPage from "../modules/masters/pages/MastersPage";
@@ -41,19 +41,7 @@ function AppRoutes() {
       <Route path="/" element={<LoginPage />} />
 
       {/* ============ DASHBOARD ============ */}
-      {/* 
-      <Route 
-        path="/dashboard" 
-        element={
-          <DashboardLayout>
-            <DashboardPage />
-          </DashboardLayout>
-        } 
-      /> 
-      */}
-      
-      {/* Redirect dashboard to masters to make it the default landing page */}
-      <Route path="/dashboard" element={<Navigate to="/masters" replace />} />
+      <Route path="/dashboard" element={<DashboardLayout><DashboardPage /></DashboardLayout>} />
 
       {/* ============ MASTERS ============ */}
       <Route path="/masters" element={<DashboardLayout><MastersPage /></DashboardLayout>} />
@@ -105,22 +93,22 @@ function AppRoutes() {
       />
 
       {/* ============ 404 - Not Found ============ */}
-      <Route 
-        path="*" 
+      <Route
+        path="*"
         element={
-          <div className="flex items-center justify-center h-screen">
+          <div className="flex h-screen items-center justify-center bg-slate-50">
             <div className="text-center">
-              <h1 className="text-6xl font-bold text-slate-800">404</h1>
-              <p className="text-lg text-slate-600 mt-2">Page not found</p>
-              {/* <a href="/dashboard" className="mt-4 inline-block text-blue-600 hover:underline">
+              <h1 className="text-6xl font-bold tracking-tight text-slate-800">404</h1>
+              <p className="mt-2 text-lg text-slate-600">Page not found</p>
+              <a
+                href="/dashboard"
+                className="mt-4 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700"
+              >
                 Go to Dashboard
-              </a> */}
-              <a href="/masters" className="mt-4 inline-block text-blue-600 hover:underline">
-                Go to Masters
               </a>
             </div>
           </div>
-        } 
+        }
       />
     </Routes>
   );

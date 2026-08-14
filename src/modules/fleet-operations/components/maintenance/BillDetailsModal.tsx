@@ -14,7 +14,7 @@ const BillDetailsModal: React.FC<BillDetailsModalProps> = ({ isOpen, bill, vehic
   if (!isOpen || !bill) return null;
 
   const vehicle = vehicles.find((v: any) => String(v.id) === String(bill.vehicleId));
-  const isPaid = bill.paymentStatus === 'approved';
+const isPaid = bill.paymentStatus === 'approved';
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });

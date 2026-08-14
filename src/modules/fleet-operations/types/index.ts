@@ -156,7 +156,6 @@ export type EMIRecord = z.infer<typeof EMIRecordSchema>;
 export interface FleetDashboardStats {
   totalVehicles: number;
   activeVehicles: number;
-  underMaintenance: number;
   fuelCostThisMonth: number;
   totalKMThisMonth: number;
   serviceDue: number;
@@ -172,4 +171,53 @@ export interface FleetDashboardStats {
   tollToday: number;
   documentsExpiring: number;
   avgFuelEfficiency: number;
+}
+
+// ---------- Fleet Overview Types ----------
+// Derived fleet statuses follow the real backend contract:
+// Inactive comes from the vehicle master record (Active/Inactive), On Trip
+// from a current active trip, everything else is Available. There is no
+// persisted "Maintenance" master state in the backend — service due is an
+// alert/KPI, never a status.
+export type FleetVehicleStatus = "On Trip" | "Available" | "Inactive";
+
+export type FleetExpiryState = "expired" | "expiring" | "safe" | "none";
+
+export interface FleetDocumentStatus {
+  /** Expiry date in display form (dd MMM yyyy) when known. */
+  expiry: string | null;
+  state: FleetExpiryState;
+}
+
+export interface FleetVehicleOverview {
+  id: number;
+  vehicleNo: number;
+  vehicleNumber: string;
+  vehicleType: string;
+  status: FleetVehicleStatus;
+  driverName: string;
+  currentTripNo: string;
+  /** Latest known odometer reading from trip meters; null when unknown. */
+  odometerKm: number | null;
+  /** Fuel expense total for the current month. */
+  fuelThisMonth: number;
+  /** Most recent fuel entry. */
+  lastFuel: { date: string; amount: number; litres: number } | null;
+  maintenance: {
+    lastServiceDate: string | null;
+    nextServiceKm: number | null;
+    serviceDue: boolean;
+  };
+  documents: {
+    insurance: FleetDocumentStatus;
+    permit: FleetDocumentStatus;
+    fitness: FleetDocumentStatus;
+  };
+  emi: {
+    financeCompany: string;
+    emiAmount: number;
+    nextDueDate: string;
+    overdue: boolean;
+  } | null;
+  fastag: { provider: string; balance: number; lowBalance: boolean } | null;
 }
