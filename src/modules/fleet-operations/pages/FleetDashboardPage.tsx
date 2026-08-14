@@ -8,6 +8,7 @@ import MonthlyFuelTrend from '../components/dashboard/MonthlyFuelTrend';
 import VehicleStatusDonut from '../components/dashboard/VehicleStatusDonut';
 import TopMaintenanceBar from '../components/dashboard/TopMaintenanceBar';
 import DailyStatTiles from '../components/dashboard/DailyStatTiles';
+import FleetOverview from '../components/fleet/FleetOverview';
 import { Truck, Activity, Wrench, Fuel, MapPin } from 'lucide-react';
 
 interface FleetDashboardPageProps {
@@ -82,6 +83,19 @@ const FleetDashboardPage = ({ embedded = false }: FleetDashboardPageProps) => {
 
           {/* Alert Strip */}
           <AlertStrip alerts={alerts} />
+
+          {/* Fleet Overview — live per-vehicle status cards */}
+          <FleetOverview
+            vehicles={data?.fleetVehicles ?? []}
+            counts={data?.fleetCounts ?? { "On Trip": 0, Available: 0, Maintenance: 0, Inactive: 0 }}
+            loading={data?.fleetLoading ?? true}
+            error={data?.fleetError ?? null}
+            onRetry={() => {
+              void data?.fleetReload().catch(() => {
+                /* error already captured in state */
+              });
+            }}
+          />
 
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

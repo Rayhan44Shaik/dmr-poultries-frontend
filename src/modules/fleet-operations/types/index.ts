@@ -124,3 +124,47 @@ export interface FleetDashboardStats {
   documentsExpiring: number;
   avgFuelEfficiency: number;
 }
+
+// ---------- Fleet Overview Types ----------
+export type FleetVehicleStatus = "On Trip" | "Available" | "Maintenance" | "Inactive";
+
+export type FleetExpiryState = "expired" | "expiring" | "safe" | "none";
+
+export interface FleetDocumentStatus {
+  /** Expiry date in display form (dd MMM yyyy) when known. */
+  expiry: string | null;
+  state: FleetExpiryState;
+}
+
+export interface FleetVehicleOverview {
+  id: number;
+  vehicleNo: number;
+  vehicleNumber: string;
+  vehicleType: string;
+  status: FleetVehicleStatus;
+  driverName: string;
+  currentTripNo: string;
+  /** Latest known odometer reading from trip meters; null when unknown. */
+  odometerKm: number | null;
+  /** Fuel expense total for the current month. */
+  fuelThisMonth: number;
+  /** Most recent fuel entry. */
+  lastFuel: { date: string; amount: number; litres: number } | null;
+  maintenance: {
+    lastServiceDate: string | null;
+    nextServiceKm: number | null;
+    serviceDue: boolean;
+  };
+  documents: {
+    insurance: FleetDocumentStatus;
+    permit: FleetDocumentStatus;
+    fitness: FleetDocumentStatus;
+  };
+  emi: {
+    financeCompany: string;
+    emiAmount: number;
+    nextDueDate: string;
+    overdue: boolean;
+  } | null;
+  fastag: { provider: string; balance: number; lowBalance: boolean } | null;
+}
