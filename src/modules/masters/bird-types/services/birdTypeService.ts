@@ -97,6 +97,17 @@ export async function createBirdType(input: BirdTypeInput): Promise<BirdType> {
   return mapBirdType(data);
 }
 
+/** POST /api/masters/bird-types/bulk — Upload multiple bird types from Excel */
+export async function bulkCreateBirdTypes(inputs: BirdTypeInput[]): Promise<BirdType[]> {
+  clearLegacyBirdTypeStorage();
+  const payload = inputs.map(toPayload);
+  const { data } = await apiPost<Record<string, unknown>[]>(
+    `${BIRD_TYPES_PATH}/bulk`,
+    payload
+  );
+  return Array.isArray(data) ? data.map(mapBirdType) : [];
+}
+
 /** PUT /api/masters/bird-types/:id */
 export async function updateBirdType(
   id: number,

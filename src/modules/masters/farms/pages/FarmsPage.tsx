@@ -11,6 +11,8 @@ import { exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/farmService";
 import type { Farm } from "../types/farm";
+import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
+import { buildFarmBulkImportConfig } from "../bulkImportConfig";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -20,6 +22,7 @@ const ITEMS_PER_PAGE = 10;
 
 function FarmsPage({ embedded = false }: FarmsPageProps) {
   const [showDialog, setShowDialog] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingFarm, setEditingFarm] = useState<Farm | null>(null);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -33,9 +36,15 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
     error,
     reload,
     addFarm,
+    addFarmsBulk,
     editFarm,
     removeFarm,
   } = useFarms();
+
+  const farmBulkImportConfig = useMemo(
+    () => buildFarmBulkImportConfig({ addFarmsBulk, reload }),
+    [addFarmsBulk, reload]
+  );
 
   // Reset to page 1 whenever search keyword changes
   const handleSearchChange = (value: string) => {
@@ -345,6 +354,17 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
               </button>
               
               <button
+                onClick={() => setShowBulkImport(true)}
+                disabled={loading || saving}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Bulk Import
+              </button>
+
+              <button
                 onClick={() => {
                   setEditingFarm(null);
                   setShowDialog(true);
@@ -472,6 +492,21 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
         }}
         onSave={handleSaveFarm}
         farm={editingFarm}
+      />
+      <BulkImportDialog
+        open={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        config={farmBulkImportConfig}
+        existing={farms}
+        onImported={(result) => {
+          logAuditEvent("BULK_IMPORT", "Farms", undefined, {
+            count: result.imported,
+          });
+          showNotification(
+            `Imported ${result.imported} of ${result.total} farms.`,
+            result.failed === 0 ? "success" : "error"
+          );
+        }}
       />
     </div>
   );

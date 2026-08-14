@@ -154,6 +154,17 @@ export async function createEmployee(input: EmployeeInput): Promise<Employee> {
   return mapEmployee(data);
 }
 
+/** POST /api/masters/employees/bulk — Upload multiple employees from Excel */
+export async function bulkCreateEmployees(inputs: EmployeeInput[]): Promise<Employee[]> {
+  clearLegacyEmployeeStorage();
+  const payload = inputs.map(toPayload);
+  const { data } = await apiPost<Record<string, unknown>[]>(
+    `${EMPLOYEES_PATH}/bulk`,
+    payload
+  );
+  return Array.isArray(data) ? data.map(mapEmployee) : [];
+}
+
 /** PUT /api/masters/employees/:id then caller should reload via GET. */
 export async function updateEmployee(
   id: number,

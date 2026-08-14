@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { BirdType } from "../types/birdType";
 import {
+  bulkCreateBirdTypes,
   createBirdType,
   deleteBirdType,
   handleApiError,
@@ -60,6 +61,25 @@ export function useBirdTypes() {
     }
   }, []);
 
+  // Uses the real transactional POST /api/masters/bird-types/bulk endpoint.
+  // If ANY row is invalid/duplicate the backend rejects the whole batch (400/409).
+  const addBirdTypesBulk = useCallback(async (inputs: BirdTypeInput[]) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await bulkCreateBirdTypes(inputs);
+      const data = await refreshBirdTypes();
+      setBirdTypes(data);
+      return data;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
   const editBirdType = useCallback(async (id: number, input: BirdTypeInput) => {
     setSaving(true);
     setError(null);
@@ -101,6 +121,7 @@ export function useBirdTypes() {
     error,
     reload,
     addBirdType,
+    addBirdTypesBulk,
     editBirdType,
     removeBirdType,
   };

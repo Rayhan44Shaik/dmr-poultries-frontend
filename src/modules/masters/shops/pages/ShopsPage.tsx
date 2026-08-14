@@ -13,6 +13,8 @@ import { handleApiError } from "../services/shopService";
 import type { Shop } from "../types/shop";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
+import { buildShopBulkImportConfig } from "../bulkImportConfig";
 
 type ShopsPageProps = { embedded?: boolean };
 
@@ -20,6 +22,7 @@ const ITEMS_PER_PAGE = 10;
 
 function ShopsPage({ embedded = false }: ShopsPageProps) {
   const [showDialog, setShowDialog] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -33,9 +36,15 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     error,
     reload,
     addShop,
+    addShopsBulk,
     editShop,
     removeShop,
   } = useShops();
+
+  const shopBulkImportConfig = useMemo(
+    () => buildShopBulkImportConfig({ addShopsBulk, reload }),
+    [addShopsBulk, reload]
+  );
 
   // Reset to page 1 whenever search keyword changes
   const handleSearchChange = (value: string) => {
@@ -338,6 +347,17 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
               </button>
               
               <button
+                onClick={() => setShowBulkImport(true)}
+                disabled={loading || saving}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Bulk Import
+              </button>
+
+              <button
                 onClick={() => {
                   setEditingShop(null);
                   setShowDialog(true);
@@ -465,6 +485,21 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
         }}
         onSave={handleSaveShop}
         shop={editingShop}
+      />
+      <BulkImportDialog
+        open={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        config={shopBulkImportConfig}
+        existing={shops}
+        onImported={(result) => {
+          logAuditEvent("BULK_IMPORT", "Shops", undefined, {
+            count: result.imported,
+          });
+          showNotification(
+            `Imported ${result.imported} of ${result.total} shops.`,
+            result.failed === 0 ? "success" : "error"
+          );
+        }}
       />
     </div>
   );

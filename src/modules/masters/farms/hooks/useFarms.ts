@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { Farm } from "../types/farm";
 import {
+  bulkCreateFarms,
   createFarm,
   deleteFarm,
   handleApiError,
@@ -60,6 +61,25 @@ export function useFarms() {
     }
   }, []);
 
+  // Uses the real transactional POST /api/masters/farms/bulk endpoint.
+  // If ANY row is invalid/duplicate the backend rejects the whole batch (400/409).
+  const addFarmsBulk = useCallback(async (inputs: FarmInput[]) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await bulkCreateFarms(inputs);
+      const data = await refreshFarms();
+      setFarms(data);
+      return data;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
   const editFarm = useCallback(async (id: number, input: FarmInput) => {
     setSaving(true);
     setError(null);
@@ -101,6 +121,7 @@ export function useFarms() {
     error,
     reload,
     addFarm,
+    addFarmsBulk,
     editFarm,
     removeFarm,
   };
