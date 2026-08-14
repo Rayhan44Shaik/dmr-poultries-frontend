@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { Employee } from "../types/employee";
 import {
+  bulkCreateEmployees,
   createEmployee,
   deleteEmployee,
   handleApiError,
@@ -61,6 +62,25 @@ export function useEmployees() {
     }
   }, []);
 
+  // Uses the real transactional POST /api/masters/employees/bulk endpoint.
+  // If ANY row is invalid/duplicate the backend rejects the whole batch (400/409).
+  const addEmployeesBulk = useCallback(async (inputs: EmployeeInput[]) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await bulkCreateEmployees(inputs);
+      const data = await refreshEmployees();
+      setEmployees(data);
+      return data;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
   const editEmployee = useCallback(async (id: number, input: EmployeeInput) => {
     setSaving(true);
     setError(null);
@@ -102,6 +122,7 @@ export function useEmployees() {
     error,
     reload,
     addEmployee,
+    addEmployeesBulk,
     editEmployee,
     removeEmployee,
   };

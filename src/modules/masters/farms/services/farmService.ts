@@ -105,6 +105,17 @@ export async function createFarm(input: FarmInput): Promise<Farm> {
   return mapFarm(data);
 }
 
+/** POST /api/masters/farms/bulk — Upload multiple farms from Excel */
+export async function bulkCreateFarms(inputs: FarmInput[]): Promise<Farm[]> {
+  clearLegacyFarmStorage();
+  const payload = inputs.map(toPayload);
+  const { data } = await apiPost<Record<string, unknown>[]>(
+    `${FARMS_PATH}/bulk`,
+    payload
+  );
+  return Array.isArray(data) ? data.map(mapFarm) : [];
+}
+
 /** PUT /api/masters/farms/:id */
 export async function updateFarm(
   id: number,

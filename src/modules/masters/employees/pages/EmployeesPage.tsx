@@ -10,6 +10,8 @@ import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/employeeService";
 import type { Employee } from "../types/employee";
+import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
+import { buildEmployeeBulkImportConfig } from "../bulkImportConfig";
 
 type EmployeesPageProps = { embedded?: boolean };
 
@@ -17,6 +19,7 @@ const ITEMS_PER_PAGE = 10;
 
 function EmployeesPage({ embedded = false }: EmployeesPageProps) {
   const [showDialog, setShowDialog] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -31,9 +34,15 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
     error,
     reload,
     addEmployee,
+    addEmployeesBulk,
     editEmployee,
     removeEmployee,
   } = useEmployees();
+
+  const employeeBulkImportConfig = useMemo(
+    () => buildEmployeeBulkImportConfig({ addEmployeesBulk, reload }),
+    [addEmployeesBulk, reload]
+  );
 
   // Get unique departments for filter dropdown
   const departments = useMemo(() => {
@@ -320,6 +329,16 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
                 Excel
               </button>
               <button
+                onClick={() => setShowBulkImport(true)}
+                disabled={loading || saving}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Bulk Import
+              </button>
+              <button
                 onClick={() => {
                   setEditingEmployee(null);
                   setShowDialog(true);
@@ -442,6 +461,21 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
         }}
         onSave={handleSaveEmployee}
         employee={editingEmployee}
+      />
+      <BulkImportDialog
+        open={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        config={employeeBulkImportConfig}
+        existing={employees}
+        onImported={(result) => {
+          logAuditEvent("BULK_IMPORT", "Employees", undefined, {
+            count: result.imported,
+          });
+          showNotification(
+            `Imported ${result.imported} of ${result.total} employees.`,
+            result.failed === 0 ? "success" : "error"
+          );
+        }}
       />
     </div>
   );

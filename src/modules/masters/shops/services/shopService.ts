@@ -106,6 +106,16 @@ export async function createShop(input: ShopInput): Promise<Shop> {
   return mapShop(data);
 }
 
+/** POST /api/masters/shops/bulk */
+export async function createShopsBulk(inputs: ShopInput[]): Promise<Shop[]> {
+  clearLegacyShopStorage();
+  const { data } = await apiPost<Record<string, unknown>[]>(
+    `${SHOPS_PATH}/bulk`,
+    inputs.map(toPayload)
+  );
+  return Array.isArray(data) ? data.map(mapShop) : [];
+}
+
 /** PUT /api/masters/shops/:id */
 export async function updateShop(
   id: number,

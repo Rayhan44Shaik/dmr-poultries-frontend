@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { Vehicle } from "../types/vehicle";
 import {
+  bulkCreateVehicles,
   createVehicle,
   deleteVehicle,
   handleApiError,
@@ -60,6 +61,25 @@ export function useVehicles() {
     }
   }, []);
 
+  // Uses the real transactional POST /api/masters/vehicles/bulk endpoint.
+  // If ANY row is invalid/duplicate the backend rejects the whole batch (400/409).
+  const addVehiclesBulk = useCallback(async (inputs: VehicleInput[]) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await bulkCreateVehicles(inputs);
+      const data = await refreshVehicles();
+      setVehicles(data);
+      return data;
+    } catch (err) {
+      const message = handleApiError(err);
+      setError(message);
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
   const editVehicle = useCallback(async (id: number, input: VehicleInput) => {
     setSaving(true);
     setError(null);
@@ -101,6 +121,7 @@ export function useVehicles() {
     error,
     reload,
     addVehicle,
+    addVehiclesBulk,
     editVehicle,
     removeVehicle,
   };
