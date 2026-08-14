@@ -126,6 +126,7 @@ export function getVehicles(): Vehicle[] {
  */
 export function saveVehicles(_vehicles: Vehicle[]): void {
   // Intentionally no-op. Cache is API-owned.
+  void _vehicles;
 }
 
 /** GET /api/masters/vehicles — sole source of truth for the Vehicles table. */

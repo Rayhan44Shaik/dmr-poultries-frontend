@@ -17,7 +17,7 @@ const MaintenanceTimeline = ({ events, vehicles, selectedVehicleId }: Maintenanc
   // Filter: Only show PAID records
   const filteredEvents = events.filter(event => {
     // Must be paid
-    if (event.paymentStatus !== 'paid') return false;
+    if (String(event.paymentStatus) !== 'paid') return false;
     
     // Apply vehicle filter if selected
     if (!selectedVehicleId || selectedVehicleId === 'all') return true;

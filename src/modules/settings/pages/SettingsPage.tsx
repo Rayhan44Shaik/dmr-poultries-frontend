@@ -1,360 +1,107 @@
 // src/modules/settings/pages/SettingsPage.tsx
-/*
-import React, { useState } from "react";
-import { 
-  User, Lock, Globe, Sun, Moon, 
-  Users, Shield, Info, Eye, EyeOff, 
-  CheckCircle2, Pencil, Trash2 
+// Settings hub: left section nav + content panels, URL-synced tabs.
+
+import React, { useEffect, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import {
+  Info,
+  KeyRound,
+  Lock,
+  Palette,
+  ShieldCheck,
+  UserCog,
+  UserRound,
 } from "lucide-react";
-import { getCurrentUser, getUsers } from "../services";
+import ErrorBoundary from "../../../components/common/ErrorBoundary";
+import { ProfileCard } from "../components/cards/ProfileCard";
+import { PasswordCard } from "../components/cards/PasswordCard";
+import { AppearanceCard } from "../components/cards/AppearanceCard";
+import { UserManagementCard } from "../components/cards/UserManagementCard";
+import { PermissionsCard } from "../components/cards/PermissionsCard";
+import { AboutCard } from "../components/cards/AboutCard";
 
-type TabKey = "profile" | "password" | "language" | "appearance" | "users" | "permissions" | "about";
+type SettingsTabKey = "profile" | "password" | "appearance" | "users" | "permissions" | "about";
 
-interface TabItem {
-  key: TabKey;
-  label: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  color: string;
-}
-
-// Tabs matching MastersPage styling with distinct icon colors
-const tabs: TabItem[] = [
-  { key: "profile", label: "Profile", icon: User, color: "text-blue-600" },
-  { key: "password", label: "Password & Security", icon: Lock, color: "text-purple-600" },
-  { key: "language", label: "Language", icon: Globe, color: "text-emerald-600" },
-  { key: "appearance", label: "Appearance", icon: Sun, color: "text-amber-600" },
-  { key: "users", label: "Users", icon: Users, color: "text-orange-600" },
-  { key: "permissions", label: "Permissions", icon: Shield, color: "text-indigo-600" },
-  { key: "about", label: "About ERP", icon: Info, color: "text-rose-600" },
+const SECTIONS: { key: SettingsTabKey; label: string; description: string; icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
+  { key: "profile", label: "Profile", description: "Your personal information", icon: UserRound },
+  { key: "password", label: "Password & Security", description: "Sign-in credentials", icon: Lock },
+  { key: "appearance", label: "Appearance", description: "Theme and font preferences", icon: Palette },
+  { key: "users", label: "Users & Roles", description: "Manage team members", icon: UserCog },
+  { key: "permissions", label: "Permissions", description: "Role-based access control", icon: KeyRound },
+  { key: "about", label: "About ERP", description: "Version and system info", icon: Info },
 ];
 
-function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<TabKey>("profile");
-  const [showPass, setShowPass] = useState({ current: false, new: false, confirm: false });
+const PANELS: Record<SettingsTabKey, React.ComponentType> = {
+  profile: ProfileCard,
+  password: PasswordCard,
+  appearance: AppearanceCard,
+  users: UserManagementCard,
+  permissions: PermissionsCard,
+  about: AboutCard,
+};
 
-  const user = getCurrentUser();
-  const users = getUsers();
+const SettingsPage = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const activeTab = (searchParams.get("tab") as SettingsTabKey) || "profile";
+  const activeKey: SettingsTabKey = PANELS[activeTab] ? activeTab : "profile";
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case "profile":
-        return (
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="flex flex-col items-center gap-3 w-full md:w-32 shrink-0">
-                <div className="h-24 w-24 rounded-full bg-slate-100 border-4 border-white shadow-md flex items-center justify-center text-slate-400">
-                  <User size={40} />
-                </div>
-                <button className="border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 w-full transition-colors shadow-sm">
-                  Change Photo
-                </button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Full Name</label>
-                  <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-medium text-slate-800">{user?.name || "N/A"}</div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Department</label>
-                  <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-medium text-slate-800">{user?.department || "N/A"}</div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Email</label>
-                  <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-medium text-slate-800">{user?.email || "N/A"}</div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Designation</label>
-                  <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-medium text-slate-800">{user?.role || "N/A"}</div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Mobile Number</label>
-                  <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-medium text-slate-800">{user?.mobile || "N/A"}</div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Username</label>
-                  <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-medium text-slate-800">rubullaadmin</div>
-                </div>
-              </div>
-            </div>
-            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setActiveTab("profile")} className="px-5 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition-colors">
-                Cancel
-              </button>
-              <button className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md transition-all">
-                Save Changes
-              </button>
-            </div>
-          </div>
-        );
-
-      case "password":
-        return (
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="flex items-center justify-center w-full md:w-1/3 shrink-0 relative text-purple-600 py-6">
-                <Lock size={80} className="opacity-90 drop-shadow-sm" />
-                <div className="absolute right-12 bottom-4 bg-white rounded-full p-1 shadow-md border border-slate-100">
-                  <CheckCircle2 size={24} className="text-emerald-500" />
-                </div>
-              </div>
-              <div className="flex-1 flex flex-col gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Current Password</label>
-                  <div className="relative">
-                    <input type={showPass.current ? "text" : "password"} placeholder="Enter current password" className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 pr-10 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white transition-all" />
-                    <button type="button" onClick={() => setShowPass(p => ({...p, current: !p.current}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                      {showPass.current ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">New Password</label>
-                  <div className="relative">
-                    <input type={showPass.new ? "text" : "password"} placeholder="Enter new password" className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 pr-10 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white transition-all" />
-                    <button type="button" onClick={() => setShowPass(p => ({...p, new: !p.new}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                      {showPass.new ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Confirm New Password</label>
-                  <div className="relative">
-                    <input type={showPass.confirm ? "text" : "password"} placeholder="Confirm new password" className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 pr-10 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white transition-all" />
-                    <button type="button" onClick={() => setShowPass(p => ({...p, confirm: !p.confirm}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                      {showPass.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setActiveTab("profile")} className="px-5 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition-colors">
-                Cancel
-              </button>
-              <button className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md transition-all">
-                Update Password
-              </button>
-            </div>
-          </div>
-        );
-
-      case "language":
-        return (
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="flex items-center justify-center w-full md:w-1/3 py-4"><span className="text-6xl">🌍</span></div>
-              <div className="flex-1 space-y-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Default Language</label>
-                  <select className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white">
-                    <option>English</option>
-                    <option>Telugu</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setActiveTab("profile")} className="px-5 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition-colors">
-                Cancel
-              </button>
-              <button className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md transition-all">
-                Save Language
-              </button>
-            </div>
-          </div>
-        );
-
-      case "appearance":
-        return (
-          <div className="flex flex-col gap-6">
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600 mb-2 block">Theme</label>
-                <div className="flex gap-3">
-                  <div className="flex items-center justify-center gap-2 border-2 border-blue-600 bg-blue-50/50 rounded-xl py-2.5 px-4 w-32 cursor-pointer font-medium text-blue-700 text-sm">
-                    <Sun size={18} className="text-blue-600" /> Light
-                  </div>
-                  <div className="flex items-center justify-center gap-2 border border-slate-200 rounded-xl py-2.5 px-4 w-32 cursor-pointer font-medium text-slate-600 text-sm hover:bg-slate-50">
-                    <Moon size={18} className="text-slate-500" /> Dark
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setActiveTab("profile")} className="px-5 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition-colors">
-                Cancel
-              </button>
-              <button className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md transition-all">
-                Apply Changes
-              </button>
-            </div>
-          </div>
-        );
-
-      case "users":
-        return (
-          <div className="flex flex-col gap-6">
-            <div className="flex justify-end">
-              <button className="text-xs font-semibold text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-lg transition-all shadow-sm">
-                + Add User
-              </button>
-            </div>
-            <div className="overflow-x-auto border border-slate-100 rounded-xl">
-              <table className="w-full text-xs text-left">
-                <thead className="text-[10px] font-bold text-slate-500 uppercase bg-slate-50/80 border-b border-slate-100">
-                  <tr>
-                    <th className="py-2.5 px-3 w-8">#</th>
-                    <th className="py-2.5 px-3">Name</th>
-                    <th className="py-2.5 px-3">Username</th>
-                    <th className="py-2.5 px-3">Role</th>
-                    <th className="py-2.5 px-3 text-center">Status</th>
-                    <th className="py-2.5 px-3 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {users?.map((u: any) => (
-                    <tr key={u.id} className="hover:bg-slate-50/50">
-                      <td className="py-3 px-3 text-center text-slate-500">{u.id}</td>
-                      <td className="py-3 px-3 font-semibold text-slate-800">{u.name}</td>
-                      <td className="py-3 px-3 text-slate-600">{u.username}</td>
-                      <td className="py-3 px-3 text-slate-600">{u.role}</td>
-                      <td className="py-3 px-3 text-center">
-                        <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold px-2.5 py-0.5 rounded-full">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-center flex justify-center gap-2">
-                        <button className="text-blue-600 hover:text-blue-800 p-1 rounded"><Pencil size={14} /></button>
-                        <button className="text-rose-500 hover:text-rose-700 p-1 rounded"><Trash2 size={14} /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-
-      case "permissions":
-        return (
-          <div className="flex flex-col gap-6">
-            <div className="overflow-x-auto border border-slate-100 rounded-xl">
-              <table className="w-full text-xs text-left">
-                <thead className="text-[10px] font-bold text-slate-500 uppercase bg-slate-50/80 border-b border-slate-100">
-                  <tr>
-                    <th className="py-2.5 px-3">Module</th>
-                    <th className="py-2.5 px-3 text-center">View</th>
-                    <th className="py-2.5 px-3 text-center">Add</th>
-                    <th className="py-2.5 px-3 text-center">Edit</th>
-                    <th className="py-2.5 px-3 text-center">Delete</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {["Dashboard", "Operations", "Accounts", "Reports", "Settings"].map((mod, i) => (
-                    <tr key={i} className="hover:bg-slate-50/50">
-                      <td className="py-2.5 px-3 font-semibold text-slate-800">{mod}</td>
-                      {["View", "Add", "Edit", "Delete"].map(p => (
-                        <td key={p} className="py-2.5 px-3 text-center">
-                          <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" defaultChecked={p !== "Add"} />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-
-      case "about":
-        return (
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col items-center gap-3 pb-2">
-              <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl shadow-inner text-5xl">🐔</div>
-              <div className="text-center">
-                <h3 className="text-lg font-bold text-slate-900 tracking-tight">DMR Poultries ERP</h3>
-                <p className="text-xs text-slate-500 max-w-xs leading-relaxed mt-1">A complete ERP solution for poultry farming operations.</p>
-              </div>
-            </div>
-          </div>
-        );
-
-      default:
-        return null;
+  useEffect(() => {
+    if (!searchParams.get("tab")) {
+      navigate("/settings?tab=profile", { replace: true });
     }
-  };
+  }, [location.search, navigate, searchParams]);
 
-  return (
-    <div className="w-full pt-4 pb-6 space-y-5">
-      {--Full-width Tab Bar Container touching left & right edges }
-      <div className="bg-white border-y sm:border border-slate-200/90 sm:rounded-xl shadow-sm px-4 sm:px-6 py-1.5 w-full">
-        <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`
-                  flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200
-                  ${isActive
-                    ? "bg-blue-50 text-blue-700 font-semibold"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                  }
-                `}
-              >
-                <Icon
-                  size={18}
-                  className={isActive ? "text-blue-700" : tab.color}
-                />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+  const ActivePanel = PANELS[activeKey];
 
-      {-- Content Area with matching Masters side padding & container styling }
-      <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="bg-white border border-slate-200/90 sm:rounded-xl shadow-sm p-6 min-h-[450px]">
-          <h2 className="text-base font-bold text-slate-800 border-b border-slate-100 pb-3 mb-4">
-            {tabs.find((t) => t.key === activeTab)?.label}
-          </h2>
-          {renderContent()}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default React.memo(SettingsPage);*/
-
-import React, { memo } from 'react';
-import ErrorBoundary from '../../../components/common/ErrorBoundary';
-
-interface SettingsPageProps {
-  embedded?: boolean;
-}
-
-const SettingsPage = ({ embedded = false }: SettingsPageProps) => {
   return (
     <ErrorBoundary>
-      <div className={`w-full flex items-center justify-center animate-in fade-in duration-500 ${
-        embedded ? 'min-h-[60vh]' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
-      }`}>
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center max-w-md w-full mx-4">
-          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 border border-blue-100 shadow-sm animate-bounce">
-            🚧
+      <div className="mx-auto w-full max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mb-5 flex items-center gap-2.5 animate-fade-in-up">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+            <ShieldCheck size={17} />
+          </span>
+          <div>
+            <h2 className="text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">System Settings</h2>
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              {SECTIONS.find((s) => s.key === activeKey)?.description ?? "Configure DMR Poultries ERP"}
+            </p>
           </div>
-          <h2 className="text-xl font-bold text-slate-800 mb-2">Settings - Coming Soon</h2>
-          <p className="text-sm text-slate-500 leading-relaxed">
-            This module is currently being enhanced and will be made fully available after the upcoming updates.
-          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
+          {/* Section nav */}
+          <nav className="flex gap-1 overflow-x-auto pb-1 scrollbar-none lg:sticky lg:top-0 lg:flex-col lg:overflow-visible lg:pb-0">
+            {SECTIONS.map((section) => {
+              const Icon = section.icon;
+              const isActive = activeKey === section.key;
+              return (
+                <button
+                  key={section.key}
+                  type="button"
+                  onClick={() => navigate(`/settings?tab=${section.key}`)}
+                  className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${
+                    isActive
+                      ? "bg-brand-50 font-semibold text-brand-800 dark:bg-brand-500/10 dark:text-brand-300"
+                      : "font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
+                  }`}
+                >
+                  <Icon size={16} className={isActive ? "text-brand-700 dark:text-brand-300" : "text-slate-400"} />
+                  <span className="flex-1">{section.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Content panel */}
+          <div className="min-w-0 animate-fade-in-up" key={activeKey}>
+            <ActivePanel />
+          </div>
         </div>
       </div>
     </ErrorBoundary>
   );
 };
 
-export default memo(SettingsPage);
+export default React.memo(SettingsPage);

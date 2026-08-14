@@ -8,7 +8,8 @@ import MonthlyFuelTrend from '../components/dashboard/MonthlyFuelTrend';
 import VehicleStatusDonut from '../components/dashboard/VehicleStatusDonut';
 import TopMaintenanceBar from '../components/dashboard/TopMaintenanceBar';
 import DailyStatTiles from '../components/dashboard/DailyStatTiles';
-import { Truck, Activity, Wrench, Fuel, MapPin } from 'lucide-react';
+import FleetOverview from '../components/fleet/FleetOverview';
+import { Truck, Activity, Fuel, MapPin } from 'lucide-react';
 
 interface FleetDashboardPageProps {
   embedded?: boolean;
@@ -29,11 +30,6 @@ const FleetDashboardPage = ({ embedded = false }: FleetDashboardPageProps) => {
         label: 'Active Vehicles',
         value: data?.activeVehicles ?? 0,
         icon: <Activity className="w-5 h-5" />,
-      },
-      {
-        label: 'Under Maintenance',
-        value: data?.underMaintenance ?? 0,
-        icon: <Wrench className="w-5 h-5" />,
       },
       {
         label: 'Fuel Cost (This Month)',
@@ -68,7 +64,7 @@ const FleetDashboardPage = ({ embedded = false }: FleetDashboardPageProps) => {
       <div className={embedded ? 'space-y-6' : 'p-4 md:p-6 space-y-6'}>
         <Suspense fallback={<LoadingSkeleton count={5} />}>
           {/* KPI Strip */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {kpis.map((kpi, idx) => (
               <KpiCard
                 key={idx}
@@ -82,6 +78,19 @@ const FleetDashboardPage = ({ embedded = false }: FleetDashboardPageProps) => {
 
           {/* Alert Strip */}
           <AlertStrip alerts={alerts} />
+
+          {/* Fleet Overview — live per-vehicle status cards */}
+          <FleetOverview
+            vehicles={data?.fleetVehicles ?? []}
+            counts={data?.fleetCounts ?? { "On Trip": 0, Available: 0, Inactive: 0 }}
+            loading={data?.fleetLoading ?? true}
+            error={data?.fleetError ?? null}
+            onRetry={() => {
+              void data?.fleetReload().catch(() => {
+                /* error already captured in state */
+              });
+            }}
+          />
 
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

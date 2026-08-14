@@ -17,6 +17,20 @@ export * from './types';
 
 // Export utils
 export * from './utils/formatters';
-export * from './utils/constants';
+export {
+  MAINTENANCE_TYPES,
+  DOCUMENT_TYPES,
+  DOCUMENT_LABELS,
+  DOCUMENT_TYPE_ORDER,
+  FASTAG_STATUSES,
+  FASTAG_STATUS_LABELS,
+  EMI_STATUSES,
+  EMI_STATUS_LABELS,
+  DEFAULT_PAGE_SIZE,
+  DATE_FORMAT,
+  DATE_DISPLAY_FORMAT,
+  DATE_TIME_DISPLAY_FORMAT,
+  FLEET_STORAGE_KEYS,
+} from './utils/constants';
 export * from './utils/helpers';
 export * from './utils/fleetExport';

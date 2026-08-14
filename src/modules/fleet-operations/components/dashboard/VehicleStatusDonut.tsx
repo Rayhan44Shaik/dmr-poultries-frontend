@@ -5,7 +5,7 @@ interface VehicleStatusDonutProps {
   data: { name: string; value: number }[];
 }
 
-const COLORS = ['#3b82f6', '#f59e0b', '#ef4444'];
+const COLORS = ['#059669', '#0ea5e9', '#94a3b8'];
 
 const VehicleStatusDonut = ({ data }: VehicleStatusDonutProps) => {
   const hasData = data.some(item => item.value > 0);
