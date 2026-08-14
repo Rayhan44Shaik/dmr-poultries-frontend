@@ -41,6 +41,7 @@ export default function RatesEntryPage({ embedded = false }: Props) {
     filter.supervisor !== "";
 
   const totalTrips = filteredTrips.length;
+  const tripsAwaitingRate = filteredTrips.filter((t) => t.rateStatus === "Pending").length;
   const totalShops = filteredTrips.reduce((sum, trip) => sum + trip.totalShops, 0);
   const totalBirds = filteredTrips.reduce((sum, trip) => sum + trip.totalBirds, 0);
   const totalWeight = filteredTrips.reduce((sum, trip) => sum + trip.totalWeight, 0);
@@ -55,10 +56,11 @@ export default function RatesEntryPage({ embedded = false }: Props) {
       showNotification("No data to export.", "error");
       return;
     }
-    const headers = ["Trip No", "Date", "Vehicle", "Supervisor", "Source Farm", "Shops", "Birds", "Weight (KG)"];
+    const headers = ["Trip No", "Date", "Vehicle", "Supervisor", "Source Farm", "Shops", "Birds", "Weight (KG)", "Rate", "Rate Status"];
     const rows = filteredTrips.map((t) => [
-      t.tripNo, t.tripDate, t.vehicleNo, t.supervisorName, t.sourceFarm,
+      t.tripNo, t.tripDate, t.vehicleNo ?? "", t.supervisorName ?? "", t.sourceFarm ?? "",
       t.totalShops.toString(), t.totalBirds.toString(), t.totalWeight.toFixed(2),
+      t.rate != null ? t.rate.toFixed(2) : "", t.rateStatus,
     ]);
     const filename = `Rates_${new Date().toISOString().split("T")[0]}`;
     exportToPDF("Rates Entry Report", headers, rows, filename);
@@ -70,10 +72,11 @@ export default function RatesEntryPage({ embedded = false }: Props) {
       showNotification("No data to export.", "error");
       return;
     }
-    const headers = ["Trip No", "Date", "Vehicle", "Supervisor", "Source Farm", "Shops", "Birds", "Weight (KG)"];
+    const headers = ["Trip No", "Date", "Vehicle", "Supervisor", "Source Farm", "Shops", "Birds", "Weight (KG)", "Rate", "Rate Status"];
     const rows = filteredTrips.map((t) => [
-      t.tripNo, t.tripDate, t.vehicleNo, t.supervisorName, t.sourceFarm,
+      t.tripNo, t.tripDate, t.vehicleNo ?? "", t.supervisorName ?? "", t.sourceFarm ?? "",
       t.totalShops, t.totalBirds, t.totalWeight,
+      t.rate ?? "", t.rateStatus,
     ]);
     const filename = `Rates_${new Date().toISOString().split("T")[0]}`;
     exportToExcel("Rates Entry Report", headers, rows, filename);
@@ -97,7 +100,7 @@ export default function RatesEntryPage({ embedded = false }: Props) {
         setSupervisor={(value) => setFilter({ ...filter, supervisor: value })}
         onSearch={() => setCurrentPage(1)}
         onReset={handleResetFilters}
-        pendingTrips={filteredTrips.length}
+        pendingTrips={tripsAwaitingRate}
         hasFilters={hasFilters}
         onExportPDF={handleExportPDF}
         onExportExcel={handleExportExcel}

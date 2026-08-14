@@ -3,6 +3,7 @@ import { ThemeProvider } from './providers/ThemeProvider';
 import { AuthProvider } from './providers/AuthProvider';
 import { SettingsProvider } from './providers/SettingsProvider';
 import { NotificationProvider } from './providers/NotificationProvider';
+import { LanguageProvider } from './providers/LanguageProvider';
 import AppRoutes from './routes/AppRoutes';
 
 function App() {
@@ -11,9 +12,11 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <SettingsProvider>
-            <NotificationProvider>
-              <AppRoutes />
-            </NotificationProvider>
+            <LanguageProvider>
+              <NotificationProvider>
+                <AppRoutes />
+              </NotificationProvider>
+            </LanguageProvider>
           </SettingsProvider>
         </AuthProvider>
       </ThemeProvider>

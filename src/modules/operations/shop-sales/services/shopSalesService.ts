@@ -53,7 +53,7 @@ function getAll(): ShopSale[] {
 
 function getById(
 
-  id: string
+  id: number
 
 ): ShopSale | undefined {
 
@@ -85,7 +85,7 @@ function saveAll(
 
 function remove(
 
-  id: string
+  id: number
 
 ) {
 

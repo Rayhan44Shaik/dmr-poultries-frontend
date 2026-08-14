@@ -78,7 +78,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
   );
   const vehicleNumber = selectedVehicleOption?.label || '';
 
-  const validator = useFuelKMValidator(vehicleNumber);
+  const validator = useFuelKMValidator(Number(form.vehicleId) || null, vehicleNumber);
   const pendingWarning = validator.getPendingWarning();
 
   const inputClass =
@@ -137,12 +137,12 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
   return (
     <div className="space-y-5">
-      {/* Row 1: Bill Number, Vehicle, Date, Driver */}
+      {/* Row 1: Maintenance Number, Vehicle, Date, Driver */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* 1. Bill Number */}
+        {/* 1. Maintenance Number (server-generated, globally unique) */}
         <div>
           <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            Bill Number
+            Maintenance Number
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -151,9 +151,10 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
             <input
               type="text"
               value={form.billNumber}
-              onChange={(e) => setFormField('billNumber', e.target.value)}
-              placeholder="Auto‑generated"
-              className={inputClass}
+              readOnly
+              disabled
+              placeholder="Auto-generated on save"
+              className={`${inputClass} bg-slate-50 text-slate-400 cursor-not-allowed`}
             />
           </div>
         </div>

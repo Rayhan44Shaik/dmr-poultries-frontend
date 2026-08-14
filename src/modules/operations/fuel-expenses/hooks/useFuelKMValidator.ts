@@ -1,15 +1,18 @@
 // modules/fleet-operations/hooks/useFuelKMValidator.ts
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFuelExpenses } from './useFuelExpenses';
 import type { FuelExpense } from '../types/fuelExpense';
+import { apiGet } from '../../../../api';
 
 interface FuelKMValidator {
-  /** The latest approved KM (meter reading) or null if none exists */
+  /** The vehicle's latest accepted meter reading across Trips, Fuel, AND
+   * Maintenance (backend/src/utils/vehicleMeterLedger.ts) — or null if none
+   * exists yet. Advisory only: the backend re-validates and is the real gate. */
   latestApprovedKM: number | null;
   /** True if there is at least one pending fuel bill for the vehicle */
   hasPendingFuel: boolean;
   /**
-   * Validates if a given KM is >= the latest approved KM.
+   * Validates if a given KM is >= the vehicle's latest recorded reading.
    * Returns { valid: boolean; message?: string }
    */
   validateKM: (km: number) => { valid: boolean; message?: string };
@@ -18,30 +21,41 @@ interface FuelKMValidator {
 }
 
 /**
- * Hook to validate KM inputs against the latest approved fuel expense
- * and to warn about pending fuel bills for a specific vehicle.
- * @param vehicleNumber - The vehicle number (e.g., "AP-02-CD-5678")
+ * Hook to validate KM inputs against the vehicle's universal latest meter
+ * reading (Trips + Fuel + Maintenance) and to warn about pending fuel bills.
+ * @param vehicleId - The vehicle's numeric id (masters.vehicles.id)
+ * @param vehicleNumber - The vehicle number, only used for display copy
  */
-export function useFuelKMValidator(vehicleNumber: string): FuelKMValidator {
+export function useFuelKMValidator(vehicleId: number | null | undefined, vehicleNumber: string): FuelKMValidator {
   // Dummy notification function – the hook doesn't need to show notifications itself
   const dummyNotify = () => {};
   const { filteredData: fuelExpenses } = useFuelExpenses(dummyNotify);
+
+  const [latestApprovedKM, setLatestApprovedKM] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!vehicleId) {
+      setLatestApprovedKM(null);
+      return;
+    }
+    apiGet<{ meter: number } | null>(`/fleet/vehicles/${vehicleId}/latest-meter`)
+      .then((res) => {
+        if (!cancelled) setLatestApprovedKM(res.data?.meter ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setLatestApprovedKM(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [vehicleId]);
 
   // Filter expenses for this vehicle
   const vehicleExpenses = useMemo(
     () => (fuelExpenses || []).filter((e: FuelExpense) => e.vehicleNo === vehicleNumber),
     [fuelExpenses, vehicleNumber]
   );
-
-  // Find the latest approved KM
-  const latestApprovedKM = useMemo(() => {
-    const approved = vehicleExpenses.filter((e: FuelExpense) => e.status === 'Approved');
-    if (approved.length === 0) return null;
-    // Get the one with the highest currentMeter reading
-    return approved.reduce((max: number, e: FuelExpense) =>
-      e.currentMeter > max ? e.currentMeter : max, 0
-    );
-  }, [vehicleExpenses]);
 
   // Check for pending bills
   const hasPendingFuel = useMemo(() => {
@@ -56,7 +70,7 @@ export function useFuelKMValidator(vehicleNumber: string): FuelKMValidator {
     if (km < latestApprovedKM) {
       return {
         valid: false,
-        message: `KM cannot be less than the last approved fuel bill reading (${latestApprovedKM.toLocaleString()} km).`,
+        message: `Meter reading cannot be less than the vehicle's latest recorded reading of ${latestApprovedKM.toLocaleString()} KM.`,
       };
     }
     return { valid: true };

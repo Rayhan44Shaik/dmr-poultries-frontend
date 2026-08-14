@@ -1,6 +1,20 @@
 @import "tailwindcss";
 @import "react-datepicker/dist/react-datepicker.css";
 
+/* Make Tailwind v4 use the class-based dark strategy driven by the global
+   ThemeProvider (which toggles the .dark class on <html>). Without this, the
+   dark: variant would default to the prefers-color-scheme media query and the
+   class-based theme switch would have no effect. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Keep native form controls & scrollbars aligned with the active theme. */
+:root {
+  color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
+}
+
 .react-datepicker__year-select {
   max-height: 180px;
   overflow-y: auto;

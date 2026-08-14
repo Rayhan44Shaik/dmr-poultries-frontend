@@ -39,7 +39,7 @@ function TripInformation({
   const [openingKmError, setOpeningKmError] = useState<string | null>(null);
   const [closingKmError, setClosingKmError] = useState<string | null>(null);
 
-  const validator = useFuelKMValidator(trip.vehicleNo);
+  const validator = useFuelKMValidator(trip.vehicleId || null, trip.vehicleNo);
 
   // ---- Options ----
   const vehicleOptions = useMemo(

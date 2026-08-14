@@ -6,7 +6,7 @@ import DocumentSummaryTiles from '../components/documents/DocumentSummaryTiles';
 import DocumentMatrix from '../components/documents/DocumentMatrix';
 import DocumentEditModal from '../components/documents/DocumentEditModal';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
-import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { RefreshCw, ChevronLeft, ChevronRight, Search, X, FileText, AlertCircle } from 'lucide-react';
 
 const PAGE_SIZE = 10;
 
@@ -38,6 +38,8 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
     formatExpiryDate,
     refetch,
     updateDocument,
+    loading,
+    error,
   } = useDocumentsData();
   const { showNotification } = useSafeNotification();
 
@@ -82,10 +84,7 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
     }
   }, [refetch, isRefreshing, showNotification]);
 
-  // ✅ Enhanced edit handler
   const handleEdit = useCallback((vehicle: any, docMap: any) => {
-    console.log('✏️ Edit clicked for vehicle:', vehicle);
-    // Normalise vehicle ID to string
     const normalizedVehicle = {
       ...vehicle,
       id: String(vehicle.id),
@@ -96,18 +95,24 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
   const handleCloseEdit = useCallback(() => setEditData(null), []);
 
   const handleSaveEdit = useCallback(
-    async (vehicleId: string, updates: Record<string, string | null>) => {
-      console.log('📝 Saving changes for vehicle', vehicleId, updates);
+    async (
+      vehicleId: string | number,
+      updates: Record<
+        string,
+        { expiryDate?: string; documentNumber?: string }
+      >,
+      files?: Record<string, File>,
+      removes?: Record<string, boolean>
+    ) => {
       try {
-        await updateDocument(vehicleId, updates);
-        await refetch?.();
+        await updateDocument(vehicleId, updates, files, removes);
         showNotification('Document dates updated successfully', 'success');
         setEditData(null);
       } catch (error: any) {
         showNotification(error?.message || 'Failed to update documents', 'error');
       }
     },
-    [refetch, updateDocument, showNotification]
+    [updateDocument, showNotification]
   );
 
   const renderPagination = () => {
@@ -120,90 +125,153 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
     for (let i = startPage; i <= endPage; i++) pageNumbers.push(i);
 
     return (
-      <div className="flex items-center gap-1 justify-end mt-4">
-        <button
-          onClick={() => handlePageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          className="p-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          <ChevronLeft size={16} />
-        </button>
-        {pageNumbers.map((num) => (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-slate-100 bg-slate-50/80">
+        <span className="text-xs font-medium text-slate-500">
+          Showing <span className="font-bold text-slate-700">{startIndex + 1}</span>–<span className="font-bold text-slate-700">{Math.min(startIndex + PAGE_SIZE, sortedMatrix.length)}</span> of <span className="font-bold text-slate-700">{sortedMatrix.length}</span> entries
+        </span>
+        <div className="flex items-center gap-1.5">
           <button
-            key={num}
-            onClick={() => handlePageChange(num)}
-            className={`px-3 py-1 rounded text-sm font-medium transition-all ${
-              num === currentPage
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-white text-gray-700 hover:bg-blue-50 hover:text-blue-600 border border-gray-300'
-            }`}
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold border border-slate-200 bg-white rounded-xl hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
           >
-            {num}
+            <ChevronLeft size={15} />
+            <span>Prev</span>
           </button>
-        ))}
-        <button
-          onClick={() => handlePageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-          className="p-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          <ChevronRight size={16} />
-        </button>
+          
+          <div className="flex items-center gap-1 px-1">
+            {pageNumbers.map((num) => (
+              <button
+                key={num}
+                onClick={() => handlePageChange(num)}
+                className={`h-7 w-7 rounded-lg text-xs font-bold transition-all shadow-sm ${
+                  num === currentPage
+                    ? 'bg-blue-600 text-white shadow-blue-200 shadow-md scale-105'
+                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                }`}
+              >
+                {num}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold border border-slate-200 bg-white rounded-xl hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
+          >
+            <span>Next</span>
+            <ChevronRight size={15} />
+          </button>
+        </div>
       </div>
     );
   };
 
-  // ✅ Include ALL document types (including RC)
   const editableDocTypes = DOCUMENT_TYPE_ORDER as unknown as string[];
 
   return (
     <ErrorBoundary>
-      {/* Removed max-w constraints to match the uniform embedded layout perfectly */}
-      <div className={`w-full space-y-4 animate-in fade-in duration-500 ${
-        embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
+      <div className={`w-full space-y-6 animate-in fade-in duration-500 ${
+        embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50/50 min-h-screen'
       }`}>
+        {loading && (
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-8 text-center text-sm font-semibold text-slate-500 flex items-center justify-center gap-3">
+            <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" /> Loading permit documents...
+          </div>
+        )}
+        
+        {!loading && error && (
+          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-5 text-sm text-rose-700 flex items-center justify-between gap-3 shadow-sm">
+            <div className="flex items-center gap-2 font-medium">
+              <AlertCircle className="w-5 h-5" />
+              <span>{error}</span>
+            </div>
+            <button onClick={handleRefresh} className="px-4 py-1.5 bg-white border border-rose-200 rounded-lg text-xs font-bold text-rose-600 hover:bg-rose-100 transition-colors shadow-sm">
+              Retry
+            </button>
+          </div>
+        )}
+
         <DocumentSummaryTiles
           counts={totalCounts}
           statusCounts={statusCounts}
           docLabels={DOCUMENT_LABELS}
         />
 
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-            <h3 className="text-sm font-semibold text-gray-700">Vehicle Document Status</h3>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden">
+          
+          {/* Header Section */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-inner">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800 tracking-tight">Vehicle Document Status</h3>
+              </div>
+            </div>
+
             <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="relative flex-1 sm:flex-none">
+              {/* Search Bar */}
+              <div className="relative group flex-1 sm:flex-none">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                 <input
                   type="text"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by vehicle number..."
-                  className="w-full sm:w-64 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Search by vehicle..."
+                  className="w-full sm:w-72 pl-9 pr-8 py-2 text-sm border border-slate-200/80 rounded-xl bg-slate-50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm text-slate-700 placeholder:text-slate-400"
                 />
+                {searchTerm && (
+                  <button
+                    onClick={() => {
+                      setSearchTerm('');
+                      setCurrentPage(1);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-100 rounded-md transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
+
+              {/* Refresh Button */}
               <button
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-all shadow-sm active:scale-95"
+                className="h-[38px] px-3.5 inline-flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 hover:text-blue-600 text-slate-600 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+                <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
               </button>
             </div>
           </div>
 
-          <DocumentMatrix
-            matrix={paginatedMatrix}
-            docTypes={DOCUMENT_TYPE_ORDER as unknown as string[]}
-            docLabels={DOCUMENT_LABELS}
-            getStatusColor={getStatusColor}
-            formatExpiryDate={formatExpiryDate}
-            onEdit={handleEdit}
-          />
+          {/* Table Area */}
+          <div className="w-full overflow-x-auto">
+            {paginatedMatrix.length > 0 ? (
+              <DocumentMatrix
+                matrix={paginatedMatrix}
+                docTypes={DOCUMENT_TYPE_ORDER as unknown as string[]}
+                docLabels={DOCUMENT_LABELS}
+                getStatusColor={getStatusColor}
+                formatExpiryDate={formatExpiryDate}
+                onEdit={handleEdit}
+              />
+            ) : (
+              <div className="py-16 text-center text-slate-400 text-sm font-medium">
+                No vehicles found matching your criteria.
+              </div>
+            )}
+          </div>
 
           {renderPagination()}
         </div>
 
-        {/* ✅ Modal conditionally rendered */}
         {editData && (
           <DocumentEditModal
             vehicle={editData.vehicle}

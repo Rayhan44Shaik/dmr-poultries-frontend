@@ -119,6 +119,8 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {  c
     status: "Draft",
     fuel: 0,
     expense: 0,
+    driverBata: 0,
+    totalTripExpense: 0,
     remarks: "",
     rateCompleted: false,
   };
@@ -176,6 +178,8 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {  c
     lastShop: str(raw.lastShop ?? raw.last_shop, defaults.lastShop),
     fuel: num(raw.fuel, defaults.fuel),
     expense: num(raw.expense, defaults.expense),
+    driverBata: num(raw.driverBata ?? raw.driver_bata, defaults.driverBata),
+    totalTripExpense: num(raw.totalTripExpense ?? raw.total_trip_expense, defaults.totalTripExpense),
     rateCompleted: Boolean(raw.rateCompleted ?? raw.rate_completed ?? defaults.rateCompleted),
     createdAt: str(raw.createdAt ?? raw.created_at, defaults.createdAt ?? new Date().toISOString()),
     updatedAt: str(raw.updatedAt ?? raw.updated_at, defaults.updatedAt ?? new Date().toISOString()),

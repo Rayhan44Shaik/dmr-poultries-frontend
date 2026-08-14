@@ -293,8 +293,8 @@ function TripRecentTable({
                       <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">{trip.supervisorName}</td>
                       <td className="px-4 py-3 text-xs text-slate-600 font-medium whitespace-nowrap">{trip.sourceFarm}</td>
                       <td className="px-4 py-3 text-center text-xs font-bold text-slate-700 whitespace-nowrap">{trip.totalShops}</td>
-                      <td className="px-4 py-3 text-center text-xs font-bold text-blue-700 whitespace-nowrap">{trip.totalBirds.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-center text-xs font-bold text-amber-600 whitespace-nowrap">{trip.totalWeight.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-center text-xs font-bold text-blue-700 whitespace-nowrap">{trip.totalBirdsDelivered.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-center text-xs font-bold text-amber-600 whitespace-nowrap">{trip.totalDeliveredWeight.toFixed(2)}</td>
                       <td className="px-4 py-3 text-center text-xs font-bold text-rose-600 whitespace-nowrap">{trip.totalMortality}</td>
                       <td className="px-4 py-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         {isDeleted ? (

@@ -165,7 +165,7 @@ export default function CompletedTripsFilters({
 
       <div className="flex items-center justify-between flex-wrap gap-4 pt-1">
         <div className="text-xs font-semibold text-slate-600">
-          Pending Trips : <span className="font-bold text-orange-600">{pendingTrips}</span>
+          Trips Awaiting Rate : <span className="font-bold text-orange-600">{pendingTrips}</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button

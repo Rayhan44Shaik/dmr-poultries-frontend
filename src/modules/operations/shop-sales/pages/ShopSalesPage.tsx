@@ -10,7 +10,6 @@ import ShopSalesFilters from "../components/ShopSalesFilters";
 import ShopSalesSummary from "../components/ShopSalesSummary";
 import ShopSalesTable from "../components/ShopSalesTable";
 import ShopSalesPagination from "../components/ShopSalesPagination";
-import type { ShopSale } from "../types/shopSale";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 
 interface ShopSalesPageProps {
@@ -35,12 +34,13 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     refreshSales,
     isLoading,
     updateSale,
+    deleteSale,
   } = useShopSales();
 
   const { shops, refreshShops } = useShops();
 
   useEffect(() => {
-    refreshSales();
+    void refreshSales();
     refreshShops();
   }, [refreshSales, refreshShops]);
 
@@ -70,14 +70,29 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     showNotification("Filters have been reset.", "info");
   }, [resetFilters, showNotification]);
 
-  const handleUpdateSale = useCallback(async (updatedSale: ShopSale) => {
-    try {
-      await updateSale(updatedSale);
-      showNotification("Sale updated successfully", "success");
-    } catch {
-      showNotification("Failed to update sale", "error");
-    }
-  }, [updateSale, showNotification]);
+  const handleUpdateSale = useCallback(
+    async (id: number, patch: Parameters<typeof updateSale>[1]) => {
+      try {
+        await updateSale(id, patch);
+        showNotification("Sale updated successfully", "success");
+      } catch (err: any) {
+        showNotification(err?.message || "Failed to update sale", "error");
+      }
+    },
+    [updateSale, showNotification]
+  );
+
+  const handleDeleteSale = useCallback(
+    async (id: number) => {
+      try {
+        await deleteSale(id);
+        showNotification("Sale deleted successfully", "success");
+      } catch (err: any) {
+        showNotification(err?.message || "Failed to delete sale", "error");
+      }
+    },
+    [deleteSale, showNotification]
+  );
 
   const handleExportPDF = useCallback(() => {
     if (filteredSales.length === 0) {
@@ -96,13 +111,13 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     ];
     const rows = filteredSales.map((s) => [
       s.tripNo,
-      s.tripDate,
+      s.saleDate,
       s.shopName,
-      s.totalBirds.toString(),
-      s.totalWeight.toFixed(2),
+      s.birds.toString(),
+      s.weight.toFixed(2),
       (s.rate ?? 0).toFixed(2),
       s.amount.toFixed(2),
-      s.remark || "-",
+      s.remarks || "-",
     ]);
     const filename = `ShopSales_${new Date().toISOString().split("T")[0]}`;
     exportToPDF("Shop Sales Report", headers, rows, filename);
@@ -126,13 +141,13 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     ];
     const rows = filteredSales.map((s) => [
       s.tripNo,
-      s.tripDate,
+      s.saleDate,
       s.shopName,
-      s.totalBirds,
-      s.totalWeight,
+      s.birds,
+      s.weight,
       s.rate ?? 0,
       s.amount,
-      s.remark || "",
+      s.remarks || "",
     ]);
     const filename = `ShopSales_${new Date().toISOString().split("T")[0]}`;
     exportToExcel("Shop Sales Report", headers, rows, filename);
@@ -182,8 +197,8 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
           <ShopSalesTable
             sales={paginatedSales}
             isLoading={isLoading}
-            shopNames={shopNames}
             onUpdateSale={handleUpdateSale}
+            onDeleteSale={handleDeleteSale}
           />
         </div>
 

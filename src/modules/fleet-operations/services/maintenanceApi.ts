@@ -24,6 +24,8 @@ export interface MaintenanceListParams {
   status?: string;
   search?: string;
   includeDeleted?: boolean;
+  /** Approved tab: return only the latest approved record per vehicle (backend). */
+  latestApproved?: boolean;
   page?: number;
   limit?: number;
 }
@@ -38,6 +40,7 @@ export function mapMaintenanceToEvent(record: any): MaintenanceEvent {
   return {
     id: String(record.id),
     vehicleId: record.vehicleId != null ? String(record.vehicleId) : '',
+    vehicleNo: record.vehicleNo != null ? String(record.vehicleNo) : '',
     date: record.date ? new Date(record.date).toISOString() : new Date().toISOString(),
     billNumber: record.billNo || '',
     currentKM: Number(record.currentKM) || 0,
@@ -52,6 +55,10 @@ export function mapMaintenanceToEvent(record: any): MaintenanceEvent {
     parts: Array.isArray(record.parts) ? record.parts : [],
     remarks: record.remarks || '',
     createdAt: record.createdAt || undefined,
+    createdBy: record.createdBy || undefined,
+    updatedAt: record.updatedAt || undefined,
+    approvedBy: record.approvedBy || undefined,
+    approvedAt: record.approvedAt || undefined,
     paymentStatus: record.paymentStatus === 'approved' ? 'approved' : 'pending',
     deletedAt: deleted ? record.updatedAt || undefined : undefined,
     documents: (Array.isArray(record.documents) ? record.documents : []).map((d: any) => ({
@@ -95,6 +102,15 @@ export const maintenanceApi = {
     const res = await apiClient.delete(`${BASE}/${id}`, {
       headers: { 'Content-Type': 'application/json' },
       data: reason ? { reason } : undefined,
+    });
+    return res.data;
+  },
+
+  /** POST /fleet/maintenance/:id/approve — approve a pending maintenance record
+   * (status-only change; documents are never touched). */
+  async approve(id: string | number, approvedBy?: string) {
+    const res = await apiClient.post(`${BASE}/${id}/approve`, {
+      approvedBy: approvedBy || 'system',
     });
     return res.data;
   },

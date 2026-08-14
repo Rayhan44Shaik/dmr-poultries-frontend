@@ -260,7 +260,10 @@ export function useTripEntry(
       const submitted = isNewTrip
         ? await submitStep1({
             ...merged,
-            startTime: new Date().toLocaleString(),
+            // ISO for the API — PostgreSQL rejects locale strings like
+            // "8/13/2026, 8:39:06 PM" (SQLSTATE 22008). Display formatting
+            // happens separately in mapApiTripToTrip/formatStartTimeForDisplay.
+            startTime: new Date().toISOString(),
           })
         : await submitTripStep(merged.id, "start", {
             ...pickStepFields(merged, STEP_FIELDS.start),
@@ -291,7 +294,7 @@ export function useTripEntry(
 
     const reachedTime = current.farmStepSubmitted
       ? current.reachedTime
-      : new Date().toLocaleString();
+      : new Date().toISOString();
     const updatedData = { ...current, ...data, reachedTime };
 
     const validation = validateFarmStep(updatedData as Trip);
@@ -449,7 +452,7 @@ export function useTripEntry(
     const avg = calculateAvgWeight(updatedData.dcWeight || 0, updatedData.totalBirds || 0);
     const pickupLoadTime = current.pickupStepSubmitted
       ? current.pickupLoadTime
-      : new Date().toLocaleString();
+      : new Date().toISOString();
 
     inFlightRef.current = true;
     setHeaderLoading(true);
@@ -587,7 +590,7 @@ export function useTripEntry(
         ...pickStepFields(current, STEP_FIELDS.expenses),
         closingMeter,
         totalKm,
-        endTime: current.endTime || new Date().toLocaleString(),
+        endTime: current.endTime || new Date().toISOString(),
         endStepSubmitted: true,
         expensesStepSubmitted: true,
       });

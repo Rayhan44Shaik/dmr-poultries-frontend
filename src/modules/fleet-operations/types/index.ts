@@ -17,6 +17,10 @@ export type DocumentType = typeof DocumentTypeEnum[number];
 export const DocumentStatusEnum = ['valid', 'expiring', 'expired'] as const;
 export type DocumentStatus = typeof DocumentStatusEnum[number];
 
+/** The five document types tracked by Fleet → Permits (backed by PostgreSQL). */
+export const PermitDocumentTypeEnum = ['insurance', 'fitness', 'permit', 'puc', 'rc'] as const;
+export type PermitDocumentType = typeof PermitDocumentTypeEnum[number];
+
 export const FastagStatusEnum = ['good', 'low', 'critical'] as const;
 export type FastagStatus = typeof FastagStatusEnum[number];
 
@@ -46,6 +50,9 @@ export const MaintenanceDocumentSchema = z.object({
 export const MaintenanceEventSchema = z.object({
   id: z.string().optional(),
   vehicleId: z.string().min(1, 'Vehicle required'),
+  /** Snapshot of the registered vehicle number taken from the Vehicle Master at
+   * save time. Used as a fallback when the master row no longer exists. */
+  vehicleNo: z.string().optional(),
   date: z.string().datetime(),
   billNumber: z.string().optional(),
   currentKM: z.number().nonnegative(),
@@ -58,6 +65,10 @@ export const MaintenanceEventSchema = z.object({
   parts: z.array(PartItemSchema),
   remarks: z.string().optional(),
   createdAt: z.string().optional(),
+  createdBy: z.string().optional(),
+  updatedAt: z.string().optional(),
+  approvedBy: z.string().optional(),
+  approvedAt: z.string().optional(),
   driverId: z.string().optional(),
   driverName: z.string().optional(),
   deletedAt: z.string().datetime().optional(),
@@ -66,6 +77,30 @@ export const MaintenanceEventSchema = z.object({
   // Bill / spare-part documents attached to the maintenance entry (metadata only).
   documents: z.array(MaintenanceDocumentSchema).optional(),
 });
+
+/**
+ * A vehicle permit / document expiry record from the backend (Fleet → Permits).
+ * One current record per (vehicle, doc_type). The scan binary is served by the
+ * backend; this DTO only carries metadata.
+ */
+export interface PermitDocument {
+  id: number;
+  vehicleId: number;
+  vehicleNo: string;
+  docType: PermitDocumentType;
+  documentNumber: string;
+  validFrom: string | null;
+  /** YYYY-MM-DD */
+  expiryDate: string;
+  remarks: string | null;
+  hasDocument: boolean;
+  fileName: string | null;
+  mimeType: string | null;
+  fileSize: number | null;
+  createdBy: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
 
 export const VehicleDocumentSchema = z.object({
   id: z.string().optional(),

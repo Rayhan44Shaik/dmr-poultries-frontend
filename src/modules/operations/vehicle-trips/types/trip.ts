@@ -110,6 +110,8 @@ export interface Trip {
 
   fuel: number;
   expense: number;
+  driverBata?: number;
+  totalTripExpense?: number;
   remarks: string;
   status: TripStatus;
   rateCompleted?: boolean;

@@ -24,8 +24,8 @@ import FastagDashboardPage from "./FastagDashboardPage";
 import VehicleExpenseReportPage from "./VehicleExpenseReportPage";
 
 const tabs = [
-  { key: "entry", label: "Entry", icon: Wrench, color: "text-amber-500", component: MaintenanceEntryPage },
   { key: "history", label: "History", icon: History, color: "text-blue-500", component: MaintenanceHistoryPage },
+  { key: "entry", label: "Entry", icon: Wrench, color: "text-amber-500", component: MaintenanceEntryPage },
   { key: "permits", label: "Permits", icon: FileSpreadsheet, color: "text-purple-500", component: DocumentsExpiryPage },
   { key: "emi", label: "EMI", icon: DollarSign, color: "text-emerald-500", component: EmiLoansPage },
   { key: "analytics", label: "Analytics", icon: BarChart3, color: "text-indigo-500", component: VehicleAnalyticsPage },

@@ -12,18 +12,28 @@ import LatestMaintenanceTable, { ViewMode } from '../components/maintenance/Late
 import ViewModal from '../components/maintenance/ViewModal';
 import { MAINTENANCE_TYPES } from '../utils/constants';
 import type { MaintenanceEvent } from '../types';
-import { RotateCcw, Save, Wrench, AlertTriangle, X, AlertCircle } from 'lucide-react';
+import { RotateCcw, Save, Wrench, AlertTriangle, X, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
   const { employees } = useEmployees();
   const { showNotification } = useSafeNotification();
-  const { vehicles, maintenance, deletedRecords, refresh: refreshMaintenance } = useMaintenanceData();
+  const { vehicles, maintenance, approvedMaintenance, deletedRecords, refresh: refreshMaintenance } = useMaintenanceData();
   const [loading, setLoading] = useState(false);
   const [selectKey, setSelectKey] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   
   // Updated view mode to support Pending, Approved, and Deleted
   const [viewMode, setViewMode] = useState<ViewMode>('pending');
+
+  // --- Approval Dialog State ---
+  const [approveDialog, setApproveDialog] = useState<{
+    open: boolean;
+    record: MaintenanceEvent | null;
+    message?: string;
+  }>({
+    open: false,
+    record: null,
+  });
 
   // --- Confirmation Dialog State ---
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -92,7 +102,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
   const vehicleNumber = selectedVehicle?.vehicleNumber || '';
 
   // --- Fuel KM Validator ---
-  const validator = useFuelKMValidator(vehicleNumber);
+  const validator = useFuelKMValidator(Number(form.vehicleId) || null, vehicleNumber);
   const pendingWarning = validator.getPendingWarning();
 
   // --- Record Filtering (Pending vs Approved vs Deleted) ---
@@ -103,20 +113,16 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
   }, [maintenance]);
 
   const approvedRecords = useMemo(() => {
-    const approved = maintenance.filter(rec => rec.paymentStatus === 'approved');
-    return approved.sort((a, b) => safeDate(b.date).getTime() - safeDate(a.date).getTime());
-  }, [maintenance]);
+    // Approved tab shows ONLY the latest approved maintenance record per vehicle
+    // (computed at the backend with DISTINCT ON).
+    return approvedMaintenance;
+  }, [approvedMaintenance]);
 
   const displayRecords = useMemo(() => {
     if (viewMode === 'pending') return pendingRecords;
     if (viewMode === 'approved') return approvedRecords;
     return deletedRecords;
   }, [viewMode, pendingRecords, approvedRecords, deletedRecords]);
-
-  const paginatedRecords = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return displayRecords.slice(start, start + pageSize);
-  }, [displayRecords, currentPage, pageSize]);
 
   // --- View modal ---
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -169,7 +175,10 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
   };
 
   const handleEdit = (record: MaintenanceEvent) => {
-    if (!isEditable(record.createdAt)) {
+    // Anchored on the record's business date (matches the backend's 10-day
+    // lock in fleetMaintenanceLock.ts — "10 days after this maintenance
+    // happened", not 10 days after it was typed in).
+    if (!isEditable(record.date)) {
       showNotification('This record is older than 10 days and cannot be edited.', 'error');
       return;
     }
@@ -274,6 +283,42 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
     }
     setConfirmDialog(prev => ({ ...prev, open: false, step: null, countdown: null }));
     showNotification('Deletion cancelled.', 'info');
+  };
+
+  // ===== APPROVE: two-step confirmation =====
+  const handleApprove = (record: MaintenanceEvent) => {
+    if (record.paymentStatus === 'approved') {
+      showNotification('This record is already approved.', 'info');
+      return;
+    }
+    if (!record.id) {
+      showNotification('Invalid record – cannot approve.', 'error');
+      return;
+    }
+    const vehicle = vehicles.find((v: any) => String(v.id) === String(record.vehicleId));
+    const vehicleDisplay = vehicle?.vehicleNumber || record.vehicleNo || record.vehicleId || 'Unknown Vehicle';
+    setApproveDialog({
+      open: true,
+      record,
+      message: `Approve maintenance record "${record.billNumber || '-'}" for vehicle "${vehicleDisplay}"?`,
+    });
+  };
+
+  const confirmApprove = async () => {
+    const record = approveDialog.record;
+    if (!record || !record.id) return;
+    try {
+      await maintenanceApi.approve(record.id, 'system');
+      showNotification('Maintenance record approved.', 'success');
+      refreshMaintenance();
+      setSelectedId(null);
+      setViewMode('approved');
+      setCurrentPage(1);
+    } catch (err) {
+      showNotification(String(err), 'error');
+    } finally {
+      setApproveDialog({ open: false, record: null });
+    }
   };
 
   // ===== Validate KM against approved fuel reading =====
@@ -386,12 +431,13 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
         {/* Latest Records Table */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden p-5">
           <LatestMaintenanceTable
-            records={paginatedRecords}
+            records={displayRecords}
             vehicles={vehicles}
             viewMode={viewMode}
             onView={handleView}
             onEdit={handleEdit}
             onDelete={startDeletion}
+            onApprove={handleApprove}
             isEditable={isEditable}
             currentPage={currentPage}
             onPageChange={setCurrentPage}
@@ -407,6 +453,43 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
             vehicles={vehicles}
             onClose={() => setViewModalOpen(false)}
           />
+        )}
+
+        {/* ===== APPROVAL CONFIRMATION MODAL ===== */}
+        {approveDialog.open && approveDialog.record && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full">
+              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-3 text-emerald-600">
+                  <CheckCircle2 size={20} />
+                  <h3 className="text-sm font-bold text-slate-800">Confirm Approval</h3>
+                </div>
+                <button
+                  onClick={() => setApproveDialog({ open: false, record: null })}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-6">
+                <p className="text-sm text-slate-600">{approveDialog.message}</p>
+                <div className="flex justify-end gap-3 mt-6">
+                  <button
+                    onClick={() => setApproveDialog({ open: false, record: null })}
+                    className="px-4 py-2 text-sm font-semibold border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmApprove}
+                    className="px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition shadow-sm"
+                  >
+                    Approve
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ===== CONFIRMATION / COUNTDOWN MODAL ===== */}

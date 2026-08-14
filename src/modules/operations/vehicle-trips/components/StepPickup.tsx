@@ -343,7 +343,15 @@ export default function StepPickup({
       return;
     }
 
-    const isEditMode = editable || isLocalEditing;
+    // "Update" vs "Submit" must reflect whether Pickup was ALREADY submitted
+    // before (trip.pickupStepSubmitted), not the generic `editable` flag —
+    // `editable` is also true for a fresh, never-submitted active step (it
+    // just means "the user can currently fill this step in"), which made
+    // this incorrectly read "Update" the moment Pickup became the active
+    // step, even on a first-time Save Progress with nothing submitted yet.
+    // Every other step (Start, Farm, Expenses) already keys this off its own
+    // *StepSubmitted flag directly — this brings Pickup in line with that.
+    const isEditMode = trip.pickupStepSubmitted;
     const title = isEditMode ? "Update Pickup KPI" : "Submit Pickup KPI";
     const message = isEditMode
       ? "Are you sure you want to update this pickup KPI? Changes will be saved and the step will remain unlocked for further edits."
@@ -667,7 +675,9 @@ export default function StepPickup({
     return acc;
   }, []);
 
-  const isEditMode = editable || isLocalEditing;
+  // Same fix as in handleSubmit() above: "Update" vs "Submit" reflects
+  // whether Pickup was already submitted, not the generic `editable` flag.
+  const isEditMode = trip.pickupStepSubmitted;
 
   return (
     <>

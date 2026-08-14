@@ -1,11 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
-import type { ShopSale, ShopSaleFilter } from "../types/shopSale";
-import type { Trip } from "../../vehicle-trips/types/trip";
-import { shopSalesService } from "../services/shopSalesService";
-import { completedTripService } from "../services/completedTripService";
+import type { ShopSale, ShopSaleFilter, ShopSaleUpdateInput } from "../types/shopSale";
+import { shopSalesApiService } from "../services/shopSalesApiService";
 import { calculateSummary } from "../utils/shopSaleCalculation";
+import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
 function useShopSales() {
+  const { showNotification } = useSafeNotification();
   const [sales, setSales] = useState<ShopSale[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<ShopSaleFilter>({
@@ -17,58 +17,33 @@ function useShopSales() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  const refreshSales = useCallback(() => {
+  // Real PostgreSQL data via GET /api/operations/shop-sales — no localStorage.
+  const refreshSales = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = shopSalesService.getAll();
+      const data = await shopSalesApiService.listShopSales();
       setSales(data);
     } catch (error) {
       console.error("Failed to load shop sales:", error);
+      showNotification("Unable to load shop sales from the server.", "error");
     } finally {
       setIsLoading(false);
     }
+  }, [showNotification]);
+
+  // Backend recomputes amount server-side (weight × rate) and rejects the
+  // edit once the trip's 10-day window has closed or the cumulative
+  // birds/weight would exceed the trip's available quantity.
+  const updateSale = useCallback(async (id: number, patch: ShopSaleUpdateInput) => {
+    const updated = await shopSalesApiService.updateShopSale(id, patch);
+    setSales((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    return updated;
   }, []);
 
-  const updateSale = useCallback(async (updatedSale: ShopSale) => {
-    const newSales = sales.map((s) =>
-      s.id === updatedSale.id ? updatedSale : s
-    );
-    setSales(newSales);
-    shopSalesService.saveAll(newSales);
-
-    const originalSale = sales.find((s) => s.id === updatedSale.id);
-    if (!originalSale) return updatedSale;
-
-    try {
-      const allTrips: Trip[] = completedTripService.getAllTrips();
-      const trip = allTrips.find((t: Trip) => t.tripNo === updatedSale.tripNo);
-      if (!trip) {
-        console.warn(`Trip not found for tripNo: ${updatedSale.tripNo}`);
-        return updatedSale;
-      }
-
-      const delivery = trip.deliveries?.find(
-        (d) => d.shopName === originalSale.shopName
-      );
-      if (!delivery) {
-        console.warn(`Delivery not found for shop: ${originalSale.shopName}`);
-        return updatedSale;
-      }
-
-      delivery.shopName = updatedSale.shopName;
-      delivery.birds = updatedSale.totalBirds;
-      delivery.weight = updatedSale.totalWeight;
-      if ('rate' in delivery) {
-        (delivery as any).rate = updatedSale.rate;
-      }
-
-      completedTripService.updateTrip(trip);
-    } catch (error) {
-      console.error("Failed to update trip delivery:", error);
-    }
-
-    return updatedSale;
-  }, [sales]);
+  const deleteSale = useCallback(async (id: number, reason?: string) => {
+    await shopSalesApiService.deleteShopSale(id, reason);
+    setSales((prev) => prev.filter((s) => s.id !== id));
+  }, []);
 
   const shopNames = useMemo(() => {
     return [...new Set(sales.map((x) => x.shopName))].sort();
@@ -78,16 +53,14 @@ function useShopSales() {
     let data = [...sales];
 
     if (filter.fromDate) {
-      data = data.filter((x) => x.tripDate >= filter.fromDate);
+      data = data.filter((x) => x.saleDate >= filter.fromDate);
     }
     if (filter.toDate) {
-      data = data.filter((x) => x.tripDate <= filter.toDate);
+      data = data.filter((x) => x.saleDate <= filter.toDate);
     }
     if (filter.shopName.trim() !== "") {
       const search = filter.shopName.toLowerCase();
-      data = data.filter((x) =>
-        x.shopName.toLowerCase().includes(search)
-      );
+      data = data.filter((x) => x.shopName.toLowerCase().includes(search));
     }
 
     switch (filter.sortBy) {
@@ -95,10 +68,10 @@ function useShopSales() {
         data.sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0));
         break;
       case "Weight":
-        data.sort((a, b) => b.totalWeight - a.totalWeight);
+        data.sort((a, b) => b.weight - a.weight);
         break;
       case "Birds":
-        data.sort((a, b) => b.totalBirds - a.totalBirds);
+        data.sort((a, b) => b.birds - a.birds);
         break;
       case "Rate":
         data.sort((a, b) => (b.rate ?? 0) - (a.rate ?? 0));
@@ -107,12 +80,7 @@ function useShopSales() {
         data.sort((a, b) => a.shopName.localeCompare(b.shopName));
         break;
       default:
-        data.sort((a, b) => {
-      // Use collectionDate as primary, fallback to createdDate
-      const dateA = a.tripDate || a.tripDate || '';
-      const dateB = b.tripDate || b.tripDate || '';
-      return dateB.localeCompare(dateA);
-    });
+        data.sort((a, b) => b.saleDate.localeCompare(a.saleDate));
     }
 
     return data;
@@ -152,6 +120,7 @@ function useShopSales() {
     refreshSales,
     isLoading,
     updateSale,
+    deleteSale,
   };
 }
 

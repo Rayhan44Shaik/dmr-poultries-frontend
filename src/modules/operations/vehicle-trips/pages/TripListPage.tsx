@@ -98,8 +98,8 @@ function TripListPage({ embedded = false }: TripListPageProps) {
 
   const totalCompletedTrips = completedTrips.length;
   const totalCompletedShops = completedTrips.reduce((sum, t) => sum + t.totalShops, 0);
-  const totalCompletedBirds = completedTrips.reduce((sum, t) => sum + t.totalBirds, 0);
-  const totalCompletedWeight = completedTrips.reduce((sum, t) => sum + t.totalWeight, 0);
+  const totalCompletedBirds = completedTrips.reduce((sum, t) => sum + t.totalBirdsDelivered, 0);
+  const totalCompletedWeight = completedTrips.reduce((sum, t) => sum + t.totalDeliveredWeight, 0);
   const totalCompletedMortality = completedTrips.reduce((sum, t) => sum + t.totalMortality, 0);
 
   const pageSize = 15;
@@ -156,8 +156,8 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       t.supervisorName,
       t.sourceFarm,
       t.totalShops.toString(),
-      t.totalBirds.toString(),
-      t.totalWeight.toFixed(2),
+      t.totalBirdsDelivered.toString(),
+      t.totalDeliveredWeight.toFixed(2),
     ]);
     const filename = `Trips_${new Date().toISOString().split("T")[0]}`;
     exportToPDF("Trip List", headers, rows, filename);
@@ -189,8 +189,8 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       t.supervisorName,
       t.sourceFarm,
       t.totalShops,
-      t.totalBirds,
-      t.totalWeight,
+      t.totalBirdsDelivered,
+      t.totalDeliveredWeight,
     ]);
     const filename = `Trips_${new Date().toISOString().split("T")[0]}`;
     exportToExcel("Trip List", headers, rows, filename);

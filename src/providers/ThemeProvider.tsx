@@ -1,40 +1,75 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-
-type Theme = 'light' | 'dark';
-
-interface ThemeContextType {
-  theme: Theme;
-  toggleTheme: () => void;
-}
-
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
+import { ThemeContext } from './themeContext';
+import type { ThemeMode } from './themeTypes';
 
 interface ThemeProviderProps {
   children: ReactNode;
 }
 
+const SYSTEM_QUERY = '(prefers-color-scheme: dark)';
+
+function readStoredMode(): ThemeMode {
+  try {
+    const stored = window.localStorage.getItem('dmr_theme_mode');
+    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
+  } catch {
+    /* storage unavailable */
+  }
+  return 'light';
+}
+
+function subscribeSystemDark(callback: () => void): () => void {
+  const mq = window.matchMedia(SYSTEM_QUERY);
+  mq.addEventListener('change', callback);
+  return () => mq.removeEventListener('change', callback);
+}
+
+function getSystemDark(): boolean {
+  try {
+    return window.matchMedia(SYSTEM_QUERY).matches;
+  } catch {
+    return false;
+  }
+}
+
 export const ThemeProvider = ({ children }: ThemeProviderProps) => {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const stored = localStorage.getItem('theme');
-    return (stored as Theme) || 'light';
-  });
+  const [themeMode, setThemeMode] = useState<ThemeMode>(readStoredMode);
+  // Live subscription to the OS color-scheme preference (idiomatic to React
+  // and avoids cascading renders — the lint-guarded alternative to a manual
+  // matchMedia sync inside an effect body).
+  const systemDark = useSyncExternalStore(subscribeSystemDark, getSystemDark, getSystemDark);
+
+  const resolved = themeMode === 'system' ? (systemDark ? 'dark' : 'light') : themeMode;
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+    document.documentElement.classList.toggle('dark', resolved === 'dark');
+    try {
+      window.localStorage.setItem('dmr_theme_mode', themeMode);
+    } catch {
+      /* storage unavailable */
+    }
+  }, [resolved, themeMode]);
 
-  const toggleTheme = () => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+  const setTheme = useCallback((mode: ThemeMode) => {
+    setThemeMode(mode);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setThemeMode((prev) => {
+      if (prev === 'system') return resolved === 'dark' ? 'light' : 'dark';
+      return prev === 'light' ? 'dark' : 'light';
+    });
+  }, [resolved]);
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme: resolved, themeMode, setTheme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );
-};
-
-export const useTheme = () => {
-  const context = useContext(ThemeContext);
-  if (!context) throw new Error('useTheme must be used within ThemeProvider');
-  return context;
 };

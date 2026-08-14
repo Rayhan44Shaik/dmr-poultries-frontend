@@ -61,17 +61,18 @@ async function remove(id: string, reason?: string): Promise<void> {
   await apiDelete(`${BASE}/${id}`, { params: reason ? { reason } : undefined });
 }
 
-// Legacy helper kept for FuelKMValidator — no longer localStorage, fetches
-// the vehicle's approved bills from the API instead.
+// Backed by the universal vehicle meter validator (backend/src/utils/vehicleMeterLedger.ts)
+// via GET /api/fleet/vehicles/:vehicleId/latest-meter — the vehicle's latest
+// accepted reading across Trips, Fuel, AND Maintenance, not just this
+// vehicle's own approved fuel bills. This is a hint only; the backend is
+// still the source of truth and rejects an out-of-order reading on submit
+// regardless of what this returns.
 async function getLatestMeterReading(vehicleId: number): Promise<number> {
   try {
-    const result = await apiGet<FuelExpense[]>(BASE, {
-      params: { vehicleId, status: "Approved" },
-    });
-    const bills = Array.isArray(result.data) ? result.data : [];
-    if (!bills.length) return 0;
-    const sorted = [...bills].sort((a, b) => (b.billDate || "").localeCompare(a.billDate || ""));
-    return sorted[0].currentMeter ?? 0;
+    const result = await apiGet<{ meter: number } | null>(
+      `/fleet/vehicles/${vehicleId}/latest-meter`
+    );
+    return result.data?.meter ?? 0;
   } catch (error) {
     handleApiError(error);
     return 0;
