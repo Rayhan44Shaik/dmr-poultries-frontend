@@ -35,11 +35,11 @@ function MastersPage() {
   }, [activeTab]);
 
   return (
-    <main className="w-full px-4 pb-8 pt-6 sm:px-5 lg:px-6">
+    <div className="w-full px-4 pb-8 pt-6 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-[1480px]">
         <ActiveComponent embedded />
       </div>
-    </main>
+    </div>
   );
 }
 
