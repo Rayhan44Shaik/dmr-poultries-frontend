@@ -7,6 +7,7 @@ import { getReportData } from '../services/reportService';
 import ReportFiltersComponent from '../components/ReportFilters';
 import ReportCard from '../components/ReportCard';
 import ShopLedgerPage from './ShopLedgerPage';
+import VehicleReportPage from '../vehicle/pages/VehicleReportPage';
 import ModuleTabs, { type ModuleTab } from '../../../ui/ModuleTabs';
 
 // ========== IMPORTS ==========
@@ -19,10 +20,10 @@ import { exportToPDF, exportToExcel } from '../../../utils/exportUtils';
 // ========== REPORT CONFIGURATIONS & ICONS ==========
 const tabs: ModuleTab[] = [
   { key: 'shopLedger', label: 'Shop Ledger', icon: BookOpen, color: 'text-violet-500' },
+  { key: 'vehicle', label: 'Vehicle Report', icon: Truck, color: 'text-sky-500' },
   { key: 'weekly', label: 'Weekly Report', icon: CalendarDays, color: 'text-emerald-500' },
   { key: 'shopSales', label: 'Shop Sales', icon: ShoppingBag, color: 'text-amber-500' },
   { key: 'collection', label: 'Collections', icon: CreditCard, color: 'text-teal-500' },
-  { key: 'vehicle', label: 'Vehicle Reports', icon: Truck, color: 'text-sky-500' },
   { key: 'expenses', label: 'Expenses', icon: FileText, color: 'text-rose-500' },
 ] as const;
 
@@ -88,7 +89,16 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
   const location = useLocation();
   const navigate = useNavigate();
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
-  const activeTab = (searchParams.get('tab') as ReportType) || 'shopLedger';
+
+  // Tab resolution: query param first, then the /reports/vehicle path alias.
+  const activeTab = useMemo<ReportType>(() => {
+    const tab = searchParams.get('tab') as ReportType | null;
+    if (tab) return tab;
+    if (location.pathname === '/reports/vehicle' || location.pathname.startsWith('/reports/vehicle/')) {
+      return 'vehicle';
+    }
+    return 'shopLedger';
+  }, [searchParams, location.pathname]);
 
   const { showNotification } = useSafeNotification();
 
@@ -98,11 +108,13 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
 
   const [filters, setFilters] = useState<ReportFilters>(() => getDefaultFilters(activeTab));
 
+  // Redirect bare /reports to the default tab. Path aliases such as
+  // /reports/vehicle resolve through activeTab and are left untouched.
   useEffect(() => {
-    if (!searchParams.get('tab')) {
+    if (!searchParams.get('tab') && location.pathname === '/reports') {
       navigate('/reports?tab=shopLedger', { replace: true });
     }
-  }, [location.search, navigate, searchParams]);
+  }, [location.pathname, location.search, navigate, searchParams]);
 
   // Update filters when active tab changes from query params
   useEffect(() => {
@@ -150,7 +162,9 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
   }, [navigate]);
 
   const reportData = useMemo(() => {
-    if (activeTab === 'shopLedger') return null;
+    // The new Vehicle Report page owns its data pipeline; the legacy card
+    // flow is only used for the remaining report types.
+    if (activeTab === 'shopLedger' || activeTab === 'vehicle') return null;
     try {
       return getReportData(activeTab, filters);
     } catch (error) {
@@ -209,6 +223,8 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
       <div className="w-full px-4 sm:px-6 lg:px-8 space-y-6">
         {activeTab === 'shopLedger' ? (
           <ShopLedgerPage embedded={true} />
+        ) : activeTab === 'vehicle' ? (
+          <VehicleReportPage embedded={true} />
         ) : (
           <>
             <ReportFiltersComponent

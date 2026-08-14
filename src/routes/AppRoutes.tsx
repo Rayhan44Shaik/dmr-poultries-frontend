@@ -69,6 +69,7 @@ function AppRoutes() {
 
       {/* ============ REPORTS ============ */}
       <Route path="/reports" element={<DashboardLayout><ReportsDashboardPage /></DashboardLayout>} />
+      <Route path="/reports/*" element={<DashboardLayout><ReportsDashboardPage /></DashboardLayout>} />
 
       {/* ===============================================
           🚀 SETTINGS - SINGLE PAGE ROUTE
