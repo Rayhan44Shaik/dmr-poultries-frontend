@@ -1,4 +1,5 @@
-import { createContext, useContext, useCallback, useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
+import { LanguageContext } from "./languageContext";
 import { translations, type Locale, type TranslationCatalog } from "../i18n/translations";
 
 const STORAGE_KEY = "dmr_language";
@@ -24,16 +25,6 @@ function getByPath(catalog: TranslationCatalog, path: string): string | undefine
   }
   return typeof node === "string" ? node : undefined;
 }
-
-interface LanguageContextType {
-  locale: Locale;
-  /** Translation helper. Resolves "a.b.c" against the active catalog,
-   * falling back to the English catalog, then to the raw key. */
-  t: (key: string) => string;
-  setLocale: (locale: Locale) => void;
-}
-
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 interface LanguageProviderProps {
   children: ReactNode;
@@ -67,10 +58,4 @@ export const LanguageProvider = ({ children }: LanguageProviderProps) => {
       {children}
     </LanguageContext.Provider>
   );
-};
-
-export const useLanguage = () => {
-  const context = useContext(LanguageContext);
-  if (!context) throw new Error("useLanguage must be used within LanguageProvider");
-  return context;
 };

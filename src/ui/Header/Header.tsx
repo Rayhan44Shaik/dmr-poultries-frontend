@@ -1,31 +1,18 @@
 // src/components/Header.tsx
 import { useLocation } from "react-router-dom";
 import { Database, LayoutDashboard, Truck } from "lucide-react";
+import { useLanguage } from "../../providers/languageContext";
 
 function Header() {
   const location = useLocation();
+  const { t } = useLanguage();
   const currentPath = location.pathname;
 
-  // ---- Masters Page ----
   const isMastersPage = currentPath === "/masters" || currentPath.startsWith("/masters/");
-
-  // ---- Operations Pages ----
   const isOperationsPage = currentPath.startsWith("/operations");
 
-  // ---- Helper to get page title ----
-  const getPageTitle = () => {
-    if (isMastersPage) return "Masters";
-    if (isOperationsPage) return "Operations";
-    if (currentPath === "/dashboard") return "Dashboard";
-    if (currentPath.startsWith("/accounts")) return "Accounts";
-    if (currentPath.startsWith("/fleet")) return "Fleet";
-    if (currentPath.startsWith("/staff")) return "Staff";
-    if (currentPath.startsWith("/reports")) return "Reports";
-    if (currentPath.startsWith("/settings")) return "Settings";
-    return "";
-  };
-
-  const title = getPageTitle();
+  const headerClass = "h-16 bg-white border-b border-slate-200 shadow-sm flex items-center justify-between px-6 dark:bg-slate-900 dark:border-slate-700";
+  const titleClass = "text-xl font-bold text-slate-800 dark:text-slate-100";
 
   const userProfile = (
     <div className="flex items-center gap-3">
@@ -33,59 +20,61 @@ function Header() {
         R
       </div>
       <div>
-        <p className="font-semibold text-slate-800">Ruhulla</p>
-        <p className="text-xs text-slate-500">Administrator</p>
+        <p className="font-semibold text-slate-800 dark:text-slate-100">Ruhulla</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Administrator</p>
       </div>
     </div>
   );
 
-  // ---- Masters Header (plain white, no gradient) ----
+  const bell = (<button className="text-slate-600 dark:text-slate-300 hover:text-green-700 text-xl">🔔</button>);
+
   if (isMastersPage) {
     return (
-      <header className="h-16 bg-white border-b border-slate-200 shadow-sm flex items-center justify-between px-6">
+      <header className={headerClass}>
         <div className="flex items-center gap-3">
           <Database size={24} className="text-blue-600" />
-          <h1 className="text-xl font-bold text-slate-800">Masters</h1>
+          <h1 className={titleClass}>{t("nav.masters")}</h1>
         </div>
-        <div className="flex items-center gap-6">
-          <button className="text-slate-600 hover:text-green-700 text-xl">🔔</button>
-          {userProfile}
-        </div>
+        <div className="flex items-center gap-6">{bell}{userProfile}</div>
       </header>
     );
   }
 
-  // ---- Operations Header (simple, same style as Masters) ----
   if (isOperationsPage) {
     return (
-      <header className="h-16 bg-white border-b border-slate-200 shadow-sm flex items-center justify-between px-6">
+      <header className={headerClass}>
         <div className="flex items-center gap-3">
           <Truck size={24} className="text-blue-600" />
-          <h1 className="text-xl font-bold text-slate-800">Operations</h1>
+          <h1 className={titleClass}>{t("nav.operations")}</h1>
         </div>
-        <div className="flex items-center gap-6">
-          <button className="text-slate-600 hover:text-green-700 text-xl">🔔</button>
-          {userProfile}
-        </div>
+        <div className="flex items-center gap-6">{bell}{userProfile}</div>
       </header>
     );
   }
 
-  // ---- Fallback for other pages ----
+  const getPageTitle = () => {
+    if (currentPath === "/dashboard") return t("nav.dashboard");
+    if (currentPath.startsWith("/accounts")) return t("nav.accounts");
+    if (currentPath.startsWith("/fleet")) return t("nav.vehicles");
+    if (currentPath.startsWith("/staff")) return t("nav.staff");
+    if (currentPath.startsWith("/reports")) return t("nav.reports");
+    if (currentPath.startsWith("/settings")) return t("nav.settings");
+    return "";
+  };
+
+  const title = getPageTitle();
+
   return (
-    <header className="h-16 bg-white border-b border-slate-200 shadow-sm flex items-center justify-between px-6">
+    <header className={headerClass}>
       <div className="flex items-center gap-3">
         {title && (
           <>
             <LayoutDashboard size={24} className="text-indigo-600" />
-            <h1 className="text-xl font-bold text-slate-800">{title}</h1>
+            <h1 className={titleClass}>{title}</h1>
           </>
         )}
       </div>
-      <div className="flex items-center gap-6">
-        <button className="text-slate-600 hover:text-green-700 text-xl">🔔</button>
-        {userProfile}
-      </div>
+      <div className="flex items-center gap-6">{bell}{userProfile}</div>
     </header>
   );
 }

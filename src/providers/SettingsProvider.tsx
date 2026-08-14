@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { SettingsContext, type Settings } from './settingsContext';
 
 // NOTE on single sources of truth:
 // - Language is owned by LanguageProvider (dmr_language key).
@@ -6,23 +7,10 @@ import { createContext, useContext, useState, type ReactNode } from 'react';
 // SettingsProvider intentionally does NOT hold language/theme so there is no
 // competing state. It keeps only generic, currently-unused business prefs.
 
-interface Settings {
-  currency: string;
-  dateFormat: string;
-}
-
-interface SettingsContextType {
-  settings: Settings;
-  updateSettings: (newSettings: Partial<Settings>) => void;
-  resetSettings: () => void;
-}
-
 const defaultSettings: Settings = {
   currency: 'INR',
   dateFormat: 'DD/MM/YYYY',
 };
-
-const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 interface SettingsProviderProps {
   children: ReactNode;
@@ -72,10 +60,4 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
       {children}
     </SettingsContext.Provider>
   );
-};
-
-export const useSettings = () => {
-  const context = useContext(SettingsContext);
-  if (!context) throw new Error('useSettings must be used within SettingsProvider');
-  return context;
 };

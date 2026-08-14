@@ -1,10 +1,8 @@
 // src/components/Sidebar.tsx
 
-import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import {
-  LayoutDashboard,
   Database,
   Truck,
   Car,
@@ -14,137 +12,55 @@ import {
   Settings,
   Building2,
 } from "lucide-react";
+import { useLanguage } from "../../providers/languageContext";
 
 export default function Sidebar() {
   const location = useLocation();
+  const { t } = useLanguage();
 
-  // Accounts children removed – now a single link
-
-  // Better matching logic for parent items
   const isActiveParent = (path: string) => {
     if (location.pathname === path) return true;
     return location.pathname.startsWith(path + "/") || location.pathname.startsWith(path);
   };
 
-  const isActiveExact = (path: string) => location.pathname === path;
+  const linkClass = (active: boolean) =>
+    ("mb-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all " +
+      (active
+        ? "bg-blue-600 text-white"
+        : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"));
+
+  const nav = [
+    { to: "/masters", icon: Database, key: "nav.masters" },
+    { to: "/operations", icon: Truck, key: "nav.operations" },
+    { to: "/fleet", icon: Car, key: "nav.vehicles" },
+    { to: "/staff", icon: Users, key: "nav.staff" },
+    { to: "/accounts", icon: ReceiptIndianRupee, key: "nav.accounts" },
+    { to: "/reports", icon: FileText, key: "nav.reports" },
+    { to: "/settings", icon: Settings, key: "nav.settings" },
+  ];
 
   return (
-    <aside className="flex h-screen w-72 flex-col border-r border-slate-200 bg-white">
-      <div className="flex h-16 items-center gap-3 border-b border-slate-200 px-5">
+    <aside className="flex h-screen w-72 flex-col border-r border-slate-200 bg-white dark:bg-slate-900 dark:border-slate-700">
+      <div className="flex h-16 items-center gap-3 border-b border-slate-200 px-5 dark:border-slate-700">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white">
           <Building2 size={22} />
         </div>
         <div>
-          <h1 className="text-lg font-bold text-slate-800">DMR Poultries</h1>
-          <p className="text-xs text-slate-500">ERP System</p>
+          <h1 className="text-lg font-bold text-slate-800 dark:text-slate-100">{t("appName")}</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{t("appSubtitle")}</p>
         </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {/* 1. Dashboard - Commented out for now
-        <Link
-          to="/dashboard"
-          className={`mb-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-            isActiveExact("/dashboard")
-              ? "bg-blue-600 text-white"
-              : "text-slate-700 hover:bg-slate-100"
-          }`}
-        >
-          <LayoutDashboard size={18} />
-          Dashboard
-        </Link>
-        */}
-
-        {/* 2. Masters */}
-        <Link
-          to="/masters"
-          className={`mb-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-            isActiveParent("/masters")
-              ? "bg-blue-600 text-white"
-              : "text-slate-700 hover:bg-slate-100"
-          }`}
-        >
-          <Database size={18} />
-          Masters
-        </Link>
-
-        {/* 3. Operations */}
-        <Link
-          to="/operations"
-          className={`mb-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-            isActiveParent("/operations")
-              ? "bg-blue-600 text-white"
-              : "text-slate-700 hover:bg-slate-100"
-          }`}
-        >
-          <Truck size={18} />
-          Operations
-        </Link>
-
-        {/* 4. Vehicles */}
-        <Link
-          to="/fleet"
-          className={`mb-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-            isActiveParent("/fleet")
-              ? "bg-blue-600 text-white"
-              : "text-slate-700 hover:bg-slate-100"
-          }`}
-        >
-          <Car size={18} />
-          Vehicles
-        </Link>
-
-        {/* 5. Staff */}
-        <Link
-          to="/staff"
-          className={`mb-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-            isActiveParent("/staff")
-              ? "bg-blue-600 text-white"
-              : "text-slate-700 hover:bg-slate-100"
-          }`}
-        >
-          <Users size={18} />
-          Staff
-        </Link>
-
-        {/* 6. Accounts – now a single link (no dropdown) */}
-        <Link
-          to="/accounts"
-          className={`mb-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-            isActiveParent("/accounts")
-              ? "bg-blue-600 text-white"
-              : "text-slate-700 hover:bg-slate-100"
-          }`}
-        >
-          <ReceiptIndianRupee size={18} />
-          Accounts
-        </Link>
-
-        {/* 7. Reports */}
-        <Link
-          to="/reports"
-          className={`mb-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-            isActiveParent("/reports")
-              ? "bg-blue-600 text-white"
-              : "text-slate-700 hover:bg-slate-100"
-          }`}
-        >
-          <FileText size={18} />
-          Reports
-        </Link>
-
-        {/* 8. Settings */}
-        <Link
-          to="/settings"
-          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-            isActiveParent("/settings")
-              ? "bg-blue-600 text-white"
-              : "text-slate-700 hover:bg-slate-100"
-          }`}
-        >
-          <Settings size={18} />
-          Settings
-        </Link>
+        {nav.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link key={item.to} to={item.to} className={linkClass(isActiveParent(item.to))}>
+              <Icon size={18} />
+              {t(item.key)}
+            </Link>
+          );
+        })}
       </nav>
     </aside>
   );
