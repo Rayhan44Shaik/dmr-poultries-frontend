@@ -2,19 +2,13 @@
 
 import React, { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Calendar, Clock, CreditCard } from "lucide-react";
 
-import ModuleTabs, { type ModuleTab } from "../../../ui/ModuleTabs";
 import DutyPlannerPage from "./DutyPlannerPage";
 import LeaveManagementPage from "./LeaveManagementPage";
 import SalaryRegisterPage from "./SalaryRegisterPage";
 
-const tabs: ModuleTab[] = [
-  { key: "duty-planner", label: "Duty Planner", icon: Calendar, color: "text-sky-500" },
-  { key: "salary-sheet", label: "Salary Register", icon: CreditCard, color: "text-violet-500" },
-  { key: "leaves", label: "Leave Management", icon: Clock, color: "text-amber-500" },
-];
-
+// Map tab keys (resolved from ?tab= sidebar deep-links / path aliases)
+// to their child page components.
 const tabComponents: Record<string, React.ComponentType<{ embedded?: boolean }>> = {
   "duty-planner": DutyPlannerPage,
   "salary-sheet": SalaryRegisterPage,
@@ -52,16 +46,9 @@ function StaffPages() {
     return tabComponents[activeTab] ?? DutyPlannerPage;
   }, [activeTab]);
 
-  const handleTabChange = (tabKey: string) => {
-    navigate(`/staff?tab=${tabKey}`);
-  };
-
   return (
-    <div className="mx-auto w-full max-w-[1480px] space-y-4 pb-6">
-      <ModuleTabs tabs={tabs} activeKey={activeTab} onChange={handleTabChange} className="px-4 pt-3 sm:px-6 lg:px-8" />
-
-      {/* Embedded Sub-Component */}
-      <div className="w-full px-4 sm:px-6 lg:px-8">
+    <div className="w-full px-4 pb-8 pt-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[1480px]">
         <ActiveComponent embedded={true} />
       </div>
     </div>

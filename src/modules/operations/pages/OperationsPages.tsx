@@ -2,20 +2,7 @@
 
 import React, { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import {
-  Sparkles,
-  ClipboardList,
-  List,
-  ShoppingBag,
-  DollarSign,
-  CreditCard,
-  Clock,
-  FileText,
-  Fuel,
-  Bird,
-} from "lucide-react";
 
-import ModuleTabs, { type ModuleTab } from "../../../ui/ModuleTabs";
 import OperationsDashboardPage from "../dashboard/pages/OperationsDashboardPage";
 import TripEntryPage from "../vehicle-trips/pages/TripEntryPage";
 import TripListPage from "../vehicle-trips/pages/TripListPage";
@@ -27,21 +14,8 @@ import CollectionReportPage from "../collections/pages/CollectionReportPage";
 import FuelExpensesPage from "../fuel-expenses/pages/FuelExpensesPage";
 import MortalityEntryPage from "../mortality/pages/MortalityEntryPage";
 
-// Tabs configuration with Overview back as default
-const tabs: ModuleTab[] = [
-  { key: "overview", label: "Daily Report", icon: Sparkles, color: "text-amber-500" },
-  { key: "trip-entry", label: "Trip Entry", icon: ClipboardList, color: "text-emerald-500" },
-  { key: "trip-list", label: "Trip List", icon: List, color: "text-sky-500" },
-  { key: "rate-entry", label: "Rate Entry", icon: DollarSign, color: "text-violet-500" },
-  { key: "shop-sales", label: "Shop Sales", icon: ShoppingBag, color: "text-amber-500" },
-  { key: "collection", label: "Collection Entry", icon: CreditCard, color: "text-teal-500" },
-  { key: "pending-collections", label: "Pending Collections", icon: Clock, color: "text-rose-500" },
-  { key: "collection-report", label: "Collection Report", icon: FileText, color: "text-indigo-500" },
-  { key: "mortality", label: "Mortality Entry", icon: Bird, color: "text-rose-500" },
-  { key: "fuel-expenses", label: "Fuel Expenses", icon: Fuel, color: "text-orange-500" },
-];
-
-// Map tab keys to their components
+// Map tab keys (resolved from ?tab= sidebar deep-links / path aliases)
+// to their child page components.
 const tabComponents: Record<string, React.ComponentType<{ embedded?: boolean }>> = {
   overview: OperationsDashboardPage,
   "trip-entry": TripEntryPage,
@@ -91,16 +65,9 @@ function OperationsPages() {
     return tabComponents[activeTab] ?? OperationsDashboardPage;
   }, [activeTab]);
 
-  const handleTabChange = (tabKey: string) => {
-    navigate(`/operations?tab=${tabKey}`);
-  };
-
   return (
-    <div className="mx-auto w-full max-w-[1480px] space-y-4 pb-6">
-      <ModuleTabs tabs={tabs} activeKey={activeTab} onChange={handleTabChange} className="px-4 pt-3 sm:px-6 lg:px-8" />
-
-      {/* Embedded Sub-Component */}
-      <div className="w-full px-4 sm:px-6 lg:px-8">
+    <div className="w-full px-4 pb-8 pt-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[1480px]">
         <ActiveComponent embedded={true} />
       </div>
     </div>

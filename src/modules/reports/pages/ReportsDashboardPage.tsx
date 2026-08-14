@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { format, subDays } from 'date-fns';
-import { Truck, ShoppingBag, CreditCard, BookOpen, FileText, CalendarDays } from 'lucide-react';
 import type { ReportFilters, ReportType } from '../types/reportTypes';
 import { getReportData } from '../services/reportService';
 import ReportFiltersComponent from '../components/ReportFilters';
 import ReportCard from '../components/ReportCard';
 import ShopLedgerPage from './ShopLedgerPage';
 import VehicleReportPage from '../vehicle/pages/VehicleReportPage';
-import ModuleTabs, { type ModuleTab } from '../../../ui/ModuleTabs';
 
 // ========== IMPORTS ==========
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
@@ -17,16 +15,7 @@ import { useEmployees } from '../../masters/employees/hooks/useEmployees';
 import { useShops } from '../../masters/shops/hooks/useShops';
 import { exportToPDF, exportToExcel } from '../../../utils/exportUtils';
 
-// ========== REPORT CONFIGURATIONS & ICONS ==========
-const tabs: ModuleTab[] = [
-  { key: 'shopLedger', label: 'Shop Ledger', icon: BookOpen, color: 'text-violet-500' },
-  { key: 'vehicle', label: 'Vehicle Report', icon: Truck, color: 'text-sky-500' },
-  { key: 'weekly', label: 'Weekly Report', icon: CalendarDays, color: 'text-emerald-500' },
-  { key: 'shopSales', label: 'Shop Sales', icon: ShoppingBag, color: 'text-amber-500' },
-  { key: 'collection', label: 'Collections', icon: CreditCard, color: 'text-teal-500' },
-  { key: 'expenses', label: 'Expenses', icon: FileText, color: 'text-rose-500' },
-] as const;
-
+// ========== REPORT CONFIGURATIONS ==========
 const REPORT_LABELS: Record<ReportType, string> = {
   weekly: 'Weekly Report',
   vehicle: 'Vehicle Report',
@@ -157,10 +146,6 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
     [shops]
   );
 
-  const handleTabChange = useCallback((tabKey: string) => {
-    navigate(`/reports?tab=${tabKey}`);
-  }, [navigate]);
-
   const reportData = useMemo(() => {
     // The new Vehicle Report page owns its data pipeline; the legacy card
     // flow is only used for the remaining report types.
@@ -211,16 +196,8 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
   );
 
   const content = (
-    <div className="mx-auto w-full max-w-[1480px] space-y-4 pb-6">
-      <ModuleTabs
-        tabs={[...tabs]}
-        activeKey={activeTab}
-        onChange={handleTabChange}
-        className="px-4 pt-3 sm:px-6 lg:px-8"
-      />
-
-      {/* Main Content Area */}
-      <div className="w-full px-4 sm:px-6 lg:px-8 space-y-6">
+    <div className="w-full px-4 pb-8 pt-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[1480px] space-y-6">
         {activeTab === 'shopLedger' ? (
           <ShopLedgerPage embedded={true} />
         ) : activeTab === 'vehicle' ? (
@@ -251,7 +228,7 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
   );
 
   if (embedded) return content;
-  return <div className="w-full space-y-4">{content}</div>;
+  return <div className="w-full">{content}</div>;
 });
 
 export default ReportsDashboardPage;
