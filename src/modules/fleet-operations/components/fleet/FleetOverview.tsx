@@ -199,6 +199,11 @@ export default function FleetOverview({ vehicles, counts, loading, error, onRetr
 
       {/* Body */}
       <div className="mt-3.5">{renderBody()}</div>
+
+      <p className="mt-3 text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">
+        Vehicles and trips sync from the server. Maintenance, documents, FASTag, EMI and fuel data are stored on
+        this device until their backend endpoints ship.
+      </p>
     </section>
   );
 }

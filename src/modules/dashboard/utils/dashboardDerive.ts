@@ -198,13 +198,17 @@ export function deriveDashboard(data: DashboardData): DerivedDashboard {
     const fuelRecords = data.fuelExpenses.filter((f) => f.vehicleNo === v.number);
     const lastFuel = fuelRecords.sort((a, b) => b.date.localeCompare(a.date))[0];
 
-    const status: FleetVehicleView["status"] = onTrip
-      ? "On Trip"
-      : v.status === "Inactive"
-      ? "Inactive"
-      : recentMaintenance && recentMaintenance.date && recentMaintenance.date >= isoDaysAgo(20)
-      ? "Maintenance"
-      : "Available";
+    // Status rules (same business rule as the fleet dashboard):
+    // "Maintenance" only from an explicit master-record state; recently
+    // serviced and service-due vehicles stay Available.
+    const status: FleetVehicleView["status"] =
+      v.status === "Maintenance"
+        ? "Maintenance"
+        : v.status === "Inactive"
+        ? "Inactive"
+        : onTrip
+        ? "On Trip"
+        : "Available";
 
     const lastMeter = latestTrip
       ? Number(latestTrip.closingMeter) || Number(latestTrip.openingMeter) + Number(latestTrip.totalKm) || null

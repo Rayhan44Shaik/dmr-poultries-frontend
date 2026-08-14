@@ -40,7 +40,9 @@ function clearLegacyVehicleStorage(): void {
 }
 
 function normalizeStatus(status: unknown): Vehicle["status"] {
-  return status === "Active" ? "Active" : "Inactive";
+  if (status === "Active") return "Active";
+  if (status === "Maintenance") return "Maintenance";
+  return "Inactive";
 }
 
 function toOptionalNumber(value: unknown): number | undefined {
@@ -126,6 +128,7 @@ export function getVehicles(): Vehicle[] {
  */
 export function saveVehicles(_vehicles: Vehicle[]): void {
   // Intentionally no-op. Cache is API-owned.
+  void _vehicles;
 }
 
 /** GET /api/masters/vehicles — sole source of truth for the Vehicles table. */

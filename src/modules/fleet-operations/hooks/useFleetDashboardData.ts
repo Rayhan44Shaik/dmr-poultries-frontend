@@ -1,7 +1,14 @@
 // src/modules/fleet-operations/hooks/useFleetDashboardData.ts
 // Fleet dashboard + fleet overview data.
-// Sources: vehicles (PostgreSQL API), trips (PostgreSQL API), fuel expenses,
-// maintenance, documents, FASTag and EMI records (existing fleet stores).
+//
+// Data sources (existing architecture — no new storage introduced):
+//  · Vehicles, trips ........... PostgreSQL API (authoritative server data)
+//  · Fuel expenses ............. operations fuel service (local store; its
+//                                backend endpoint has not shipped yet)
+//  · Maintenance, documents, FASTag, EMI ... fleet local stores (backend
+//                                endpoints have not shipped yet)
+//    Local-store values are honoured only for the areas whose backend does
+//    not exist yet and are never presented as PostgreSQL-authoritative.
 
 import { useMemo } from "react";
 import { endOfMonth, format, isWithinInterval, startOfMonth } from "date-fns";
@@ -156,19 +163,22 @@ export function useFleetDashboardData(): FleetDashboardData {
         const lastServiceDate = lastService ? lastService.date.slice(0, 10) : null;
         const nextServiceKm =
           lastService?.nextServiceKM && lastService.nextServiceKM > 0 ? lastService.nextServiceKM : null;
+        // Service due is an alert (KPI strip + card chip), never a status.
         const serviceDue = nextServiceKm != null && odometerKm != null && odometerKm >= nextServiceKm;
-        const recentlyServiced =
-          lastServiceDate != null &&
-          parseDateLike(lastServiceDate) != null &&
-          new Date(lastServiceDate).getTime() >= now.getTime() - 30 * 86400000;
 
+        // Status rules:
+        //  · "Maintenance" only when the vehicle master record carries an
+        //    explicit maintenance state — recently serviced and service-due
+        //    vehicles remain Available (service due surfaces as an alert).
+        //  · Inactive comes from the master record.
+        //  · "On Trip" is derived from an active (Pending) trip.
         let status: FleetVehicleStatus;
-        if (v.status !== "Active") {
+        if (v.status === "Maintenance") {
+          status = "Maintenance";
+        } else if (v.status !== "Active") {
           status = "Inactive";
         } else if (activeTrip) {
           status = "On Trip";
-        } else if (recentlyServiced || serviceDue) {
-          status = "Maintenance";
         } else {
           status = "Available";
         }
@@ -256,8 +266,17 @@ export function useFleetDashboardData(): FleetDashboardData {
     const thisMonthTrips = allTrips.filter(
       (t) => t.tripDate && isWithinInterval(new Date(t.tripDate), { start: monthStart, end: monthEnd })
     );
-    const fuelCostThisMonth = thisMonthTrips.reduce((sum, t) => sum + (t.expense || 0), 0);
     const totalKMThisMonth = thisMonthTrips.reduce((sum, t) => sum + (t.totalKm || 0), 0);
+
+    // Fuel metrics use the fuel-expense records (fuel bills) as the
+    // authoritative fuel source. Trip `expense` also contains meals,
+    // loading, maintenance, tolls and other costs, so it is never used
+    // as fuel cost.
+    const monthFuelExpenses = fuelExpenses.filter((f) => {
+      const date = parseDateLike(f.date);
+      return date != null && isWithinInterval(date, { start: monthStart, end: monthEnd });
+    });
+    const fuelCostThisMonth = monthFuelExpenses.reduce((sum, f) => sum + (Number(f.amount) || 0), 0);
 
     const thirtyDaysLater = new Date(now.getTime() + 30 * 86400000);
     const expiringDocs = documents.filter((d) => {
@@ -271,12 +290,13 @@ export function useFleetDashboardData(): FleetDashboardData {
 
     const serviceDue = fleetVehicles.filter((v) => v.maintenance.serviceDue).length;
 
+    // Monthly fuel trend from fuel-expense records, grouped by bill month.
     const monthlyFuel: Record<string, number> = {};
-    allTrips.forEach((t) => {
-      if (t.tripDate && t.expense) {
-        const key = format(new Date(t.tripDate), "yyyy-MM");
-        monthlyFuel[key] = (monthlyFuel[key] || 0) + t.expense;
-      }
+    fuelExpenses.forEach((f) => {
+      const date = parseDateLike(f.date);
+      if (!date) return;
+      const key = format(date, "yyyy-MM");
+      monthlyFuel[key] = (monthlyFuel[key] || 0) + (Number(f.amount) || 0);
     });
     const monthlyFuelTrend = Object.entries(monthlyFuel)
       .sort((a, b) => a[0].localeCompare(b[0]))
@@ -309,12 +329,19 @@ export function useFleetDashboardData(): FleetDashboardData {
       (t) => t.tripDate && isWithinInterval(new Date(t.tripDate), { start: todayStart, end: now })
     );
     const kmToday = todayTrips.reduce((sum, t) => sum + (t.totalKm || 0), 0);
-    const fuelToday = todayTrips.reduce((sum, t) => sum + (t.fuel || 0), 0);
+
+    // "Fuel Today" is litres from today's fuel bills; efficiency is
+    // km per litre using the same authoritative fuel-expense source.
+    const todayFuelExpenses = fuelExpenses.filter((f) => {
+      const date = parseDateLike(f.date);
+      return date != null && date >= todayStart && date <= now;
+    });
+    const fuelToday = todayFuelExpenses.reduce((sum, f) => sum + (Number(f.litres) || 0), 0);
     const documentsExpiring = expiringDocs.length;
 
     const totalKM = allTrips.reduce((sum, t) => sum + (t.totalKm || 0), 0);
-    const totalFuel = allTrips.reduce((sum, t) => sum + (t.fuel || 0), 0);
-    const avgFuelEfficiency = totalFuel > 0 ? totalKM / totalFuel : 0;
+    const totalLitres = fuelExpenses.reduce((sum, f) => sum + (Number(f.litres) || 0), 0);
+    const avgFuelEfficiency = totalLitres > 0 ? totalKM / totalLitres : 0;
 
     return {
       totalVehicles,
