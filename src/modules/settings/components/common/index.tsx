@@ -1,23 +1,24 @@
 import React from "react";
 
 export const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = "" }) => (
-  <div className={`bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm ${className}`}>
+  <div className={`bg-white rounded-xl border border-slate-200/80 p-6 shadow-card ${className}`}>
     {children}
   </div>
 );
 
 export const Button: React.FC<{
   children: React.ReactNode;
-  variant?: "primary" | "secondary" | "danger";
+  variant?: "primary" | "secondary" | "danger" | "outline";
   onClick?: () => void;
   className?: string;
   type?: "button" | "submit" | "reset";
 }> = ({ children, variant = "primary", onClick, className = "", type = "button" }) => {
-  const baseStyle = "px-4 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2";
+  const baseStyle = "px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm active:scale-[0.98] flex items-center justify-center gap-2";
   const variants = {
-    primary: "bg-[#6c5ce7] hover:bg-[#5a4bd1] text-white shadow-indigo-100",
+    primary: "bg-brand-600 hover:bg-brand-700 text-white shadow-sm",
     secondary: "border border-slate-200 bg-white hover:bg-slate-50 text-slate-700",
-    danger: "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-100"
+    danger: "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-100",
+    outline: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
   };
 
   return (

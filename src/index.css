@@ -1,11 +1,162 @@
 @import "tailwindcss";
 @import "react-datepicker/dist/react-datepicker.css";
 
-.react-datepicker__year-select {
-  max-height: 180px;
-  overflow-y: auto;
+/* ------------------------------------------------------------------ */
+/*  DMR Poultries ERP — Design System                                  */
+/*  Primary brand: deep emerald green (agriculture / poultry / money)  */
+/* ------------------------------------------------------------------ */
+
+/* Class-based dark mode (toggled by ThemeProvider via .dark on <html>) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Typography */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+
+  /* ------------------------------------------------------------------
+     Brand scale.
+     The legacy `blue-*` utilities are remapped onto the emerald scale so
+     every pre-existing page inherits the new brand identity without a
+     fragile mass find/replace. New code should use `emerald-*` or the
+     `brand` alias below; keep `sky-*` for informational (blue) accents.
+  ------------------------------------------------------------------ */
+  --color-blue-50: #ecfdf5;
+  --color-blue-100: #d1fae5;
+  --color-blue-200: #a7f3d0;
+  --color-blue-300: #6ee7b7;
+  --color-blue-400: #34d399;
+  --color-blue-500: #10b981;
+  --color-blue-600: #059669;
+  --color-blue-700: #047857;
+  --color-blue-800: #065f46;
+  --color-blue-900: #064e3b;
+  --color-blue-950: #022c22;
+
+  --color-brand-50: #ecfdf5;
+  --color-brand-100: #d1fae5;
+  --color-brand-200: #a7f3d0;
+  --color-brand-300: #6ee7b7;
+  --color-brand-400: #34d399;
+  --color-brand-500: #10b981;
+  --color-brand-600: #059669;
+  --color-brand-700: #047857;
+  --color-brand-800: #065f46;
+  --color-brand-900: #064e3b;
+  --color-brand-950: #022c22;
+
+  /* Soft, layered shadows — restrained elevation */
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
+  --shadow-card-lg: 0 1px 2px rgb(15 23 42 / 0.04), 0 10px 28px -10px rgb(15 23 42 / 0.12);
+  --shadow-pop: 0 4px 10px -2px rgb(15 23 42 / 0.08), 0 14px 34px -10px rgb(15 23 42 / 0.16);
+
+  /* Motion */
+  --animate-fade-in: fade-in 0.22s ease-out both;
+  --animate-fade-in-up: fade-in-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-scale-in: scale-in 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-slide-down: slide-down 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes slide-down {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 }
-/* 🔥 Compact range picker – fixes stretching and bubble issues */
+
+@layer base {
+  /* Preserve the legacy universal border colour assumption */
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-slate-200);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-slate-100/80 font-sans text-slate-900 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  .dark body {
+    @apply bg-slate-950 text-slate-100;
+  }
+
+  ::selection {
+    background: var(--color-brand-200);
+    color: var(--color-brand-950);
+  }
+
+  h1, h2, h3, h4 {
+    letter-spacing: -0.01em;
+  }
+
+  /* Consistent, brand-tinted keyboard focus */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Refined scrollbars */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-slate-300);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-slate-400);
+    background-clip: content-box;
+    border: 3px solid transparent;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: var(--color-slate-600);
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+}
+
+/* Utility: hide scrollbars but keep scrolling */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Utility: hide scrollbars on tables in touch contexts */
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+/* ============================================================
+   DATE RANGE PICKER OVERRIDES (react-date-range) — brand themed
+   ============================================================ */
+
 .rdrDateRangePickerWrapper {
   padding: 0 !important;
   width: 100% !important;
@@ -48,13 +199,11 @@
   font-size: 0.65rem !important;
 }
 
-/* 👇 Day numbers dark */
 .rdrDayNumber span {
   color: #1a1a1a !important;
   font-weight: 600 !important;
 }
 
-/* Selected range – white text on blue */
 .rdrDaySelected .rdrDayNumber span,
 .rdrDayInRange .rdrDayNumber span,
 .rdrDayStartEdge .rdrDayNumber span,
@@ -62,13 +211,11 @@
   color: white !important;
 }
 
-/* Today – dark and bold, but only when NOT part of the selected range */
 .rdrDayToday .rdrDayNumber span {
   color: #1a1a1a !important;
   font-weight: 700 !important;
 }
 
-/* Today that is ALSO selected/start/end/in-range — force white to win */
 .rdrDayToday.rdrDaySelected .rdrDayNumber span,
 .rdrDayToday.rdrDayStartEdge .rdrDayNumber span,
 .rdrDayToday.rdrDayEndEdge .rdrDayNumber span,
@@ -77,63 +224,41 @@
   font-weight: 700 !important;
 }
 
-/* Hide side panels */
 .rdrDefinedRangesWrapper,
 .rdrMonthName {
   display: none !important;
 }
 
-/* Navigation arrows smaller */
-.rdrNextPrevButton,
-.rdrPprevButton,
-.rdrNextButton {
+.rdrNextPrevButton {
   width: 24px !important;
   height: 24px !important;
 }
 
-/* Rounded edges for selection */
-/* Rounded edges for selection */
 .rdrDayStartEdge,
 .rdrDayEndEdge,
 .rdrDayInRange {
   border-radius: 4px !important;
 }
 
-/* Start & End dates – solid dark blue */
 .rdrDayStartEdge,
 .rdrDayEndEdge,
 .rdrStartEdge,
 .rdrEndEdge {
-  background: #1e40af !important;
+  background: #047857 !important;
 }
 
-/* In-between range days – light blue fill */
 .rdrDayInRange,
 .rdrInRange {
-  background: rgba(59, 130, 246, 0.3) !important;
+  background: rgba(16, 185, 129, 0.18) !important;
 }
 
-.rdrDefinedRangesWrapper {
-  display: none !important;
+/* ============================================================
+   DATE PICKER (react-datepicker) — brand themed
+   ============================================================ */
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background-color: #059669 !important;
 }
-
-  /* Animate all buttons that have common classes */
-button,
-button[class*="px-"][class*="py-"] {
-  transition: all 0.2s ease-in-out;
-}
-
-button:hover {
-  transform: scale(1.03);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-button:active {
-  transform: scale(0.97);
-}
-
-/* If you want a subtle pulse on click */
-button:focus-visible {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
+.react-datepicker__day--selected:hover {
+  background-color: #047857 !important;
 }

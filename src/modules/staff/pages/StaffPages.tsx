@@ -2,21 +2,24 @@
 
 import React, { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Calendar, Clock, CreditCard, LayoutGrid, Users, FileText } from "lucide-react";
+import { Calendar, Clock, CreditCard } from "lucide-react";
 
+import ModuleTabs, { type ModuleTab } from "../../../ui/ModuleTabs";
 import DutyPlannerPage from "./DutyPlannerPage";
 import LeaveManagementPage from "./LeaveManagementPage";
 import SalaryRegisterPage from "./SalaryRegisterPage";
 
-// Placeholder sub-components for other staff tabs if needed
-const StaffOverview = () => <div className="p-6 text-slate-600 text-sm font-medium">Staff Overview Content</div>;
-const EmployeeList = () => <div className="p-6 text-slate-600 text-sm font-medium">Employee Master Directory</div>;
-
-const tabs = [
-  { key: "duty-planner", label: "Duty Planner", icon: Calendar, color: "text-blue-500", component: DutyPlannerPage },
-  { key: "leaves", label: "Leave", icon: Clock, color: "text-amber-500", component: LeaveManagementPage },
-  { key: "salary-sheet", label: "Salary Sheet", icon: CreditCard, color: "text-purple-500", component: SalaryRegisterPage },
+const tabs: ModuleTab[] = [
+  { key: "duty-planner", label: "Duty Planner", icon: Calendar, color: "text-sky-500" },
+  { key: "salary-sheet", label: "Salary Register", icon: CreditCard, color: "text-violet-500" },
+  { key: "leaves", label: "Leave Management", icon: Clock, color: "text-amber-500" },
 ];
+
+const tabComponents: Record<string, React.ComponentType<{ embedded?: boolean }>> = {
+  "duty-planner": DutyPlannerPage,
+  "salary-sheet": SalaryRegisterPage,
+  leaves: LeaveManagementPage,
+};
 
 function StaffPages() {
   const location = useLocation();
@@ -46,8 +49,7 @@ function StaffPages() {
   }, [location.pathname, searchParams, navigate]);
 
   const ActiveComponent = useMemo(() => {
-    const found = tabs.find((tab) => tab.key === activeTab);
-    return found ? found.component : DutyPlannerPage;
+    return tabComponents[activeTab] ?? DutyPlannerPage;
   }, [activeTab]);
 
   const handleTabChange = (tabKey: string) => {
@@ -55,36 +57,8 @@ function StaffPages() {
   };
 
   return (
-    <div className="w-full pt-3 pb-6 space-y-4">
-      {/* Tab Navigation Container (Scrollbar hidden via cross-browser Tailwind utility) */}
-      <div className="bg-white border-y sm:border border-slate-200/90 sm:rounded-xl shadow-sm px-3 py-1.5 w-full">
-        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none [ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => handleTabChange(tab.key)}
-                className={`
-                  flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 shrink-0 cursor-pointer
-                  ${isActive
-                    ? "bg-blue-50 text-blue-700 font-semibold"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                  }
-                `}
-              >
-                <Icon
-                  size={18}
-                  className={isActive ? "text-blue-700" : tab.color}
-                />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+    <div className="mx-auto w-full max-w-[1480px] space-y-4 pb-6">
+      <ModuleTabs tabs={tabs} activeKey={activeTab} onChange={handleTabChange} className="px-4 pt-3 sm:px-6 lg:px-8" />
 
       {/* Embedded Sub-Component */}
       <div className="w-full px-4 sm:px-6 lg:px-8">
