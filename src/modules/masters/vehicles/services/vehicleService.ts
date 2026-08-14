@@ -40,9 +40,7 @@ function clearLegacyVehicleStorage(): void {
 }
 
 function normalizeStatus(status: unknown): Vehicle["status"] {
-  if (status === "Active") return "Active";
-  if (status === "Maintenance") return "Maintenance";
-  return "Inactive";
+  return status === "Active" ? "Active" : "Inactive";
 }
 
 function toOptionalNumber(value: unknown): number | undefined {

@@ -156,7 +156,6 @@ export function DeliveryVolumeChart({ data }: { data: DerivedDashboard }) {
 const STATUS_COLORS: Record<string, string> = {
   "On Trip": "#059669",
   Available: "#0ea5e9",
-  Maintenance: "#f59e0b",
   Inactive: "#94a3b8",
 };
 

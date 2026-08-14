@@ -166,16 +166,14 @@ export function useFleetDashboardData(): FleetDashboardData {
         // Service due is an alert (KPI strip + card chip), never a status.
         const serviceDue = nextServiceKm != null && odometerKm != null && odometerKm >= nextServiceKm;
 
-        // Status rules:
-        //  · "Maintenance" only when the vehicle master record carries an
-        //    explicit maintenance state — recently serviced and service-due
-        //    vehicles remain Available (service due surfaces as an alert).
-        //  · Inactive comes from the master record.
-        //  · "On Trip" is derived from an active (Pending) trip.
+        // Status follows the real backend contract — the vehicle master
+        // record only persists Active/Inactive, so there is no master
+        // "Maintenance" state to fall back to:
+        //  · Inactive  → master record status "Inactive"
+        //  · On Trip   → master status Active + a current active trip
+        //  · Available → master status Active + no current active trip
         let status: FleetVehicleStatus;
-        if (v.status === "Maintenance") {
-          status = "Maintenance";
-        } else if (v.status !== "Active") {
+        if (v.status !== "Active") {
           status = "Inactive";
         } else if (activeTrip) {
           status = "On Trip";
@@ -247,13 +245,12 @@ export function useFleetDashboardData(): FleetDashboardData {
         };
       })
       .sort((a, b) => {
-        const order: Record<FleetVehicleStatus, number> = { "On Trip": 0, Maintenance: 1, Available: 2, Inactive: 3 };
+        const order: Record<FleetVehicleStatus, number> = { "On Trip": 0, Available: 1, Inactive: 2 };
         return order[a.status] - order[b.status] || a.vehicleNumber.localeCompare(b.vehicleNumber);
       });
 
     const fleetCounts: Record<FleetVehicleStatus, number> = {
       "On Trip": fleetVehicles.filter((v) => v.status === "On Trip").length,
-      Maintenance: fleetVehicles.filter((v) => v.status === "Maintenance").length,
       Available: fleetVehicles.filter((v) => v.status === "Available").length,
       Inactive: fleetVehicles.filter((v) => v.status === "Inactive").length,
     };
@@ -261,7 +258,6 @@ export function useFleetDashboardData(): FleetDashboardData {
     /* ----- Existing dashboard stats ----- */
     const totalVehicles = vehicles.length;
     const activeVehicles = vehicles.filter((v) => v.status === "Active").length;
-    const underMaintenance = fleetCounts.Maintenance;
 
     const thisMonthTrips = allTrips.filter(
       (t) => t.tripDate && isWithinInterval(new Date(t.tripDate), { start: monthStart, end: monthEnd })
@@ -306,7 +302,6 @@ export function useFleetDashboardData(): FleetDashboardData {
     const statusCounts = {
       "On Trip": fleetCounts["On Trip"],
       Available: fleetCounts.Available,
-      Maintenance: fleetCounts.Maintenance,
       Inactive: fleetCounts.Inactive,
     };
     const vehicleStatusDonut = Object.entries(statusCounts).map(([name, value]) => ({ name, value }));
@@ -346,7 +341,6 @@ export function useFleetDashboardData(): FleetDashboardData {
     return {
       totalVehicles,
       activeVehicles,
-      underMaintenance,
       fuelCostThisMonth,
       totalKMThisMonth,
       serviceDue,

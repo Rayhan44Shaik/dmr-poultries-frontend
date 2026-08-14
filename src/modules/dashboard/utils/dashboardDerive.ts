@@ -46,7 +46,7 @@ export interface FleetVehicleView {
   id: number;
   number: string;
   type: string;
-  status: "On Trip" | "Available" | "Maintenance" | "Inactive";
+  status: "On Trip" | "Available" | "Inactive";
   driver: string;
   currentTrip: string;
   fuel: number;
@@ -198,17 +198,14 @@ export function deriveDashboard(data: DashboardData): DerivedDashboard {
     const fuelRecords = data.fuelExpenses.filter((f) => f.vehicleNo === v.number);
     const lastFuel = fuelRecords.sort((a, b) => b.date.localeCompare(a.date))[0];
 
-    // Status rules (same business rule as the fleet dashboard):
-    // "Maintenance" only from an explicit master-record state; recently
-    // serviced and service-due vehicles stay Available.
+    // Status follows the real backend contract — the vehicle master record
+    // only persists Active/Inactive (no persisted "Maintenance" state):
+    //  · Inactive  → master record status "Inactive"
+    //  · On Trip   → master status Active + a current active trip
+    //  · Available → master status Active + no current active trip
+    // Service due and recent servicing are alerts/info, never a status.
     const status: FleetVehicleView["status"] =
-      v.status === "Maintenance"
-        ? "Maintenance"
-        : v.status === "Inactive"
-        ? "Inactive"
-        : onTrip
-        ? "On Trip"
-        : "Available";
+      v.status === "Inactive" ? "Inactive" : onTrip ? "On Trip" : "Available";
 
     const lastMeter = latestTrip
       ? Number(latestTrip.closingMeter) || Number(latestTrip.openingMeter) + Number(latestTrip.totalKm) || null
@@ -229,10 +226,10 @@ export function deriveDashboard(data: DashboardData): DerivedDashboard {
     };
   });
 
-  const vehicleActivity = (["On Trip", "Available", "Maintenance", "Inactive"] as const).map((status, i) => ({
+  const vehicleActivity = (["On Trip", "Available", "Inactive"] as const).map((status, i) => ({
     name: status,
     value: fleet.filter((f) => f.status === status).length,
-    color: ["#059669", "#0ea5e9", "#f59e0b", "#94a3b8"][i],
+    color: ["#059669", "#0ea5e9", "#94a3b8"][i],
   }));
 
   /* ----- Activity timeline ----- */

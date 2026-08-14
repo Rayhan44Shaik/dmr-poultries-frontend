@@ -107,7 +107,6 @@ export type EMIRecord = z.infer<typeof EMIRecordSchema>;
 export interface FleetDashboardStats {
   totalVehicles: number;
   activeVehicles: number;
-  underMaintenance: number;
   fuelCostThisMonth: number;
   totalKMThisMonth: number;
   serviceDue: number;
@@ -126,7 +125,12 @@ export interface FleetDashboardStats {
 }
 
 // ---------- Fleet Overview Types ----------
-export type FleetVehicleStatus = "On Trip" | "Available" | "Maintenance" | "Inactive";
+// Derived fleet statuses follow the real backend contract:
+// Inactive comes from the vehicle master record (Active/Inactive), On Trip
+// from a current active trip, everything else is Available. There is no
+// persisted "Maintenance" master state in the backend — service due is an
+// alert/KPI, never a status.
+export type FleetVehicleStatus = "On Trip" | "Available" | "Inactive";
 
 export type FleetExpiryState = "expired" | "expiring" | "safe" | "none";
 

@@ -7,7 +7,7 @@ import { RefreshCw, Search, Truck } from "lucide-react";
 import type { FleetVehicleOverview, FleetVehicleStatus } from "../../types";
 import FleetVehicleCard from "./FleetVehicleCard";
 
-const STATUS_FILTERS: ("all" | FleetVehicleStatus)[] = ["all", "On Trip", "Available", "Maintenance", "Inactive"];
+const STATUS_FILTERS: ("all" | FleetVehicleStatus)[] = ["all", "On Trip", "Available", "Inactive"];
 
 function CardSkeleton() {
   return (
@@ -139,8 +139,7 @@ export default function FleetOverview({ vehicles, counts, loading, error, onRetr
         <div>
           <h3 className="text-[15px] font-semibold tracking-tight text-slate-900 dark:text-white">Fleet overview</h3>
           <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
-            {counts["On Trip"]} on trip · {counts.Available} available · {counts.Maintenance} in maintenance ·{" "}
-            {counts.Inactive} inactive
+            {counts["On Trip"]} on trip · {counts.Available} available · {counts.Inactive} inactive
           </p>
         </div>
         <Link

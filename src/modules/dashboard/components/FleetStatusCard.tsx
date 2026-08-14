@@ -2,21 +2,19 @@
 // Fleet overview — vehicle tiles with status, driver, trip, fuel, maintenance.
 
 import { Link } from "react-router-dom";
-import { ArrowRight, Gauge, ShieldAlert, Truck, Wrench } from "lucide-react";
+import { ArrowRight, Gauge, ShieldAlert, Truck } from "lucide-react";
 import type { FleetVehicleView } from "../utils/dashboardDerive";
 import { formatINR, formatNumber } from "../../../utils/format";
 
 const STATUS_STYLES: Record<FleetVehicleView["status"], string> = {
   "On Trip": "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-400",
   Available: "bg-sky-50 text-sky-700 ring-sky-600/20 dark:bg-sky-500/10 dark:text-sky-400",
-  Maintenance: "bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-400",
   Inactive: "bg-slate-100 text-slate-500 ring-slate-500/10 dark:bg-slate-700/60 dark:text-slate-400",
 };
 
 const STATUS_DOT: Record<FleetVehicleView["status"], string> = {
   "On Trip": "bg-emerald-500",
   Available: "bg-sky-500",
-  Maintenance: "bg-amber-500",
   Inactive: "bg-slate-400",
 };
 
@@ -40,8 +38,7 @@ export default function FleetStatusCard({ fleet }: FleetStatusCardProps) {
         <div>
           <h3 className="text-[13.5px] font-semibold tracking-tight text-slate-800 dark:text-slate-100">Vehicle status</h3>
           <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
-            {fleet.filter((f) => f.status === "On Trip").length} on trip · {fleet.filter((f) => f.status === "Available").length} available ·{" "}
-            {fleet.filter((f) => f.status === "Maintenance").length} in maintenance
+            {fleet.filter((f) => f.status === "On Trip").length} on trip · {fleet.filter((f) => f.status === "Available").length} available
           </p>
         </div>
         <Link
@@ -82,14 +79,8 @@ export default function FleetStatusCard({ fleet }: FleetStatusCardProps) {
                   className="rounded-lg border border-slate-100 bg-slate-50/40 p-3 transition-colors hover:border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800/40 dark:hover:border-slate-700 dark:hover:bg-slate-800/70"
                 >
                   <div className="flex items-center gap-2.5">
-                    <span
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                        vehicle.status === "Maintenance"
-                          ? "bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400"
-                          : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400"
-                      }`}
-                    >
-                      {vehicle.status === "Maintenance" ? <Wrench size={15} /> : <Truck size={15} />}
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+                      <Truck size={15} />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5">

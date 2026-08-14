@@ -32,11 +32,6 @@ export type Vehicle = {
   rcDate?: string;
   
 
-  /**
-   * Master-record status. "Maintenance" represents an explicit
-   * active-maintenance state set on the vehicle master (fleet overview
-   * treats it as the only maintenance-status source); the current
-   * PostgreSQL enum stores 'Active'/'Inactive'.
-   */
-  status: "Active" | "Inactive" | "Maintenance";
+  /** Master-record status — the persisted backend contract is Active/Inactive only. */
+  status: "Active" | "Inactive";
 };

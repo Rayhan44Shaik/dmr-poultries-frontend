@@ -90,10 +90,7 @@ function VehicleForm({ vehicle, onSave, onCancel, isSaving = false }: VehicleFor
       setEngineNumber(vehicle.engineNumber ?? "");
       setChassisNumber(vehicle.chassisNumber ?? "");
       setRcDate(vehicle.rcDate ?? "");
-      // The form's toggle offers Active/Inactive only; an explicit
-      // "Maintenance" master status is preserved on save but displays
-      // as Inactive in this toggle (same coercion as before).
-      setStatus(vehicle.status === "Active" ? "Active" : "Inactive");
+      setStatus(vehicle.status);
     } else {
       // Reset all
       setVehicleNumber("");

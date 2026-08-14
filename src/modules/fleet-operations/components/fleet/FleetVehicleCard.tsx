@@ -15,10 +15,6 @@ const STATUS_STYLES: Record<FleetVehicleStatus, { badge: string; dot: string }> 
     badge: "bg-sky-50 text-sky-700 ring-sky-600/20 dark:bg-sky-500/10 dark:text-sky-400",
     dot: "bg-sky-500",
   },
-  Maintenance: {
-    badge: "bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-400",
-    dot: "bg-amber-500",
-  },
   Inactive: {
     badge: "bg-slate-100 text-slate-500 ring-slate-500/10 dark:bg-slate-700/60 dark:text-slate-400",
     dot: "bg-slate-400",
@@ -69,14 +65,8 @@ function FleetVehicleCard({ vehicle }: FleetVehicleCardProps) {
       {/* Header */}
       <header className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-              vehicle.status === "Maintenance"
-                ? "bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400"
-                : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-            }`}
-          >
-            {vehicle.status === "Maintenance" ? <Wrench size={16} /> : <Truck size={16} />}
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+            <Truck size={16} />
           </span>
           <div className="min-w-0">
             <p className="truncate text-[14px] font-bold tracking-tight text-slate-900 dark:text-white">
