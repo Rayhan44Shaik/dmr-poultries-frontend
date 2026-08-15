@@ -1,193 +1,275 @@
 // src/modules/staff/hooks/useLeaveManagement.ts
+// Leave Management + Leave Report — fully PostgreSQL/API backed. No localStorage.
+// Authoritative sources:
+//   - Leave requests: leaveService -> GET/POST/PATCH/DELETE /api/staff/leaves
+//   - Leave report:   leaveService -> GET /api/staff/leaves/report
+//   - Employees:      masters employeeService -> GET /api/masters/employees
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  loadEmployees,
-  loadLeaveRequests,
-  saveLeaveRequests,
-  getLeaveBalance,
-  getAllLeaveBalances,
-} from '../services/staffService';
-import type { LeaveRequest, LeaveBalance } from '../types/staffDashboard';
+  listLeaves,
+  createLeave,
+  updateLeaveStatus,
+  deleteLeave as deleteLeaveApi,
+  getLeaveReport,
+} from '../services/leaveService';
+import { loadEmployees } from '../../masters/employees/services/employeeService';
+import type { Employee } from '../../masters/employees/types/employee';
+import type {
+  LeaveRequest,
+  LeaveListResult,
+  LeaveReport,
+  LeaveReportItem,
+} from '../types/staffDashboard';
 
 type NotificationFn = (message: string, type?: 'success' | 'error' | 'info') => void;
 
+export interface LeaveFilters {
+  status: 'All' | 'Pending' | 'Approved' | 'Rejected';
+  month: string;
+  department: string;
+  employeeId: number | null;
+  leaveType: 'All' | 'Casual' | 'Sick' | 'Emergency' | 'Annual';
+  search: string;
+}
+
+const DEFAULT_FILTERS: LeaveFilters = {
+  status: 'Pending',
+  month: new Date().toISOString().slice(0, 7),
+  department: '',
+  employeeId: null,
+  leaveType: 'All',
+  search: '',
+};
+
 export function useLeaveManagement(showNotification?: NotificationFn) {
-  const notify = showNotification || ((msg: string) => console.log(msg));
+  const notify = useMemo(
+    () => showNotification || ((msg: string) => console.log(msg)),
+    [showNotification]
+  );
 
-  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [balances, setBalances] = useState<LeaveBalance[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [filters, setFilters] = useState<LeaveFilters>(DEFAULT_FILTERS);
+  const [list, setList] = useState<LeaveListResult>({ items: [], total: 0, page: 1, limit: 100, totalPages: 0 });
+  const [report, setReport] = useState<LeaveReport>({ month: DEFAULT_FILTERS.month, items: [] });
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'All' | 'Pending' | 'Approved' | 'Rejected'>('Pending');
-  const [search, setSearch] = useState('');
+  const [reportLoading, setReportLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
 
-  const loadData = useCallback(() => {
-    setLoading(true);
-    try {
-      const empData = loadEmployees();
-      const leaveData = loadLeaveRequests();
-      setEmployees(empData);
-      setLeaves(leaveData);
-      setBalances(getAllLeaveBalances());
-    } catch (error) {
-      console.error('Failed to load leave data:', error);
-    } finally {
-      setLoading(false);
-    }
+  // Authoritative Employee Master from the backend.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const data = await loadEmployees();
+        if (active) setEmployees(Array.isArray(data) ? data : []);
+      } catch {
+        if (active) setEmployees([]);
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  const filteredLeaves = useMemo(() => {
-    let result = leaves;
-    if (filter !== 'All') {
-      result = result.filter((l) => l.status === filter);
-    }
-    if (search.trim()) {
-      const query = search.toLowerCase();
-      result = result.filter(
-        (l) =>
-          l.employeeName.toLowerCase().includes(query) ||
-          l.type.toLowerCase().includes(query) ||
-          l.status.toLowerCase().includes(query)
-      );
-    }
-    return result.sort((a, b) => {
-      if (a.status === 'Pending' && b.status !== 'Pending') return -1;
-      if (b.status === 'Pending' && a.status !== 'Pending') return 1;
-      return b.createdAt.localeCompare(a.createdAt);
+  const fetchList = useCallback(async () => {
+    return listLeaves({
+      status: filters.status,
+      month: filters.month || undefined,
+      department: filters.department || undefined,
+      employeeId: filters.employeeId ?? undefined,
+      leaveType: filters.leaveType === 'All' ? undefined : filters.leaveType,
+      search: filters.search || undefined,
+      page: 1,
+      limit: 200,
     });
-  }, [leaves, filter, search]);
+  }, [filters.status, filters.month, filters.department, filters.employeeId, filters.leaveType, filters.search]);
 
-  const stats = useMemo(() => ({
-    pending: leaves.filter((l) => l.status === 'Pending').length,
-    approved: leaves.filter((l) => l.status === 'Approved').length,
-    rejected: leaves.filter((l) => l.status === 'Rejected').length,
-    total: leaves.length,
-  }), [leaves]);
+  const fetchReport = useCallback(async () => {
+    return getLeaveReport({
+      month: filters.month,
+      ...(filters.department ? { department: filters.department } : {}),
+      ...(filters.employeeId ? { employeeId: filters.employeeId } : {}),
+    });
+  }, [filters.month, filters.department, filters.employeeId]);
 
-  const totalBalances = useMemo(() => {
-    return balances.reduce(
-      (acc, b) => ({
-        total: acc.total + b.total,
-        used: acc.used + b.used,
-        remaining: acc.remaining + b.remaining,
-      }),
-      { total: 0, used: 0, remaining: 0 }
-    );
-  }, [balances]);
+  // Initial + filter-change loads. The async IIFE only touches state after an
+  // await, so it never triggers a synchronous setState cascade inside an effect.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchList();
+        if (!cancelled) setList(data);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Failed to load leave requests.');
+          setList({ items: [], total: 0, page: 1, limit: 200, totalPages: 0 });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchList]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchReport();
+        if (!cancelled) setReport(data);
+      } catch (e) {
+        if (!cancelled) {
+          setReportError(e instanceof Error ? e.message : 'Failed to load leave report.');
+          setReport({ month: filters.month, items: [] });
+        }
+      } finally {
+        if (!cancelled) setReportLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchReport, filters.month]);
+
+  const stats = useMemo(() => {
+    const requests = list.items;
+    return {
+      approved: requests.filter((l) => l.status === 'Approved').length,
+      pending: requests.filter((l) => l.status === 'Pending').length,
+      rejected: requests.filter((l) => l.status === 'Rejected').length,
+      onLeaveToday: report.items.filter((r) => r.approvedLeaveDays > 0).length,
+      approvedDays: report.items.reduce((s, r) => s + r.approvedLeaveDays, 0),
+    };
+  }, [list.items, report.items]);
+
+  const departments = useMemo(() => {
+    const set = new Set<string>();
+    employees.forEach((e) => {
+      if (e?.department) set.add(String(e.department));
+    });
+    return Array.from(set).sort();
+  }, [employees]);
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    setReportLoading(true);
+    setReportError(null);
+    fetchList()
+      .then((data) => setList(data))
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : 'Failed to load leave requests.');
+        setList({ items: [], total: 0, page: 1, limit: 200, totalPages: 0 });
+      })
+      .finally(() => setLoading(false));
+    fetchReport()
+      .then((data) => setReport(data))
+      .catch((e) => {
+        setReportError(e instanceof Error ? e.message : 'Failed to load leave report.');
+        setReport({ month: filters.month, items: [] });
+      })
+      .finally(() => setReportLoading(false));
+  }, [fetchList, fetchReport, filters.month]);
+
+  const setFilter = useCallback(<K extends keyof LeaveFilters>(key: K, value: LeaveFilters[K]) => {
+    setFilters((f) => ({ ...f, [key]: value }));
+  }, []);
+
+  const resetFilters = useCallback(() => {
+    setFilters(DEFAULT_FILTERS);
+  }, []);
 
   const addLeave = useCallback(
-    (leave: Omit<LeaveRequest, 'id' | 'createdAt' | 'status'>) => {
-      const newLeave: LeaveRequest = {
-        ...leave,
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString(),
-        status: 'Pending',
-      };
-      const balance = getLeaveBalance(leave.employeeId);
-      if (balance && leave.days > balance.remaining) {
-        notify(`Insufficient leave balance. Available: ${balance.remaining} days`, 'error');
+    async (input: {
+      employeeId: number;
+      type: LeaveRequest['type'];
+      fromDate: string;
+      toDate: string;
+      days?: number;
+      reason?: string;
+    }) => {
+      try {
+        await createLeave(input);
+        notify('Leave request submitted successfully!', 'success');
+        refresh();
+        return true;
+      } catch (e) {
+        notify(e instanceof Error ? e.message : 'Could not submit leave request.', 'error');
         return false;
       }
-      const updated = [...leaves, newLeave];
-      setLeaves(updated);
-      saveLeaveRequests(updated);
-      setBalances(getAllLeaveBalances());
-      notify('Leave request submitted successfully!', 'success');
-      return true;
     },
-    [leaves, notify]
+    [notify, refresh]
   );
 
   const approveLeave = useCallback(
-    (id: string, approvedBy?: string) => {
-      const leave = leaves.find((l) => l.id === id);
-      if (!leave) return;
-      const balance = getLeaveBalance(leave.employeeId);
-      if (balance && leave.days > balance.remaining) {
-        notify(`Cannot approve: Insufficient balance. Available: ${balance.remaining} days`, 'error');
-        return;
+    async (id: string, approvedBy?: string) => {
+      try {
+        await updateLeaveStatus(id, 'Approved', { approvedBy: approvedBy || 'Admin' });
+        notify('Leave approved!', 'success');
+        refresh();
+      } catch (e) {
+        notify(e instanceof Error ? e.message : 'Could not approve leave.', 'error');
       }
-      const updated = leaves.map((l) =>
-        l.id === id
-          ? {
-              ...l,
-              status: 'Approved' as const,
-              approvedAt: new Date().toISOString(),
-              approvedBy: approvedBy || 'Admin',
-            }
-          : l
-      );
-      setLeaves(updated);
-      saveLeaveRequests(updated);
-      setBalances(getAllLeaveBalances());
-      notify('Leave approved!', 'success');
     },
-    [leaves, notify]
+    [notify, refresh]
   );
 
   const rejectLeave = useCallback(
-    (id: string, rejectionReason: string) => {
+    async (id: string, rejectionReason: string) => {
       if (!rejectionReason.trim()) {
         notify('Please provide a rejection reason.', 'error');
         return;
       }
-      const updated = leaves.map((l) =>
-        l.id === id
-          ? {
-              ...l,
-              status: 'Rejected' as const,
-              rejectionReason,
-            }
-          : l
-      );
-      setLeaves(updated);
-      saveLeaveRequests(updated);
-      notify('Leave rejected.', 'info');
+      try {
+        await updateLeaveStatus(id, 'Rejected', { rejectionReason });
+        notify('Leave rejected.', 'info');
+        refresh();
+      } catch (e) {
+        notify(e instanceof Error ? e.message : 'Could not reject leave.', 'error');
+      }
     },
-    [leaves, notify]
+    [notify, refresh]
   );
 
   const deleteLeave = useCallback(
-    (id: string) => {
-      const leave = leaves.find((l) => l.id === id);
-      if (leave?.status === 'Approved' || leave?.status === 'Rejected') {
-        notify('Cannot delete approved/rejected leave.', 'error');
-        return;
+    async (id: string) => {
+      if (!window.confirm('Delete this pending leave request?')) return;
+      try {
+        await deleteLeaveApi(id);
+        notify('Leave request deleted.', 'info');
+        refresh();
+      } catch (e) {
+        notify(e instanceof Error ? e.message : 'Could not delete leave.', 'error');
       }
-      if (!window.confirm('Delete this leave request?')) return;
-      const updated = leaves.filter((l) => l.id !== id);
-      setLeaves(updated);
-      saveLeaveRequests(updated);
-      notify('Leave request deleted.', 'info');
     },
-    [leaves, notify]
+    [notify, refresh]
   );
 
-  const refresh = useCallback(() => {
-    loadData();
-  }, [loadData]);
-
   return {
-    leaves: filteredLeaves,
-    allLeaves: leaves,
+    leaves: list.items,
+    allLeaves: list.items,
+    report,
+    reportLoading,
+    reportError,
     stats,
-    balances,
-    totalBalances,
-    filter,
-    setFilter,
-    search,
-    setSearch,
     loading,
+    error,
+    filters,
+    setFilter,
+    resetFilters,
+    employees,
+    departments,
     addLeave,
     approveLeave,
     rejectLeave,
     deleteLeave,
     refresh,
-    employees,
   };
 }
+
+export type { LeaveReportItem };

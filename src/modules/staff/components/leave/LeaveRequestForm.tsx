@@ -28,7 +28,9 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
   };
 
   const getEmpId = (emp: any): number | string => {
-    return emp?.employeeNo ?? emp?.id ?? emp?.empNo ?? 0;
+    // Backend leave_requests.employee_id references employees.id (PK), so the
+    // DB id must be sent, not the employee number.
+    return emp?.id ?? emp?.employeeId ?? emp?.employeeNo ?? 0;
   };
 
   const uniqueDepartments = Array.from(

@@ -83,10 +83,12 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) 
             <thead className="bg-slate-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Employee</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Department</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Type</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">From → To</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Days</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Reason</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Actions</th>
               </tr>
             </thead>
@@ -94,6 +96,7 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) 
               {leaves.map((leave) => (
                 <tr key={leave.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3 text-sm font-medium text-slate-800">{leave.employeeName}</td>
+                  <td className="px-4 py-3 text-sm text-slate-600">{leave.department || '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${getTypeColor(leave.type)}`}>
                       {leave.type}
@@ -107,6 +110,9 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) 
                     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(leave.status)}`}>
                       {leave.status}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-slate-500 max-w-[180px] truncate" title={leave.reason}>
+                    {leave.reason || '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">

@@ -137,6 +137,53 @@ export interface LeaveRequest {
   createdAt: string;
   approvedBy?: string;
   approvedAt?: string;
+  /** Joined from employees by the backend (for table/report display). */
+  employeeNo?: number;
+  department?: string;
+}
+
+export interface LeaveListResult {
+  items: LeaveRequest[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface LeaveReportItem {
+  employeeId: number;
+  employeeNo: number;
+  employeeName: string;
+  department: string;
+  approvedLeaveDays: number;
+  pendingLeaveDays: number;
+  rejectedLeaveDays: number;
+  leaveDates: string[];
+  leaveTypes: string[];
+}
+
+export interface LeaveReport {
+  month: string;
+  items: LeaveReportItem[];
+}
+
+export interface LeaveReportFilters {
+  month: string;
+  department?: string;
+  employeeId?: number;
+}
+
+export interface LeaveListFilters {
+  status?: string;
+  month?: string;
+  employeeId?: number;
+  department?: string;
+  leaveType?: string;
+  fromDate?: string;
+  toDate?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface LeaveBalance {

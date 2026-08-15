@@ -89,7 +89,7 @@ export function SalaryView({ record, onClose, formatCurrency = (amt) =>
           </div>
         </div>
 
-        <Section title="Attendance" tone="text-indigo-600">
+        <Section title="Day Summary" tone="text-indigo-600">
           <Row label="Working Days" value={record.workingDays ?? "—"} strong />
           <Row label="Present Days" value={record.presentDays ?? "—"} />
           <Row label="Leave Days" value={record.leaveDays ?? "—"} />
