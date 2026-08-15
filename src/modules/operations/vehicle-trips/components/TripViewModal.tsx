@@ -50,6 +50,17 @@ interface Props {
   onEdit?: (trip: Trip) => void;
 }
 
+/**
+ * Props for the inner body. Declared explicitly (instead of Omit<Props, ...>)
+ * so the required `trip` is a plain non-nullable Trip and every field is
+ * visible at a glance.
+ */
+interface ContentProps {
+  trip: Trip;
+  onClose: () => void;
+  onEdit?: (trip: Trip) => void;
+}
+
 const SHOPS_PER_PAGE = 6;
 
 /* ────────────────────────────────────────────────────────────────
@@ -878,7 +889,7 @@ function ViewStepDeliveries({ trip }: { trip: Trip }) {
    MODAL BODY (hooks live here so the early-return stays safe)
    ──────────────────────────────────────────────────────────────── */
 
-function TripViewModalContent({ trip: incomingTrip, onClose, onEdit }: Omit<Props, "open" | "trip"> & { trip: Trip }) {
+function TripViewModalContent({ trip: incomingTrip, onClose, onEdit }: ContentProps) {
   const [viewStepIndex, setViewStepIndex] = useState(0);
   const [hydratedTrip, setHydratedTrip] = useState<Trip | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -1246,19 +1257,16 @@ function TripViewModalContent({ trip: incomingTrip, onClose, onEdit }: Omit<Prop
   );
 }
 
-function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props) {
+/**
+ * Outer shell: keeps the `open` / `trip === null` early-return OUT of the
+ * component that owns the hooks, so hook order can never change between
+ * renders. `shops` / `birdTypes` stay in the public Props (both call sites
+ * pass them) but the read-only view resolves names off the trip itself.
+ */
+function TripViewModal({ open, trip, onClose, onEdit }: Props) {
   if (!open || !trip) return null;
 
-  return (
-    <TripViewModalContent
-      key={trip.id}
-      trip={trip}
-      onClose={onClose}
-      shops={shops}
-      birdTypes={birdTypes}
-      onEdit={onEdit}
-    />
-  );
+  return <TripViewModalContent key={trip.id} trip={trip} onClose={onClose} onEdit={onEdit} />;
 }
 
 export default React.memo(TripViewModal);
