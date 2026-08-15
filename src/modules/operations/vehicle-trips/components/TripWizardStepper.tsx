@@ -4,7 +4,7 @@ import { Check } from "lucide-react";
 interface Props {
   currentStep: number;
   steps: string[];
-  completedMask: { start: boolean; farm: boolean; pickup: boolean; delivery: boolean };
+  completedMask: { start: boolean; farm: boolean; pickup: boolean; delivery: boolean; end?: boolean };
   onStepClick?: (index: number) => void;
 }
 
@@ -13,7 +13,7 @@ export default function TripWizardStepper({ currentStep, steps, completedMask, o
   const stepStatus = [0, 1, 2, 3, 4].map((index) => {
     const stepNames = ["start", "farm", "pickup", "delivery", "end"];
     const key = stepNames[index];
-    if (key === "end") return false; 
+    if (key === "end") return completedMask.end === true;
     return completedMask[key as keyof typeof completedMask];
   });
 

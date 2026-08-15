@@ -1183,15 +1183,13 @@ function TripViewModalContent({ trip: incomingTrip, onClose, onEdit }: Omit<Prop
           <TripWizardStepper
             steps={["Start", "Farm", "Pickup", "Deliveries", "End"]}
             currentStep={currentStep}
-            completedMask={
-              {
-                start: isStartCompleted,
-                farm: isFarmCompleted,
-                pickup: isPickupCompleted,
-                delivery: isDeliveryCompleted,
-                end: isEndCompleted,
-              } as any
-            }
+            completedMask={{
+              start: isStartCompleted,
+              farm: isFarmCompleted,
+              pickup: isPickupCompleted,
+              delivery: isDeliveryCompleted,
+              end: isEndCompleted,
+            }}
             onStepClick={setViewStepIndex}
           />
 
