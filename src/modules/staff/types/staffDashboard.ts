@@ -92,7 +92,7 @@ export interface DutyPlannerFilters {
   weekStart: string;       // Monday date
 }
 export interface ShiftConfig {
-  type: 'Driver' | 'Delivery' | 'Rest' | 'Repair' | 'Office' | 'WeeklyOff';
+  type: 'Driver' | 'Delivery' | 'Rest' | 'Repair' | 'Office' | 'OfficeDuty' | 'Collection' | 'WeeklyOff';
   label: string;
   bgColor: string;
   textColor: string;
@@ -165,6 +165,8 @@ export interface SalaryRecord {
   employeeId: number;
   employeeName: string;
   department: string;
+  role?: string;
+  month: string;
   basicSalary: number;
   overtime: number;
   incentives: number;
@@ -178,10 +180,22 @@ export interface SalaryRecord {
   otherDeductions: number;
   totalDeductions: number;
   netSalary: number;
-  status: 'Pending' | 'Paid';
-  paymentDate?: string;
-  month: string; // YYYY-MM
+  status: 'Pending' | 'Submitted' | 'Paid';
+  paymentDate?: string | null;
+  paymentRef?: string | null;
+  paidAt?: string | null;
+  submittedAt?: string | null;
+  submittedBy?: string | null;
   createdAt: string;
+  // Derived at read time by the backend from the authoritative Duty Planner
+  // attendance summary — never computed in the frontend.
+  workingDays?: number;
+  presentDays?: number;
+  leaveDays?: number;
+  weeklyOffDays?: number;
+  // Derived lifecycle flags returned by the backend salary list.
+  monthClosed?: boolean;
+  correctionWindowDaysRemaining?: number | null;
 }
 
 export interface SalaryCalculation {

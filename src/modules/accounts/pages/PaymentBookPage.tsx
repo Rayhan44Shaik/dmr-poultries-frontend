@@ -83,10 +83,23 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
   // Auto-sync interval / listener setup for background entries
   useEffect(() => {
     loadPayments();
-    const interval = setInterval(() => {
-      loadPayments();
-    }, 1000); // Polls and auto-syncs entries instantly every second
-    return () => clearInterval(interval);
+
+    const sync = () => {
+      if (!document.hidden) loadPayments();
+    };
+
+    const interval = setInterval(sync, 1000); // Polls and auto-syncs entries instantly every second
+
+    const handleVisibility = () => {
+      if (!document.hidden) sync();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [loadPayments]);
 
   useEffect(() => {

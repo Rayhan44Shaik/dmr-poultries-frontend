@@ -1,230 +1,157 @@
 // src/modules/staff/components/salary/salaryTable.tsx
 
-import React, { useMemo, useRef, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { useMemo } from "react";
+import { CheckCircle2, Eye, Lock, Pencil, Trash2, Undo2, Send, Wallet } from "lucide-react";
+import type { SalaryRecord } from "../../types/staffDashboard";
+
+type Action = "view" | "edit" | "submit" | "pay" | "markUnpaid" | "unsubmit" | "delete";
 
 type SalaryTableProps = {
-  records: any[];
-  selectedIds: string[];
-  toggleSelectOne: (id: string) => void;
-  toggleSelectAll: () => void;
-  isSelectDropdownOpen?: boolean;
-  setIsSelectDropdownOpen?: (open: boolean) => void;
-  dropdownRef?: React.RefObject<HTMLDivElement | null>;
-  formatCurrency?: (amount: number) => string;
+  records: SalaryRecord[];
   currentPage: number;
   setCurrentPage?: (page: number) => void;
   itemsPerPage: number;
-  currentMonth?: string;
-  onClearSelection?: () => void;
-  onView?: (record: any) => void;
-  onEdit?: (record: any) => void;
-  onMarkPaid?: (id: string) => void;
+  formatCurrency?: (amount: number) => string;
+  saving?: boolean;
+  onAction: (action: Action, record: SalaryRecord) => void;
 };
+
+function StatusBadge({ record }: { record: SalaryRecord }) {
+  const windowOpen =
+    record.status === "Paid" &&
+    record.correctionWindowDaysRemaining != null &&
+    record.correctionWindowDaysRemaining > 0;
+
+  if (record.status === "Pending") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+        Pending
+      </span>
+    );
+  }
+  if (record.status === "Submitted") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+        <Lock size={11} /> Submitted
+      </span>
+    );
+  }
+  // Paid
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
+        record.monthClosed || !windowOpen
+          ? "bg-slate-100 text-slate-600 border-slate-200"
+          : "bg-emerald-50 text-emerald-700 border-emerald-200"
+      }`}
+    >
+      <CheckCircle2 size={11} />
+      Paid
+      {(record.monthClosed || !windowOpen) && <Lock size={10} />}
+    </span>
+  );
+}
+
+function actionStatus(record: SalaryRecord): string {
+  if (record.monthClosed) return "This payroll month is closed.";
+  if (record.status === "Paid") {
+    if (record.correctionWindowDaysRemaining == null || record.correctionWindowDaysRemaining <= 0) {
+      return "Correction window expired — paid salary is locked.";
+    }
+    return "";
+  }
+  return "";
+}
 
 export function SalaryTable({
   records,
-  selectedIds,
-  toggleSelectOne,
-  toggleSelectAll,
-  isSelectDropdownOpen = false,
-  setIsSelectDropdownOpen = () => {},
-  dropdownRef,
-  formatCurrency,
   currentPage,
   setCurrentPage = () => {},
   itemsPerPage,
-  currentMonth = '',
-  onClearSelection,
+  formatCurrency,
+  saving = false,
+  onAction,
 }: SalaryTableProps) {
-  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const formatVal = formatCurrency || ((amount: number) =>
+    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(amount || 0));
 
-  // Fallback currency formatter
-  const formatVal = formatCurrency || ((amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2,
-    }).format(amount || 0);
-  });
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (tableContainerRef.current && !tableContainerRef.current.contains(event.target as Node)) {
-        const target = event.target as HTMLElement;
-        const text = target.textContent || '';
-        const isBatchOrAction = 
-          target.closest('button') && 
-          (text.includes('Mark Paid') || 
-           text.includes('Mark Pending') || 
-           text.includes('Clear Selection') ||
-           text.includes('View') || 
-           text.includes('Edit') || 
-           text.includes('Delete') ||
-           text.includes('Download PDF'));
-
-        if (!isBatchOrAction && selectedIds.length > 0) {
-          onClearSelection?.();
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [selectedIds, onClearSelection]);
-
-  const sortedRecords = useMemo(() => {
-    const priorityMap: Record<string, number> = {
-      'supervisor': 1,
-      'driver': 2,
-      'helper': 3,
-      'accounts': 99,
-      'accountant': 99,
-    };
-
-    return [...records].sort((a, b) => {
-      const deptA = (a.department || a.role || '').toLowerCase();
-      const deptB = (b.department || b.role || '').toLowerCase();
-      
-      const scoreA = priorityMap[deptA] ?? 50;
-      const scoreB = priorityMap[deptB] ?? 50;
-
-      if (scoreA !== scoreB) {
-        return scoreA - scoreB;
-      }
-      return (a.employeeName || a.name || '').localeCompare(b.employeeName || b.name || '');
-    });
-  }, [records]);
+  const sortedRecords = useMemo(
+    () =>
+      [...records].sort((a, b) =>
+        (a.employeeName || "").localeCompare(b.employeeName || "")
+      ),
+    [records]
+  );
 
   const totalPages = Math.ceil(sortedRecords.length / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentRecords = sortedRecords.slice(startIndex, startIndex + itemsPerPage);
 
-  const isAllSortedSelected = sortedRecords.length > 0 && selectedIds.length >= sortedRecords.length;
+  if (records.length === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-sm">
+        No salary records for the selected month.
+      </div>
+    );
+  }
 
   return (
-    <div ref={tableContainerRef} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase relative">
-                <div className="inline-block" ref={dropdownRef}>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsSelectDropdownOpen(!isSelectDropdownOpen);
-                    }}
-                    className="flex items-center gap-1.5 px-2 py-1 bg-white border border-slate-300 rounded-md text-xs font-bold text-slate-700 hover:bg-slate-100 transition shadow-2xs"
-                  >
-                    <span>#</span>
-                    {selectedIds.length > 0 && (
-                      <span className="bg-blue-600 text-white px-1.5 py-0.2 rounded-full text-[10px]">
-                        {selectedIds.length}
-                      </span>
-                    )}
-                    <ChevronDown size={12} />
-                  </button>
-
-                  {isSelectDropdownOpen && (
-                    <div 
-                      onClick={(e) => e.stopPropagation()} 
-                      className="absolute left-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150"
-                    >
-                      <div className="flex items-center justify-between px-2 py-1.5 border-b border-slate-100 mb-1">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Select Records</span>
-                        <button
-                          type="button"
-                          onClick={() => toggleSelectAll()}
-                          className="text-[11px] text-blue-600 hover:underline font-semibold"
-                        >
-                          {isAllSortedSelected ? 'Deselect All' : `Select All (${sortedRecords.length})`}
-                        </button>
-                      </div>
-                      <div className="max-h-60 overflow-y-auto space-y-0.5">
-                        {sortedRecords.map((record: any, idx: number) => {
-                          const isChecked = selectedIds.includes(record.id);
-                          return (
-                            <label
-                              key={record.id}
-                              className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs text-slate-700 select-none"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => toggleSelectOne(record.id)}
-                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                              />
-                              <span className="font-semibold text-slate-500 w-6">#{idx + 1}</span>
-                              <span className="truncate flex-1 font-medium">{record.employeeName || record.name}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Employee Name</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Department / Role</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Month</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Base Salary</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Deduction</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Penalty</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Advance Given</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Net Salary</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Employee</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Department</th>
+              <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Working</th>
+              <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Present</th>
+              <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Leave</th>
+              <th className="px-3 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Basic</th>
+              <th className="px-3 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Gross</th>
+              <th className="px-3 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Deductions</th>
+              <th className="px-3 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Net</th>
+              <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Status</th>
+              <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Payment Date</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
-            {currentRecords.map((record: any, index: number) => {
-              const absoluteIndex = startIndex + index + 1;
-              const isSelected = selectedIds.includes(record.id);
-              
-              const statusVal = String(record.status || '').trim().toLowerCase();
-              const isPaid = statusVal === 'paid' || statusVal === 'approved';
+            {currentRecords.map((record) => {
+              const note = actionStatus(record);
+              const windowOpen =
+                record.status === "Paid" &&
+                record.correctionWindowDaysRemaining != null &&
+                record.correctionWindowDaysRemaining > 0;
 
               return (
-                <tr
-                  key={record.id}
-                  onClick={() => toggleSelectOne(record.id)}
-                  className={`transition-colors cursor-pointer ${
-                    isSelected ? 'bg-blue-50/70 border-blue-200' : 'hover:bg-slate-50'
-                  }`}
-                >
-                  <td className="px-4 py-3 text-sm text-slate-600 font-medium">
-                    <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-xs ${
-                      isSelected ? 'bg-blue-600 text-white font-bold' : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      {absoluteIndex}
-                    </span>
+                <tr key={record.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3 text-sm font-semibold text-slate-800 whitespace-nowrap">{record.employeeName}</td>
+                  <td className="px-4 py-3 text-sm text-slate-600">{record.department}</td>
+                  <td className="px-3 py-3 text-center text-sm text-slate-700">{record.workingDays ?? "—"}</td>
+                  <td className="px-3 py-3 text-center text-sm text-slate-700">{record.presentDays ?? "—"}</td>
+                  <td className="px-3 py-3 text-center text-sm text-slate-700">{record.leaveDays ?? "—"}</td>
+                  <td className="px-3 py-3 text-right text-sm text-slate-700">{formatVal(record.basicSalary)}</td>
+                  <td className="px-3 py-3 text-right text-sm text-slate-700">{formatVal(record.totalGross)}</td>
+                  <td className="px-3 py-3 text-right text-sm text-rose-600">{formatVal(record.totalDeductions)}</td>
+                  <td className="px-3 py-3 text-right text-sm font-bold text-slate-800">{formatVal(record.netSalary)}</td>
+                  <td className="px-3 py-3">
+                    <StatusBadge record={record} />
+                    {record.status === "Paid" && windowOpen && (
+                      <span className="block text-[10px] text-amber-600 mt-0.5">
+                        window {record.correctionWindowDaysRemaining}d
+                      </span>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-sm font-semibold text-slate-800">{record.employeeName || record.name}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">
-                    <div className="font-medium text-slate-800">{record.department || record.role}</div>
-                    <div className="text-xs text-slate-400">{record.role}</div>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-600 font-medium">
-                    <span className="px-2 py-0.5 bg-slate-100 rounded text-xs text-slate-700 font-mono">
-                      {record.month || currentMonth}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right font-semibold text-slate-700">
-                    {formatVal(record.baseSalary || record.grossSalary || 0)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-rose-600">
-                    {formatVal(record.totalDeductions || record.leaveDeduction || record.deduction || 0)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-amber-600">
-                    {formatVal(record.latePenalty || record.penalty || 0)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-blue-600">
-                    {formatVal(record.advanceRecovery || record.advanceGiven || 0)}
-                  </td>
-                  <td className={`px-4 py-3 text-sm text-right font-bold ${isPaid ? 'text-emerald-600' : 'text-amber-600'}`}>
-                    {formatVal(record.netSalary)}
+                  <td className="px-3 py-3 text-sm text-slate-600">{record.paymentDate ?? "—"}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <ActionButtons
+                        record={record}
+                        saving={saving}
+                        onAction={onAction}
+                      />
+                    </div>
+                    {note && <div className="text-[10px] text-slate-400 text-right mt-1">{note}</div>}
                   </td>
                 </tr>
               );
@@ -247,7 +174,6 @@ export function SalaryTable({
             >
               Previous
             </button>
-
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
               <button
                 key={page}
@@ -255,14 +181,13 @@ export function SalaryTable({
                 onClick={() => setCurrentPage(page)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                   currentPage === page
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'border border-slate-300 text-slate-700 bg-white hover:bg-slate-100'
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "border border-slate-300 text-slate-700 bg-white hover:bg-slate-100"
                 }`}
               >
                 {page}
               </button>
             ))}
-
             <button
               type="button"
               onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPages))}
@@ -275,5 +200,70 @@ export function SalaryTable({
         </div>
       )}
     </div>
+  );
+}
+
+function ActionButtons({
+  record,
+  saving,
+  onAction,
+}: {
+  record: SalaryRecord;
+  saving: boolean;
+  onAction: (action: Action, record: SalaryRecord) => void;
+}) {
+  const btn =
+    "p-1.5 rounded-lg border transition disabled:opacity-40 disabled:cursor-not-allowed";
+  const view = `${btn} border-slate-200 text-slate-600 hover:bg-slate-100`;
+  const blue = `${btn} border-blue-200 text-blue-700 hover:bg-blue-50`;
+  const emerald = `${btn} border-emerald-200 text-emerald-700 hover:bg-emerald-50`;
+  const amber = `${btn} border-amber-200 text-amber-700 hover:bg-amber-50`;
+  const rose = `${btn} border-rose-200 text-rose-700 hover:bg-rose-50`;
+
+  const windowOpen =
+    record.status === "Paid" &&
+    record.correctionWindowDaysRemaining != null &&
+    record.correctionWindowDaysRemaining > 0;
+
+  return (
+    <>
+      <button type="button" className={view} title="View" onClick={() => onAction("view", record)}>
+        <Eye size={14} />
+      </button>
+
+      {record.status === "Pending" && !record.monthClosed && (
+        <>
+          <button type="button" className={blue} title="Submit" disabled={saving} onClick={() => onAction("submit", record)}>
+            <Send size={14} />
+          </button>
+          <button type="button" className={amber} title="Edit" disabled={saving} onClick={() => onAction("edit", record)}>
+            <Pencil size={14} />
+          </button>
+          <button type="button" className={emerald} title="Pay" disabled={saving} onClick={() => onAction("pay", record)}>
+            <Wallet size={14} />
+          </button>
+          <button type="button" className={rose} title="Delete" disabled={saving} onClick={() => onAction("delete", record)}>
+            <Trash2 size={14} />
+          </button>
+        </>
+      )}
+
+      {record.status === "Submitted" && !record.monthClosed && (
+        <>
+          <button type="button" className={emerald} title="Pay" disabled={saving} onClick={() => onAction("pay", record)}>
+            <Wallet size={14} />
+          </button>
+          <button type="button" className={amber} title="Un-submit (back to Pending)" disabled={saving} onClick={() => onAction("unsubmit", record)}>
+            <Undo2 size={14} />
+          </button>
+        </>
+      )}
+
+      {record.status === "Paid" && !record.monthClosed && windowOpen && (
+        <button type="button" className={amber} title="Mark Unpaid (correction window)" disabled={saving} onClick={() => onAction("markUnpaid", record)}>
+          <Undo2 size={14} />
+        </button>
+      )}
+    </>
   );
 }

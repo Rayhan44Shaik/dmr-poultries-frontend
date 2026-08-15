@@ -29,19 +29,20 @@ export function useAnalyticsData() {
   const fastagTransactions = useMemo(() => getFastagTransactions(), []);
   const [period, setPeriod] = useState<'thisMonth' | 'lastMonth' | 'quarter'>('thisMonth');
 
-  const now = new Date();
-  let startDate: Date, endDate: Date;
-  if (period === 'thisMonth') {
-    startDate = startOfMonth(now);
-    endDate = endOfMonth(now);
-  } else if (period === 'lastMonth') {
-    const lastMonth = subMonths(now, 1);
-    startDate = startOfMonth(lastMonth);
-    endDate = endOfMonth(lastMonth);
-  } else {
-    startDate = subMonths(now, 3);
-    endDate = now;
-  }
+  const { startDate, endDate } = useMemo(() => {
+    const now = new Date();
+
+    if (period === 'thisMonth') {
+      return { startDate: startOfMonth(now), endDate: endOfMonth(now) };
+    }
+
+    if (period === 'lastMonth') {
+      const lastMonth = subMonths(now, 1);
+      return { startDate: startOfMonth(lastMonth), endDate: endOfMonth(lastMonth) };
+    }
+
+    return { startDate: subMonths(now, 3), endDate: now };
+  }, [period]);
 
   const filteredTrips = useMemo(() => {
     return allTrips.filter((t: any) => {

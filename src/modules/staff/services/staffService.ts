@@ -326,6 +326,8 @@ export function getShiftConfigs(): ShiftConfig[] {
     { type: 'Rest', label: 'Rest', bgColor: 'bg-slate-100', textColor: 'text-slate-600', borderColor: 'border-slate-300' },
     { type: 'Repair', label: 'Repair', bgColor: 'bg-amber-100', textColor: 'text-amber-700', borderColor: 'border-amber-300' },
     { type: 'Office', label: 'Office', bgColor: 'bg-indigo-100', textColor: 'text-indigo-700', borderColor: 'border-indigo-300' },
+    { type: 'OfficeDuty', label: 'Office Duty', bgColor: 'bg-indigo-50', textColor: 'text-indigo-600', borderColor: 'border-indigo-200' },
+    { type: 'Collection', label: 'Collection', bgColor: 'bg-teal-100', textColor: 'text-teal-700', borderColor: 'border-teal-300' },
     { type: 'WeeklyOff', label: 'Weekly Off', bgColor: 'bg-rose-100', textColor: 'text-rose-700', borderColor: 'border-rose-300' },
   ];
 }

@@ -113,6 +113,22 @@
     border-radius: 2px;
   }
 
+  /* Fast, subtle button interaction — GPU-friendly (transform only).
+     No layout-affecting properties are animated, so there is no reflow or jump. */
+  button {
+    transition:
+      transform 120ms ease,
+      box-shadow 120ms ease;
+  }
+
+  button:hover:not(:disabled) {
+    transform: translateY(-1px) scale(1.01);
+  }
+
+  button:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+  }
+
   /* Refined scrollbars */
   ::-webkit-scrollbar {
     width: 10px;

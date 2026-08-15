@@ -16,7 +16,7 @@ import {
   Clock,
   Calendar,
 } from "lucide-react";
-import { DatePicker } from "../../../../components/common/DatePicker";
+import DatePicker from "../../../../components/common/DatePicker";
 
 // The form collects the vehicle fields it owns; insurance/permit/fitness
 // expiries are managed on the fleet documents pages.
