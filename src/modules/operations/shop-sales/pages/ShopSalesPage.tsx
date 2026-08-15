@@ -3,6 +3,7 @@
 import { useEffect, useCallback } from "react";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
+import { handleApiError } from "../../../../api";
 
 import useShopSales from "../hooks/useShopSales";
 import { useShops } from "../../../masters/shops/hooks/useShops";
@@ -74,8 +75,11 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     try {
       await updateSale(updatedSale);
       showNotification("Sale updated successfully", "success");
-    } catch {
-      showNotification("Failed to update sale", "error");
+    } catch (error) {
+      // Surface the backend's actual rejection reason (e.g. capacity
+      // exceeded, rate locked, edit window closed) through the existing
+      // notification mechanism instead of a generic message.
+      showNotification(handleApiError(error), "error");
     }
   }, [updateSale, showNotification]);
 

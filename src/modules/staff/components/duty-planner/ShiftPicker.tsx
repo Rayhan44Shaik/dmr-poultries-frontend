@@ -1,20 +1,21 @@
 // src/modules/staff/components/duty-planner/ShiftPicker.tsx
 
 import { memo } from 'react';
-import { X } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import { getShiftConfigs } from '../../services/staffService';
 
 interface ShiftPickerProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (dutyType: string) => void;
+  onRemove?: () => void;
   currentDuty?: string;
   date: string;
   employeeName?: string;
   employeeRole?: string;
 }
 
-function ShiftPicker({ isOpen, onClose, onSelect, currentDuty, date, employeeName, employeeRole }: ShiftPickerProps) {
+function ShiftPicker({ isOpen, onClose, onSelect, onRemove, currentDuty, date, employeeName, employeeRole }: ShiftPickerProps) {
   if (!isOpen) return null;
 
   const shifts = getShiftConfigs();
@@ -66,6 +67,18 @@ function ShiftPicker({ isOpen, onClose, onSelect, currentDuty, date, employeeNam
         <div className="mt-4 text-xs text-slate-400 text-center">
           {isSaturday && <span className="text-rose-500 font-medium">Saturday: Compulsory duty (cannot be Rest or Weekly Off)</span>}
         </div>
+
+        {currentDuty && onRemove && (
+          <div className="mt-4 pt-3 border-t border-slate-100">
+            <button
+              onClick={onRemove}
+              className="w-full py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 text-sm font-semibold transition hover:bg-rose-100 flex items-center justify-center gap-2"
+            >
+              <Trash2 size={15} />
+              Remove Duty
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

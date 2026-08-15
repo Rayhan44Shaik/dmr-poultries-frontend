@@ -80,7 +80,7 @@ export interface DutyAssignment {
   employeeName: string;
   department: string;
   role: string;
-  dutyType: 'Driver' | 'Delivery' | 'Rest' | 'Repair' | 'Office' | 'WeeklyOff';
+  dutyType: 'Driver' | 'Delivery' | 'Rest' | 'Repair' | 'Office' | 'OfficeDuty' | 'Collection' | 'WeeklyOff';
   date: string; // YYYY-MM-DD
   vehicleId?: number;
   vehicleNo?: string;

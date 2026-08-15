@@ -3,17 +3,19 @@
 import { memo } from 'react';
 import { getShiftConfigs } from '../../services/staffService';
 import { isDateLocked } from '../../hooks/useDutyPlanner';
-import type { Employee } from '../../types/staffDashboard';
+import type { DutyAssignment, Employee } from '../../types/staffDashboard';
 
 interface DutyPlannerGridProps {
   employees: Employee[];
   weekDays: string[];
-  getAssignment: (employeeId: number, date: string) => any;
+  getAssignment: (employeeId: number, date: string) => DutyAssignment | undefined;
   onCellClick: (employeeId: number, date: string) => void;
   loading: boolean;
+  /** True when the backend locks the whole week (Submitted/Locked). */
+  weekLocked?: boolean;
 }
 
-function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, loading }: DutyPlannerGridProps) {
+function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, loading, weekLocked = false }: DutyPlannerGridProps) {
   const shiftConfigs = getShiftConfigs();
 
   const getShiftStyle = (dutyType: string) => {
@@ -62,7 +64,7 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
                   const dutyType = assignment?.dutyType || '';
                   const { bg, text, border } = getShiftStyle(dutyType);
                   const isSaturday = new Date(day).getDay() === 6;
-                  const locked = isDateLocked(day);
+                  const locked = weekLocked || isDateLocked(day);
 
                   return (
                     <td key={idx} className="px-1 py-1 text-center">

@@ -29,26 +29,8 @@ async function saveRates(tripId: number, deliveries: Trip["deliveries"]): Promis
   return true;
 }
 
-/**
- * @deprecated Compatibility shims only. The separate (still localStorage-
- * based) Shop Sales module's useShopSales hook calls these to opportunistically
- * sync a delivery edit back onto a legacy "vehicleTrips" trip record — a
- * write-only path with no reader. Rate Entry itself no longer reads or
- * writes trip data via localStorage (PostgreSQL is now the only source of
- * truth for it), so these intentionally no-op rather than resurrect that
- * store. Wiring Shop Sales onto the real backend is out of scope here.
- */
-function getAllTrips(): Trip[] {
-  return [];
-}
-function updateTrip(_trip: Trip): boolean {
-  return false;
-}
-
 export const completedTripService = {
   getCompletedTrips,
   getTrip,
   saveRates,
-  getAllTrips,
-  updateTrip,
 };

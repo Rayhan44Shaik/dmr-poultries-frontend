@@ -4,7 +4,6 @@ import type {
   LeaveRequest,
   SalaryRecord,
   AdvanceLoan,
-  DutyAssignment,
   AttendanceRecord,
   StaffDashboardData,
   LeaveBalance,
@@ -78,11 +77,6 @@ export function loadAdvanceLoans(): AdvanceLoan[] {
   return raw ? JSON.parse(raw) : [];
 }
 
-export function loadDutyAssignments(): DutyAssignment[] {
-  const raw = localStorage.getItem('dmr-duty-assignments');
-  return raw ? JSON.parse(raw) : [];
-}
-
 export function loadAttendanceRecords(): AttendanceRecord[] {
   const raw = localStorage.getItem('dmr-attendance-records');
   return raw ? JSON.parse(raw) : [];
@@ -101,10 +95,6 @@ export function saveSalaryRecords(salaries: SalaryRecord[]): void {
 
 export function saveAdvanceLoans(records: AdvanceLoan[]): void {
   localStorage.setItem('dmr-advance-loans', JSON.stringify(records));
-}
-
-export function saveDutyAssignments(assignments: DutyAssignment[]): void {
-  localStorage.setItem('dmr-duty-assignments', JSON.stringify(assignments));
 }
 
 export function saveAttendanceRecords(records: AttendanceRecord[]): void {
@@ -338,53 +328,6 @@ export function getShiftConfigs(): ShiftConfig[] {
     { type: 'Office', label: 'Office', bgColor: 'bg-indigo-100', textColor: 'text-indigo-700', borderColor: 'border-indigo-300' },
     { type: 'WeeklyOff', label: 'Weekly Off', bgColor: 'bg-rose-100', textColor: 'text-rose-700', borderColor: 'border-rose-300' },
   ];
-}
-
-/**
- * Get duty planner data for a given week and list of roles.
- * Department filter is removed – we only filter by roles.
- * Returns all distinct roles from the entire employee pool for the dropdown.
- */
-export function getDutyPlannerData(
-  weekStart: string,
-  roles: string[]
-): {
-  employees: Employee[];
-  assignments: DutyAssignment[];
-  weekDays: string[];
-  allRoles: string[];
-} {
-  const allEmployees = loadEmployees();
-
-  // Compute all distinct roles (for the multi‑select dropdown)
-  const allRoles = Array.from(new Set(allEmployees.map(e => e.role).filter(Boolean)));
-
-  // Filter employees by roles (if any selected)
-  let filtered = allEmployees;
-  if (roles && roles.length > 0) {
-    filtered = filtered.filter(e => roles.includes(e.role));
-  }
-
-  // Generate week days (Monday to Sunday)
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + i);
-    return d.toISOString().split('T')[0];
-  });
-
-  // Load all assignments and filter to only those for filtered employees and week days
-  const allAssignments = loadDutyAssignments();
-  const employeeIds = new Set(filtered.map(e => e.id));
-  const assignments = allAssignments.filter(
-    a => employeeIds.has(a.employeeId) && weekDays.includes(a.date)
-  );
-
-  return {
-    employees: filtered,
-    assignments,
-    weekDays,
-    allRoles,
-  };
 }
 
 // ============================================================
