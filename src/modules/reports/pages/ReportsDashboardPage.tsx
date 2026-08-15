@@ -196,8 +196,8 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
   );
 
   const content = (
-    <div className="w-full px-4 pb-8 pt-6 sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-[1480px] space-y-6">
+    <div className="w-full px-4 pb-8 pt-6 sm:px-5 lg:px-6">
+      <div className="mx-auto w-full max-w-[1600px] space-y-6">
         {activeTab === 'shopLedger' ? (
           <ShopLedgerPage embedded={true} />
         ) : activeTab === 'vehicle' ? (

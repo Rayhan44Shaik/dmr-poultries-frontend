@@ -35,8 +35,8 @@ function MastersPage() {
   }, [activeTab]);
 
   return (
-    <div className="w-full px-4 pb-8 pt-6 sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-[1480px]">
+    <div className="w-full px-4 pb-8 pt-6 sm:px-5 lg:px-6">
+      <div className="mx-auto w-full max-w-[1600px]">
         <ActiveComponent embedded />
       </div>
     </div>

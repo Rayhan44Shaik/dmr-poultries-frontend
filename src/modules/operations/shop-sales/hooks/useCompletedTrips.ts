@@ -17,6 +17,7 @@ export default function useCompletedTrips() {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const pageSize = 10;
   const [filter, setFilter] = useState({
     fromDate: "",
@@ -26,8 +27,15 @@ export default function useCompletedTrips() {
     supervisor: "",
   });
 
-  function loadTrips() {
-    setTrips(completedTripService.getCompletedTrips());
+  async function loadTrips() {
+    try {
+      const data = await completedTripService.getCompletedTrips();
+      setTrips(data);
+      setLoadError(null);
+    } catch (error) {
+      console.error("Failed to load Rate Entry trips from the backend", error);
+      setLoadError("Could not load trips from the server.");
+    }
   }
 
   useEffect(() => {
@@ -60,14 +68,21 @@ export default function useCompletedTrips() {
   const vehicleList = [...new Set(trips.map((x) => x.vehicleNo))];
   const supervisorList = [...new Set(trips.map((x) => x.supervisorName))];
 
-  const openRateEntry = (trip: Trip) => {
-    setSelectedTrip(trip);
-    setModalOpen(true);
+  // The list row only carries trip-level summary fields — fetch the full
+  // trip (with shop-wise deliveries) from PostgreSQL before opening the
+  // modal, which is what actually needs the per-shop rate rows.
+  const openRateEntry = async (trip: Trip) => {
+    try {
+      const full = await completedTripService.getTrip(trip.id);
+      setSelectedTrip(full);
+      setModalOpen(true);
+    } catch (error) {
+      console.error(`Failed to load trip ${trip.id} for Rate Entry`, error);
+    }
   };
 
-  const openModifyRate = (trip: Trip) => {
-    setSelectedTrip(trip);
-    setModalOpen(true);
+  const openModifyRate = async (trip: Trip) => {
+    await openRateEntry(trip);
   };
 
   const closeRateEntry = () => {
@@ -75,12 +90,14 @@ export default function useCompletedTrips() {
     setModalOpen(false);
   };
 
-  const saveTrip = (deliveries: Trip["deliveries"]) => {
+  const saveTrip = async (deliveries: Trip["deliveries"]) => {
     if (!selectedTrip) return;
-    const saved = completedTripService.saveRates(selectedTrip.id, deliveries);
-    if (saved) {
+    try {
+      await completedTripService.saveRates(selectedTrip.id, deliveries);
       closeRateEntry();
-      loadTrips();
+      await loadTrips();
+    } catch (error) {
+      console.error(`Failed to save & lock rates for trip ${selectedTrip.id}`, error);
     }
   };
 
@@ -107,5 +124,6 @@ export default function useCompletedTrips() {
     openModifyRate,
     closeRateEntry,
     saveTrip,
+    loadError,
   };
 }
