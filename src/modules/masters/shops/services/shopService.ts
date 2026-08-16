@@ -52,6 +52,12 @@ function mapShop(raw: Record<string, unknown>): Shop {
     village: String(raw.village ?? ""),
     address: String(raw.address ?? ""),
     status: normalizeStatus(raw.status),
+    currentBalance:
+      raw.currentBalance != null
+        ? Number(raw.currentBalance)
+        : raw.current_balance != null
+        ? Number(raw.current_balance)
+        : 0,
   };
 }
 

@@ -80,7 +80,7 @@ const VehicleReportsPage = ({ embedded = false }: VehicleReportsPageProps) => {
 
 export default memo(VehicleReportsPage);*/
 
-import React, { memo } from 'react';
+import { memo } from 'react';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 
 interface VehicleReportsPageProps {

@@ -11,7 +11,7 @@ type Props = {
   embedded?: boolean;
 };
 
-export default function RatesEntryPage({ embedded = false }: Props) {
+export default function RatesEntryPage({ embedded: _embedded = false }: Props) {
   const { showNotification } = useSafeNotification();
 
   const {

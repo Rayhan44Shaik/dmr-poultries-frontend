@@ -6,7 +6,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { BoxDetail } from "../types/trip";
-import { ShopDeliveryWithExtra } from "../components/Step_4/useShopDeliveryForm";
+import type { ShopDeliveryWithExtra } from "../components/Step_4/useShopDeliveryForm";
 
 // ─── MONOCHROME & ACCENT COLOR PALETTE ──────────────────────────────────────
 type RGB = [number, number, number];
@@ -59,7 +59,7 @@ function drawField(
 export function generateShopPDF(
   row: ShopDeliveryWithExtra,
   safeBoxDetails: BoxDetail[] = [],
-  tripNo?: string,
+  _tripNo?: string,
   vehicleNo?: string,
   supervisorName?: string,
   supervisorPhone?: string,

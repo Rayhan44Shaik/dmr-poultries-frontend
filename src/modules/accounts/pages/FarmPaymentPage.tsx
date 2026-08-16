@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { FarmPaymentTable } from '../components/farm-payment/FarmPaymentTable';
 import { FarmerPaymentFilters } from '../components/farm-payment/FarmerPaymentFilters';

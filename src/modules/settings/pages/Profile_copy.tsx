@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { User, Mail, Phone, Briefcase, Building2, Hash, Calendar, Camera, Lock, Sparkles, Check, RotateCcw } from "lucide-react";
+import { User, Building2, Hash, Calendar, Camera, Check } from "lucide-react";
 import { getCurrentUser } from "../services";
 
 export default function Profile() {

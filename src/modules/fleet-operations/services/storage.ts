@@ -1,5 +1,5 @@
-import { VehicleDocument } from '../types';
-import { DocumentType } from '../utils/constants';
+import type { VehicleDocument } from '../types';
+import type { DocumentType } from '../utils/constants';
 
 const generateId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;

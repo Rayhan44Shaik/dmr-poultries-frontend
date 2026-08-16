@@ -13,7 +13,6 @@ interface EmiScheduleTableProps {
 const EmiScheduleTable = ({
   emiRecords,
   vehicles,
-  simplified = false,
   pageSize = 10,
   showAllVehicles = false,
 }: EmiScheduleTableProps) => {

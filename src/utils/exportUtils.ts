@@ -23,7 +23,6 @@ export const exportToPDF = (
   const pageHeight = doc.internal.pageSize.getHeight();
   const primaryColor = [37, 99, 235]; // Deep professional blue (#2563eb)
   const secondaryColor = [71, 85, 105]; // Slate gray (#475569)
-  const lightBgColor = [248, 250, 252]; // Very light slate background (#f8fafc)
 
   // ---------------------------------------------------------------------------
   // 1. Decorative Header Accent Bar

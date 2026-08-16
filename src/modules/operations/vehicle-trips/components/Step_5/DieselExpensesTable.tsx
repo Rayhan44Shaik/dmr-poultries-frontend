@@ -16,7 +16,7 @@ export default function DieselExpensesTable({
   sheetData,
   handleChange,
   dieselAmounts,
-  totalDieselAmount,
+  totalDieselAmount: _totalDieselAmount,
   showNotification,
   destMeter,
 }: DieselExpensesTableProps) {
@@ -77,7 +77,7 @@ export default function DieselExpensesTable({
   };
 
   // ─── Helper: update a single field in React state ───────────────
-  const handleFieldChange = (field: string, num: number, value: any) => {
+  const handleFieldChange = (field: string, _num: number, value: any) => {
     handleChange(field, value);
   };
 

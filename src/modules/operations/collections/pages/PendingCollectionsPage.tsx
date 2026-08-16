@@ -34,8 +34,7 @@ const formatDate = (dateStr: string) => {
 
 const getAllShopSales = () => {
   try {
-    const raw = localStorage.getItem("shopSales");
-    return raw ? JSON.parse(raw) : [];
+    return collectionService.getShopSales();
   } catch {
     return [];
   }
@@ -108,8 +107,9 @@ export default function PendingCollectionsPage() {
     showSummary: false,
   });
 
-  const loadData = () => {
+  const loadData = async () => {
     try {
+      await collectionService.refreshFromBackend();
       const pending = collectionService.getPendingCollections();
       const all = collectionService.getCollections();
       setPendingData(pending);
@@ -122,10 +122,7 @@ export default function PendingCollectionsPage() {
   };
 
   useEffect(() => {
-    loadData();
-    const handleStorage = () => loadData();
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    void loadData();
   }, []);
 
   useEffect(() => {
@@ -542,8 +539,7 @@ export default function PendingCollectionsPage() {
     setIsEditModalOpen(true);
     updateSummaryForShop(shopName);
   };
-
-  const handleDelete = (shopName: string) => {
+    const handleDelete = async (shopName: string) => {
     const latest = getLatestCollection(shopName);
     if (!latest) {
       showNotification("No collection to delete.", "error");
@@ -559,7 +555,7 @@ export default function PendingCollectionsPage() {
       return;
     }
     if (window.confirm(`Delete collection for ${shopName}?`)) {
-      const success = collectionService.deleteCollection(latest.id);
+      const success = await collectionService.deleteCollection(latest.id);
       if (success) {
         refreshData();
         setSummary((prev) => ({ ...prev, showSummary: false }));
@@ -577,8 +573,9 @@ export default function PendingCollectionsPage() {
     setSummary((prev) => ({ ...prev, showSummary: false }));
   };
 
-  const refreshData = () => {
+  const refreshData = async () => {
     try {
+      await collectionService.refreshFromBackend();
       const pending = collectionService.getPendingCollections();
       const all = collectionService.getCollections();
       setPendingData(pending);
@@ -894,6 +891,7 @@ export default function PendingCollectionsPage() {
           shopName={selectedShop}
           mode={editMode}
           allCollections={allCollections}
+          collection={getLatestCollection(selectedShop)}
           onRefresh={refreshData}
         />
       )}

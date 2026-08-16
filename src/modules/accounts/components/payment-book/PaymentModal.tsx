@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { X } from 'lucide-react';
-import { Payment } from '../../types/payment.types';
+import type { Payment } from '../../types/payment.types';
 import { PaymentService } from '../../services/PaymentService';
 import { FarmPaymentService } from '../../services/FarmPaymentService';
 import { tripService } from '../../../operations/vehicle-trips/services/tripService';

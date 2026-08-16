@@ -59,7 +59,7 @@ import {
   getMonth,
   differenceInCalendarDays,
 } from "date-fns";
-import { DayPicker, type DropdownProps } from "react-day-picker";
+import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
 
 /* =============================================================================
@@ -352,45 +352,6 @@ function CalendarDropdown({
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * Adapter so react-day-picker v10 Dropdown props map onto CalendarDropdown.
- * DayPicker passes options as { value, label, disabled }[] and value as string/number.
- */
-function DayPickerDropdownAdapter(props: DropdownProps) {
-  const { options, value, onChange, "aria-label": ariaLabel, disabled } = props as DropdownProps & {
-    options?: CalendarDropdownOption[];
-    value?: string | number;
-    onChange?: React.ChangeEventHandler<HTMLSelectElement>;
-    "aria-label"?: string;
-    disabled?: boolean;
-  };
-
-  if (disabled) {
-    const current = options?.find((o) => String(o.value) === String(value));
-    return (
-      <span className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-500 rounded-lg py-1.5 px-2.5 min-w-[75px]">
-        {current?.label ?? String(value ?? "")}
-      </span>
-    );
-  }
-
-  return (
-    <CalendarDropdown
-      value={value ?? ""}
-      options={options ?? []}
-      aria-label={ariaLabel}
-      onChange={(e) => {
-        if (!onChange) return;
-        // Synthesize a change event shape DayPicker expects from a <select>
-        const synthetic = {
-          target: { value: String(e.target.value) },
-        } as React.ChangeEvent<HTMLSelectElement>;
-        onChange(synthetic);
-      }}
-    />
   );
 }
 

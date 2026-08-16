@@ -1,5 +1,3 @@
-import React from "react";
-
 export default function Permissions() {
   const modules = ["Dashboard", "Operations", "Accounts", "Reports", "Settings"];
 

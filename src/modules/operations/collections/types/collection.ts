@@ -1,21 +1,90 @@
 /* ==========================================================
    COLLECTION STATUS
+   Mirrors backend ops_record_status (collection-entry API).
 ========================================================== */
 
 export type CollectionStatus =
-  | "Pending"
-  | "Approved";
+  | "Pending Approval"
+  | "Approved"
+  | "Rejected"
+  | "Deleted"
+  | "Draft";
+
+/** Legacy 2-state view used by some modules. Do not extend UI logic on this. */
+export type CollectionLegacyStatus = "Pending" | "Approved" | "All";
+
+/* ==========================================================
+   COLLECTION API ENTRY
+   Exact backend shape from GET/POST /operations/collection-entry
+========================================================== */
+
+export interface CollectionApiEntry {
+  id: number;
+  collectionNo: string;
+  collectionDate: string;
+  shopId: number | null;
+  shopName: string;
+  tripId: number | null;
+  amountDue: number;
+  amount: number;
+  amountCollected: number;
+  collector: string;
+  paymentMode: string;
+  referenceNo: string;
+  remarks: string;
+  status: CollectionStatus;
+  deleted: boolean;
+  deletedBy?: string | null;
+  deletedAt?: string | null;
+  isFinancial: boolean;
+  openingBalance: number | null;
+  closingBalance: number | null;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  createdBy: string;
+  createdAt: string | null;
+  updatedAt?: string | null;
+}
+
+/** Payload for POST /operations/collection-entry */
+export interface CollectionEntryInput {
+  collectionDate: string;
+  shopId: number;
+  shopName?: string;
+  collector?: string;
+  paymentMode?: string;
+  referenceNo?: string;
+  remarks?: string;
+  amount: number;
+  createdBy?: string;
+}
+
+/* ==========================================================
+   COLLECTION ENTRY FORM
+   UI form state consumed by the Entry page and its components
+========================================================== */
+
+export interface CollectionEntry {
+  collectionId: string;
+  collectionNo: string;
+  collectionDate: string;
+  shopName: string;
+  collectorName: string;
+  paymentModeName: string;
+  referenceNo: string;
+  amount: number;
+  remarks: string;
+  numericId?: number;
+  numericShopId?: number | null;
+}
 
 /* ==========================================================
    PAYMENT MODE
 ========================================================== */
 
 export interface PaymentMode {
-
   id: string;
-
   name: string;
-
 }
 
 /* ==========================================================
@@ -23,77 +92,33 @@ export interface PaymentMode {
 ========================================================== */
 
 export interface Collector {
-
-
-
   employeeName: string;
-
 }
 
 /* ==========================================================
-   COLLECTION ENTRY
-========================================================== */
-
-export interface CollectionEntry {
-
-  collectionId: string;
-
-  collectionNo: string;
-
-  collectionDate: string;
-
-  shopName: string;
-
-  collectorName: string;
-
-  paymentModeName: string;
-
-  referenceNo: string;
-
-  amount: number;
-
-  remarks: string;
-
-}
-
-/* ==========================================================
-   COLLECTION TRANSACTION
+   COLLECTION (legacy view for external modules)
 ========================================================== */
 
 export interface Collection {
-
   id: string;
-
   collectionNo: string;
-
   collectionDate: string;
-
   shopName: string;
-
   collectorName: string;
-
   paymentModeName: string;
-
   referenceNo: string;
-
   amount: number;
-
   remarks: string;
-
-  status: CollectionStatus;
-
+  status: CollectionLegacyStatus;
   createdDate: string;
-
   createdBy: string;
-
   approvedDate?: string;
-
   approvedBy?: string;
-
   modifiedDate?: string;
-
   modifiedBy?: string;
-
+  /** Backend ids surfaced for the collection module */
+  numericId?: number;
+  numericShopId?: number | null;
 }
 
 /* ==========================================================
@@ -101,22 +126,14 @@ export interface Collection {
 ========================================================== */
 
 export interface PendingCollection {
-
-
+  shopId?: number;
   shopName: string;
-
   openingBalance: number;
-
   totalSales: number;
-
   totalCollections: number;
-
   currentPending: number;
-
   overdueDays: number;
-
   lastCollectionDate: string;
-
 }
 
 /* ==========================================================
@@ -124,31 +141,20 @@ export interface PendingCollection {
 ========================================================== */
 
 export interface RecentCollection {
-
   id: string;
-
   collectionNo: string;
-
   collectionDate: string;
-
   shopName: string;
-
   collectorName: string;
-
   paymentModeName: string;
-
   referenceNo: string;
-
   amount: number;
-
   remarks: string;
-
-  status: CollectionStatus;
-
+  status: CollectionLegacyStatus;
   approvedBy?: string;
-
   approvedDate?: string;
-
+  numericId?: number;
+  numericShopId?: number | null;
 }
 
 /* ==========================================================
@@ -156,21 +162,13 @@ export interface RecentCollection {
 ========================================================== */
 
 export interface CollectionErrors {
-
   collectionDate?: string;
-
   shopName?: string;
-
   collectorName?: string;
-
   paymentModeName?: string;
-
   referenceNo?: string;
-
   amount?: string;
-
   remarks?: string;
-
 }
 
 /* ==========================================================
@@ -178,19 +176,12 @@ export interface CollectionErrors {
 ========================================================== */
 
 export interface CollectionFilter {
-
   fromDate: string;
-
   toDate: string;
-
   shopName: string;
-
   collectorName: string;
-
   paymentModeName: string;
-
   status: string;
-
 }
 
 /* ==========================================================
@@ -198,15 +189,10 @@ export interface CollectionFilter {
 ========================================================== */
 
 export interface Pagination {
-
   page: number;
-
   pageSize: number;
-
   totalRecords: number;
-
   totalPages: number;
-
 }
 
 /* ==========================================================
@@ -214,15 +200,10 @@ export interface Pagination {
 ========================================================== */
 
 export interface CollectorSummary {
-
   collectorId: string;
-
   collectorName: string;
-
   totalCollections: number;
-
   totalAmount: number;
-
 }
 
 /* ==========================================================
@@ -230,15 +211,10 @@ export interface CollectorSummary {
 ========================================================== */
 
 export interface PaymentModeSummary {
-
   paymentModeName: string;
-
   totalCollections: number;
-
   totalAmount: number;
-
   percentage: number;
-
 }
 
 /* ==========================================================
@@ -246,13 +222,8 @@ export interface PaymentModeSummary {
 ========================================================== */
 
 export interface CollectionDashboardSummary {
-
   totalPendingShops: number;
-
   totalPendingAmount: number;
-
   pendingApproval: number;
-
   approvedCollections: number;
-
 }

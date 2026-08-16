@@ -1,7 +1,7 @@
 // src/modules/accounts/components/payment-book/PaymentTable.tsx
 
-import React, { useState, useMemo } from 'react';
-import { Payment } from '../../types/payment.types';
+import { useState, useMemo } from 'react';
+import type { Payment } from '../../types/payment.types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface PaymentTableProps {

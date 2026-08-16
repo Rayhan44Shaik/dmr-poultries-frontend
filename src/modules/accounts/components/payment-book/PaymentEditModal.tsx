@@ -1,8 +1,8 @@
 // src/modules/accounts/components/payment-book/PaymentEditModal.tsx
 
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X, Clock } from 'lucide-react';
-import { Payment } from '../../types/payment.types';
+import type { Payment } from '../../types/payment.types';
 import { PaymentService } from '../../services/PaymentService';
 import { canEditItem } from '../../../../utils/dateUtils';
 

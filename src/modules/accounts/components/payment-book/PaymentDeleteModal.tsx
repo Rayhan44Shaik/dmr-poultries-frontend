@@ -1,6 +1,6 @@
 // src/modules/accounts/components/payment-book/PaymentDeleteModal.tsx
 
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { X, AlertTriangle, Clock, Trash2 } from 'lucide-react';
 import type { Payment } from '../../types/payment.types';
 import { canDeleteItem } from '../../../../utils/dateUtils';

@@ -146,7 +146,7 @@ const computeVehicleReport = (trips: any[], fuel: any[], filters: ReportFilters)
   };
 };
 
-const computeShopSalesReport = (sales: any[], trips: any[], filters: ReportFilters): ReportData => {
+const computeShopSalesReport = (sales: any[], _trips: any[], filters: ReportFilters): ReportData => {
   const filteredSales = filterByDateRange(sales, 'tripDate', filters.dateFrom, filters.dateTo);
   const shopGroups = groupAndSum(filteredSales, 'shopName', ['amount', 'birds', 'weight', 'boxes']);
   const topShops = [...shopGroups].sort((a, b) => safeNumber(b.amount) - safeNumber(a.amount)).slice(0, 5);
@@ -173,7 +173,7 @@ const computeShopSalesReport = (sales: any[], trips: any[], filters: ReportFilte
   };
 };
 
-const computeCollectionReport = (collections: any[], sales: any[], filters: ReportFilters): ReportData => {
+const computeCollectionReport = (collections: any[], _sales: any[], filters: ReportFilters): ReportData => {
   const filteredCollections = filterByDateRange(collections, 'collectionDate', filters.dateFrom, filters.dateTo);
   const approved = filteredCollections.filter(c => c.status === 'Approved');
 

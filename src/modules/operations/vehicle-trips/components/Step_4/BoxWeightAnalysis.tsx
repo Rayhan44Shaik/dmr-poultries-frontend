@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { Scale, AlertTriangle, AlertCircle, Box, FileText } from "lucide-react";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
 import jsPDF from "jspdf";
@@ -19,7 +19,7 @@ export default function BoxWeightAnalysis({
   boxDetails = [],
   deliveries,
   dcWeight,
-  totalFarmBirds,
+  totalFarmBirds: _totalFarmBirds,
   tripNo = "N/A",
   vehicleNo = "N/A",
   supervisorName = "N/A",

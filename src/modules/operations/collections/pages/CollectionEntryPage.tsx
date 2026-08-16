@@ -13,7 +13,7 @@ type Props = {
   embedded?: boolean;
 };
 
-export default function CollectionEntryPage({ embedded = false }: Props) {
+export default function CollectionEntryPage({ embedded: _embedded = false }: Props) {
   const vm = useCollectionEntry();
   const { showNotification } = useSafeNotification();
 
@@ -103,6 +103,7 @@ export default function CollectionEntryPage({ embedded = false }: Props) {
           onStatusChange={vm.changeStatusFilter}
           onPageChange={vm.changePage}
           onApprove={vm.approveCollection}
+          onReject={vm.rejectCollection}
           onEdit={vm.editCollection}
           onDelete={vm.deleteCollection}
           onViewShop={handleViewShop}

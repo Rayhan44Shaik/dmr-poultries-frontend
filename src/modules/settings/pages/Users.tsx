@@ -1,4 +1,3 @@
-import React from "react";
 import { Pencil, Trash2, Plus } from "lucide-react";
 import { getUsers } from "../services";
 

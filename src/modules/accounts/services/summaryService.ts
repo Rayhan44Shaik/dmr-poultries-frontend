@@ -2,7 +2,6 @@
 
 import { tripService } from '../../operations/vehicle-trips/services/tripService';
 import { collectionService } from '../../operations/collections/services/collectionService';
-import { shopSalesService } from '../../operations/shop-sales/services/shopSalesService';
 import { FarmPaymentService } from './FarmPaymentService';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { Collection } from '../../operations/collections/types/collection';

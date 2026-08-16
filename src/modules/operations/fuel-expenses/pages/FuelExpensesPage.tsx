@@ -16,7 +16,6 @@ import {
   Pencil,
   Trash2,
   CheckCircle,
-  X,
   Plus,
   FileText,
   FileSpreadsheet,

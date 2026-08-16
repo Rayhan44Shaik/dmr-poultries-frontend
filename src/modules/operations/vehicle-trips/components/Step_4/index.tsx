@@ -2,7 +2,7 @@
 // (Referenced helper or included components as part of UnLoadingTable module)
 
 // src/modules/operations/vehicle-trips/components/Step_4/UnLoadingTable.tsx
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { 
   Plus, Clock, Building2, Users, Scale, AlertCircle, Search, X, 
   LayoutGrid, BarChart2,
@@ -127,7 +127,7 @@ export default function UnLoadingTable({
   tripDate = "",
   viewMode = "shop",
   onViewModeChange,
-  stepNumber = 4,
+  stepNumber: _stepNumber = 4,
   updateDeliveries,
   saveDeliveries,
   submitDeliveries,

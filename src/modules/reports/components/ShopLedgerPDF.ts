@@ -10,7 +10,7 @@ export interface LedgerTransaction {
   debit: number;
   credit: number;
   balance: number;
-  type: "sale" | "collection";
+  type: "sale" | "collection" | "correction";
   paymentMode?: string;
   collectionNo?: string;
 }

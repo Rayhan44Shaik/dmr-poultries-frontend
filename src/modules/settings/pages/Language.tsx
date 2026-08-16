@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Globe, Check, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
 
 interface LanguageOption {

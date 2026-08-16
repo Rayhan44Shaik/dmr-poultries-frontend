@@ -1,9 +1,7 @@
 // src/modules/accounts/components/payment-book/PaymentViewModal.tsx
 
-import React from 'react';
 import { X, Calendar, User, Hash, Tag, CreditCard, DollarSign, MessageSquare, CheckCircle, Clock, AlertCircle, Truck, FileText } from 'lucide-react';
 import type { Payment } from '../../types/payment.types';
-import type { FarmPayment } from '../../types/farmPayment.types';
 import { FarmPaymentService } from '../../services/FarmPaymentService';
 
 interface PaymentViewModalProps {

@@ -1,6 +1,6 @@
 // src/modules/operations/vehicle-trips/components/TripFinalKPI.tsx
 
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import type { Trip, ShopDelivery } from "../types/trip";
 import {
   Weight,
@@ -9,7 +9,6 @@ import {
   HeartPulse,
   TrendingDown,
   Ticket,
-  MapPin,
   Route,
   Activity,
   Fuel,

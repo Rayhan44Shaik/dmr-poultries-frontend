@@ -6,11 +6,12 @@ import type {
   RecentCollection,
   PaymentMode,
   Collection,
+  CollectionLegacyStatus,
 } from "../types/collection";
 import { collectionService } from "../services/collectionService";
-import { shopService } from "../../../masters/shops/services/shopService";
-import { getEmployees } from "../../../masters/employees/services/employeeService";
-import { getBanks } from "../../../masters/banks/services/bankService";
+import { loadShops, shopService } from "../../../masters/shops/services/shopService";
+import { getEmployees, loadEmployees } from "../../../masters/employees/services/employeeService";
+import { getBanks, loadBanks } from "../../../masters/banks/services/bankService";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
 export default function useCollectionEntry() {
@@ -51,29 +52,40 @@ export default function useCollectionEntry() {
 
   function loadMasterData() {
     setLoading(true);
-    try {
-      const shopNames = shopService.getAll().map((s) => s.shopName).sort();
-      setShops(shopNames);
-      const collectorNames = getEmployees()
-        .filter((emp) => (emp.department ?? "").toLowerCase() === "collection")
-        .map((emp) => emp.employeeName)
-        .sort();
-      setCollectors(collectorNames);
-      const modes: PaymentMode[] = [{ id: "cash", name: "Cash" }];
-      getBanks().forEach((bank) => modes.push({ id: bank.bankName, name: bank.bankName }));
-      setPaymentModes(modes);
-      setPendingCollections(collectionService.getPendingCollections());
-      setRecentCollections(collectionService.getRecentCollections("Pending"));
-      setAllCollections(collectionService.getCollections()); // ← load all
-    } catch (error) {
-      showNotification("Failed to load master data.", "error");
-    } finally {
-      setLoading(false);
-    }
+    Promise.all([
+      loadShops(),
+      loadEmployees(),
+      loadBanks(),
+      collectionService.refreshFromBackend(),
+    ])
+      .then(() => {
+        const shopNames = shopService.getAll().map((s) => s.shopName).sort();
+        setShops(shopNames);
+        const allEmployees = getEmployees();
+        const collectorNames = allEmployees
+          .filter((emp) => (emp.department ?? "").toLowerCase() === "collection")
+          .map((emp) => emp.employeeName)
+          .sort();
+        // Fall back to all employees when no one is tagged "Collection" yet.
+        setCollectors(collectorNames.length > 0 ? collectorNames : allEmployees.map((e) => e.employeeName).sort());
+        const modes: PaymentMode[] = [{ id: "cash", name: "Cash" }];
+        getBanks().forEach((bank) => modes.push({ id: bank.bankName, name: bank.bankName }));
+        setPaymentModes(modes);
+        setPendingCollections(collectionService.getPendingCollections());
+        setRecentCollections(collectionService.getRecentCollections("Pending"));
+        setAllCollections(collectionService.getCollections());
+      })
+      .catch(() => {
+        showNotification("Failed to load master data.", "error");
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }
 
   useEffect(() => {
     loadMasterData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function findPendingShop(shopName: string): PendingCollection | null {
@@ -81,22 +93,17 @@ export default function useCollectionEntry() {
   }
 
   function getShopSales(shopName: string) {
-    try {
-      const raw = localStorage.getItem("shopSales");
-      if (!raw) return [];
-      const sales = JSON.parse(raw);
-      return sales.filter((s: any) => s.shopName === shopName);
-    } catch {
-      return [];
-    }
+    return collectionService
+      .getShopSales()
+      .filter((s) => s.shopName === shopName);
   }
 
   function computeShopTotals(shopName: string) {
     const sales = getShopSales(shopName);
-    const totalSales = sales.reduce((sum: number, s: any) => sum + (Number(s.amount) || 0), 0);
+    const totalSales = sales.reduce((sum: number, s) => sum + (Number(s.amount) || 0), 0);
     const collections = collectionService.getCollectionsForShop(shopName);
-    const totalCollections = collections.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
-    const currentPending = totalSales - totalCollections;
+    const totalCollections = collections.reduce((sum: number, c) => sum + (Number(c.amount) || 0), 0);
+    const currentPending = collectionService.getShopBalance(shopName);
     return { totalSales, totalCollections, currentPending };
   }
 
@@ -110,9 +117,9 @@ export default function useCollectionEntry() {
           totalSales,
           totalCollections,
           currentPending,
-          openingBalance: currentPending,
+          openingBalance: collectionService.getShopOpeningBalance(shopName),
           overdueDays: 0,
-          lastCollectionDate: new Date().toISOString().split('T')[0],
+          lastCollectionDate: new Date().toISOString().split("T")[0],
         };
     setPendingShop(updatedShop);
     setEntry((prev) => ({
@@ -181,33 +188,33 @@ export default function useCollectionEntry() {
     if (!pendingShop) return 0;
     const sales = getShopSales(pendingShop.shopName);
     return sales
-      .filter((s: any) => {
+      .filter((s) => {
         const saleDate = new Date(s.tripDate);
         return saleDate >= weekRange.monday && saleDate <= weekRange.sunday;
       })
-      .reduce((sum: number, s: any) => sum + Number(s.amount), 0);
+      .reduce((sum: number, s) => sum + Number(s.amount), 0);
   }, [pendingShop, weekRange]);
 
   const weeklyCollections = useMemo(() => {
     if (!pendingShop) return 0;
     const collections = collectionService.getCollectionsForShop(pendingShop.shopName);
     return collections
-      .filter((c: any) => {
+      .filter((c) => {
         const colDate = new Date(c.collectionDate);
         return colDate >= weekRange.monday && colDate <= weekRange.sunday && c.status === "Approved";
       })
-      .reduce((sum: number, c: any) => sum + Number(c.amount), 0);
+      .reduce((sum: number, c) => sum + Number(c.amount), 0);
   }, [pendingShop, weekRange]);
 
   const weeklyPending = useMemo(() => {
     if (!pendingShop) return 0;
     const collections = collectionService.getCollectionsForShop(pendingShop.shopName);
     return collections
-      .filter((c: any) => {
+      .filter((c) => {
         const colDate = new Date(c.collectionDate);
         return colDate >= weekRange.monday && colDate <= weekRange.sunday && c.status === "Pending";
       })
-      .reduce((sum: number, c: any) => sum + Number(c.amount), 0);
+      .reduce((sum: number, c) => sum + Number(c.amount), 0);
   }, [pendingShop, weekRange]);
 
   const openingBalance = useMemo(() => pendingShop?.currentPending ?? 0, [pendingShop]);
@@ -263,6 +270,11 @@ export default function useCollectionEntry() {
     return false;
   }, [pendingShop, entry]);
 
+  const canSaveOnServer = useMemo(() => {
+    if (!entry.shopName) return false;
+    return collectionService.getShopIdForName(entry.shopName) != null;
+  }, [entry.shopName]);
+
   function updateEntry<K extends keyof CollectionEntry>(field: K, value: CollectionEntry[K]) {
     setEntry((prev) => ({ ...prev, [field]: value }));
     setErrors({});
@@ -311,17 +323,16 @@ export default function useCollectionEntry() {
     if (!validateEntry()) return;
     try {
       setIsSaving(true);
-      const success = collectionService.saveCollection(entry);
+      const success = await collectionService.saveCollection(entry);
       if (!success) {
         showNotification("Failed to save collection.", "error");
         return;
       }
       showNotification("Collection saved successfully!", "success");
 
-      const pending = collectionService.getPendingCollections();
-      setPendingCollections(pending);
+      setPendingCollections(collectionService.getPendingCollections());
       setRecentCollections(collectionService.getRecentCollections(statusFilter));
-      setAllCollections(collectionService.getCollections()); // ← refresh all
+      setAllCollections(collectionService.getCollections());
 
       resetEntry();
       setErrors({});
@@ -337,14 +348,14 @@ export default function useCollectionEntry() {
     resetEntry();
   }
 
-  function changeStatusFilter(status: "Pending" | "Approved" | "All") {
-    setStatusFilter(status);
+  function changeStatusFilter(status: CollectionLegacyStatus | "All") {
+    setStatusFilter(status as "Pending" | "Approved" | "All");
     setCurrentPage(1);
     setRecentCollections(collectionService.getRecentCollections(status));
   }
 
-  function approveCollection(id: string) {
-    const success = collectionService.approveCollection(id, "Admin");
+  async function approveCollection(id: string) {
+    const success = await collectionService.approveCollection(id, "Admin");
     if (success) {
       showNotification("Collection approved successfully!", "success");
       refreshPage();
@@ -353,13 +364,25 @@ export default function useCollectionEntry() {
     }
   }
 
-  function deleteCollection(id: string) {
-    const success = collectionService.deleteCollection(id);
+  async function deleteCollection(id: string) {
+    const success = await collectionService.deleteCollection(id);
     if (success) {
       showNotification("Collection deleted successfully!", "success");
       refreshPage();
     } else {
       showNotification("This collection can no longer be deleted.", "error");
+    }
+  }
+
+  async function rejectCollection(id: string) {
+    const confirmed = window.confirm("Reject this collection? The amount will not be adjusted.");
+    if (!confirmed) return;
+    const success = await collectionService.rejectCollection(id, "Admin");
+    if (success) {
+      showNotification("Collection rejected successfully!", "success");
+      refreshPage();
+    } else {
+      showNotification("Failed to reject collection.", "error");
     }
   }
 
@@ -395,15 +418,15 @@ export default function useCollectionEntry() {
           totalSales,
           totalCollections,
           currentPending,
-          openingBalance: currentPending,
+          openingBalance: collectionService.getShopOpeningBalance(collection.shopName),
           overdueDays: 0,
-          lastCollectionDate: collection.collectionDate || new Date().toISOString().split('T')[0],
+          lastCollectionDate: collection.collectionDate || new Date().toISOString().split("T")[0],
         };
 
     setPendingShop(updatedShop);
 
     setEntry({
-      collectionId: collection.id,
+      collectionId: String(collection.numericId ?? collection.id),
       collectionNo: collection.collectionNo,
       collectionDate: collection.collectionDate,
       shopName: collection.shopName,
@@ -424,7 +447,7 @@ export default function useCollectionEntry() {
     const collections = collectionService.getCollections();
     const existing = collections.find((row) => row.id === entry.collectionId);
     if (!existing) return;
-    const success = collectionService.updateCollection({
+    const success = await collectionService.updateCollection({
       ...existing,
       collectionDate: entry.collectionDate,
       shopName: entry.shopName,
@@ -435,7 +458,7 @@ export default function useCollectionEntry() {
       remarks: entry.remarks
     });
     if (!success) {
-      showNotification("Edit is allowed only within 10 days.", "error");
+      showNotification("Edit failed. The collection may be locked.", "error");
       return;
     }
     showNotification("Collection updated successfully!", "success");
@@ -528,6 +551,7 @@ export default function useCollectionEntry() {
     saveCollection: saveOrUpdateCollection,
     cancelCollection,
     approveCollection,
+    rejectCollection,
     deleteCollection,
     editCollection,
     refreshPage,
@@ -610,6 +634,7 @@ export default function useCollectionEntry() {
     saveCollection: saveOrUpdateCollection,
     cancelCollection,
     approveCollection,
+    rejectCollection,
     deleteCollection,
     editCollection,
     viewLedger,
@@ -622,6 +647,7 @@ export default function useCollectionEntry() {
     hasRecentCollections,
     noPendingShops,
     noRecentCollections,
+    canSaveOnServer,
     actions,
     allCollections, // ← exposed
   };

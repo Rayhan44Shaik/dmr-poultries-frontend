@@ -3,7 +3,6 @@ import useTrips from "../hooks/useTrips";
 import TripFilters from "../components/TripFilters";
 import TripKPICards from "../components/TripKPICards";
 import TripMasterTable from "../components/TripMasterTable";
-import TripPagination from "../components/TripPagination";
 import TripViewModal from "../components/TripViewModal";
 
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";

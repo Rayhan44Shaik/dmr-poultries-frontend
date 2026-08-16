@@ -1,6 +1,6 @@
 // src/modules/accounts/payment-book/PaymentBookPage.tsx
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { PaymentTable } from '../components/payment-book/PaymentTable';
 import { PaymentViewModal } from '../components/payment-book/PaymentViewModal';

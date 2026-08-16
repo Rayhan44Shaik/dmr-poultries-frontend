@@ -89,11 +89,11 @@ interface Props {
 
 export default function StepEnd({
   trip,
-  updateTrip,
+  updateTrip: _updateTrip,
   submitExpensesStep,
   saveEndProgress,
   submitStartStep,
-  editable = false,
+  editable: _editable = false,
   canEdit = true,
   onCancel,
   clearForm,

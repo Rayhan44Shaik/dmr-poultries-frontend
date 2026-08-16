@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, CreditCard } from 'lucide-react';
-import { Payment } from '../../types/payment.types';
+import type { Payment } from '../../types/payment.types';
 import { PaymentService } from '../../services/PaymentService';
 import { getBanks } from '../../../masters/banks/services/bankService';
 import { DatePicker } from '../../../../components/common/DatePicker';

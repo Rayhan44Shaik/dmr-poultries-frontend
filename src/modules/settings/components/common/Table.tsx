@@ -13,13 +13,13 @@ interface Props {
 export const Table: React.FC<Props> = ({ 
   columns, 
   data, 
-  isLoading, 
+  isLoading: _isLoading, 
   searchPlaceholder = "Search...", 
   onExport 
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortOrder] = useState<'asc' | 'desc'>('asc');
 
   const filteredData = useMemo(() => {
     let result = data;

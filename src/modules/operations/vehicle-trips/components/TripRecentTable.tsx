@@ -1,7 +1,7 @@
 // src/modules/operations/vehicle-trips/components/TripRecentTable.tsx
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Eye, Pencil, RefreshCw, History, Trash2, Clock, Layers, AlertCircle, Search, FileText, CheckCircle, UserCheck } from "lucide-react";
+import { Eye, Pencil, RefreshCw, History, Trash2, Clock, Layers, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
 

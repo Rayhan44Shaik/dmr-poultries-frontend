@@ -18,8 +18,6 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
   trips,
   paymentData,
   onPaymentUpdate,
-  onRefresh,
-  showNotification,
 }) => {
   const [tooltipTripId, setTooltipTripId] = useState<string | null>(null);
 

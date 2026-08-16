@@ -2,14 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
-  Clock,
-  Users,
-  Scale,
-  DollarSign,
-  CheckCircle,
-  AlertCircle,
   Download,
-  PieChart,
   ChevronLeft,
   ChevronRight,
   FileText,
@@ -23,7 +16,6 @@ import { exportPDF, exportExcel } from '../components/Summary';
 import { PaymentService } from '../services/PaymentService';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { WeeklyMetrics, ExpenseBreakdown } from '../types/summary.types';
-import type { Payment } from '../types/payment.types';
 
 // ---- Helpers ----
 const formatCurrency = (amount: number): string => {
@@ -158,7 +150,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
   
   // Fetch all payments from PaymentService for overriding Farm Payments
   const allPayments = useMemo(() => {
-    const _trigger = refreshKey; // Trigger reactivity on storage updates
+    // Trigger reactivity on storage updates via refreshKey in deps
     return PaymentService.getPayments();
   }, [refreshKey]);
 

@@ -3,7 +3,6 @@ import { FileText, Truck, User, ShieldAlert, MapPin, Calendar, Gauge, DollarSign
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { DatePicker } from "../../../../components/common/DatePicker";
-import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { useFuelKMValidator } from "../../../operations/fuel-expenses/hooks/useFuelKMValidator";
 
 interface Props {
@@ -35,7 +34,6 @@ function TripInformation({
   supervisors,
   farms,
 }: Props) {
-  const { showNotification } = useSafeNotification();
   const [openingKmError, setOpeningKmError] = useState<string | null>(null);
   const [closingKmError, setClosingKmError] = useState<string | null>(null);
 

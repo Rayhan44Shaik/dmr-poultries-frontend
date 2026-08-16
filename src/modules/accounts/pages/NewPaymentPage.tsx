@@ -1,7 +1,5 @@
 // src/modules/accounts/pages/NewPaymentPage.tsx
 
-import React from 'react';
-
 interface NewPaymentPageProps {
   embedded?: boolean;
 }

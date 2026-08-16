@@ -211,7 +211,7 @@ const VehicleExpenseReportPage = () => {
 
 export default memo(VehicleExpenseReportPage);*/
 
-import React, { memo } from 'react';
+import { memo } from 'react';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 
 interface VehicleReportsPageProps {

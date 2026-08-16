@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
 
 export default function Password() {

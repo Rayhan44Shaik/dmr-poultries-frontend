@@ -12,6 +12,7 @@ interface Props {
   onStatusChange: (status: "Pending" | "Approved" | "All") => void;
   onPageChange: (page: number) => void;
   onApprove: (id: string) => void;
+  onReject: (id: string) => void;
   onEdit: (collection: RecentCollection) => void;
   onDelete: (id: string) => void;
   onViewShop: (shopName: string) => void;
@@ -32,6 +33,7 @@ export default function RecentCollectionsTable({
   onStatusChange,
   onPageChange,
   onApprove,
+  onReject,
   onEdit,
   onDelete,
   onViewShop,
@@ -230,6 +232,12 @@ export default function RecentCollectionsTable({
                               className="rounded-lg bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-200"
                             >
                               Edit
+                            </button>
+                            <button
+                              onClick={() => onReject(col.id)}
+                              className="rounded-lg bg-orange-100 px-3 py-1 text-xs font-medium text-orange-700 transition hover:bg-orange-200"
+                            >
+                              Reject
                             </button>
                             <button
                               onClick={() => onDelete(col.id)}

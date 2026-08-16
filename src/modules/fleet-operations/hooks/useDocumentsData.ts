@@ -3,15 +3,14 @@ import {
   parse,
   format,
   isBefore,
-  isAfter,
   differenceInDays,
   addDays,
 } from 'date-fns';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
-import { Vehicle } from '../../masters/vehicles/types/vehicle';
+import type { Vehicle } from '../../masters/vehicles/types/vehicle';
 import { getDocuments, updateDocumentExpiry, setData, FLEET_KEYS } from '../services/storage';
-import { DocumentTypeEnum, VehicleDocument } from '../types';
-import { DocumentType } from '../utils/constants';
+import { DocumentTypeEnum, type VehicleDocument } from '../types';
+import type { DocumentType } from '../utils/constants';
 
 type DocumentTypeKey = 'insurance' | 'fitness' | 'permit' | 'puc' | 'rc';
 type Counts = Record<DocumentTypeKey, number>;

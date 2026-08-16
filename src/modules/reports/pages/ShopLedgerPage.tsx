@@ -1,96 +1,47 @@
-import React, { useState, useMemo, useCallback } from "react";
-import { format, isWithinInterval, parseISO } from "date-fns";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { format } from "date-fns";
 import { Download } from "lucide-react";
 import Select from "react-select";
 import * as XLSX from "xlsx";
-import { shopSalesService } from "../../operations/shop-sales/services/shopSalesService";
-import { collectionService } from "../../operations/collections/services/collectionService";
 import { useShops } from "../../masters/shops/hooks/useShops";
+import type { Shop } from "../../masters/shops/types/shop";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { DatePicker } from "../../../components/common/DatePicker";
-import { generateShopLedgerPDF, LedgerTransaction } from "../components/ShopLedgerPDF";
+import {
+  fetchShopLedger,
+  type ShopLedgerRow,
+} from "../services/shopLedgerService";
+import { generateShopLedgerPDF } from "../components/ShopLedgerPDF";
+import type { LedgerTransaction } from "../components/ShopLedgerPDF";
 
 interface ShopLedgerProps {
   embedded?: boolean;
 }
 
-// ─── Helper to generate ledger for a single shop ───
-const getLedgerForShop = (
-  shopName: string,
-  allSales: any[],
-  allCollections: any[],
-  dateFrom: string,
-  dateTo: string
-): LedgerTransaction[] => {
-  const filterByShop = (items: any[]) => items.filter((item) => item.shopName === shopName);
+// ─── Ledger row mapping — keeps the existing LedgerTransaction shape that the
+//     table + PDF/Excel exports already consume. Birds/weight/rate belong to
+//     sale rows (backend trip-delivery detail); collections carry their number.
+const txParticulars = (row: ShopLedgerRow): string => {
+  if (row.type === "correction") return row.description || "Correction";
+  if (row.type === "collection") return row.referenceNo || row.paymentMode || "Cash";
+  return row.referenceNo || "Sale";
+};
 
-  // Opening balance
-  const salesBefore = filterByShop(allSales).filter((s) => s.tripDate < dateFrom);
-  const collectionsBefore = filterByShop(allCollections).filter((c) => c.collectionDate < dateFrom);
-  const openingBalance =
-    salesBefore.reduce((sum, s) => sum + (s.amount || 0), 0) -
-    collectionsBefore.reduce((sum, c) => sum + (c.amount || 0), 0);
-
-  const filterDate = (item: any) => {
-    const d = item.tripDate || item.collectionDate;
-    if (!d) return false;
-    return isWithinInterval(parseISO(d), {
-      start: parseISO(dateFrom),
-      end: parseISO(dateTo),
-    });
+const mapRowToTx = (row: ShopLedgerRow): LedgerTransaction => {
+  const isSale = row.type === "sale";
+  return {
+    date: row.date,
+    particulars: txParticulars(row),
+    birds: isSale ? row.birds : 0,
+    weight: isSale ? row.weight : 0,
+    rate: isSale ? row.rate : 0,
+    debit: Number(row.debit) || 0,
+    credit: Number(row.credit) || 0,
+    balance: Number(row.balance) || 0,
+    type: row.type,
+    paymentMode: row.paymentMode ?? undefined,
+    collectionNo: row.referenceNo || undefined,
   };
-
-  let filteredSales = filterByShop(allSales).filter(filterDate);
-  let filteredCollections = filterByShop(allCollections).filter(filterDate);
-
-  const salesTx: LedgerTransaction[] = filteredSales.map((s) => ({
-    date: s.tripDate,
-    particulars: String(s.tripNo || "Sale"),
-    birds: s.totalBirds || 0,
-    weight: s.totalWeight || 0,
-    rate: s.rate || 0,
-    debit: s.amount || 0,
-    credit: 0,
-    balance: 0,
-    type: "sale",
-    paymentMode: undefined,
-  }));
-
-  const collectionTx: LedgerTransaction[] = filteredCollections.map((c) => ({
-    date: c.collectionDate,
-    particulars: c.paymentModeName || "Cash",
-    birds: 0,
-    weight: 0,
-    rate: 0,
-    debit: 0,
-    credit: c.amount || 0,
-    balance: 0,
-    type: "collection",
-    paymentMode: undefined,
-  }));
-
-  const allTx = [...salesTx, ...collectionTx].sort((a, b) => a.date.localeCompare(b.date));
-
-  let balance = openingBalance;
-  const ledgerWithBalance = allTx.map((tx) => {
-    balance = balance + tx.debit - tx.credit;
-    return { ...tx, balance };
-  });
-
-  const openingRow: LedgerTransaction = {
-    date: dateFrom,
-    particulars: "Opening Balance",
-    birds: 0,
-    weight: 0,
-    rate: 0,
-    debit: 0,
-    credit: 0,
-    balance: openingBalance,
-    type: "sale",
-    paymentMode: undefined,
-  };
-
-  return [openingRow, ...ledgerWithBalance];
 };
 
 const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
@@ -105,92 +56,56 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
   const shopOptions = useMemo(() => {
     const all = [{ value: "All Shops", label: "All Shops" }];
-    const shopList = shops.map((shop: any) => ({
+    const shopList = shops.map((shop: Shop) => ({
       value: shop.shopName,
       label: shop.shopName,
     }));
     return [...all, ...shopList];
   }, [shops]);
 
-  // ── Data for the current view (merged) ──
-  const ledgerData = useMemo(() => {
-    const allSales = shopSalesService.getAll();
-    const allCollections = collectionService
-      .getCollections()
-      .filter((c) => c.status === "Approved");
+  // ── Ledger data: fetched from the backend, scoped by shop + date range ──
+  const [ledgerData, setLedgerData] = useState<LedgerTransaction[]>([]);
+  const [ledgerLoading, setLedgerLoading] = useState(true);
 
-    const filterByShop = (items: any[]) => {
-      if (selectedShop === "All Shops") return items;
-      return items.filter((item) => item.shopName === selectedShop);
-    };
+  const buildLedger = useCallback(
+    async (from: string, to: string, shopId?: number): Promise<LedgerTransaction[]> => {
+      const res = await fetchShopLedger({ fromDate: from, toDate: to, shopId });
+      const openingRow: LedgerTransaction = {
+        date: from,
+        particulars: "Opening Balance",
+        birds: 0,
+        weight: 0,
+        rate: 0,
+        debit: 0,
+        credit: 0,
+        balance: Number(res.openingBalance) || 0,
+        type: "sale",
+      };
+      return [openingRow, ...res.data.map(mapRowToTx)];
+    },
+    []
+  );
 
-    const salesBefore = filterByShop(allSales).filter((s) => s.tripDate < dateFrom);
-    const collectionsBefore = filterByShop(allCollections).filter((c) => c.collectionDate < dateFrom);
-    const openingBalance =
-      salesBefore.reduce((sum, s) => sum + (s.amount || 0), 0) -
-      collectionsBefore.reduce((sum, c) => sum + (c.amount || 0), 0);
-
-    const filterDate = (item: any) => {
-      const d = item.tripDate || item.collectionDate;
-      if (!d) return false;
-      return isWithinInterval(parseISO(d), {
-        start: parseISO(dateFrom),
-        end: parseISO(dateTo),
+  useEffect(() => {
+    let cancelled = false;
+    const shopId =
+      selectedShop === "All Shops"
+        ? undefined
+        : shops.find((s: Shop) => s.shopName === selectedShop)?.id;
+    buildLedger(dateFrom, dateTo, shopId)
+      .then((tx) => {
+        if (!cancelled) setLedgerData(tx);
+      })
+      .catch(() => {
+        if (!cancelled) setLedgerData([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLedgerLoading(false);
       });
+    return () => {
+      cancelled = true;
     };
-
-    let filteredSales = filterByShop(allSales).filter(filterDate);
-    let filteredCollections = filterByShop(allCollections).filter(filterDate);
-
-    const salesTx: LedgerTransaction[] = filteredSales.map((s) => ({
-      date: s.tripDate,
-      particulars: String(s.tripNo || "Sale"),
-      birds: s.totalBirds || 0,
-      weight: s.totalWeight || 0,
-      rate: s.rate || 0,
-      debit: s.amount || 0,
-      credit: 0,
-      balance: 0,
-      type: "sale",
-      paymentMode: undefined,
-    }));
-
-    const collectionTx: LedgerTransaction[] = filteredCollections.map((c) => ({
-      date: c.collectionDate,
-      particulars: c.paymentModeName || "Cash",
-      birds: 0,
-      weight: 0,
-      rate: 0,
-      debit: 0,
-      credit: c.amount || 0,
-      balance: 0,
-      type: "collection",
-      paymentMode: undefined,
-    }));
-
-    const allTx = [...salesTx, ...collectionTx].sort((a, b) => a.date.localeCompare(b.date));
-
-    let balance = openingBalance;
-    const ledgerWithBalance = allTx.map((tx) => {
-      balance = balance + tx.debit - tx.credit;
-      return { ...tx, balance };
-    });
-
-    const openingRow: LedgerTransaction = {
-      date: dateFrom,
-      particulars: "Opening Balance",
-      birds: 0,
-      weight: 0,
-      rate: 0,
-      debit: 0,
-      credit: 0,
-      balance: openingBalance,
-      type: "sale",
-      paymentMode: undefined,
-    };
-
-    return [openingRow, ...ledgerWithBalance];
-  }, [dateFrom, dateTo, selectedShop]);
+  }, [dateFrom, dateTo, selectedShop, shops, buildLedger]);
 
   // ── Summary for the current view ──
   const summary = useMemo(() => {
@@ -209,142 +124,132 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
   // ─── Export Functions ──────────────────────────────────────
 
-  const handleExportPDF = useCallback(() => {
-    const allSales = shopSalesService.getAll();
-    const allCollections = collectionService.getCollections().filter((c) => c.status === "Approved");
-
-    let shopNames: string[] = [];
-    if (selectedShop === "All Shops") {
-      const filterDate = (item: any) => {
-        const d = item.tripDate || item.collectionDate;
-        if (!d) return false;
-        return isWithinInterval(parseISO(d), {
-          start: parseISO(dateFrom),
-          end: parseISO(dateTo),
+  const handleExportPDF = useCallback(async () => {
+    try {
+      let shopNames: string[] = [];
+      if (selectedShop === "All Shops") {
+        const all = await fetchShopLedger({ fromDate: dateFrom, toDate: dateTo });
+        const names = new Set<string>();
+        all.data.forEach((r) => {
+          if (r.shopName) names.add(r.shopName);
         });
-      };
-      const salesInRange = allSales.filter(filterDate);
-      const collectionsInRange = allCollections.filter(filterDate);
-      const allShops = new Set<string>();
-      salesInRange.forEach((s) => allShops.add(s.shopName));
-      collectionsInRange.forEach((c) => allShops.add(c.shopName));
-      shopNames = Array.from(allShops).filter(Boolean).sort();
-    } else {
-      shopNames = [selectedShop];
-    }
-
-    if (shopNames.length === 0) {
-      showNotification("No shops found in the selected date range.", "error");
-      return;
-    }
-
-    const allLedgers: { shop: string; data: LedgerTransaction[] }[] = [];
-    for (const shop of shopNames) {
-      const ledger = getLedgerForShop(shop, allSales, allCollections, dateFrom, dateTo);
-      if (ledger.length > 1) {
-        allLedgers.push({ shop, data: ledger });
+        shopNames = Array.from(names).sort();
+      } else {
+        shopNames = [selectedShop];
       }
+
+      if (shopNames.length === 0) {
+        showNotification("No shops found in the selected date range.", "error");
+        return;
+      }
+
+      const allLedgers: { shop: string; data: LedgerTransaction[] }[] = [];
+      for (const shop of shopNames) {
+        const shopId = shops.find((s: Shop) => s.shopName === shop)?.id;
+        const ledger = await buildLedger(dateFrom, dateTo, shopId);
+        if (ledger.length > 1) {
+          allLedgers.push({ shop, data: ledger });
+        }
+      }
+
+      if (allLedgers.length === 0) {
+        showNotification("No transaction data to export.", "error");
+        return;
+      }
+
+      generateShopLedgerPDF(allLedgers, dateFrom, dateTo, selectedShop);
+      showNotification("PDF downloaded successfully.", "success");
+    } catch {
+      showNotification("Failed to load ledger data. Please try again.", "error");
     }
+  }, [selectedShop, dateFrom, dateTo, showNotification, shops, buildLedger]);
 
-    if (allLedgers.length === 0) {
-      showNotification("No transaction data to export.", "error");
-      return;
-    }
-
-    generateShopLedgerPDF(allLedgers, dateFrom, dateTo, selectedShop);
-    showNotification("PDF downloaded successfully.", "success");
-  }, [selectedShop, dateFrom, dateTo, showNotification]);
-
-  const handleExportExcel = useCallback(() => {
-    const allSales = shopSalesService.getAll();
-    const allCollections = collectionService.getCollections().filter((c) => c.status === "Approved");
-
-    let shopNames: string[] = [];
-    if (selectedShop === "All Shops") {
-      const filterDate = (item: any) => {
-        const d = item.tripDate || item.collectionDate;
-        if (!d) return false;
-        return isWithinInterval(parseISO(d), {
-          start: parseISO(dateFrom),
-          end: parseISO(dateTo),
+  const handleExportExcel = useCallback(async () => {
+    try {
+      let shopNames: string[] = [];
+      if (selectedShop === "All Shops") {
+        const all = await fetchShopLedger({ fromDate: dateFrom, toDate: dateTo });
+        const names = new Set<string>();
+        all.data.forEach((r) => {
+          if (r.shopName) names.add(r.shopName);
         });
-      };
-      const salesInRange = allSales.filter(filterDate);
-      const collectionsInRange = allCollections.filter(filterDate);
-      const allShops = new Set<string>();
-      salesInRange.forEach((s) => allShops.add(s.shopName));
-      collectionsInRange.forEach((c) => allShops.add(c.shopName));
-      shopNames = Array.from(allShops).filter(Boolean).sort();
-    } else {
-      shopNames = [selectedShop];
+        shopNames = Array.from(names).sort();
+      } else {
+        shopNames = [selectedShop];
+      }
+
+      if (shopNames.length === 0) {
+        showNotification("No shops found in the selected date range.", "error");
+        return;
+      }
+
+      const ledgers: { shop: string; ledger: LedgerTransaction[] }[] = [];
+      for (const shop of shopNames) {
+        const shopId = shops.find((s: Shop) => s.shopName === shop)?.id;
+        const ledger = await buildLedger(dateFrom, dateTo, shopId);
+        if (ledger.length <= 1) continue;
+        ledgers.push({ shop, ledger });
+      }
+
+      const headers = ["Date", "Particulars", "Birds", "Weight (KG)", "Rate (₹)", "Debit (₹)", "Credit (₹)", "Balance (₹)", "Payment Mode"];
+      const workbook = XLSX.utils.book_new();
+
+      ledgers.forEach(({ shop, ledger }) => {
+        const rows = ledger.map((t) => [
+          t.date,
+          t.particulars,
+          t.type === "sale" ? t.birds : "-",
+          t.type === "sale" ? t.weight.toFixed(2) : "-",
+          t.type === "sale" ? t.rate.toFixed(2) : "-",
+          t.debit.toFixed(2),
+          t.credit.toFixed(2),
+          t.balance.toFixed(2),
+          t.paymentMode || "-",
+        ]);
+
+        const tx = ledger.slice(1);
+        const totalDebit = tx.reduce((sum, t) => sum + t.debit, 0);
+        const totalCredit = tx.reduce((sum, t) => sum + t.credit, 0);
+        const totalBirds = tx.filter((t) => t.type === "sale").reduce((sum, t) => sum + t.birds, 0);
+        const totalWeight = tx.filter((t) => t.type === "sale").reduce((sum, t) => sum + t.weight, 0);
+        const closingBalance = ledger.length > 0 ? ledger[ledger.length - 1].balance : 0;
+        rows.push([
+          "TOTAL",
+          "",
+          totalBirds,
+          totalWeight.toFixed(2),
+          "",
+          totalDebit.toFixed(2),
+          totalCredit.toFixed(2),
+          closingBalance.toFixed(2),
+          "",
+        ]);
+
+        const wsData = [headers, ...rows];
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        XLSX.utils.book_append_sheet(workbook, ws, shop.slice(0, 31));
+      });
+
+      const summaryRows = [
+        ["Shop", "Total Debit", "Total Credit", "Closing Balance"],
+      ];
+      ledgers.forEach(({ shop, ledger }) => {
+        const tx = ledger.slice(1);
+        const totalDebit = tx.reduce((sum, t) => sum + t.debit, 0);
+        const totalCredit = tx.reduce((sum, t) => sum + t.credit, 0);
+        const closingBalance = ledger[ledger.length - 1].balance;
+        summaryRows.push([shop, totalDebit.toFixed(2), totalCredit.toFixed(2), closingBalance.toFixed(2)]);
+      });
+      const summaryWs = XLSX.utils.aoa_to_sheet(summaryRows);
+      XLSX.utils.book_append_sheet(workbook, summaryWs, "Summary");
+
+      const filename = `ShopLedger_${selectedShop === "All Shops" ? "AllShops" : selectedShop.replace(/\s+/g, "_")}_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+      XLSX.writeFile(workbook, filename);
+      showNotification("Excel downloaded successfully.", "success");
+    } catch {
+      showNotification("Failed to load ledger data. Please try again.", "error");
     }
-
-    if (shopNames.length === 0) {
-      showNotification("No shops found in the selected date range.", "error");
-      return;
-    }
-
-    const headers = ["Date", "Particulars", "Birds", "Weight (KG)", "Rate (₹)", "Debit (₹)", "Credit (₹)", "Balance (₹)", "Payment Mode"];
-    const workbook = XLSX.utils.book_new();
-
-    shopNames.forEach((shop) => {
-      const ledger = getLedgerForShop(shop, allSales, allCollections, dateFrom, dateTo);
-      if (ledger.length <= 1) return;
-
-      const rows = ledger.map((t) => [
-        t.date,
-        t.particulars,
-        t.type === "sale" ? t.birds : "-",
-        t.type === "sale" ? t.weight.toFixed(2) : "-",
-        t.type === "sale" ? t.rate.toFixed(2) : "-",
-        t.debit.toFixed(2),
-        t.credit.toFixed(2),
-        t.balance.toFixed(2),
-        t.paymentMode || "-",
-      ]);
-
-      const tx = ledger.slice(1);
-      const totalDebit = tx.reduce((sum, t) => sum + t.debit, 0);
-      const totalCredit = tx.reduce((sum, t) => sum + t.credit, 0);
-      const totalBirds = tx.filter((t) => t.type === "sale").reduce((sum, t) => sum + t.birds, 0);
-      const totalWeight = tx.filter((t) => t.type === "sale").reduce((sum, t) => sum + t.weight, 0);
-      const closingBalance = ledger.length > 0 ? ledger[ledger.length - 1].balance : 0;
-      rows.push([
-        "TOTAL",
-        "",
-        totalBirds,
-        totalWeight.toFixed(2),
-        "",
-        totalDebit.toFixed(2),
-        totalCredit.toFixed(2),
-        closingBalance.toFixed(2),
-        "",
-      ]);
-
-      const wsData = [headers, ...rows];
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      XLSX.utils.book_append_sheet(workbook, ws, shop.slice(0, 31));
-    });
-
-    const summaryRows = [
-      ["Shop", "Total Debit", "Total Credit", "Closing Balance"],
-    ];
-    shopNames.forEach((shop) => {
-      const ledger = getLedgerForShop(shop, allSales, allCollections, dateFrom, dateTo);
-      if (ledger.length <= 1) return;
-      const tx = ledger.slice(1);
-      const totalDebit = tx.reduce((sum, t) => sum + t.debit, 0);
-      const totalCredit = tx.reduce((sum, t) => sum + t.credit, 0);
-      const closingBalance = ledger[ledger.length - 1].balance;
-      summaryRows.push([shop, totalDebit.toFixed(2), totalCredit.toFixed(2), closingBalance.toFixed(2)]);
-    });
-    const summaryWs = XLSX.utils.aoa_to_sheet(summaryRows);
-    XLSX.utils.book_append_sheet(workbook, summaryWs, "Summary");
-
-    const filename = `ShopLedger_${selectedShop === "All Shops" ? "AllShops" : selectedShop.replace(/\s+/g, "_")}_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
-    XLSX.writeFile(workbook, filename);
-    showNotification("Excel downloaded successfully.", "success");
-  }, [selectedShop, dateFrom, dateTo, showNotification]);
+  }, [selectedShop, dateFrom, dateTo, showNotification, shops, buildLedger]);
 
   // ─── React-Select styles (original) ───
   const selectStyles = {
@@ -500,7 +405,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 {ledgerData.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-12 text-center text-slate-400">
-                      No transactions found for the selected filters.
+                      {ledgerLoading
+                        ? "Loading ledger..."
+                        : "No transactions found for the selected filters."}
                     </td>
                   </tr>
                 ) : (
@@ -508,6 +415,12 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     {ledgerData.map((tx, idx) => {
                       const isOpening = idx === 0;
                       const isSale = tx.type === "sale";
+                      const typeLabel =
+                        tx.type === "sale"
+                          ? { text: "(Sale)", color: "text-emerald-600" }
+                          : tx.type === "collection"
+                            ? { text: "(Collection)", color: "text-blue-600" }
+                            : { text: "(Correction)", color: "text-rose-600" };
                       return (
                         <tr
                           key={idx}
@@ -517,8 +430,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                           <td className="px-4 py-3 text-xs font-medium text-slate-700">
                             {tx.particulars}
                             {!isOpening && (
-                              <span className={`ml-2 text-[10px] font-semibold ${isSale ? "text-emerald-600" : "text-blue-600"}`}>
-                                {isSale ? "(Sale)" : "(Collection)"}
+                              <span className={`ml-2 text-[10px] font-semibold ${typeLabel.color}`}>
+                                {typeLabel.text}
                               </span>
                             )}
                           </td>

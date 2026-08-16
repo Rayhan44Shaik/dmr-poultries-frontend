@@ -83,8 +83,9 @@ export default function CollectionReportPage({ embedded = false }: Props) {
 
   const shopSearch = useShopSearch(allShopNames, shopName, setShopName);
 
-  const loadData = () => {
+  const loadData = async () => {
     try {
+      await collectionService.refreshFromBackend();
       const all = collectionService.getCollections();
       setAllCollections(all);
       setLoading(false);
@@ -95,10 +96,7 @@ export default function CollectionReportPage({ embedded = false }: Props) {
   };
 
   useEffect(() => {
-    loadData();
-    const handleStorage = () => loadData();
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    void loadData();
   }, []);
 
   const filteredData = useMemo(() => {

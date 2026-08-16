@@ -1,4 +1,3 @@
-import React from "react";
 import { Check, Box, Users, Scale, Clock, Pencil, FileText, Package, AlertCircle } from "lucide-react";
 import type { ShopDelivery } from "../../types/trip";
 import type { ShopDeliveryWithExtra } from "./useShopDeliveryForm";

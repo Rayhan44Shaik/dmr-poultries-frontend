@@ -1,18 +1,11 @@
 import React, { useState, useRef } from "react";
 import { Card, Button, Input, Select } from "../common";
 import { 
-  User, 
   Camera, 
-  Mail, 
-  Phone, 
-  Building2, 
-  Briefcase, 
-  ShieldCheck, 
   Hash, 
   Calendar, 
   Sparkles, 
   Globe, 
-  Palette, 
   Edit3, 
   Check, 
   X,

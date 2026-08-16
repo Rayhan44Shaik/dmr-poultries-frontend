@@ -1,4 +1,3 @@
-import React from "react";
 import { Check, CircleAlert, CircleX, Save, Send, X } from "lucide-react";
 
 export type WizardNoticeState = {

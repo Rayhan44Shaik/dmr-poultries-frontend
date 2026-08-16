@@ -5,7 +5,6 @@ import Select from "react-select";
 import { MapPin, Upload, X, Loader2 } from "lucide-react";
 import { fuelExpenseService } from "../services/fuelExpenseService";
 import type { FuelExpense } from "../types/fuelExpense";
-import { useFuelKMValidator } from "../../../operations/fuel-expenses/hooks/useFuelKMValidator";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
 interface Props {
@@ -55,9 +54,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
 
   const activeVehicles = vehicles.filter(v => (v.status?.toLowerCase() === "active"));
 
-  // ✅ Still use validator for min meter reading, but we don't show the warning banner
-  const validator = useFuelKMValidator(vehicleNo);
-  const latestApprovedKM = validator.latestApprovedKM;
+  // ✅ Validator used for min meter reading checks; warning banner intentionally not shown
 
   useEffect(() => {
     if (initialData && editingId) {

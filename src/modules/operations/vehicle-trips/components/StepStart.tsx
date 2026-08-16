@@ -557,8 +557,8 @@ function StepStart({
   onCancel,
   clearForm,
   headerLoading = false,
-  subscribeHeaderSaveStatus,
-  getHeaderSaveStatus,
+  subscribeHeaderSaveStatus: _subscribeHeaderSaveStatus,
+  getHeaderSaveStatus: _getHeaderSaveStatus,
 }: Props) {
   const [form, setForm] = useState<Step1FormState>(() => tripToForm(loadSnapshot));
   const [isSubmitting, setIsSubmitting] = useState(false);

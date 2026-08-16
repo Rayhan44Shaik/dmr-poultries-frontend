@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { X, Save, Eye, Calendar, User, CreditCard, Hash, IndianRupee, FileText } from "lucide-react";
-import type { Collection } from "../../types/collection";
+import { X, Save, Eye, Calendar, User, CreditCard, Hash, IndianRupee, FileText, Loader2 } from "lucide-react";
+import type { Collection, CollectionApiEntry } from "../../types/collection";
 import { collectionService } from "../../services/collectionService";
 
 const formatCurrency = (amount: number) =>
@@ -26,6 +26,8 @@ interface EditCollectionModalProps {
   shopName: string;
   mode: "view" | "edit";
   allCollections: Collection[];
+  /** The specific collection this modal was opened for (view/edit target). */
+  collection?: Collection | null;
   onRefresh: () => void;
 }
 
@@ -35,14 +37,17 @@ export function EditCollectionModal({
   shopName,
   mode,
   allCollections,
+  collection,
   onRefresh,
 }: EditCollectionModalProps) {
   const shopCollections = allCollections
     .filter((c) => c.shopName === shopName)
     .sort((a, b) => b.collectionDate.localeCompare(a.collectionDate));
   const latest = shopCollections.length > 0 ? shopCollections[0] : null;
+  const selected = collection ?? latest;
 
   const [formData, setFormData] = useState({
+    collectionNo: "",
     collectionDate: "",
     collectorName: "",
     paymentModeName: "",
@@ -51,18 +56,49 @@ export function EditCollectionModal({
     remarks: "",
   });
 
+  // Backend-sourced "Recent 10 Shop Credits": newest first, max 10, per shop.
+  const [recentList, setRecentList] = useState<CollectionApiEntry[]>([]);
+  const [recentLoading, setRecentLoading] = useState(false);
+
   useEffect(() => {
-    if (latest) {
+    let cancelled = false;
+    const shopId = collectionService.getShopIdForName(shopName);
+    if (!isOpen || !shopId) {
+      if (!isOpen) setRecentList([]);
+      return;
+    }
+    setRecentLoading(true);
+    collectionService
+      .fetchRecentCollectionsForShop(shopId, 10)
+      .then((rows) => {
+        if (!cancelled) setRecentList(rows);
+      })
+      .catch(() => {
+        // Fall back to the page-level cache so the modal never goes empty.
+        if (!cancelled) setRecentList([]);
+      })
+      .finally(() => {
+        if (!cancelled) setRecentLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, shopName]);
+
+  useEffect(() => {
+    if (selected) {
       setFormData({
-        collectionDate: latest.collectionDate,
-        collectorName: latest.collectorName,
-        paymentModeName: latest.paymentModeName,
-        referenceNo: latest.referenceNo || "",
-        amount: latest.amount,
-        remarks: latest.remarks || "",
+        collectionNo: selected.collectionNo || "",
+        collectionDate: selected.collectionDate,
+        collectorName: selected.collectorName,
+        paymentModeName: selected.paymentModeName,
+        referenceNo: selected.referenceNo || "",
+        amount: selected.amount,
+        remarks: selected.remarks || "",
       });
     } else {
       setFormData({
+        collectionNo: "",
         collectionDate: new Date().toISOString().split("T")[0],
         collectorName: "",
         paymentModeName: "Cash",
@@ -71,19 +107,19 @@ export function EditCollectionModal({
         remarks: "",
       });
     }
-  }, [latest]);
+  }, [selected]);
 
   const handleChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = () => {
-    if (!latest) {
+  const handleSave = async () => {
+    if (!selected) {
       alert("No collection to edit. Please create a new collection.");
       return;
     }
     const updated: Collection = {
-      ...latest,
+      ...selected,
       collectionDate: formData.collectionDate,
       collectorName: formData.collectorName,
       paymentModeName: formData.paymentModeName,
@@ -91,12 +127,12 @@ export function EditCollectionModal({
       amount: formData.amount,
       remarks: formData.remarks,
     };
-    const success = collectionService.updateCollection(updated);
+    const success = await collectionService.updateCollection(updated);
     if (success) {
       onRefresh();
       onClose();
     } else {
-      alert("Failed to update. The collection may be older than 10 days.");
+      alert("Failed to update. The collection may be locked or deleted.");
     }
   };
 
@@ -212,9 +248,14 @@ export function EditCollectionModal({
         <div className="p-6 max-h-[70vh] overflow-y-auto">
           {isView ? (
             <>
-              {/* Latest Collection Details */}
+              {/* Selected Collection Details */}
               <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-                <h4 className="mb-2 text-sm font-semibold text-slate-700">Latest Collection</h4>
+                <h4 className="mb-2 text-sm font-semibold text-slate-700">Selected Collection Details</h4>
+                {renderField({
+                  label: "Collection No.",
+                  value: formData.collectionNo || "-",
+                  icon: Hash,
+                })}
                 {renderField({
                   label: "Collection Date",
                   value: formatDate(formData.collectionDate),
@@ -248,10 +289,22 @@ export function EditCollectionModal({
                 })}
               </div>
 
-              {/* Recent Collections Table */}
+              {/* Recent 10 Shop Credits — backend-sourced, newest first */}
               <div className="mt-6">
-                <h4 className="mb-3 text-sm font-semibold text-slate-700">Recent Collections</h4>
-                {shopCollections.length === 0 ? (
+                <div className="mb-3 flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-slate-700">
+                    Recent 10 Shop Credits
+                  </h4>
+                  {recentLoading && (
+                    <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                      <Loader2 size={12} className="animate-spin" />
+                      Loading...
+                    </span>
+                  )}
+                </div>
+                {recentLoading && recentList.length === 0 ? (
+                  <p className="text-sm text-slate-500">Loading recent collections...</p>
+                ) : recentList.length === 0 ? (
                   <p className="text-sm text-slate-500">No collections found for this shop.</p>
                 ) : (
                   <div className="overflow-x-auto rounded-lg border border-slate-200">
@@ -262,6 +315,9 @@ export function EditCollectionModal({
                             Date
                           </th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                            Collection No.
+                          </th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                             Amount
                           </th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
@@ -270,30 +326,40 @@ export function EditCollectionModal({
                           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                             Payment Mode
                           </th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                            Status
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
-                        {shopCollections.slice(0, 5).map((col) => (
+                        {recentList.slice(0, 10).map((col) => (
                           <tr key={col.id} className="hover:bg-slate-50">
                             <td className="px-3 py-2 text-sm text-slate-600">
                               {formatDate(col.collectionDate)}
                             </td>
+                            <td className="px-3 py-2 text-sm font-medium text-slate-700">
+                              {col.collectionNo || "-"}
+                            </td>
                             <td className="px-3 py-2 text-sm font-medium text-slate-800">
-                              {formatCurrency(col.amount)}
+                              {formatCurrency(Number(col.amount) || 0)}
                             </td>
                             <td className="px-3 py-2 text-sm text-slate-600">
-                              {col.collectorName}
+                              {col.collector || "-"}
                             </td>
                             <td className="px-3 py-2 text-sm text-slate-600">
-                              {col.paymentModeName}
+                              {col.paymentMode || "-"}
+                            </td>
+                            <td className="px-3 py-2 text-sm text-slate-600">
+                              {col.status || "-"}
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                    {shopCollections.length > 5 && (
+                    {recentList.length >= 10 && (
                       <p className="px-3 py-2 text-xs text-slate-400">
-                        Showing latest 5 of {shopCollections.length} collections
+                        Showing latest 10 of {recentList.length}+ collections — full history is
+                        available in Shop Ledger.
                       </p>
                     )}
                   </div>

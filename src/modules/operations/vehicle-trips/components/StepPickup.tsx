@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
-  Lock, Scale, Bird, Box, Gauge, Clock, Pencil, X, CheckCircle,
-  Plus, Trash2, FileText, Loader2, AlertTriangle, Camera, Download
+  Scale, Bird, Box, Gauge, Clock, Pencil,
+  Plus, Trash2, FileText, AlertTriangle, Camera, Download
 } from "lucide-react";
 import type { Trip, BoxDetail } from "../types/trip";
 import { getVehicles } from "../../../masters/vehicles/services/vehicleService";
@@ -100,9 +100,9 @@ function ConfirmationModal({
 
 export default function StepPickup({
   trip,
-  setTrip,
+  setTrip: _setTrip,
   updateTrip,
-  updateBoxDetails,
+  updateBoxDetails: _updateBoxDetails,
   submitPickupStep,
   savePickupProgress,
   editable = false,
@@ -136,7 +136,7 @@ export default function StepPickup({
   const [imageKey, setImageKey] = useState<string | null>(trip.dcPhotoKey || null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const savedPhotoKeyRef = useRef<string | null>(trip.dcPhotoKey || null);
-  const [isImageLoading, setIsImageLoading] = useState(false);
+  const [, setIsImageLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ─── Toast state ────────────────────────────────────────────────────

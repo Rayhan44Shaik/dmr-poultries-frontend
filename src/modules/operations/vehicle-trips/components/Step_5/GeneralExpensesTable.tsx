@@ -23,12 +23,12 @@ export default function GeneralExpensesTable({
   pickupTolls,
   totalExpenses1,
   totalExpenses2,
-  totalAllExpenses,
+  totalAllExpenses: _totalAllExpenses,
   totalDistanceCovered,
   averageKmLtr,
   openingMeter,
   destMeter,
-  trip,
+  trip: _trip,
 }: GeneralExpensesTableProps) {
   const blockInvalidChar = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (["e", "E", "+", "-"].includes(e.key)) {

@@ -36,10 +36,10 @@ export default function StepDeliveries({
   submitDeliveriesStep,
   saveDeliveriesProgress,
   clearForm,
-  readOnly = false,
+  readOnly: _readOnly = false,
   editable = false,
   canEdit = true,
-  onCancel,
+  onCancel: _onCancel,
   boxDetails = [],
 }: Props) {
   // Toggle view mode: 'shops' | 'analysis'

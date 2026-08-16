@@ -67,8 +67,6 @@ const MaintenanceTimeline = ({ events, vehicles, selectedVehicleId }: Maintenanc
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
           .map((event) => {
             const matchedVehicle = vehicles.find(v => String(v.id) === String(event.vehicleId));
-            // All events here are paid by filter
-            const isPaid = true;
             
             return (
               <div key={event.id} className="relative pl-10 border-l border-slate-200 pb-6 last:border-l-0 last:pb-2">

@@ -1,9 +1,6 @@
 // src/modules/accounts/types/summary.types.ts
 
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
-import type { ShopSale } from '../../operations/shop-sales/types/shopSale';
-import type { Collection } from '../../operations/collections/types/collection';
-import type { FarmPayment } from './farmPayment.types';
 
 /**
  * Metrics for a single week (or any period)

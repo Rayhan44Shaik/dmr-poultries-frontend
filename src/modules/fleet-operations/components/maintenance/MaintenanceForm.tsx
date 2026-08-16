@@ -1,11 +1,10 @@
-import React, { memo, useState, useMemo } from 'react';
+import { memo, useState, useMemo } from 'react';
 import Select from 'react-select';
 import { DatePicker } from '../../../../components/common/DatePicker';
 import { Car, User, Gauge, Wrench, Cog, Building2, UserCog, FileText, Hash } from 'lucide-react';
 import PartsTable from './PartsTable';
 import type { PartItem } from '../../types';
 import { useFuelKMValidator } from "../../../operations/fuel-expenses/hooks/useFuelKMValidator";
-import { useSafeNotification } from '../../../../hooks/useSafeNotification';
 
 interface MaintenanceFormProps {
   form: {
@@ -48,7 +47,6 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
   setFormField,
   selectKey,
 }) => {
-  const { showNotification } = useSafeNotification();
   const [kmError, setKmError] = useState<string | null>(null);
 
   // Get vehicle number from selected vehicle option
@@ -59,7 +57,6 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
   const vehicleNumber = selectedVehicleOption?.label || '';
 
   const validator = useFuelKMValidator(vehicleNumber);
-  const pendingWarning = validator.getPendingWarning();
 
   const inputClass =
     'w-full h-10 pl-10 pr-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition bg-white';
