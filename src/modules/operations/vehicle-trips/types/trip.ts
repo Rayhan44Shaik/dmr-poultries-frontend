@@ -1,3 +1,16 @@
+export interface MarketRateReference {
+  shopId: number | null;
+  shopName: string;
+  birdTypeId: number | null;
+  birdType: string;
+  masterRate: number | null;
+  lastTripRate: number | null;
+  lastTripDate: string | null;
+  lastTripNo: string | null;
+  avgTripRate: number | null;
+  tripRateSamples: number;
+}
+
 export interface ShopDelivery {
   id: number;
   serialNo?: number;
@@ -17,6 +30,10 @@ export interface ShopDelivery {
   amount: number;
 
   remarks: string;
+
+  /** READ-ONLY market/reference rate resolved by the backend (Rate Entry
+   * detail). Never edited in the frontend. */
+  marketRate?: MarketRateReference | null;
 }
 
 export type TripStatus = "Draft" | "Pending" | "Completed" | "Deleted";
@@ -98,7 +115,13 @@ export interface Trip {
   remarks: string;
   status: TripStatus;
   rateCompleted?: boolean;
-  
+
+  /** Rate Entry lock audit (backend-authoritative). Used to render the
+   * Shop Sales 10-day correction state. */
+  rateLockedAt?: string | null;
+  rateLockedBy?: string | null;
+  ratesEntered?: number;
+
   createdAt?: string;
   updatedAt?: string;
   deleted?: boolean;

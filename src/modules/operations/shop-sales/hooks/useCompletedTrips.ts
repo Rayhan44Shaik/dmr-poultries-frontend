@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Trip } from "../../vehicle-trips/types/trip";
 import { completedTripService } from "../services/completedTripService";
+import { handleApiError } from "../../../../api";
 
 // Helper to compute aggregates from deliveries
 function computeTripAggregates(trip: Trip) {
@@ -18,6 +19,7 @@ export default function useCompletedTrips() {
   const [modalOpen, setModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const pageSize = 10;
   const [filter, setFilter] = useState({
     fromDate: "",
@@ -27,20 +29,24 @@ export default function useCompletedTrips() {
     supervisor: "",
   });
 
-  async function loadTrips() {
+  const loadTrips = useCallback(async () => {
     try {
       const data = await completedTripService.getCompletedTrips();
       setTrips(data);
       setLoadError(null);
     } catch (error) {
       console.error("Failed to load Rate Entry trips from the backend", error);
-      setLoadError("Could not load trips from the server.");
+      setLoadError(handleApiError(error));
     }
-  }
+  }, []);
 
   useEffect(() => {
-    loadTrips();
-  }, []);
+    // Load Rate Entry trips from the backend on mount. The async fetch's
+    // setState runs after the awaited response (not synchronously in the
+    // effect), which is the standard data-loading idiom.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadTrips();
+  }, [loadTrips]);
 
   // Filter and enrich trips with aggregates
   const filteredTrips = useMemo(() => {
@@ -68,43 +74,77 @@ export default function useCompletedTrips() {
   const vehicleList = [...new Set(trips.map((x) => x.vehicleNo))];
   const supervisorList = [...new Set(trips.map((x) => x.supervisorName))];
 
-  // The list row only carries trip-level summary fields — fetch the full
-  // trip (with shop-wise deliveries) from PostgreSQL before opening the
-  // modal, which is what actually needs the per-shop rate rows.
-  const openRateEntry = async (trip: Trip) => {
+  // Fetch the full Rate Entry detail (shop-wise deliveries + market
+  // reference) from GET /operations/rate-entry/:tripId before opening the
+  // modal — the backend is the authority for delivery rows.
+  const openRateEntry = useCallback(async (trip: Trip) => {
     try {
       const full = await completedTripService.getTrip(trip.id);
       setSelectedTrip(full);
       setModalOpen(true);
     } catch (error) {
       console.error(`Failed to load trip ${trip.id} for Rate Entry`, error);
+      setLoadError(handleApiError(error));
     }
-  };
+  }, []);
 
-  const openModifyRate = async (trip: Trip) => {
+  const openModifyRate = useCallback(async (trip: Trip) => {
     await openRateEntry(trip);
-  };
+  }, [openRateEntry]);
 
-  const closeRateEntry = () => {
+  const closeRateEntry = useCallback(() => {
     setSelectedTrip(null);
     setModalOpen(false);
-  };
+    setLoadError(null);
+    setIsSaving(false);
+  }, []);
 
-  const saveTrip = async (deliveries: Trip["deliveries"]) => {
-    if (!selectedTrip) return;
-    try {
-      await completedTripService.saveRates(selectedTrip.id, deliveries);
-      closeRateEntry();
-      await loadTrips();
-    } catch (error) {
-      console.error(`Failed to save & lock rates for trip ${selectedTrip.id}`, error);
-    }
-  };
+  /** Save only (no lock) — PUT /operations/rate-entry/:tripId. */
+  const saveTrip = useCallback(
+    async (deliveries: Trip["deliveries"]): Promise<boolean> => {
+      if (!selectedTrip || isSaving) return false;
+      setIsSaving(true);
+      try {
+        await completedTripService.saveOnly(selectedTrip.id, deliveries);
+        closeRateEntry();
+        await loadTrips();
+        return true;
+      } catch (error) {
+        console.error(`Failed to save rates for trip ${selectedTrip.id}`, error);
+        setLoadError(handleApiError(error));
+        return false;
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [selectedTrip, isSaving, closeRateEntry, loadTrips]
+  );
 
-  const resetFilters = () => {
+  /** Save & Lock — PUT save then POST lock (one-way). */
+  const saveAndLockTrip = useCallback(
+    async (deliveries: Trip["deliveries"]): Promise<boolean> => {
+      if (!selectedTrip || isSaving) return false;
+      setIsSaving(true);
+      try {
+        await completedTripService.saveRates(selectedTrip.id, deliveries);
+        closeRateEntry();
+        await loadTrips();
+        return true;
+      } catch (error) {
+        console.error(`Failed to save & lock rates for trip ${selectedTrip.id}`, error);
+        setLoadError(handleApiError(error));
+        return false;
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [selectedTrip, isSaving, closeRateEntry, loadTrips]
+  );
+
+  const resetFilters = useCallback(() => {
     setFilter({ fromDate: "", toDate: "", tripNo: "", vehicle: "", supervisor: "" });
     setCurrentPage(1);
-  };
+  }, []);
 
   return {
     trips,
@@ -124,6 +164,8 @@ export default function useCompletedTrips() {
     openModifyRate,
     closeRateEntry,
     saveTrip,
+    saveAndLockTrip,
     loadError,
+    isSaving,
   };
 }

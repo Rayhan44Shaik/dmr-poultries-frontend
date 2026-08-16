@@ -3,66 +3,103 @@
  * localStorage) is the single source of truth for eligible trips and their
  * shop-wise rates.
  *
- * GET  /operations/rate-entry                    -> eligible trips (Approved/Completed, not deleted, not locked)
- * POST /operations/rate-entry                     -> save (upsert) rates for a trip, unlocked
- * POST /operations/rate-entry/trip/:tripId/lock    -> explicit lock (immutable + unlocks Shop Sales)
+ * Backend contract (Rate Entry owns the lock):
+ *   GET  /operations/rate-entry              -> eligible trips (Completed, not deleted, not rate-locked)
+ *   GET  /operations/rate-entry/:tripId      -> trip detail + shop-wise deliveries + market-rate reference
+ *   PUT  /operations/rate-entry/:tripId      -> save (draft) rates; does NOT lock
+ *   POST /operations/rate-entry/:tripId/lock -> save & lock — immutable, unlocks Shop Sales
  */
-import { apiGet, apiPost } from "../../../../api";
-import type { Trip, ShopDelivery } from "../../vehicle-trips/types/trip";
+import { apiGet, apiPost, apiPut } from "../../../../api";
+import type { Trip } from "../../vehicle-trips/types/trip";
 
 const RATE_ENTRY_PATH = "/operations/rate-entry";
 
-/** Raw shape returned by GET /operations/rate-entry (RateEntryTrip, camelCase). */
-interface RateEntryTripRow {
-  tripId: number;
+/**
+ * Backend RateEntryDelivery — the authoritative shop-wise delivery line as
+ * returned by GET /operations/rate-entry/:tripId (camelCase). `marketRate`
+ * carries the READ-ONLY market/reference rate the backend already resolved.
+ */
+export interface RateEntryDeliveryDto {
+  id: number;
+  serialNo: number | null;
+  boxNo: number | null;
+  shopId: number | null;
+  shopName: string;
+  birdTypeId: number | null;
+  birdType: string;
+  birds: number;
+  weight: number;
+  mortality: number;
+  mortKg: number | null;
+  rate: number | null;
+  amount: number;
+  remarks: string;
+  deliveryMode: "box" | "weight";
+  marketRate: {
+    shopId: number | null;
+    shopName: string;
+    birdTypeId: number | null;
+    birdType: string;
+    masterRate: number | null;
+    lastTripRate: number | null;
+    lastTripDate: string | null;
+    lastTripNo: string | null;
+    avgTripRate: number | null;
+    tripRateSamples: number;
+  } | null;
+}
+
+/** Backend RateEntryTrip — the authoritative Rate Entry row shape. */
+export interface RateEntryTripDto {
+  id: number;
   tripNo: string;
   tripDate: string;
-  tripStatus: string;
-  vehicleId: number | null;
+  status: string;
   vehicleNo: string | null;
-  driverId: number | null;
   driverName: string | null;
-  supervisorId: number | null;
   supervisorName: string | null;
-  sourceFarmId: number | null;
   sourceFarm: string | null;
   totalBirds: number;
   totalWeight: number;
   totalShops: number;
-  birdTypeId: number | null;
-  birdType: string | null;
-  rateStatus: "Pending" | "Entered";
-  rateEntryId: number | null;
-  rate: number | null;
-  remarks: string | null;
-  locked: boolean;
-  createdBy?: string | null;
-  createdAt?: string | null;
-  updatedAt?: string | null;
+  rateLocked: boolean;
+  rateLockedAt: string | null;
+  rateLockedBy: string | null;
+  ratesEntered: number;
+  deliveriesCount: number;
+  totalAmount: number;
+  deliveries: RateEntryDeliveryDto[];
 }
 
-/** Maps a Rate Entry list row onto the frontend Trip shape the table/filter
- * components already consume. Deliveries are intentionally left empty here
- * — they're loaded on demand (loadTripWithDeliveries) only when the user
- * opens the Enter/Modify Rate modal for a specific trip. */
-function mapRowToTrip(row: RateEntryTripRow): Trip {
+function num(value: unknown, fallback = 0): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/**
+ * Maps a backend RateEntryTrip row onto the frontend Trip shape the
+ * existing table/filter components consume. Deliveries are populated from
+ * the backend detail; list rows carry empty deliveries (loaded on demand
+ * when the user opens the modal via GET /operations/rate-entry/:tripId).
+ */
+function mapRowToTrip(row: RateEntryTripDto, withDeliveries: boolean): Trip {
   const now = new Date().toISOString();
   return {
-    id: row.tripId,
+    id: row.id,
     tripNo: row.tripNo,
     tripDate: row.tripDate,
     startTime: "",
-    vehicleId: row.vehicleId ?? 0,
+    vehicleId: 0,
     vehicleNo: row.vehicleNo ?? "",
-    driverId: row.driverId ?? 0,
+    driverId: 0,
     driverName: row.driverName ?? "",
-    supervisorId: row.supervisorId ?? 0,
+    supervisorId: 0,
     supervisorName: row.supervisorName ?? "",
     advanceAmount: 0,
     helpers: [],
     openingMeter: 0,
     startStepSubmitted: true,
-    sourceFarmId: row.sourceFarmId ?? 0,
+    sourceFarmId: 0,
     sourceFarm: row.sourceFarm ?? "",
     reachedTime: "",
     destMeter: 0,
@@ -78,7 +115,24 @@ function mapRowToTrip(row: RateEntryTripRow): Trip {
     birds: 0,
     weight: 0,
     boxDetails: [],
-    deliveries: [],
+    deliveries: withDeliveries
+      ? row.deliveries.map((d) => ({
+          id: d.id,
+          boxNo: d.boxNo ?? 0,
+          shopId: d.shopId ?? 0,
+          shopName: d.shopName,
+          birdTypeId: d.birdTypeId ?? 0,
+          birdType: d.birdType,
+          birds: num(d.birds),
+          weight: num(d.weight),
+          mortality: num(d.mortality),
+          rate: d.rate,
+          amount: num(d.amount),
+          remarks: d.remarks,
+          // Carry the backend market/reference rate for display (read-only).
+          marketRate: d.marketRate,
+        }))
+      : [],
     deliveryStepSubmitted: true,
     closingMeter: 0,
     endTime: "",
@@ -96,62 +150,57 @@ function mapRowToTrip(row: RateEntryTripRow): Trip {
     lastShop: "",
     fuel: 0,
     expense: 0,
-    remarks: row.remarks ?? "",
-    // Rate Entry only ever lists Approved/Completed trips (the backend
-    // eligibility query enforces this) — surfaced as-is for display.
-    status: row.tripStatus === "Approved" ? "Completed" : (row.tripStatus as Trip["status"]),
-    // A trip only ever appears here while its rate is unlocked — locked
-    // trips are excluded by the backend query, so this list never contains
-    // a rateCompleted trip.
-    rateCompleted: false,
-    createdAt: row.createdAt ?? now,
-    updatedAt: row.updatedAt ?? now,
+    remarks: "",
+    status: "Completed",
+    rateCompleted: row.rateLocked,
+    rateLockedAt: row.rateLockedAt,
+    rateLockedBy: row.rateLockedBy,
+    ratesEntered: row.ratesEntered,
+    createdAt: now,
+    updatedAt: now,
   };
 }
 
-/** GET /operations/rate-entry — trips waiting for (or mid-way through)
- * rate entry. No pagination params are sent, so the backend returns the
- * full eligible list; filtering/pagination stays client-side exactly as
- * before, only the data source changed from localStorage to PostgreSQL. */
+/** GET /operations/rate-entry — trips currently eligible for rate entry
+ * (Completed, not deleted, not rate-locked). The backend is the authority. */
 export async function listEligibleTrips(): Promise<Trip[]> {
-  const { data } = await apiGet<RateEntryTripRow[]>(RATE_ENTRY_PATH);
-  return data.map(mapRowToTrip);
+  const { data } = await apiGet<RateEntryTripDto[]>(RATE_ENTRY_PATH);
+  return (data || []).map((row) => mapRowToTrip(row, false));
 }
 
-/** Weighted-average rate across the shop-wise lines — used as the Rate
- * Entry header/reference rate (rate_entry.rate); the authoritative
- * per-shop values are what's actually written to trip_deliveries. */
-function headerRate(deliveries: ShopDelivery[]): number {
-  const totalWeight = deliveries.reduce((sum, d) => sum + (d.weight || 0), 0);
-  if (totalWeight <= 0) {
-    return deliveries.find((d) => (d.rate ?? 0) > 0)?.rate ?? 0;
-  }
-  const weighted = deliveries.reduce((sum, d) => sum + (d.weight || 0) * (d.rate ?? 0), 0);
-  return Number((weighted / totalWeight).toFixed(2));
+/** GET /operations/rate-entry/:tripId — full trip detail with shop-wise
+ * deliveries + market-rate reference, for the Enter/Modify Rate modal. */
+export async function getRateEntryTrip(tripId: number): Promise<Trip> {
+  const { data } = await apiGet<RateEntryTripDto>(`${RATE_ENTRY_PATH}/${tripId}`);
+  return mapRowToTrip(data, true);
 }
 
-/**
- * Save shop-wise rates then immediately lock the trip — this mirrors the
- * existing "Save & Lock Trip" single modal action; the backend still
- * performs these as two distinct, separately-enforced steps (save is
- * idempotent while unlocked, lock is a one-way transition).
- */
-export async function saveAndLockRates(
+/** PUT /operations/rate-entry/:tripId — save (draft) shop-wise rates.
+ * Sends only deliveryId + rate; amount is always computed server-side. */
+export async function saveRates(
   tripId: number,
-  deliveries: ShopDelivery[],
-  actor = "web-user"
+  deliveries: Array<{ deliveryId: number; rate: number }>
 ): Promise<void> {
   const lines = deliveries
     .filter((d) => d.rate != null && d.rate > 0)
-    .map((d) => ({ id: d.id, rate: d.rate as number }));
+    .map((d) => ({ deliveryId: d.deliveryId, rate: d.rate }));
+  await apiPut(`${RATE_ENTRY_PATH}/${tripId}`, { rates: lines });
+}
 
-  await apiPost(RATE_ENTRY_PATH, {
-    tripId,
-    rate: headerRate(deliveries),
-    deliveries: lines,
-    createdBy: actor,
-    updatedBy: actor,
-  });
+/** POST /operations/rate-entry/:tripId/lock — save & lock. After a
+ * successful lock the trip is immutable and Shop Sales becomes available. */
+export async function lockRates(tripId: number, actor = "web-user"): Promise<void> {
+  await apiPost(`${RATE_ENTRY_PATH}/${tripId}/lock`, { lockedBy: actor });
+}
 
-  await apiPost(`${RATE_ENTRY_PATH}/trip/${tripId}/lock`, { lockedBy: actor });
+/** Save shop-wise rates then immediately lock the trip — this mirrors the
+ * existing "Save & Lock Trip" single modal action. The backend still
+ * performs these as two distinct, separately-enforced steps. */
+export async function saveAndLockRates(
+  tripId: number,
+  deliveries: Array<{ deliveryId: number; rate: number }>,
+  actor = "web-user"
+): Promise<void> {
+  await saveRates(tripId, deliveries);
+  await lockRates(tripId, actor);
 }

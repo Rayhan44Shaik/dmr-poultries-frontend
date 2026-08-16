@@ -1,6 +1,6 @@
 // src/modules/operations/shop-sales/components/ShopSalesTable.tsx
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Hash,
   Truck,
@@ -14,8 +14,7 @@ import {
   Check,
   X,
   Edit2,
-  Search,
-  ChevronDown,
+  Lock,
 } from "lucide-react";
 import type { ShopSale } from "../types/shopSale";
 
@@ -26,115 +25,23 @@ interface Props {
   onUpdateSale?: (updatedSale: ShopSale) => void;
 }
 
-// Custom Searchable Dropdown with fixed outside-click behavior
-function CustomShopSelect({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (val: string) => void;
-  options: string[];
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const filteredOptions = options.filter((name) =>
-    name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-        setSearchTerm("");
-      }
-    }
-
-    // Use mousedown with a slight defer or standard listener so it properly registers clicks outside
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isOpen]);
-
-  return (
-    <div className="relative min-w-[200px]" ref={containerRef}>
-      {/* Dropdown Input Box */}
-      <div
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="w-full border border-blue-300 rounded-lg px-2.5 py-2 text-xs font-medium bg-white shadow-2xs cursor-pointer flex items-center justify-between focus:ring-2 focus:ring-blue-500"
-      >
-        <span className="truncate text-slate-800 font-semibold">{value || "Select Shop"}</span>
-        <ChevronDown size={14} className="text-slate-400 shrink-0 ml-1" />
-      </div>
-
-      {/* Floating Dropdown Menu */}
-      {isOpen && (
-        <div className="absolute z-50 top-full left-0 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
-          {/* Search Box */}
-          <div className="p-1.5 border-b border-slate-100 flex items-center gap-1 bg-slate-50">
-            <Search size={12} className="text-slate-400 ml-1" />
-            <input
-              type="text"
-              placeholder="Search shop..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full text-xs bg-transparent outline-none px-1 py-0.5"
-              autoFocus
-            />
-          </div>
-
-          {/* List restricted to max-h-40 (~5 items height) */}
-          <div className="max-h-40 overflow-y-auto divide-y divide-slate-50">
-            {filteredOptions.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-slate-400 text-center">
-                No shops found
-              </div>
-            ) : (
-              filteredOptions.map((name) => (
-                <div
-                  key={name}
-                  onClick={() => {
-                    onChange(name);
-                    setIsOpen(false);
-                    setSearchTerm("");
-                  }}
-                  className={`px-3 py-2 text-xs font-medium cursor-pointer transition-colors hover:bg-blue-50 ${
-                    name === value ? "bg-blue-50/80 font-semibold text-blue-700" : "text-slate-700"
-                  }`}
-                >
-                  {name}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: Props) {
+function ShopSalesTable({ sales, isLoading = false, onUpdateSale }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<ShopSale>>({});
 
   const startEditing = (sale: ShopSale, e?: React.MouseEvent) => {
     e?.stopPropagation();
+    // The correction workflow edits ONLY birds/weight/rate — and only while
+    // the backend says the sale is editable (Rate Entry locked + within the
+    // 10-day window). Shop, bird type, mortality, amount are never edited
+    // here.
     if (editingId === sale.id) return;
+    if (sale.editable === false || sale.correctionWindowExpired === true) return;
     setEditingId(sale.id);
     setEditData({
-      shopName: sale.shopName,
       totalBirds: sale.totalBirds,
       totalWeight: sale.totalWeight,
       rate: sale.rate,
-      remark: sale.remark,
     });
   };
 
@@ -150,20 +57,18 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
     const originalSale = sales.find((s) => s.id === editingId);
     if (!originalSale) return;
 
-    const newShopName = editData.shopName ?? originalSale.shopName;
     const newBirds = editData.totalBirds ?? originalSale.totalBirds ?? 0;
     const newWeight = editData.totalWeight ?? originalSale.totalWeight ?? 0;
     const newRate = editData.rate ?? originalSale.rate ?? 0;
-    const newRemark = editData.remark !== undefined ? editData.remark : originalSale.remark;
 
+    // Amount is intentionally NOT included — the backend recomputes it from
+    // weight × rate and returns it as authoritative. The optimistic display
+    // below (after save) uses whatever the backend returned.
     const updatedSale: ShopSale = {
       ...originalSale,
-      shopName: newShopName,
       totalBirds: newBirds,
       totalWeight: newWeight,
       rate: newRate,
-      amount: newWeight * newRate,
-      remark: newRemark,
     };
     onUpdateSale(updatedSale);
     setEditingId(null);
@@ -199,7 +104,7 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
               Editing row
             </span>
           ) : (
-            <span className="text-xs text-slate-400 font-medium">Click the edit button on a row to edit</span>
+            <span className="text-xs text-slate-400 font-medium">Click the edit button on a row to edit Birds / Weight / Rate</span>
           )}
         </div>
       </div>
@@ -263,6 +168,9 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
                 </div>
               </th>
               <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                Rate Lock
+              </th>
+              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
                 Action
               </th>
             </tr>
@@ -270,52 +178,33 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
           <tbody className="divide-y divide-slate-100">
             {sales.length === 0 ? (
               <tr>
-                <td colSpan={10} className="py-12 text-center text-slate-400 text-sm font-medium">
-                  No shop sales found.
+                <td colSpan={11} className="py-12 text-center text-slate-400 text-sm font-medium">
+                  No Shop Sales available until Rate Entry is locked.
                 </td>
               </tr>
             ) : (
               sales.map((sale, index) => {
                 const isEditing = editingId === sale.id;
-                const currentShopName = isEditing ? (editData.shopName ?? sale.shopName) : sale.shopName;
+                const readOnly = sale.editable === false || sale.correctionWindowExpired === true;
                 const currentBirds = isEditing ? (editData.totalBirds ?? sale.totalBirds) : sale.totalBirds;
                 const currentWeight = isEditing ? (editData.totalWeight ?? sale.totalWeight) : sale.totalWeight;
                 const currentRate = isEditing ? (editData.rate ?? sale.rate) : sale.rate;
-                const currentRemark = isEditing ? (editData.remark ?? sale.remark) : sale.remark;
-                
-                const displayAmount = isEditing
-                  ? (Number(currentWeight) || 0) * (Number(currentRate) || 0)
-                  : sale.amount;
 
                 return (
                   <tr
                     key={sale.id}
                     className={`transition-colors group ${
                       isEditing ? "bg-blue-50/70 shadow-inner" : "hover:bg-slate-50/80"
-                    }`}
+                    } ${readOnly && !isEditing ? "opacity-80" : ""}`}
                   >
                     <td className="px-3.5 py-3 text-center text-xs font-semibold text-slate-500">{index + 1}</td>
-                    <td className="px-3.5 py-3 font-medium text-slate-700 text-xs">
-                      {sale.tripNo}
-                    </td>
+                    <td className="px-3.5 py-3 font-medium text-slate-700 text-xs">{sale.tripNo}</td>
                     <td className="px-3.5 py-3 text-xs text-slate-600 font-medium">{sale.tripDate}</td>
-
-                    {/* Searchable Shop Name Dropdown */}
-                    <td className="px-3.5 py-3 text-xs font-semibold text-slate-700">
-                      {isEditing ? (
-                        <CustomShopSelect
-                          value={currentShopName}
-                          onChange={(val) => handleInputChange("shopName", val)}
-                          options={shopNames}
-                        />
-                      ) : (
-                        <span className="font-medium text-slate-800">{sale.shopName}</span>
-                      )}
-                    </td>
+                    <td className="px-3.5 py-3 text-xs font-semibold text-slate-700">{sale.shopName}</td>
 
                     {/* Birds */}
                     <td className="px-3.5 py-3 text-center text-xs">
-                      {isEditing ? (
+                      {isEditing && !readOnly ? (
                         <input
                           type="number"
                           value={currentBirds ?? 0}
@@ -335,7 +224,7 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
 
                     {/* Weight */}
                     <td className="px-3.5 py-3 text-center text-xs">
-                      {isEditing ? (
+                      {isEditing && !readOnly ? (
                         <input
                           type="number"
                           value={currentWeight ?? 0}
@@ -355,7 +244,7 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
 
                     {/* Rate */}
                     <td className="px-3.5 py-3 text-center text-xs">
-                      {isEditing ? (
+                      {isEditing && !readOnly ? (
                         <input
                           type="number"
                           value={currentRate ?? 0}
@@ -373,25 +262,32 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
                       )}
                     </td>
 
-                    {/* Amount */}
+                    {/* Amount — always from backend, never editable */}
                     <td className="px-3.5 py-3 text-center text-xs font-bold text-slate-700">
                       <span className="inline-block">
-                        ₹ {displayAmount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                        ₹ {sale.amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
                       </span>
                     </td>
 
-                    {/* Remark */}
+                    {/* Remark — read-only in the correction workflow */}
                     <td className="px-3.5 py-3 text-xs text-slate-600">
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={currentRemark ?? ""}
-                          onChange={(e) => handleInputChange("remark", e.target.value)}
-                          placeholder="Add remark..."
-                          className="w-full border border-blue-300 rounded-lg px-2.5 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-2xs outline-none transition-all"
-                        />
+                      <span className="text-slate-700 font-medium">{sale.remark?.trim() || "-"}</span>
+                    </td>
+
+                    {/* Rate Lock */}
+                    <td className="px-3.5 py-3 text-center">
+                      {sale.rateCompleted ? (
+                        readOnly ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-500 px-2 py-0.5 text-[10px] font-semibold">
+                            <Lock size={11} /> Locked
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[10px] font-semibold">
+                            Editable
+                          </span>
+                        )
                       ) : (
-                        <span className="text-slate-700 font-medium">{sale.remark?.trim() || "-"}</span>
+                        <span className="text-[10px] text-slate-400 font-medium">—</span>
                       )}
                     </td>
 
@@ -416,12 +312,16 @@ function ShopSalesTable({ sales, isLoading = false, shopNames, onUpdateSale }: P
                             <X size={14} />
                           </button>
                         </div>
+                      ) : readOnly ? (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 text-slate-400 px-2.5 py-1.5 text-[10px] font-semibold cursor-not-allowed">
+                          <Lock size={11} /> Read-Only
+                        </span>
                       ) : (
                         <button
                           type="button"
                           onClick={(e) => startEditing(sale, e)}
                           className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-xs inline-flex items-center gap-1.5 text-xs font-medium cursor-pointer"
-                          title="Edit row"
+                          title="Edit Birds / Weight / Rate"
                         >
                           <Edit2 size={12} />
                           Edit

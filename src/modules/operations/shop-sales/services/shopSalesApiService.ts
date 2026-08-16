@@ -53,6 +53,12 @@ interface ApiShopSale {
   approvedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  /** Backend-authoritative Rate Entry lock / 10-day correction state. */
+  rateCompleted?: boolean;
+  rateLockedAt?: string | null;
+  rateLockedBy?: string | null;
+  correctionWindowExpired?: boolean;
+  correctionWindowClosesAt?: string | null;
 }
 
 function num(value: unknown, fallback = 0): number {
@@ -86,6 +92,11 @@ function mapApiSaleToShopSale(row: ApiShopSale): ShopSale {
     birdTypeId: row.birdTypeId,
     editable: row.editable,
     windowExpiresAt: row.windowExpiresAt,
+    rateCompleted: row.rateCompleted,
+    rateLockedAt: row.rateLockedAt,
+    rateLockedBy: row.rateLockedBy,
+    correctionWindowExpired: row.correctionWindowExpired,
+    correctionWindowClosesAt: row.correctionWindowClosesAt,
   };
 }
 

@@ -31,6 +31,9 @@ export default function RatesEntryPage({ embedded = false }: Props) {
     openModifyRate,
     closeRateEntry,
     saveTrip,
+    saveAndLockTrip,
+    loadError,
+    isSaving,
   } = useCompletedTrips();
 
   const hasFilters =
@@ -103,6 +106,12 @@ export default function RatesEntryPage({ embedded = false }: Props) {
         onExportExcel={handleExportExcel}
       />
 
+      {loadError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {loadError}
+        </div>
+      )}
+
       {hasFilters && (
         <TripKPICards
           totalTrips={totalTrips}
@@ -113,11 +122,17 @@ export default function RatesEntryPage({ embedded = false }: Props) {
         />
       )}
 
-      <CompletedTripsTable
-        trips={paginatedTrips}
-        onEnterRate={openRateEntry}
-        onModifyRate={openModifyRate}
-      />
+      {filteredTrips.length === 0 && !loadError ? (
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-10 text-center text-sm font-medium text-slate-500">
+          No completed trips awaiting rate entry.
+        </div>
+      ) : (
+        <CompletedTripsTable
+          trips={paginatedTrips}
+          onEnterRate={openRateEntry}
+          onModifyRate={openModifyRate}
+        />
+      )}
 
       <TripPagination
         currentPage={currentPage}
@@ -130,6 +145,9 @@ export default function RatesEntryPage({ embedded = false }: Props) {
         trip={selectedTrip}
         onClose={closeRateEntry}
         onSave={saveTrip}
+        onSaveAndLock={saveAndLockTrip}
+        isSaving={isSaving}
+        loadError={loadError}
       />
     </div>
   );

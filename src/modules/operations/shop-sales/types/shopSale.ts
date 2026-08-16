@@ -42,6 +42,12 @@ amount: number;
    * authority on every actual mutation — this is display-only. */
   editable?: boolean;
   windowExpiresAt?: string | null;
+  /** Backend-authoritative Rate Entry lock / 10-day correction state. */
+  rateCompleted?: boolean;
+  rateLockedAt?: string | null;
+  rateLockedBy?: string | null;
+  correctionWindowExpired?: boolean;
+  correctionWindowClosesAt?: string | null;
 
 }
 
