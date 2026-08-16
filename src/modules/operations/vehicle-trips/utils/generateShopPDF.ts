@@ -7,6 +7,8 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { BoxDetail } from "../types/trip";
 import type { ShopDeliveryWithExtra } from "../components/Step_4/useShopDeliveryForm";
+import henImage from "../components/Step_4/Hen_Image.webp";
+import { drawDmrPoultryHeader } from "./drawDmrPoultryHeader";
 
 // ─── MONOCHROME & ACCENT COLOR PALETTE ──────────────────────────────────────
 type RGB = [number, number, number];
@@ -56,7 +58,7 @@ function drawField(
 }
 
 // ─── MAIN PDF GENERATOR ──────────────────────────────────────────────────────
-export function generateShopPDF(
+export async function generateShopPDF(
   row: ShopDeliveryWithExtra,
   safeBoxDetails: BoxDetail[] = [],
   _tripNo?: string,
@@ -64,12 +66,11 @@ export function generateShopPDF(
   supervisorName?: string,
   supervisorPhone?: string,
   tripDate?: string,
-  _logoLeftUrl?: string,
-  _henIconUrl?: string,
+  logoLeftUrl?: string,
+  henIconUrl?: string,
   deliveryTime?: string
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    try {
+  try {
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -152,20 +153,18 @@ export function generateShopPDF(
         timeValue = "Just now";
       }
 
-      let currentY = 14;
-
-      // ─── 2. TOP TITLE HEADING ─────────────────────────────────────────────
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      setText(doc, COLOR.black);
-      doc.text("DELIVERY RECEIPT", margin, currentY);
+      // ─── 2. REUSABLE DMR HEADER ──────────────────────────────────────────
+      // The left logo is vector based. The right hen is background-removed,
+      // cropped and aspect-fitted by the shared header helper.
+      let currentY = await drawDmrPoultryHeader(doc, {
+        margin,
+        top: 10,
+        logoUrl: logoLeftUrl,
+        henUrl: henIconUrl || henImage,
+        subtitle: "Delivery Receipt",
+      });
 
       currentY += 4;
-      setDraw(doc, COLOR.black);
-      doc.setLineWidth(0.6);
-      doc.line(margin, currentY, pageWidth - margin, currentY);
-
-      currentY += 6;
 
       // ─── 3. UNIFIED INFO CARD (IDENTICAL LAYOUT FOR BOTH MODES) ──────────
       const c1 = margin + 6;
@@ -494,10 +493,8 @@ export function generateShopPDF(
       link.click();
       document.body.removeChild(link);
       setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
-
-      resolve();
-    } catch (error: any) {
-      reject(new Error(error?.message || "Failed to generate PDF receipt."));
+    } catch (error: unknown) {
+      if (error instanceof Error) throw error;
+      throw new Error("Failed to generate PDF receipt.", { cause: error });
     }
-  });
 }
