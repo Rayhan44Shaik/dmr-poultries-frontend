@@ -19,7 +19,8 @@
     "backend:install": "npm install --prefix backend",
     "backend:dev": "npm run dev --prefix backend",
     "backend:migrate": "npm run db:migrate --prefix backend",
-    "backend:seed": "npm run db:seed --prefix backend"
+    "backend:seed": "npm run db:seed --prefix backend",
+    "test:mobile": "tsx --test src/shared/trip/tripCore.test.ts src/modules/supervisor-mobile/services/mobileTripState.test.ts src/modules/supervisor-mobile/services/mobileQueueDurability.test.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
@@ -57,7 +58,9 @@
     "eslint": "^10.5.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
+    "fake-indexeddb": "^6.2.5",
     "globals": "^17.6.0",
+    "tsx": "^4.23.12",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.61.0",
     "vite": "^8.1.0",

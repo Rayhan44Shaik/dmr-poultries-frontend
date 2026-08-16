@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, type Dispatch, type SetStateAction } from "react";
-import type { Trip, ShopDelivery, BoxDetail, TripStatus } from "../types/trip";
+import type { Trip, ShopDelivery, BoxDetail, TripStatus } from "../../../../shared/trip/types";
 import {
   handleApiError,
   loadTripById,
@@ -8,13 +8,15 @@ import {
   submitTripStep,
 } from "../services/tripHeaderApiService";
 import {
-  calculateAvgWeight,
+  applyDeliveryMetrics,
+  calculatePickupTotals,
+  createEmptyTrip,
   validateStartStep,
   validateFarmStep,
   validatePickupStep,
   validateEndStep,
   validateFinalTrip,
-} from "../services/tripFormService";
+} from "../../../../shared/trip";
 
 type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void;
 
@@ -27,64 +29,7 @@ export function useTripEntry(
   const onTripsChangedRef = useRef(onTripsChanged);
   onTripsChangedRef.current = onTripsChanged;
 
-  const emptyTrip = (): Trip => ({
-    id: 0,
-    tripNo: "",
-    tripDate: new Date().toISOString().split("T")[0],
-    startTime: "",
-    vehicleId: 0,
-    vehicleNo: "",
-    driverId: 0,
-    driverName: "",
-    supervisorId: 0,
-    supervisorName: "",
-    helpers: [],
-    loaders: [],
-    openingMeter: 0,
-    advanceAmount: 0,
-    startStepSubmitted: false,
-    sourceFarmId: 0,
-    sourceFarm: "",
-    reachedTime: "",
-    destMeter: 0,
-    pickupTolls: 0,
-    farmStepSubmitted: false,
-    farmAddress: "",
-    dcWeight: 0,
-    totalBirds: 0,
-    boxes: 0,
-    boxDetails: [],
-    avgWeight: 0,
-    pickupLoadTime: "",
-    pickupStepSubmitted: false,
-    deliveries: [],
-    deliveryStepSubmitted: false,
-    closingMeter: 0,
-    endTime: "",
-    deliveryTolls: 0,
-    endStepSubmitted: false,
-    totalKm: 0,
-    totalShops: 0,
-    totalWeight: 0,
-    totalDeliveredWeight: 0,
-    totalBirdsDelivered: 0,
-    totalMortality: 0,
-    totalMortalityCount: 0,
-    totalMortalityWeight: 0,
-    weightLoss: 0,
-    survivalRate: 0,
-    lastShop: "",
-    status: "Draft",
-    fuel: 0,
-    expense: 0,
-    remarks: "",
-    rateCompleted: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    boxNo: 0,
-    birds: 0,
-    weight: 0,
-  });
+  const emptyTrip = createEmptyTrip;
 
   const [trip, setTrip] = useState<Trip>(emptyTrip);
   const [savedTrip, setSavedTrip] = useState<Trip>(emptyTrip);
@@ -117,25 +62,6 @@ export function useTripEntry(
     (): "idle" | "saving" | "saved" => "idle",
     []
   );
-
-  const calculateDeliveryKPIs = (
-    deliveries: ShopDelivery[],
-    birds: number,
-    dcWeight: number,
-    avgWeight: number,
-    mortalityCount: number
-  ) => {
-    const totalDelBirds = deliveries.reduce((s, r) => s + r.birds, 0);
-    const totalDelWeight = deliveries.reduce((s, r) => s + r.weight, 0);
-    const totalShops = deliveries.length;
-    const lastShop = deliveries.length > 0 ? deliveries[deliveries.length - 1].shopName : "";
-
-    const mortalityWeight = Number((mortalityCount * avgWeight).toFixed(2));
-    const weightLoss = Number((dcWeight - totalDelWeight - mortalityWeight).toFixed(2));
-    const survivalRate = birds > 0 ? Number(((1 - mortalityCount / birds) * 100).toFixed(1)) : 0;
-
-    return { totalDelBirds, totalDelWeight, totalShops, lastShop, mortalityWeight, weightLoss, survivalRate };
-  };
 
   /** Step 1 edits update React state only — no localStorage, no backend. */
   const applyStartFieldChange = useCallback(
@@ -319,18 +245,11 @@ export function useTripEntry(
     _silent: boolean = false
   ) => {
     const current = tripRef.current;
-    const totalBirds = rows.reduce((sum, r) => sum + (r.birds || 0), 0);
-    const dcWeight = Number(rows.reduce((sum, r) => sum + (r.weight || 0), 0).toFixed(2));
-    const boxes = rows.length;
-    const avgWeight = calculateAvgWeight(dcWeight, totalBirds);
-
+    const totals = calculatePickupTotals(rows);
     const updatedTrip: Trip = {
       ...current,
       boxDetails: rows,
-      totalBirds,
-      dcWeight,
-      boxes,
-      avgWeight,
+      ...totals,
     };
 
     setTrip(updatedTrip);
@@ -358,7 +277,7 @@ export function useTripEntry(
       return false;
     }
 
-    const avg = calculateAvgWeight(updatedData.dcWeight || 0, updatedData.totalBirds || 0);
+    const avg = calculatePickupTotals(updatedData.boxDetails || []).avgWeight;
     const pickupLoadTime = current.pickupStepSubmitted
       ? current.pickupLoadTime
       : new Date().toLocaleString();
@@ -423,30 +342,7 @@ export function useTripEntry(
   };
 
   const updateDeliveries = (rows: ShopDelivery[], _persistToStorage: boolean = false) => {
-    const current = tripRef.current;
-    const totalMortalityCount = rows.reduce((sum, r) => sum + (r.mortality || 0), 0);
-    const kpis = calculateDeliveryKPIs(
-      rows,
-      current.totalBirds,
-      current.dcWeight,
-      current.avgWeight,
-      totalMortalityCount
-    );
-
-    const updatedTrip: Trip = {
-      ...current,
-      deliveries: rows,
-      totalDeliveredWeight: kpis.totalDelWeight,
-      totalBirdsDelivered: kpis.totalDelBirds,
-      totalShops: kpis.totalShops,
-      lastShop: kpis.lastShop,
-      totalMortalityWeight: kpis.mortalityWeight,
-      weightLoss: kpis.weightLoss,
-      survivalRate: kpis.survivalRate,
-      totalMortalityCount: totalMortalityCount,
-      totalWeight: kpis.totalDelWeight,
-      totalMortality: totalMortalityCount,
-    };
+    const updatedTrip = applyDeliveryMetrics(tripRef.current, rows);
 
     // Wizard edits stay in React state until Submit.
     setTrip(updatedTrip);

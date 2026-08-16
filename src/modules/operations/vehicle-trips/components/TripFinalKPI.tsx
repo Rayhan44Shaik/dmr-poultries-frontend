@@ -3,6 +3,11 @@
 import React, { useMemo } from "react";
 import type { Trip, ShopDelivery } from "../types/trip";
 import {
+  calculateDeliveryDisplayTotals,
+  calculateTripDistances,
+  sumFlattenedDieselLitres,
+} from "../../../../shared/trip/calculations";
+import {
   Weight,
   Bird,
   ShoppingBag,
@@ -26,47 +31,11 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
     return null;
   }
 
-  // ─── Compute totals directly from Shop Deliveries ──────────────────
-  const deliveryTotals = useMemo(() => {
-    if (!deliveries || deliveries.length === 0) {
-      return {
-        totalBirds: trip.totalBirdsDelivered || 0,
-        totalWeight: trip.totalDeliveredWeight || 0,
-        totalMortality: trip.totalMortalityCount || 0,
-        totalMortalityKg: trip.totalMortalityWeight || 0,
-      };
-    }
-
-    return deliveries.reduce(
-      (acc, row) => {
-        const rowWithExtra = row as ShopDelivery & {
-          mortalityWeight?: number;
-          mortalityKg?: number;
-        };
-
-        let rowMortalityKg =
-          rowWithExtra.mortalityWeight ?? rowWithExtra.mortalityKg ?? 0;
-
-        if (rowMortalityKg === 0 && (row.mortality || 0) > 0) {
-          const avgPerBird =
-            row.birds > 0
-              ? row.weight / row.birds
-              : trip.totalBirds > 0
-              ? (trip.dcWeight || 0) / trip.totalBirds
-              : 0;
-          rowMortalityKg = row.mortality * avgPerBird;
-        }
-
-        return {
-          totalBirds: acc.totalBirds + (row.birds || 0),
-          totalWeight: acc.totalWeight + (row.weight || 0),
-          totalMortality: acc.totalMortality + (row.mortality || 0),
-          totalMortalityKg: acc.totalMortalityKg + rowMortalityKg,
-        };
-      },
-      { totalBirds: 0, totalWeight: 0, totalMortality: 0, totalMortalityKg: 0 }
-    );
-  }, [deliveries, trip]);
+  // Shared delivery totals are used by both Desktop and Mobile KPI views.
+  const deliveryTotals = useMemo(
+    () => calculateDeliveryDisplayTotals(trip, deliveries),
+    [deliveries, trip]
+  );
 
   const mortalityWeight = deliveryTotals.totalMortalityKg;
 
@@ -85,22 +54,18 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
   }, [deliveryTotals.totalBirds, trip.totalBirds]);
 
   // ─── Distances ──────────────────────────────────────────────────────
-  const pickupDist = Math.max(0, (trip.destMeter || 0) - (trip.openingMeter || 0));
-  const deliveryDist = Math.max(0, (trip.closingMeter || 0) - (trip.destMeter || 0));
-  const totalDist = Math.max(0, (trip.closingMeter || 0) - (trip.openingMeter || 0));
+  const {
+    pickupDistance: pickupDist,
+    deliveryDistance: deliveryDist,
+    totalDistance: totalDist,
+  } = calculateTripDistances(trip);
 
   // ─── Mileage ──────────────────────────────────────────────────────
-  let totalDieselLiters = 0;
-  for (let i = 1; i <= 6; i++) {
-    const key = `dieselLtr${i}`;
-    const val = (trip as any)[key];
-    if (val !== undefined && val !== null && val !== "") {
-      totalDieselLiters += Number(val);
-    }
-  }
-  const totalDistanceCovered = totalDist;
-  const mileage = totalDistanceCovered > 0 && totalDieselLiters > 0
-    ? totalDistanceCovered / totalDieselLiters
+  const totalDieselLiters = sumFlattenedDieselLitres(
+    trip as unknown as Record<string, unknown>
+  );
+  const mileage = totalDist > 0 && totalDieselLiters > 0
+    ? totalDist / totalDieselLiters
     : 0;
 
   // ─── Define cards ──────────────────────────────────────────────────

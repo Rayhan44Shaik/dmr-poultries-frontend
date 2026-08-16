@@ -10,7 +10,12 @@ import {
   apiPost,
   handleApiError,
 } from "../../../../api";
-import type { Trip, TripStatus } from "../types/trip";
+import {
+  createEmptyTrip,
+  isTripStatus,
+  type Trip,
+  type TripStatus,
+} from "../../../../shared/trip";
 
 const TRIPS_PATH = "/trips";
 
@@ -49,10 +54,7 @@ function formatStartTimeForDisplay(value: unknown): string {
 
 function normalizeStatus(value: unknown): TripStatus {
   const status = str(value, "Draft");
-  if (status === "Draft" || status === "Pending" || status === "Completed" || status === "Deleted") {
-    return status;
-  }
-  return "Draft";
+  return isTripStatus(status) ? status : "Draft";
 }
 
 function normalizeDate(value: unknown): string {
@@ -68,59 +70,7 @@ function normalizeDate(value: unknown): string {
 
 /** Map backend trip JSON onto the frontend Trip model. */
 export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
-  const defaults: Trip = existing ?? {
-    id: 0,
-    tripNo: "",
-    tripDate: "",
-    startTime: "",
-    vehicleId: 0,
-    vehicleNo: "",
-    driverId: 0,
-    driverName: "",
-    supervisorId: 0,
-    supervisorName: "",
-    helpers: [],
-    openingMeter: 0,
-    advanceAmount: 0,
-    startStepSubmitted: false,
-    sourceFarmId: 0,
-    sourceFarm: "",
-    reachedTime: "",
-    destMeter: 0,
-    pickupTolls: 0,
-    farmStepSubmitted: false,
-    dcWeight: 0,
-    totalBirds: 0,
-    boxes: 0,
-    avgWeight: 0,
-    pickupLoadTime: "",
-    pickupStepSubmitted: false,
-    boxNo: 0,
-    birds: 0,
-    weight: 0,
-    boxDetails: [],
-    deliveries: [],
-    deliveryStepSubmitted: false,
-    closingMeter: 0,
-    endTime: "",
-    deliveryTolls: 0,
-    totalKm: 0,
-    totalShops: 0,
-    totalWeight: 0,
-    totalDeliveredWeight: 0,
-    totalBirdsDelivered: 0,
-    totalMortality: 0,
-    totalMortalityCount: 0,
-    totalMortalityWeight: 0,
-    weightLoss: 0,
-    survivalRate: 0,
-    lastShop: "",
-    status: "Draft",
-    fuel: 0,
-    expense: 0,
-    remarks: "",
-    rateCompleted: false,
-  };
+  const defaults: Trip = existing ?? createEmptyTrip({ tripDate: "" });
 
   return {
     ...defaults,
