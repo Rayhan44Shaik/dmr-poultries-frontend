@@ -33,11 +33,31 @@ import ReportsDashboardPage from "../modules/reports/pages/ReportsDashboardPage"
 // Settings Module (Standalone page without separate layout)
 import SettingsPage from "../modules/settings/pages/SettingsPage";
 
+const SupervisorMobilePage = React.lazy(
+  () => import("../modules/supervisor-mobile/pages/SupervisorMobilePage")
+);
+
+const mobileFallback = (
+  <div className="flex min-h-dvh items-center justify-center bg-slate-100 text-sm font-semibold text-slate-500">
+    Loading Supervisor Trip Entry…
+  </div>
+);
+
 function AppRoutes() {
   return (
     <Routes>
       {/* Auth - No Layout */}
       <Route path="/" element={<LoginPage />} />
+
+      {/* ============ SUPERVISOR MOBILE — Trip Entry Steps 1–5 only ============ */}
+      <Route
+        path="/mobile"
+        element={<React.Suspense fallback={mobileFallback}><SupervisorMobilePage /></React.Suspense>}
+      />
+      <Route
+        path="/mobile/trips"
+        element={<React.Suspense fallback={mobileFallback}><SupervisorMobilePage /></React.Suspense>}
+      />
 
       {/* ============ DASHBOARD ============ */}
       <Route path="/dashboard" element={<DashboardLayout><DashboardPage /></DashboardLayout>} />

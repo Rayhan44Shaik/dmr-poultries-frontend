@@ -30,7 +30,13 @@ import { fuelExpenseService } from "../../fuel-expenses/services/fuelExpenseServ
 
 // --- Utils ---
 import { canEditItem } from "../../../../utils/dateUtils";
-import type { Trip, ShopDelivery } from "../types/trip";
+import {
+  getNextIncompleteTripStep,
+  isTripEnded as hasTripEnded,
+  TRIP_STEP_LABELS,
+  type Trip,
+  type ShopDelivery,
+} from "../../../../shared/trip";
 
 type TripEntryPageProps = { embedded?: boolean; };
 
@@ -226,26 +232,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const isFarmCompleted = Boolean(trip.farmStepSubmitted);
   const isPickupCompleted = Boolean(trip.pickupStepSubmitted);
   const isDeliveryCompleted = Boolean(trip.deliveryStepSubmitted);
-  const isTripEnded = Boolean(
-    trip.endStepSubmitted ||
-    trip.expensesStepSubmitted ||
-    endStepSubmitted ||
-    trip.status === "Completed" ||
-    trip.status === "Pending"
-  );
+  const isTripEnded = hasTripEnded(trip) || endStepSubmitted;
 
   const canEditTrip = trip.createdAt ? canEditItem(trip.createdAt) : true;
 
-  // Next incomplete step becomes the active step after each successful submit.
-  const currentStep = !isStartCompleted
-    ? 0
-    : !isFarmCompleted
-      ? 1
-      : !isPickupCompleted
-        ? 2
-        : !isDeliveryCompleted
-          ? 3
-          : 4;
+  // Shared Desktop + Mobile workflow definition.
+  const currentStep = getNextIncompleteTripStep(trip);
 
   const vehicleOpts = useMemo(
     () => vehicles.map((v: any) => ({ id: v.id, vehicleNumber: v.vehicleNumber })),
@@ -464,7 +456,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         ) : (
           <>
             <TripWizardStepper
-              steps={["Start", "Farm", "Pickup", "Deliveries", "End"]}
+              steps={TRIP_STEP_LABELS}
               currentStep={isTripEnded ? 4 : currentStep}
               completedMask={{
                 start: isStartCompleted,

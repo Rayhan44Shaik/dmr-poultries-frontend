@@ -1,5 +1,6 @@
 import React from "react";
 import { Check } from "lucide-react";
+import { TRIP_STEP_KEYS } from "../../../../shared/trip/workflow";
 
 interface Props {
   currentStep: number;
@@ -10,11 +11,10 @@ interface Props {
 
 export default function TripWizardStepper({ currentStep, steps, completedMask, onStepClick }: Props) {
   // Map the masks to step indices (Logic untouched)
-  const stepStatus = [0, 1, 2, 3, 4].map((index) => {
-    const stepNames = ["start", "farm", "pickup", "delivery", "end"];
-    const key = stepNames[index];
-    if (key === "end") return false; 
-    return completedMask[key as keyof typeof completedMask];
+  const stepStatus = TRIP_STEP_KEYS.map((key) => {
+    if (key === "expenses") return false;
+    const maskKey = key === "deliveries" ? "delivery" : key;
+    return completedMask[maskKey as keyof typeof completedMask];
   });
 
   return (

@@ -3,6 +3,11 @@ import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Pencil, Loader2, Sc
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { WizardActionBar, WizardStepNotice } from "./WizardStepUI";
+import {
+  TRIP_FIELD_DEFINITIONS,
+  TRIP_STEP_DEFINITIONS,
+} from "../../../../shared/trip/definitions";
+import { validateFarmStep } from "../../../../shared/trip/validation";
 
 interface Props {
   trip: Trip;
@@ -147,24 +152,13 @@ export default function StepFarm({
   };
 
   const handleSubmit = async () => {
-    if (!trip.sourceFarmId || !trip.sourceFarm) {
-      notify("Please select a Destination / Farm.", "warning");
-      return;
-    }
-    if (!trip.destMeter || trip.destMeter <= 0) {
-      notify("Please enter a valid Destination Meter (KM).", "warning");
+    const validation = validateFarmStep(trip);
+    if (!validation.valid) {
+      notify(validation.errors[0], "warning");
       return;
     }
     if (destMeterError) {
       notify(destMeterError, "warning");
-      return;
-    }
-    if (trip.pickupTolls === undefined || trip.pickupTolls < 0) {
-      notify("Please enter valid Toll Gates.", "warning");
-      return;
-    }
-    if (!(trip as any).avgBirdWeight || (trip as any).avgBirdWeight <= 0) {
-      notify("Please enter a valid Average Bird Weight.", "warning");
       return;
     }
 
@@ -203,7 +197,7 @@ export default function StepFarm({
               2
             </span>
             <h2 className="text-base font-bold text-slate-800 tracking-tight">
-              REACHED FARM / DESTINATION
+              {TRIP_STEP_DEFINITIONS[1].title.toUpperCase()}
             </h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -296,7 +290,7 @@ export default function StepFarm({
               2
             </span>
             <h2 className="text-base font-bold text-slate-800 tracking-tight">
-              REACHED FARM / DESTINATION
+              {TRIP_STEP_DEFINITIONS[1].title.toUpperCase()}
             </h2>
           </div>
           {((editable && trip.farmStepSubmitted) || isLocalEditing) && (
@@ -310,7 +304,7 @@ export default function StepFarm({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 sm:gap-x-6 gap-y-3.5 sm:gap-y-4">
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-              <Clock size={14} className="text-slate-400" /> Reached Time <span className="text-red-500">*</span>
+              <Clock size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.reachedTime.label} {TRIP_FIELD_DEFINITIONS.reachedTime.required && <span className="text-red-500">*</span>}
             </label>
             <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
               {trip.reachedTime ? trip.reachedTime : <span className="text-slate-400 font-normal text-xs">Auto-captured on submit</span>}
@@ -319,7 +313,7 @@ export default function StepFarm({
 
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-              <Store size={14} className="text-slate-400" /> Farm <span className="text-red-500">*</span>
+              <Store size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.sourceFarmId.label} {TRIP_FIELD_DEFINITIONS.sourceFarmId.required && <span className="text-red-500">*</span>}
             </label>
             <Select<{ value: number; label: string }, false>
               options={farmOptions}
@@ -343,7 +337,7 @@ export default function StepFarm({
 
           <div className="sm:col-span-2">
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-              <MapPin size={14} className="text-slate-400" /> Detailed Farm Address
+              <MapPin size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.farmAddress.label}
             </label>
             <div className="flex items-center gap-2 mt-1">
               <input
@@ -372,7 +366,7 @@ export default function StepFarm({
 
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-              <Gauge size={14} className="text-slate-400" /> Destination Meter (KM) <span className="text-red-500">*</span>
+              <Gauge size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.destMeter.label} {TRIP_FIELD_DEFINITIONS.destMeter.required && <span className="text-red-500">*</span>}
             </label>
             <input
               type="number"
@@ -398,7 +392,7 @@ export default function StepFarm({
 
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-              <Ticket size={14} className="text-slate-400" /> Toll Gates (Pickup) <span className="text-red-500">*</span>
+              <Ticket size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.pickupTolls.label} {TRIP_FIELD_DEFINITIONS.pickupTolls.required && <span className="text-red-500">*</span>}
             </label>
             <input
               type="number"
@@ -417,7 +411,7 @@ export default function StepFarm({
 
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-              <Scale size={14} className="text-slate-400" /> Avg Bird Weight (kg) <span className="text-red-500">*</span>
+              <Scale size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.avgBirdWeight.label} {TRIP_FIELD_DEFINITIONS.avgBirdWeight.required && <span className="text-red-500">*</span>}
             </label>
             <input
               type="number"
@@ -437,7 +431,7 @@ export default function StepFarm({
 
           <div>
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-              <MessageSquare size={14} className="text-slate-400" /> Remarks
+              <MessageSquare size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.remarks.label}
             </label>
             <input
               type="text"
