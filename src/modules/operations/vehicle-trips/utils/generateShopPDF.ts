@@ -7,8 +7,8 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { BoxDetail } from "../types/trip";
 import type { ShopDeliveryWithExtra } from "../components/Step_4/useShopDeliveryForm";
-import henImage from "../components/Step_4/Hen_Image.webp";
-import { drawDmrPoultryHeader } from "./drawDmrPoultryHeader";
+import henImage from "../../../../assets/dmr-hen.jpg";
+import { drawDmrPoultryHeader } from "../../../../utils/drawDmrPoultryHeader";
 
 // ─── MONOCHROME & ACCENT COLOR PALETTE ──────────────────────────────────────
 type RGB = [number, number, number];
@@ -70,7 +70,6 @@ export async function generateShopPDF(
   henIconUrl?: string,
   deliveryTime?: string
 ): Promise<void> {
-  try {
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -493,8 +492,4 @@ export async function generateShopPDF(
       link.click();
       document.body.removeChild(link);
       setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
-    } catch (error: unknown) {
-      if (error instanceof Error) throw error;
-      throw new Error("Failed to generate PDF receipt.", { cause: error });
-    }
 }

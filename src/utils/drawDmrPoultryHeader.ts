@@ -2,10 +2,15 @@ import type jsPDF from "jspdf";
 
 type RGB = [number, number, number];
 
-type PreparedImage = {
+export type PreparedHeaderImage = {
   dataUrl: string;
   width: number;
   height: number;
+};
+
+export type DmrPoultryHeaderAssets = {
+  logo?: PreparedHeaderImage;
+  hen?: PreparedHeaderImage;
 };
 
 export interface DmrPoultryHeaderOptions {
@@ -119,7 +124,7 @@ function imageToCanvas(image: HTMLImageElement) {
   return { canvas, context };
 }
 
-async function prepareLogoImage(src: string): Promise<PreparedImage> {
+async function prepareLogoImage(src: string): Promise<PreparedHeaderImage> {
   const image = await loadImage(src);
   const { canvas } = imageToCanvas(image);
   return {
@@ -169,7 +174,7 @@ function getBorderBackground(
  * inside the hen remain intact while the rectangular studio background and
  * JPEG fringe disappear.
  */
-export async function prepareHenCutout(src: string): Promise<PreparedImage> {
+export async function prepareHenCutout(src: string): Promise<PreparedHeaderImage> {
   const image = await loadImage(src);
   const { canvas, context } = imageToCanvas(image);
   const width = canvas.width;
@@ -337,13 +342,44 @@ function drawHenFallback(doc: jsPDF, x: number, y: number, width: number, height
 }
 
 /**
- * Reusable PDF header. It draws only the DMR logo, centered heading/divider and
- * right-side hen, then returns the Y coordinate immediately below the header.
+ * Loads and prepares the optional raster assets once. Reuse the returned object
+ * with drawPreparedDmrPoultryHeader when the same header is repeated on every
+ * page of a multi-page document.
  */
-export async function drawDmrPoultryHeader(
+export async function prepareDmrPoultryHeaderAssets(
+  options: Pick<DmrPoultryHeaderOptions, "logoUrl" | "henUrl">
+): Promise<DmrPoultryHeaderAssets> {
+  const assets: DmrPoultryHeaderAssets = {};
+
+  if (options.logoUrl) {
+    try {
+      assets.logo = await prepareLogoImage(options.logoUrl);
+    } catch {
+      // The vector logo is used when a custom logo cannot be loaded.
+    }
+  }
+
+  if (options.henUrl) {
+    try {
+      assets.hen = await prepareHenCutout(options.henUrl);
+    } catch (error) {
+      console.warn("Unable to prepare the DMR header hen; using the vector fallback.", error);
+    }
+  }
+
+  return assets;
+}
+
+/**
+ * Synchronous header renderer for multi-page PDFs. Prepare the images once with
+ * prepareDmrPoultryHeaderAssets, then call this function inside autoTable's
+ * willDrawPage callback.
+ */
+export function drawPreparedDmrPoultryHeader(
   doc: jsPDF,
-  options: DmrPoultryHeaderOptions = {}
-): Promise<number> {
+  options: Omit<DmrPoultryHeaderOptions, "logoUrl" | "henUrl"> = {},
+  assets: DmrPoultryHeaderAssets = {}
+): number {
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = options.margin ?? 12;
   const top = options.top ?? 10;
@@ -351,25 +387,20 @@ export async function drawDmrPoultryHeader(
   const subtitle = options.subtitle ?? "";
   const logoSize = 24;
 
-  if (options.logoUrl) {
-    try {
-      const logo = await prepareLogoImage(options.logoUrl);
-      const ratio = Math.min(logoSize / logo.width, logoSize / logo.height);
-      const width = logo.width * ratio;
-      const height = logo.height * ratio;
-      doc.addImage(
-        logo.dataUrl,
-        "PNG",
-        margin + (logoSize - width) / 2,
-        top + (logoSize - height) / 2,
-        width,
-        height,
-        undefined,
-        "FAST"
-      );
-    } catch {
-      drawDmrLogo(doc, margin, top, logoSize);
-    }
+  if (assets.logo) {
+    const ratio = Math.min(logoSize / assets.logo.width, logoSize / assets.logo.height);
+    const width = assets.logo.width * ratio;
+    const height = assets.logo.height * ratio;
+    doc.addImage(
+      assets.logo.dataUrl,
+      "PNG",
+      margin + (logoSize - width) / 2,
+      top + (logoSize - height) / 2,
+      width,
+      height,
+      undefined,
+      "FAST"
+    );
   } else {
     drawDmrLogo(doc, margin, top, logoSize);
   }
@@ -378,26 +409,19 @@ export async function drawDmrPoultryHeader(
   const henHeight = 29;
   const henX = pageWidth - margin - henWidth;
   const henY = top - 2;
-  let henDrawn = false;
 
-  if (options.henUrl) {
-    try {
-      const hen = await prepareHenCutout(options.henUrl);
-      const ratio = Math.min(henWidth / hen.width, henHeight / hen.height);
-      const width = hen.width * ratio;
-      const height = hen.height * ratio;
-      const x = henX + (henWidth - width) / 2;
-      const y = henY + henHeight - height;
+  if (assets.hen) {
+    const ratio = Math.min(henWidth / assets.hen.width, henHeight / assets.hen.height);
+    const width = assets.hen.width * ratio;
+    const height = assets.hen.height * ratio;
+    const x = henX + (henWidth - width) / 2;
+    const y = henY + henHeight - height;
 
-      drawSoftContactShadow(doc, x + width / 2, y + height - 0.3, width * 0.7);
-      doc.addImage(hen.dataUrl, "PNG", x, y, width, height, undefined, "FAST");
-      henDrawn = true;
-    } catch (error) {
-      console.warn("Unable to render the DMR header hen; using the vector fallback.", error);
-    }
+    drawSoftContactShadow(doc, x + width / 2, y + height - 0.3, width * 0.7);
+    doc.addImage(assets.hen.dataUrl, "PNG", x, y, width, height, undefined, "FAST");
+  } else {
+    drawHenFallback(doc, henX, henY, henWidth, henHeight);
   }
-
-  if (!henDrawn) drawHenFallback(doc, henX, henY, henWidth, henHeight);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(26);
@@ -427,4 +451,17 @@ export async function drawDmrPoultryHeader(
   doc.circle(pageWidth / 2 + 4, dividerY, 0.65, "F");
 
   return Math.max(top + logoSize, henY + henHeight, dividerY) + 3;
+}
+
+/**
+ * Reusable single-page PDF header. It prepares the supplied image URLs, draws
+ * the DMR logo, centered title/divider and right-side hen, then returns the Y
+ * coordinate immediately below the header.
+ */
+export async function drawDmrPoultryHeader(
+  doc: jsPDF,
+  options: DmrPoultryHeaderOptions = {}
+): Promise<number> {
+  const assets = await prepareDmrPoultryHeaderAssets(options);
+  return drawPreparedDmrPoultryHeader(doc, options, assets);
 }

@@ -7,9 +7,10 @@ import BankTable from "../components/BankTable";
 import BankDialog from "../dialogs/BankDialog";
 import { useBanks } from "../hooks/useBanks";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
-import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
+import { exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/bankService";
+import { exportBanksToPDF } from "../utils/exportBanksPdf";
 import type { Bank } from "../types/bank";
 
 type BanksPageProps = { embedded?: boolean };
@@ -22,6 +23,7 @@ function BanksPage({ embedded = false }: BanksPageProps) {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const { showNotification } = useSafeNotification();
   const {
@@ -60,25 +62,24 @@ function BanksPage({ embedded = false }: BanksPageProps) {
     return filteredBanks.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredBanks, currentPage]);
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (filteredBanks.length === 0) {
       showNotification("No data to export.", "error");
       return;
     }
-    const headers = ["Bank No", "Bank Name", "Branch", "Account Number", "IFSC Code", "UPI ID", "Status"];
-    const rows = filteredBanks.map((bank) => [
-      bank.bankNo.toString(),
-      bank.bankName,
-      bank.branch,
-      bank.accountNumber,
-      bank.ifscCode,
-      bank.upiId || "-",
-      bank.status,
-    ]);
+
     const filename = `Banks_${new Date().toISOString().split("T")[0]}`;
-    exportToPDF("Banks - Master List", headers, rows, filename);
-    logAuditEvent("EXPORT_PDF", "Banks", undefined, { count: filteredBanks.length });
-    showNotification("PDF exported successfully!", "success");
+    setExportingPdf(true);
+    try {
+      await exportBanksToPDF(filteredBanks, filename);
+      logAuditEvent("EXPORT_PDF", "Banks", undefined, { count: filteredBanks.length });
+      showNotification("Branded PDF exported successfully!", "success");
+    } catch (error) {
+      console.error("Banks PDF export failed:", error);
+      showNotification("Unable to export the PDF. Please try again.", "error");
+    } finally {
+      setExportingPdf(false);
+    }
   };
 
   const handleExportExcel = () => {
@@ -263,14 +264,24 @@ function BanksPage({ embedded = false }: BanksPageProps) {
                 {/* Dropdown Menu */}
                 <div className="absolute right-0 mt-2 w-32 bg-white border border-slate-200 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-2 group-hover:translate-y-0 overflow-hidden">
                   <button
-                    onClick={handleExportPDF}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                    onClick={() => {
+                      void handleExportPDF();
+                    }}
+                    disabled={exportingPdf}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-60 disabled:cursor-wait"
                   >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
-                      <path fillRule="evenodd" d="M8 11a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1zm0 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1zm0 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" />
-                    </svg>
-                    PDF
+                    {exportingPdf ? (
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" />
+                        <path className="opacity-80" fill="currentColor" d="M12 3a9 9 0 00-9 9h3a6 6 0 016-6V3z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                        <path fillRule="evenodd" d="M8 11a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1zm0 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1zm0 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    {exportingPdf ? "Generating..." : "PDF"}
                   </button>
                   <button
                     onClick={handleExportExcel}
