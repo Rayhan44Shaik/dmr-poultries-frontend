@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Clock, Lock } from "lucide-react";
+import { TRIP_FIELD_DEFINITIONS } from "../../../../../shared/trip/definitions";
 
 interface GeneralExpensesTableProps {
   sheetData: any;
@@ -349,7 +350,7 @@ export default function GeneralExpensesTable({
 
           <tr className="border-b border-slate-200">
             <td className="font-medium text-slate-700 py-3 px-3">
-              End Meter Reading <span className="text-red-500">*</span>
+              {TRIP_FIELD_DEFINITIONS.closingMeter.label} {TRIP_FIELD_DEFINITIONS.closingMeter.required && <span className="text-red-500">*</span>}
             </td>
             <td colSpan={2} className="p-0 relative border-r border-slate-200">
               <div className="flex flex-col justify-center h-full px-2 py-1">
@@ -387,7 +388,7 @@ export default function GeneralExpensesTable({
               {pickupTolls}
             </td>
             <td colSpan={2} className="font-medium text-slate-700 px-3 border-r border-slate-200 bg-slate-50/30">
-              Total Toll Gates (Destination) <span className="text-red-500">*</span>
+              {TRIP_FIELD_DEFINITIONS.deliveryTolls.label} {TRIP_FIELD_DEFINITIONS.deliveryTolls.required && <span className="text-red-500">*</span>}
             </td>
             <td colSpan={2} className="p-0">
               <input

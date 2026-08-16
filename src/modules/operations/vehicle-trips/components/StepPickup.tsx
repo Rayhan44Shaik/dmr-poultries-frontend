@@ -8,6 +8,11 @@ import { getVehicles } from "../../../masters/vehicles/services/vehicleService";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { WizardActionBar, WizardStepNotice } from "./WizardStepUI";
+import { calculatePickupTotals } from "../../../../shared/trip/calculations";
+import {
+  TRIP_FIELD_DEFINITIONS,
+  TRIP_STEP_DEFINITIONS,
+} from "../../../../shared/trip/definitions";
 
 interface Props {
   trip: Trip;
@@ -187,13 +192,7 @@ export default function StepPickup({
     }
   }, [trip.id, isLocalEditing]);
 
-  const totals = useMemo(() => {
-    const totalBirds = rows.reduce((s, r) => s + (r.birds || 0), 0);
-    const dcWeight = Number(rows.reduce((s, r) => s + (r.weight || 0), 0).toFixed(2));
-    const boxes = rows.length;
-    const avgWeight = dcWeight > 0 && totalBirds > 0 ? Number((dcWeight / totalBirds).toFixed(3)) : 0;
-    return { totalBirds, dcWeight, boxes, avgWeight };
-  }, [rows]);
+  const totals = useMemo(() => calculatePickupTotals(rows), [rows]);
 
   // ─── Row operations with Max Box Limit Check ───────────────────────
   const addRow = () => {
@@ -523,7 +522,7 @@ export default function StepPickup({
               3
             </span>
             <h2 className="text-base font-bold text-slate-800 tracking-tight">
-              PICKUP KPI
+              {TRIP_STEP_DEFINITIONS[2].title.toUpperCase()}
             </h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -752,7 +751,7 @@ export default function StepPickup({
               3
             </span>
             <h2 className="text-base font-bold text-slate-800 tracking-tight">
-              PICKUP KPI
+              {TRIP_STEP_DEFINITIONS[2].title.toUpperCase()}
             </h2>
           </div>
           <div className="flex items-center gap-3">
@@ -776,7 +775,7 @@ export default function StepPickup({
             <div className="flex-1">
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
                 <Camera size={14} className="text-slate-400" />
-                DC Photo <span className="text-red-500">*</span>
+                {TRIP_FIELD_DEFINITIONS.dcPhotoKey.label} {TRIP_FIELD_DEFINITIONS.dcPhotoKey.required && <span className="text-red-500">*</span>}
               </label>
               <div className="mt-1 flex items-center gap-3">
                 <button

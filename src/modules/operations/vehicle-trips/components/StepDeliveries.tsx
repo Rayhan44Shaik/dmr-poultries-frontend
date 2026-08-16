@@ -8,6 +8,8 @@ import {
 import UnLoadingTable from "./Step_4";
 import BoxWeightAnalysis from "./Step_4/BoxWeightAnalysis";
 import type { ShopDelivery, Trip, BoxDetail } from "../types/trip";
+import { validateDeliveriesStep } from "../../../../shared/trip/validation";
+import { TRIP_STEP_DEFINITIONS } from "../../../../shared/trip/definitions";
 
 interface Props {
   rows: ShopDelivery[];
@@ -87,53 +89,10 @@ export default function StepDeliveries({
     clearForm();
   };
 
-  // ─── Lock Validation Pipeline ────────────────────────────────────────
+  // Shared Desktop + Mobile delivery balance rules.
   const validationResult = useMemo(() => {
-    if (rows.length === 0)
-      return { valid: false, reason: "Please add at least one shop delivery." };
-    if ((trip.dcWeight || 0) <= 0)
-      return { valid: false, reason: "DC Weight must be greater than 0." };
-
-    const totalMortalityCount = rows.reduce(
-      (sum, r) => sum + (r.mortality || 0),
-      0
-    );
-    const totalDelBirds = rows.reduce((sum, r) => sum + (r.birds || 0), 0);
-    const totalDelWeight = rows.reduce((sum, r) => sum + (r.weight || 0), 0);
-    const avgWeight = trip.totalBirds > 0 ? trip.dcWeight / trip.totalBirds : 0;
-
-    const explicitMortalityWeight = rows.reduce((sum, r) => {
-      const extra = r as ShopDelivery & {
-        mortalityWeight?: number;
-        mortalityKg?: number;
-      };
-      return sum + (extra.mortalityWeight ?? extra.mortalityKg ?? 0);
-    }, 0);
-
-    const mortalityWeight =
-      explicitMortalityWeight > 0
-        ? explicitMortalityWeight
-        : totalMortalityCount * avgWeight;
-
-    const totalOutWeight = totalDelWeight + mortalityWeight;
-
-    if (trip.totalBirds !== totalDelBirds + totalMortalityCount) {
-      return {
-        valid: false,
-        reason: `Bird count mismatch! Farm (${trip.totalBirds}) != Delivered (${totalDelBirds}) + Mor (${totalMortalityCount})`,
-      };
-    }
-
-    if (totalOutWeight - trip.dcWeight > 0.05) {
-      return {
-        valid: false,
-        reason: `Total weight (${totalOutWeight.toFixed(
-          2
-        )} Kg) exceeds DC Weight (${trip.dcWeight.toFixed(2)} Kg)`,
-      };
-    }
-
-    return { valid: true, reason: "" };
+    const validation = validateDeliveriesStep(trip, rows);
+    return { valid: validation.valid, reason: validation.errors[0] || "" };
   }, [rows, trip]);
 
   const canLock = validationResult.valid;
@@ -158,7 +117,7 @@ export default function StepDeliveries({
             4
           </span>
           <h2 className="text-base font-bold text-slate-800 tracking-tight">
-            SHOP DELIVERIES
+            {TRIP_STEP_DEFINITIONS[3].title.toUpperCase()}
           </h2>
         </div>
 

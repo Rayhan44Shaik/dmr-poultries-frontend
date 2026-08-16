@@ -10,8 +10,12 @@ import React, {
 import { Clock, User, Truck, Gauge, Wallet, Pencil } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
-import { validateStartStep } from "../services/tripFormService";
+import { validateStartStep } from "../../../../shared/trip/validation";
 import { WizardActionBar, WizardStepNotice, type WizardNoticeState } from "./WizardStepUI";
+import {
+  TRIP_FIELD_DEFINITIONS,
+  TRIP_STEP_DEFINITIONS,
+} from "../../../../shared/trip/definitions";
 
 type VehicleOption = { id: number; vehicleNumber: string };
 type EmployeeOption = { id: number; employeeName: string; department: string };
@@ -184,7 +188,7 @@ const StartTimeField = React.memo(function StartTimeField({ startTime }: { start
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <Clock size={14} className="text-slate-400" /> Start Time <span className="text-red-500">*</span>
+        <Clock size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.startTime.label} {TRIP_FIELD_DEFINITIONS.startTime.required && <span className="text-red-500">*</span>}
       </label>
       <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
         {startTime ? (
@@ -244,7 +248,7 @@ const VehicleField = React.memo(function VehicleField({
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <Truck size={14} className="text-slate-400" /> Vehicle No. <span className="text-red-500">*</span>
+        <Truck size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.vehicleId.label} {TRIP_FIELD_DEFINITIONS.vehicleId.required && <span className="text-red-500">*</span>}
       </label>
       <Select<VehicleOption, false>
         options={options}
@@ -291,7 +295,7 @@ const SupervisorField = React.memo(function SupervisorField({
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-slate-400" /> Supervisor <span className="text-red-500">*</span>
+        <User size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.supervisorId.label} {TRIP_FIELD_DEFINITIONS.supervisorId.required && <span className="text-red-500">*</span>}
       </label>
       <Select<EmployeeOption, false>
         options={options}
@@ -338,7 +342,7 @@ const DriverField = React.memo(function DriverField({
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-slate-400" /> Driver <span className="text-red-500">*</span>
+        <User size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.driverId.label} {TRIP_FIELD_DEFINITIONS.driverId.required && <span className="text-red-500">*</span>}
       </label>
       <Select<EmployeeOption, false>
         options={options}
@@ -381,7 +385,7 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <Gauge size={14} className="text-slate-400" /> Starting Meter (KM) <span className="text-red-500">*</span>
+        <Gauge size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.openingMeter.label} {TRIP_FIELD_DEFINITIONS.openingMeter.required && <span className="text-red-500">*</span>}
       </label>
       <input
         type="text"
@@ -425,7 +429,7 @@ const AdvanceField = React.memo(function AdvanceField({
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <Wallet size={14} className="text-slate-400" /> Advance / Expenses <span className="text-red-500">*</span>
+        <Wallet size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.advanceAmount.label} {TRIP_FIELD_DEFINITIONS.advanceAmount.required && <span className="text-red-500">*</span>}
       </label>
       <input
         type="text"
@@ -473,7 +477,7 @@ const HelpersField = React.memo(function HelpersField({
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-slate-400" /> Helpers <span className="text-red-500">*</span>
+        <User size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.helpers.label} {TRIP_FIELD_DEFINITIONS.helpers.required && <span className="text-red-500">*</span>}
       </label>
       <Select<EmployeeOption, true>
         options={options}
@@ -521,7 +525,7 @@ const LoadersField = React.memo(function LoadersField({
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-amber-500" /> Loaders <span className="text-red-500">*</span>
+        <User size={14} className="text-amber-500" /> {TRIP_FIELD_DEFINITIONS.loaders.label} {TRIP_FIELD_DEFINITIONS.loaders.required && <span className="text-red-500">*</span>}
       </label>
       <Select<EmployeeOption, true>
         options={options}
@@ -755,7 +759,7 @@ function StepStart({
             <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
               1
             </span>
-            <h2 className="text-base font-bold text-slate-800 tracking-tight">TRIP START (AT OFFICE)</h2>
+            <h2 className="text-base font-bold text-slate-800 tracking-tight">{TRIP_STEP_DEFINITIONS[0].title.toUpperCase()}</h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {canEdit && (
@@ -855,7 +859,7 @@ function StepStart({
             <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
               1
             </span>
-            <h2 className="text-base font-bold text-slate-800 tracking-tight">TRIP START (AT OFFICE)</h2>
+            <h2 className="text-base font-bold text-slate-800 tracking-tight">{TRIP_STEP_DEFINITIONS[0].title.toUpperCase()}</h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {((editable && startStepSubmitted) || isLocalEditing) && (

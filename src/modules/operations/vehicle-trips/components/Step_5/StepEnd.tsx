@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import type { Trip, TripStatus } from "../../types/trip";
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
+import { TRIP_STEP_DEFINITIONS } from "../../../../../shared/trip/definitions";
 import GeneralExpensesTable from "./GeneralExpensesTable";
 import DieselExpensesTable from "./DieselExpensesTable";
 import { fuelExpenseService } from "../../../fuel-expenses/services/fuelExpenseService";
@@ -459,7 +460,7 @@ export default function StepEnd({
           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-3">
             <div className="flex items-center gap-2">
               <span className="bg-blue-600 text-white w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0">5</span>
-              <h2 className="text-sm font-bold text-slate-800 tracking-tight">EXPENSES SHEET (SUBMITTED)</h2>
+              <h2 className="text-sm font-bold text-slate-800 tracking-tight">{TRIP_STEP_DEFINITIONS[4].title.toUpperCase()} (SUBMITTED)</h2>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {canEdit && (
@@ -505,7 +506,7 @@ export default function StepEnd({
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
             <div className="flex items-center gap-2">
               <span className="bg-blue-600 text-white w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0">5</span>
-              <h2 className="text-sm font-bold text-slate-800 tracking-tight">EXPENSES SHEET</h2>
+              <h2 className="text-sm font-bold text-slate-800 tracking-tight">{TRIP_STEP_DEFINITIONS[4].title.toUpperCase()}</h2>
             </div>
             <div className="flex items-center gap-2"><span className="text-[11px] text-slate-700 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 whitespace-nowrap">Editable View</span></div>
           </div>
