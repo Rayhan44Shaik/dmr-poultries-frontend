@@ -60,6 +60,10 @@ function ShopSalesTable({ sales, isLoading = false, onUpdateSale }: Props) {
     const newBirds = editData.totalBirds ?? originalSale.totalBirds ?? 0;
     const newWeight = editData.totalWeight ?? originalSale.totalWeight ?? 0;
     const newRate = editData.rate ?? originalSale.rate ?? 0;
+    if (newRate < 50 || newRate > 300) {
+      window.alert("Rate must be between ₹50 and ₹300.");
+      return;
+    }
 
     // Amount is intentionally NOT included — the backend recomputes it from
     // weight × rate and returns it as authoritative. The optimistic display
@@ -126,6 +130,9 @@ function ShopSalesTable({ sales, isLoading = false, onUpdateSale }: Props) {
                 </div>
               </th>
               <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                Shop No
+              </th>
+              <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
                 <div className="flex items-center gap-1.5">
                   <Calendar size={14} className="text-blue-500" />
                   Date
@@ -178,7 +185,7 @@ function ShopSalesTable({ sales, isLoading = false, onUpdateSale }: Props) {
           <tbody className="divide-y divide-slate-100">
             {sales.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-12 text-center text-slate-400 text-sm font-medium">
+                <td colSpan={12} className="py-12 text-center text-slate-400 text-sm font-medium">
                   No Shop Sales available until Rate Entry is locked.
                 </td>
               </tr>
@@ -199,6 +206,7 @@ function ShopSalesTable({ sales, isLoading = false, onUpdateSale }: Props) {
                   >
                     <td className="px-3.5 py-3 text-center text-xs font-semibold text-slate-500">{index + 1}</td>
                     <td className="px-3.5 py-3 font-medium text-slate-700 text-xs">{sale.tripNo}</td>
+                    <td className="px-3.5 py-3 text-xs font-semibold text-slate-700">{sale.shopNo || "—"}</td>
                     <td className="px-3.5 py-3 text-xs text-slate-600 font-medium">{sale.tripDate}</td>
                     <td className="px-3.5 py-3 text-xs font-semibold text-slate-700">{sale.shopName}</td>
 

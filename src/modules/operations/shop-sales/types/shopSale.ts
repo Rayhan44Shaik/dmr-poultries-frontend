@@ -8,6 +8,8 @@ export interface ShopSale {
 
   tripDate: string;
 
+  shopNo?: string;
+
   shopId: string;
 
   shopName: string;

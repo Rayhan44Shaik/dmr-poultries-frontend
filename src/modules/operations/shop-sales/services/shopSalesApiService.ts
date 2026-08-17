@@ -35,6 +35,7 @@ interface ApiShopSale {
   birdType: string;
   tripId: number | null;
   tripNo: string;
+  shopNo?: string;
   vehicleNo: string | null;
   farmName: string | null;
   birds: number;
@@ -77,6 +78,7 @@ function mapApiSaleToShopSale(row: ApiShopSale): ShopSale {
     tripNo: row.tripNo,
     tripDate: row.saleDate,
     shopId: row.shopId == null ? "" : String(row.shopId),
+    shopNo: row.shopNo ?? "",
     shopName: row.shopName,
     birdType: row.birdType,
     totalBirds: num(row.birds),
