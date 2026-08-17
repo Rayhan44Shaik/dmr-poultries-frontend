@@ -26,6 +26,8 @@ export default function VehicleReportPage({ embedded = false }: VehicleReportPag
     [appliedFilters]
   );
 
+  const drivers = useMemo(() => [...new Set(sources.trips.data.map((trip) => trip.driverName).filter(Boolean))].sort(), [sources.trips.data]);
+
   const selectedVehicleNumber =
     appliedFilters.vehicleId === "all"
       ? null
@@ -75,6 +77,7 @@ export default function VehicleReportPage({ embedded = false }: VehicleReportPag
       {/* ------------------------------------------ Filters ------ */}
       <VehicleReportFilters
         vehicles={sources.vehicles.data}
+        drivers={drivers}
         applied={draftFilters}
         onApply={applyFilters}
         onReset={resetFilters}

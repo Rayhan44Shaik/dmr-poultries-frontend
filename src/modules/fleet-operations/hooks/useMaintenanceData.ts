@@ -1,6 +1,7 @@
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
 import { useFuelExpenses } from '../../operations/fuel-expenses/hooks/useFuelExpenses';
+import { handleApiError } from '../../../api/errors';
 import { maintenanceApi, mapMaintenanceToEvent } from '../services/maintenanceApi';
 import type { MaintenanceEvent } from '../types';
 
@@ -13,209 +14,187 @@ interface UpcomingService {
   liveCurrentKM: number;
 }
 
+const rowsOf = (payload: any): any[] => Array.isArray(payload) ? payload : (payload?.data ?? []);
+
 export function useMaintenanceData() {
   const { vehicles } = useVehicles();
-  const dummyNotify = () => {};
-  const { filteredData: fuelExpenses } = useFuelExpenses(dummyNotify);
-
+  const { filteredData: fuelExpenses } = useFuelExpenses(() => {});
   const [refreshKey, setRefreshKey] = useState(0);
   const [maintenance, setMaintenance] = useState<MaintenanceEvent[]>([]);
   const [approvedMaintenance, setApprovedMaintenance] = useState<MaintenanceEvent[]>([]);
   const [deletedRecords, setDeletedRecords] = useState<MaintenanceEvent[]>([]);
+  const [historyRecords, setHistoryRecords] = useState<MaintenanceEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
-  // Active + soft-deleted maintenance come from the backend (PostgreSQL).
-  // The Approved tab must show ONLY the latest approved maintenance per vehicle,
-  // which the backend computes with DISTINCT ON (status=Approved&latestApproved=true).
+  const [selectedVehicle, setSelectedVehicle] = useState('all');
+  const [selectedDriver, setSelectedDriver] = useState('all');
+  const [selectedMaintenanceType, setSelectedMaintenanceType] = useState('all');
+  const [selectedServiceType, setSelectedServiceType] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Entry workspace datasets: pending/current, latest approved per vehicle and
+  // the deleted audit list. These are intentionally independent of History filters.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setError(null);
       try {
         const [activeData, approvedData, allData] = await Promise.all([
-          maintenanceApi.list(),
-          maintenanceApi.list({ status: 'Approved', latestApproved: true }),
-          maintenanceApi.list({ includeDeleted: true }),
+          maintenanceApi.list({ limit: 500 }),
+          maintenanceApi.list({ status: 'Approved', latestApproved: true, limit: 500 }),
+          maintenanceApi.list({ includeDeleted: true, limit: 500 }),
         ]);
         if (cancelled) return;
-        const activeList = Array.isArray(activeData) ? activeData : (activeData?.data ?? []);
-        const approvedList = Array.isArray(approvedData) ? approvedData : (approvedData?.data ?? []);
-        const allList = Array.isArray(allData) ? allData : (allData?.data ?? []);
-        const active: MaintenanceEvent[] = activeList.map(mapMaintenanceToEvent);
-        const approved: MaintenanceEvent[] = approvedList.map(mapMaintenanceToEvent);
-        const all: MaintenanceEvent[] = allList.map(mapMaintenanceToEvent);
+        const active = rowsOf(activeData).map(mapMaintenanceToEvent);
+        const approved = rowsOf(approvedData).map(mapMaintenanceToEvent);
+        const all = rowsOf(allData).map(mapMaintenanceToEvent);
         setMaintenance(active);
         setApprovedMaintenance(approved);
-        setDeletedRecords(all.filter((m) => Boolean(m.deletedAt)));
-      } catch {
+        setDeletedRecords(all.filter((record) => Boolean(record.deletedAt)));
+      } catch (cause) {
         if (!cancelled) {
           setMaintenance([]);
           setApprovedMaintenance([]);
           setDeletedRecords([]);
+          setError(handleApiError(cause));
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [refreshKey]);
 
-  const [selectedVehicle, setSelectedVehicle] = useState<string>('all');
-  const [selectedMaintenanceType, setSelectedMaintenanceType] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  // History uses the established query contract. Type/service filtering remains
+  // client-side because those fields are not part of the backend query contract.
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setHistoryLoading(true);
+      setHistoryError(null);
+      try {
+        const payload = await maintenanceApi.list({
+          vehicleId: selectedVehicle === 'all' ? undefined : selectedVehicle,
+          driverId: selectedDriver === 'all' ? undefined : selectedDriver,
+          fromDate: fromDate || undefined,
+          toDate: toDate || undefined,
+          status: selectedStatus === 'all' || selectedStatus === 'Deleted' ? undefined : selectedStatus,
+          search: searchQuery.trim() || undefined,
+          includeDeleted: selectedStatus === 'Deleted' || selectedStatus === 'all',
+          page: 1,
+          limit: 500,
+        });
+        if (!cancelled) setHistoryRecords(rowsOf(payload).map(mapMaintenanceToEvent));
+      } catch (cause) {
+        if (!cancelled) {
+          setHistoryRecords([]);
+          setHistoryError(handleApiError(cause));
+        }
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
+      }
+    }, searchQuery ? 250 : 0);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [fromDate, refreshKey, searchQuery, selectedDriver, selectedStatus, selectedVehicle, toDate]);
 
-  // Full approved history — the source for the maintenance log timeline.
   const approvedHistory = useMemo(
-    () => maintenance.filter((m: MaintenanceEvent) => m.paymentStatus === 'approved'),
+    () => maintenance.filter((record) => record.paymentStatus === 'approved' && !record.deletedAt),
     [maintenance]
   );
 
-  // Unique maintenance details/types derived dynamically from the actual approved records.
   const maintenanceTypes = useMemo(() => {
-    const set = new Set<string>();
-    approvedHistory.forEach((m: MaintenanceEvent) => {
-      if (m.serviceType && String(m.serviceType).trim()) set.add(String(m.serviceType).trim());
-      if (m.maintenanceType && String(m.maintenanceType).trim()) set.add(String(m.maintenanceType).trim());
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [approvedHistory]);
+    const values = new Set<string>();
+    historyRecords.forEach((record) => String(record.maintenanceType || '').split(',').forEach((type) => {
+      if (type.trim()) values.add(type.trim());
+    }));
+    return [...values].sort((a, b) => a.localeCompare(b));
+  }, [historyRecords]);
 
-  // Vehicle number lookup by id for search + canonical display.
+  const serviceTypes = useMemo(() => {
+    const values = new Set(historyRecords.map((record) => String(record.serviceType || '').trim()).filter(Boolean));
+    return [...values].sort((a, b) => a.localeCompare(b));
+  }, [historyRecords]);
+
+  const drivers = useMemo(() => {
+    const map = new Map<string, string>();
+    historyRecords.forEach((record) => {
+      if (record.driverId && record.driverName) map.set(String(record.driverId), record.driverName);
+    });
+    return [...map].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [historyRecords]);
+
   const vehicleNumberById = useMemo(() => {
     const map = new Map<string, string>();
-    vehicles.forEach((v: any) => map.set(String(v.id), String(v.vehicleNumber || '')));
+    vehicles.forEach((vehicle: any) => map.set(String(vehicle.id), String(vehicle.vehicleNumber || '')));
     return map;
   }, [vehicles]);
 
-  const matchesSearch = useCallback((m: MaintenanceEvent, query: string): boolean => {
-    if (!query) return true;
-    const needle = query.toLowerCase();
-    const vehicleNo = vehicleNumberById.get(String(m.vehicleId)) || m.vehicleNo || '';
-    return [
-      m.billNumber,
-      vehicleNo,
-      m.serviceType,
-      m.maintenanceType,
-      m.garage,
-      m.mechanic,
-      m.driverName,
-      m.remarks,
-    ].some((value) => value && String(value).toLowerCase().includes(needle));
-  }, [vehicleNumberById]);
+  const filtered = useMemo(() => historyRecords.filter((record) => {
+    if (selectedStatus === 'Deleted' && !record.deletedAt) return false;
+    if (selectedStatus === 'Pending' && (record.paymentStatus !== 'pending' || record.deletedAt)) return false;
+    if (selectedStatus === 'Approved' && (record.paymentStatus !== 'approved' || record.deletedAt)) return false;
+    if (selectedStatus === 'all' && record.deletedAt) return false;
+    if (selectedMaintenanceType !== 'all' && !String(record.maintenanceType || '').split(',').map((value) => value.trim()).includes(selectedMaintenanceType)) return false;
+    if (selectedServiceType !== 'all' && String(record.serviceType || '') !== selectedServiceType) return false;
+    if (searchQuery.trim()) {
+      const needle = searchQuery.trim().toLowerCase();
+      const vehicleNo = vehicleNumberById.get(String(record.vehicleId)) || record.vehicleNo || '';
+      const values = [record.billNumber, vehicleNo, record.driverName, record.maintenanceType, record.serviceType, record.garage, record.mechanic, record.remarks];
+      if (!values.some((value) => String(value || '').toLowerCase().includes(needle))) return false;
+    }
+    return true;
+  }), [historyRecords, searchQuery, selectedMaintenanceType, selectedServiceType, selectedStatus, vehicleNumberById]);
 
-  // Approved-only history, then vehicle filter → maintenance details filter →
-  // search. Pending / Rejected / Deleted records are never part of this dataset.
-  const filtered = useMemo(() => {
-    return approvedHistory.filter((m: MaintenanceEvent) => {
-      if (!matchesSearch(m, searchQuery)) return false;
-
-      if (selectedMaintenanceType && selectedMaintenanceType !== 'all') {
-        const typeMatch = selectedMaintenanceType.toLowerCase();
-        const service = String(m.serviceType || '').trim().toLowerCase();
-        const maint = String(m.maintenanceType || '').trim().toLowerCase();
-        if (service !== typeMatch && maint !== typeMatch) return false;
-      }
-
-      if (!selectedVehicle || selectedVehicle === 'all') return true;
-      const linkedVehicle = vehicles.find(v => String(v.id) === String(m.vehicleId));
-      return (
-        String(m.vehicleId) === String(selectedVehicle) ||
-        (linkedVehicle && linkedVehicle.vehicleNumber === selectedVehicle)
-      );
-    });
-  }, [approvedHistory, selectedVehicle, selectedMaintenanceType, searchQuery, vehicles, matchesSearch]);
+  const historyStats = useMemo(() => ({
+    total: filtered.length,
+    totalCost: filtered.reduce((sum, record) => sum + Number(record.totalCost || 0), 0),
+    approved: filtered.filter((record) => record.paymentStatus === 'approved').length,
+    pending: filtered.filter((record) => record.paymentStatus !== 'approved').length,
+    vehiclesServiced: new Set(filtered.map((record) => String(record.vehicleId))).size,
+    documents: filtered.reduce((sum, record) => sum + (record.documents?.length || 0), 0),
+  }), [filtered]);
 
   const upcomingServices = useMemo((): UpcomingService[] => {
-    // Baselines come strictly from APPROVED maintenance — a pending/rejected/
-    // deleted record must never act as the last completed service.
-    const list = vehicles
-      .map((v: any) => {
-        const vehicleMaintenances = approvedHistory.filter((m: MaintenanceEvent) => String(m.vehicleId) === String(v.id));
-        const lastMaint = vehicleMaintenances.sort((a: MaintenanceEvent, b: MaintenanceEvent) =>
-          new Date(b.date).getTime() - new Date(a.date).getTime()
-        )[0] || null;
+    const list = vehicles.map((vehicle: any) => {
+      const lastMaint = approvedHistory
+        .filter((record) => String(record.vehicleId) === String(vehicle.id))
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0] || null;
+      const maxFuelKM = (fuelExpenses || [])
+        .filter((entry: any) => String(entry.vehicleNo) === String(vehicle.vehicleNumber))
+        .reduce((max: number, entry: any) => Math.max(max, Number(entry.meterReading) || 0), 0);
+      const liveCurrentKM = Math.max(Number(vehicle.currentKM) || 0, maxFuelKM, lastMaint?.currentKM || 0);
+      const nextKM = lastMaint?.nextServiceKM && lastMaint.nextServiceKM > 0 ? lastMaint.nextServiceKM : liveCurrentKM + 5000;
+      const dueKM = nextKM - liveCurrentKM;
+      return { vehicle, lastMaint, nextKM, dueKM, isDue: dueKM <= 1000, liveCurrentKM };
+    }).sort((a, b) => a.dueKM - b.dueKM);
+    return selectedVehicle === 'all' ? list : list.filter((item) => String(item.vehicle.id) === selectedVehicle);
+  }, [approvedHistory, fuelExpenses, selectedVehicle, vehicles]);
 
-        const vehicleFuelLogs = (fuelExpenses || []).filter((f: any) => String(f.vehicleNo) === String(v.vehicleNumber));
-        const maxFuelKM = vehicleFuelLogs.reduce((max: number, log: any) => Math.max(max, Number(log.meterReading) || 0), 0);
-
-        const liveCurrentKM = Math.max(Number(v.currentKM) || 0, maxFuelKM, lastMaint?.currentKM || 0);
-
-        const nextKM = lastMaint?.nextServiceKM && lastMaint.nextServiceKM > 0
-          ? lastMaint.nextServiceKM
-          : liveCurrentKM + 5000;
-
-        const dueKM = nextKM - liveCurrentKM;
-
-        return {
-          vehicle: v,
-          lastMaint,
-          nextKM,
-          dueKM,
-          isDue: dueKM <= 1000,
-          liveCurrentKM
-        };
-      })
-      .sort((a: UpcomingService, b: UpcomingService) => a.dueKM - b.dueKM);
-
-    // Sync the Upcoming Action Schedules with the shared selected vehicle state.
-    if (selectedVehicle && selectedVehicle !== 'all') {
-      return list.filter((s: UpcomingService) =>
-        String(s.vehicle.id) === String(selectedVehicle) ||
-        String(s.vehicle.vehicleNumber) === String(selectedVehicle)
-      );
-    }
-
-    // When the search clearly identifies one or more vehicles, keep the schedule
-    // panel synchronized to those vehicles only; otherwise never randomly hide it.
-    const query = searchQuery.trim().toLowerCase();
-    if (query) {
-      const matched = list.filter((s: UpcomingService) =>
-        String(s.vehicle.vehicleNumber || '').toLowerCase().includes(query)
-      );
-      if (matched.length > 0) return matched;
-    }
-
-    return list;
-  }, [vehicles, approvedHistory, fuelExpenses, selectedVehicle, searchQuery]);
-
-  const hasActiveFilters = useMemo(
-    () =>
-      (selectedVehicle !== 'all' && selectedVehicle !== '' && selectedVehicle !== null) ||
-      (selectedMaintenanceType !== 'all' && selectedMaintenanceType !== '' && selectedMaintenanceType !== null) ||
-      searchQuery !== '',
-    [selectedVehicle, selectedMaintenanceType, searchQuery]
-  );
+  const hasActiveFilters = selectedVehicle !== 'all' || selectedDriver !== 'all' ||
+    selectedMaintenanceType !== 'all' || selectedServiceType !== 'all' || selectedStatus !== 'all' ||
+    Boolean(fromDate || toDate || searchQuery);
 
   const resetFilters = useCallback(() => {
-    setSelectedVehicle('all');
-    setSelectedMaintenanceType('all');
-    setSearchQuery('');
+    setSelectedVehicle('all'); setSelectedDriver('all'); setSelectedMaintenanceType('all');
+    setSelectedServiceType('all'); setSelectedStatus('all'); setFromDate(''); setToDate(''); setSearchQuery('');
   }, []);
 
-  const refresh = useCallback(() => {
-    setRefreshKey(prev => prev + 1);
-  }, []);
+  const refresh = useCallback(() => setRefreshKey((value) => value + 1), []);
 
   return {
-    vehicles,
-    maintenance,
-    approvedMaintenance,
-    approvedHistory,
-    maintenanceTypes,
-    filtered,
-    upcomingServices,
-    selectedVehicle,
-    setSelectedVehicle,
-    selectedMaintenanceType,
-    setSelectedMaintenanceType,
-    searchQuery,
-    setSearchQuery,
-    hasActiveFilters,
-    resetFilters,
-    deletedRecords,
-    loading,
-    refresh,
+    vehicles, maintenance, approvedMaintenance, approvedHistory, deletedRecords,
+    filtered, maintenanceTypes, serviceTypes, drivers, historyStats, upcomingServices,
+    selectedVehicle, setSelectedVehicle, selectedDriver, setSelectedDriver,
+    selectedMaintenanceType, setSelectedMaintenanceType, selectedServiceType, setSelectedServiceType,
+    selectedStatus, setSelectedStatus, fromDate, setFromDate, toDate, setToDate,
+    searchQuery, setSearchQuery, hasActiveFilters, resetFilters,
+    loading, historyLoading, error, historyError, refresh,
   };
 }

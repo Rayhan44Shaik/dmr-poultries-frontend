@@ -4,9 +4,8 @@ import {
   maintenanceApi,
   mapMaintenanceToEvent,
 } from '../services/maintenanceApi';
-import { mirrorMaintenance } from '../services/storage';
 import { handleApiError } from '../../../api/errors';
-import type { MaintenanceDocument, MaintenanceEvent, PartItem } from '../types';
+import type { MaintenanceDocument, PartItem } from '../types';
 
 export const MAINTENANCE_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024; // 10 MB per file
 export const MAINTENANCE_DOCUMENT_MAX_FILES = 10;
@@ -228,8 +227,8 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
         saved = await maintenanceApi.create(formData);
         showNotification('Maintenance record saved successfully!', 'success');
       }
-      const event: MaintenanceEvent = mapMaintenanceToEvent(saved);
-      mirrorMaintenance(event);
+      // Validate the response against the frontend mapper before refreshing.
+      mapMaintenanceToEvent(saved);
       onSuccess();
       resetToFresh();
     } catch (err) {

@@ -213,19 +213,22 @@ export function useDocumentsData() {
       vehicleId: string | number,
       updates: Record<
         string,
-        string | { expiryDate?: string; documentNumber?: string } | null
+        string | { expiryDate?: string; documentNumber?: string; validFrom?: string; remarks?: string } | null
       >,
       files?: Record<string, File | null>,
       removes?: Record<string, boolean>
     ) => {
       for (const [type, value] of Object.entries(updates)) {
         const dateStr = typeof value === 'string' ? value : value?.expiryDate;
-        const docNo =
-          typeof value === 'object' && value !== null ? value.documentNumber : undefined;
+        const docNo = typeof value === 'object' && value !== null ? value.documentNumber : undefined;
+        const validFrom = typeof value === 'object' && value !== null ? value.validFrom : undefined;
+        const remarks = typeof value === 'object' && value !== null ? value.remarks : undefined;
 
         const payload: Record<string, unknown> = {};
         if (dateStr) payload.expiryDate = toIsoFormat(dateStr);
         if (docNo !== undefined && docNo !== null) payload.documentNumber = docNo;
+        if (validFrom !== undefined) payload.validFrom = validFrom ? toIsoFormat(validFrom) : null;
+        if (remarks !== undefined) payload.remarks = remarks || null;
         if (removes?.[type]) payload.removeDocument = true;
 
         const file = files?.[type] ?? undefined;

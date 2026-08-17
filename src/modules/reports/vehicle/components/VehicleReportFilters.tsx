@@ -3,7 +3,7 @@
 // Apply and Reset. Draft state stays here until Apply is pressed.
 
 import { useMemo, useState } from "react";
-import { CalendarDays, RotateCcw, Search, Truck } from "lucide-react";
+import { CalendarDays, RotateCcw, Search, Truck, UserRound } from "lucide-react";
 import type { Vehicle } from "../../../masters/vehicles/types/vehicle";
 import type { VehicleReportDatePreset, VehicleReportFilters as Filters } from "../types/vehicleReportTypes";
 import { DATE_PRESETS, resolveDateWindow } from "../utils/vehicleReportDates";
@@ -16,14 +16,16 @@ const labelClass = "mb-1 block text-[11px] font-semibold uppercase tracking-wide
 
 interface VehicleReportFiltersProps {
   vehicles: Vehicle[];
+  drivers: string[];
   applied: Filters;
   onApply: (filters: Filters) => void;
   onReset: () => void;
   disabled?: boolean;
 }
 
-export default function VehicleReportFilters({ vehicles, applied, onApply, onReset, disabled = false }: VehicleReportFiltersProps) {
+export default function VehicleReportFilters({ vehicles, drivers, applied, onApply, onReset, disabled = false }: VehicleReportFiltersProps) {
   const [vehicleId, setVehicleId] = useState<number | "all">(applied.vehicleId);
+  const [driver, setDriver] = useState<string | 'all'>(applied.driver);
   const [preset, setPreset] = useState<VehicleReportDatePreset>(applied.preset);
   const [fromDate, setFromDate] = useState(applied.fromDate);
   const [toDate, setToDate] = useState(applied.toDate);
@@ -38,6 +40,7 @@ export default function VehicleReportFilters({ vehicles, applied, onApply, onRes
     const window = resolveDateWindow(preset, fromDate, toDate);
     onApply({
       vehicleId,
+      driver,
       preset,
       fromDate: window.from,
       toDate: window.to,
@@ -46,6 +49,7 @@ export default function VehicleReportFilters({ vehicles, applied, onApply, onRes
 
   const handleReset = () => {
     setVehicleId("all");
+    setDriver("all");
     setPreset("thisMonth");
     setFromDate("");
     setToDate("");
@@ -55,7 +59,7 @@ export default function VehicleReportFilters({ vehicles, applied, onApply, onRes
   return (
     <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-card animate-fade-in-up dark:border-slate-800 dark:bg-slate-900">
       <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {/* Vehicle */}
           <div className="min-w-0">
             <label className={labelClass}>
@@ -65,6 +69,14 @@ export default function VehicleReportFilters({ vehicles, applied, onApply, onRes
               Vehicle
             </label>
             <VehicleSelect vehicles={vehicles} value={vehicleId} onChange={setVehicleId} disabled={disabled} />
+          </div>
+
+          <div>
+            <label className={labelClass}><span className="mr-1 inline-flex align-middle"><UserRound size={11} /></span>Driver</label>
+            <select value={driver} onChange={(e) => setDriver(e.target.value)} disabled={disabled} className={inputClass}>
+              <option value="all">All Drivers</option>
+              {drivers.map((name) => <option key={name} value={name}>{name}</option>)}
+            </select>
           </div>
 
           {/* Date preset */}

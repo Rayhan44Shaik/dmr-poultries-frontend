@@ -8,8 +8,10 @@
 import {
   apiGet,
   apiPost,
+  apiPut,
   handleApiError,
 } from "../../../../api";
+import apiClient from '../../../../api/client';
 import {
   createEmptyTrip,
   isTripStatus,
@@ -186,6 +188,17 @@ export async function loadTripById(id: number): Promise<Trip> {
 export async function listTrips(): Promise<Trip[]> {
   const { data } = await apiGet<ApiTripRecord[]>(TRIPS_PATH);
   return data.map((trip) => mapApiTripToTrip(trip));
+}
+
+/** PUT /api/trips/:id — update a Trip History record through PostgreSQL. */
+export async function updateTripRecord(trip: Trip): Promise<Trip> {
+  const { data } = await apiPut<ApiTripRecord>(`${TRIPS_PATH}/${trip.id}`, trip);
+  return mapApiTripToTrip(data, trip);
+}
+
+/** DELETE /api/trips/:id — backend-owned soft delete with optional reason. */
+export async function deleteTripRecord(id: number, reason?: string): Promise<void> {
+  await apiClient.delete(`${TRIPS_PATH}/${id}`, { data: reason ? { reason } : undefined });
 }
 
 /** Single final Step 1 submission. No draft is created or updated before this request. */

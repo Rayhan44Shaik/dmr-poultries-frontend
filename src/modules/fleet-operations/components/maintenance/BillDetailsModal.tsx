@@ -14,7 +14,7 @@ const BillDetailsModal: React.FC<BillDetailsModalProps> = ({ isOpen, bill, vehic
   if (!isOpen || !bill) return null;
 
   const vehicle = vehicles.find((v: any) => String(v.id) === String(bill.vehicleId));
-const isPaid = bill.paymentStatus === 'approved';
+  const isApproved = bill.paymentStatus === 'approved';
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -58,12 +58,12 @@ const isPaid = bill.paymentStatus === 'approved';
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Bill Number</p>
-              <p className={`text-sm font-bold ${isPaid ? 'text-green-600' : 'text-orange-500'}`}>
+              <p className={`text-sm font-bold ${isApproved ? 'text-green-600' : 'text-orange-500'}`}>
                 {bill.billNumber || '-'}
-                {isPaid && (
+                {isApproved && (
                   <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                    Paid
+                    Approved
                   </span>
                 )}
               </p>
@@ -71,6 +71,17 @@ const isPaid = bill.paymentStatus === 'approved';
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Current KM</p>
               <p className="text-sm font-bold text-slate-800">{bill.currentKM.toLocaleString()}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Driver</p>
+              <p className="text-sm text-slate-700">{bill.driverName || '-'}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Next Service KM</p>
+              <p className="text-sm font-bold text-slate-800">{bill.nextServiceKM ? bill.nextServiceKM.toLocaleString() : '-'}</p>
             </div>
           </div>
 
@@ -96,12 +107,6 @@ const isPaid = bill.paymentStatus === 'approved';
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Mechanic</p>
               <p className="text-sm text-slate-700">{bill.mechanic || '-'}</p>
             </div>
-          </div>
-
-          {/* Driver Row */}
-          <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Driver</p>
-            <p className="text-sm text-slate-700">{bill.driverName || '-'}</p>
           </div>
 
           {/* Parts Table */}

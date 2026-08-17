@@ -65,13 +65,17 @@ export function deriveVehicleReport(input: DeriveInput): VehicleReportResult {
   // Completed trips inside the window, keyed by vehicle number (the business
   // link between trips and vehicles; ids are never surfaced in the UI).
   const completedTripsInWindow = trips.filter(
-    (t) => isCompletedOperationalTrip(t) && t.vehicleNo && isInDateWindow(t.tripDate, window)
+    (t) => isCompletedOperationalTrip(t) && t.vehicleNo && isInDateWindow(t.tripDate, window) &&
+      (filters.driver === 'all' || t.driverName === filters.driver)
   );
 
   const rows: VehicleReportRow[] = inScopeVehicles
     .map((vehicle) => {
       const vehicleTrips = completedTripsInWindow.filter((t) => t.vehicleNo === vehicle.vehicleNumber);
       const distanceKm = vehicleTrips.reduce((sum, t) => sum + num(t.totalKm), 0);
+      const totalBirds = vehicleTrips.reduce((sum, t) => sum + num(t.totalBirds), 0);
+      const totalWeight = vehicleTrips.reduce((sum, t) => sum + num(t.totalWeight), 0);
+      const totalMortality = vehicleTrips.reduce((sum, t) => sum + num(t.totalMortality), 0);
 
       const vehicleFuel = fuelSourceAvailable
         ? fuel.filter((f) => f.vehicleNo === vehicle.vehicleNumber && isInDateWindow(f.date, window))
@@ -117,6 +121,9 @@ export function deriveVehicleReport(input: DeriveInput): VehicleReportResult {
         status: vehicle.status,
         trips: vehicleTrips.length,
         distanceKm,
+        totalBirds,
+        totalWeight,
+        totalMortality,
         fuelLitres,
         fuelCost,
         maintenanceCost,
@@ -132,6 +139,9 @@ export function deriveVehicleReport(input: DeriveInput): VehicleReportResult {
 
   const totalTrips = rows.reduce((sum, r) => sum + r.trips, 0);
   const totalDistanceKm = rows.reduce((sum, r) => sum + r.distanceKm, 0);
+  const totalBirds = rows.reduce((sum, r) => sum + r.totalBirds, 0);
+  const totalWeight = rows.reduce((sum, r) => sum + r.totalWeight, 0);
+  const totalMortality = rows.reduce((sum, r) => sum + r.totalMortality, 0);
 
   const totalFuelLitres = fuelSourceAvailable ? rows.reduce((sum, r) => sum + (r.fuelLitres ?? 0), 0) : null;
   const totalFuelCost = fuelSourceAvailable ? rows.reduce((sum, r) => sum + (r.fuelCost ?? 0), 0) : null;
@@ -148,6 +158,9 @@ export function deriveVehicleReport(input: DeriveInput): VehicleReportResult {
       totalVehicles: rows.length,
       totalTrips,
       totalDistanceKm,
+      totalBirds,
+      totalWeight,
+      totalMortality,
       totalFuelLitres,
       totalFuelCost,
       totalMaintenanceCost,

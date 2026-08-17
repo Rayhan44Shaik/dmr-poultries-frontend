@@ -6,8 +6,9 @@ import useTrips from '../../operations/vehicle-trips/hooks/useTrips';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import { useFuelExpenses } from '../../operations/fuel-expenses/hooks/useFuelExpenses';
 import type { FuelExpense } from '../../operations/fuel-expenses/types/fuelExpense';
-import { getFastags, getFastagTransactions, getEMIRecords } from '../services/storage';
+import { getFastags, getFastagTransactions } from '../services/storage';
 import { maintenanceApi, mapMaintenanceToEvent } from '../services/maintenanceApi';
+import emiApi from '../services/emiApi';
 import type { MaintenanceEvent } from '../types';
 
 interface FastagTransaction {
@@ -78,14 +79,25 @@ export function useExpenseReportData() {
   const allTrips = useMemo(() => tripsData?.allTrips ?? [], [tripsData]);
   const { filteredData: fuelExpenses } = useFuelExpenses(dummyNotify);
   const [maintenance, setMaintenance] = useState<MaintenanceEvent[]>([]);
+  const [emiRecords, setEmiRecords] = useState<EMIRecord[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await maintenanceApi.list({ status: 'Approved' });
+        const [res, schedules] = await Promise.all([
+          maintenanceApi.list({ status: 'Approved' }),
+          emiApi.list({ limit: 500 }),
+        ]);
         const list = Array.isArray(res) ? res : (res?.data ?? []);
-        if (!cancelled) setMaintenance(Array.isArray(list) ? list.map(mapMaintenanceToEvent) : []);
+        if (!cancelled) {
+          setMaintenance(Array.isArray(list) ? list.map(mapMaintenanceToEvent) : []);
+          setEmiRecords(schedules.map((schedule) => ({
+            vehicleId: schedule.vehicleId,
+            emiAmount: schedule.emiAmount,
+            status: schedule.status,
+          })));
+        }
       } catch {
         if (!cancelled) setMaintenance([]);
       }
@@ -107,8 +119,6 @@ export function useExpenseReportData() {
     });
     return map;
   }, [fastags]);
-
-  const emiRecords = useMemo(() => (getEMIRecords() || []) as EMIRecord[], []);
 
   const today = new Date();
   const [fromDate, setFromDate] = useState(format(startOfMonth(today), 'yyyy-MM-dd'));

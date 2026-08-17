@@ -95,6 +95,9 @@ function VehicleDetailDrawer({ row, periodLabel, onClose }: VehicleDetailDrawerP
           <div className="grid grid-cols-2 gap-2.5">
             <MetricCell label="Trips" value={formatCount(row.trips)} />
             <MetricCell label="Distance" value={formatKm(row.distanceKm)} />
+            <MetricCell label="Birds / Loads" value={formatCount(row.totalBirds)} />
+            <MetricCell label="Weight" value={`${formatCount(row.totalWeight)} kg`} />
+            <MetricCell label="Mortality" value={formatCount(row.totalMortality)} />
             <MetricCell label="Fuel" value={row.fuelLitres === null ? NOT_AVAILABLE : formatLitres(row.fuelLitres)} />
             <MetricCell label="Fuel Cost" value={row.fuelCost === null ? NOT_AVAILABLE : formatINR(row.fuelCost)} />
             <MetricCell

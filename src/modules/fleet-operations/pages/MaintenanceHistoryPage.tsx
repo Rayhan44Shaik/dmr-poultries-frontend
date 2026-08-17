@@ -1,294 +1,105 @@
-import { memo, useState, useRef, useEffect, useMemo } from 'react';
-import { useMaintenanceData } from '../hooks/useMaintenanceData';
+import { memo, useEffect, useMemo, useState } from 'react';
+import {
+  AlertCircle,
+  CalendarDays,
+  CheckCircle2,
+  FileText,
+  FilterX,
+  IndianRupee,
+  Loader2,
+  Paperclip,
+  Search,
+  Truck,
+  UserRound,
+  Wrench,
+} from 'lucide-react';
+import { DatePicker } from '../../../components/common/DatePicker';
+import { apiGet } from '../../../api';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import MaintenanceTimeline, { type VehicleMeterEvent } from '../components/maintenance/MaintenanceTimeline';
 import UpcomingServices from '../components/maintenance/UpcomingServices';
-import { AlertCircle, CheckCircle2, ChevronDown, Search, X, FilterX } from 'lucide-react';
+import BillDetailsModal from '../components/maintenance/BillDetailsModal';
+import { useMaintenanceData } from '../hooks/useMaintenanceData';
 import { safeDate } from '../utils/maintenanceHelpers';
-import { apiGet } from '../../../api';
+import type { MaintenanceEvent } from '../types';
 
-interface MaintenanceHistoryPageProps {
-  embedded?: boolean;
-}
-
-interface FilterOption {
-  value: string;
-  label: string;
-}
-
-interface FilterDropdownProps {
-  allLabel: string;
-  value: string;
-  options: FilterOption[];
-  onSelect: (value: string) => void;
-  searchable?: boolean;
-}
-
-const FilterDropdown = ({ allLabel, value, options, onSelect, searchable = false }: FilterDropdownProps) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const allOptions: FilterOption[] = useMemo(
-    () => [{ value: 'all', label: allLabel }, ...options],
-    [allLabel, options]
-  );
-
-  const visibleOptions = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return allOptions;
-    return allOptions.filter((o) => o.label.toLowerCase().includes(needle));
-  }, [allOptions, query]);
-
-  const currentLabel = allOptions.find((o) => o.value === value)?.label || allLabel;
-
-  return (
-    <div className="relative" ref={containerRef}>
-      <button
-        type="button"
-        onClick={() => setIsOpen((o) => !o)}
-        className="inline-flex items-center justify-between gap-2 h-9 px-3 bg-white rounded-xl border border-slate-200 shadow-sm text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500/50 min-w-[170px] max-w-[230px]"
-      >
-        <span className="truncate">{currentLabel}</span>
-        <ChevronDown
-          size={14}
-          className={`text-slate-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-        />
-      </button>
-
-      {isOpen && (
-        <div className="absolute z-40 mt-1.5 min-w-full w-max max-w-[260px] bg-white border border-slate-200/80 rounded-xl shadow-xl p-1.5 border-t-blue-500 border-t-2 animate-in fade-in slide-in-from-top-1 duration-200">
-          {searchable && (
-            <div className="relative mb-1">
-              <Search size={12} className="text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={`Search ${allLabel.toLowerCase()}...`}
-                className="w-full h-8 pl-7 pr-2 bg-slate-50 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 placeholder-slate-400"
-              />
-            </div>
-          )}
-          <div className="max-h-[220px] overflow-y-auto scrollbar-thin space-y-0.5">
-            {visibleOptions.length > 0 ? (
-              visibleOptions.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onSelect(opt.value);
-                    setQuery('');
-                    setIsOpen(false);
-                  }}
-                  className={`w-full text-left h-9 px-2.5 text-xs font-bold rounded-lg transition-colors truncate flex items-center
-                    ${value === opt.value
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                    }`}
-                >
-                  {opt.label}
-                </button>
-              ))
-            ) : (
-              <div className="py-3 px-2 text-center text-[11px] font-bold text-slate-400">No matches found</div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+interface MaintenanceHistoryPageProps { embedded?: boolean }
+const selectClass = 'h-10 min-w-[170px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15';
 
 const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProps) => {
-  const {
-    vehicles,
-    filtered,
-    upcomingServices,
-    selectedVehicle,
-    setSelectedVehicle,
-    selectedMaintenanceType,
-    setSelectedMaintenanceType,
-    searchQuery,
-    setSearchQuery,
-    hasActiveFilters,
-    resetFilters,
-    approvedHistory,
-    maintenanceTypes,
-  } = useMaintenanceData();
-
-  const overdueCount = upcomingServices.filter((s) => s.isDue).length;
-
-  // Canonical vehicle options from the Vehicle Master (numbers only, no ids).
-  const vehicleOptions = useMemo<FilterOption[]>(
-    () =>
-      vehicles
-        .map((v: any) => ({ value: String(v.id), label: String(v.vehicleNumber || '') }))
-        .filter((o: FilterOption) => o.label),
-    [vehicles]
-  );
-
-  const maintenanceTypeOptions = useMemo<FilterOption[]>(
-    () => maintenanceTypes.map((type) => ({ value: type, label: type })),
-    [maintenanceTypes]
-  );
-
-  // Approved maintenance log, newest first (by actual maintenance date).
-  const timelineEvents = useMemo(() => {
-    return filtered
-      .filter((e: any) => e.paymentStatus === 'approved')
-      .slice()
-      .sort((a: any, b: any) => safeDate(b.date).getTime() - safeDate(a.date).getTime());
-  }, [filtered]);
-
-  // Trip/Fuel meter events supplement the maintenance-only timeline above.
-  // Only fetched when the user has narrowed to a single vehicle — the
-  // backend endpoint is per-vehicle (backend/src/routes/fleet.ts
-  // GET /fleet/vehicles/:vehicleId/meter-history, backed by the same
-  // universal vehicle_meter_events view used for write-time validation).
+  const data = useMaintenanceData();
   const [meterEvents, setMeterEvents] = useState<VehicleMeterEvent[]>([]);
+  const [selectedRecord, setSelectedRecord] = useState<MaintenanceEvent | null>(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+
   useEffect(() => {
     let cancelled = false;
-    if (!selectedVehicle || selectedVehicle === 'all') {
-      setMeterEvents([]);
-      return;
-    }
-    apiGet<VehicleMeterEvent[]>(`/fleet/vehicles/${selectedVehicle}/meter-history`)
-      .then((res) => {
-        if (!cancelled) {
-          setMeterEvents((res.data ?? []).filter((e) => e.sourceType !== 'MAINTENANCE'));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setMeterEvents([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedVehicle]);
+    if (!data.selectedVehicle || data.selectedVehicle === 'all') { setMeterEvents([]); return; }
+    apiGet<VehicleMeterEvent[]>(`/fleet/vehicles/${data.selectedVehicle}/meter-history`)
+      .then((response) => { if (!cancelled) setMeterEvents((response.data || []).filter((event) => event.sourceType !== 'MAINTENANCE')); })
+      .catch(() => { if (!cancelled) setMeterEvents([]); });
+    return () => { cancelled = true; };
+  }, [data.selectedVehicle]);
 
-  const allApprovedCount = approvedHistory.length;
-  const visibleCount = timelineEvents.length;
+  useEffect(() => setPage(1), [data.selectedVehicle, data.selectedDriver, data.selectedMaintenanceType, data.selectedServiceType, data.selectedStatus, data.fromDate, data.toDate, data.searchQuery]);
 
-  // Small contextual count shown beside the timeline heading.
-  const resultText = useMemo(
-    () => `Showing ${visibleCount} of ${allApprovedCount} records`,
-    [visibleCount, allApprovedCount]
-  );
+  const sorted = useMemo(() => [...data.filtered].sort((a, b) => safeDate(b.date).getTime() - safeDate(a.date).getTime()), [data.filtered]);
+  const pages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const rows = sorted.slice((page - 1) * pageSize, page * pageSize);
+  const timelineEvents = sorted.filter((record) => record.paymentStatus === 'approved' && !record.deletedAt);
+  const vehicleNumber = (record: MaintenanceEvent) => data.vehicles.find((vehicle: any) => String(vehicle.id) === String(record.vehicleId))?.vehicleNumber || record.vehicleNo || `#${record.vehicleId}`;
+
+  const cards = [
+    { label: 'Total Maintenance', value: data.historyStats.total, icon: Wrench, tone: 'bg-blue-50 text-blue-600' },
+    { label: 'Total Cost', value: `₹${data.historyStats.totalCost.toLocaleString('en-IN')}`, icon: IndianRupee, tone: 'bg-violet-50 text-violet-600' },
+    { label: 'Approved', value: data.historyStats.approved, icon: CheckCircle2, tone: 'bg-emerald-50 text-emerald-600' },
+    { label: 'Pending', value: data.historyStats.pending, icon: AlertCircle, tone: 'bg-amber-50 text-amber-600' },
+    { label: 'Vehicles Serviced', value: data.historyStats.vehiclesServiced, icon: Truck, tone: 'bg-cyan-50 text-cyan-600' },
+    { label: 'Documents', value: data.historyStats.documents, icon: Paperclip, tone: 'bg-slate-100 text-slate-600' },
+  ];
 
   return (
     <ErrorBoundary>
-      <div className={`w-full space-y-4 animate-in fade-in duration-500 ${
-        embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
-      }`}>
-
-        {/* Streamlined Toolbar Row */}
-        <div className="flex items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/60 shadow-sm">
-          <div className="flex items-center gap-2">
-            {overdueCount > 0 ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-rose-50 border border-rose-100 text-rose-700 text-xs font-bold rounded-xl">
-                <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-                <span>{overdueCount} {overdueCount === 1 ? 'Vehicle requires' : 'Vehicles require'} attention</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-bold rounded-xl">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>All vehicle schedules are clear</span>
-              </div>
-            )}
-          </div>
+      <div className={`w-full space-y-5 animate-in fade-in duration-300 ${embedded ? '' : 'min-h-screen bg-slate-50 px-4 py-6 md:px-8'}`}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div><h2 className="text-lg font-bold text-slate-900">Maintenance History</h2><p className="text-sm text-slate-500">Approved, pending and deleted Fleet maintenance records.</p></div>
+          <button onClick={data.refresh} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">Refresh</button>
         </div>
 
-        {/* Maintenance History Filter Bar */}
-        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-3.5">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <FilterDropdown
-              allLabel="All Maintenance Details"
-              value={selectedMaintenanceType}
-              options={maintenanceTypeOptions}
-              onSelect={setSelectedMaintenanceType}
-            />
-
-            <FilterDropdown
-              allLabel="All Vehicles"
-              value={selectedVehicle}
-              options={vehicleOptions}
-              onSelect={setSelectedVehicle}
-              searchable
-            />
-
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search size={13} className="text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search maintenance..."
-                className="w-full h-9 pl-8 pr-8 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500/50 placeholder-slate-400 transition-all"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-200/70 transition-colors"
-                  title="Clear search"
-                >
-                  <X size={13} />
-                </button>
-              )}
-            </div>
-
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="inline-flex items-center gap-1.5 h-9 px-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-colors"
-              >
-                <FilterX size={14} />
-                Clear
-              </button>
-            )}
-          </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {cards.map(({ label, value, icon: Icon, tone }) => <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-xl ${tone}`}><Icon size={17} /></div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p><p className="mt-1 truncate text-lg font-black text-slate-800">{value}</p></div>)}
         </div>
 
-        {/* Dashboard Panels Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between gap-3">
-              <h3 className="text-[10px] font-black text-slate-400 tracking-widest uppercase">Maintenance Log Timeline</h3>
-              <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">{resultText}</span>
-            </div>
-            <div className="p-5 md:p-6">
-              <MaintenanceTimeline
-                events={timelineEvents}
-                meterEvents={meterEvents}
-                vehicles={vehicles}
-                hasActiveFilters={hasActiveFilters}
-                onClearFilters={resetFilters}
-              />
-            </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-end gap-3">
+            <select value={data.selectedVehicle} onChange={(e) => data.setSelectedVehicle(e.target.value)} className={selectClass}><option value="all">All Vehicles</option>{data.vehicles.map((vehicle: any) => <option key={vehicle.id} value={String(vehicle.id)}>{vehicle.vehicleNumber}</option>)}</select>
+            <select value={data.selectedDriver} onChange={(e) => data.setSelectedDriver(e.target.value)} className={selectClass}><option value="all">All Drivers</option>{data.drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select>
+            <select value={data.selectedMaintenanceType} onChange={(e) => data.setSelectedMaintenanceType(e.target.value)} className={selectClass}><option value="all">All Maintenance Types</option>{data.maintenanceTypes.map((type) => <option key={type}>{type}</option>)}</select>
+            <select value={data.selectedServiceType} onChange={(e) => data.setSelectedServiceType(e.target.value)} className={selectClass}><option value="all">All Service Types</option>{data.serviceTypes.map((type) => <option key={type}>{type}</option>)}</select>
+            <select value={data.selectedStatus} onChange={(e) => data.setSelectedStatus(e.target.value)} className={`${selectClass} min-w-[140px]`}><option value="all">All Statuses</option><option value="Approved">Approved</option><option value="Pending">Pending</option><option value="Deleted">Deleted</option></select>
+            <div className="w-40"><DatePicker value={data.fromDate} onChange={data.setFromDate} placeholder="From date" /></div>
+            <div className="w-40"><DatePicker value={data.toDate} onChange={data.setToDate} placeholder="To date" /></div>
+            <div className="relative min-w-[220px] flex-1"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={data.searchQuery} onChange={(e) => data.setSearchQuery(e.target.value)} placeholder="Search bill, vehicle, garage…" className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-semibold outline-none focus:border-blue-500 focus:bg-white" /></div>
+            {data.hasActiveFilters && <button onClick={data.resetFilters} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-600 hover:bg-slate-50"><FilterX size={14} /> Clear</button>}
           </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/50">
-              <h3 className="text-[10px] font-black text-slate-400 tracking-widest uppercase">Upcoming Action Schedules</h3>
-            </div>
-            <div className="p-5 md:p-6">
-              <UpcomingServices services={upcomingServices} />
-            </div>
-          </div>
+          <p className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-400"><CalendarDays size={12} /> Date range, vehicle, driver, status and search are sent through the Fleet maintenance query contract.</p>
         </div>
 
+        {(data.historyError || data.error) && <div className="flex items-center justify-between rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"><span className="flex items-center gap-2"><AlertCircle size={17} />{data.historyError || data.error}</span><button onClick={data.refresh} className="font-bold underline">Retry</button></div>}
+
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div><h3 className="text-sm font-bold text-slate-800">Maintenance Records</h3><p className="text-xs text-slate-400">{sorted.length} matching records</p></div></div>
+          {data.historyLoading ? <div className="flex items-center justify-center gap-2 py-20 text-sm font-semibold text-slate-500"><Loader2 size={20} className="animate-spin text-blue-500" /> Loading maintenance history…</div> : rows.length === 0 ? <div className="py-20 text-center"><FileText size={40} className="mx-auto mb-3 text-slate-300" /><p className="font-bold text-slate-700">No maintenance records</p><p className="text-sm text-slate-400">Adjust the filters or create a maintenance entry.</p></div> : <div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-100"><thead className="bg-slate-50"><tr>{['Date','Vehicle','Driver','Maintenance / Service','Garage','KM','Parts','Total Cost','Status','Actions'].map((heading) => <th key={heading} className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">{heading}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{rows.map((record) => <tr key={record.id} className="hover:bg-slate-50/70"><td className="px-4 py-3 whitespace-nowrap text-xs text-slate-600">{new Date(record.date).toLocaleDateString('en-IN')}</td><td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-slate-800">{vehicleNumber(record)}</td><td className="px-4 py-3 whitespace-nowrap text-xs text-slate-600"><span className="inline-flex items-center gap-1"><UserRound size={12} />{record.driverName || '—'}</span></td><td className="px-4 py-3 min-w-[190px]"><p className="text-xs font-semibold text-slate-700">{record.maintenanceType || '—'}</p><p className="text-[11px] text-slate-400">{record.serviceType || '—'}</p></td><td className="px-4 py-3 text-xs text-slate-600">{record.garage || '—'}</td><td className="px-4 py-3 text-right text-xs font-semibold text-slate-700">{record.currentKM.toLocaleString()}</td><td className="px-4 py-3 text-center text-xs text-slate-600">{record.parts?.length || 0}</td><td className="px-4 py-3 text-right text-xs font-bold text-blue-700">₹{record.totalCost.toLocaleString('en-IN')}</td><td className="px-4 py-3"><span className={`rounded-full border px-2 py-1 text-[10px] font-bold ${record.deletedAt ? 'border-rose-200 bg-rose-50 text-rose-700' : record.paymentStatus === 'approved' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>{record.deletedAt ? 'Deleted' : record.paymentStatus === 'approved' ? 'Approved' : 'Pending'}</span></td><td className="px-4 py-3"><button onClick={() => setSelectedRecord(record)} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100">View</button></td></tr>)}</tbody></table></div>}
+          {pages > 1 && <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-5 py-3 text-xs text-slate-500"><span>Page {page} of {pages}</span><div className="flex gap-2"><button disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="rounded-lg border bg-white px-3 py-1.5 font-bold disabled:opacity-40">Previous</button><button disabled={page === pages} onClick={() => setPage((value) => value + 1)} className="rounded-lg border bg-white px-3 py-1.5 font-bold disabled:opacity-40">Next</button></div></div>}
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-2"><div className="border-b border-slate-100 px-5 py-4"><h3 className="text-sm font-bold text-slate-800">Approved Maintenance Timeline</h3></div><div className="p-5"><MaintenanceTimeline events={timelineEvents} meterEvents={meterEvents} vehicles={data.vehicles} hasActiveFilters={data.hasActiveFilters} onClearFilters={data.resetFilters} /></div></div>
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-5 py-4"><h3 className="text-sm font-bold text-slate-800">Upcoming Service</h3></div><div className="p-5"><UpcomingServices services={data.upcomingServices} /></div></div>
+        </div>
+
+        <BillDetailsModal isOpen={Boolean(selectedRecord)} bill={selectedRecord} vehicles={data.vehicles} onClose={() => setSelectedRecord(null)} />
       </div>
     </ErrorBoundary>
   );

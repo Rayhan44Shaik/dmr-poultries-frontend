@@ -14,6 +14,7 @@ import {
   Trash2,
   Undo2,
   CheckCircle2,
+  Download,
 } from 'lucide-react';
 import { DatePicker } from '../../../../components/common/DatePicker';
 import { useSafeNotification } from '../../../../hooks/useSafeNotification';
@@ -26,6 +27,8 @@ interface PermitDocView {
   hasDocument?: boolean;
   fileName?: string | null;
   mimeType?: string | null;
+  validFrom?: string | null;
+  remarks?: string | null;
 }
 
 interface DocumentEditModalProps {
@@ -35,7 +38,7 @@ interface DocumentEditModalProps {
   onClose: () => void;
   onSave: (
     vehicleId: string | number,
-    updates: Record<string, { expiryDate?: string; documentNumber?: string }>,
+    updates: Record<string, { expiryDate?: string; documentNumber?: string; validFrom?: string; remarks?: string }>,
     files?: Record<string, File>,
     removes?: Record<string, boolean>
   ) => Promise<void>;
@@ -91,7 +94,9 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
     : Object.keys(docMap);
 
   const initialDates: Record<string, string> = {};
+  const initialValidFrom: Record<string, string> = {};
   const initialNumbers: Record<string, string> = {};
+  const initialRemarks: Record<string, string> = {};
   documentTypes.forEach((type) => {
     const doc = docMap[type];
     const expiry = getExpiry(doc);
@@ -99,11 +104,15 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
       const normalized = normalizeDate(expiry);
       if (normalized) initialDates[type] = normalized;
     }
+    if (doc?.validFrom) initialValidFrom[type] = normalizeDate(doc.validFrom);
     if (doc?.documentNumber) initialNumbers[type] = String(doc.documentNumber);
+    if (doc?.remarks) initialRemarks[type] = String(doc.remarks);
   });
 
   const [editedDates, setEditedDates] = useState<Record<string, string>>(() => ({ ...initialDates }));
+  const [editedValidFrom, setEditedValidFrom] = useState<Record<string, string>>(() => ({ ...initialValidFrom }));
   const [editedNumbers, setEditedNumbers] = useState<Record<string, string>>(() => ({ ...initialNumbers }));
+  const [editedRemarks, setEditedRemarks] = useState<Record<string, string>>(() => ({ ...initialRemarks }));
   const [selectedFiles, setSelectedFiles] = useState<Record<string, File | null>>({});
   const [removeFlags, setRemoveFlags] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -120,6 +129,17 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
   };
 
   const handleFileChange = (type: string, file: File | null) => {
+    if (file) {
+      const supported = ['image/png', 'image/jpeg', 'application/pdf'].includes(file.type) || /\.(png|jpe?g|pdf)$/i.test(file.name);
+      if (!supported) {
+        setErrors((prev) => ({ ...prev, [type]: 'Only JPG, JPEG, PNG and PDF files are supported.' }));
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        setErrors((prev) => ({ ...prev, [type]: 'File size cannot exceed 10 MB.' }));
+        return;
+      }
+    }
     setSelectedFiles((prev) => ({ ...prev, [type]: file }));
     if (file) setRemoveFlags((prev) => ({ ...prev, [type]: false }));
     setErrors((prev) => ({ ...prev, [type]: '' }));
@@ -129,7 +149,7 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
     const newErrors: Record<string, string> = {};
     const todayStr = new Date().toISOString().split('T')[0];
 
-    const updates: Record<string, { expiryDate?: string; documentNumber?: string }> = {};
+    const updates: Record<string, { expiryDate?: string; documentNumber?: string; validFrom?: string; remarks?: string }> = {};
     const files: Record<string, File> = {};
     const removes: Record<string, boolean> = {};
 
@@ -137,7 +157,11 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
       const doc = docMap[type];
       const newDate = editedDates[type];
       const newNumber = editedNumbers[type];
+      const newValidFrom = editedValidFrom[type] || '';
+      const newRemarks = editedRemarks[type] || '';
       const oldDate = initialDates[type];
+      const oldValidFrom = initialValidFrom[type] || '';
+      const oldRemarks = initialRemarks[type] || '';
       const oldNumber = doc?.documentNumber ?? '';
       const hasFile = Boolean(selectedFiles[type]);
       const removing = Boolean(removeFlags[type]);
@@ -149,19 +173,26 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
 
       const dateChanged = Boolean(newDate && newDate !== oldDate);
       const numberChanged = newNumber != null && String(newNumber).trim() !== String(oldNumber ?? '');
+      const validFromChanged = newValidFrom !== oldValidFrom;
+      const remarksChanged = newRemarks.trim() !== oldRemarks.trim();
 
-      if (!dateChanged && !numberChanged && !hasFile && !removing) return;
+      if (newValidFrom && newDate && newValidFrom > newDate) {
+        newErrors[type] = 'Valid from date must be before the expiry date.';
+        return;
+      }
+
+      if (!dateChanged && !numberChanged && !validFromChanged && !remarksChanged && !hasFile && !removing) return;
 
       if (!newDate && !oldDate) {
         newErrors[type] = 'Please provide an expiry date before saving this document.';
         return;
       }
 
-      const entry: { expiryDate?: string; documentNumber?: string } = {};
+      const entry: { expiryDate?: string; documentNumber?: string; validFrom?: string; remarks?: string } = {};
       if (newDate || oldDate) entry.expiryDate = newDate || oldDate;
-      if (newNumber != null && String(newNumber).trim() !== '') {
-        entry.documentNumber = String(newNumber).trim();
-      }
+      if (newNumber != null) entry.documentNumber = String(newNumber).trim();
+      if (validFromChanged) entry.validFrom = newValidFrom;
+      if (remarksChanged) entry.remarks = newRemarks.trim();
       updates[type] = entry;
       if (hasFile) files[type] = selectedFiles[type] as File;
       if (removing && !hasFile) removes[type] = true;
@@ -264,18 +295,18 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
 
                       {/* Expiry Date */}
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Expiry Date
-                        </label>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Expiry Date</label>
                         <div className="relative w-full z-10">
-                          <DatePicker
-                            value={currentDate}
-                            onChange={(val) => handleDateChange(type, val)}
-                            placeholder={hasExisting ? 'Update date' : 'Select date'}
-                            error={error}
-                            className="w-full text-sm"
-                          />
+                          <DatePicker value={currentDate} onChange={(val) => handleDateChange(type, val)} placeholder={hasExisting ? 'Update date' : 'Select date'} error={error} className="w-full text-sm" />
                         </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Valid From</label>
+                        <DatePicker value={editedValidFrom[type] || ''} onChange={(val) => setEditedValidFrom((prev) => ({ ...prev, [type]: normalizeDate(val) }))} placeholder="Valid from" className="w-full text-sm" />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Remarks</label>
+                        <input type="text" value={editedRemarks[type] || ''} onChange={(e) => setEditedRemarks((prev) => ({ ...prev, [type]: e.target.value }))} placeholder="Optional remarks" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                       </div>
                     </div>
 
@@ -341,6 +372,17 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
                           >
                             <Eye className="w-3.5 h-3.5" /> View
                           </a>
+                        )}
+
+                        {hasScan && !selectedFileName && (
+                          <button
+                            type="button"
+                            onClick={() => permitApi.downloadDocument(vehicle.id, type, doc?.fileName)}
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+                            title="Download scan"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Download
+                          </button>
                         )}
 
                         {hasScan && !isRemoving && !selectedFileName && (

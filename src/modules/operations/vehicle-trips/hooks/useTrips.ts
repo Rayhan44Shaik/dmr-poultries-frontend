@@ -2,9 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Trip } from "../types/trip";
-import { tripService } from "../services/tripService";
-import { renumberPendingTripsForDate } from "../services/tripFormService";
-import { listTrips } from "../services/tripHeaderApiService";
+import { deleteTripRecord, listTrips, updateTripRecord } from "../services/tripHeaderApiService";
 
 type NotificationFn = (message: string, type?: "success" | "error" | "info") => void;
 
@@ -55,57 +53,31 @@ export default function useTrips(showNotification?: NotificationFn) {
     setCurrentPage(1);
   };
 
-  // ✅ Soft‑delete with reason and renumbering
-  const deleteTrip = (id: number, reason?: string) => {
+  // Trip History mutations use the same PostgreSQL API as reads. No browser
+  // storage fallback can diverge from the authoritative trip list.
+  const deleteTrip = async (id: number, reason?: string) => {
     try {
-      const allTrips = tripService.getAll() || [];
-      const tripIndex = allTrips.findIndex((t) => t.id === id);
-      if (tripIndex === -1) {
-        notify("Trip not found.", "error");
-        return;
-      }
-
-      const tripToDelete = allTrips[tripIndex];
-      const wasPending = tripToDelete.status === "Pending";
-      const tripDate = tripToDelete.tripDate;
-
-      const updatedTrip: Trip = {
-        ...tripToDelete,
-        deleted: true,
-        deletedReason: reason || "No reason provided",
-      };
-      tripService.update(updatedTrip);
-      refreshTrips();
-
-      if (wasPending) {
-        renumberPendingTripsForDate(tripDate);
-        refreshTrips();
-        notify(`Trip deleted and remaining pending trips for ${tripDate} renumbered.`, "success");
-      } else {
-        notify("Trip deleted successfully!", "success");
-      }
+      await deleteTripRecord(id, reason);
+      await refreshTrips();
+      notify("Trip deleted successfully!", "success");
     } catch {
       notify("Failed to delete trip.", "error");
     }
   };
 
-  const updateTrip = (trip: Trip) => {
+  const updateTrip = async (trip: Trip) => {
     try {
-      tripService.update(trip);
-      refreshTrips();
+      await updateTripRecord(trip);
+      await refreshTrips();
       notify("Trip updated successfully!", "success");
     } catch {
       notify("Failed to update trip.", "error");
     }
   };
 
-  // ✅ Updated: accept approvedBy parameter
   const changeStatus = (trip: Trip, status: "Pending" | "Completed", approvedBy?: string) => {
-    const updatedTrip = { ...trip, status };
-    if (status === "Completed" && approvedBy) {
-      (updatedTrip as any).approvedBy = approvedBy;
-    }
-    updateTrip(updatedTrip);
+    const updatedTrip = { ...trip, status, ...(status === "Completed" && approvedBy ? { approvedBy } : {}) };
+    void updateTrip(updatedTrip);
   };
 
   const recentTrips = useMemo(() => trips.slice(0, 5), [trips]);

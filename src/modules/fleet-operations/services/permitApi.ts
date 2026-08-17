@@ -2,6 +2,7 @@
 // Records and optional scans live in PostgreSQL — this layer talks to the
 // backend; it never stores permit data in localStorage.
 import apiClient from '../../../api/client';
+import { saveAs } from 'file-saver';
 import type { PermitDocument } from '../types';
 
 const BASE = '/fleet/permits';
@@ -65,6 +66,12 @@ export const permitApi = {
   documentUrl(vehicleId: string | number, docType: string): string {
     const base = (apiClient.defaults.baseURL || '').replace(/\/+$/, '');
     return `${base}${BASE}/${vehicleId}/${docType}/document`;
+  },
+
+  /** Download through Axios so API errors are normalized consistently. */
+  async downloadDocument(vehicleId: string | number, docType: string, fileName?: string | null) {
+    const res = await apiClient.get(`${BASE}/${vehicleId}/${docType}/document`, { responseType: 'blob' });
+    saveAs(res.data as Blob, fileName || `${docType}-document`);
   },
 };
 

@@ -152,6 +152,64 @@ export type FASTag = z.infer<typeof FASTagSchema>;
 export type FASTagTransaction = z.infer<typeof FASTagTransactionSchema>;
 export type EMIRecord = z.infer<typeof EMIRecordSchema>;
 
+// ---------- Backend-ready EMI domain ----------
+export type EmiStatus = 'active' | 'paid' | 'overdue' | 'closed';
+export type EmiPaymentMode = 'cash' | 'bank_transfer' | 'upi' | 'cheque' | 'auto_debit' | 'other';
+
+export interface EmiSchedule {
+  id: string;
+  vehicleId: number;
+  vehicleNumber?: string;
+  loanReference: string;
+  financeCompany: string;
+  principal: number;
+  interestRate?: number | null;
+  emiAmount: number;
+  startDate: string;
+  endDate: string;
+  totalEmis: number;
+  paidEmis: number;
+  remainingEmis: number;
+  nextEmiDate?: string | null;
+  status: EmiStatus;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface EmiPayment {
+  id: string;
+  emiId: string;
+  paymentDate: string;
+  amount: number;
+  paymentMode: EmiPaymentMode;
+  reference?: string;
+  remarks?: string;
+  createdAt?: string;
+}
+
+export interface EmiScheduleInput {
+  vehicleId: number;
+  loanReference: string;
+  financeCompany: string;
+  principal: number;
+  interestRate?: number | null;
+  emiAmount: number;
+  startDate: string;
+  endDate: string;
+  totalEmis: number;
+  paidEmis?: number;
+  nextEmiDate?: string | null;
+  status?: EmiStatus;
+}
+
+export interface EmiPaymentInput {
+  paymentDate: string;
+  amount: number;
+  paymentMode: EmiPaymentMode;
+  reference?: string;
+  remarks?: string;
+}
+
 // ---------- Dashboard Types ----------
 export interface FleetDashboardStats {
   totalVehicles: number;

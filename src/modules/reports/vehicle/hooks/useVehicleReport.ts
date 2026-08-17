@@ -18,6 +18,7 @@ function defaultFilters(): VehicleReportFilters {
   const window = defaultDateWindow();
   return {
     vehicleId: "all",
+    driver: "all",
     preset: "thisMonth",
     fromDate: window.from,
     toDate: window.to,

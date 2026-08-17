@@ -36,7 +36,8 @@ export const isServerBillNo = (billNo?: string | null): boolean =>
 
 /** Map a backend FleetMaintenance row into the frontend MaintenanceEvent shape. */
 export function mapMaintenanceToEvent(record: any): MaintenanceEvent {
-  const deleted = Boolean(record.deleted);
+  const deleted = Boolean(record.deleted || record.deletedAt);
+  const normalizedStatus = String(record.paymentStatus || record.status || '').toLowerCase();
   return {
     id: String(record.id),
     vehicleId: record.vehicleId != null ? String(record.vehicleId) : '',
@@ -59,8 +60,8 @@ export function mapMaintenanceToEvent(record: any): MaintenanceEvent {
     updatedAt: record.updatedAt || undefined,
     approvedBy: record.approvedBy || undefined,
     approvedAt: record.approvedAt || undefined,
-    paymentStatus: record.paymentStatus === 'approved' ? 'approved' : 'pending',
-    deletedAt: deleted ? record.updatedAt || undefined : undefined,
+    paymentStatus: normalizedStatus === 'approved' ? 'approved' : 'pending',
+    deletedAt: deleted ? record.deletedAt || record.updatedAt || undefined : undefined,
     documents: (Array.isArray(record.documents) ? record.documents : []).map((d: any) => ({
       id: d.id,
       maintenanceId: d.maintenanceId,

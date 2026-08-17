@@ -1,4 +1,4 @@
-import { memo, useState, useCallback, useMemo, useEffect } from 'react';
+import { memo, useState, useCallback, useMemo } from 'react';
 import { useDocumentsData } from '../hooks/useDocumentsData';
 import { DOCUMENT_LABELS, DOCUMENT_TYPE_ORDER } from '../utils/constants';
 import ErrorBoundary from '../../../components/common/ErrorBoundary';
@@ -48,10 +48,6 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    refetch();
-  }, []);
-
   const filteredMatrix = useMemo(() => {
     if (!searchTerm.trim()) return matrix;
     return matrix.filter((row: any) =>
@@ -99,7 +95,7 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
       vehicleId: string | number,
       updates: Record<
         string,
-        { expiryDate?: string; documentNumber?: string }
+        { expiryDate?: string; documentNumber?: string; validFrom?: string; remarks?: string }
       >,
       files?: Record<string, File>,
       removes?: Record<string, boolean>

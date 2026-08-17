@@ -17,7 +17,7 @@ import { RotateCcw, Save, Wrench, AlertTriangle, X, AlertCircle, CheckCircle2 } 
 const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
   const { employees } = useEmployees();
   const { showNotification } = useSafeNotification();
-  const { vehicles, maintenance, approvedMaintenance, deletedRecords, refresh: refreshMaintenance } = useMaintenanceData();
+  const { vehicles, maintenance, approvedMaintenance, deletedRecords, loading: recordsLoading, error: recordsError, refresh: refreshMaintenance } = useMaintenanceData();
   const [loading, setLoading] = useState(false);
   const [selectKey, setSelectKey] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -428,8 +428,18 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
           </div>
         </div>
 
+        {recordsError && (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+            <span className="flex items-center gap-2"><AlertCircle size={17} />{recordsError}</span>
+            <button type="button" onClick={refreshMaintenance} className="font-bold underline">Retry</button>
+          </div>
+        )}
+
         {/* Latest Records Table */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden p-5">
+          {recordsLoading ? (
+            <div className="py-12 text-center text-sm font-semibold text-slate-500">Loading maintenance records…</div>
+          ) : (
           <LatestMaintenanceTable
             records={displayRecords}
             vehicles={vehicles}
@@ -444,6 +454,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
             pageSize={pageSize}
             onToggleView={handleViewToggle}
           />
+          )}
         </div>
 
         {/* View Modal */}

@@ -8,7 +8,7 @@ import TopPerformersTable from '../components/analytics/TopPerformersTable';
 import HighestExpenseTable from '../components/analytics/HighestExpenseTable';
 import { DatePicker } from '../../../components/common/DatePicker';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Fuel, DollarSign, Gauge, RotateCcw, Loader2, CalendarDays, Truck } from 'lucide-react';
+import { TrendingUp, Fuel, DollarSign, Gauge, RotateCcw, Loader2, CalendarDays, Truck, Wrench, CreditCard, AlertCircle } from 'lucide-react';
 import type { Vehicle } from '../../masters/vehicles/types/vehicle';
 
 interface VehicleAnalyticsPageProps {
@@ -82,6 +82,7 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
     vehicles,
     clearFilters,
     loading,
+    error,
   } = useAnalyticsData();
 
   const vehicleOptions = (vehicles || []).map((v: Vehicle) => ({
@@ -90,11 +91,13 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
   }));
 
   const kpis = [
+    { label: 'Total Trips', value: stats.totalTrips, icon: <Truck className="w-4 h-4 text-indigo-600" />, format: 'number' as const },
     { label: 'Total Distance (KM)', value: stats.totalDistance, icon: <TrendingUp className="w-4 h-4 text-blue-600" />, format: 'number' as const },
-    { label: 'Average Mileage (km/l)', value: stats.avgMileage.toFixed(2), icon: <Gauge className="w-4 h-4 text-amber-600" /> },
-    { label: 'Total Fuel Used (Ltrs)', value: stats.totalFuel, icon: <Fuel className="w-4 h-4 text-sky-600" />, format: 'number' as const },
+    { label: 'Average Mileage', value: stats.avgMileage.toFixed(2), icon: <Gauge className="w-4 h-4 text-amber-600" /> },
+    { label: 'Fuel Cost', value: stats.fuelCost, icon: <Fuel className="w-4 h-4 text-sky-600" />, format: 'currency' as const },
+    { label: 'Maintenance Cost', value: stats.maintenanceCost, icon: <Wrench className="w-4 h-4 text-violet-600" />, format: 'currency' as const },
+    { label: 'EMI Due', value: stats.emiCost, icon: <CreditCard className="w-4 h-4 text-emerald-600" />, format: 'currency' as const },
     { label: 'Total Expense', value: stats.totalExpense, icon: <DollarSign className="w-4 h-4 text-rose-600" />, format: 'currency' as const },
-    { label: 'Cost per KM', value: stats.costPerKM, icon: <DollarSign className="w-4 h-4 text-emerald-600" />, format: 'currency' as const },
   ];
 
   return (
@@ -168,6 +171,12 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
           </button>
         </div>
 
+        {error && (
+          <div className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+            <AlertCircle size={17} /> {error}
+          </div>
+        )}
+
         {loading ? (
           <div className="w-full flex items-center justify-center py-24">
             <div className="flex items-center gap-2.5 text-sm font-semibold text-slate-500">
@@ -178,7 +187,7 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
         ) : (
           <>
             {/* High Tech Minimal KPI Panel Layout */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
               {kpis.map((kpi, idx) => (
                 <KpiCard
                   key={idx}

@@ -30,6 +30,8 @@ export interface DateWindow {
 export interface VehicleReportFilters {
   /** Vehicle master id, or "all" for the whole fleet. */
   vehicleId: number | "all";
+  /** Driver name from completed trip records, or all. */
+  driver: string | "all";
   preset: VehicleReportDatePreset;
   /** Custom range (used when preset === "custom"). */
   fromDate: string;
@@ -67,6 +69,9 @@ export interface VehicleReportRow {
   trips: number;
   /** Sum of trip.totalKm for completed trips inside the period. */
   distanceKm: number;
+  totalBirds: number;
+  totalWeight: number;
+  totalMortality: number;
   /** Sum of fuel-bill litres inside the period; null when the fuel source failed. */
   fuelLitres: number | null;
   /** Sum of fuel-bill amounts inside the period; null when the fuel source failed. */
@@ -90,6 +95,9 @@ export interface VehicleReportSummary {
   totalVehicles: number;
   totalTrips: number;
   totalDistanceKm: number;
+  totalBirds: number;
+  totalWeight: number;
+  totalMortality: number;
   totalFuelLitres: number | null;
   totalFuelCost: number | null;
   totalMaintenanceCost: number | null;
@@ -115,6 +123,9 @@ export type VehicleReportSortKey =
   | "vehicleNumber"
   | "trips"
   | "distanceKm"
+  | "totalBirds"
+  | "totalWeight"
+  | "totalMortality"
   | "fuelLitres"
   | "fuelCost"
   | "maintenanceCost"
