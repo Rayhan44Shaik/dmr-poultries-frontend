@@ -39,8 +39,8 @@ export const TRIP_FIELD_DEFINITIONS = {
   vehicleId: { key: "vehicleId", step: "start", label: "Vehicle No.", kind: "select", required: true, optionSource: "vehicles" },
   supervisorId: { key: "supervisorId", step: "start", label: "Supervisor", kind: "select", required: true, optionSource: "supervisors" },
   driverId: { key: "driverId", step: "start", label: "Driver", kind: "select", required: true, optionSource: "drivers" },
-  openingMeter: { key: "openingMeter", step: "start", label: "Starting Meter (KM)", kind: "number", required: true, unit: "KM" },
-  advanceAmount: { key: "advanceAmount", step: "start", label: "Advance / Expenses", kind: "number", required: true, unit: "INR" },
+  openingMeter: { key: "openingMeter", step: "start", label: "Starting Meter (KM)", kind: "number", required: false, unit: "KM" },
+  advanceAmount: { key: "advanceAmount", step: "start", label: "Advance / Expenses", kind: "number", required: false, unit: "INR" },
   helpers: { key: "helpers", step: "start", label: "Helpers", kind: "multi-select", required: true, optionSource: "helpers" },
   loaders: { key: "loaders", step: "start", label: "Loaders", kind: "multi-select", required: true, optionSource: "loaders" },
 

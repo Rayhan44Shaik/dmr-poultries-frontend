@@ -74,6 +74,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     updateDeliveries,
     updateBoxDetails,
     submitStartStep,
+    updateStartStep,
     saveStartProgress,
     submitFarmStep,
     saveFarmProgress,
@@ -165,7 +166,15 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       if (!loadedFromApi) {
         loadTrip(selectedTrip);
       }
-      showNotification(`✏️ Trip ${selectedTrip.tripNo} loaded. Proceed to edit.`, "info");
+      const nextStepLabels: Record<number, string> = {
+        0: "Step 1 — Trip Start",
+        1: "Step 2 — Farm Entry",
+        2: "Step 3 — Pickup",
+        3: "Step 4 — Deliveries",
+        4: "Step 5 — Completion",
+      };
+      const nextLabel = nextStepLabels[targetStep] ?? "the next step";
+      showNotification(`♻️ Trip Resumed — ${selectedTrip.tripNo}. Continue with ${nextLabel}.`, "success");
     })();
   };
 
@@ -320,6 +329,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           loadSnapshot={step1LoadSnapshot}
           updateTrip={updateStartTrip}
           submitStartStep={submitStartStep}
+          updateStartStep={updateStartStep}
           saveStartProgress={saveStartProgress}
           hasUnsavedChanges={JSON.stringify({
             vehicleId: trip.vehicleId, vehicleNo: trip.vehicleNo, driverId: trip.driverId,

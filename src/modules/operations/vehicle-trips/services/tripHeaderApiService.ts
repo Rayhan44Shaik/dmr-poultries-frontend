@@ -8,6 +8,8 @@
 import {
   apiGet,
   apiPost,
+  apiPatch,
+  apiDelete,
   handleApiError,
 } from "../../../../api";
 import {
@@ -164,8 +166,10 @@ export function toStep1Payload(trip: Partial<Trip>): Record<string, unknown> {
     driverName: trip.driverName || null,
     supervisorId: trip.supervisorId || null,
     supervisorName: trip.supervisorName || null,
-    openingMeter: trip.openingMeter ?? 0,
-    advanceAmount: trip.advanceAmount ?? 0,
+    // KM / Advance are OPTIONAL. Empty (0/blank) is sent as null so the backend
+    // persists a true NULL (and skips meter validation) instead of 0.
+    openingMeter: trip.openingMeter && trip.openingMeter > 0 ? trip.openingMeter : null,
+    advanceAmount: trip.advanceAmount && trip.advanceAmount > 0 ? trip.advanceAmount : null,
     helpers: trip.helpers ?? [],
     loaders: trip.loaders ?? [],
     remarks: trip.remarks ?? "",
@@ -237,6 +241,31 @@ export async function fetchLastClosingMeter(vehicleId: number): Promise<LastClos
     `${TRIPS_PATH}/vehicle/${vehicleId}/last-meter`
   );
   if (!data || data.closingMeter == null) return null;
+  return data;
+}
+
+/** PATCH /api/trips/:id/status — backend-authoritative status transition
+ * (Pending -> Completed / Draft -> Pending). The backend enforces the state
+ * machine and persists the change to PostgreSQL, so the Trip List / Recent
+ * lifecycle survives refresh and is never stored in localStorage. */
+export async function changeTripStatus(
+  id: number,
+  status: TripStatus,
+  approvedBy?: string
+): Promise<Trip> {
+  const { data } = await apiPatch<ApiTripRecord>(`${TRIPS_PATH}/${id}/status`, {
+    status,
+    approvedBy,
+  });
+  return mapApiTripToTrip(data);
+}
+
+/** DELETE /api/trips/:id — backend soft-delete. Reason is sent as a query
+ * param (the backend route reads req.body.reason ?? req.query.reason). */
+export async function deleteTripFromApi(id: number, reason?: string): Promise<{ id: number; deleted: boolean }> {
+  const { data } = await apiDelete<{ id: number; deleted: boolean }>(`${TRIPS_PATH}/${id}`, {
+    params: reason ? { reason } : undefined,
+  });
   return data;
 }
 

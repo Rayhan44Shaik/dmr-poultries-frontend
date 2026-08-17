@@ -146,6 +146,38 @@ export function useTripEntry(
     }
   };
 
+  /** Update an ALREADY-SUBMITTED Step 1 (top-level Edit → "Update Start
+   * Details"). Uses the existing-trip submit step endpoint (mode submit) so the
+   * step STAYS submitted and the backend re-validates changed resources/meters
+   * (self-excluded) — never a save-mode call that would strip start_step_submitted. */
+  const updateStartStep = async (data: Partial<Trip> = {}): Promise<boolean> => {
+    const current = { ...tripRef.current, ...data };
+    if (!current.id) {
+      notifyRef.current?.("Trip ID is missing. Submit Start Details first.", "error");
+      return false;
+    }
+
+    const validation = validateStartStep(current as Trip);
+    if (!validation.valid) {
+      return false;
+    }
+
+    setHeaderLoading(true);
+    try {
+      const submitted = await submitTripStep(current.id, "start", {
+        ...current,
+        startStepSubmitted: true,
+      });
+      applySavedTrip(submitted);
+      return true;
+    } catch (error) {
+      console.error("Unable to update start details:", error);
+      return false;
+    } finally {
+      setHeaderLoading(false);
+    }
+  };
+
   const submitFarmStep = async (data: Partial<Trip> = {}): Promise<boolean> => {
     const current = tripRef.current;
     if (!current.id) {
@@ -440,6 +472,7 @@ export function useTripEntry(
     updateDeliveries,
     updateBoxDetails,
     submitStartStep,
+    updateStartStep,
     saveStartProgress,
     submitFarmStep,
     saveFarmProgress,

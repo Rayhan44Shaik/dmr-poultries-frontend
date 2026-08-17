@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Trip } from "../types/trip";
-import { tripService } from "../services/tripService";
-import { renumberPendingTripsForDate } from "../services/tripFormService";
-import { listTrips } from "../services/tripHeaderApiService";
+import { apiPut } from "../../../../api";
+import { listTrips, changeTripStatus, deleteTripFromApi } from "../services/tripHeaderApiService";
 
 type NotificationFn = (message: string, type?: "success" | "error" | "info") => void;
 
@@ -55,57 +54,48 @@ export default function useTrips(showNotification?: NotificationFn) {
     setCurrentPage(1);
   };
 
-  // ✅ Soft‑delete with reason and renumbering
-  const deleteTrip = (id: number, reason?: string) => {
+  // ✅ Soft-delete via the backend API (PostgreSQL soft-delete). The Trip List /
+  // Recent lifecycle is backend-authoritative and survives refresh — never
+  // localStorage. `deleted` trips stay soft-deleted and never resurface.
+  const deleteTrip = async (id: number, reason?: string) => {
     try {
-      const allTrips = tripService.getAll() || [];
-      const tripIndex = allTrips.findIndex((t) => t.id === id);
-      if (tripIndex === -1) {
-        notify("Trip not found.", "error");
-        return;
-      }
-
-      const tripToDelete = allTrips[tripIndex];
-      const wasPending = tripToDelete.status === "Pending";
-      const tripDate = tripToDelete.tripDate;
-
-      const updatedTrip: Trip = {
-        ...tripToDelete,
-        deleted: true,
-        deletedReason: reason || "No reason provided",
-      };
-      tripService.update(updatedTrip);
-      refreshTrips();
-
-      if (wasPending) {
-        renumberPendingTripsForDate(tripDate);
-        refreshTrips();
-        notify(`Trip deleted and remaining pending trips for ${tripDate} renumbered.`, "success");
-      } else {
-        notify("Trip deleted successfully!", "success");
-      }
-    } catch {
-      notify("Failed to delete trip.", "error");
+      await deleteTripFromApi(id, reason || "No reason provided");
+      await refreshTrips();
+      notify("Trip deleted successfully!", "success");
+    } catch (err) {
+      const msg = (err as { message?: string })?.message ?? "Failed to delete trip.";
+      notify(`Failed to delete trip: ${msg}`, "error");
     }
   };
 
-  const updateTrip = (trip: Trip) => {
+  // ✅ Persist a full-trip edit through the backend generic save. Kept for API
+  // parity; the wizard uses submitStep endpoints, but any caller that replaces
+  // a trip object now writes to PostgreSQL, not localStorage.
+  const updateTrip = async (trip: Trip) => {
     try {
-      tripService.update(trip);
-      refreshTrips();
+      const { data } = await apiPut<Record<string, unknown>>(
+        `/trips/${trip.id}`,
+        { ...trip, mode: "submit" }
+      );
+      await refreshTrips();
       notify("Trip updated successfully!", "success");
+      return data;
     } catch {
       notify("Failed to update trip.", "error");
     }
   };
 
-  // ✅ Updated: accept approvedBy parameter
-  const changeStatus = (trip: Trip, status: "Pending" | "Completed", approvedBy?: string) => {
-    const updatedTrip = { ...trip, status };
-    if (status === "Completed" && approvedBy) {
-      (updatedTrip as any).approvedBy = approvedBy;
+  // ✅ Updated: accept approvedBy parameter. Status transitions (Pending ->
+  // Completed) are validated and persisted by the backend API.
+  const changeStatus = async (trip: Trip, status: "Pending" | "Completed", approvedBy?: string) => {
+    try {
+      await changeTripStatus(trip.id, status, approvedBy);
+      await refreshTrips();
+      notify(status === "Completed" ? "Trip approved successfully!" : "Trip status updated.", "success");
+    } catch (err) {
+      const msg = (err as { message?: string })?.message ?? "Failed to update trip status.";
+      notify(`Failed to update trip status: ${msg}`, "error");
     }
-    updateTrip(updatedTrip);
   };
 
   const recentTrips = useMemo(() => trips.slice(0, 5), [trips]);

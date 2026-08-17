@@ -28,6 +28,7 @@ interface Props {
   loadSnapshot: Trip;
   updateTrip: (updates: Partial<Trip>) => void;
   submitStartStep: (data: Partial<Trip>) => Promise<boolean>;
+  updateStartStep?: (data: Partial<Trip>) => Promise<boolean>;
   saveStartProgress?: (data: Partial<Trip>) => Promise<boolean>;
   hasUnsavedChanges?: boolean;
   vehicleOptions: VehicleOption[];
@@ -552,6 +553,7 @@ function StepStart({
   loadSnapshot,
   updateTrip,
   submitStartStep,
+  updateStartStep,
   saveStartProgress,
   hasUnsavedChanges = false,
   vehicleOptions,
@@ -670,11 +672,14 @@ function StepStart({
       vehicle: !patch.vehicleId || !patch.vehicleNo,
       supervisor: !patch.supervisorId || !patch.supervisorName,
       driver: !patch.driverId || !patch.driverName,
-      openingMeter: form.openingMeterText.trim() === "" || !Number.isFinite(Number(form.openingMeterText)),
+      // KM / Advance are OPTIONAL — an empty value is valid (saved as NULL).
+      // Only a non-empty value that is not a valid non-negative number is flagged.
+      openingMeter:
+        form.openingMeterText.trim() !== "" &&
+        !Number.isFinite(Number(form.openingMeterText)),
       advance:
-        form.advanceText.trim() === "" ||
-        !Number.isFinite(Number(form.advanceText)) ||
-        Number(form.advanceText) < 0,
+        form.advanceText.trim() !== "" &&
+        (!Number.isFinite(Number(form.advanceText)) || Number(form.advanceText) < 0),
       helpers: !patch.helpers || patch.helpers.length === 0,
       loaders: !patch.loaders || patch.loaders.length === 0,
     };
@@ -719,9 +724,17 @@ function StepStart({
     setShowErrors(false);
     setIsSubmitting(true);
     updateTrip(patch);
-    const success = tripId > 0 && startStepSubmitted && saveStartProgress
-      ? await saveStartProgress(patch)
-      : await submitStartStep(patch);
+    // Editing an already-submitted Step 1 must re-submit via the existing-trip
+    // submit endpoint (updateStartStep) so the step STAYS submitted and the
+    // backend re-validates changed resources/meters. saveStartProgress is save
+    // mode and would strip start_step_submitted — only used for a NEW trip's
+    // manual "Save Progress" button, never for editing a submitted Step 1.
+    const success =
+      tripId > 0 && startStepSubmitted
+        ? updateStartStep
+          ? await updateStartStep(patch)
+          : await submitStartStep(patch)
+        : await submitStartStep(patch);
     if (success) {
       // Keep form values so the form→trip sync effect cannot wipe the submitted trip
       // while the parent advances to Step 2.
@@ -731,7 +744,7 @@ function StepStart({
       setNotice({ type: "error", message: "Unable to save start details. Please try again." });
     }
     setIsSubmitting(false);
-  }, [loadSnapshot, saveStartProgress, startStepSubmitted, submitStartStep, tripId, updateTrip]);
+  }, [loadSnapshot, submitStartStep, updateStartStep, startStepSubmitted, tripId, updateTrip]);
 
   const handleSaveProgress = useCallback(async () => {
     if (!saveStartProgress || !tripId) return;
@@ -816,7 +829,9 @@ function StepStart({
               <Wallet size={12} className="text-amber-500" /> Advance / Expenses
             </span>
             <span className="text-xs font-bold text-slate-800">
-              ₹{(loadSnapshot.advanceAmount ?? 0).toLocaleString()}
+              {loadSnapshot.advanceAmount
+                ? `₹${loadSnapshot.advanceAmount.toLocaleString()}`
+                : "--"}
             </span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
@@ -928,7 +943,8 @@ function StepStart({
         <WizardStepNotice notice={notice} dirty={hasUnsavedChanges} />
         <WizardActionBar
           onCancel={handleCancelEdit}
-          onSave={tripId > 0 && saveStartProgress ? handleSaveProgress : undefined}
+          // Step 1 has NO "Save Progress": opening the page never creates a
+          // draft, and Start Details are only persisted on submit.
           onSubmit={handleSubmit}
           busy={inputsLocked}
           saveDisabled={!hasUnsavedChanges}
