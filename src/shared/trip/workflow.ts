@@ -5,10 +5,31 @@ export const TRIP_STATUSES = ["Draft", "Pending", "Completed", "Deleted"] as con
 export const TRIP_STEP_LABELS = TRIP_STEP_DEFINITIONS.map((step) => step.label);
 export const TRIP_STEP_KEYS = TRIP_STEP_DEFINITIONS.map((step) => step.key);
 
-export function getNextIncompleteTripStep(trip: Pick<
+export const TRIP_RESUME_ACTION_LABELS = [
+  "Resume — Start / Step 1",
+  "Resume — Farm / Step 2",
+  "Resume — Pickup / Step 3",
+  "Resume — Deliveries / Step 4",
+  "Resume — End / Step 5",
+] as const;
+
+type TripStepFlags = Pick<
   Trip,
-  "startStepSubmitted" | "farmStepSubmitted" | "pickupStepSubmitted" | "deliveryStepSubmitted"
->): number {
+  | "startStepSubmitted"
+  | "farmStepSubmitted"
+  | "pickupStepSubmitted"
+  | "deliveryStepSubmitted"
+  | "endStepSubmitted"
+  | "expensesStepSubmitted"
+>;
+
+export function isTripWizardComplete(
+  trip: Pick<Trip, "endStepSubmitted" | "expensesStepSubmitted">
+): boolean {
+  return Boolean(trip.endStepSubmitted || trip.expensesStepSubmitted);
+}
+
+export function getNextIncompleteTripStep(trip: TripStepFlags): number {
   if (!trip.startStepSubmitted) return 0;
   if (!trip.farmStepSubmitted) return 1;
   if (!trip.pickupStepSubmitted) return 2;
@@ -16,19 +37,44 @@ export function getNextIncompleteTripStep(trip: Pick<
   return 4;
 }
 
+export function getLastSubmittedTripStep(trip: TripStepFlags): number | null {
+  if (isTripWizardComplete(trip)) return 4;
+  if (trip.deliveryStepSubmitted) return 3;
+  if (trip.pickupStepSubmitted) return 2;
+  if (trip.farmStepSubmitted) return 1;
+  if (trip.startStepSubmitted) return 0;
+  return null;
+}
+
+export function getResumeActionLabel(trip: TripStepFlags): string | null {
+  if (isTripWizardComplete(trip)) return null;
+  return TRIP_RESUME_ACTION_LABELS[getNextIncompleteTripStep(trip)] ?? null;
+}
+
+export function getTripWizardCompletedMask(trip: TripStepFlags): {
+  start: boolean;
+  farm: boolean;
+  pickup: boolean;
+  delivery: boolean;
+  end: boolean;
+} {
+  return {
+    start: Boolean(trip.startStepSubmitted),
+    farm: Boolean(trip.farmStepSubmitted),
+    pickup: Boolean(trip.pickupStepSubmitted),
+    delivery: Boolean(trip.deliveryStepSubmitted),
+    end: isTripWizardComplete(trip),
+  };
+}
+
 export function getTripStepKey(index: number): TripStepKey {
   return TRIP_STEP_DEFINITIONS[index]?.key ?? "start";
 }
 
 export function isTripEnded(
-  trip: Pick<Trip, "endStepSubmitted" | "expensesStepSubmitted" | "status">
+  trip: Pick<Trip, "endStepSubmitted" | "expensesStepSubmitted">
 ): boolean {
-  return Boolean(
-    trip.endStepSubmitted ||
-      trip.expensesStepSubmitted ||
-      trip.status === "Pending" ||
-      trip.status === "Completed"
-  );
+  return isTripWizardComplete(trip);
 }
 
 export function isTripStatus(value: unknown): value is TripStatus {

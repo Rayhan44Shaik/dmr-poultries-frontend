@@ -5,11 +5,16 @@ import { X, FileText, Download, Pencil, UserCheck } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Trip } from "../types/trip";
+import {
+  getNextIncompleteTripStep,
+  getTripWizardCompletedMask,
+  isTripWizardComplete,
+  TRIP_STEP_LABELS,
+} from "../../../../shared/trip";
 
 // --- Import the Steps to render them inside the View Modal ---
 import TripWizardStepper from "./TripWizardStepper";
 import StepStart from "./StepStart";
-import StepFarm from "./StepFarm";
 import StepPickup from "./StepPickup";
 import StepDeliveries from "./StepDeliveries";
 import StepEnd from "./Step_5/StepEnd";
@@ -24,6 +29,44 @@ interface Props {
   onEdit?: (trip: Trip) => void;
 }
 
+function Step2View({ trip }: { trip: Trip }) {
+  const gpsCaptured =
+    trip.farmGpsLat != null &&
+    trip.farmGpsLon != null &&
+    Number.isFinite(Number(trip.farmGpsLat)) &&
+    Number.isFinite(Number(trip.farmGpsLon)) &&
+    !(Number(trip.farmGpsLat) === 0 && Number(trip.farmGpsLon) === 0);
+  const rows: Array<[string, string]> = [
+    ["Trip Number", trip.tripNo || "Not entered"],
+    ["Step 2 status", trip.farmStepSubmitted ? "Submitted" : "Not submitted"],
+    ["Farm Name", trip.sourceFarm || "Not entered"],
+    ["Farm Address", trip.farmAddress?.trim() ? trip.farmAddress : "Not entered"],
+    ["Farm Meter", trip.destMeter ? `${trip.destMeter} KM` : "Not entered"],
+    ["Step 2 Reached/Farm Time", trip.reachedTime || "Not entered"],
+    ["Tolls", trip.pickupTolls == null ? "Not entered" : String(trip.pickupTolls)],
+    ["Average Bird Weight", trip.avgBirdWeight ? `${trip.avgBirdWeight} kg` : "Not entered"],
+    ["GPS Latitude", gpsCaptured ? String(trip.farmGpsLat) : "Not entered"],
+    ["GPS Longitude", gpsCaptured ? String(trip.farmGpsLon) : "Not entered"],
+    ["GPS Accuracy", gpsCaptured && trip.farmGpsAccuracy != null ? String(trip.farmGpsAccuracy) : "Not entered"],
+    ["GPS Captured Time", gpsCaptured && trip.farmGpsTime ? String(trip.farmGpsTime) : "Not entered"],
+    ["Remarks", trip.remarks?.trim() ? trip.remarks : "Not entered"],
+  ];
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
+      <h3 className="text-sm font-bold text-slate-800">Step 2 — Farm Loading</h3>
+      <p className="text-xs font-semibold text-slate-600">{gpsCaptured ? "GPS captured" : "GPS: Not captured"}</p>
+      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {rows.map(([label, value]) => (
+          <div key={label} className="border border-slate-100 rounded-xl p-3">
+            <dt className="text-[10px] uppercase font-semibold text-slate-400">{label}</dt>
+            <dd className="text-xs font-semibold text-slate-800 mt-0.5">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props) {
   const [viewStepIndex, setViewStepIndex] = useState(0);
 
@@ -34,22 +77,17 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
   if (!open || !trip) return null;
 
   // Now TypeScript knows trip is definitely a Trip object
-  const totalKm = (trip.closingMeter || 0) - (trip.openingMeter || 0);
+  const totalKm =
+    trip.totalKm != null && Number.isFinite(Number(trip.totalKm))
+      ? Number(trip.totalKm)
+      : (Number(trip.closingMeter || 0) - Number(trip.openingMeter || 0));
 
-  // ─── STEP STATE FLAGS ───
-  const isStartCompleted = trip.startStepSubmitted;
-  const isFarmCompleted = trip.farmStepSubmitted;
-  const isPickupCompleted = trip.pickupStepSubmitted;
-  const isDeliveryCompleted = trip.deliveryStepSubmitted;
-  const isEndCompleted = (trip as any).endStepSubmitted === true || trip.status === "Completed";
-  const isTripEnded = trip.status === "Completed";
-
-  const currentStep = isTripEnded ? 4
-    : (isEndCompleted ? 4
-      : (isDeliveryCompleted ? 3
-        : (isPickupCompleted ? 2
-          : (isFarmCompleted ? 1
-            : (isStartCompleted ? 0 : 0)))));
+  // ─── STEP STATE FLAGS (backend submitted flags only — never inferred from status) ───
+  const isStartCompleted = Boolean(trip.startStepSubmitted);
+  const isDeliveryCompleted = Boolean(trip.deliveryStepSubmitted);
+  const isEndCompleted = isTripWizardComplete(trip);
+  const completedMask = getTripWizardCompletedMask(trip);
+  const currentStep = isEndCompleted ? 4 : getNextIncompleteTripStep(trip);
 
   // ─── PDF download ──────────────────────────────────────────────
   const downloadPDF = () => {
@@ -72,10 +110,25 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
       ["Trip No", trip.tripNo, "Vehicle", trip.vehicleNo],
       ["Trip Date", trip.tripDate, "Driver", trip.driverName],
       ["Supervisor", trip.supervisorName, "Source Farm", trip.sourceFarm],
-      ["Opening KM", trip.openingMeter.toString(), "Closing KM", trip.closingMeter.toString()],
+      ["Opening KM", trip.openingMeter == null ? "Not entered" : trip.openingMeter.toString(), "Closing KM", trip.closingMeter.toString()],
       ["Total KM", totalKm.toString(), "Fuel (Ltrs)", trip.fuel.toString()],
       ["Expense", `₹ ${trip.expense}`, "Status", trip.status],
       ["DC Weight", `${(trip as any).dcWeight || 0} KG`, "Total Birds", `${trip.totalBirds || 0}`],
+      ["Farm", trip.sourceFarm || "Not entered", "Farm Meter", trip.destMeter ? String(trip.destMeter) : "Not entered"],
+      ["Farm Address", trip.farmAddress?.trim() ? trip.farmAddress : "Not entered", "Avg Bird Weight", trip.avgBirdWeight ? `${trip.avgBirdWeight} kg` : "Not entered"],
+      ["Tolls (Farm)", trip.pickupTolls == null ? "Not entered" : String(trip.pickupTolls), "Farm Time", trip.reachedTime || "Not entered"],
+      [
+        "GPS",
+        trip.farmGpsLat != null &&
+        trip.farmGpsLon != null &&
+        Number.isFinite(Number(trip.farmGpsLat)) &&
+        Number.isFinite(Number(trip.farmGpsLon)) &&
+        !(Number(trip.farmGpsLat) === 0 && Number(trip.farmGpsLon) === 0)
+          ? `${trip.farmGpsLat}, ${trip.farmGpsLon}`
+          : "GPS: Not captured",
+        "GPS Time",
+        trip.farmGpsTime || "Not entered",
+      ],
       ...((trip as any).approvedBy ? [["Approved By", (trip as any).approvedBy, "", ""]] : []),
     ];
 
@@ -98,14 +151,54 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
     doc.text(trip.remarks || "--", margin, y);
     y += 8;
 
-    const tableHeaders = ["S.No", "Box", "Shop Name", "Birds", "Weight (KG)", "Remarks"];
-    const tableRows = trip.deliveries.map((row, index) => [
+    const pickupBoxes = Array.isArray(trip.boxDetails) ? trip.boxDetails : [];
+    if (pickupBoxes.length) {
+      doc.setFontSize(12);
+      doc.setTextColor(0);
+      doc.text("Step 3 — Pickup Boxes", margin, y);
+      y += 4;
+      autoTable(doc, {
+        head: [["S.No", "Box", "Birds", "Weight (KG)", "Avg WT"]],
+        body: pickupBoxes.map((b, index) => {
+          const birds = Number(b.birds || 0);
+          const weight = Number(b.weight || 0);
+          const avg =
+            b.avgWeight != null && Number.isFinite(Number(b.avgWeight))
+              ? Number(b.avgWeight)
+              : birds > 0 && weight > 0
+                ? Number((weight / birds).toFixed(3))
+                : null;
+          return [
+            String(index + 1),
+            String(b.boxNo),
+            String(birds),
+            weight.toFixed(2),
+            avg == null ? "--" : avg.toFixed(3),
+          ];
+        }),
+        startY: y,
+        theme: "striped",
+        headStyles: { fillColor: [5, 150, 105], textColor: 255 },
+        styles: { fontSize: 9, cellPadding: 2 },
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 6;
+    }
+
+    const tableHeaders = ["S.No", "Shop", "Mode", "Boxes", "Birds", "Weight (KG)", "Mortality", "Remarks"];
+    const tableRows = (trip.deliveries || []).map((row, index) => [
       (index + 1).toString(),
-      row.boxNo.toString(),
-      row.shopName,
-      row.birds.toString(),
-      row.weight.toFixed(2),
-      row.remarks || "--", // ✅ Fixed: missing closing quote
+      row.shopName || "--",
+      row.deliveryMode === "weight" ? "Weight" : "Box",
+      Array.isArray(row.selectedBoxIds) && row.selectedBoxIds.length
+        ? row.selectedBoxIds.join(", ")
+        : row.boxNo != null
+          ? String(row.boxNo)
+          : "--",
+      String(row.birds ?? 0),
+      Number(row.weight || 0).toFixed(2),
+      `${row.mortality ?? 0}${row.mortKg ? ` / ${Number(row.mortKg).toFixed(2)} kg` : ""}`,
+      row.remarks || "--",
     ]);
 
     autoTable(doc, {
@@ -120,6 +213,116 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
       margin: { left: margin, right: margin },
     });
     y = (doc as any).lastAutoTable.finalY + 6;
+
+    const expenseRows: string[][] = [];
+    const expensePairs: Array<[string, number]> = [
+      ["Meals", Number(trip.meals || 0)],
+      ["Loading", Number(trip.loading || 0)],
+      ["Meals / Tiffin", Number(trip.mealsTiffin || 0)],
+      ["Vehicle Maintenance", Number(trip.vehicleMaintenance || 0)],
+      ["Tea", Number(trip.othersRC || 0)],
+      ["Driver", Number(trip.others1Amt || 0)],
+      ["Supervisor", Number(trip.others2Amt || 0)],
+      ["Helper & loader", Number(trip.others3Amt || 0)],
+      ["Others", Number(trip.others4Amt || 0)],
+      ["Others", Number(trip.others5Amt || 0)],
+    ];
+    expensePairs.filter(([, amt]) => amt > 0).forEach(([label, amt]) => {
+      expenseRows.push([label, `₹ ${amt.toFixed(2)}`]);
+    });
+    if (expenseRows.length) {
+      doc.setFontSize(12);
+      doc.text("Step 5 — General Expenses", margin, y);
+      y += 4;
+      autoTable(doc, {
+        head: [["Category", "Amount"]],
+        body: expenseRows,
+        startY: y,
+        theme: "striped",
+        headStyles: { fillColor: [5, 150, 105], textColor: 255 },
+        styles: { fontSize: 9, cellPadding: 2 },
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 6;
+    }
+
+    const dieselRows: string[][] = [];
+    const submittedDiesel = Array.isArray(trip.dieselEntries)
+      ? trip.dieselEntries.filter((e) => e.submitted !== false)
+      : [];
+    if (submittedDiesel.length) {
+      submittedDiesel.forEach((e, idx) => {
+        const lat = e.gpsLat;
+        const lon = e.gpsLon;
+        const gps =
+          lat != null && lon != null && Number(lat) !== 0 && Number(lon) !== 0
+            ? `${lat}, ${lon}`
+            : "GPS: Not captured";
+        dieselRows.push([
+          String(idx + 1),
+          String(e.litres ?? ""),
+          String(e.rate ?? ""),
+          `₹ ${Number(e.amount ?? 0).toFixed(2)}`,
+          String(e.meter ?? "--"),
+          String(e.bunkName || "--"),
+          gps,
+          e.submittedAt || "--",
+          e.imageData ? "Persisted" : "--",
+        ]);
+      });
+    } else {
+      for (let i = 1; i <= 6; i++) {
+        const submitted = (trip as any)[`dieselSubmitted${i}`];
+        if (!submitted) continue;
+        const ltr = Number((trip as any)[`dieselLtr${i}`] || 0);
+        const rate = Number((trip as any)[`dieselRate${i}`] || 0);
+        const amount = Number((trip as any)[`dieselAmount${i}`] ?? 0);
+        const meter = (trip as any)[`dieselMeter${i}`] ?? "--";
+        const bunk = (trip as any)[`dieselBunk${i}`] || "--";
+        const lat = (trip as any)[`dieselGpsLat${i}`];
+        const lon = (trip as any)[`dieselGpsLon${i}`];
+        const gps =
+          lat != null && lon != null && Number(lat) !== 0 && Number(lon) !== 0
+            ? `${lat}, ${lon}`
+            : "GPS: Not captured";
+        dieselRows.push([
+          String(dieselRows.length + 1),
+          String(ltr),
+          String(rate),
+          `₹ ${amount.toFixed(2)}`,
+          String(meter),
+          String(bunk),
+          gps,
+          (trip as any)[`dieselSubmittedAt${i}`] || "--",
+          (trip as any)[`dieselImage${i}`] ? "Persisted" : "--",
+        ]);
+      }
+    }
+    if (dieselRows.length) {
+      doc.setFontSize(12);
+      doc.text("Step 5 — Diesel / Fuel", margin, y);
+      y += 4;
+      autoTable(doc, {
+        head: [["S.No", "Litres", "Rate", "Amount", "Meter", "Bunk", "GPS", "Submitted At", "Bill"]],
+        body: dieselRows,
+        startY: y,
+        theme: "striped",
+        headStyles: { fillColor: [5, 150, 105], textColor: 255 },
+        styles: { fontSize: 8, cellPadding: 1.5 },
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 6;
+    }
+
+    const mileage = trip.mileageKmL;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      `Mileage: ${mileage != null && Number.isFinite(Number(mileage)) ? `${Number(mileage).toFixed(2)} km/L` : "Not available"}`,
+      margin,
+      y
+    );
+    y += 8;
 
     doc.setFontSize(11);
     doc.setTextColor(0);
@@ -141,6 +344,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
       return (
         <StepStart
           tripId={trip.id}
+          tripNo={trip.tripNo}
           startTime={trip.startTime}
           startStepSubmitted={trip.startStepSubmitted}
           loadSnapshot={trip}
@@ -153,11 +357,19 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
         />
       );
     }
-    if (viewStepIndex === 1 && isFarmCompleted) {
-      return <StepFarm trip={trip} setTrip={noopDispatch} updateTrip={noop} submitFarmStep={() => false} farms={[]} />;
+    if (viewStepIndex === 1) {
+      return <Step2View trip={trip} />;
     }
-    if (viewStepIndex === 2 && isPickupCompleted) {
-      return <StepPickup trip={trip} setTrip={noopDispatch} updateTrip={noop} submitPickupStep={() => false} updateBoxDetails={noop} />;
+    if (viewStepIndex === 2) {
+      return (
+        <StepPickup
+          trip={trip}
+          setTrip={noopDispatch}
+          updateTrip={noop}
+          submitPickupStep={() => false}
+          updateBoxDetails={noop}
+        />
+      );
     }
     if (viewStepIndex === 3 && isDeliveryCompleted) {
       return <StepDeliveries rows={trip.deliveries || []} setRows={noopDispatch} shops={shops} birdTypes={birdTypes} trip={trip} updateDeliveries={noop} submitDeliveriesStep={() => false} clearForm={noop} readOnly={true} />;
@@ -182,7 +394,8 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col">
+      {/* Changed max-w-5xl to max-w-7xl here */}
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-7xl max-h-[92vh] overflow-hidden flex flex-col">
         
         <div className="flex items-center justify-between px-10 py-6 border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80">
           <div className="flex items-center gap-4">
@@ -210,17 +423,9 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
         <div className="py-8 px-10 overflow-y-auto space-y-6 flex-1">
           
           <TripWizardStepper
-            steps={["Start", "Farm", "Pickup", "Deliveries", "End"]}
+            steps={TRIP_STEP_LABELS}
             currentStep={currentStep}
-            completedMask={
-              {
-                start: isStartCompleted,
-                farm: isFarmCompleted,
-                pickup: isPickupCompleted,
-                delivery: isDeliveryCompleted,
-                end: isEndCompleted,
-              } as any
-            }
+            completedMask={completedMask}
             onStepClick={setViewStepIndex}
           />
 

@@ -8,6 +8,7 @@
 import {
   apiGet,
   apiPost,
+  apiPut,
   apiPatch,
   apiDelete,
   handleApiError,
@@ -35,6 +36,18 @@ function num(value: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function numOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function optionalQuantity(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 function numOrZero(value: unknown): number {
   if (value === null || value === undefined) return 0;
   return num(value, 0);
@@ -44,7 +57,8 @@ function str(value: unknown, fallback = ""): string {
   return value == null ? fallback : String(value);
 }
 
-function formatStartTimeForDisplay(value: unknown): string {
+/** Shared user-facing timestamp formatter for Step 1–5 View (locale/timezone as-is). */
+export function formatStartTimeForDisplay(value: unknown): string {
   if (!value) return "";
   const raw = String(value);
   const parsed = new Date(raw);
@@ -52,6 +66,39 @@ function formatStartTimeForDisplay(value: unknown): string {
     return parsed.toLocaleString();
   }
   return raw;
+}
+
+function mapDeliveriesForDisplay(value: unknown, fallback: Trip["deliveries"]): Trip["deliveries"] {
+  if (!Array.isArray(value)) return fallback;
+  return value.map((row) => ({
+    ...(row as Trip["deliveries"][number]),
+    autoCaptureTime: formatStartTimeForDisplay((row as { autoCaptureTime?: unknown }).autoCaptureTime)
+      || (row as { autoCaptureTime?: string }).autoCaptureTime,
+  }));
+}
+
+function mapDieselEntriesForDisplay(
+  value: unknown,
+  fallback: Trip["dieselEntries"]
+): Trip["dieselEntries"] {
+  if (!Array.isArray(value)) return fallback;
+  return value.map((row) => {
+    const entry = row as NonNullable<Trip["dieselEntries"]>[number];
+    return {
+      ...entry,
+      submittedAt: formatStartTimeForDisplay(entry.submittedAt) || entry.submittedAt,
+    };
+  });
+}
+
+function mapFlattenedDieselTimestamps(raw: ApiTripRecord): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (/^dieselSubmittedAt\d+$/.test(key)) {
+      out[key] = formatStartTimeForDisplay(value) || value;
+    }
+  }
+  return out;
 }
 
 function normalizeStatus(value: unknown): TripStatus {
@@ -90,8 +137,8 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     supervisorName: str(raw.supervisorName ?? raw.supervisor_name, defaults.supervisorName),
     helpers: Array.isArray(raw.helpers) ? (raw.helpers as string[]) : defaults.helpers,
     loaders: Array.isArray(raw.loaders) ? (raw.loaders as string[]) : defaults.loaders ?? [],
-    openingMeter: numOrZero(raw.openingMeter ?? raw.opening_meter ?? defaults.openingMeter),
-    advanceAmount: num(raw.advanceAmount ?? raw.advance_amount, defaults.advanceAmount),
+    openingMeter: numOrNull(raw.openingMeter ?? raw.opening_meter),
+    advanceAmount: numOrNull(raw.advanceAmount ?? raw.advance_amount),
     startStepSubmitted: Boolean(raw.startStepSubmitted ?? raw.start_step_submitted ?? defaults.startStepSubmitted),
     remarks: str(raw.remarks, defaults.remarks),
     farmStepSubmitted: Boolean(raw.farmStepSubmitted ?? raw.farm_step_submitted ?? defaults.farmStepSubmitted),
@@ -99,13 +146,21 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     deliveryStepSubmitted: Boolean(raw.deliveryStepSubmitted ?? raw.delivery_step_submitted ?? defaults.deliveryStepSubmitted),
     endStepSubmitted: Boolean(raw.endStepSubmitted ?? raw.end_step_submitted ?? defaults.endStepSubmitted),
     expensesStepSubmitted: Boolean(raw.expensesStepSubmitted ?? raw.expenses_step_submitted ?? defaults.expensesStepSubmitted),
+    expensesStepSubmittedAt: raw.expensesStepSubmittedAt != null || raw.expenses_step_submitted_at != null
+      ? formatStartTimeForDisplay(raw.expensesStepSubmittedAt ?? raw.expenses_step_submitted_at)
+      : defaults.expensesStepSubmittedAt,
+    submittedAtTimestamp: formatStartTimeForDisplay(
+      raw.expensesStepSubmittedAt ?? raw.expenses_step_submitted_at ?? raw.submittedAtTimestamp ?? raw.submittedAt
+    ) || defaults.submittedAtTimestamp,
+    mileageKmL: numOrNull(raw.mileageKmL ?? raw.mileage_km_l),
+    dieselEntries: mapDieselEntriesForDisplay(raw.dieselEntries, defaults.dieselEntries),
     dcWeight: num(raw.dcWeight ?? raw.dc_weight, defaults.dcWeight),
     totalBirds: num(raw.totalBirds ?? raw.total_birds, defaults.totalBirds),
     boxes: num(raw.boxes, defaults.boxes),
     avgWeight: num(raw.avgWeight ?? raw.avg_weight, defaults.avgWeight),
     pickupLoadTime: formatStartTimeForDisplay(raw.pickupLoadTime ?? raw.pickup_load_time) || defaults.pickupLoadTime,
     boxDetails: Array.isArray(raw.boxDetails) ? (raw.boxDetails as Trip["boxDetails"]) : defaults.boxDetails,
-    deliveries: Array.isArray(raw.deliveries) ? (raw.deliveries as Trip["deliveries"]) : defaults.deliveries,
+    deliveries: mapDeliveriesForDisplay(raw.deliveries, defaults.deliveries),
     closingMeter: numOrZero(raw.closingMeter ?? raw.closing_meter ?? defaults.closingMeter),
     endTime: formatStartTimeForDisplay(raw.endTime ?? raw.end_time) || defaults.endTime,
     deliveryTolls: num(raw.deliveryTolls ?? raw.delivery_tolls, defaults.deliveryTolls),
@@ -131,10 +186,18 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     destMeter: numOrZero(raw.destMeter ?? raw.dest_meter ?? defaults.destMeter),
     pickupTolls: num(raw.pickupTolls ?? raw.pickup_tolls, defaults.pickupTolls),
     farmAddress: raw.farmAddress != null ? str(raw.farmAddress) : raw.farm_address != null ? str(raw.farm_address) : defaults.farmAddress,
-    avgBirdWeight: num(raw.avgBirdWeight ?? raw.avg_bird_weight, defaults.avgBirdWeight),
+    avgBirdWeight: num(raw.avgBirdWeight ?? raw.avg_bird_weight, defaults.avgBirdWeight ?? 0),
+    farmGpsLat: numOrNull(raw.farmGpsLat ?? raw.farm_gps_lat),
+    farmGpsLon: numOrNull(raw.farmGpsLon ?? raw.farm_gps_lon),
+    farmGpsAccuracy: numOrNull(raw.farmGpsAccuracy ?? raw.farm_gps_accuracy),
+    farmGpsTime: raw.farmGpsTime != null ? str(raw.farmGpsTime) : raw.farm_gps_time != null ? str(raw.farm_gps_time) : defaults.farmGpsTime ?? null,
     dcPhotoKey: raw.dcPhotoKey != null ? str(raw.dcPhotoKey) : raw.dc_photo_key != null ? str(raw.dc_photo_key) : defaults.dcPhotoKey,
     dcPhotoMime: raw.dcPhotoMime != null ? str(raw.dcPhotoMime) : defaults.dcPhotoMime,
     dcPhotoData: raw.dcPhotoData != null ? str(raw.dcPhotoData) : defaults.dcPhotoData,
+    dcPhotoKey2: raw.dcPhotoKey2 != null ? str(raw.dcPhotoKey2) : defaults.dcPhotoKey2,
+    dcPhotoMime2: raw.dcPhotoMime2 != null ? str(raw.dcPhotoMime2) : defaults.dcPhotoMime2,
+    dcPhotoData2: raw.dcPhotoData2 != null ? str(raw.dcPhotoData2) : defaults.dcPhotoData2,
+    vehicleBoxCapacity: numOrNull(raw.vehicleBoxCapacity) ?? defaults.vehicleBoxCapacity,
     destinationTolls: num(raw.destinationTolls ?? raw.destination_tolls, defaults.destinationTolls),
     meals: num(raw.meals, defaults.meals),
     loading: num(raw.loading, defaults.loading),
@@ -146,10 +209,10 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     others3Amt: num(raw.others3Amt ?? raw.others3_amt, defaults.others3Amt),
     others4Amt: num(raw.others4Amt ?? raw.others4_amt, defaults.others4Amt),
     others5Amt: num(raw.others5Amt ?? raw.others5_amt, defaults.others5Amt),
-    submittedAtTimestamp: str(raw.submittedAtTimestamp, defaults.submittedAtTimestamp),
     deleted: Boolean(raw.deleted ?? defaults.deleted),
     deletedReason: raw.deletedReason != null ? str(raw.deletedReason) : defaults.deletedReason,
     approvedBy: raw.approvedBy != null ? str(raw.approvedBy) : defaults.approvedBy,
+    ...mapFlattenedDieselTimestamps(raw),
   };
 }
 
@@ -157,24 +220,176 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
 export function toStep1Payload(trip: Partial<Trip>): Record<string, unknown> {
   return {
     tripDate: trip.tripDate,
-    tripNo: trip.tripNo,
     status: trip.status ?? "Draft",
-    startTime: trip.startStepSubmitted ? (trip.startTime || null) : null,
     vehicleId: trip.vehicleId || null,
     vehicleNo: trip.vehicleNo || null,
     driverId: trip.driverId || null,
     driverName: trip.driverName || null,
     supervisorId: trip.supervisorId || null,
     supervisorName: trip.supervisorName || null,
-    // KM / Advance are OPTIONAL. Empty (0/blank) is sent as null so the backend
-    // persists a true NULL (and skips meter validation) instead of 0.
-    openingMeter: trip.openingMeter && trip.openingMeter > 0 ? trip.openingMeter : null,
-    advanceAmount: trip.advanceAmount && trip.advanceAmount > 0 ? trip.advanceAmount : null,
+    openingMeter: optionalQuantity(trip.openingMeter),
+    advanceAmount: optionalQuantity(trip.advanceAmount),
     helpers: trip.helpers ?? [],
     loaders: trip.loaders ?? [],
     remarks: trip.remarks ?? "",
     startStepSubmitted: trip.startStepSubmitted ?? false,
   };
+}
+
+function normalizeTolls(value: unknown): number {
+  const n = Number(value ?? 0);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n;
+}
+
+/** Step 2 payload — Farm Loading only. Never sends Completed Trips / Average Rate / client reachedTime. */
+export function toStep2Payload(trip: Partial<Trip>): Record<string, unknown> {
+  const destMeter = optionalQuantity(trip.destMeter);
+  const avgBirdWeight = optionalQuantity(trip.avgBirdWeight);
+  const payload: Record<string, unknown> = {
+    sourceFarmId: trip.sourceFarmId || null,
+    sourceFarm: trip.sourceFarm || null,
+    farmAddress: trip.farmAddress ?? "",
+    destMeter: destMeter === 0 ? null : destMeter,
+    pickupTolls: normalizeTolls(trip.pickupTolls),
+    avgBirdWeight: avgBirdWeight === 0 ? null : avgBirdWeight,
+    remarks: trip.remarks ?? "",
+    farmStepSubmitted: trip.farmStepSubmitted ?? false,
+  };
+  const lat = numOrNull(trip.farmGpsLat);
+  const lon = numOrNull(trip.farmGpsLon);
+  if (
+    lat != null &&
+    lon != null &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lon >= -180 &&
+    lon <= 180 &&
+    !(lat === 0 && lon === 0)
+  ) {
+    payload.farmGpsLat = lat;
+    payload.farmGpsLon = lon;
+    const acc = numOrNull(trip.farmGpsAccuracy);
+    payload.farmGpsAccuracy = acc != null && acc >= 0 ? acc : null;
+    payload.farmGpsTime = trip.farmGpsTime || null;
+  }
+  return payload;
+}
+
+export function toStep3Payload(trip: Partial<Trip> & { removedBoxNos?: number[]; syncPickupPhotos?: boolean }): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+  if (Array.isArray(trip.boxDetails) && trip.boxDetails.length) {
+    payload.boxDetails = trip.boxDetails.map((b) => ({
+      boxNo: b.boxNo,
+      birds: b.birds ?? 0,
+      weight: b.weight ?? 0,
+    }));
+  }
+  if (Array.isArray(trip.removedBoxNos) && trip.removedBoxNos.length) {
+    payload.removedBoxNos = trip.removedBoxNos;
+  }
+  if (trip.dcPhotoKey) payload.dcPhotoKey = trip.dcPhotoKey;
+  if (trip.dcPhotoMime) payload.dcPhotoMime = trip.dcPhotoMime;
+  if (trip.dcPhotoData) payload.dcPhotoData = trip.dcPhotoData;
+  if (trip.dcPhotoKey2) payload.dcPhotoKey2 = trip.dcPhotoKey2;
+  if (trip.dcPhotoMime2) payload.dcPhotoMime2 = trip.dcPhotoMime2;
+  if (trip.dcPhotoData2) payload.dcPhotoData2 = trip.dcPhotoData2;
+  if (trip.syncPickupPhotos) payload.syncPickupPhotos = true;
+  return payload;
+}
+
+export function toStep5Payload(trip: Partial<Trip> & Record<string, unknown>): Record<string, unknown> {
+  const n = (v: unknown) => {
+    if (v === undefined || v === null || v === "") return 0;
+    const x = Number(v);
+    return Number.isFinite(x) ? x : 0;
+  };
+  const payload: Record<string, unknown> = {
+    meals: n(trip.meals),
+    loading: n(trip.loading),
+    mealsTiffin: n(trip.mealsTiffin),
+    vehicleMaintenance: n(trip.vehicleMaintenance),
+    othersRC: n(trip.othersRC),
+    others1Amt: n(trip.others1Amt),
+    others2Amt: n(trip.others2Amt),
+    others3Amt: n(trip.others3Amt),
+    others4Amt: n(trip.others4Amt),
+    others5Amt: n(trip.others5Amt),
+    remarks: trip.remarks ?? "",
+  };
+  const raw = trip as Record<string, unknown>;
+  const endRaw = raw.endMeter ?? trip.closingMeter;
+  if (endRaw !== "" && endRaw != null && Number.isFinite(Number(endRaw))) {
+    payload.endMeter = Number(endRaw);
+    payload.closingMeter = Number(endRaw);
+  }
+  const tollRaw = raw.destinationTolls ?? trip.deliveryTolls;
+  if (tollRaw !== "" && tollRaw != null && Number.isFinite(Number(tollRaw))) {
+    payload.destinationTolls = Number(tollRaw);
+    payload.deliveryTolls = Number(tollRaw);
+  }
+  return payload;
+}
+
+export type DieselSubmitPayload = {
+  clientKey: string;
+  litres: number;
+  rate: number;
+  meter: number;
+  bunkName: string;
+  gpsLat: number;
+  gpsLon: number;
+  gpsAccuracy: number | null;
+  gpsCapturedAt: string | null;
+  imageData: string;
+  imageName?: string | null;
+};
+
+export async function submitTripDiesel(tripId: number, payload: DieselSubmitPayload): Promise<Trip> {
+  const { data } = await apiPost<ApiTripRecord>(`${TRIPS_PATH}/${tripId}/diesel`, payload);
+  return mapApiTripToTrip(data);
+}
+
+export async function updateTripDiesel(
+  tripId: number,
+  entryId: number,
+  payload: DieselSubmitPayload
+): Promise<Trip> {
+  const { data } = await apiPatch<ApiTripRecord>(`${TRIPS_PATH}/${tripId}/diesel/${entryId}`, payload);
+  return mapApiTripToTrip(data);
+}
+
+export async function deleteTripDiesel(tripId: number, entryId: number): Promise<Trip> {
+  const { data } = await apiDelete<ApiTripRecord>(`${TRIPS_PATH}/${tripId}/diesel/${entryId}`);
+  return mapApiTripToTrip(data);
+}
+
+export function toStep4Payload(trip: Partial<Trip> & { deliveries?: Trip["deliveries"] }): Record<string, unknown> {
+  const rows = Array.isArray(trip.deliveries) ? trip.deliveries : [];
+  return {
+    deliveries: rows.map((d) => ({
+      id: d.id && d.id < 1e12 ? d.id : undefined,
+      clientKey: d.clientKey || undefined,
+      shopId: d.shopId || null,
+      shopName: d.shopName || "",
+      birdTypeId: d.birdTypeId || null,
+      birdType: d.birdType || "",
+      birds: d.birds ?? 0,
+      weight: d.weight ?? 0,
+      mortality: d.mortality ?? 0,
+      mortKg: d.mortKg ?? 0,
+      remarks: d.remarks ?? "",
+      deliveryMode: d.deliveryMode === "weight" ? "weight" : "box",
+      selectedBoxIds: d.selectedBoxIds ?? [],
+      perBoxData: d.perBoxData ?? [],
+      serialNo: d.serialNo,
+    })),
+  };
+}
+
+export async function saveTripDeliveries(tripId: number, trip: Partial<Trip>): Promise<Trip> {
+  const { data } = await apiPut<ApiTripRecord>(`${TRIPS_PATH}/${tripId}/deliveries`, toStep4Payload(trip));
+  return mapApiTripToTrip(data, trip as Trip);
 }
 
 /** GET /api/trips/:id — load full trip (Step 1 resume). */
@@ -187,8 +402,10 @@ export async function loadTripById(id: number): Promise<Trip> {
  * is the single source of truth — never fall back to stale localStorage
  * data that could override PostgreSQL (Trip List must reflect the same
  * updated trip deliveries/summaries as Shop Sales). */
-export async function listTrips(): Promise<Trip[]> {
-  const { data } = await apiGet<ApiTripRecord[]>(TRIPS_PATH);
+export async function listTrips(options?: { includeDeleted?: boolean }): Promise<Trip[]> {
+  const { data } = await apiGet<ApiTripRecord[]>(TRIPS_PATH, {
+    params: options?.includeDeleted ? { includeDeleted: "true" } : undefined,
+  });
   return data.map((trip) => mapApiTripToTrip(trip));
 }
 
@@ -197,7 +414,6 @@ export async function submitStep1(trip: Partial<Trip>): Promise<Trip> {
   const payload = {
     ...toStep1Payload(trip),
     startStepSubmitted: true,
-    startTime: trip.startTime || new Date().toISOString(),
     status: "Draft" as TripStatus,
   };
   const { data } = await apiPost<ApiTripRecord>(`${TRIPS_PATH}/steps/start`, payload);
@@ -215,9 +431,43 @@ export async function submitTripStep(
   step: TripWizardStep,
   trip: Partial<Trip>
 ): Promise<Trip> {
+  let body: Record<string, unknown> = { ...trip, mode: "submit" };
+  if (step === "start") {
+    delete body.startTime;
+    body.startStepSubmitted = true;
+    Object.assign(body, toStep1Payload({ ...trip, startStepSubmitted: true }));
+    body.mode = "submit";
+  }
+  if (step === "farm") {
+    body = {
+      ...toStep2Payload({ ...trip, farmStepSubmitted: true }),
+      mode: "submit",
+      farmStepSubmitted: true,
+    };
+  }
+  if (step === "pickup") {
+    body = {
+      ...toStep3Payload(trip),
+      mode: "submit",
+      pickupStepSubmitted: true,
+      pickupBoxWrite: "replace",
+    };
+  }
+  if (step === "deliveries") {
+    body = {
+      ...toStep4Payload(trip),
+      mode: "submit",
+    };
+  }
+  if (step === "expenses") {
+    body = {
+      ...toStep5Payload(trip as Partial<Trip> & Record<string, unknown>),
+      mode: "submit",
+    };
+  }
   const { data } = await apiPost<ApiTripRecord>(
     `${TRIPS_PATH}/${tripId}/steps/${step}`,
-    { ...trip, mode: "submit" }
+    body
   );
   return mapApiTripToTrip(data, trip as Trip);
 }
@@ -228,11 +478,35 @@ export async function saveTripStepProgress(
   step: TripWizardStep,
   trip: Partial<Trip>
 ): Promise<Trip> {
+  const body: Record<string, unknown> =
+    step === "farm"
+      ? { ...toStep2Payload({ ...trip, farmStepSubmitted: false }), mode: "save" }
+      : step === "pickup"
+        ? { ...toStep3Payload(trip), mode: "save", pickupBoxWrite: "upsert" }
+        : step === "deliveries"
+          ? { ...toStep4Payload(trip), mode: "save" }
+          : step === "expenses"
+            ? { ...toStep5Payload(trip as Partial<Trip> & Record<string, unknown>), mode: "save" }
+          : { ...trip, mode: "save" };
   const { data } = await apiPost<ApiTripRecord>(
     `${TRIPS_PATH}/${tripId}/steps/${step}`,
-    { ...trip, mode: "save" }
+    body
   );
   return mapApiTripToTrip(data, trip as Trip);
+}
+
+export type AvailableTripResources = {
+  vehicles: Array<{ id: number; vehicleNumber: string }>;
+  drivers: Array<{ id: number; employeeName: string; department: string }>;
+  supervisors: Array<{ id: number; employeeName: string; department: string }>;
+  helpers: Array<{ id: number; employeeName: string; department: string }>;
+  loaders: Array<{ id: number; employeeName: string; department: string }>;
+};
+
+export async function fetchAvailableResources(tripId?: number | null): Promise<AvailableTripResources> {
+  const suffix = tripId && tripId > 0 ? `?tripId=${tripId}` : "";
+  const { data } = await apiGet<AvailableTripResources>(`${TRIPS_PATH}/available-resources${suffix}`);
+  return data;
 }
 
 /** GET /api/trips/vehicle/:vehicleId/last-meter — opening KM validation. */

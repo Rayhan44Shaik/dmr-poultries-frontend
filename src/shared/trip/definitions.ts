@@ -35,7 +35,7 @@ export interface TripFieldDefinition {
 
 export const TRIP_FIELD_DEFINITIONS = {
   tripDate: { key: "tripDate", step: "start", label: "Trip Date", kind: "computed", required: true, readOnly: true },
-  startTime: { key: "startTime", step: "start", label: "Start Time", kind: "computed", required: true, readOnly: true },
+  startTime: { key: "startTime", step: "start", label: "Start Time", kind: "computed", required: false, readOnly: true },
   vehicleId: { key: "vehicleId", step: "start", label: "Vehicle No.", kind: "select", required: true, optionSource: "vehicles" },
   supervisorId: { key: "supervisorId", step: "start", label: "Supervisor", kind: "select", required: true, optionSource: "supervisors" },
   driverId: { key: "driverId", step: "start", label: "Driver", kind: "select", required: true, optionSource: "drivers" },
@@ -46,9 +46,9 @@ export const TRIP_FIELD_DEFINITIONS = {
 
   reachedTime: { key: "reachedTime", step: "farm", label: "Reached Time", kind: "computed", required: true, readOnly: true },
   sourceFarmId: { key: "sourceFarmId", step: "farm", label: "Farm", kind: "select", required: true, optionSource: "farms" },
-  farmAddress: { key: "farmAddress", step: "farm", label: "Detailed Farm Address", kind: "location", required: false },
-  destMeter: { key: "destMeter", step: "farm", label: "Destination Meter (KM)", kind: "number", required: true, unit: "KM" },
-  pickupTolls: { key: "pickupTolls", step: "farm", label: "Toll Gates (Pickup)", kind: "number", required: true, unit: "count" },
+  farmAddress: { key: "farmAddress", step: "farm", label: "Farm Address", kind: "location", required: true },
+  destMeter: { key: "destMeter", step: "farm", label: "Farm / Destination Meter (KM)", kind: "number", required: true, unit: "KM" },
+  pickupTolls: { key: "pickupTolls", step: "farm", label: "Tolls", kind: "number", required: false, unit: "count" },
   avgBirdWeight: { key: "avgBirdWeight", step: "farm", label: "Avg Bird Weight (kg)", kind: "number", required: true, unit: "KG" },
   remarks: { key: "remarks", step: "farm", label: "Remarks", kind: "text", required: false },
 

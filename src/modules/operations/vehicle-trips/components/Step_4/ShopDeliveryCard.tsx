@@ -21,11 +21,16 @@ export default function ShopDeliveryCard({
 }: Props) {
   const isWeightMode = row.deliveryMode === "weight";
   const selectedBoxes = row.selectedBoxIds || [];
-  const mortalityCount = row.mortality || 0;
+  const perBox = row.perBoxData || [];
+  const mortalityCount = row.mortality ?? 0;
+  const mortKg = row.mortKg ?? 0;
+  const display = (value: string | number | null | undefined) => {
+    if (value == null || value === "" || (typeof value === "number" && Number.isNaN(value))) return "Not entered";
+    return String(value);
+  };
 
   return (
     <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between gap-2.5">
-      {/* Top Bar: Shop Name, Mode Icon Badge, Mortality Badge & Actions */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-2">
         <div className="flex items-center gap-2 overflow-hidden">
           <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200/50">
@@ -33,31 +38,21 @@ export default function ShopDeliveryCard({
           </div>
 
           <div className="flex items-center gap-1.5 overflow-hidden">
-            <span
-              className="font-bold text-slate-800 text-sm truncate"
-              title={row.shopName}
-            >
-              {row.shopName}
+            <span className="font-bold text-slate-800 text-sm truncate" title={row.shopName}>
+              {row.shopName || "Not entered"}
             </span>
 
-            {/* Compact Mode Logo Badge */}
-            {isWeightMode ? (
-              <span
-                title="Delivery Mode: Weight"
-                className="p-1 rounded-md bg-purple-50 text-purple-700 border border-purple-200/60 shrink-0 flex items-center justify-center"
-              >
-                <Scale size={13} className="stroke-[2.5]" />
-              </span>
-            ) : (
-              <span
-                title="Delivery Mode: Box"
-                className="p-1 rounded-md bg-amber-50 text-amber-700 border border-amber-200/60 shrink-0 flex items-center justify-center"
-              >
-                <Box size={13} className="stroke-[2.5]" />
-              </span>
-            )}
+            <span
+              title={`Delivery Mode: ${isWeightMode ? "Weight" : "Box"}`}
+              className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold shrink-0 border ${
+                isWeightMode
+                  ? "bg-purple-50 text-purple-700 border-purple-200/60"
+                  : "bg-amber-50 text-amber-700 border-amber-200/60"
+              }`}
+            >
+              {isWeightMode ? "WEIGHT" : "BOX"}
+            </span>
 
-            {/* Mortality Badge (Shown only if mortality > 0) */}
             {mortalityCount > 0 && (
               <span
                 title={`Mortality: ${mortalityCount} birds`}
@@ -91,20 +86,19 @@ export default function ShopDeliveryCard({
         </div>
       </div>
 
-      {/* Details Grid: Boxes, Birds, Weight */}
       <div className="grid grid-cols-3 gap-2 bg-slate-50/70 p-2 rounded-xl border border-slate-100">
         <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-lg border border-slate-200/50 shadow-2xs">
           <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-0.5">
             <Box size={11} className="text-slate-500 stroke-[2]" /> Boxes
           </span>
-          <span className="text-xs font-bold text-slate-800">{row.boxNo}</span>
+          <span className="text-xs font-bold text-slate-800">{display(selectedBoxes.length || row.boxNo)}</span>
         </div>
 
         <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-lg border border-slate-200/50 shadow-2xs">
           <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-0.5">
             <Users size={11} className="text-blue-500 stroke-[2]" /> Birds
           </span>
-          <span className="text-xs font-bold text-slate-800">{row.birds}</span>
+          <span className="text-xs font-bold text-slate-800">{row.birds ? row.birds : "Not entered"}</span>
         </div>
 
         <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-lg border border-slate-200/50 shadow-2xs">
@@ -112,12 +106,20 @@ export default function ShopDeliveryCard({
             <Scale size={11} className="text-emerald-500 stroke-[2]" /> Weight
           </span>
           <span className="text-xs font-bold text-slate-800">
-            {row.weight ? row.weight.toFixed(2) : "0.00"} kg
+            {row.weight ? `${row.weight.toFixed(2)} kg` : "Not entered"}
           </span>
         </div>
       </div>
 
-      {/* Box Numbers Badges Section */}
+      {(mortalityCount > 0 || mortKg > 0) && (
+        <div className="flex items-center justify-between px-2 py-1.5 bg-red-50/60 rounded-lg border border-red-100 text-[11px]">
+          <span className="text-red-600 font-semibold">Mortality</span>
+          <span className="text-red-700 font-bold">
+            {mortalityCount} birds · {mortKg ? mortKg.toFixed(2) : "0.00"} kg
+          </span>
+        </div>
+      )}
+
       {selectedBoxes.length > 0 && (
         <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-100/60 rounded-lg border border-slate-200/40 text-[11px] overflow-x-auto no-scrollbar">
           <span className="text-slate-400 font-semibold flex items-center gap-1 shrink-0 text-[10px] uppercase">
@@ -136,16 +138,40 @@ export default function ShopDeliveryCard({
         </div>
       )}
 
-      {/* Footer Info: Time & Bird Type */}
+      {perBox.length > 0 && (
+        <div className="rounded-lg border border-slate-200/60 bg-white px-2 py-1.5 text-[11px]">
+          <span className="text-slate-400 font-semibold uppercase text-[10px]">Per-box allocation</span>
+          <div className="mt-1 space-y-0.5">
+            {perBox.map((pb) => (
+              <div key={pb.boxNo} className="flex justify-between text-slate-700">
+                <span className="font-bold">#{pb.boxNo}</span>
+                <span>
+                  {pb.birds} birds · {Number(pb.weight || 0).toFixed(2)} kg
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {row.remarks ? (
+        <p className="text-[11px] text-slate-500 px-1">
+          <span className="font-semibold text-slate-400 uppercase text-[10px]">Remarks </span>
+          {row.remarks}
+        </p>
+      ) : null}
+
       <div className="flex items-center justify-between pt-0.5 text-[11px] text-slate-400 font-medium">
         <div className="flex items-center gap-1">
           <Clock size={12} className="text-slate-400 stroke-[2]" />
-          <span>{row.autoCaptureTime || "Just now"}</span>
+          <span>{row.autoCaptureTime || "Not entered"}</span>
         </div>
-        {row.birdType && (
+        {row.birdType ? (
           <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded-md text-[10px] border border-blue-100">
             {row.birdType}
           </span>
+        ) : (
+          <span className="text-[10px]">Not entered</span>
         )}
       </div>
     </div>

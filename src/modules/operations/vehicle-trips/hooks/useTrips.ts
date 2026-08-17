@@ -7,7 +7,10 @@ import { listTrips, changeTripStatus, deleteTripFromApi } from "../services/trip
 
 type NotificationFn = (message: string, type?: "success" | "error" | "info") => void;
 
-export default function useTrips(showNotification?: NotificationFn) {
+export default function useTrips(
+  showNotification?: NotificationFn,
+  options?: { includeDeleted?: boolean }
+) {
   const notifyRef = useRef(showNotification);
   notifyRef.current = showNotification;
   const notify = useCallback(
@@ -30,13 +33,15 @@ export default function useTrips(showNotification?: NotificationFn) {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
+  const includeDeleted = Boolean(options?.includeDeleted);
+
   const refreshTrips = useCallback(async () => {
     try {
-      setTrips(await listTrips());
+      setTrips(await listTrips({ includeDeleted }));
     } catch {
       notifyRef.current?.("Unable to load trips from the server.", "error");
     }
-  }, []);
+  }, [includeDeleted]);
 
   useEffect(() => {
     void refreshTrips();

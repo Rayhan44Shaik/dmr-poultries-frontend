@@ -1,6 +1,7 @@
-import jsPDF from "jspdf";
+import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import henImage from "../../../../../assets/dmr-hen.jpg";
+
+import henImage from "../../../../assets/dmr-hen.jpg";
 
 import {
   drawPreparedDmrPoultryHeader,
@@ -30,45 +31,60 @@ const COLOR = {
 };
 
 const PAGE_MARGIN = 14;
+
+/**
+ * Shared letterhead ends at approximately 41 mm when top is 7.
+ * The summary section ends around 60 mm.
+ */
 const TABLE_START_Y = 66;
-const FOOTER_Y = 200;
+
+/**
+ * Portrait A4 width:
+ *
+ * 210 mm - 14 mm left margin - 14 mm right margin = 182 mm.
+ *
+ * Column widths:
+ *
+ * 14 + 34 + 26 + 34 + 27 + 29 + 18 = 182 mm.
+ */
+const TABLE_WIDTH = 182;
 
 function setText(
   doc: jsPDF,
-  color: RGB
-) {
+  color: RGB,
+): void {
   doc.setTextColor(
     color[0],
     color[1],
-    color[2]
+    color[2],
   );
 }
 
 function setFill(
   doc: jsPDF,
-  color: RGB
-) {
+  color: RGB,
+): void {
   doc.setFillColor(
     color[0],
     color[1],
-    color[2]
+    color[2],
   );
 }
 
 function setDraw(
   doc: jsPDF,
-  color: RGB
-) {
+  color: RGB,
+): void {
   doc.setDrawColor(
     color[0],
     color[1],
-    color[2]
+    color[2],
   );
 }
 
 function formatGeneratedAt(
-  date: Date
-) {
+  date: Date,
+): string {
   return new Intl.DateTimeFormat(
     "en-IN",
     {
@@ -78,8 +94,24 @@ function formatGeneratedAt(
       hour: "2-digit",
       minute: "2-digit",
       hour12: true,
-    }
+    },
   ).format(date);
+}
+
+function getSafeFilename(
+  filename: string,
+): string {
+  const cleaned =
+    filename.trim() ||
+    `Banks_${new Date()
+      .toISOString()
+      .slice(0, 10)}`;
+
+  return cleaned
+    .toLowerCase()
+    .endsWith(".pdf")
+    ? cleaned
+    : `${cleaned}.pdf`;
 }
 
 function drawMetric(
@@ -89,8 +121,8 @@ function drawMetric(
   x: number,
   y: number,
   width: number,
-  valueColor: RGB
-) {
+  valueColor: RGB,
+): void {
   setFill(doc, COLOR.white);
   setDraw(doc, COLOR.border);
 
@@ -103,10 +135,14 @@ function drawMetric(
     14,
     2,
     2,
-    "FD"
+    "FD",
   );
 
-  doc.setFont("helvetica", "bold");
+  doc.setFont(
+    "helvetica",
+    "bold",
+  );
+
   doc.setFontSize(11);
 
   setText(doc, valueColor);
@@ -114,12 +150,10 @@ function drawMetric(
   doc.text(
     String(value),
     x + 4,
-    y + 6.2
+    y + 6.2,
   );
 
-  doc.setFont("helvetica", "bold");
   doc.setFontSize(6.4);
-
   setText(doc, COLOR.muted);
 
   doc.text(
@@ -128,23 +162,33 @@ function drawMetric(
     y + 10.7,
     {
       charSpace: 0.35,
-    }
+    },
   );
 }
 
+/**
+ * Draws the common DMR POULTRIES letterhead and the Bank summary section.
+ *
+ * Letterhead layout:
+ * - Left: proprietor, mobile and office address
+ * - Centre: DMR POULTRIES
+ * - Right: hen image
+ *
+ * No left-side logo and no Banks Master Directory subtitle.
+ */
 function drawPageHeader(
   doc: jsPDF,
-  banks: Bank[],
+  banks: readonly Bank[],
   generatedAt: string,
-  assets: DmrPoultryHeaderAssets
-) {
+  assets: DmrPoultryHeaderAssets,
+): void {
   const pageWidth =
     doc.internal.pageSize.getWidth();
 
   const activeCount =
     banks.filter(
       (bank) =>
-        bank.status === "Active"
+        bank.status === "Active",
     ).length;
 
   const inactiveCount =
@@ -156,11 +200,8 @@ function drawPageHeader(
       {
         margin: PAGE_MARGIN,
         top: 7,
-        title: "DMR POULTRY",
-        subtitle:
-          "Banks Master Directory",
       },
-      assets
+      assets,
     );
 
   const summaryY =
@@ -179,37 +220,35 @@ function drawPageHeader(
     18,
     2.5,
     2.5,
-    "FD"
+    "FD",
   );
 
   doc.setFont(
     "helvetica",
-    "bold"
+    "bold",
   );
 
-  doc.setFontSize(11.5);
-
+  doc.setFontSize(10.5);
   setText(doc, COLOR.navy);
 
   doc.text(
     "Bank Accounts & Payment Directory",
     PAGE_MARGIN + 5,
-    summaryY + 7
+    summaryY + 7,
   );
 
   doc.setFont(
     "helvetica",
-    "normal"
+    "normal",
   );
 
-  doc.setFontSize(7.5);
-
+  doc.setFontSize(7.2);
   setText(doc, COLOR.muted);
 
   doc.text(
     `Generated: ${generatedAt}`,
     PAGE_MARGIN + 5,
-    summaryY + 12.5
+    summaryY + 12.5,
   );
 
   const metricWidth = 27;
@@ -229,7 +268,7 @@ function drawPageHeader(
     metricsStartX,
     summaryY + 2,
     metricWidth,
-    COLOR.navy
+    COLOR.navy,
   );
 
   drawMetric(
@@ -241,7 +280,7 @@ function drawPageHeader(
       metricGap,
     summaryY + 2,
     metricWidth,
-    COLOR.activeText
+    COLOR.activeText,
   );
 
   drawMetric(
@@ -249,22 +288,35 @@ function drawPageHeader(
     "Inactive",
     inactiveCount,
     metricsStartX +
-      (metricWidth + metricGap) * 2,
+      (metricWidth + metricGap) *
+        2,
     summaryY + 2,
     metricWidth,
-    COLOR.inactiveText
+    COLOR.inactiveText,
   );
 }
 
+/**
+ * Draws page numbers after AutoTable has generated all pages.
+ */
 function drawFooters(
   doc: jsPDF,
-  generatedAt: string
-) {
+  generatedAt: string,
+): void {
   const pageWidth =
     doc.internal.pageSize.getWidth();
 
+  const pageHeight =
+    doc.internal.pageSize.getHeight();
+
   const totalPages =
     doc.getNumberOfPages();
+
+  const footerTextY =
+    pageHeight - 6;
+
+  const footerLineY =
+    pageHeight - 10;
 
   for (
     let pageNumber = 1;
@@ -279,38 +331,37 @@ function drawFooters(
 
     doc.line(
       PAGE_MARGIN,
-      FOOTER_Y - 4,
+      footerLineY,
       pageWidth - PAGE_MARGIN,
-      FOOTER_Y - 4
+      footerLineY,
     );
 
     doc.setFont(
       "helvetica",
-      "normal"
+      "normal",
     );
 
     doc.setFontSize(7.2);
-
     setText(doc, COLOR.muted);
 
     doc.text(
-      "DMR Poultry • Banks Master Directory • Confidential",
+      "DMR POULTRIES • Confidential",
       PAGE_MARGIN,
-      FOOTER_Y
+      footerTextY,
     );
 
     doc.text(
       generatedAt,
       pageWidth / 2,
-      FOOTER_Y,
+      footerTextY,
       {
         align: "center",
-      }
+      },
     );
 
     doc.setFont(
       "helvetica",
-      "bold"
+      "bold",
     );
 
     setText(doc, COLOR.navy);
@@ -318,55 +369,89 @@ function drawFooters(
     doc.text(
       `Page ${pageNumber} of ${totalPages}`,
       pageWidth - PAGE_MARGIN,
-      FOOTER_Y,
+      footerTextY,
       {
         align: "right",
-      }
+      },
     );
   }
 }
 
 /**
- * Generates and downloads the complete branded Banks PDF.
+ * Generates and downloads the branded Bank directory PDF.
  *
- * The Excel exporter is separate and remains unchanged.
+ * The function is asynchronous because the hen image is prepared before
+ * drawing the PDF. It is prepared once and reused on every page.
  */
-export async function exportBanksToPDF(
-  banks: Bank[],
-  filename: string
+export async function exportBankPdf(
+  banks: readonly Bank[],
+  filename: string,
 ): Promise<void> {
+  if (banks.length === 0) {
+    throw new Error(
+      "No bank records are available to export.",
+    );
+  }
+
   const doc = new jsPDF({
-    orientation: "landscape",
+    orientation: "portrait",
     unit: "mm",
     format: "a4",
     compress: true,
+    putOnlyUsedFonts: true,
+  });
+
+  doc.setProperties({
+    title:
+      "Bank Accounts & Payment Directory",
+    subject:
+      "DMR POULTRIES Bank accounts and payment directory",
+    author: "DMR POULTRIES",
+    creator: "DMR POULTRIES",
   });
 
   const generatedAt =
-    formatGeneratedAt(new Date());
+    formatGeneratedAt(
+      new Date(),
+    );
 
-  // Process the hen only once and reuse it on every PDF page.
+  /**
+   * Correct path from:
+   *
+   * src/modules/masters/banks/utils/exportBankPdf.ts
+   *
+   * to:
+   *
+   * src/assets/dmr-hen.jpg
+   */
   const assets =
     await prepareDmrPoultryHeaderAssets({
       henUrl: henImage,
     });
 
-  const sortedBanks = [...banks].sort(
+  const sortedBanks = [
+    ...banks,
+  ].sort(
     (first, second) =>
-      first.bankNo - second.bankNo
+      first.bankNo -
+      second.bankNo,
   );
 
-  const rows = sortedBanks.map(
-    (bank) => [
-      String(bank.bankNo),
-      bank.bankName,
-      bank.branch,
-      bank.accountNumber,
-      bank.ifscCode,
-      bank.upiId || "-",
-      bank.status,
-    ]
-  );
+  const rows =
+    sortedBanks.map(
+      (bank) => [
+        String(bank.bankNo),
+        bank.bankName.trim(),
+        bank.branch.trim(),
+        bank.accountNumber.trim(),
+        bank.ifscCode
+          .trim()
+          .toUpperCase(),
+        bank.upiId?.trim() ||
+          "-",
+        bank.status,
+      ],
+    );
 
   autoTable(doc, {
     startY: TABLE_START_Y,
@@ -378,7 +463,7 @@ export async function exportBanksToPDF(
       left: PAGE_MARGIN,
     },
 
-    tableWidth: "auto",
+    tableWidth: TABLE_WIDTH,
 
     head: [
       [
@@ -400,20 +485,20 @@ export async function exportBanksToPDF(
 
     styles: {
       font: "helvetica",
-      fontSize: 8.2,
-      minCellHeight: 8.5,
+      fontSize: 7,
+      minCellHeight: 7,
 
       cellPadding: {
-        top: 2.7,
-        right: 2.8,
-        bottom: 2.7,
-        left: 2.8,
+        top: 1.8,
+        right: 1.6,
+        bottom: 1.8,
+        left: 1.6,
       },
 
       valign: "middle",
       textColor: COLOR.slate,
       lineColor: COLOR.border,
-      lineWidth: 0.18,
+      lineWidth: 0.15,
       overflow: "linebreak",
     },
 
@@ -421,11 +506,15 @@ export async function exportBanksToPDF(
       fillColor: COLOR.header,
       textColor: COLOR.white,
       fontStyle: "bold",
-      fontSize: 7.5,
-      minCellHeight: 10,
+      fontSize: 6.6,
+      minCellHeight: 9,
       halign: "left",
       valign: "middle",
-      lineColor: [61, 83, 123],
+      lineColor: [
+        61,
+        83,
+        123,
+      ],
       lineWidth: 0.2,
     },
 
@@ -434,38 +523,45 @@ export async function exportBanksToPDF(
     },
 
     columnStyles: {
+      /**
+       * Total width:
+       *
+       * 14 + 34 + 26 + 34 + 27 + 29 + 18 = 182 mm.
+       */
       0: {
-        cellWidth: 16,
+        cellWidth: 14,
         halign: "center",
         fontStyle: "bold",
         textColor: COLOR.navy,
       },
 
       1: {
-        cellWidth: 48,
+        cellWidth: 34,
         fontStyle: "bold",
         textColor: COLOR.navy,
       },
 
       2: {
-        cellWidth: 42,
+        cellWidth: 26,
       },
 
       3: {
-        cellWidth: 49,
+        cellWidth: 34,
+        halign: "center",
       },
 
       4: {
-        cellWidth: 36,
+        cellWidth: 27,
         fontStyle: "bold",
+        halign: "center",
       },
 
       5: {
-        cellWidth: 51,
+        cellWidth: 29,
       },
 
       6: {
-        cellWidth: 27,
+        cellWidth: 18,
         halign: "center",
         fontStyle: "bold",
       },
@@ -473,16 +569,18 @@ export async function exportBanksToPDF(
 
     didParseCell: (data) => {
       if (
-        data.section === "head" &&
+        data.section ===
+          "head" &&
         data.column.index === 0
       ) {
         data.cell.styles.fillColor =
           COLOR.headerAccent;
       }
 
-      // Hide normal status text because a custom status pill is drawn below.
+      // Hide standard status text because a status badge is drawn below.
       if (
-        data.section === "body" &&
+        data.section ===
+          "body" &&
         data.column.index === 6
       ) {
         data.cell.text = [];
@@ -491,21 +589,30 @@ export async function exportBanksToPDF(
 
     didDrawCell: (data) => {
       if (
-        data.section !== "body" ||
+        data.section !==
+          "body" ||
         data.column.index !== 6
       ) {
         return;
       }
 
-      const status = String(
-        data.cell.raw ?? "Inactive"
-      );
+      const status =
+        String(
+          data.cell.raw ??
+            "Inactive",
+        );
 
-      const active =
-        status === "Active";
+      const isActive =
+        status.toLowerCase() ===
+        "active";
 
-      const pillWidth = 17;
-      const pillHeight = 5.5;
+      const displayStatus =
+        isActive
+          ? "Active"
+          : "Inactive";
+
+      const pillWidth = 15;
+      const pillHeight = 5.2;
 
       const pillX =
         data.cell.x +
@@ -521,9 +628,9 @@ export async function exportBanksToPDF(
 
       setFill(
         doc,
-        active
+        isActive
           ? COLOR.activeBg
-          : COLOR.inactiveBg
+          : COLOR.inactiveBg,
       );
 
       doc.roundedRect(
@@ -533,49 +640,64 @@ export async function exportBanksToPDF(
         pillHeight,
         2.5,
         2.5,
-        "F"
+        "F",
       );
 
       doc.setFont(
         "helvetica",
-        "bold"
+        "bold",
       );
 
-      doc.setFontSize(6.7);
+      doc.setFontSize(5.9);
 
       setText(
         doc,
-        active
+        isActive
           ? COLOR.activeText
-          : COLOR.inactiveText
+          : COLOR.inactiveText,
       );
 
       doc.text(
-        status,
+        displayStatus,
         data.cell.x +
           data.cell.width / 2,
-        pillY + 3.8,
+        pillY + 3.55,
         {
           align: "center",
-        }
+        },
       );
     },
 
-    // Draw the full DMR header on every PDF page.
-    willDrawPage: () => {
+    /**
+     * AutoTable reserves TABLE_START_Y on every page.
+     *
+     * Drawing the header in didDrawPage ensures table content cannot paint
+     * over the letterhead.
+     */
+    didDrawPage: () => {
       drawPageHeader(
         doc,
         sortedBanks,
         generatedAt,
-        assets
+        assets,
       );
     },
   });
 
   drawFooters(
     doc,
-    generatedAt
+    generatedAt,
   );
 
-  doc.save(`${filename}.pdf`);
+  doc.save(
+    getSafeFilename(
+      filename,
+    ),
+  );
 }
+
+/**
+ * Compatibility alias for existing imports.
+ */
+export const exportBanksToPDF =
+  exportBankPdf;

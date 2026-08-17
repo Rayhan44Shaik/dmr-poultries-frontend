@@ -2,7 +2,7 @@
 // (Referenced helper or included components as part of UnLoadingTable module)
 
 // src/modules/operations/vehicle-trips/components/Step_4/UnLoadingTable.tsx
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   Plus, Clock, Building2, Users, Scale, AlertCircle, Search, X, 
   LayoutGrid, BarChart2,
@@ -41,6 +41,7 @@ interface Props {
   saveDeliveries?: () => Promise<boolean>;
   submitDeliveries?: () => boolean | Promise<boolean>;
   onClose?: () => void;
+  persistedRows?: ShopDelivery[];
 }
 
 // ─── Confirmation Modal Component ───────────────────────────────────
@@ -132,6 +133,7 @@ export default function UnLoadingTable({
   saveDeliveries,
   submitDeliveries,
   onClose,
+  persistedRows,
 }: Props) {
   const safeRows = rows ?? [];
   const safeShops = shops ?? [];
@@ -156,8 +158,7 @@ export default function UnLoadingTable({
   // ─── Saving & Toast State ─────────────────────────────────────────
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null);
-  const savedRowsRef = useRef(JSON.stringify(rows ?? []));
-  const hasUnsavedChanges = JSON.stringify(safeRows) !== savedRowsRef.current;
+  const hasUnsavedChanges = JSON.stringify(safeRows) !== JSON.stringify(persistedRows ?? []);
 
   // ─── Confirmation Modal State ────────────────────────────────────
   const [confirmation, setConfirmation] = useState<{
@@ -209,17 +210,35 @@ export default function UnLoadingTable({
 
   // ─── Filter Pending Boxes ───────────────────────────────────────
   const pendingBoxes = useMemo(() => {
-    const assignedBoxIds = new Set<number>();
+    const used = new Map<number, { birds: number; weight: number }>();
+    const add = (boxNo: number, birds: number, weight: number) => {
+      const cur = used.get(boxNo) ?? { birds: 0, weight: 0 };
+      used.set(boxNo, { birds: cur.birds + birds, weight: cur.weight + weight });
+    };
     safeRows.forEach((row: any) => {
-      if (Array.isArray(row.selectedBoxIds)) {
-        row.selectedBoxIds.forEach((id: number) => assignedBoxIds.add(Number(id)));
+      const per = Array.isArray(row.perBoxData) ? row.perBoxData : [];
+      const selected: number[] = Array.isArray(row.selectedBoxIds) ? row.selectedBoxIds.map(Number) : [];
+      if (per.length) {
+        per.forEach((pb: { boxNo: number; birds: number; weight: number }) => add(Number(pb.boxNo), Number(pb.birds || 0), Number(pb.weight || 0)));
+      } else if (selected.length === 1) {
+        add(
+          selected[0],
+          Number(row.birds || 0) + Number(row.mortality || 0),
+          Number(row.weight || 0) + Number(row.mortKg || 0)
+        );
+      } else {
+        selected.forEach((id) => add(id, 0, 0));
       }
     });
-
-    return safeBoxDetails.filter((b: any) => {
-      const bId = Number(b.id ?? b.boxNo);
-      return !assignedBoxIds.has(bId);
-    });
+    return safeBoxDetails
+      .map((b: any) => {
+        const boxNo = Number(b.boxNo ?? b.id);
+        const consumed = used.get(boxNo) ?? { birds: 0, weight: 0 };
+        const remainBirds = Math.max(0, Number(b.birds || 0) - consumed.birds);
+        const remainWeight = Math.max(0, Number(b.weight || 0) - consumed.weight);
+        return { ...b, boxNo, birds: remainBirds, weight: remainWeight };
+      })
+      .filter((b: any) => b.birds > 0 || b.weight > 0);
   }, [safeRows, safeBoxDetails]);
 
   // ─── PDF Export for Pending Boxes ─────────────────────────────
@@ -363,8 +382,7 @@ export default function UnLoadingTable({
     try {
       const success = await saveDeliveries();
       if (success) {
-        savedRowsRef.current = JSON.stringify(safeRows);
-        setToast({ message: "Delivery details saved successfully.", type: "success" });
+        setToast({ message: "Progress saved successfully.", type: "success" });
       } else {
         setToast({ message: "Unable to save delivery details. Please try again.", type: "error" });
       }
@@ -422,7 +440,6 @@ export default function UnLoadingTable({
           void (async () => {
             const success = submitDeliveries ? (await submitDeliveries()) !== false : false;
             if (success) {
-              savedRowsRef.current = JSON.stringify(safeRows);
               setHasBeenSubmitted(true);
               setToast({ message: "Delivery details submitted successfully.", type: "success" });
               if (showForm) closeForm();
@@ -625,7 +642,10 @@ export default function UnLoadingTable({
       farmWeight: farmWeightVal,
       mortKg: mortKgVal,
       perBoxData: perBoxData,
-      autoCaptureTime: autoCaptureTime || new Date().toLocaleString(),
+      clientKey: editingId
+        ? (safeRows.find((r) => r.id === editingId) as ShopDelivery | undefined)?.clientKey || `ck-${editingId}`
+        : (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `ck-${Date.now()}`),
+      autoCaptureTime: autoCaptureTime || undefined,
     };
 
     if (editingId !== null) {
@@ -647,6 +667,12 @@ export default function UnLoadingTable({
       return [{ value: 0, label: "No shops available", isDisabled: true }];
     }
     const opts = safeShops
+      .filter((shop: any) => {
+        const status = String(shop.status ?? "Active");
+        const id = shop.id ?? shop.shopId ?? 0;
+        if (status === "Active") return true;
+        return safeRows.some((r) => Number(r.shopId) === Number(id));
+      })
       .map((shop: any) => {
         const value = shop.id ?? shop.shopId ?? 0;
         const label = shop.shopName ?? shop.name ?? `Shop ${value}`;
@@ -655,7 +681,7 @@ export default function UnLoadingTable({
       .filter((opt: { value: number; label: string; isDisabled: boolean }) => opt.value > 0);
     opts.sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
     return opts;
-  }, [safeShops]);
+  }, [safeShops, safeRows]);
 
   const birdOptions = useMemo(() => {
     if (!safeBirdTypes || safeBirdTypes.length === 0) {
@@ -1013,15 +1039,21 @@ export default function UnLoadingTable({
       {!showForm && !readOnly && (
         <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xs">
           <WizardStepNotice
-            notice={toast ? { type: toast.type === "warning" ? "info" : toast.type, message: toast.message } : null}
-            dirty={hasUnsavedChanges}
+            notice={
+              toast
+                ? { type: toast.type === "warning" ? "info" : toast.type, message: toast.message }
+                : hasUnsavedChanges
+                  ? { type: "info", message: "Unsaved changes" }
+                  : null
+            }
+            dirty={false}
           />
           <WizardActionBar
             onCancel={handleCloseView}
             onSave={saveDeliveries ? handleSaveProgress : undefined}
             onSubmit={handleSubmitOrUpdateDeliveries}
             busy={isSaving}
-            saveDisabled={!hasUnsavedChanges || safeRows.length === 0}
+            saveDisabled={false}
             submitDisabled={safeRows.length === 0}
             submitLabel={hasBeenSubmitted ? "Update Deliveries" : "Submit Deliveries"}
           />

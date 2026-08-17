@@ -8,6 +8,7 @@ import { FileText, Plus } from "lucide-react";
 import TripRecentTable from "../components/TripRecentTable";
 import TripViewModal from "../components/TripViewModal";
 import TripWizardStepper from "../components/TripWizardStepper";
+import { WizardStepNotice } from "../components/WizardStepUI";
 import StepStart from "../components/StepStart";
 import StepDeliveries from "../components/StepDeliveries";
 import StepFarm from "../components/StepFarm";
@@ -18,21 +19,21 @@ import TripFinalKPI from "../components/TripFinalKPI";
 // --- Hooks ---
 import { useTripEntry } from "../hooks/useTripEntry";
 import useTrips from "../hooks/useTrips";
-import { useVehicles } from "../../../masters/vehicles/hooks/useVehicles";
-import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
+import { fetchAvailableResources, loadTripById } from "../services/tripHeaderApiService";
 import { useFarms } from "../../../masters/farms/hooks/useFarms";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useBirdTypes } from "../../../masters/bird-types/hooks/useBirdTypes";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
-// --- Services ---
-import { fuelExpenseService } from "../../fuel-expenses/services/fuelExpenseService";
-
 // --- Utils ---
 import { canEditItem } from "../../../../utils/dateUtils";
 import {
+  getLastSubmittedTripStep,
   getNextIncompleteTripStep,
+  getResumeActionLabel,
+  getTripWizardCompletedMask,
   isTripEnded as hasTripEnded,
+  isTripWizardComplete,
   TRIP_STEP_LABELS,
   type Trip,
   type ShopDelivery,
@@ -51,14 +52,14 @@ type EntryScreen = "prompt" | "form";
 function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { vehicles } = useVehicles();
-  const { employees } = useEmployees();
   const { farms } = useFarms();
   const { shops } = useShops();
   const { birdTypes } = useBirdTypes();
 
   const { showNotification } = useSafeNotification();
-  const { allTrips, refreshTrips, deleteTrip, changeStatus } = useTrips(showNotification);
+  const { allTrips, refreshTrips, deleteTrip, changeStatus } = useTrips(showNotification, {
+    includeDeleted: true,
+  });
 
   const {
     trip,
@@ -75,7 +76,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     updateBoxDetails,
     submitStartStep,
     updateStartStep,
-    saveStartProgress,
     submitFarmStep,
     saveFarmProgress,
     submitPickupStep,
@@ -89,6 +89,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     clearTrip,
     updateStartTrip,
     registerStep1SuccessCallback,
+    registerStep2SuccessCallback,
+    registerStep3SuccessCallback,
+    registerStep4SuccessCallback,
   } = useTripEntry(showNotification, refreshTrips);
 
   const [rows, setRows] = useState<ShopDelivery[]>([]);
@@ -97,8 +100,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const [viewStepIndex, setViewStepIndex] = useState(0);
 
   const [entryScreen, setEntryScreen] = useState<EntryScreen>("prompt");
+  const [editingSubmittedStep, setEditingSubmittedStep] = useState<number | null>(null);
   const isManualSelect = useRef(false);
-  const endStepJustSubmitted = useRef(false);
+  const pinOpenedStep = useRef(false);
 
   /** Strip tripId from URL so refresh never resumes an active wizard. */
   const clearTripIdFromUrl = useCallback(() => {
@@ -113,69 +117,126 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     clearTripIdFromUrl();
   }, [clearTripIdFromUrl]);
 
-  // After Step 1 success: keep trip in React state and open Step 2.
+  // After Step 1 success: close the wizard and return to Create Trip Entry.
+  // The submitted trip is already in Recent Trips via onTripsChanged.
   useEffect(() => {
-    registerStep1SuccessCallback(() => {
-      setIsEditing(true);
-      setViewStepIndex(1);
-      setEntryScreen("form");
+    registerStep1SuccessCallback((saved) => {
+      showNotification(`Step 1 submitted — ${saved.tripNo}.`, "success");
+      clearTrip();
+      setRows([]);
+      setEntryScreen("prompt");
+      setViewStepIndex(0);
+      setIsEditing(false);
+      setEditingSubmittedStep(null);
+      setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
+      clearTripIdFromUrl();
       isManualSelect.current = false;
     });
-  }, [registerStep1SuccessCallback, setIsEditing]);
+  }, [registerStep1SuccessCallback, clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, showNotification]);
 
-  // ─── Handle status change with fuel bill validation ────────────
+  useEffect(() => {
+    registerStep2SuccessCallback((saved: Trip) => {
+      showNotification(`Step 2 submitted — ${saved.tripNo}.`, "success");
+      clearTrip();
+      setRows([]);
+      setEntryScreen("prompt");
+      setViewStepIndex(0);
+      setIsEditing(false);
+      setEditingSubmittedStep(null);
+      setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
+      clearTripIdFromUrl();
+      isManualSelect.current = false;
+    });
+  }, [registerStep2SuccessCallback, clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, showNotification]);
+
+  useEffect(() => {
+    registerStep3SuccessCallback((saved: Trip) => {
+      showNotification(`Step 3 submitted — ${saved.tripNo}.`, "success");
+      clearTrip();
+      setRows([]);
+      setEntryScreen("prompt");
+      setViewStepIndex(0);
+      setIsEditing(false);
+      setEditingSubmittedStep(null);
+      setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
+      clearTripIdFromUrl();
+      isManualSelect.current = false;
+    });
+  }, [registerStep3SuccessCallback, clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, showNotification]);
+
+  useEffect(() => {
+    registerStep4SuccessCallback((saved: Trip) => {
+      showNotification(`Step 4 submitted — ${saved.tripNo}.`, "success");
+      clearTrip();
+      setRows([]);
+      setEntryScreen("prompt");
+      setViewStepIndex(0);
+      setIsEditing(false);
+      setEditingSubmittedStep(null);
+      setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
+      clearTripIdFromUrl();
+      isManualSelect.current = false;
+    });
+  }, [registerStep4SuccessCallback, clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, showNotification]);
+
   const handleStatusChange = (trip: Trip, status: "Pending" | "Completed") => {
-    if (status === "Completed") {
-      const bills = fuelExpenseService.getBillsForTrip(trip.vehicleId, trip.tripDate);
-      const pendingBills = bills.filter(b => b.status === "Pending");
-
-      if (pendingBills.length > 0) {
-        const msg = pendingBills.length === 1
-          ? `⚠️ 1 fuel bill for this trip is not approved. Please approve it before completing the trip.`
-          : `⚠️ ${pendingBills.length} fuel bills for this trip are not approved. Please approve them before completing the trip.`;
-        showNotification(msg, "info");
-        return;
-      }
-    }
-
     changeStatus(trip, status);
   };
 
   const handleView = (selectedTrip: Trip) => {
     setViewTrip(selectedTrip);
     setViewOpen(true);
+    void loadTripById(selectedTrip.id)
+      .then((loaded) => setViewTrip(loaded))
+      .catch(() => {
+        showNotification("Could not refresh trip from server. Showing last loaded data.", "info");
+      });
   };
 
-  const handleEdit = (selectedTrip: Trip) => {
+  const openExistingTrip = async (
+    selectedTrip: Trip,
+    targetStep: number,
+    message: string,
+    editSubmittedStep: number | null
+  ) => {
     setEntryScreen("form");
-    let targetStep = 0;
-
-    if (selectedTrip.status === "Completed" || selectedTrip.status === "Pending" || selectedTrip.endStepSubmitted || selectedTrip.expensesStepSubmitted) targetStep = 4;
-    else if (selectedTrip.deliveryStepSubmitted) targetStep = 4;
-    else if (selectedTrip.pickupStepSubmitted) targetStep = 3;
-    else if (selectedTrip.farmStepSubmitted) targetStep = 2;
-    else if (selectedTrip.startStepSubmitted) targetStep = 1;
-
     setViewStepIndex(targetStep);
     setRows(selectedTrip.deliveries || []);
     setIsEditing(true);
+    setEditingSubmittedStep(editSubmittedStep);
     isManualSelect.current = true;
+    pinOpenedStep.current = true;
+    showNotification(message, "success");
+    const loadedFromApi = await loadTripFromApi(selectedTrip.id);
+    if (!loadedFromApi) {
+      loadTrip(selectedTrip);
+    }
+  };
 
-    void (async () => {
-      const loadedFromApi = await loadTripFromApi(selectedTrip.id);
-      if (!loadedFromApi) {
-        loadTrip(selectedTrip);
-      }
-      const nextStepLabels: Record<number, string> = {
-        0: "Step 1 — Trip Start",
-        1: "Step 2 — Farm Entry",
-        2: "Step 3 — Pickup",
-        3: "Step 4 — Deliveries",
-        4: "Step 5 — Completion",
-      };
-      const nextLabel = nextStepLabels[targetStep] ?? "the next step";
-      showNotification(`♻️ Trip Resumed — ${selectedTrip.tripNo}. Continue with ${nextLabel}.`, "success");
-    })();
+  const handleResume = (selectedTrip: Trip) => {
+    if (selectedTrip.deleted || selectedTrip.status !== "Draft" || isTripWizardComplete(selectedTrip)) {
+      return;
+    }
+    const targetStep = getNextIncompleteTripStep(selectedTrip);
+    const resumeLabel = getResumeActionLabel(selectedTrip) ?? `Step ${targetStep + 1}`;
+    void openExistingTrip(
+      selectedTrip,
+      targetStep,
+      `Resuming Trip ${selectedTrip.tripNo} — ${resumeLabel}`,
+      null
+    );
+  };
+
+  const handleEdit = (selectedTrip: Trip) => {
+    const targetStep = getLastSubmittedTripStep(selectedTrip);
+    if (targetStep == null) return;
+    const stepName = TRIP_STEP_LABELS[targetStep] ?? `Step ${targetStep + 1}`;
+    void openExistingTrip(
+      selectedTrip,
+      targetStep,
+      `Edit Mode — Step ${targetStep + 1}: ${stepName}`,
+      targetStep
+    );
   };
 
   const handleRefresh = () => {
@@ -221,9 +282,11 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setEntryScreen("prompt");
     setViewStepIndex(0);
     setIsEditing(false);
+    setEditingSubmittedStep(null);
     setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
     clearTripIdFromUrl();
     isManualSelect.current = false;
+    pinOpenedStep.current = false;
   }, [clearTrip, clearTripIdFromUrl, setIsEditing, setTrip]);
 
   const createNewTrip = useCallback(() => {
@@ -233,8 +296,10 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
     clearTripIdFromUrl();
     setIsEditing(true);
+    setEditingSubmittedStep(null);
     setEntryScreen("form");
     isManualSelect.current = false;
+    pinOpenedStep.current = false;
   }, [clearTrip, clearTripIdFromUrl, setIsEditing, setTrip]);
 
   const isStartCompleted = Boolean(trip.startStepSubmitted);
@@ -248,14 +313,33 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   // Shared Desktop + Mobile workflow definition.
   const currentStep = getNextIncompleteTripStep(trip);
 
-  const vehicleOpts = useMemo(
-    () => vehicles.map((v: any) => ({ id: v.id, vehicleNumber: v.vehicleNumber })),
-    [vehicles]
-  );
-  const employeeOpts = useMemo(
-    () => employees.map((e: any) => ({ id: e.id, employeeName: e.employeeName, department: e.department })),
-    [employees]
-  );
+  const [vehicleOpts, setVehicleOpts] = useState<Array<{ id: number; vehicleNumber: string }>>([]);
+  const [employeeOpts, setEmployeeOpts] = useState<Array<{ id: number; employeeName: string; department: string }>>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const tripId = trip.id > 0 ? trip.id : undefined;
+    void fetchAvailableResources(tripId)
+      .then((available) => {
+        if (cancelled) return;
+        setVehicleOpts(available.vehicles ?? []);
+        setEmployeeOpts([
+          ...(available.drivers ?? []),
+          ...(available.supervisors ?? []),
+          ...(available.helpers ?? []),
+          ...(available.loaders ?? []),
+        ]);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setVehicleOpts([]);
+          setEmployeeOpts([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [trip.id, trip.startStepSubmitted, entryScreen]);
 
   const step1LoadSnapshot = useMemo(
     () => trip,
@@ -277,43 +361,24 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   );
 
   useEffect(() => {
-    if (isManualSelect.current) return;
+    if (pinOpenedStep.current || isManualSelect.current) return;
     if (currentStep > viewStepIndex) {
       setViewStepIndex(currentStep);
     }
   }, [currentStep, viewStepIndex]);
 
-  useEffect(() => {
-    isManualSelect.current = false;
-  }, [trip.id]);
-
-  useEffect(() => {
-    if (!isTripEnded && trip.status === "Pending" && entryScreen === "form") {
-      setTrip((prev) => ({ ...prev, status: "Draft" as any }) as Trip);
-    }
-  }, [isTripEnded, trip.status, setTrip, entryScreen]);
-
-  useEffect(() => {
-    if (isTripEnded && trip.status === "Draft" && !endStepJustSubmitted.current && entryScreen === "form") {
-      endStepJustSubmitted.current = true;
-      setTrip((prev) => ({ ...prev, status: "Pending" }));
-      showNotification?.("✅ Trip submitted for approval.", "success");
-    }
-    if (!isTripEnded) {
-      endStepJustSubmitted.current = false;
-    }
-  }, [isTripEnded, trip.status, setTrip, showNotification, entryScreen]);
-
   const isNewTrip = trip.id === 0 || !trip.tripNo;
 
   const isEditable = (stepCompleted: boolean) => {
+    if (trip.status === "Completed") return false;
+    if (editingSubmittedStep === viewStepIndex && isEditing) {
+      return canEditTrip || trip.status === "Draft" || trip.status === "Pending";
+    }
     if (viewStepIndex === 4) {
-      if (trip.status === "Completed") return false;
       return isEditing && (canEditTrip || trip.status === "Draft" || trip.status === "Pending");
     }
     const isViewingActiveStep = !isTripEnded && viewStepIndex === currentStep;
     if (isViewingActiveStep && !stepCompleted) {
-      // Active wizard step is always editable in-session.
       return isNewTrip || isEditing || trip.status === "Draft";
     }
     return false;
@@ -324,13 +389,13 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       return (
         <StepStart
           tripId={trip.id}
+          tripNo={trip.tripNo}
           startTime={trip.startTime}
           startStepSubmitted={trip.startStepSubmitted}
           loadSnapshot={step1LoadSnapshot}
           updateTrip={updateStartTrip}
           submitStartStep={submitStartStep}
           updateStartStep={updateStartStep}
-          saveStartProgress={saveStartProgress}
           hasUnsavedChanges={JSON.stringify({
             vehicleId: trip.vehicleId, vehicleNo: trip.vehicleNo, driverId: trip.driverId,
             driverName: trip.driverName, supervisorId: trip.supervisorId,
@@ -365,12 +430,14 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           saveFarmProgress={saveFarmProgress}
           hasUnsavedChanges={JSON.stringify({
             sourceFarmId: trip.sourceFarmId, sourceFarm: trip.sourceFarm, farmAddress: trip.farmAddress,
-            destMeter: trip.destMeter, pickupTolls: trip.pickupTolls, avgBirdWeight: (trip as any).avgBirdWeight,
-            remarks: trip.remarks,
+            destMeter: trip.destMeter, pickupTolls: trip.pickupTolls, avgBirdWeight: trip.avgBirdWeight,
+            remarks: trip.remarks, farmGpsLat: trip.farmGpsLat, farmGpsLon: trip.farmGpsLon,
+            farmGpsAccuracy: trip.farmGpsAccuracy, farmGpsTime: trip.farmGpsTime,
           }) !== JSON.stringify({
             sourceFarmId: savedTrip.sourceFarmId, sourceFarm: savedTrip.sourceFarm, farmAddress: savedTrip.farmAddress,
-            destMeter: savedTrip.destMeter, pickupTolls: savedTrip.pickupTolls, avgBirdWeight: (savedTrip as any).avgBirdWeight,
-            remarks: savedTrip.remarks,
+            destMeter: savedTrip.destMeter, pickupTolls: savedTrip.pickupTolls, avgBirdWeight: savedTrip.avgBirdWeight,
+            remarks: savedTrip.remarks, farmGpsLat: savedTrip.farmGpsLat, farmGpsLon: savedTrip.farmGpsLon,
+            farmGpsAccuracy: savedTrip.farmGpsAccuracy, farmGpsTime: savedTrip.farmGpsTime,
           })}
           farms={farms}
           editable={isEditable(isFarmCompleted)}
@@ -468,18 +535,22 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
             <TripWizardStepper
               steps={TRIP_STEP_LABELS}
               currentStep={isTripEnded ? 4 : currentStep}
-              completedMask={{
-                start: isStartCompleted,
-                farm: isFarmCompleted,
-                pickup: isPickupCompleted,
-                delivery: isDeliveryCompleted,
-                end: isTripEnded,
-              } as any}
+              completedMask={getTripWizardCompletedMask(trip)}
               onStepClick={(idx) => {
                 setViewStepIndex(idx);
                 isManualSelect.current = true;
+                pinOpenedStep.current = true;
               }}
             />
+
+            {editingSubmittedStep != null && editingSubmittedStep === viewStepIndex && (
+              <WizardStepNotice
+                notice={{
+                  type: "info",
+                  message: `Edit Mode — Step ${editingSubmittedStep + 1}: ${TRIP_STEP_LABELS[editingSubmittedStep]}. You are editing the last submitted step.`,
+                }}
+              />
+            )}
 
             <div className="mt-6">{renderSelectedStep()}</div>
             {isStartCompleted && <TripFinalKPI trip={trip} deliveries={rows} />}
@@ -492,11 +563,13 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         onRefresh={handleRefresh}
         onView={handleView}
         onEdit={handleEdit}
+        onResume={handleResume}
         onDelete={(trip, reason) => deleteTrip(trip.id, reason)}
         onStatusChange={handleStatusChange}
       />
 
       <TripViewModal
+        key={viewTrip?.id ?? "closed"}
         trip={viewTrip}
         open={viewOpen}
         onClose={() => {

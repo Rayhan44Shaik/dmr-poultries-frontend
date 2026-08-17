@@ -1,20 +1,31 @@
 import { Check } from "lucide-react";
 import { TRIP_STEP_KEYS } from "../../../../shared/trip/workflow";
 
+export type TripWizardCompletedMask = {
+  start: boolean;
+  farm: boolean;
+  pickup: boolean;
+  delivery: boolean;
+  end?: boolean;
+};
+
 interface Props {
   currentStep: number;
   steps: string[];
-  completedMask: { start: boolean; farm: boolean; pickup: boolean; delivery: boolean };
+  completedMask: TripWizardCompletedMask;
   onStepClick?: (index: number) => void;
 }
 
-export default function TripWizardStepper({ currentStep, steps, completedMask, onStepClick }: Props) {
-  // Map the masks to step indices (Logic untouched)
-  const stepStatus = TRIP_STEP_KEYS.map((key) => {
-    if (key === "expenses") return false;
-    const maskKey = key === "deliveries" ? "delivery" : key;
-    return completedMask[maskKey as keyof typeof completedMask];
+export function resolveStepperCompletion(completedMask: TripWizardCompletedMask): boolean[] {
+  return TRIP_STEP_KEYS.map((key) => {
+    if (key === "expenses") return Boolean(completedMask.end);
+    const maskKey = (key === "deliveries" ? "delivery" : key) as keyof TripWizardCompletedMask;
+    return Boolean(completedMask[maskKey]);
   });
+}
+
+export default function TripWizardStepper({ currentStep, steps, completedMask, onStepClick }: Props) {
+  const stepStatus = resolveStepperCompletion(completedMask);
 
   return (
     <div className="relative w-full flex justify-between items-start md:items-center mb-8 px-1 md:px-4 pt-4 md:pt-2">
@@ -67,7 +78,7 @@ export default function TripWizardStepper({ currentStep, steps, completedMask, o
               {/* Hide "Completed" on mobile to prevent overlapping text, show on tablets/laptops */}
               {isCompleted && (
                 <span className="hidden md:block text-[9px] md:text-[10px] text-emerald-600 mt-0.5">
-                  Completed
+                  Submitted
                 </span>
               )}
             </div>

@@ -419,7 +419,7 @@ function SupervisorTripWorkspace({ supervisor }: { supervisor: MobileSupervisorP
       const localTrip: Trip = {
         ...trip,
         ...data,
-        pickupLoadTime: trip.pickupLoadTime || new Date().toISOString(),
+        pickupLoadTime: trip.pickupLoadTime || "",
         pickupStepSubmitted: true,
         status: "Draft",
       };

@@ -4,12 +4,16 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Eye, Pencil, RefreshCw, History, Trash2, Clock, Layers, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
+import {
+  getResumeActionLabel,
+} from "../../../../shared/trip";
 
 interface Props {
   trips?: Trip[];
   onRefresh: () => void;
   onView: (trip: Trip) => void;
   onEdit: (trip: Trip) => void;
+  onResume?: (trip: Trip) => void;
   onDelete?: (trip: Trip, reason: string) => void;
   // ✅ Updated: accept optional approvedBy parameter
   onStatusChange?: (trip: Trip, status: "Pending" | "Completed", approvedBy?: string) => void;
@@ -20,6 +24,7 @@ function TripRecentTable({
   onRefresh,
   onView,
   onEdit,
+  onResume,
   onDelete,
   onStatusChange,
 }: Props) {
@@ -78,10 +83,10 @@ function TripRecentTable({
     });
   }, [safeTrips, searchTerm]);
 
-  const allDraft = sortedTrips.filter((t) => !t.deleted && !t.endStepSubmitted);
-  const allPending = sortedTrips.filter((t) => !t.deleted && t.endStepSubmitted && t.status !== "Completed");
+  const allDraft = sortedTrips.filter((t) => !t.deleted && t.status === "Draft");
+  const allPending = sortedTrips.filter((t) => !t.deleted && t.status === "Pending");
   const allApproved = sortedTrips.filter((t) => !t.deleted && t.status === "Completed");
-  const allDeleted = sortedTrips.filter((t) => t.deleted === true);
+  const allDeleted = sortedTrips.filter((t) => t.deleted === true || t.status === "Deleted");
 
   const draftCount = allDraft.length;
   const pendingCount = allPending.length;
@@ -144,24 +149,18 @@ function TripRecentTable({
 
   const getStepBadge = (trip: Trip) => {
     if (trip.status === "Completed") {
-      return { label: "Completed", color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={12} /> };
+      return { label: "Completed", color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={12} />, resume: false };
     }
-    if (!trip.startStepSubmitted) {
-      return { label: "Step 1", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <FileText size={12} /> };
+    if (trip.status === "Pending") {
+      return { label: "Pending", color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, resume: false };
     }
-    if (trip.startStepSubmitted && !trip.farmStepSubmitted) {
-      return { label: "Step 2", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <FileText size={12} /> };
-    }
-    if (trip.farmStepSubmitted && !trip.pickupStepSubmitted) {
-      return { label: "Step 3", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <FileText size={12} /> };
-    }
-    if (trip.pickupStepSubmitted && !trip.deliveryStepSubmitted) {
-      return { label: "Step 4", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <FileText size={12} /> };
-    }
-    if (trip.deliveryStepSubmitted && !trip.endStepSubmitted) {
-      return { label: "Step 5 (End)", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <FileText size={12} /> };
-    }
-    return { label: "Pending", color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} /> };
+    const resumeLabel = getResumeActionLabel(trip);
+    return {
+      label: resumeLabel ?? "Draft",
+      color: "bg-blue-50 text-blue-700 border-blue-200",
+      icon: <FileText size={12} />,
+      resume: Boolean(resumeLabel),
+    };
   };
 
   // ✅ Handle status change with approver name
@@ -256,7 +255,7 @@ function TripRecentTable({
                   const isSelected = trip.id === selectedTripId;
                   const isDeleted = trip.deleted === true;
                   const isApproved = trip.status === "Completed";
-                  const showDropdown = !isDeleted && onStatusChange && trip.endStepSubmitted && !isApproved;
+                  const showDropdown = !isDeleted && onStatusChange && trip.status === "Pending" && !isApproved;
 
                   return (
                     <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
@@ -297,16 +296,21 @@ function TripRecentTable({
                           (() => {
                             const badge = getStepBadge(trip);
                             return (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (onEdit) onEdit(trip);
-                                }}
-                                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm border cursor-pointer hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-200 ${badge.color}`}
-                              >
-                                {badge.icon}
-                                {badge.label}
-                              </button>
+                              <div className="flex flex-col items-center gap-0.5">
+                                {trip.status === "Draft" && (
+                                  <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Draft</span>
+                                )}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (badge.resume && onResume) onResume(trip);
+                                  }}
+                                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm border ${badge.resume ? "cursor-pointer hover:shadow-md hover:scale-105 active:scale-95" : "cursor-default"} transition-all duration-200 ${badge.color}`}
+                                >
+                                  {badge.icon}
+                                  {badge.label}
+                                </button>
+                              </div>
                             );
                           })()
                         )}

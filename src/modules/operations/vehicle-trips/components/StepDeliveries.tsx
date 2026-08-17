@@ -153,11 +153,12 @@ export default function StepDeliveries({
             <button
               type="button"
               onClick={handleEnableStepEdit}
-              title="Edit Shop Deliveries"
-              aria-label="Edit Shop Deliveries"
+              title="Edit Deliveries"
+              aria-label="Edit Deliveries"
               className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95 flex items-center justify-center text-xs font-semibold shadow-2xs"
             >
               <Pencil size={14} />
+              <span className="hidden sm:inline">Edit Deliveries</span>
             </button>
           )}
 
@@ -167,7 +168,7 @@ export default function StepDeliveries({
             </span>
           ) : (
             <span className="text-xs text-blue-700 font-semibold bg-blue-50 px-3 py-1 rounded-full border border-blue-200 whitespace-nowrap">
-              {editingShopId ? "Editing Shop Details" : isStepEditing ? "Edit Mode Active" : "Step Unlocked"}
+              {editingShopId ? "Editing Shop Details" : isStepEditing ? "Editing Trip " + trip.tripNo : "Step Unlocked"}
             </span>
           )}
         </div>
@@ -193,15 +194,10 @@ export default function StepDeliveries({
           supervisorPhone=""
           tripDate={trip.tripDate}
           updateDeliveries={updateDeliveries}
-          saveDeliveries={saveDeliveriesProgress ? async () => {
-            if (!canLock) {
-              alert(`⚠️ ${validationResult.reason}`);
-              return false;
-            }
-            return saveDeliveriesProgress(rows);
-          } : undefined}
+          saveDeliveries={saveDeliveriesProgress ? async () => saveDeliveriesProgress(rows) : undefined}
           submitDeliveries={handleLockDeliveries}
           onClose={handleCancelWizard}
+          persistedRows={trip.deliveries || []}
         />
       ) : (
         <BoxWeightAnalysis

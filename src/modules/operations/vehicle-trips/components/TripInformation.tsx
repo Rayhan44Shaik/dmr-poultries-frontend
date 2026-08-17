@@ -146,7 +146,7 @@ function TripInformation({
         setTrip((prev) => ({
           ...prev,
           closingMeter: 0,
-          totalKm: 0 - prev.openingMeter,
+          totalKm: 0 - (prev.openingMeter ?? 0),
         }));
         setClosingKmError(null);
         return;
@@ -159,7 +159,7 @@ function TripInformation({
       setTrip((prev) => ({
         ...prev,
         closingMeter: rounded,
-        totalKm: Math.round((rounded - prev.openingMeter) * 100) / 100,
+        totalKm: Math.round((rounded - (prev.openingMeter ?? 0)) * 100) / 100,
       }));
       
       // Validate and show error if needed
@@ -202,7 +202,7 @@ function TripInformation({
     [updateField]
   );
 
-  const displayValue = (val: number) => (val === 0 ? "" : val);
+  const displayValue = (val: number | null | undefined) => (val == null || val === 0 ? "" : val);
 
   const selectStyles = {
     control: (base: any) => ({

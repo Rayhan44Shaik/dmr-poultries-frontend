@@ -8,7 +8,7 @@ import { getVehicles } from "../../../masters/vehicles/services/vehicleService";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { WizardActionBar, WizardStepNotice } from "./WizardStepUI";
-import { calculatePickupTotals } from "../../../../shared/trip/calculations";
+import { calculatePickupTotals, calculateBoxAvgWeight } from "../../../../shared/trip/calculations";
 import {
   TRIP_FIELD_DEFINITIONS,
   TRIP_STEP_DEFINITIONS,
@@ -28,13 +28,41 @@ interface Props {
 }
 
 type Row = BoxDetail & { uid: string };
+type PickupPhoto = { key: string; mime: string; data: string };
 const generateUid = () => Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
 const makeRow = (boxNo: number): Row => ({
   uid: generateUid(),
   boxNo,
   birds: 0,
   weight: 0,
+  avgWeight: null,
 });
+
+function formatAvg(birds: number, weight: number, stored?: number | null) {
+  const avg = stored != null && Number.isFinite(stored) && stored > 0
+    ? stored
+    : calculateBoxAvgWeight(birds, weight);
+  return avg == null ? "—" : String(avg);
+}
+
+function photosFromTrip(trip: Trip): PickupPhoto[] {
+  const out: PickupPhoto[] = [];
+  if (trip.dcPhotoData && trip.dcPhotoData.startsWith("data:image/")) {
+    out.push({
+      key: trip.dcPhotoKey || `dc_photo_${trip.id}_1`,
+      mime: trip.dcPhotoMime || "image/jpeg",
+      data: trip.dcPhotoData,
+    });
+  }
+  if (trip.dcPhotoData2 && trip.dcPhotoData2.startsWith("data:image/")) {
+    out.push({
+      key: trip.dcPhotoKey2 || `dc_photo_${trip.id}_2`,
+      mime: trip.dcPhotoMime2 || "image/jpeg",
+      data: trip.dcPhotoData2,
+    });
+  }
+  return out.slice(0, 2);
+}
 
 // ─── Confirmation Modal ──────────────────────────────────────────────
 interface ConfirmationModalProps {
@@ -118,31 +146,30 @@ export default function StepPickup({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(false);
+  const [removedBoxNos, setRemovedBoxNos] = useState<number[]>([]);
   const [rows, setRows] = useState<Row[]>(() => {
     const details = trip.boxDetails || [];
     return details.length > 0 ? details.map((d) => ({ ...d, uid: generateUid() })) : [makeRow(1)];
   });
 
-  // ─── Fetch Vehicle Max Box Limit ───────────────────────────────────
   const maxBoxes = useMemo(() => {
+    if (trip.vehicleBoxCapacity && trip.vehicleBoxCapacity > 0) return trip.vehicleBoxCapacity;
     try {
       const vehicles = getVehicles();
       const matched = vehicles.find(
         (v) =>
           v.vehicleNumber?.trim().toLowerCase() === trip.vehicleNo?.trim().toLowerCase()
       );
-      return matched?.noOfBoxes ?? 85; // Default max limit fallback if not specified
+      return matched?.noOfBoxes && matched.noOfBoxes > 0 ? matched.noOfBoxes : 0;
     } catch {
-      return 85;
+      return 0;
     }
-  }, [trip.vehicleNo]);
+  }, [trip.vehicleNo, trip.vehicleBoxCapacity]);
 
-  // ─── Image upload state ────────────────────────────────────────────
-  const [imageKey, setImageKey] = useState<string | null>(trip.dcPhotoKey || null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const savedPhotoKeyRef = useRef<string | null>(trip.dcPhotoKey || null);
-  const [, setIsImageLoading] = useState(false);
+  const [photos, setPhotos] = useState<PickupPhoto[]>(() => photosFromTrip(trip));
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const savedPhotosRef = useRef<PickupPhoto[]>(photosFromTrip(trip));
 
   // ─── Toast state ────────────────────────────────────────────────────
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -169,19 +196,13 @@ export default function StepPickup({
     const currentBoxes = rows.map(({ uid, ...rest }) => rest);
     const savedBoxes = trip.boxDetails || [];
     return JSON.stringify(currentBoxes) !== JSON.stringify(savedBoxes) ||
-      imageKey !== savedPhotoKeyRef.current;
-  }, [rows, trip.boxDetails, imageKey]);
+      JSON.stringify(photos.map((p) => p.key)) !== JSON.stringify(savedPhotosRef.current.map((p) => p.key));
+  }, [rows, trip.boxDetails, photos]);
 
   useEffect(() => {
-    setImagePreview(trip.dcPhotoData || null);
-  }, [trip.dcPhotoData, imageKey]);
-
-  // ─── Sync imageKey with trip.dcPhotoKey ────────────────────────────
-  useEffect(() => {
-    if (trip.dcPhotoKey !== imageKey) {
-      setImageKey(trip.dcPhotoKey || null);
-    }
-  }, [trip.dcPhotoKey]);
+    setPhotos(photosFromTrip(trip));
+    savedPhotosRef.current = photosFromTrip(trip);
+  }, [trip.id, trip.dcPhotoKey, trip.dcPhotoKey2, trip.dcPhotoData, trip.dcPhotoData2]);
 
   useEffect(() => {
     const details = trip.boxDetails || [];
@@ -190,13 +211,13 @@ export default function StepPickup({
     } else {
       setRows([makeRow(1)]);
     }
-  }, [trip.id, isLocalEditing]);
+  }, [trip.id, isLocalEditing, trip.boxDetails?.length]);
 
   const totals = useMemo(() => calculatePickupTotals(rows), [rows]);
 
   // ─── Row operations with Max Box Limit Check ───────────────────────
   const addRow = () => {
-    if (rows.length >= maxBoxes) {
+    if (maxBoxes > 0 && rows.length >= maxBoxes) {
       setToast({
         message: `Box limit exceeded! Maximum allowed boxes for this vehicle is ${maxBoxes}.`,
         type: "error",
@@ -205,7 +226,7 @@ export default function StepPickup({
     }
     if (rows.length > 0) {
       const lastRow = rows[rows.length - 1];
-      if (lastRow.birds === 0 || lastRow.weight === 0) {
+      if (!(lastRow.birds > 0) || !(lastRow.weight > 0)) {
         setToast({
           message: "Please fill the current box (Birds & Weight) before adding a new one.",
           type: "error",
@@ -218,13 +239,26 @@ export default function StepPickup({
 
   const removeRow = (uid: string) => {
     setRows((prev) => {
-      const next = prev.filter((r) => r.uid !== uid);
-      return next.map((r, idx) => ({ ...r, boxNo: idx + 1 }));
+      if (prev.length <= 1) return prev;
+      const last = prev[prev.length - 1];
+      if (last.uid !== uid) {
+        setToast({ message: "Remove the last box first.", type: "error" });
+        return prev;
+      }
+      setRemovedBoxNos((ids) => [...ids, last.boxNo]);
+      return prev.slice(0, -1);
     });
   };
 
   const updateRow = (uid: string, field: "birds" | "weight", value: number) => {
-    setRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, [field]: value } : r)));
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.uid !== uid) return r;
+        const next = { ...r, [field]: value };
+        next.avgWeight = calculateBoxAvgWeight(next.birds, next.weight);
+        return next;
+      })
+    );
   };
 
   const blockScrollAndArrows = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -240,6 +274,16 @@ export default function StepPickup({
   }, [rows]);
 
   // ─── Image upload handlers ──────────────────────────────────────────
+  const photoFields = (): Partial<Trip> & { syncPickupPhotos: boolean } => ({
+    dcPhotoKey: photos[0]?.key,
+    dcPhotoMime: photos[0]?.mime,
+    dcPhotoData: photos[0]?.data,
+    dcPhotoKey2: photos[1]?.key,
+    dcPhotoMime2: photos[1]?.mime,
+    dcPhotoData2: photos[1]?.data,
+    syncPickupPhotos: true,
+  });
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -252,44 +296,65 @@ export default function StepPickup({
       setToast({ message: "Image size must be less than 5MB.", type: "error" });
       return;
     }
+    if (photos.length >= 2) {
+      setToast({ message: "A maximum of 2 photos is allowed.", type: "error" });
+      return;
+    }
 
     try {
-      setIsImageLoading(true);
       const data = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result));
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
-      const key = `dc_photo_${trip.id}_${Date.now()}`;
-      setImageKey(key);
-      setImagePreview(data);
-      updateTrip({ dcPhotoKey: key, dcPhotoMime: file.type, dcPhotoData: data });
+      if (!data.startsWith("data:image/")) {
+        setToast({ message: "Please select a valid image file.", type: "error" });
+        return;
+      }
+      const next: PickupPhoto = {
+        key: `dc_photo_${trip.id}_${photos.length + 1}_${Date.now()}`,
+        mime: file.type,
+        data,
+      };
+      const nextPhotos = [...photos, next].slice(0, 2);
+      setPhotos(nextPhotos);
+      updateTrip({
+        dcPhotoKey: nextPhotos[0]?.key,
+        dcPhotoMime: nextPhotos[0]?.mime,
+        dcPhotoData: nextPhotos[0]?.data,
+        dcPhotoKey2: nextPhotos[1]?.key,
+        dcPhotoMime2: nextPhotos[1]?.mime,
+        dcPhotoData2: nextPhotos[1]?.data,
+      });
     } catch (error) {
       console.error("Failed to read image:", error);
       setToast({ message: "Failed to read image. Please try again.", type: "error" });
-    } finally {
-      setIsImageLoading(false);
     }
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
-  const removeImage = async () => {
-    if (imageKey) {
-      setImageKey(null);
-      updateTrip({ dcPhotoKey: undefined, dcPhotoMime: undefined, dcPhotoData: undefined });
-      setImagePreview(null);
-    }
+  const removeImage = async (key: string) => {
+    const nextPhotos = photos.filter((p) => p.key !== key);
+    setPhotos(nextPhotos);
+    updateTrip({
+      dcPhotoKey: nextPhotos[0]?.key,
+      dcPhotoMime: nextPhotos[0]?.mime,
+      dcPhotoData: nextPhotos[0]?.data,
+      dcPhotoKey2: nextPhotos[1]?.key,
+      dcPhotoMime2: nextPhotos[1]?.mime,
+      dcPhotoData2: nextPhotos[1]?.data,
+    });
   };
 
   // ─── Download Image ──────────────────────────────────────────────────
   const downloadImage = async () => {
-    if (!imagePreview) return;
+    if (!photos[0]?.data) return;
     try {
       const link = document.createElement("a");
-      link.href = imagePreview;
+      link.href = photos[0].data;
       link.download = `DC_Photo_${trip.tripNo || "trip"}.jpg`;
       document.body.appendChild(link);
       link.click();
@@ -306,18 +371,16 @@ export default function StepPickup({
     setIsSaving(true);
     const success = await savePickupProgress({
       boxDetails: getBoxDetails(),
-      totalBirds: totals.totalBirds,
-      dcWeight: totals.dcWeight,
-      boxes: totals.boxes,
-      avgWeight: totals.avgWeight,
-      dcPhotoKey: imageKey || undefined,
-      dcPhotoMime: trip.dcPhotoMime,
-      dcPhotoData: trip.dcPhotoData,
-    });
+      removedBoxNos,
+      ...photoFields(),
+    } as Partial<Trip>);
     setToast(success
-      ? { message: "Pickup details saved successfully.", type: "success" }
+      ? { message: "Progress saved successfully.", type: "success" }
       : { message: "Unable to save pickup details. Please try again.", type: "error" });
-    if (success) savedPhotoKeyRef.current = imageKey;
+    if (success) {
+      savedPhotosRef.current = photos;
+      setRemovedBoxNos([]);
+    }
     setIsSaving(false);
   };
 
@@ -340,7 +403,7 @@ export default function StepPickup({
     if (isSubmitting) return;
     if (trip.pickupStepSubmitted && !editable && !isLocalEditing) return;
 
-    if (!imageKey) {
+    if (!photos.length) {
       setToast({ message: "Please upload a DC photo before submitting.", type: "error" });
       return;
     }
@@ -365,13 +428,7 @@ export default function StepPickup({
           try {
             const success = await submitPickupStep({
               boxDetails: getBoxDetails(),
-              totalBirds: totals.totalBirds,
-              dcWeight: totals.dcWeight,
-              boxes: totals.boxes,
-              avgWeight: totals.avgWeight,
-              dcPhotoKey: imageKey || undefined,
-              dcPhotoMime: trip.dcPhotoMime,
-              dcPhotoData: trip.dcPhotoData,
+              ...photoFields(),
             });
             if (success) {
               setIsLocalEditing(false);
@@ -390,7 +447,7 @@ export default function StepPickup({
     });
   };
 
-  const canSubmit = rows.length > 0 && totals.totalBirds > 0 && totals.dcWeight > 0 && imageKey !== null;
+  const canSubmit = rows.length > 0 && totals.totalBirds > 0 && totals.dcWeight > 0 && photos.length >= 1;
 
   // ─── PDF Generation ─────────────────────────────────────────────────
   const generatePDF = () => {
@@ -445,12 +502,17 @@ export default function StepPickup({
       });
 
       const boxData = trip.boxDetails || [];
-      const tableRows = boxData.map((r) => [r.boxNo, r.birds, r.weight.toFixed(2)]);
+      const tableRows = boxData.map((r) => [
+        r.boxNo,
+        r.birds,
+        Number(r.weight).toFixed(2),
+        formatAvg(Number(r.birds), Number(r.weight), r.avgWeight),
+      ]);
 
       autoTable(doc, {
         startY: y + 6,
-        head: [['Box #', 'Birds', 'Weight (Kg)']],
-        body: tableRows.length > 0 ? tableRows : [['—', '—', '—']],
+        head: [['Box #', 'Birds', 'Weight (Kg)', 'Avg WT (Kg)']],
+        body: tableRows.length > 0 ? tableRows : [['—', '—', '—', '—']],
         theme: 'grid',
         styles: { fontSize: 9, cellPadding: 4 },
         headStyles: {
@@ -462,8 +524,9 @@ export default function StepPickup({
         foot: tableRows.length > 0
           ? [[
               { content: 'Total', colSpan: 1, styles: { fontStyle: 'bold' } },
-              { content: totals.totalBirds.toString(), styles: { fontStyle: 'bold' } },
-              { content: totals.dcWeight.toFixed(2), styles: { fontStyle: 'bold' } },
+              { content: String(trip.totalBirds || totals.totalBirds), styles: { fontStyle: 'bold' } },
+              { content: Number(trip.dcWeight || totals.dcWeight).toFixed(2), styles: { fontStyle: 'bold' } },
+              { content: formatAvg(Number(trip.totalBirds), Number(trip.dcWeight), trip.avgWeight), styles: { fontStyle: 'bold' } },
             ]]
           : undefined,
       });
@@ -475,10 +538,11 @@ export default function StepPickup({
       doc.text('SUMMARY', 14, finalY + 10);
 
       const summaryData = [
-        ['Total DC Weight', totals.dcWeight.toFixed(2) + ' Kg'],
-        ['Total Birds', totals.totalBirds],
-        ['Loaded Boxes', `${totals.boxes} / ${maxBoxes}`],
-        ['Average Weight', totals.avgWeight > 0 ? totals.avgWeight + ' Kg' : '—'],
+        ['Pickup Time', trip.pickupLoadTime || 'Not entered'],
+        ['Total DC Weight', Number(trip.dcWeight || 0).toFixed(2) + ' Kg'],
+        ['Total Birds', trip.totalBirds || 0],
+        ['Loaded Boxes', `${trip.boxes || totals.boxes} / ${maxBoxes || '—'}`],
+        ['Average Weight', formatAvg(Number(trip.totalBirds), Number(trip.dcWeight), trip.avgWeight) + (trip.avgWeight ? ' Kg' : '')],
       ];
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
@@ -553,7 +617,7 @@ export default function StepPickup({
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Scale size={12} className="text-emerald-500" /> DC Wt
             </span>
-            <span className="text-xs font-bold text-slate-800">{trip.dcWeight.toFixed(2)} Kg</span>
+            <span className="text-xs font-bold text-slate-800">{trip.dcWeight ? `${Number(trip.dcWeight).toFixed(2)} Kg` : "Not entered"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
@@ -571,15 +635,18 @@ export default function StepPickup({
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Gauge size={12} className="text-purple-500" /> Avg Wt
             </span>
-            <span className="text-xs font-bold text-slate-800">{trip.avgWeight || 0} Kg</span>
+            <span className="text-xs font-bold text-slate-800">{trip.avgWeight ? `${trip.avgWeight} Kg` : "—"}</span>
           </div>
         </div>
 
         {/* DC Photo Status Card */}
-        {imageKey && (
-          <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center gap-2 text-xs font-medium text-slate-700">
+        {photos.length > 0 && (
+          <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center gap-3 text-xs font-medium text-slate-700 flex-wrap">
             <Camera size={16} className="text-slate-400" />
-            <span>DC Photo uploaded</span>
+            <span>{photos.length} photo{photos.length === 1 ? "" : "s"} uploaded</span>
+            {photos.map((p) => (
+              <img key={p.key} src={p.data} alt="Pickup" className="h-12 w-12 object-cover rounded-lg border border-slate-200" />
+            ))}
           </div>
         )}
 
@@ -588,25 +655,18 @@ export default function StepPickup({
           <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto max-h-96 overflow-y-auto">
             <table className="w-full table-fixed border-collapse text-xs">
               <colgroup>
-                <col className="w-[8%]" />
-                <col className="w-[12%]" />
-                <col className="w-[13.33%]" />
-                <col className="w-[8%]" />
-                <col className="w-[12%]" />
-                <col className="w-[13.33%]" />
-                <col className="w-[8%]" />
-                <col className="w-[12%]" />
-                <col className="w-[13.33%]" />
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <col key={i} className="w-[8.33%]" />
+                ))}
               </colgroup>
               <thead>
                 <tr className="bg-slate-50 text-slate-600 text-[10px] uppercase sticky top-0 z-10 border-b border-slate-200">
                   {[1, 2, 3].map((i, idx) => (
                     <React.Fragment key={i}>
-                      <th className={`text-center px-3 py-2 font-bold bg-slate-50 text-slate-600 border-r border-slate-200 ${idx > 0 ? 'pl-5' : ''}`}>BOX</th>
-                      <th className="text-center px-3 py-2 font-bold bg-slate-50 text-slate-600 border-r border-slate-200">BIRDS</th>
-                      <th className={`text-center px-3 py-2 font-bold bg-slate-50 text-slate-600 ${idx < 2 ? 'border-r-2 border-slate-300 pr-5' : ''}`}>
-                        WT(KG)
-                      </th>
+                      <th className={`text-center px-2 py-2 font-bold bg-slate-50 text-slate-600 border-r border-slate-200 ${idx > 0 ? 'pl-4' : ''}`}>BOX</th>
+                      <th className="text-center px-2 py-2 font-bold bg-slate-50 text-slate-600 border-r border-slate-200">BIRDS</th>
+                      <th className="text-center px-2 py-2 font-bold bg-slate-50 text-slate-600 border-r border-slate-200">WT(KG)</th>
+                      <th className={`text-center px-2 py-2 font-bold bg-slate-50 text-slate-600 ${idx < 2 ? 'border-r-2 border-slate-300' : ''}`}>AVG WT(KG)</th>
                     </React.Fragment>
                   ))}
                 </tr>
@@ -616,10 +676,11 @@ export default function StepPickup({
                   <tr key={idx} className="bg-white hover:bg-slate-50 transition-colors">
                     {group.map((r, colIdx) => (
                       <React.Fragment key={r.boxNo}>
-                        <td className={`text-center px-3 py-2 font-semibold text-slate-800 border-r border-slate-200 ${colIdx > 0 ? 'pl-5' : ''}`}>{r.boxNo}</td>
-                        <td className="text-center px-3 py-2 font-bold text-slate-800 border-r border-slate-200">{r.birds}</td>
-                        <td className={`text-center px-3 py-2 font-semibold text-slate-800 ${colIdx < 2 ? 'border-r-2 border-slate-300 pr-5' : ''}`}>
-                          {r.weight.toFixed(2)}
+                        <td className={`text-center px-2 py-2 font-semibold text-slate-800 border-r border-slate-200 ${colIdx > 0 ? 'pl-4' : ''}`}>{r.boxNo}</td>
+                        <td className="text-center px-2 py-2 font-bold text-slate-800 border-r border-slate-200">{r.birds || "Not entered"}</td>
+                        <td className="text-center px-2 py-2 font-semibold text-slate-800 border-r border-slate-200">{r.weight ? Number(r.weight).toFixed(2) : "Not entered"}</td>
+                        <td className={`text-center px-2 py-2 font-semibold text-slate-800 ${colIdx < 2 ? 'border-r-2 border-slate-300' : ''}`}>
+                          {formatAvg(Number(r.birds), Number(r.weight), r.avgWeight)}
                         </td>
                       </React.Fragment>
                     ))}
@@ -628,11 +689,10 @@ export default function StepPickup({
                         const emptyIdx = group.length + i;
                         return (
                           <React.Fragment key={i}>
-                            <td className={`text-center px-3 py-2 text-slate-300 border-r border-slate-200 ${emptyIdx > 0 ? 'pl-5' : ''}`}>—</td>
-                            <td className="text-center px-3 py-2 text-slate-300 border-r border-slate-200">—</td>
-                            <td className={`text-center px-3 py-2 text-slate-300 ${emptyIdx < 2 ? 'border-r-2 border-slate-300 pr-5' : ''}`}>
-                              —
-                            </td>
+                            <td className={`text-center px-2 py-2 text-slate-300 border-r border-slate-200 ${emptyIdx > 0 ? 'pl-4' : ''}`}>—</td>
+                            <td className="text-center px-2 py-2 text-slate-300 border-r border-slate-200">—</td>
+                            <td className="text-center px-2 py-2 text-slate-300 border-r border-slate-200">—</td>
+                            <td className={`text-center px-2 py-2 text-slate-300 ${emptyIdx < 2 ? 'border-r-2 border-slate-300' : ''}`}>—</td>
                           </React.Fragment>
                         );
                       })}
@@ -649,7 +709,7 @@ export default function StepPickup({
             Pickup KPI details submitted successfully.
           </p>
           <div className="flex items-center gap-2 flex-wrap">
-            {imageKey && (
+            {photos.length > 0 && (
               <button
                 onClick={downloadImage}
                 className="flex items-center justify-center p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-xs transition-all active:scale-95"
@@ -672,10 +732,15 @@ export default function StepPickup({
   }
 
   // ─── EDIT / ENTRY VIEW ──────────────────────────────────────────────────
-  const groupedRows = rows.reduce((acc: Row[][], _, i, arr) => {
+  const showAddSlot = isLastRowComplete && maxBoxes > 0 && rows.length < maxBoxes;
+  const entrySlots: Array<{ type: "box"; row: Row } | { type: "add" }> = [
+    ...rows.map((row) => ({ type: "box" as const, row })),
+    ...(showAddSlot ? [{ type: "add" as const }] : []),
+  ];
+  const groupedRows = entrySlots.reduce((acc: typeof entrySlots[], _, i, arr) => {
     if (i % 3 === 0) acc.push(arr.slice(i, i + 3));
     return acc;
-  }, []);
+  }, [] as typeof entrySlots[]);
 
   const isEditMode = editable || isLocalEditing;
 
@@ -757,7 +822,7 @@ export default function StepPickup({
           <div className="flex items-center gap-3">
             {(isEditMode || isLocalEditing) && trip.pickupStepSubmitted && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
-                Editable View
+                Editing Trip {trip.tripNo}
               </span>
             )}
           </div>
@@ -777,25 +842,18 @@ export default function StepPickup({
                 <Camera size={14} className="text-slate-400" />
                 {TRIP_FIELD_DEFINITIONS.dcPhotoKey.label} {TRIP_FIELD_DEFINITIONS.dcPhotoKey.required && <span className="text-red-500">*</span>}
               </label>
-              <div className="mt-1 flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1.5 text-xs font-semibold bg-white text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-all shadow-xs"
-                >
-                  Choose Image
-                </button>
-                {imageKey && (
+              <div className="mt-1 flex items-center gap-3 flex-wrap">
+                {photos.length < 2 && (
                   <button
                     type="button"
-                    onClick={removeImage}
-                    className="px-3 py-1.5 text-xs font-semibold bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-all"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-1.5 text-xs font-semibold bg-white text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-all shadow-xs"
                   >
-                    Remove
+                    Choose Image
                   </button>
                 )}
                 <span className="text-xs text-slate-500">
-                  {imageKey ? "✅ Uploaded" : "No image selected"}
+                  {photos.length ? `${photos.length} of 2 uploaded` : "No image selected"}
                 </span>
               </div>
               <input
@@ -805,11 +863,23 @@ export default function StepPickup({
                 onChange={handleFileSelect}
                 className="hidden"
               />
-              <p className="text-[10px] text-slate-400 mt-1">Max 5MB, JPG/PNG</p>
+              <p className="text-[10px] text-slate-400 mt-1">Max 2 photos, 5MB each, JPG/PNG. Submit requires at least 1.</p>
             </div>
-            {imagePreview && (
-              <div className="flex-shrink-0">
-                <img src={imagePreview} alt="DC Preview" className="h-20 w-20 object-cover rounded-lg border border-slate-200" />
+            {photos.length > 0 && (
+              <div className="flex-shrink-0 flex gap-2">
+                {photos.map((p) => (
+                  <div key={p.key} className="relative">
+                    <img src={p.data} alt="Pickup" className="h-20 w-20 object-cover rounded-lg border border-slate-200" />
+                    <button
+                      type="button"
+                      onClick={() => void removeImage(p.key)}
+                      className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 text-[10px] leading-5"
+                      title="Remove photo"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -819,48 +889,25 @@ export default function StepPickup({
         <div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-slate-600">
-              Box entries (Max limit: {maxBoxes} boxes)
+              Box entries (Max limit: {maxBoxes || "—"} boxes)
             </span>
-            <button
-              type="button"
-              onClick={addRow}
-              disabled={!isLastRowComplete || rows.length >= maxBoxes}
-              className={`flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-lg border transition-all active:scale-95 ${
-                isLastRowComplete && rows.length < maxBoxes
-                  ? "text-blue-700 bg-blue-50 hover:bg-blue-100 border-blue-200"
-                  : "text-slate-400 bg-slate-50 border-slate-200 cursor-not-allowed"
-              }`}
-              title={rows.length >= maxBoxes ? `Max vehicle box limit (${maxBoxes}) reached` : isLastRowComplete ? "Add a new box" : "Fill the current box first"}
-            >
-              <Plus size={14} /> Add Box
-            </button>
           </div>
 
           <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs max-h-80 overflow-y-auto">
             <table className="w-full table-fixed border-collapse text-xs">
               <colgroup>
-                <col className="w-[8%]" />
-                <col className="w-[12%]" />
-                <col className="w-[13.33%]" />
-                <col className="w-[8%]" />
-                <col className="w-[12%]" />
-                <col className="w-[13.33%]" />
-                <col className="w-[8%]" />
-                <col className="w-[12%]" />
-                <col className="w-[13.33%]" />
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <col key={i} className="w-[8.33%]" />
+                ))}
               </colgroup>
               <thead>
                 <tr className="bg-slate-50 text-slate-600 text-[10px] uppercase font-bold sticky top-0 z-10 border-b border-slate-200">
                   {[1, 2, 3].map((blockIdx) => (
                     <React.Fragment key={blockIdx}>
-                      <th className={`text-center px-1 py-2 font-bold text-slate-600 bg-slate-50 border-r border-slate-200 ${blockIdx > 1 ? 'pl-5' : ''}`}>BOX</th>
+                      <th className={`text-center px-1 py-2 font-bold text-slate-600 bg-slate-50 border-r border-slate-200 ${blockIdx > 1 ? 'pl-4' : ''}`}>BOX</th>
                       <th className="text-center px-1 py-2 font-bold text-slate-600 bg-slate-50 border-r border-slate-200">BIRDS</th>
-                      <th className={`px-1 py-2 font-bold text-slate-600 bg-slate-50 ${blockIdx < 3 ? 'border-r-2 border-slate-300 pr-5' : ''}`}>
-                        <div className="flex items-center justify-center">
-                          <span className="text-center">WT(KG)</span>
-                          <div className="w-[22px] shrink-0" />
-                        </div>
-                      </th>
+                      <th className="text-center px-1 py-2 font-bold text-slate-600 bg-slate-50 border-r border-slate-200">WT(KG)</th>
+                      <th className={`text-center px-1 py-2 font-bold text-slate-600 bg-slate-50 ${blockIdx < 3 ? 'border-r-2 border-slate-300' : ''}`}>AVG WT(KG)</th>
                     </React.Fragment>
                   ))}
                 </tr>
@@ -868,9 +915,28 @@ export default function StepPickup({
               <tbody className="divide-y divide-slate-100 bg-white">
                 {groupedRows.map((group, idx) => (
                   <tr key={idx} className="hover:bg-slate-50 transition-colors bg-white">
-                    {group.map((row, groupIdx) => (
+                    {group.map((slot, groupIdx) => {
+                      if (slot.type === "add") {
+                        return (
+                          <td
+                            key="add-box"
+                            colSpan={4}
+                            className={`px-1 py-1.5 bg-white ${groupIdx < 2 ? "border-r-2 border-slate-300" : ""}`}
+                          >
+                            <button
+                              type="button"
+                              onClick={addRow}
+                              className="w-full h-8 text-[10px] font-bold uppercase tracking-wide text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg"
+                            >
+                              <Plus size={12} className="inline mr-1" /> Add Box
+                            </button>
+                          </td>
+                        );
+                      }
+                      const row = slot.row;
+                      return (
                       <React.Fragment key={row.uid}>
-                        <td className={`text-center px-1 py-1.5 font-bold text-slate-700 text-xs bg-white border-r border-slate-200 ${groupIdx > 0 ? 'pl-5' : ''}`}>{row.boxNo}</td>
+                        <td className={`text-center px-1 py-1.5 font-bold text-slate-700 text-xs bg-white border-r border-slate-200 ${groupIdx > 0 ? 'pl-4' : ''}`}>{row.boxNo}</td>
                         <td className="px-1 py-1.5 bg-white border-r border-slate-200">
                           <input
                             type="number"
@@ -884,7 +950,7 @@ export default function StepPickup({
                             className="mini-input hide-spinner"
                           />
                         </td>
-                        <td className={`px-1 py-1.5 bg-white ${groupIdx < 2 ? 'border-r-2 border-slate-300 pr-5' : ''}`}>
+                        <td className="px-1 py-1.5 bg-white border-r border-slate-200">
                           <div className="flex items-center gap-0.5">
                             <input
                               type="number"
@@ -900,7 +966,7 @@ export default function StepPickup({
                             <button
                               type="button"
                               onClick={() => removeRow(row.uid)}
-                              disabled={rows.length === 1}
+                              disabled={rows.length === 1 || row.uid !== rows[rows.length - 1]?.uid}
                               className="mini-delete shrink-0"
                               title="Delete box"
                             >
@@ -908,18 +974,21 @@ export default function StepPickup({
                             </button>
                           </div>
                         </td>
+                        <td className={`text-center px-1 py-1.5 text-xs font-semibold text-slate-700 bg-white ${groupIdx < 2 ? 'border-r-2 border-slate-300' : ''}`}>
+                          {formatAvg(row.birds, row.weight, row.avgWeight)}
+                        </td>
                       </React.Fragment>
-                    ))}
+                      );
+                    })}
                     {group.length < 3 &&
                       Array.from({ length: 3 - group.length }).map((_, i) => {
                         const emptyIdx = group.length + i;
                         return (
                           <React.Fragment key={i}>
-                            <td className={`text-center px-1 py-1.5 text-slate-300 text-xs bg-white border-r border-slate-200 ${emptyIdx > 0 ? 'pl-5' : ''}`}>—</td>
+                            <td className={`text-center px-1 py-1.5 text-slate-300 text-xs bg-white border-r border-slate-200 ${emptyIdx > 0 ? 'pl-4' : ''}`}>—</td>
                             <td className="text-center px-1 py-1.5 text-slate-300 text-xs bg-white border-r border-slate-200">—</td>
-                            <td className={`text-center px-1 py-1.5 text-slate-300 text-xs bg-white ${emptyIdx < 2 ? 'border-r-2 border-slate-300 pr-5' : ''}`}>
-                              —
-                            </td>
+                            <td className="text-center px-1 py-1.5 text-slate-300 text-xs bg-white border-r border-slate-200">—</td>
+                            <td className={`text-center px-1 py-1.5 text-slate-300 text-xs bg-white ${emptyIdx < 2 ? 'border-r-2 border-slate-300' : ''}`}>—</td>
                           </React.Fragment>
                         );
                       })}
@@ -978,7 +1047,7 @@ export default function StepPickup({
           onSave={savePickupProgress ? handleSaveProgress : undefined}
           onSubmit={handleSubmit}
           busy={isSaving || isSubmitting}
-          saveDisabled={!hasUnsavedChanges || !canSubmit}
+          saveDisabled={false}
           submitDisabled={!canSubmit || (trip.pickupStepSubmitted && !isEditMode)}
           submitLabel={isEditMode ? "Update Pickup" : "Submit Pickup"}
         />

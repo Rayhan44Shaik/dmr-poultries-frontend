@@ -1,6 +1,6 @@
 // src/modules/operations/vehicle-trips/components/Step_5/StepEnd.tsx
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Pencil,
   AlertTriangle,
@@ -10,8 +10,6 @@ import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 import { TRIP_STEP_DEFINITIONS } from "../../../../../shared/trip/definitions";
 import GeneralExpensesTable from "./GeneralExpensesTable";
 import DieselExpensesTable from "./DieselExpensesTable";
-import { fuelExpenseService } from "../../../fuel-expenses/services/fuelExpenseService";
-import type { FuelExpense } from "../../../fuel-expenses/types/fuelExpense";
 
 // ─── ConfirmationModal ────────────────────────────────────────────
 function ConfirmationModal({ isOpen, title, message, confirmLabel = "Yes, Proceed", cancelLabel = "Cancel", onConfirm, onCancel, type = "warning" }: {
@@ -129,7 +127,7 @@ export default function StepEnd({
   const buildSheetDataFromTrip = (tripData: Trip): SheetData => {
     const data: SheetData = {
       vehicleNo: tripData.vehicleNo || "",
-      submittedAtTimestamp: (tripData as any).submittedAtTimestamp || (tripData as any).submittedAt || "",
+      submittedAtTimestamp: (tripData as any).expensesStepSubmittedAt || (tripData as any).submittedAtTimestamp || (tripData as any).submittedAt || "",
       advance: tripData.advanceAmount ?? "",
       meals: (tripData as any).meals ?? "",
       loading: (tripData as any).loading ?? "",
@@ -148,8 +146,7 @@ export default function StepEnd({
     };
     // Copy all diesel fields from trip
     Object.keys(tripData).forEach(key => {
-      if (key.startsWith("dieselLtr") || key.startsWith("dieselRate") || key.startsWith("dieselMeter") ||
-          key.startsWith("dieselBunk") || key.startsWith("dieselImage") || key.startsWith("dieselImageName")) {
+      if (key.startsWith("diesel")) {
         (data as any)[key] = (tripData as any)[key];
       }
     });
@@ -194,16 +191,20 @@ export default function StepEnd({
     return indices.sort((a,b) => a - b);
   };
 
-  const dieselIndices = getDieselIndices(sheetData);
-  const dieselAmounts = dieselIndices.map(idx => {
+  const dieselIndices = getDieselIndices(sheetData).filter((idx) => sheetData[`dieselSubmitted${idx}`]);
+  const dieselAmounts = getDieselIndices(sheetData).map(idx => {
     const ltr = Number(sheetData[`dieselLtr${idx}`] || 0);
     const rate = Number(sheetData[`dieselRate${idx}`] || 0);
     return ltr * rate;
   });
-  const totalDieselAmount = dieselAmounts.reduce((acc, curr) => acc + curr, 0);
+  const totalDieselAmount = dieselIndices.reduce((acc, idx) => {
+    const ltr = Number(sheetData[`dieselLtr${idx}`] || 0);
+    const rate = Number(sheetData[`dieselRate${idx}`] || 0);
+    return acc + ltr * rate;
+  }, 0);
   const totalDieselLiters = dieselIndices.reduce((acc, idx) => acc + Number(sheetData[`dieselLtr${idx}`] || 0), 0);
 
-  let averageKmLtr = "0.00";
+  let averageKmLtr = "";
   if (totalDistanceCovered > 0 && totalDieselLiters > 0) {
     averageKmLtr = (totalDistanceCovered / totalDieselLiters).toFixed(2);
   }
@@ -214,8 +215,12 @@ export default function StepEnd({
   // ─── Handle field changes in React state only ──────────────────
   const handleChange = (field: string, value: any) => {
     setErrorMsg("");
-    const updated = { ...sheetData, [field]: value };
-    setSheetData(updated);
+    setSheetData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const applyBatchUpdates = (updates: Record<string, any>) => {
+    setErrorMsg("");
+    setSheetData((prev) => ({ ...prev, ...updates }));
   };
 
   // ─── Compute derived values ──────────────────────────────────────
@@ -236,92 +241,39 @@ export default function StepEnd({
   const totalAllExpenses = totalExpenses1 + totalExpenses2;
 
   const remainingBalance =
-    Number(sheetData.advance || 0) - totalAllExpenses - totalDieselAmount;
+    Number(trip.advanceAmount || 0) - totalAllExpenses - totalDieselAmount;
 
-  // ─── Prepare final payload for submission ──────────────────────
   const prepareFinalPayload = (stepSubmitted = false) => {
-    const existingTimestamp = (trip as any).submittedAtTimestamp || sheetData.submittedAtTimestamp;
-    const capturedTimestamp = existingTimestamp || new Date().toLocaleString("en-IN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true,
-    });
-
     let newStatus: TripStatus = trip.status || "Draft";
-    if (stepSubmitted) {
-      if (trip.status !== "Deleted") {
-        newStatus = "Completed"; // ✅ FIXED: End step signifies trip completion
-      } else {
-        newStatus = "Deleted";
-      }
+    if (stepSubmitted && trip.status !== "Deleted") {
+      newStatus = "Completed";
     }
 
     return {
-      ...sheetData,
-      submittedAtTimestamp: capturedTimestamp,
+      meals: sheetData.meals,
+      loading: sheetData.loading,
+      mealsTiffin: sheetData.mealsTiffin,
+      vehicleMaintenance: sheetData.vehicleMaintenance,
+      othersRC: sheetData.othersRC,
+      others1Amt: sheetData.others1Amt,
+      others2Amt: sheetData.others2Amt,
+      others3Amt: sheetData.others3Amt,
+      others4Amt: sheetData.others4Amt,
+      others5Amt: sheetData.others5Amt,
+      endMeter: sheetData.endMeter,
+      closingMeter: Number(sheetData.endMeter) || 0,
+      destinationTolls: sheetData.destinationTolls === "" ? 0 : Number(sheetData.destinationTolls),
+      deliveryTolls: sheetData.destinationTolls === "" ? 0 : Number(sheetData.destinationTolls),
+      remarks: sheetData.remarks,
       totalExpenses: totalAllExpenses,
       totalDieselAmount,
       remainingBalance,
       pickupTolls: trip.pickupTolls || 0,
-      closingMeter: Number(sheetData.endMeter) || 0,
-      deliveryTolls: sheetData.destinationTolls === "" ? 0 : Number(sheetData.destinationTolls),
-      advanceAmount: sheetData.advance === "" ? 0 : Number(sheetData.advance),
-      openingMeter: openingMeter,
       expensesStepSubmitted: stepSubmitted,
-      endStepSubmitted: stepSubmitted, // ✅ Explicitly set endStepSubmitted
+      endStepSubmitted: stepSubmitted,
       status: newStatus,
     };
   };
-
-  // ─── Sync fuel bills after submission ──────────────────────────
-  const syncFuelBillsOnSubmit = useCallback((data: SheetData) => {
-    const indices = getDieselIndices(data);
-    if (indices.length === 0) return;
-
-    const existingBills = fuelExpenseService.getBillsForTrip(trip.vehicleId, trip.tripDate);
-    const existingKeys = new Set<string>();
-    existingBills.forEach(b => {
-      const key = `${b.amount}-${b.meterReading}-${b.petrolBunk}`;
-      existingKeys.add(key);
-    });
-
-    indices.forEach(idx => {
-      const ltr = Number(data[`dieselLtr${idx}`] || 0);
-      const rate = Number(data[`dieselRate${idx}`] || 0);
-      const meter = Number(data[`dieselMeter${idx}`] || 0);
-      const bunk = data[`dieselBunk${idx}`] || "";
-      const image = data[`dieselImage${idx}`] || "";
-      if (!ltr || !rate || !meter || !bunk) return;
-
-      const amount = ltr * rate;
-      const key = `${amount}-${meter}-${bunk}`;
-      if (existingKeys.has(key)) return;
-
-      const fuelBill: Omit<FuelExpense, "id" | "billNo" | "createdDate" | "createdBy" | "status"> = {
-        date: trip.tripDate,
-        vehicleId: trip.vehicleId,
-        vehicleNo: trip.vehicleNo,
-        driverId: trip.driverId,
-        driverName: trip.driverName,
-        supervisorId: trip.supervisorId,
-        supervisorName: trip.supervisorName,
-        meterReading: meter,
-        amount: amount,
-        rate: rate,
-        litres: ltr,
-        petrolBunk: bunk,
-        remarks: `Auto-created from trip ${trip.tripNo}`,
-        image: image,
-        synced: true,
-      };
-
-      fuelExpenseService.save(fuelBill);
-    });
-  }, [trip]);
 
   // ─── Save progress (manual) ──────────────────────────────────────
   const handleSaveProgress = async () => {
@@ -351,6 +303,8 @@ export default function StepEnd({
     let highestDieselMeter = 0;
     Object.keys(sheetData).forEach((key) => {
       if (key.startsWith("dieselMeter")) {
+        const idx = key.replace("dieselMeter", "");
+        if (!sheetData[`dieselSubmitted${idx}`]) return;
         const val = Number(sheetData[key]);
         if (!isNaN(val) && val > highestDieselMeter) highestDieselMeter = val;
       }
@@ -373,27 +327,62 @@ export default function StepEnd({
     }
 
     const destTollsNum = Number(sheetData.destinationTolls);
-    if (sheetData.destinationTolls === "" || sheetData.destinationTolls === null || isNaN(destTollsNum) || destTollsNum <= 0) {
-      setErrorMsg("Total Toll Gates (Destination) must be greater than 0.");
-      setToast({ message: "Total Toll Gates (Destination) must be greater than 0.", type: "warning" });
+    if (sheetData.destinationTolls === "" || sheetData.destinationTolls === null || isNaN(destTollsNum) || destTollsNum < 0) {
+      setErrorMsg("Total Toll Gates (Destination) must be 0 or greater.");
+      setToast({ message: "Total Toll Gates (Destination) must be 0 or greater.", type: "warning" });
       return;
     }
 
-    setConfirmation({
-      isOpen: true,
-      title: isSubmitted ? "Update Expenses Sheet" : "Submit Expenses Sheet",
-      message: isSubmitted
-        ? "Are you sure you want to update the submitted expenses sheet with recent changes?"
-        : "Are you sure you want to submit this expenses sheet? This will mark the trip as completed and lock current entries.",
-      confirmLabel: isSubmitted ? "Yes, Update" : "Yes, Submit",
-      cancelLabel: "Cancel",
-      type: "info",
-      onConfirm: () => {
-        setConfirmation((prev) => ({ ...prev, isOpen: false }));
-        executeSubmit();
-      },
-      onCancel: () => setConfirmation((prev) => ({ ...prev, isOpen: false })),
-    });
+    const draftCount = getDieselIndices(sheetData).filter((idx) => {
+      if (sheetData[`dieselSubmitted${idx}`]) return false;
+      return Boolean(
+        sheetData[`dieselLtr${idx}`] ||
+        sheetData[`dieselRate${idx}`] ||
+        sheetData[`dieselMeter${idx}`] ||
+        sheetData[`dieselBunk${idx}`] ||
+        sheetData[`dieselImage${idx}`]
+      );
+    }).length;
+
+    const proceedToFinalConfirm = () => {
+      setConfirmation({
+        isOpen: true,
+        title: isSubmitted ? "Update Expenses Sheet" : "Submit Expenses Sheet",
+        message: isSubmitted
+          ? "Are you sure you want to update the submitted expenses sheet with recent changes?"
+          : "Are you sure you want to submit this expenses sheet? This will mark the trip as completed and lock current entries.",
+        confirmLabel: isSubmitted ? "Yes, Update" : "Yes, Submit",
+        cancelLabel: "Cancel",
+        type: "info",
+        onConfirm: () => {
+          setConfirmation((prev) => ({ ...prev, isOpen: false }));
+          executeSubmit();
+        },
+        onCancel: () => setConfirmation((prev) => ({ ...prev, isOpen: false })),
+      });
+    };
+
+    if (draftCount > 0) {
+      setConfirmation({
+        isOpen: true,
+        title: "Diesel bills are still in draft",
+        message:
+          draftCount === 1
+            ? "Diesel bills are still in draft. Only submitted diesel bills are saved. Do you want to submit Step 5 without submitting these draft bills? You have 1 diesel bill that has not been submitted."
+            : `Diesel bills are still in draft. Only submitted diesel bills are saved. Do you want to submit Step 5 without submitting these draft bills? You have ${draftCount} diesel bills in draft.`,
+        confirmLabel: "Submit Step 5 Without Draft",
+        cancelLabel: draftCount === 1 ? "Go Back" : "Review Drafts",
+        type: "warning",
+        onConfirm: () => {
+          setConfirmation((prev) => ({ ...prev, isOpen: false }));
+          proceedToFinalConfirm();
+        },
+        onCancel: () => setConfirmation((prev) => ({ ...prev, isOpen: false })),
+      });
+      return;
+    }
+
+    proceedToFinalConfirm();
   };
 
   const executeSubmit = async () => {
@@ -408,10 +397,8 @@ export default function StepEnd({
         if (result === false) success = false;
       }
       if (success) {
-        setSheetData(finalData as any);
         setIsLocalEditing(false);
         setIsSubmittedLocal(true);
-        syncFuelBillsOnSubmit(finalData as any);
         setToast({ message: "End details submitted successfully.", type: "success" });
         // Final step complete → return to Create New Trip (no resume).
         if (clearForm) window.setTimeout(clearForm, 700);
@@ -480,11 +467,15 @@ export default function StepEnd({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
               <p className="text-[11px] text-slate-500 font-medium">Date & Time</p>
-              <p className="text-xs font-semibold text-slate-900 mt-0.5">{sheetData.submittedAtTimestamp || "--"}</p>
+              <p className="text-xs font-semibold text-slate-900 mt-0.5">{sheetData.submittedAtTimestamp || (trip as any).expensesStepSubmittedAt || "--"}</p>
             </div>
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
               <p className="text-[11px] text-slate-500 font-medium">Vehicle No</p>
-              <p className="text-xs font-semibold text-slate-900 mt-0.5">{sheetData.vehicleNo || "--"}</p>
+              <p className="text-xs font-semibold text-slate-900 mt-0.5">{trip.vehicleNo || "--"}</p>
+            </div>
+            <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
+              <p className="text-[11px] text-slate-500 font-medium">Advance</p>
+              <p className="text-xs font-semibold text-emerald-700 mt-0.5">₹{Number(trip.advanceAmount || 0).toFixed(2)}</p>
             </div>
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
               <p className="text-[11px] text-slate-500 font-medium">Total Expenses</p>
@@ -499,6 +490,30 @@ export default function StepEnd({
               <p className="text-xs font-semibold text-emerald-600 mt-0.5">₹{remainingBalance.toFixed(2)}</p>
             </div>
           </div>
+          <GeneralExpensesTable
+            sheetData={sheetData}
+            handleChange={handleChange}
+            pickupTolls={trip.pickupTolls || 0}
+            totalExpenses1={totalExpenses1}
+            totalExpenses2={totalExpenses2}
+            totalAllExpenses={totalAllExpenses}
+            totalDistanceCovered={totalDistanceCovered}
+            averageKmLtr={averageKmLtr}
+            openingMeter={openingMeter}
+            destMeter={destMeter}
+            trip={trip}
+            readOnly
+          />
+          <DieselExpensesTable
+            tripId={trip.id}
+            sheetData={sheetData}
+            handleChange={handleChange}
+            applyBatchUpdates={applyBatchUpdates}
+            dieselAmounts={dieselAmounts}
+            totalDieselAmount={totalDieselAmount}
+            destMeter={destMeter}
+            readOnly
+          />
         </div>
       ) : (
         // ─── Editable View ────────────────────────────────────────────
@@ -530,8 +545,10 @@ export default function StepEnd({
 
           <DieselExpensesTable
             key={`diesel-${trip.id}`}
+            tripId={trip.id}
             sheetData={sheetData}
             handleChange={handleChange}
+            applyBatchUpdates={applyBatchUpdates}
             dieselAmounts={dieselAmounts}
             totalDieselAmount={totalDieselAmount}
             destMeter={destMeter}

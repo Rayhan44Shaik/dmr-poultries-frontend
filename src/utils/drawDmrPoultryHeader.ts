@@ -1,6 +1,10 @@
-import type jsPDF from "jspdf";
+import { jsPDF } from "jspdf";
 
 type RGB = [number, number, number];
+
+export type DmrPdfOrientation =
+  | "portrait"
+  | "landscape";
 
 export type PreparedHeaderImage = {
   dataUrl: string;
@@ -9,149 +13,142 @@ export type PreparedHeaderImage = {
 };
 
 export type DmrPoultryHeaderAssets = {
-  logo?: PreparedHeaderImage;
   hen?: PreparedHeaderImage;
 };
 
 export interface DmrPoultryHeaderOptions {
-  /** Left/right page inset in the same unit used to create the jsPDF document. */
+  /** Left/right page margin in millimetres. */
   margin?: number;
 
-  /** Top edge of the header. */
+  /** Top position of the header. */
   top?: number;
 
-  /** Optional replacement for the vector DMR logo. */
-  logoUrl?: string;
-
-  /** Hen image URL. The image is cut out automatically before it is drawn. */
+  /**
+   * Optional hen-image URL.
+   * The connected outer background is removed automatically.
+   */
   henUrl?: string;
 
-  title?: string;
-  subtitle?: string;
+  /** Optional business-name override. */
+  businessName?: string;
+
+  /** Optional proprietor-name override. */
+  proprietorName?: string;
+
+  /** Optional mobile-number override. */
+  mobileNumber?: string;
+
+  /** Optional address override. */
+  address?: string;
 }
+
+export const DMR_POULTRY_DETAILS = {
+  businessName: "DMR POULTRIES",
+  proprietorName:
+    "D. Srinivas Chakrapani",
+  mobileNumber: "+91 98484 17474",
+  address:
+    "Madhira Rd, Peddapuram, Andhra Pradesh 521181",
+} as const;
 
 const NAVY: RGB = [15, 35, 79];
 const RED: RGB = [178, 20, 34];
-const WHITE: RGB = [255, 255, 255];
+const MUTED: RGB = [75, 85, 99];
 
-const setFill = (doc: jsPDF, color: RGB) =>
-  doc.setFillColor(color[0], color[1], color[2]);
+const setFill = (
+  doc: jsPDF,
+  color: RGB,
+): void => {
+  doc.setFillColor(
+    color[0],
+    color[1],
+    color[2],
+  );
+};
 
-const setDraw = (doc: jsPDF, color: RGB) =>
-  doc.setDrawColor(color[0], color[1], color[2]);
+const setDraw = (
+  doc: jsPDF,
+  color: RGB,
+): void => {
+  doc.setDrawColor(
+    color[0],
+    color[1],
+    color[2],
+  );
+};
 
-const setText = (doc: jsPDF, color: RGB) =>
-  doc.setTextColor(color[0], color[1], color[2]);
+const setText = (
+  doc: jsPDF,
+  color: RGB,
+): void => {
+  doc.setTextColor(
+    color[0],
+    color[1],
+    color[2],
+  );
+};
 
 /**
- * Draws the DMR logo entirely using jsPDF vectors.
- * It remains sharp in all PDF sizes and does not require a separate logo file.
+ * Creates a compressed ISO A4 PDF.
  */
-export function drawDmrLogo(
-  doc: jsPDF,
-  x: number,
-  y: number,
-  size = 24
+export function createDmrPoultryPdf(
+  orientation:
+    DmrPdfOrientation = "portrait",
+): jsPDF {
+  return new jsPDF({
+    orientation,
+    unit: "mm",
+    format: "a4",
+    compress: true,
+    putOnlyUsedFonts: true,
+  });
+}
+
+function loadImage(
+  src: string,
+): Promise<HTMLImageElement> {
+  return new Promise(
+    (resolve, reject) => {
+      const image = new Image();
+
+      image.crossOrigin =
+        "anonymous";
+
+      image.onload = () => {
+        resolve(image);
+      };
+
+      image.onerror = () => {
+        reject(
+          new Error(
+            `Unable to load header image: ${src}`,
+          ),
+        );
+      };
+
+      image.src = src;
+    },
+  );
+}
+
+function imageToCanvas(
+  image: HTMLImageElement,
 ) {
-  doc.saveGraphicsState();
-
-  const centerX = x + size / 2;
-  const centerY = y + size / 2;
-  const radius = size / 2 - 0.6;
-
-  setFill(doc, WHITE);
-  setDraw(doc, NAVY);
-
-  doc.setLineWidth(0.9);
-  doc.circle(centerX, centerY, radius, "FD");
-
-  setDraw(doc, RED);
-  doc.setLineWidth(0.45);
-  doc.circle(centerX, centerY, radius - 1.8, "S");
-
-  // Red poultry crown.
-  setFill(doc, RED);
-
-  doc.triangle(
-    centerX - 4.2,
-    centerY - 4.1,
-    centerX - 2.3,
-    centerY - 7.1,
-    centerX - 0.8,
-    centerY - 4.1,
-    "F"
-  );
-
-  doc.triangle(
-    centerX - 1.2,
-    centerY - 4.1,
-    centerX + 0.7,
-    centerY - 7.7,
-    centerX + 2.2,
-    centerY - 4.1,
-    "F"
-  );
-
-  doc.triangle(
-    centerX + 1.7,
-    centerY - 4.1,
-    centerX + 3.8,
-    centerY - 6.8,
-    centerX + 4.8,
-    centerY - 3.8,
-    "F"
-  );
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  setText(doc, RED);
-
-  doc.text("DMR", centerX, centerY + 1.6, {
-    align: "center",
-  });
-
-  doc.setFontSize(4.8);
-  setText(doc, NAVY);
-
-  doc.text("POULTRY", centerX, centerY + 6.1, {
-    align: "center",
-  });
-
-  doc.restoreGraphicsState();
-}
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-
-    image.crossOrigin = "anonymous";
-
-    image.onload = () => {
-      resolve(image);
-    };
-
-    image.onerror = () => {
-      reject(
-        new Error(`Unable to load header image: ${src}`)
-      );
-    };
-
-    image.src = src;
-  });
-}
-
-function imageToCanvas(image: HTMLImageElement) {
-  const canvas = document.createElement("canvas");
+  const canvas =
+    document.createElement("canvas");
 
   canvas.width =
-    image.naturalWidth || image.width;
+    image.naturalWidth ||
+    image.width;
 
   canvas.height =
-    image.naturalHeight || image.height;
+    image.naturalHeight ||
+    image.height;
 
-  const context = canvas.getContext("2d", {
-    willReadFrequently: true,
-  });
+  const context =
+    canvas.getContext("2d", {
+      willReadFrequently: true,
+    });
 
   if (
     !context ||
@@ -159,11 +156,15 @@ function imageToCanvas(image: HTMLImageElement) {
     canvas.height === 0
   ) {
     throw new Error(
-      "Unable to create a canvas for the header image."
+      "Unable to create a canvas for the header image.",
     );
   }
 
-  context.drawImage(image, 0, 0);
+  context.drawImage(
+    image,
+    0,
+    0,
+  );
 
   return {
     canvas,
@@ -171,144 +172,180 @@ function imageToCanvas(image: HTMLImageElement) {
   };
 }
 
-async function prepareLogoImage(
-  src: string
-): Promise<PreparedHeaderImage> {
-  const image = await loadImage(src);
-
-  const { canvas } = imageToCanvas(image);
-
-  return {
-    dataUrl: canvas.toDataURL("image/png"),
-    width: canvas.width,
-    height: canvas.height,
-  };
-}
-
 function getBorderBackground(
   pixels: Uint8ClampedArray,
   width: number,
-  height: number
+  height: number,
 ): RGB {
-  const red: number[] = [];
-  const green: number[] = [];
-  const blue: number[] = [];
+  const channels: [
+    number[],
+    number[],
+    number[],
+  ] = [[], [], []];
 
   const step = Math.max(
     1,
-    Math.floor(Math.min(width, height) / 100)
+    Math.floor(
+      Math.min(width, height) /
+        100,
+    ),
   );
 
-  const sample = (x: number, y: number) => {
-    const offset = (y * width + x) * 4;
+  const sample = (
+    x: number,
+    y: number,
+  ) => {
+    const offset =
+      (y * width + x) * 4;
 
-    red.push(pixels[offset]);
-    green.push(pixels[offset + 1]);
-    blue.push(pixels[offset + 2]);
+    channels[0].push(
+      pixels[offset],
+    );
+
+    channels[1].push(
+      pixels[offset + 1],
+    );
+
+    channels[2].push(
+      pixels[offset + 2],
+    );
   };
 
-  for (let x = 0; x < width; x += step) {
+  for (
+    let x = 0;
+    x < width;
+    x += step
+  ) {
     sample(x, 0);
     sample(x, height - 1);
   }
 
-  for (let y = 0; y < height; y += step) {
+  for (
+    let y = 0;
+    y < height;
+    y += step
+  ) {
     sample(0, y);
     sample(width - 1, y);
   }
 
-  const median = (values: number[]) => {
-    values.sort((first, second) => first - second);
+  const median = (
+    values: number[],
+  ) => {
+    values.sort(
+      (first, second) =>
+        first - second,
+    );
 
     return (
-      values[Math.floor(values.length / 2)] ?? 0
+      values[
+        Math.floor(
+          values.length / 2,
+        )
+      ] ?? 0
     );
   };
 
   return [
-    median(red),
-    median(green),
-    median(blue),
+    median(channels[0]),
+    median(channels[1]),
+    median(channels[2]),
   ];
 }
 
 /**
  * Removes only the image background connected to the outer border.
  *
- * This preserves dark eye and feather details while removing the black
- * rectangular background and JPEG edge artifacts.
+ * This protects interior feather and eye details while removing
+ * rectangular JPG backgrounds.
  */
 export async function prepareHenCutout(
-  src: string
+  src: string,
 ): Promise<PreparedHeaderImage> {
-  const image = await loadImage(src);
+  const image =
+    await loadImage(src);
 
-  const { canvas, context } =
-    imageToCanvas(image);
+  const {
+    canvas,
+    context,
+  } = imageToCanvas(image);
 
   const width = canvas.width;
   const height = canvas.height;
 
-  const imageData = context.getImageData(
-    0,
-    0,
-    width,
-    height
-  );
+  const imageData =
+    context.getImageData(
+      0,
+      0,
+      width,
+      height,
+    );
 
-  const pixels = imageData.data;
+  const pixels =
+    imageData.data;
 
-  const background = getBorderBackground(
-    pixels,
-    width,
-    height
-  );
+  const background =
+    getBorderBackground(
+      pixels,
+      width,
+      height,
+    );
 
-  const backgroundLuminance =
+  const luminance =
     background[0] * 0.2126 +
     background[1] * 0.7152 +
     background[2] * 0.0722;
 
-  // Dark JPEG backgrounds need a wider tolerance.
-  // White backgrounds require a smaller tolerance to protect white feathers.
   const tolerance =
-    backgroundLuminance < 45
+    luminance < 45
       ? 108
-      : backgroundLuminance > 215
+      : luminance > 215
         ? 42
         : 62;
 
-  const pixelCount = width * height;
+  const pixelCount =
+    width * height;
 
-  const removed = new Uint8Array(pixelCount);
-  const queue = new Int32Array(pixelCount);
+  const removed =
+    new Uint8Array(pixelCount);
+
+  const queue =
+    new Int32Array(pixelCount);
 
   let queueStart = 0;
   let queueEnd = 0;
 
   const matchesBackground = (
-    position: number
-  ) => {
-    const offset = position * 4;
+    position: number,
+  ): boolean => {
+    const offset =
+      position * 4;
 
-    if (pixels[offset + 3] === 0) {
+    if (
+      pixels[offset + 3] === 0
+    ) {
       return true;
     }
 
     return (
       Math.abs(
-        pixels[offset] - background[0]
+        pixels[offset] -
+          background[0],
       ) <= tolerance &&
       Math.abs(
-        pixels[offset + 1] - background[1]
+        pixels[offset + 1] -
+          background[1],
       ) <= tolerance &&
       Math.abs(
-        pixels[offset + 2] - background[2]
+        pixels[offset + 2] -
+          background[2],
       ) <= tolerance
     );
   };
 
-  const enqueue = (position: number) => {
+  const enqueue = (
+    position: number,
+  ): void => {
     if (
       removed[position] ||
       !matchesBackground(position)
@@ -317,26 +354,54 @@ export async function prepareHenCutout(
     }
 
     removed[position] = 1;
-    queue[queueEnd++] = position;
+    queue[queueEnd] = position;
+    queueEnd += 1;
   };
 
-  // Add all matching edge pixels.
-  for (let x = 0; x < width; x += 1) {
+  // Add all matching outer-border pixels.
+  for (
+    let x = 0;
+    x < width;
+    x += 1
+  ) {
     enqueue(x);
-    enqueue((height - 1) * width + x);
+
+    enqueue(
+      (height - 1) *
+        width +
+        x,
+    );
   }
 
-  for (let y = 0; y < height; y += 1) {
+  for (
+    let y = 0;
+    y < height;
+    y += 1
+  ) {
     enqueue(y * width);
-    enqueue(y * width + width - 1);
+
+    enqueue(
+      y * width +
+        width -
+        1,
+    );
   }
 
-  // Flood-fill only the connected outer background.
-  while (queueStart < queueEnd) {
-    const position = queue[queueStart++];
+  // Flood-fill only the background connected to the image border.
+  while (
+    queueStart < queueEnd
+  ) {
+    const position =
+      queue[queueStart];
 
-    const x = position % width;
-    const y = Math.floor(position / width);
+    queueStart += 1;
+
+    const x =
+      position % width;
+
+    const y = Math.floor(
+      position / width,
+    );
 
     if (x > 0) {
       enqueue(position - 1);
@@ -347,17 +412,22 @@ export async function prepareHenCutout(
     }
 
     if (y > 0) {
-      enqueue(position - width);
+      enqueue(
+        position - width,
+      );
     }
 
     if (y + 1 < height) {
-      enqueue(position + width);
+      enqueue(
+        position + width,
+      );
     }
   }
 
-  // Remove background and identify the first feathered edge.
-  const edge = new Uint8Array(pixelCount);
+  const edge =
+    new Uint8Array(pixelCount);
 
+  // Remove the selected background and identify the first edge.
   for (
     let position = 0;
     position < pixelCount;
@@ -367,10 +437,16 @@ export async function prepareHenCutout(
       continue;
     }
 
-    pixels[position * 4 + 3] = 0;
+    pixels[
+      position * 4 + 3
+    ] = 0;
 
-    const x = position % width;
-    const y = Math.floor(position / width);
+    const x =
+      position % width;
+
+    const y = Math.floor(
+      position / width,
+    );
 
     if (
       x > 0 &&
@@ -388,23 +464,42 @@ export async function prepareHenCutout(
 
     if (
       y > 0 &&
-      !removed[position - width]
+      !removed[
+        position - width
+      ]
     ) {
-      edge[position - width] = 1;
+      edge[
+        position - width
+      ] = 1;
     }
 
     if (
       y + 1 < height &&
-      !removed[position + width]
+      !removed[
+        position + width
+      ]
     ) {
-      edge[position + width] = 1;
+      edge[
+        position + width
+      ] = 1;
     }
   }
 
-  // Add a second softened edge to prevent a dark JPEG halo.
   const secondEdge =
     new Uint8Array(pixelCount);
 
+  const markSecondEdge = (
+    position: number,
+  ): void => {
+    if (
+      !removed[position] &&
+      !edge[position]
+    ) {
+      secondEdge[position] = 1;
+    }
+  };
+
+  // Feather the first edge.
   for (
     let position = 0;
     position < pixelCount;
@@ -414,61 +509,72 @@ export async function prepareHenCutout(
       continue;
     }
 
-    pixels[position * 4 + 3] = Math.min(
-      pixels[position * 4 + 3],
-      150
+    pixels[
+      position * 4 + 3
+    ] = Math.min(
+      pixels[
+        position * 4 + 3
+      ],
+      150,
     );
 
-    const x = position % width;
-    const y = Math.floor(position / width);
+    const x =
+      position % width;
 
-    if (
-      x > 0 &&
-      !removed[position - 1] &&
-      !edge[position - 1]
-    ) {
-      secondEdge[position - 1] = 1;
+    const y = Math.floor(
+      position / width,
+    );
+
+    if (x > 0) {
+      markSecondEdge(
+        position - 1,
+      );
     }
 
-    if (
-      x + 1 < width &&
-      !removed[position + 1] &&
-      !edge[position + 1]
-    ) {
-      secondEdge[position + 1] = 1;
+    if (x + 1 < width) {
+      markSecondEdge(
+        position + 1,
+      );
     }
 
-    if (
-      y > 0 &&
-      !removed[position - width] &&
-      !edge[position - width]
-    ) {
-      secondEdge[position - width] = 1;
+    if (y > 0) {
+      markSecondEdge(
+        position - width,
+      );
     }
 
-    if (
-      y + 1 < height &&
-      !removed[position + width] &&
-      !edge[position + width]
-    ) {
-      secondEdge[position + width] = 1;
+    if (y + 1 < height) {
+      markSecondEdge(
+        position + width,
+      );
     }
   }
 
+  // Feather the second edge to prevent a dark JPG halo.
   for (
     let position = 0;
     position < pixelCount;
     position += 1
   ) {
-    if (secondEdge[position]) {
-      pixels[position * 4 + 3] = Math.min(
-        pixels[position * 4 + 3],
-        225
+    if (
+      secondEdge[position]
+    ) {
+      pixels[
+        position * 4 + 3
+      ] = Math.min(
+        pixels[
+          position * 4 + 3
+        ],
+        225,
       );
     }
   }
 
-  context.putImageData(imageData, 0, 0);
+  context.putImageData(
+    imageData,
+    0,
+    0,
+  );
 
   // Find visible image bounds.
   let minX = width;
@@ -481,50 +587,91 @@ export async function prepareHenCutout(
     position < pixelCount;
     position += 1
   ) {
-    if (pixels[position * 4 + 3] <= 8) {
+    if (
+      pixels[
+        position * 4 + 3
+      ] <= 8
+    ) {
       continue;
     }
 
-    const x = position % width;
-    const y = Math.floor(position / width);
+    const x =
+      position % width;
 
-    minX = Math.min(minX, x);
-    minY = Math.min(minY, y);
-    maxX = Math.max(maxX, x);
-    maxY = Math.max(maxY, y);
+    const y = Math.floor(
+      position / width,
+    );
+
+    minX = Math.min(
+      minX,
+      x,
+    );
+
+    minY = Math.min(
+      minY,
+      y,
+    );
+
+    maxX = Math.max(
+      maxX,
+      x,
+    );
+
+    maxY = Math.max(
+      maxY,
+      y,
+    );
   }
 
-  if (maxX < minX || maxY < minY) {
+  if (
+    maxX < minX ||
+    maxY < minY
+  ) {
     throw new Error(
-      "The hen image did not contain a visible subject."
+      "The hen image did not contain a visible subject.",
     );
   }
 
   const padding = Math.max(
     2,
     Math.round(
-      Math.min(width, height) * 0.006
-    )
+      Math.min(
+        width,
+        height,
+      ) * 0.006,
+    ),
   );
 
-  minX = Math.max(0, minX - padding);
-  minY = Math.max(0, minY - padding);
+  minX = Math.max(
+    0,
+    minX - padding,
+  );
+
+  minY = Math.max(
+    0,
+    minY - padding,
+  );
 
   maxX = Math.min(
     width - 1,
-    maxX + padding
+    maxX + padding,
   );
 
   maxY = Math.min(
     height - 1,
-    maxY + padding
+    maxY + padding,
   );
 
-  const cropWidth = maxX - minX + 1;
-  const cropHeight = maxY - minY + 1;
+  const cropWidth =
+    maxX - minX + 1;
+
+  const cropHeight =
+    maxY - minY + 1;
 
   const cropped =
-    document.createElement("canvas");
+    document.createElement(
+      "canvas",
+    );
 
   cropped.width = cropWidth;
   cropped.height = cropHeight;
@@ -534,7 +681,7 @@ export async function prepareHenCutout(
 
   if (!croppedContext) {
     throw new Error(
-      "Unable to crop the hen image."
+      "Unable to crop the hen image.",
     );
   }
 
@@ -547,12 +694,14 @@ export async function prepareHenCutout(
     0,
     0,
     cropWidth,
-    cropHeight
+    cropHeight,
   );
 
   return {
     dataUrl:
-      cropped.toDataURL("image/png"),
+      cropped.toDataURL(
+        "image/png",
+      ),
     width: cropWidth,
     height: cropHeight,
   };
@@ -562,213 +711,396 @@ function drawSoftContactShadow(
   doc: jsPDF,
   centerX: number,
   baseY: number,
-  width: number
-) {
+  width: number,
+): void {
   doc.saveGraphicsState();
 
-  const shades = [248, 244, 239, 234];
+  const shades = [
+    248,
+    244,
+    239,
+    234,
+  ];
 
-  shades.forEach((shade, index) => {
-    const scale = 1 - index * 0.16;
+  shades.forEach(
+    (shade, index) => {
+      const scale =
+        1 - index * 0.16;
 
-    doc.setFillColor(
-      shade,
-      shade,
-      shade
-    );
+      doc.setFillColor(
+        shade,
+        shade,
+        shade,
+      );
 
-    doc.ellipse(
-      centerX,
-      baseY,
-      (width * scale) / 2,
-      1.35 * scale,
-      "F"
-    );
-  });
+      doc.ellipse(
+        centerX,
+        baseY,
+        (width * scale) / 2,
+        1.35 * scale,
+        "F",
+      );
+    },
+  );
 
   doc.restoreGraphicsState();
 }
 
+/**
+ * Draws a vector poultry fallback when a hen image is unavailable.
+ */
 function drawHenFallback(
   doc: jsPDF,
   x: number,
   y: number,
   width: number,
-  height: number
-) {
+  height: number,
+): void {
   doc.saveGraphicsState();
 
-  const centerX = x + width / 2;
-  const centerY = y + height / 2;
+  const centerX =
+    x + width / 2;
 
-  doc.setFillColor(242, 243, 246);
+  const centerY =
+    y + height / 2;
+
+  drawSoftContactShadow(
+    doc,
+    centerX,
+    y + height - 1,
+    width * 0.62,
+  );
+
+  doc.setFillColor(
+    242,
+    243,
+    246,
+  );
 
   doc.ellipse(
     centerX - 1,
     centerY + 2,
     width * 0.34,
     height * 0.28,
-    "F"
+    "F",
   );
 
   doc.circle(
-    centerX + width * 0.23,
-    centerY - height * 0.2,
+    centerX +
+      width * 0.23,
+    centerY -
+      height * 0.2,
     height * 0.12,
-    "F"
+    "F",
   );
 
   setFill(doc, RED);
 
   doc.circle(
-    centerX + width * 0.23,
-    centerY - height * 0.34,
+    centerX +
+      width * 0.23,
+    centerY -
+      height * 0.34,
     height * 0.045,
-    "F"
+    "F",
   );
 
-  doc.setFillColor(218, 160, 62);
+  doc.setFillColor(
+    218,
+    160,
+    62,
+  );
 
   doc.triangle(
-    centerX + width * 0.34,
-    centerY - height * 0.2,
-    centerX + width * 0.46,
-    centerY - height * 0.16,
-    centerX + width * 0.34,
-    centerY - height * 0.12,
-    "F"
+    centerX +
+      width * 0.34,
+    centerY -
+      height * 0.2,
+    centerX +
+      width * 0.46,
+    centerY -
+      height * 0.16,
+    centerX +
+      width * 0.34,
+    centerY -
+      height * 0.12,
+    "F",
   );
 
   doc.restoreGraphicsState();
 }
 
 /**
- * Prepares the logo and hen once.
+ * Prepares the optional hen image once.
  *
- * Use this function before generating a multi-page PDF. The returned assets can
- * be reused on every page without processing the same image repeatedly.
+ * Reuse the returned asset for every page instead of processing the source
+ * JPG separately on every page.
  */
 export async function prepareDmrPoultryHeaderAssets(
   options: Pick<
     DmrPoultryHeaderOptions,
-    "logoUrl" | "henUrl"
-  >
+    "henUrl"
+  > = {},
 ): Promise<DmrPoultryHeaderAssets> {
-  const assets: DmrPoultryHeaderAssets = {};
-
-  if (options.logoUrl) {
-    try {
-      assets.logo =
-        await prepareLogoImage(
-          options.logoUrl
-        );
-    } catch {
-      // The vector DMR logo is used when the custom logo fails.
-    }
+  if (!options.henUrl) {
+    return {};
   }
 
-  if (options.henUrl) {
-    try {
-      assets.hen =
+  try {
+    return {
+      hen:
         await prepareHenCutout(
-          options.henUrl
-        );
-    } catch (error) {
-      console.warn(
-        "Unable to prepare the DMR header hen; using the vector fallback.",
-        error
-      );
-    }
-  }
+          options.henUrl,
+        ),
+    };
+  } catch (error) {
+    console.warn(
+      "Unable to prepare the DMR header hen; using the vector fallback.",
+      error,
+    );
 
-  return assets;
+    return {};
+  }
 }
 
 /**
- * Synchronous reusable PDF header.
+ * Draws the reusable DMR POULTRIES letterhead.
  *
- * This function is suitable for jsPDF AutoTable's willDrawPage callback.
+ * Layout:
+ * - Left: proprietor name and mobile number only
+ * - Centre: DMR POULTRIES with the address directly underneath
+ * - Right: prepared hen image or vector fallback
+ *
+ * There is no left-side logo, OFFICE label or report subtitle.
+ *
+ * The returned number is the safe Y-coordinate for page content.
  */
 export function drawPreparedDmrPoultryHeader(
   doc: jsPDF,
   options: Omit<
     DmrPoultryHeaderOptions,
-    "logoUrl" | "henUrl"
+    "henUrl"
   > = {},
-  assets: DmrPoultryHeaderAssets = {}
+  assets: DmrPoultryHeaderAssets = {},
 ): number {
   const pageWidth =
     doc.internal.pageSize.getWidth();
 
-  const margin = options.margin ?? 12;
-  const top = options.top ?? 10;
+  const margin =
+    options.margin ?? 12;
 
-  const title =
-    options.title ?? "DMR POULTRY";
+  const top =
+    options.top ?? 9;
 
-  const subtitle =
-    options.subtitle ?? "";
+  const details = {
+    businessName:
+      options.businessName ??
+      DMR_POULTRY_DETAILS.businessName,
 
-  const logoSize = 24;
+    proprietorName:
+      options.proprietorName ??
+      DMR_POULTRY_DETAILS.proprietorName,
 
-  // Draw custom prepared logo or fallback vector logo.
-  if (assets.logo) {
-    const ratio = Math.min(
-      logoSize / assets.logo.width,
-      logoSize / assets.logo.height
+    mobileNumber:
+      options.mobileNumber ??
+      DMR_POULTRY_DETAILS.mobileNumber,
+
+    address:
+      options.address ??
+      DMR_POULTRY_DETAILS.address,
+  };
+
+  doc.saveGraphicsState();
+
+  /*
+   * LEFT-SIDE PROPRIETOR DETAILS
+   *
+   * Only the proprietor's name and mobile number are displayed.
+   */
+  doc.setFont(
+    "helvetica",
+    "bold",
+  );
+
+  doc.setFontSize(7.4);
+  setText(doc, RED);
+
+  doc.text(
+    "PROPRIETOR",
+    margin,
+    top + 2.8,
+  );
+
+  // The owner name is intentionally larger and more prominent.
+  doc.setFontSize(10.5);
+  setText(doc, NAVY);
+
+  doc.text(
+    details.proprietorName,
+    margin,
+    top + 8.3,
+  );
+
+  doc.setFont(
+    "helvetica",
+    "normal",
+  );
+
+  doc.setFontSize(8);
+  setText(doc, MUTED);
+
+  doc.text(
+    `Mobile: ${details.mobileNumber}`,
+    margin,
+    top + 13.5,
+  );
+
+  /*
+   * CENTRED BUSINESS NAME
+   *
+   * pageWidth / 2 keeps it centred on both portrait and landscape A4 pages.
+   */
+  doc.setFont(
+    "helvetica",
+    "bold",
+  );
+
+  doc.setFontSize(
+    pageWidth < 240
+      ? 23
+      : 26,
+  );
+
+  setText(doc, NAVY);
+
+  doc.text(
+    details.businessName,
+    pageWidth / 2,
+    top + 10.7,
+    {
+      align: "center",
+    },
+  );
+
+  /*
+   * CENTRED ADDRESS
+   *
+   * The address appears below DMR POULTRIES without an OFFICE label.
+   */
+  doc.setFont(
+    "helvetica",
+    "normal",
+  );
+
+  doc.setFontSize(
+    pageWidth < 240
+      ? 7
+      : 7.5,
+  );
+
+  setText(doc, MUTED);
+
+  doc.text(
+    details.address,
+    pageWidth / 2,
+    top + 16.5,
+    {
+      align: "center",
+      maxWidth:
+        pageWidth < 240
+          ? 86
+          : 110,
+    },
+  );
+
+  /*
+   * CENTRE DECORATIVE DIVIDER
+   */
+  const dividerY =
+    top + 23.5;
+
+  const dividerHalfWidth =
+    Math.min(
+      50,
+      pageWidth * 0.2,
     );
 
-    const width =
-      assets.logo.width * ratio;
+  setDraw(doc, RED);
+  doc.setLineWidth(0.45);
 
-    const height =
-      assets.logo.height * ratio;
+  doc.line(
+    pageWidth / 2 -
+      dividerHalfWidth,
+    dividerY,
+    pageWidth / 2 - 12,
+    dividerY,
+  );
 
-    doc.addImage(
-      assets.logo.dataUrl,
-      "PNG",
-      margin + (logoSize - width) / 2,
-      top + (logoSize - height) / 2,
-      width,
-      height,
-      undefined,
-      "FAST"
-    );
-  } else {
-    drawDmrLogo(
-      doc,
-      margin,
-      top,
-      logoSize
-    );
-  }
+  doc.line(
+    pageWidth / 2 + 12,
+    dividerY,
+    pageWidth / 2 +
+      dividerHalfWidth,
+    dividerY,
+  );
 
-  const henWidth = 31;
-  const henHeight = 29;
+  setFill(doc, RED);
+
+  doc.circle(
+    pageWidth / 2 - 4,
+    dividerY,
+    0.6,
+    "F",
+  );
+
+  doc.circle(
+    pageWidth / 2,
+    dividerY,
+    0.82,
+    "F",
+  );
+
+  doc.circle(
+    pageWidth / 2 + 4,
+    dividerY,
+    0.6,
+    "F",
+  );
+
+  /*
+   * RIGHT-SIDE HEN
+   */
+  const henWidth = 29;
+  const henHeight = 27;
 
   const henX =
     pageWidth -
     margin -
     henWidth;
 
-  const henY = top - 2;
+  const henY =
+    top - 1;
 
-  // Draw prepared hen or vector fallback.
   if (assets.hen) {
     const ratio = Math.min(
-      henWidth / assets.hen.width,
-      henHeight / assets.hen.height
+      henWidth /
+        assets.hen.width,
+      henHeight /
+        assets.hen.height,
     );
 
     const width =
-      assets.hen.width * ratio;
+      assets.hen.width *
+      ratio;
 
     const height =
-      assets.hen.height * ratio;
+      assets.hen.height *
+      ratio;
 
     const x =
       henX +
-      (henWidth - width) / 2;
+      (henWidth - width) /
+        2;
 
     const y =
       henY +
@@ -779,7 +1111,7 @@ export function drawPreparedDmrPoultryHeader(
       doc,
       x + width / 2,
       y + height - 0.3,
-      width * 0.7
+      width * 0.7,
     );
 
     doc.addImage(
@@ -790,7 +1122,7 @@ export function drawPreparedDmrPoultryHeader(
       width,
       height,
       undefined,
-      "FAST"
+      "FAST",
     );
   } else {
     drawHenFallback(
@@ -798,114 +1130,51 @@ export function drawPreparedDmrPoultryHeader(
       henX,
       henY,
       henWidth,
-      henHeight
+      henHeight,
     );
   }
 
-  // Center heading.
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(26);
+  /*
+   * FULL-WIDTH BOTTOM BORDER
+   */
+  const baselineY =
+    top + 29;
 
-  setText(doc, NAVY);
-
-  doc.text(
-    title,
-    pageWidth / 2,
-    top + 12.5,
-    {
-      align: "center",
-    }
-  );
-
-  // Subtitle.
-  if (subtitle) {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
-
-    setText(doc, RED);
-
-    doc.text(
-      subtitle.toUpperCase(),
-      pageWidth / 2,
-      top + 18.2,
-      {
-        align: "center",
-        charSpace: 0.7,
-      }
-    );
-  }
-
-  // Decorative divider.
-  const dividerY = top + 24;
-  const dividerHalfWidth = 52;
-
-  setDraw(doc, RED);
-
-  doc.setLineWidth(0.45);
+  setDraw(doc, NAVY);
+  doc.setLineWidth(0.18);
 
   doc.line(
-    pageWidth / 2 - dividerHalfWidth,
-    dividerY,
-    pageWidth / 2 - 13,
-    dividerY
+    margin,
+    baselineY,
+    pageWidth - margin,
+    baselineY,
   );
 
-  doc.line(
-    pageWidth / 2 + 13,
-    dividerY,
-    pageWidth / 2 + dividerHalfWidth,
-    dividerY
-  );
+  doc.restoreGraphicsState();
 
-  setFill(doc, RED);
-
-  doc.circle(
-    pageWidth / 2 - 4,
-    dividerY,
-    0.65,
-    "F"
-  );
-
-  doc.circle(
-    pageWidth / 2,
-    dividerY,
-    0.85,
-    "F"
-  );
-
-  doc.circle(
-    pageWidth / 2 + 4,
-    dividerY,
-    0.65,
-    "F"
-  );
-
-  return (
-    Math.max(
-      top + logoSize,
-      henY + henHeight,
-      dividerY
-    ) + 3
-  );
+  return baselineY + 5;
 }
 
 /**
- * Convenience function for a single-page PDF.
+ * Convenience function for PDFs that provide a hen-image URL.
  *
- * It prepares the supplied images and then draws the header.
+ * For a multi-page PDF, prepare the asset once with
+ * prepareDmrPoultryHeaderAssets() and reuse it with
+ * drawPreparedDmrPoultryHeader().
  */
 export async function drawDmrPoultryHeader(
   doc: jsPDF,
-  options: DmrPoultryHeaderOptions = {}
+  options:
+    DmrPoultryHeaderOptions = {},
 ): Promise<number> {
   const assets =
     await prepareDmrPoultryHeaderAssets(
-      options
+      options,
     );
 
   return drawPreparedDmrPoultryHeader(
     doc,
     options,
-    assets
+    assets,
   );
 }

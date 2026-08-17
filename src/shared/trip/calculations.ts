@@ -47,15 +47,23 @@ export function calculateTotals(rows: ShopDelivery[], avgWeight = 0) {
   };
 }
 
+export function calculateBoxAvgWeight(birds: number, weight: number): number | null {
+  if (!(birds > 0) || !(weight > 0) || !Number.isFinite(birds) || !Number.isFinite(weight)) {
+    return null;
+  }
+  return Number((weight / birds).toFixed(3));
+}
+
 export function calculatePickupTotals(rows: BoxDetail[]) {
-  const totalBirds = rows.reduce((sum, row) => sum + Number(row.birds || 0), 0);
+  const entered = rows.filter((row) => Number(row.birds || 0) > 0 || Number(row.weight || 0) > 0);
+  const totalBirds = entered.reduce((sum, row) => sum + Number(row.birds || 0), 0);
   const dcWeight = Number(
-    rows.reduce((sum, row) => sum + Number(row.weight || 0), 0).toFixed(2)
+    entered.reduce((sum, row) => sum + Number(row.weight || 0), 0).toFixed(2)
   );
   return {
     totalBirds,
     dcWeight,
-    boxes: rows.length,
+    boxes: entered.length,
     avgWeight: calculateAvgWeight(dcWeight, totalBirds),
   };
 }

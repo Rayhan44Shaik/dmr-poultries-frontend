@@ -167,8 +167,8 @@ export function useFleetDashboardData(): FleetDashboardData {
       const trip = latestTripByVehicle.get(vehicleNumber);
       if (!trip) return null;
       if (trip.closingMeter > 0) return trip.closingMeter;
-      if (trip.openingMeter > 0 && trip.totalKm > 0) return trip.openingMeter + trip.totalKm;
-      if (trip.openingMeter > 0) return trip.openingMeter;
+      if ((trip.openingMeter ?? 0) > 0 && trip.totalKm > 0) return (trip.openingMeter ?? 0) + trip.totalKm;
+      if ((trip.openingMeter ?? 0) > 0) return trip.openingMeter;
       return null;
     };
 

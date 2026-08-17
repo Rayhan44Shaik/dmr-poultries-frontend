@@ -12,6 +12,7 @@ import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useBirdTypes } from "../../../masters/bird-types/hooks/useBirdTypes";
 
 import type { Trip } from "../types/trip";
+import { loadTripById } from "../services/tripHeaderApiService";
 
 type TripListPageProps = { embedded?: boolean };
 
@@ -115,6 +116,11 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     setSelectedTrip(trip);
     setViewOpen(true);
     setSelectedRowId(null);
+    void loadTripById(trip.id)
+      .then((loaded) => setSelectedTrip(loaded))
+      .catch(() => {
+        showNotification("Could not refresh trip from server. Showing last loaded data.", "info");
+      });
   };
 
   const handleRowClick = (trip: Trip) => {

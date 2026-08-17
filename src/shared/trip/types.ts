@@ -22,9 +22,17 @@ export interface ShopDelivery {
   birds: number;
   weight: number;
   mortality: number;
+  mortKg?: number;
   rate: number | null;
   amount: number;
   remarks: string;
+  deliveryMode?: "box" | "weight";
+  selectedBoxIds?: number[];
+  farmBirds?: number;
+  farmWeight?: number;
+  perBoxData?: PerBoxDelivery[];
+  autoCaptureTime?: string;
+  clientKey?: string;
   /** READ-ONLY market/reference rate resolved by the backend. */
   marketRate?: MarketRateReference | null;
 }
@@ -35,6 +43,7 @@ export interface BoxDetail {
   boxNo: number;
   birds: number;
   weight: number;
+  avgWeight?: number | null;
 }
 
 export interface PerBoxDelivery {
@@ -59,10 +68,10 @@ export interface Trip {
   driverName: string;
   supervisorId: number;
   supervisorName: string;
-  advanceAmount: number;
+  advanceAmount: number | null;
   helpers: string[];
   loaders?: string[];
-  openingMeter: number;
+  openingMeter: number | null;
   startStepSubmitted: boolean;
 
   sourceFarmId: number;
@@ -73,6 +82,10 @@ export interface Trip {
   farmStepSubmitted: boolean;
   farmAddress?: string;
   avgBirdWeight?: number;
+  farmGpsLat?: number | null;
+  farmGpsLon?: number | null;
+  farmGpsAccuracy?: number | null;
+  farmGpsTime?: string | null;
 
   dcWeight: number;
   totalBirds: number;
@@ -80,6 +93,7 @@ export interface Trip {
   avgWeight: number;
   pickupLoadTime: string;
   pickupStepSubmitted: boolean;
+  vehicleBoxCapacity?: number;
   boxNo: number;
   birds: number;
   weight: number;
@@ -105,6 +119,26 @@ export interface Trip {
   submittedAtTimestamp?: string;
   endStepSubmitted?: boolean;
   expensesStepSubmitted?: boolean;
+  dieselEntries?: Array<{
+    id?: number;
+    rowIndex: number;
+    litres?: number | null;
+    rate?: number | null;
+    amount?: number | null;
+    meter?: number | null;
+    bunkName?: string | null;
+    gpsLat?: number | null;
+    gpsLon?: number | null;
+    gpsAccuracy?: number | null;
+    gpsCapturedAt?: string | null;
+    imageData?: string | null;
+    imageName?: string | null;
+    submitted?: boolean;
+    submittedAt?: string | null;
+    clientKey?: string | null;
+  }>;
+  expensesStepSubmittedAt?: string;
+  mileageKmL?: number | null;
 
   totalKm: number;
   totalShops: number;
@@ -135,5 +169,8 @@ export interface Trip {
   dcPhotoKey?: string;
   dcPhotoMime?: string;
   dcPhotoData?: string;
+  dcPhotoKey2?: string;
+  dcPhotoMime2?: string;
+  dcPhotoData2?: string;
   approvedBy?: string;
 }

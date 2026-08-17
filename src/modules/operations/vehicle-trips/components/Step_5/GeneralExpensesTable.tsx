@@ -16,6 +16,7 @@ interface GeneralExpensesTableProps {
   openingMeter: number;
   destMeter: number;
   trip?: any;
+  readOnly?: boolean;
 }
 
 export default function GeneralExpensesTable({
@@ -26,10 +27,11 @@ export default function GeneralExpensesTable({
   totalExpenses2,
   totalAllExpenses: _totalAllExpenses,
   totalDistanceCovered,
-  averageKmLtr,
+  averageKmLtr: _averageKmLtr,
   openingMeter,
   destMeter,
-  trip: _trip,
+  trip,
+  readOnly = false,
 }: GeneralExpensesTableProps) {
   const blockInvalidChar = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (["e", "E", "+", "-"].includes(e.key)) {
@@ -85,14 +87,16 @@ export default function GeneralExpensesTable({
 
   let totalDieselLiters = 0;
   for (let i = 1; i <= 6; i++) {
+    if (!sheetData[`dieselSubmitted${i}`]) continue;
     totalDieselLiters += Number(sheetData[`dieselLtr${i}`] || 0);
   }
   const computedAverage =
     computedDistance > 0 && totalDieselLiters > 0
       ? (computedDistance / totalDieselLiters).toFixed(2)
-      : Number(averageKmLtr) > 0
-      ? averageKmLtr
-      : "0.00";
+      : null;
+  const vehicleNo = trip?.vehicleNo || sheetData.vehicleNo || "";
+  const advance = trip?.advanceAmount ?? sheetData.advance ?? "";
+  const timestamp = trip?.expensesStepSubmittedAt || sheetData.submittedAtTimestamp || "Captured on first submit";
 
   return (
     <div className="rounded-xl border border-slate-200 overflow-x-auto shadow-xs bg-white">
@@ -104,34 +108,20 @@ export default function GeneralExpensesTable({
             Date & Time :
           </span>
           <span className="font-semibold text-slate-900 truncate">
-            {sheetData.submittedAtTimestamp || "Captured on first submit"}
+            {timestamp}
           </span>
         </div>
 
         <div className="py-2.5 px-3 flex items-center gap-2 border-b md:border-b-0 md:border-r border-slate-200">
           <span className="font-bold text-slate-700 whitespace-nowrap">Vehicle No :</span>
-          <input
-            type="text"
-            value={sheetData.vehicleNo || ""}
-            onChange={(e) => handleChange("vehicleNo", e.target.value)}
-            className="font-bold text-blue-700 text-xs uppercase bg-transparent outline-none w-full"
-            placeholder="Vehicle No"
-          />
+          <span className="font-bold text-blue-700 text-xs uppercase truncate">{vehicleNo || "--"}</span>
         </div>
 
         <div className="py-2.5 px-3 flex items-center gap-2">
           <span className="font-bold text-slate-700 whitespace-nowrap">Advance ₹ :</span>
-          <input
-            type="number"
-            min="0"
-            placeholder="0.00"
-            value={formatZero(sheetData.advance)}
-            onKeyDown={blockInvalidChar}
-            onChange={(e) =>
-              handleChange("advance", e.target.value === "" ? "" : Number(e.target.value))
-            }
-            className="font-bold text-emerald-700 text-xs bg-transparent outline-none w-full"
-          />
+          <span className="font-bold text-emerald-700 text-xs">
+            {advance === "" || advance == null ? "--" : Number(advance).toFixed(2)}
+          </span>
         </div>
       </div>
 
@@ -150,7 +140,31 @@ export default function GeneralExpensesTable({
             </td>
           </tr>
 
-          {/* Expense rows – unchanged UI, but inputs call handleChange */}
+          {/* Expense rows */}
+          {readOnly ? (
+            <>
+              {[
+                ["Meals", sheetData.meals],
+                ["Loading", sheetData.loading],
+                ["Meals / Tiffin", sheetData.mealsTiffin],
+                ["Vehicle Maintenance", sheetData.vehicleMaintenance],
+                ["Tea", sheetData.othersRC],
+                ["Driver", sheetData.others1Amt],
+                ["Supervisor", sheetData.others2Amt],
+                ["Helper & loader", sheetData.others3Amt],
+                ["Others", sheetData.others4Amt],
+                ["Others", sheetData.others5Amt],
+              ]
+                .filter(([, amt]) => Number(amt) > 0)
+                .map(([label, amt], i) => (
+                  <tr key={`${label}-${i}`} className="border-b border-slate-100">
+                    <td className="font-medium text-slate-700 py-2.5 px-3">{label}</td>
+                    <td colSpan={6} className="font-semibold text-slate-900 px-3">₹{Number(amt).toFixed(2)}</td>
+                  </tr>
+                ))}
+            </>
+          ) : (
+            <>
           <tr className="border-b border-slate-100 hover:bg-slate-50/40 transition-colors">
             <td className="font-medium text-slate-700 py-2.5 px-3">Meals</td>
             <td colSpan={2} className="p-0 border-r border-slate-200">
@@ -315,6 +329,8 @@ export default function GeneralExpensesTable({
               />
             </td>
           </tr>
+            </>
+          )}
 
           <tr className="bg-slate-100/80 font-bold text-slate-800 text-xs border-b border-slate-200">
             <td className="py-2.5 px-3">TOTAL (₹)</td>
@@ -376,7 +392,7 @@ export default function GeneralExpensesTable({
               Average (KM/Ltr)
             </td>
             <td colSpan={2} className="font-bold text-blue-600 px-3 bg-slate-50/50">
-              {computedDistance > 0 && Number(computedAverage) > 0 ? computedAverage : "---"}
+              {computedAverage ? computedAverage : "Not available"}
             </td>
           </tr>
 

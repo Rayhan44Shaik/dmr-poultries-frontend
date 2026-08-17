@@ -23,6 +23,7 @@ type SaveStatus = "idle" | "saving" | "saved";
 
 interface Props {
   tripId: number;
+  tripNo?: string;
   startTime: string;
   startStepSubmitted: boolean;
   loadSnapshot: Trip;
@@ -71,14 +72,14 @@ const EMPTY_FORM: Step1FormState = {
 };
 
 function formatNumericField(value: number | undefined | null): string {
-  if (value === undefined || value === null || value === 0) return "";
+  if (value === undefined || value === null) return "";
   return String(value);
 }
 
-function parseNumericField(text: string): number {
-  if (text.trim() === "") return 0;
+function parseNumericField(text: string): number | null {
+  if (text.trim() === "") return null;
   const parsed = Number(text);
-  return Number.isFinite(parsed) ? parsed : 0;
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function tripToForm(trip: Trip): Step1FormState {
@@ -548,13 +549,13 @@ const LoadersField = React.memo(function LoadersField({
 
 function StepStart({
   tripId,
+  tripNo,
   startTime,
   startStepSubmitted,
   loadSnapshot,
   updateTrip,
   submitStartStep,
   updateStartStep,
-  saveStartProgress,
   hasUnsavedChanges = false,
   vehicleOptions,
   employeeOptions,
@@ -676,7 +677,7 @@ function StepStart({
       // Only a non-empty value that is not a valid non-negative number is flagged.
       openingMeter:
         form.openingMeterText.trim() !== "" &&
-        !Number.isFinite(Number(form.openingMeterText)),
+        (!Number.isFinite(Number(form.openingMeterText)) || Number(form.openingMeterText) < 0),
       advance:
         form.advanceText.trim() !== "" &&
         (!Number.isFinite(Number(form.advanceText)) || Number(form.advanceText) < 0),
@@ -718,6 +719,7 @@ function StepStart({
     const validation = validateStartStep(candidate);
     if (!validation.valid) {
       setShowErrors(true);
+      setNotice({ type: "error", message: validation.errors[0] || "Please complete required fields." });
       return;
     }
 
@@ -736,33 +738,11 @@ function StepStart({
           : await submitStartStep(patch)
         : await submitStartStep(patch);
     if (success) {
-      // Keep form values so the form→trip sync effect cannot wipe the submitted trip
-      // while the parent advances to Step 2.
       setIsLocalEditing(false);
       setNotice({ type: "success", message: "Start details submitted successfully." });
-    } else {
-      setNotice({ type: "error", message: "Unable to save start details. Please try again." });
     }
     setIsSubmitting(false);
   }, [loadSnapshot, submitStartStep, updateStartStep, startStepSubmitted, tripId, updateTrip]);
-
-  const handleSaveProgress = useCallback(async () => {
-    if (!saveStartProgress || !tripId) return;
-    const patch = formToTripPatch(formRef.current);
-    const candidate = { ...loadSnapshot, ...patch } as Trip;
-    const validation = validateStartStep(candidate);
-    if (!validation.valid) {
-      setShowErrors(true);
-      setNotice({ type: "error", message: validation.errors[0] || "Please complete required fields." });
-      return;
-    }
-    setIsSubmitting(true);
-    const success = await saveStartProgress(patch);
-    setNotice(success
-      ? { type: "success", message: "Start details saved successfully." }
-      : { type: "error", message: "Unable to save. Please try again." });
-    setIsSubmitting(false);
-  }, [loadSnapshot, saveStartProgress, tripId]);
 
   if (startStepSubmitted && !editable && !isLocalEditing) {
     return (
@@ -794,6 +774,12 @@ function StepStart({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              Trip Number
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.tripNo || "--"}</span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Clock size={12} className="text-slate-500" /> Start Time
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{startTime || "--"}</span>
@@ -821,7 +807,9 @@ function StepStart({
               <Gauge size={12} className="text-purple-500" /> Opening Meter
             </span>
             <span className="text-xs font-bold text-slate-800">
-              {loadSnapshot.openingMeter ? `${loadSnapshot.openingMeter} KM` : "--"}
+              {loadSnapshot.openingMeter == null
+                ? "Not entered"
+                : `${loadSnapshot.openingMeter} KM`}
             </span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
@@ -829,9 +817,9 @@ function StepStart({
               <Wallet size={12} className="text-amber-500" /> Advance / Expenses
             </span>
             <span className="text-xs font-bold text-slate-800">
-              {loadSnapshot.advanceAmount
-                ? `₹${loadSnapshot.advanceAmount.toLocaleString()}`
-                : "--"}
+              {loadSnapshot.advanceAmount == null
+                ? "Not entered"
+                : `₹${loadSnapshot.advanceAmount.toLocaleString()}`}
             </span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
@@ -879,7 +867,7 @@ function StepStart({
           <div className="flex items-center gap-2 shrink-0">
             {((editable && startStepSubmitted) || isLocalEditing) && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
-                Editable View
+                {tripNo ? `Editing Trip ${tripNo}` : "Editable View"}
               </span>
             )}
           </div>
@@ -958,6 +946,7 @@ function StepStart({
 function areStepStartPropsEqual(prev: Props, next: Props): boolean {
   return (
     prev.tripId === next.tripId &&
+    prev.tripNo === next.tripNo &&
     prev.startTime === next.startTime &&
     prev.startStepSubmitted === next.startStepSubmitted &&
     prev.editable === next.editable &&
@@ -967,7 +956,6 @@ function areStepStartPropsEqual(prev: Props, next: Props): boolean {
     prev.employeeOptions === next.employeeOptions &&
     prev.updateTrip === next.updateTrip &&
     prev.submitStartStep === next.submitStartStep &&
-    prev.saveStartProgress === next.saveStartProgress &&
     prev.hasUnsavedChanges === next.hasUnsavedChanges &&
     prev.onCancel === next.onCancel &&
     prev.clearForm === next.clearForm &&

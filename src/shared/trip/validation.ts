@@ -34,6 +34,11 @@ export function validateStartStep(trip: Trip): TripValidationResult {
   }
   if (required("openingMeter") && (trip.openingMeter == null || Number.isNaN(trip.openingMeter))) {
     errors.push("Valid Opening Meter reading is required.");
+  } else if (
+    trip.openingMeter != null &&
+    (Number.isNaN(Number(trip.openingMeter)) || Number(trip.openingMeter) < 0)
+  ) {
+    errors.push("Opening Meter must be a valid non-negative number.");
   }
   if (
     required("advanceAmount") && (
@@ -43,6 +48,11 @@ export function validateStartStep(trip: Trip): TripValidationResult {
     )
   ) {
     errors.push("Valid Advance amount is required.");
+  } else if (
+    trip.advanceAmount != null &&
+    (Number.isNaN(Number(trip.advanceAmount)) || Number(trip.advanceAmount) < 0)
+  ) {
+    errors.push("Advance must be a valid non-negative number.");
   }
   return result(errors);
 }
@@ -50,16 +60,23 @@ export function validateStartStep(trip: Trip): TripValidationResult {
 export function validateFarmStep(trip: Trip): TripValidationResult {
   const errors: string[] = [];
   if (required("sourceFarmId") && (!trip.sourceFarmId || !trip.sourceFarm)) {
-    errors.push("Please select a Destination Farm.");
+    errors.push("Please select a Farm.");
+  }
+  if (required("farmAddress") && !String(trip.farmAddress ?? "").trim()) {
+    errors.push("Farm address is required.");
   }
   if (required("destMeter") && (!trip.destMeter || trip.destMeter <= 0)) {
-    errors.push("Valid Destination Meter reading is required.");
+    errors.push("Valid Farm Meter reading is required.");
   }
-  if (trip.destMeter <= trip.openingMeter && trip.openingMeter > 0) {
-    errors.push("Destination Meter cannot be less than or equal to the Start Meter.");
+  const startMeter = trip.openingMeter;
+  if (trip.destMeter != null && startMeter != null && trip.destMeter <= startMeter) {
+    errors.push(
+      `Farm meter (${trip.destMeter} KM) must be strictly greater than the Step 1 starting meter (${startMeter} KM).`
+    );
   }
-  if (required("pickupTolls") && (!trip.pickupTolls || trip.pickupTolls <= 0)) {
-    errors.push("Please enter the number of tolls crossed on the pickup route.");
+  const tolls = Number(trip.pickupTolls ?? 0);
+  if (Number.isNaN(tolls) || tolls < 0) {
+    errors.push("Tolls cannot be negative.");
   }
   if (required("avgBirdWeight") && (!trip.avgBirdWeight || trip.avgBirdWeight <= 0)) {
     errors.push("Please enter a valid Average Bird Weight.");
@@ -69,18 +86,33 @@ export function validateFarmStep(trip: Trip): TripValidationResult {
 
 export function validatePickupStep(trip: Trip): TripValidationResult {
   const errors: string[] = [];
-  if (required("dcPhotoKey") && !trip.dcPhotoKey) errors.push("DC Photo is required.");
-  if (required("boxDetails") && !trip.boxDetails.length) {
-    errors.push("At least one complete box is required.");
+  const photos = [trip.dcPhotoData, trip.dcPhotoData2].filter(
+    (d) => typeof d === "string" && d.startsWith("data:image/")
+  );
+  if (photos.length < 1) errors.push("Please upload at least one pickup photo.");
+  if (photos.length > 2) errors.push("A maximum of 2 photos is allowed.");
+  const boxes = trip.boxDetails || [];
+  if (!boxes.length) errors.push("At least one complete box is required.");
+  const nos = boxes.map((b) => Number(b.boxNo));
+  for (let i = 0; i < nos.length; i++) {
+    if (!Number.isInteger(nos[i]) || nos[i] !== i + 1) {
+      errors.push("Box numbers must be sequential (1, 2, 3…).");
+      break;
+    }
   }
-  if (required("dcWeight") && (!trip.dcWeight || trip.dcWeight <= 0)) {
-    errors.push("Total DC Weight is required.");
+  for (const box of boxes) {
+    if (!Number.isInteger(Number(box.birds)) || Number(box.birds) <= 0) {
+      errors.push(`Box ${box.boxNo} birds must be a valid positive whole number.`);
+      break;
+    }
+    if (!Number.isFinite(Number(box.weight)) || Number(box.weight) <= 0) {
+      errors.push(`Box ${box.boxNo} weight must be a valid positive number.`);
+      break;
+    }
   }
-  if (required("totalBirds") && (!trip.totalBirds || trip.totalBirds <= 0)) {
-    errors.push("Total Birds loaded is required.");
-  }
-  if (required("boxes") && (!trip.boxes || trip.boxes <= 0)) {
-    errors.push("Number of Boxes loaded is required.");
+  const cap = Number(trip.vehicleBoxCapacity || 0);
+  if (cap > 0 && boxes.length > cap) {
+    errors.push(`Vehicle box capacity exceeded. Maximum boxes for this vehicle: ${cap}.`);
   }
   return result(errors);
 }
@@ -88,36 +120,25 @@ export function validatePickupStep(trip: Trip): TripValidationResult {
 export function validateDeliveriesStep(
   trip: Pick<Trip, "dcWeight" | "totalBirds">,
   rows: ShopDelivery[],
-  weightToleranceKg = 0.05
+  _weightToleranceKg = 0.05
 ): TripValidationResult {
   if (required("deliveries") && !rows.length) {
     return result(["Please add at least one shop delivery."]);
   }
-  if (required("dcWeight") && trip.dcWeight <= 0) {
-    return result(["DC Weight must be greater than 0."]);
-  }
-
+  const pickupBirds = Number(trip.totalBirds || 0);
+  const pickupWeight = Number(trip.dcWeight || 0);
   const totalMortalityCount = rows.reduce((sum, row) => sum + Number(row.mortality || 0), 0);
   const totalBirdsDelivered = rows.reduce((sum, row) => sum + Number(row.birds || 0), 0);
   const totalDeliveredWeight = rows.reduce((sum, row) => sum + Number(row.weight || 0), 0);
-  const averageWeight = trip.totalBirds > 0 ? trip.dcWeight / trip.totalBirds : 0;
-  const explicitMortalityWeight = rows.reduce((sum, row) => {
-    const extra = row as ShopDelivery & { mortalityWeight?: number; mortalityKg?: number };
-    return sum + Number(extra.mortalityWeight ?? extra.mortalityKg ?? 0);
-  }, 0);
-  const mortalityWeight = explicitMortalityWeight > 0
-    ? explicitMortalityWeight
-    : totalMortalityCount * averageWeight;
-
-  if (trip.totalBirds !== totalBirdsDelivered + totalMortalityCount) {
+  const mortalityWeight = rows.reduce((sum, row) => sum + Number(row.mortKg || 0), 0);
+  if (pickupBirds > 0 && totalBirdsDelivered + totalMortalityCount > pickupBirds) {
     return result([
-      `Bird count mismatch! Farm (${trip.totalBirds}) != Delivered (${totalBirdsDelivered}) + Mor (${totalMortalityCount})`,
+      `Delivered birds plus mortality (${totalBirdsDelivered + totalMortalityCount}) exceed Pickup birds (${pickupBirds}).`,
     ]);
   }
-  const totalOutWeight = totalDeliveredWeight + mortalityWeight;
-  if (totalOutWeight - trip.dcWeight > weightToleranceKg) {
+  if (pickupWeight > 0 && totalDeliveredWeight + mortalityWeight - pickupWeight > 0.05) {
     return result([
-      `Total weight (${totalOutWeight.toFixed(2)} Kg) exceeds DC Weight (${trip.dcWeight.toFixed(2)} Kg)`,
+      `Delivered weight plus mortality weight exceeds Pickup weight (${pickupWeight.toFixed(2)} Kg).`,
     ]);
   }
   return result([]);
@@ -131,8 +152,11 @@ export function validateEndStep(trip: Trip): TripValidationResult {
   if (trip.closingMeter <= trip.destMeter && trip.destMeter > 0) {
     errors.push("Closing Meter cannot be less than the Destination Meter.");
   }
-  if (required("deliveryTolls") && (!trip.deliveryTolls || trip.deliveryTolls <= 0)) {
-    errors.push("Please enter the number of tolls crossed on the delivery route.");
+  if (required("deliveryTolls")) {
+    const tolls = Number(trip.deliveryTolls ?? trip.destinationTolls);
+    if (!Number.isFinite(tolls) || tolls < 0) {
+      errors.push("Please enter the number of tolls crossed on the delivery route (0 or greater).");
+    }
   }
   return result(errors);
 }
