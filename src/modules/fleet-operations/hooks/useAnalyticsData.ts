@@ -1,129 +1,119 @@
-import { useMemo, useState } from 'react';
-import { startOfMonth, endOfMonth, subMonths, eachWeekOfInterval, getWeek } from 'date-fns';
+import { useEffect, useMemo, useState } from 'react';
+import { eachWeekOfInterval, endOfMonth, format, getWeek, startOfMonth } from 'date-fns';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
+import type { Vehicle } from '../../masters/vehicles/types/vehicle';
 import useTrips from '../../operations/vehicle-trips/hooks/useTrips';
-import { getMaintenance, getFastagTransactions } from '../services/storage';
+import type { Trip } from '../../operations/vehicle-trips/types/trip';
+import { useFuelExpenses } from '../../operations/fuel-expenses/hooks/useFuelExpenses';
+import type { FuelExpense } from '../../operations/fuel-expenses/types/fuelExpense';
+import { handleApiError } from '../../../api/errors';
+import { maintenanceApi, mapMaintenanceToEvent } from '../services/maintenanceApi';
+import emiApi from '../services/emiApi';
+import type { EmiSchedule, MaintenanceEvent } from '../types';
 
-interface MaintenanceRecord {
-  id: string;
-  vehicleId: string;
-  date: string;
-  currentKM: number;
-  maintenanceType: string;
-  serviceType: string;
-  garage?: string;
-  mechanic?: string;
-  nextServiceKM?: number;
-  totalCost: number;
-  parts: any[];
-  remarks?: string;
+interface VehicleStat extends Vehicle {
+  dist: number; fuel: number; fuelCost: number; maintenance: number; maintCost: number;
+  emiCost: number; tollCost: number; otherCost: number; expense: number; totalExpense: number; mileage: number;
 }
 
-const dummyNotify = () => {};
+const numberOf = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : 0;
+const dayMs = (value: unknown): number | null => {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).getTime();
+};
+const dateString = (date: Date) => format(date, 'yyyy-MM-dd');
+const tripOtherExpense = (trips: Trip[]) => trips.reduce((sum, trip) => sum + numberOf(trip.meals) + numberOf(trip.mealsTiffin) + numberOf(trip.loading) + numberOf(trip.vehicleMaintenance) + numberOf(trip.othersRC) + numberOf(trip.others1Amt) + numberOf(trip.others2Amt) + numberOf(trip.others3Amt) + numberOf(trip.others4Amt) + numberOf(trip.others5Amt), 0);
+const tripTolls = (trips: Trip[]) => trips.reduce((sum, trip) => sum + numberOf(trip.pickupTolls) + numberOf(trip.deliveryTolls) + numberOf(trip.destinationTolls), 0);
 
 export function useAnalyticsData() {
-  const { vehicles } = useVehicles();
-  const tripsData = useTrips(dummyNotify);
-  const allTrips = tripsData?.allTrips || [];
-  const maintenance = useMemo(() => getMaintenance() as MaintenanceRecord[], []);
-  const fastagTransactions = useMemo(() => getFastagTransactions(), []);
-  const [period, setPeriod] = useState<'thisMonth' | 'lastMonth' | 'quarter'>('thisMonth');
+  const { vehicles, loading: vehiclesLoading } = useVehicles();
+  const tripsState = useTrips(() => {});
+  const allTrips = useMemo(() => tripsState?.allTrips ?? [], [tripsState]);
+  const { filteredData: fuelExpenses, loading: fuelLoading } = useFuelExpenses(() => {});
+  const [maintenance, setMaintenance] = useState<MaintenanceEvent[]>([]);
+  const [emiSchedules, setEmiSchedules] = useState<EmiSchedule[]>([]);
+  const [remoteLoading, setRemoteLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null);
+  const [fromDate, setFromDateState] = useState(() => dateString(startOfMonth(new Date())));
+  const [toDate, setToDateState] = useState(() => dateString(endOfMonth(new Date())));
 
-  const { startDate, endDate } = useMemo(() => {
-    const now = new Date();
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setRemoteLoading(true); setError(null);
+      try {
+        const [maintenancePayload, emiPayload] = await Promise.all([
+          maintenanceApi.list({ status: 'Approved', fromDate, toDate, vehicleId: selectedVehicleId || undefined, limit: 500 }),
+          emiApi.list({ vehicleId: selectedVehicleId || undefined, fromDate, toDate, limit: 500 }),
+        ]);
+        if (cancelled) return;
+        const rows = Array.isArray(maintenancePayload) ? maintenancePayload : maintenancePayload?.data ?? [];
+        setMaintenance(rows.map(mapMaintenanceToEvent));
+        setEmiSchedules(emiPayload);
+      } catch (cause) {
+        if (!cancelled) { setMaintenance([]); setEmiSchedules([]); setError(handleApiError(cause)); }
+      } finally { if (!cancelled) setRemoteLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [fromDate, selectedVehicleId, toDate]);
 
-    if (period === 'thisMonth') {
-      return { startDate: startOfMonth(now), endDate: endOfMonth(now) };
-    }
+  const setFromDate = (value: string) => { if (value) { setFromDateState(value); if (value > toDate) setToDateState(value); } };
+  const setToDate = (value: string) => { if (value) { setToDateState(value); if (value < fromDate) setFromDateState(value); } };
+  const clearFilters = () => { setSelectedVehicleId(null); setFromDateState(dateString(startOfMonth(new Date()))); setToDateState(dateString(endOfMonth(new Date()))); };
+  const inRange = (value: unknown) => { const point = dayMs(value); const start = dayMs(fromDate); const end = dayMs(toDate); return point != null && start != null && end != null && point >= start && point <= end; };
+  const selectedVehicle = vehicles.find((vehicle) => selectedVehicleId == null || vehicle.id === selectedVehicleId);
+  const selectedNumber = selectedVehicleId == null ? null : selectedVehicle?.vehicleNumber;
 
-    if (period === 'lastMonth') {
-      const lastMonth = subMonths(now, 1);
-      return { startDate: startOfMonth(lastMonth), endDate: endOfMonth(lastMonth) };
-    }
+  const periodTrips = useMemo(() => allTrips.filter((trip) => trip.status === 'Completed' && !trip.deleted && inRange(trip.tripDate) && (!selectedNumber || trip.vehicleNo === selectedNumber)), [allTrips, fromDate, selectedNumber, toDate]);
+  const periodFuel = useMemo(() => (fuelExpenses || []).filter((entry: FuelExpense) => inRange(entry.date) && (!selectedNumber || entry.vehicleNo === selectedNumber)), [fuelExpenses, fromDate, selectedNumber, toDate]);
+  const periodMaintenance = useMemo(() => maintenance.filter((record) => inRange(record.date) && (selectedVehicleId == null || String(record.vehicleId) === String(selectedVehicleId))), [fromDate, maintenance, selectedVehicleId, toDate]);
+  const periodEmi = useMemo(() => emiSchedules.filter((schedule) => !schedule.nextEmiDate || inRange(schedule.nextEmiDate)), [emiSchedules, fromDate, toDate]);
 
-    return { startDate: subMonths(now, 3), endDate: now };
-  }, [period]);
+  const totalDistance = periodTrips.reduce((sum, trip) => sum + numberOf(trip.totalKm), 0);
+  const totalFuel = periodFuel.reduce((sum, entry) => sum + numberOf(entry.litres), 0);
+  const fuelCost = periodFuel.reduce((sum, entry) => sum + numberOf(entry.amount), 0);
+  const maintenanceCost = periodMaintenance.reduce((sum, record) => sum + numberOf(record.totalCost), 0);
+  const emiCost = periodEmi.filter((schedule) => schedule.status !== 'paid' && schedule.status !== 'closed').reduce((sum, schedule) => sum + numberOf(schedule.emiAmount), 0);
+  const tollCost = tripTolls(periodTrips);
+  const otherCost = tripOtherExpense(periodTrips);
+  const totalExpense = fuelCost + maintenanceCost + emiCost + tollCost + otherCost;
+  const stats = { totalTrips: periodTrips.length, totalDistance, totalFuel, fuelCost, maintenanceCost, emiCost, totalExpense, avgMileage: totalFuel > 0 ? totalDistance / totalFuel : 0, costPerKM: totalDistance > 0 ? totalExpense / totalDistance : 0 };
 
-  const filteredTrips = useMemo(() => {
-    return allTrips.filter((t: any) => {
-      const d = new Date(t.tripDate);
-      return d >= startDate && d <= endDate;
-    });
-  }, [allTrips, startDate, endDate]);
+  const weeklyData = useMemo(() => eachWeekOfInterval({ start: new Date(`${fromDate}T00:00:00`), end: new Date(`${toDate}T00:00:00`) }).map((week) => {
+    const start = week.getTime(); const end = start + 7 * 86400000;
+    const trips = periodTrips.filter((trip) => { const point = dayMs(trip.tripDate); return point != null && point >= start && point < end; });
+    const fuel = periodFuel.filter((entry) => { const point = dayMs(entry.date); return point != null && point >= start && point < end; }).reduce((sum, entry) => sum + numberOf(entry.litres), 0);
+    const distance = trips.reduce((sum, trip) => sum + numberOf(trip.totalKm), 0);
+    return { week: `W${getWeek(week)}`, fuel, mileage: fuel > 0 ? distance / fuel : 0 };
+  }), [fromDate, periodFuel, periodTrips, toDate]);
 
-  const stats = useMemo(() => {
-    const totalDistance = filteredTrips.reduce((sum: number, t: any) => sum + (t.totalKm || 0), 0);
-    const totalFuel = filteredTrips.reduce((sum: number, t: any) => sum + (t.fuel || 0), 0);
-    const totalExpense = filteredTrips.reduce((sum: number, t: any) => sum + (t.expense || 0), 0);
-    const avgMileage = totalFuel > 0 ? totalDistance / totalFuel : 0;
-    const costPerKM = totalDistance > 0 ? totalExpense / totalDistance : 0;
-    return { totalDistance, totalFuel, totalExpense, avgMileage, costPerKM };
-  }, [filteredTrips]);
+  const expenseBreakdown = [
+    { name: 'Fuel', value: fuelCost }, { name: 'Maintenance', value: maintenanceCost },
+    { name: 'EMI', value: emiCost }, { name: 'Toll', value: tollCost }, { name: 'Other', value: otherCost },
+  ];
 
-  const weeklyData = useMemo(() => {
-    const weeks = eachWeekOfInterval({ start: startDate, end: endDate });
-    return weeks.map((week: Date) => {
-      const weekTrips = filteredTrips.filter((t: any) => {
-        const d = new Date(t.tripDate);
-        return d >= week && d < new Date(week.getTime() + 7 * 24 * 60 * 60 * 1000);
-      });
-      const fuel = weekTrips.reduce((sum: number, t: any) => sum + (t.fuel || 0), 0);
-      const dist = weekTrips.reduce((sum: number, t: any) => sum + (t.totalKm || 0), 0);
-      return {
-        week: `W${getWeek(week)}`,
-        fuel,
-        mileage: dist > 0 ? dist / fuel : 0,
-      };
-    });
-  }, [filteredTrips, startDate, endDate]);
-
-  const expenseBreakdown = useMemo(() => {
-    const fuelTotal = filteredTrips.reduce((sum: number, t: any) => sum + (t.expense || 0), 0);
-    const tollTotal = fastagTransactions
-      .filter((t: any) => new Date(t.date) >= startDate && new Date(t.date) <= endDate)
-      .reduce((sum: number, t: any) => sum + t.amount, 0);
-    const maintTotal = maintenance
-      .filter((m: MaintenanceRecord) => new Date(m.date) >= startDate && new Date(m.date) <= endDate)
-      .reduce((sum: number, m: MaintenanceRecord) => sum + m.totalCost, 0);
-    const otherTotal = Math.max(0, stats.totalExpense - fuelTotal - tollTotal - maintTotal);
-    return [
-      { name: 'Fuel', value: fuelTotal },
-      { name: 'Maintenance', value: maintTotal },
-      { name: 'Toll', value: tollTotal },
-      { name: 'Other', value: otherTotal },
-    ];
-  }, [filteredTrips, fastagTransactions, maintenance, startDate, endDate, stats.totalExpense]);
-
-  const vehicleStats = useMemo(() => {
-    return vehicles.map((v: any) => {
-      const vTrips = filteredTrips.filter((t: any) => t.vehicleNo === v.vehicleNumber);
-      const dist = vTrips.reduce((sum: number, t: any) => sum + (t.totalKm || 0), 0);
-      const fuel = vTrips.reduce((sum: number, t: any) => sum + (t.fuel || 0), 0);
-      const expense = vTrips.reduce((sum: number, t: any) => sum + (t.expense || 0), 0);
-      const mileage = fuel > 0 ? dist / fuel : 0;
-      return { ...v, dist, fuel, expense, mileage };
-    });
-  }, [vehicles, filteredTrips]);
-
-  const topPerformers = useMemo(() => {
-    return [...vehicleStats]
-      .sort((a: any, b: any) => b.mileage - a.mileage)
-      .slice(0, 5);
-  }, [vehicleStats]);
-
-  const highestExpense = useMemo(() => {
-    return [...vehicleStats]
-      .sort((a: any, b: any) => b.expense - a.expense)
-      .slice(0, 5);
-  }, [vehicleStats]);
+  const vehicleStats = useMemo((): VehicleStat[] => vehicles.filter((vehicle) => selectedVehicleId == null || vehicle.id === selectedVehicleId).map((vehicle) => {
+    const trips = periodTrips.filter((trip) => trip.vehicleNo === vehicle.vehicleNumber);
+    const fuelRows = periodFuel.filter((entry) => entry.vehicleNo === vehicle.vehicleNumber);
+    const maintenanceRows = periodMaintenance.filter((record) => String(record.vehicleId) === String(vehicle.id));
+    const emiRows = periodEmi.filter((record) => String(record.vehicleId) === String(vehicle.id));
+    const dist = trips.reduce((sum, trip) => sum + numberOf(trip.totalKm), 0);
+    const fuel = fuelRows.reduce((sum, entry) => sum + numberOf(entry.litres), 0);
+    const vehicleFuelCost = fuelRows.reduce((sum, entry) => sum + numberOf(entry.amount), 0);
+    const maintCost = maintenanceRows.reduce((sum, record) => sum + numberOf(record.totalCost), 0);
+    const vehicleEmiCost = emiRows.filter((record) => record.status !== 'paid' && record.status !== 'closed').reduce((sum, record) => sum + numberOf(record.emiAmount), 0);
+    const tollCost = tripTolls(trips); const otherCost = tripOtherExpense(trips);
+    const expense = vehicleFuelCost + maintCost + vehicleEmiCost + tollCost + otherCost;
+    return { ...vehicle, dist, fuel, fuelCost: vehicleFuelCost, maintenance: maintCost, maintCost, emiCost: vehicleEmiCost, tollCost, otherCost, expense, totalExpense: expense, mileage: fuel > 0 ? dist / fuel : 0 };
+  }), [periodEmi, periodFuel, periodMaintenance, periodTrips, selectedVehicleId, vehicles]);
 
   return {
-    stats,
-    weeklyData,
-    expenseBreakdown,
-    topPerformers,
-    highestExpense,
-    period,
-    setPeriod,
+    stats, weeklyData, expenseBreakdown,
+    topPerformers: [...vehicleStats].sort((a, b) => b.mileage - a.mileage).slice(0, 5),
+    highestExpense: [...vehicleStats].sort((a, b) => b.expense - a.expense).slice(0, 5),
+    fromDate, toDate, setFromDate, setToDate, selectedVehicleId, setSelectedVehicleId,
+    vehicles, clearFilters, loading: vehiclesLoading || fuelLoading || remoteLoading, error,
   };
 }

@@ -7,6 +7,7 @@ interface ExpenseRow {
   totalExpense: number;
   maintenance: number;
   fuel: number;
+  fuelCost?: number;
 }
 
 interface HighestExpenseTableProps {
@@ -35,7 +36,7 @@ const HighestExpenseTable = ({ expenses }: HighestExpenseTableProps) => {
         </thead>
         <tbody className="bg-white divide-y divide-slate-100">
           {expenses.map((expense) => {
-            const grandTotal = expense.totalExpense || (expense.maintenance + expense.fuel) || 1;
+            const grandTotal = expense.totalExpense || ((expense.maintenance || 0) + (expense.fuelCost || expense.fuel || 0)) || 1;
             const maintPercent = Math.min(((expense.maintenance || 0) / grandTotal) * 100, 100);
 
             return (
@@ -61,7 +62,7 @@ const HighestExpenseTable = ({ expenses }: HighestExpenseTableProps) => {
                   {Number(expense.maintenance || 0).toLocaleString('en-IN')}
                 </td>
                 <td className="px-4 py-3.5 text-right whitespace-nowrap font-medium text-slate-600 text-sm">
-                  {Number(expense.fuel || 0).toLocaleString('en-IN')}
+                  {Number(expense.fuelCost ?? expense.fuel ?? 0).toLocaleString('en-IN')}
                 </td>
               </tr>
             );

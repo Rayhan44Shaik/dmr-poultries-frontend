@@ -1,10 +1,23 @@
-import { memo, useState, useMemo } from 'react';
+import React, { memo, useState, useMemo } from 'react';
 import Select from 'react-select';
 import { DatePicker } from '../../../../components/common/DatePicker';
-import { Car, User, Gauge, Wrench, Cog, Building2, UserCog, FileText, Hash } from 'lucide-react';
+import { Car, User, Gauge, Wrench, Cog, Building2, UserCog, FileText, Hash, Paperclip, Upload, Trash2, File as FileIcon, AlertTriangle } from 'lucide-react';
 import PartsTable from './PartsTable';
 import type { PartItem } from '../../types';
+import { maintenanceApi } from '../../services/maintenanceApi';
 import { useFuelKMValidator } from "../../../operations/fuel-expenses/hooks/useFuelKMValidator";
+import { useSafeNotification } from '../../../../hooks/useSafeNotification';
+
+export interface FormDocumentItem {
+  key: string;
+  existingId?: number;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  file?: File;
+  objectUrl?: string;
+  markedForRemoval?: boolean;
+}
 
 interface MaintenanceFormProps {
   form: {
@@ -32,6 +45,10 @@ interface MaintenanceFormProps {
   onMaintenanceChange: (selected: any) => void;  // receives array of selected values
   setFormField: (field: string, value: any) => void;
   selectKey: number;
+  documents: FormDocumentItem[];
+  onAddDocuments: (files: File[]) => void;
+  onRemoveDocument: (key: string) => void;
+  onMarkDocumentRemoval: (key: string) => void;
 }
 
 const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
@@ -46,7 +63,12 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
   onMaintenanceChange,
   setFormField,
   selectKey,
+  documents,
+  onAddDocuments,
+  onRemoveDocument,
+  onMarkDocumentRemoval,
 }) => {
+  const { showNotification } = useSafeNotification();
   const [kmError, setKmError] = useState<string | null>(null);
 
   // Get vehicle number from selected vehicle option
@@ -57,6 +79,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
   const vehicleNumber = selectedVehicleOption?.label || '';
 
   const validator = useFuelKMValidator(vehicleNumber);
+  const pendingWarning = validator.getPendingWarning();
 
   const inputClass =
     'w-full h-10 pl-10 pr-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition bg-white';
@@ -89,14 +112,37 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
     }
   };
 
+  const handleDocumentInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) onAddDocuments(files);
+    e.target.value = '';
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (!bytes) return '';
+    if (bytes > 1048576) return `${(bytes / 1048576).toFixed(1)} MB`;
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  };
+
+  const isImageDoc = (doc: FormDocumentItem): boolean =>
+    doc.mimeType?.startsWith('image/') || /\.(png|jpe?g)$/i.test(doc.fileName);
+
+  const documentPreviewUrl = (doc: FormDocumentItem): string | undefined => {
+    if (doc.objectUrl) return doc.objectUrl;
+    if (doc.existingId != null && form.id) {
+      return maintenanceApi.documentUrl(form.id, doc.existingId);
+    }
+    return undefined;
+  };
+
   return (
     <div className="space-y-5">
-      {/* Row 1: Bill Number, Vehicle, Date, Driver */}
+      {/* Row 1: Maintenance Number, Vehicle, Date, Driver */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* 1. Bill Number */}
+        {/* 1. Maintenance Number (server-generated, globally unique) */}
         <div>
           <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            Bill Number
+            Maintenance Number
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -105,9 +151,10 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
             <input
               type="text"
               value={form.billNumber}
-              onChange={(e) => setFormField('billNumber', e.target.value)}
-              placeholder="Auto‑generated"
-              className={inputClass}
+              readOnly
+              disabled
+              placeholder="Auto-generated on save"
+              className={`${inputClass} bg-slate-50 text-slate-400 cursor-not-allowed`}
             />
           </div>
         </div>
@@ -348,6 +395,99 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       {/* Parts Table */}
       <div className="border-t border-slate-200 pt-5">
         <PartsTable parts={parts} setParts={setParts} hideSubline={true} />
+      </div>
+
+      {/* Bill / Spare‑part Documents */}
+      <div className="border-t border-slate-200 pt-5">
+        <div className="flex items-start justify-between gap-4 mb-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <Paperclip size={16} className="text-slate-500" />
+              Bill / Spare‑part Documents <span className="text-red-500">*</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              PNG, JPG/JPEG or PDF. Max 10 MB each, up to 10 files. Adding files always
+              appends to the existing ones.
+            </p>
+          </div>
+          <label
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition cursor-pointer shrink-0"
+          >
+            <Upload size={14} />
+            Add Document
+            <input
+              type="file"
+              accept=".png,.jpg,.jpeg,.pdf"
+              multiple
+              hidden
+              onChange={handleDocumentInput}
+            />
+          </label>
+        </div>
+
+        {documents.length === 0 ? (
+          <p className="text-sm text-slate-400 italic">
+            No documents added yet — a bill / spare‑part document is required to save.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {documents.map((doc) => {
+              const previewUrl = documentPreviewUrl(doc);
+              const isImage = isImageDoc(doc);
+              return (
+                <div
+                  key={doc.key}
+                  className={`relative group border rounded-xl overflow-hidden bg-slate-50 ${
+                    doc.markedForRemoval ? 'border-red-300 opacity-60' : 'border-slate-200'
+                  }`}
+                >
+                  <div className="h-24 w-full bg-slate-100 flex items-center justify-center overflow-hidden">
+                    {isImage && previewUrl ? (
+                      <img
+                        src={previewUrl}
+                        alt={doc.fileName}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center text-slate-400">
+                        <FileIcon size={26} />
+                        <span className="text-[10px] mt-1 uppercase text-slate-400">PDF</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-2">
+                    <p className="text-xs font-medium text-slate-700 truncate" title={doc.fileName}>
+                      {doc.fileName}
+                    </p>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-[10px] text-slate-400">
+                        {formatFileSize(doc.fileSize)}
+                      </span>
+                      {doc.markedForRemoval ? (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-red-500">
+                          <AlertTriangle size={10} /> Will remove
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            doc.existingId != null && !doc.file
+                              ? onMarkDocumentRemoval(doc.key)
+                              : onRemoveDocument(doc.key)
+                          }
+                          className="text-slate-400 hover:text-red-500 transition"
+                          title="Remove document"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -7,10 +7,10 @@ import {
   addDays,
 } from 'date-fns';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
-import type { Vehicle } from '../../masters/vehicles/types/vehicle';
-import { getDocuments, updateDocumentExpiry, setData, FLEET_KEYS } from '../services/storage';
-import { DocumentTypeEnum, type VehicleDocument } from '../types';
-import type { DocumentType } from '../utils/constants';
+import { Vehicle } from '../../masters/vehicles/types/vehicle';
+import permitApi from '../services/permitApi';
+import type { PermitDocument } from '../types';
+import { DocumentTypeEnum, VehicleDocument, DocumentType } from '../types';
 
 type DocumentTypeKey = 'insurance' | 'fitness' | 'permit' | 'puc' | 'rc';
 type Counts = Record<DocumentTypeKey, number>;
@@ -28,6 +28,16 @@ interface StatusCounts {
   };
 }
 
+/** Frontend shape of a permit document — VehicleDocument plus scan metadata. */
+export interface PermitViewDocument extends VehicleDocument {
+  docType: string;
+  hasDocument: boolean;
+  fileName: string | null;
+  mimeType: string | null;
+  validFrom?: string | null;
+  remarks?: string | null;
+}
+
 // Helpers
 const parseDate = (dateStr: string | undefined): Date | null => {
   if (!dateStr) return null;
@@ -40,11 +50,6 @@ const formatDate = (dateStr: string | undefined): string => {
   return parsed ? format(parsed, 'dd-MMM-yyyy') : '—';
 };
 
-const getDefaultExpiry = (): string => {
-  const date = addDays(new Date(), 120);
-  return format(date, 'dd/MM/yyyy');
-};
-
 const toDisplayFormat = (dateStr: string): string => {
   if (!dateStr) return '';
   const yyyyMMdd = /^\d{4}-\d{2}-\d{2}$/;
@@ -53,66 +58,70 @@ const toDisplayFormat = (dateStr: string): string => {
     return `${parts[2]}/${parts[1]}/${parts[0]}`;
   }
   const ddMMyyyy = /^\d{2}\/\d{2}\/\d{4}$/;
-  if (ddMMyyyy.test(dateStr)) {
-    return dateStr;
-  }
+  if (ddMMyyyy.test(dateStr)) return dateStr;
   const parsed = parse(dateStr, 'yyyy-MM-dd', new Date());
-  if (!isNaN(parsed.getTime())) {
-    return format(parsed, 'dd/MM/yyyy');
-  }
+  if (!isNaN(parsed.getTime())) return format(parsed, 'dd/MM/yyyy');
   return dateStr;
 };
 
-const normaliseDocuments = (docs: VehicleDocument[]): VehicleDocument[] => {
-  return docs.map((doc) => {
-    if (doc.expiryDate) {
-      doc.expiryDate = toDisplayFormat(doc.expiryDate);
-    }
-    return doc;
-  });
+const toIsoFormat = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const yyyyMMdd = /^\d{4}-\d{2}-\d{2}$/;
+  if (yyyyMMdd.test(dateStr)) return dateStr;
+  const parsed = parse(dateStr, 'dd/MM/yyyy', new Date());
+  if (!isNaN(parsed.getTime())) return format(parsed, 'yyyy-MM-dd');
+  return dateStr;
 };
 
+/** Convert a backend permit record into the shape the matrix / modal expects,
+ * with expiry dates normalized to dd/MM/yyyy for the existing UI. */
+function mapPermitToView(p: PermitDocument): PermitViewDocument {
+  return {
+    id: String(p.id),
+    vehicleId: String(p.vehicleId),
+    type: p.docType as DocumentType,
+    documentNumber: p.documentNumber,
+    expiryDate: toDisplayFormat(p.expiryDate),
+    status: 'valid',
+    docType: p.docType,
+    hasDocument: p.hasDocument,
+    fileName: p.fileName,
+    mimeType: p.mimeType,
+    validFrom: p.validFrom,
+    remarks: p.remarks,
+  } as PermitViewDocument;
+}
+
 export function useDocumentsData() {
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [version, setVersion] = useState(0);
   const { vehicles } = useVehicles();
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [permitDocs, setPermitDocs] = useState<PermitViewDocument[]>([]);
 
   useEffect(() => {
-    setRefreshKey((prev) => prev + 1);
-  }, []);
-
-  const documents = useMemo(() => {
-    let docs = getDocuments();
-    docs = normaliseDocuments(docs);
-
-    if (vehicles.length > 0) {
-      let needsUpdate = false;
-      const newDocs = [...docs];
-      vehicles.forEach((v) => {
-        DocumentTypeEnum.forEach((type) => {
-          const exists = newDocs.some(
-            (d) => String(d.vehicleId) === String(v.id) && d.type === type
-          );
-          if (!exists) {
-            needsUpdate = true;
-            newDocs.push({
-              id: `${v.id}-${type}-${Date.now()}-${Math.random()}`,
-              vehicleId: String(v.id),
-              type: type as DocumentType,
-              documentNumber: '',
-              expiryDate: getDefaultExpiry(),
-              status: 'valid',
-            } as VehicleDocument);
-          }
-        });
-      });
-      if (needsUpdate) {
-        setData(FLEET_KEYS.DOCUMENTS, newDocs);
-        docs = normaliseDocuments(newDocs);
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await permitApi.list();
+        if (!cancelled) setPermitDocs(rows.map(mapPermitToView));
+      } catch (e) {
+        if (!cancelled) {
+          const msg =
+            e instanceof Error ? e.message : 'Failed to load permit documents';
+          console.error('[permits] failed to load:', e);
+          setError(msg);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    }
-    return docs;
-  }, [vehicles, refreshKey, version]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
+
+  const documents = useMemo(() => permitDocs, [permitDocs]);
 
   const [filterType, setFilterType] = useState<string>('all');
   const now = new Date();
@@ -192,23 +201,54 @@ export function useDocumentsData() {
   const formatExpiryDate = formatDate;
 
   const refetch = useCallback(() => {
+    setLoading(true);
+    setError(null);
     setRefreshKey((prev) => prev + 1);
   }, []);
 
+  /** Save expiry dates / document numbers for one or more types, optionally
+   * uploading a scan (files[type]) or removing an existing scan (removes[type]). */
   const updateDocument = useCallback(
-    async (vehicleId: string | number, updates: Record<string, string | null>) => {
-      console.log('💾 Updating documents for vehicle', vehicleId, updates);
-      for (const [type, dateValue] of Object.entries(updates)) {
-        if (dateValue) {
-          const formattedDate = toDisplayFormat(dateValue);
-          updateDocumentExpiry(vehicleId.toString(), type, formattedDate);
+    async (
+      vehicleId: string | number,
+      updates: Record<
+        string,
+        string | { expiryDate?: string; documentNumber?: string; validFrom?: string; remarks?: string } | null
+      >,
+      files?: Record<string, File | null>,
+      removes?: Record<string, boolean>
+    ) => {
+      for (const [type, value] of Object.entries(updates)) {
+        const dateStr = typeof value === 'string' ? value : value?.expiryDate;
+        const docNo = typeof value === 'object' && value !== null ? value.documentNumber : undefined;
+        const validFrom = typeof value === 'object' && value !== null ? value.validFrom : undefined;
+        const remarks = typeof value === 'object' && value !== null ? value.remarks : undefined;
+
+        const payload: Record<string, unknown> = {};
+        if (dateStr) payload.expiryDate = toIsoFormat(dateStr);
+        if (docNo !== undefined && docNo !== null) payload.documentNumber = docNo;
+        if (validFrom !== undefined) payload.validFrom = validFrom ? toIsoFormat(validFrom) : null;
+        if (remarks !== undefined) payload.remarks = remarks || null;
+        if (removes?.[type]) payload.removeDocument = true;
+
+        const file = files?.[type] ?? undefined;
+        if (file) {
+          const fd = new FormData();
+          Object.entries(payload).forEach(([k, v]) => {
+            if (v !== undefined && v !== null) fd.append(k, String(v));
+          });
+          fd.append('document', file, file.name);
+          await permitApi.upsert(vehicleId, type, fd);
+        } else {
+          await permitApi.upsert(vehicleId, type, payload);
         }
       }
-      setVersion((v) => v + 1);
-      refetch();
+      setLoading(true);
+      setError(null);
+      setRefreshKey((prev) => prev + 1);
       return { success: true };
     },
-    [refetch]
+    []
   );
 
   return {
@@ -223,5 +263,7 @@ export function useDocumentsData() {
     formatExpiryDate,
     refetch,
     updateDocument,
+    loading,
+    error,
   };
 }

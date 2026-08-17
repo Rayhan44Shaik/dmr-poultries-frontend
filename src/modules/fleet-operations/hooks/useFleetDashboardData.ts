@@ -1,16 +1,14 @@
 // src/modules/fleet-operations/hooks/useFleetDashboardData.ts
 // Fleet dashboard + fleet overview data.
 //
-// Data sources (existing architecture — no new storage introduced):
-//  · Vehicles, trips ........... PostgreSQL API (authoritative server data)
-//  · Fuel expenses ............. operations fuel service (local store; its
-//                                backend endpoint has not shipped yet)
-//  · Maintenance, documents, FASTag, EMI ... fleet local stores (backend
-//                                endpoints have not shipped yet)
-//    Local-store values are honoured only for the areas whose backend does
-//    not exist yet and are never presented as PostgreSQL-authoritative.
+// Data sources:
+//  · Vehicles, trips ........... authoritative API services
+//  · Maintenance, documents, EMI ... separate Fleet backend API contracts
+//  · Fuel expenses ............. existing Operations fuel service abstraction
+//  · FASTag .................... unavailable until its API contract is connected
+// No synthetic or browser-local Fleet entity is presented as server data.
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { endOfMonth, format, isWithinInterval, startOfMonth } from "date-fns";
 import type {
   EMIRecord,
@@ -26,8 +24,10 @@ import type {
 import { useVehicles } from "../../masters/vehicles/hooks/useVehicles";
 import useTrips from "../../operations/vehicle-trips/hooks/useTrips";
 import { fuelExpenseService } from "../../operations/fuel-expenses/services/fuelExpenseService";
-import { getDocuments, getEMIRecords, getFastags, getMaintenance } from "../services/storage";
 import type { Trip } from "../../operations/vehicle-trips/types/trip";
+import { maintenanceApi, mapMaintenanceToEvent } from "../services/maintenanceApi";
+import permitApi from "../services/permitApi";
+import emiApi from "../services/emiApi";
 
 export interface FleetOverviewResult {
   /** Per-vehicle status cards for the fleet overview. */
@@ -91,10 +91,45 @@ export function useFleetDashboardData(): FleetDashboardData {
   const tripsData = useTrips(DUMMY_NOTIFY);
   const allTrips = useMemo(() => tripsData?.allTrips || [], [tripsData?.allTrips]);
 
-  const maintenance = useMemo<MaintenanceEvent[]>(() => getMaintenance() as MaintenanceEvent[], []);
-  const documents = useMemo<VehicleDocument[]>(() => getDocuments(), []);
-  const fastags = useMemo<FASTag[]>(() => getFastags() as FASTag[], []);
-  const emiRecords = useMemo<EMIRecord[]>(() => getEMIRecords() as EMIRecord[], []);
+  const [maintenance, setMaintenance] = useState<MaintenanceEvent[]>([]);
+  const [documents, setDocuments] = useState<VehicleDocument[]>([]);
+  const [emiRecords, setEmiRecords] = useState<EMIRecord[]>([]);
+  // FASTag remains unavailable until its API contract is connected; never
+  // substitute browser-local or synthetic production values.
+  const fastags: FASTag[] = [];
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.allSettled([
+      maintenanceApi.list({ status: 'Approved', limit: 500 }),
+      permitApi.list(),
+      emiApi.list({ limit: 500 }),
+    ]).then(([maintenanceResult, permitResult, emiResult]) => {
+      if (cancelled) return;
+      if (maintenanceResult.status === 'fulfilled') {
+        const rows = Array.isArray(maintenanceResult.value) ? maintenanceResult.value : maintenanceResult.value?.data ?? [];
+        setMaintenance(rows.map(mapMaintenanceToEvent));
+      }
+      if (permitResult.status === 'fulfilled') {
+        setDocuments(permitResult.value.map((record) => ({
+          id: String(record.id), vehicleId: String(record.vehicleId), type: record.docType,
+          documentNumber: record.documentNumber || '-', expiryDate: record.expiryDate,
+          status: 'valid', uploadedFile: record.fileName || undefined,
+        })));
+      }
+      if (emiResult.status === 'fulfilled') {
+        setEmiRecords(emiResult.value.map((record) => ({
+          id: record.id, vehicleId: String(record.vehicleId), financeCompany: record.financeCompany,
+          loanAmount: record.principal, emiAmount: record.emiAmount, startDate: record.startDate,
+          endDate: record.endDate, nextEMIDate: record.nextEmiDate || record.endDate,
+          status: record.status === 'closed' ? 'paid' : record.status,
+          paidEMIs: record.paidEmis, totalEMIs: record.totalEmis,
+        })));
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   const fuelExpenses = useMemo(() => {
     try {
       return fuelExpenseService.getAll();
