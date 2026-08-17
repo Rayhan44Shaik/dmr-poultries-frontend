@@ -28,9 +28,6 @@ const COLUMNS: Column[] = [
   { key: "vehicleNumber", label: "Vehicle No", align: "left", render: (r) => r.vehicleNumber },
   { key: "trips", label: "Trips", align: "right", render: (r) => formatCount(r.trips) },
   { key: "distanceKm", label: "Distance", align: "right", render: (r) => formatKmValue(r.distanceKm) },
-  { key: "totalBirds", label: "Birds", align: "right", render: (r) => formatCount(r.totalBirds) },
-  { key: "totalWeight", label: "Weight", align: "right", render: (r) => formatCount(r.totalWeight) },
-  { key: "totalMortality", label: "Mortality", align: "right", render: (r) => formatCount(r.totalMortality) },
   { key: "fuelLitres", label: "Fuel", align: "right", render: (r) => (r.fuelLitres === null ? NOT_AVAILABLE : formatLitres(r.fuelLitres)) },
   { key: "fuelCost", label: "Fuel Cost", align: "right", render: (r) => (r.fuelCost === null ? NOT_AVAILABLE : formatINR(r.fuelCost)) },
   { key: "maintenanceCost", label: "Maintenance Cost", align: "right", render: (r) => (r.maintenanceCost === null ? NOT_AVAILABLE : formatINR(r.maintenanceCost)) },
@@ -42,9 +39,6 @@ const SORT_VALUE: Record<VehicleReportSortKey, (row: VehicleReportRow) => number
   vehicleNumber: (r) => r.vehicleNumber.toLowerCase(),
   trips: (r) => r.trips,
   distanceKm: (r) => r.distanceKm,
-  totalBirds: (r) => r.totalBirds,
-  totalWeight: (r) => r.totalWeight,
-  totalMortality: (r) => r.totalMortality,
   fuelLitres: (r) => r.fuelLitres ?? -1,
   fuelCost: (r) => r.fuelCost ?? -1,
   maintenanceCost: (r) => r.maintenanceCost ?? -1,
@@ -137,7 +131,7 @@ function VehicleReportTable({ rows, loading = false, selectedVehicleNumber, onSe
 
     return (
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1180px] border-collapse text-left">
+        <table className="w-full min-w-[880px] border-collapse text-left">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/70 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-500">
               {COLUMNS.map((column) => {
@@ -180,9 +174,6 @@ function VehicleReportTable({ rows, loading = false, selectedVehicleNumber, onSe
                 <td className="px-4 py-3 text-right tabular-nums text-slate-700 dark:text-slate-200">
                   {formatKmValue(row.distanceKm)} <span className="text-slate-400">km</span>
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums text-slate-700 dark:text-slate-200">{formatCount(row.totalBirds)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-slate-700 dark:text-slate-200">{formatCount(row.totalWeight)} <span className="text-slate-400">kg</span></td>
-                <td className="px-4 py-3 text-right tabular-nums text-rose-600 dark:text-rose-400">{formatCount(row.totalMortality)}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-slate-700 dark:text-slate-200">
                   {row.fuelLitres === null ? NOT_AVAILABLE : (
                     <>

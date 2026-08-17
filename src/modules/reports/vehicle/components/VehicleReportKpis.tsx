@@ -4,13 +4,10 @@
 import { memo } from "react";
 import {
   Activity,
-  Bird,
   Fuel,
-  HeartPulse,
   Gauge,
   IndianRupee,
   Route,
-  Scale,
   Truck,
   Wrench,
   type LucideIcon,
@@ -48,27 +45,6 @@ const KPI_DEFS: KpiDef[] = [
     icon: Gauge,
     tone: "bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400",
     value: (s) => formatKm(s.totalDistanceKm),
-  },
-  {
-    key: "birds",
-    label: "Total Birds / Loads",
-    icon: Bird,
-    tone: "bg-lime-50 text-lime-700 dark:bg-lime-500/10 dark:text-lime-400",
-    value: (s) => formatCount(s.totalBirds),
-  },
-  {
-    key: "weight",
-    label: "Total Weight",
-    icon: Scale,
-    tone: "bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400",
-    value: (s) => `${formatCount(s.totalWeight)} kg`,
-  },
-  {
-    key: "mortality",
-    label: "Mortality",
-    icon: HeartPulse,
-    tone: "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400",
-    value: (s) => formatCount(s.totalMortality),
   },
   {
     key: "fuel",
@@ -128,7 +104,7 @@ function VehicleReportKpis({ summary, loading = false }: VehicleReportKpisProps)
   if (loading || !summary) {
     return (
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {Array.from({ length: KPI_DEFS.length }).map((_, i) => (
+        {Array.from({ length: 8 }).map((_, i) => (
           <KpiSkeleton key={i} />
         ))}
       </div>
