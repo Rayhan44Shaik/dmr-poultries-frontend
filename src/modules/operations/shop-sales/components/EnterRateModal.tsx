@@ -11,16 +11,47 @@ import {
   AlertCircle,
   Lock,
   Save,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
+import RateEntryMarketMasterTables from "./RateEntryMarketMasterTables";
+import type { RateEntryMarketRateMasterDto } from "../utils/rateEntryMarketMaster";
+
+const SHOPS_PER_PAGE = 7;
+
+function isValidSellingRate(rate: number | null | undefined): boolean {
+  return rate != null && Number.isFinite(rate) && rate >= 50 && rate <= 300;
+}
+
+function normalizeRate(rate: number | null | undefined): number | null {
+  if (rate == null || !Number.isFinite(rate) || rate === 0) return null;
+  return rate;
+}
+
+function formatTripDateDisplay(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+function weekdayName(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return "—";
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return d.toLocaleDateString("en-IN", { weekday: "long" });
+}
+
+function formatInr(n: number): string {
+  return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 interface Props {
   open: boolean;
   trip: Trip | null;
   onClose: () => void;
-  /** Save only (no lock) — PUT /operations/rate-entry/:tripId */
   onSave: (deliveries: Trip["deliveries"]) => Promise<boolean> | boolean | void;
-  /** Save & Lock — PUT save then POST lock */
   onSaveAndLock: (deliveries: Trip["deliveries"]) => Promise<boolean> | boolean | void;
   isSaving?: boolean;
   loadError?: string | null;
@@ -39,58 +70,127 @@ export default function EnterRateModal({
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [lockError, setLockError] = useState<string | null>(null);
+  const [lockAttempted, setLockAttempted] = useState(false);
+  const [shopPage, setShopPage] = useState(1);
 
   const saving = isSaving || busy;
 
-  // ─── INITIALIZE TRIP DELIVERIES FROM THE BACKEND DETAIL ───
-  // The backend (GET /operations/rate-entry/:tripId) is the only source of
-  // truth for the delivery rows and their existing rates. Amount is always
-  // displayed from the backend — never recomputed authoritatively here.
-  // Syncing the trip prop into modal-local state on open is the intended
-  // idiom for a controlled modal; the setStates run once per trip open.
   useEffect(() => {
     if (!trip) return;
     /* eslint-disable react-hooks/set-state-in-effect -- controlled modal: sync trip prop into local state on open */
     setShowSuccessToast(false);
     setShowConfirm(false);
+    setLockError(null);
+    setLockAttempted(false);
+    setShopPage(1);
     setDeliveries(
       trip.deliveries.map((d) => ({
         ...d,
-        rate: d.rate ?? null,
+        rate: normalizeRate(d.rate),
       }))
     );
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [trip]);
 
-  // ─── DISPLAY TOTALS (informational only — backend recomputes amounts) ───
   const totalBirds = useMemo(() => deliveries.reduce((sum, row) => sum + row.birds, 0), [deliveries]);
   const totalWeight = useMemo(() => deliveries.reduce((sum, row) => sum + row.weight, 0), [deliveries]);
   const grandAmount = useMemo(
-    () => deliveries.reduce((sum, row) => sum + (row.amount || 0), 0),
+    () =>
+      deliveries.reduce((sum, row) => {
+        if (isValidSellingRate(row.rate)) {
+          return sum + Number((row.weight * (row.rate as number)).toFixed(2));
+        }
+        return sum;
+      }, 0),
     [deliveries]
   );
 
-  const canSave = useMemo(() => {
-    return deliveries.every((row) => {
-      const rate = row.rate;
-      return rate !== null && rate !== undefined && rate >= 50 && rate <= 300;
-    });
-  }, [deliveries]);
+  const hasInvalidEnteredRate = useMemo(
+    () =>
+      deliveries.some((row) => {
+        const rate = normalizeRate(row.rate);
+        return rate !== null && !isValidSellingRate(rate);
+      }),
+    [deliveries]
+  );
+
+  const canLock = useMemo(
+    () => deliveries.length > 0 && deliveries.every((row) => isValidSellingRate(normalizeRate(row.rate))),
+    [deliveries]
+  );
+
+  const marketMaster = useMemo(() => {
+    return (trip as Trip & { marketRateMaster?: RateEntryMarketRateMasterDto | null } | null)
+      ?.marketRateMaster;
+  }, [trip]);
+
+  const tripDateVenRate = useMemo(() => {
+    const row = marketMaster?.companyRates.find((r) => r.date === trip?.tripDate);
+    if (!row?.entered || row.vencobRate == null) return null;
+    return row.vencobRate;
+  }, [marketMaster, trip?.tripDate]);
+
+  const isDirty = useMemo(() => {
+    if (!trip) return false;
+    return deliveries.some((row, i) => normalizeRate(row.rate) !== normalizeRate(trip.deliveries[i]?.rate));
+  }, [deliveries, trip]);
+
+  const shopPageCount = Math.max(1, Math.ceil(deliveries.length / SHOPS_PER_PAGE));
+  const pagedDeliveries = useMemo(() => {
+    const start = (shopPage - 1) * SHOPS_PER_PAGE;
+    return deliveries.slice(start, start + SHOPS_PER_PAGE).map((row, i) => ({
+      row,
+      index: start + i,
+    }));
+  }, [deliveries, shopPage]);
+
+  useEffect(() => {
+    if (shopPage > shopPageCount) setShopPage(shopPageCount);
+  }, [shopPage, shopPageCount]);
+
+  const resetRates = () => {
+    if (!trip) return;
+    setLockError(null);
+    setLockAttempted(false);
+    setDeliveries(
+      trip.deliveries.map((d) => ({
+        ...d,
+        rate: normalizeRate(d.rate),
+      }))
+    );
+  };
 
   const confirmSave = async (mode: "save" | "lock") => {
     if (saving) return;
+    if (mode === "save") {
+      if (hasInvalidEnteredRate) {
+        setLockError("Entered rates must be between ₹50 and ₹300. Blank shops can still be saved.");
+        return;
+      }
+      if (!isDirty) return;
+    }
+    if (mode === "lock") {
+      setLockAttempted(true);
+      if (!canLock) {
+        const firstMissing = deliveries.findIndex((row) => !isValidSellingRate(normalizeRate(row.rate)));
+        if (firstMissing >= 0) {
+          setShopPage(Math.floor(firstMissing / SHOPS_PER_PAGE) + 1);
+        }
+        return;
+      }
+    }
     setShowConfirm(false);
     setBusy(true);
+    setLockError(null);
     try {
-      if (mode === "lock") {
-        await onSaveAndLock(deliveries);
-      } else {
-        await onSave(deliveries);
-      }
+      const ok =
+        mode === "lock" ? await onSaveAndLock(deliveries) : await onSave(deliveries);
+      if (ok === false) return;
       setShowSuccessToast(true);
       setTimeout(() => {
         setShowSuccessToast(false);
-        onClose();
+        if (mode === "lock") onClose();
       }, 1200);
     } finally {
       setBusy(false);
@@ -109,271 +209,311 @@ export default function EnterRateModal({
         .no-spinner { -moz-appearance: textfield; }
       `}</style>
 
-      <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
-        {/* Success Toast */}
+      <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3 overflow-y-auto">
         {showSuccessToast && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20 transition-all">
-            <div className="bg-white rounded-2xl shadow-2xl border border-emerald-100 p-6 flex flex-col items-center gap-3 animate-in fade-in zoom-in duration-200">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20">
+            <div className="bg-white rounded-2xl shadow-2xl border border-emerald-100 p-6 flex flex-col items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
                 <CheckCircle2 size={28} />
               </div>
               <div className="text-center">
                 <h3 className="text-base font-bold text-slate-800">Rates Saved Successfully!</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Trip has been updated securely.</p>
+                <p className="text-xs text-slate-500 mt-0.5">Saved to the server. Refresh will keep these rates.</p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Confirmation Modal */}
         {showConfirm && (
-          <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/30 transition-all">
-            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full mx-4 p-6 animate-in fade-in zoom-in duration-200">
+          <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/30">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full mx-4 p-6">
               <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shrink-0">
                   <AlertCircle size={20} />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-bold text-slate-800">Confirm Lock Trip</h3>
-                  <p className="text-sm text-slate-500 mt-1">
-                    Save rates and lock this trip? You won't be able to edit rates after this.
+                  <h3 className="text-lg font-bold text-slate-800">Locking this trip</h3>
+                  <p className="text-sm text-slate-600 mt-1">
+                    After <span className="font-semibold">LOCK &amp; SUBMIT</span>, rates cannot be edited in Rate Entry.
+                    This trip will leave the pending list and move to Shop Sales.
                   </p>
                 </div>
               </div>
               <div className="mt-6 flex justify-end gap-3">
                 <button
                   onClick={() => setShowConfirm(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all"
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => confirmSave("lock")}
                   disabled={saving}
-                  className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-sm font-medium text-white transition-all shadow-sm active:scale-95"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-sm font-medium text-white"
                 >
-                  {saving ? "Saving..." : "OK"}
+                  {saving ? "Locking..." : "Lock — cannot edit"}
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Main Modal Container */}
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto flex flex-col relative">
-          {/* Header */}
-          <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between z-20 shrink-0">
-            <div>
-              <h2 className="text-xl font-bold text-slate-800">
-                {rateLocked ? "Rates (Read-Only)" : "Enter Selling Rates"}
-              </h2>
-              <p className="text-xs text-slate-500">
-                {rateLocked
-                  ? "This trip's rates are locked."
-                  : "Enter shop-wise rates — the backend locks the trip."}
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[94vh] flex flex-col relative overflow-hidden">
+          <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-start justify-between shrink-0">
+            <h2 className="text-xl font-bold text-slate-900">
+              {rateLocked ? "Rates (Read-Only)" : "Enter Selling Rates"}
+            </h2>
+            <button
+              onClick={onClose}
+              className="h-8 w-8 rounded-full hover:bg-slate-100 flex items-center justify-center"
+              aria-label="Close"
+            >
+              <X size={18} className="text-slate-600" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 px-5 py-3 shrink-0">
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-white px-3 py-2.5">
+              <div>
                 <p className="text-[10px] uppercase tracking-wider text-slate-500">Trip Number</p>
-                <p className="text-sm font-bold text-green-700">{trip.tripNo}</p>
-              </div>
-              <button
-                onClick={onClose}
-                className="h-8 w-8 rounded-full hover:bg-slate-100 flex items-center justify-center"
-                aria-label="Close"
-              >
-                <X size={18} className="text-slate-600" />
-              </button>
-            </div>
-          </div>
-
-          {/* Trip Info */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-6 py-3 border-b bg-slate-50/60 shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-indigo-100 flex items-center justify-center">
-                <Truck size={16} className="text-indigo-700" />
-              </div>
-              <div>
-                <p className="text-[10px] uppercase text-slate-500">Vehicle</p>
-                <p className="text-sm font-medium text-slate-800">{trip.vehicleNo}</p>
+                <p className="text-sm font-bold text-emerald-700">{trip.tripNo}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-green-100 flex items-center justify-center">
-                <CalendarDays size={16} className="text-green-700" />
+            <div className="flex items-center gap-3 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2.5">
+              <div className="h-9 w-9 rounded-lg bg-sky-100 flex items-center justify-center">
+                <Truck size={18} className="text-sky-700" />
               </div>
               <div>
-                <p className="text-[10px] uppercase text-slate-500">Trip Date</p>
-                <p className="text-sm font-medium text-slate-800">{trip.tripDate}</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500">Vehicle No</p>
+                <p className="text-sm font-bold text-slate-800">{trip.vehicleNo}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5">
+              <div className="h-9 w-9 rounded-lg bg-emerald-100 flex items-center justify-center">
+                <CalendarDays size={18} className="text-emerald-700" />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500">Trip Date</p>
+                <p className="text-sm font-bold text-slate-800">{formatTripDateDisplay(trip.tripDate)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500">Day</p>
+                <p className="text-sm font-bold text-slate-800">{weekdayName(trip.tripDate)}</p>
               </div>
             </div>
           </div>
 
-          {/* Lock banner */}
-          {rateLocked && (
-            <div className="px-6 py-2.5 border-b border-amber-200 bg-amber-50 flex items-center gap-2 shrink-0">
-              <Lock size={14} className="text-amber-600" />
-              <span className="text-xs font-medium text-amber-700">
-                This trip is rate-locked. Rates are read-only.
-                {trip.rateLockedAt ? ` Locked at ${new Date(trip.rateLockedAt).toLocaleString()}.` : ""}
-              </span>
-            </div>
-          )}
+          <div className="shrink-0 border-t border-slate-100">
+            <RateEntryMarketMasterTables
+              master={marketMaster}
+              tripDate={trip.tripDate}
+              loadError={null}
+            />
+          </div>
 
-          {/* Error banner */}
-          {loadError && (
-            <div className="px-6 py-2.5 border-b border-red-200 bg-red-50 flex items-center gap-2 shrink-0">
+          {(loadError || lockError) && (
+            <div className="px-5 py-2 border-b border-red-200 bg-red-50 flex items-center gap-2 shrink-0">
               <AlertCircle size={14} className="text-red-600" />
-              <span className="text-xs font-medium text-red-700">{loadError}</span>
+              <span className="text-xs font-medium text-red-700">{lockError || loadError}</span>
             </div>
           )}
 
-          {/* Table */}
-          <div className="overflow-x-auto px-1 flex-1">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 border-b sticky top-0 z-10 shadow-sm">
-                <tr className="text-slate-600">
-                  <th className="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wider">S.No</th>
-                  <th className="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wider">Shop Name</th>
-                  <th className="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wider">Birds</th>
-                  <th className="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wider">Weight</th>
-                  <th className="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wider">Market Rate</th>
-                  <th className="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wider bg-amber-50">Rate (₹/KG)</th>
-                  <th className="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wider">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deliveries.map((delivery, index) => {
-                  const rate = delivery.rate;
-                  const amount = delivery.amount || 0;
-                  const isValid = rate !== null && rate !== undefined && rate >= 50 && rate <= 300;
-                  const market = delivery.marketRate;
+          <div className="px-5 py-2 flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div className="overflow-auto flex-1 min-h-0">
+              <table className="min-w-full text-sm">
+                <thead className="sticky top-0 bg-white z-10">
+                  <tr className="text-slate-500 border-b border-slate-200">
+                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">S.No</th>
+                    <th className="px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wider">Shop Name</th>
+                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">Birds</th>
+                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">Weight (KG)</th>
+                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">Market Rate (₹/KG)</th>
+                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">Rate (₹/KG)</th>
+                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">Amount (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedDeliveries.map(({ row: delivery, index }) => {
+                    const rate = normalizeRate(delivery.rate);
+                    const isValid = isValidSellingRate(rate);
+                    const amount = isValid ? Number((delivery.weight * (rate as number)).toFixed(2)) : 0;
+                    const market = delivery.marketRate;
+                    const marketRateValue =
+                      market?.masterRate != null ? Number(market.masterRate) : tripDateVenRate;
+                    const belowMin = rate != null && rate < 50;
+                    const aboveMax = rate != null && rate > 300;
+                    const missingForLock = lockAttempted && !isValid;
 
-                  return (
-                    <tr key={delivery.id} className="border-b last:border-0 hover:bg-indigo-50/40 transition-colors">
-                      <td className="px-3 py-3 text-center text-xs text-slate-500">{index + 1}</td>
-                      <td className="px-3 py-3 text-xs font-medium text-slate-700">{delivery.shopName}</td>
-                      <td className="px-3 py-3 text-center text-xs font-semibold text-blue-700">{delivery.birds.toLocaleString()}</td>
-                      <td className="px-3 py-3 text-center text-xs font-semibold text-orange-600">{delivery.weight.toFixed(2)}</td>
-                      <td className="px-3 py-3 text-center text-xs text-slate-500">
-                        {market?.lastTripRate != null || market?.masterRate != null ? (
-                          <span className="font-medium text-indigo-600">
-                            ₹ {market?.lastTripRate ?? market?.masterRate}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 bg-amber-50/50">
-                        {rateLocked ? (
-                          <span className="inline-block w-full text-center text-sm font-bold text-slate-600">
-                            {rate != null ? `₹ ${rate.toFixed(2)}` : "—"}
-                          </span>
-                        ) : (
-                          <div className="flex items-center justify-center gap-1">
-                            <span className="text-xs text-slate-500">₹</span>
-                            <input
-                              type="number"
-                              min={50}
-                              max={300}
-                              step="0.01"
-                              value={rate === null ? "" : rate}
-                              placeholder="Enter rate"
-                              disabled={saving}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                const updated = [...deliveries];
-                                const num = value === "" ? null : Number(value);
-                                (updated[index] as Trip["deliveries"][number]).rate = num;
-                                setDeliveries(updated);
-                              }}
-                              className={`w-24 px-2 py-1.5 rounded-lg border text-center text-sm font-medium outline-none transition-all focus:ring-2 no-spinner ${
-                                rate !== null && rate !== undefined
-                                  ? isValid
-                                    ? "border-green-400 focus:ring-green-200 bg-green-50"
-                                    : "border-red-400 focus:ring-red-200 bg-red-50"
-                                  : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-200"
-                              }`}
-                            />
-                          </div>
-                        )}
-                        {!rateLocked && rate === null && <p className="text-[9px] text-amber-600 text-center mt-0.5">Required</p>}
-                        {!rateLocked && rate !== null && !isValid && <p className="text-[9px] text-red-500 text-center mt-0.5">50-300 only</p>}
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        <span className={`inline-block rounded-lg px-3 py-1 text-xs font-bold min-w-[80px] ${amount > 0 ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-400"}`}>
-                          ₹ {amount.toFixed(2)}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    return (
+                      <tr
+                        key={delivery.id}
+                        className={`border-b border-slate-100 ${missingForLock ? "bg-red-50" : ""}`}
+                      >
+                        <td className="px-2 py-2.5 text-center text-xs text-slate-500">{index + 1}</td>
+                        <td className="px-2 py-2.5 text-xs font-medium text-slate-800">{delivery.shopName}</td>
+                        <td className="px-2 py-2.5 text-center text-xs font-semibold text-emerald-600">
+                          {delivery.birds.toLocaleString()}
+                        </td>
+                        <td className="px-2 py-2.5 text-center text-xs font-semibold text-orange-500">
+                          {delivery.weight.toFixed(2)}
+                        </td>
+                        <td className="px-2 py-2.5 text-center text-xs font-semibold text-sky-600">
+                          {marketRateValue != null ? Number(marketRateValue).toFixed(2) : "—"}
+                        </td>
+                        <td className="px-2 py-2">
+                          {rateLocked ? (
+                            <span className="block text-center text-sm font-bold text-slate-600">
+                              {rate != null ? rate.toFixed(2) : "—"}
+                            </span>
+                          ) : (
+                            <div className="flex flex-col items-center">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={rate === null ? "" : rate}
+                                placeholder=""
+                                disabled={saving}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  const updated = [...deliveries];
+                                  const num = value === "" ? null : Number(value);
+                                  (updated[index] as Trip["deliveries"][number]).rate = num;
+                                  setDeliveries(updated);
+                                }}
+                                className={`w-[88px] px-2 py-1 rounded-md border text-center text-sm font-semibold outline-none no-spinner ${
+                                  rate == null
+                                    ? "border-slate-300"
+                                    : isValid
+                                      ? "border-emerald-500 bg-emerald-50 text-emerald-800"
+                                      : "border-red-500 bg-red-50 text-red-700"
+                                }`}
+                              />
+                              {belowMin && <p className="text-[10px] text-red-500 mt-0.5">⚠ Min ₹50</p>}
+                              {aboveMax && <p className="text-[10px] text-red-500 mt-0.5">⚠ Max ₹300</p>}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-2 py-2.5 text-center text-xs font-semibold text-slate-700">
+                          ₹ {formatInr(amount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {deliveries.length > SHOPS_PER_PAGE && (
+              <div className="flex items-center justify-center gap-3 pt-2 shrink-0">
+                <button
+                  type="button"
+                  disabled={shopPage <= 1}
+                  onClick={() => setShopPage((p) => Math.max(1, p - 1))}
+                  className="h-8 w-8 rounded-lg border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:bg-slate-50"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="text-xs font-medium text-slate-600">
+                  Page {shopPage} of {shopPageCount}
+                </span>
+                <button
+                  type="button"
+                  disabled={shopPage >= shopPageCount}
+                  onClick={() => setShopPage((p) => Math.min(shopPageCount, p + 1))}
+                  className="h-8 w-8 rounded-lg border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:bg-slate-50"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Footer */}
-          <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-4 z-20 shrink-0">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-              <div className="bg-slate-50 rounded-lg px-3 py-2 text-center flex items-center justify-center gap-2">
-                <Store size={18} className="text-blue-600" />
+          <div className="bg-white border-t border-slate-200 px-5 py-3 shrink-0">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+              <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
+                <Store size={16} className="text-slate-500" />
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase">Shops</p>
-                  <p className="text-lg font-bold text-slate-800">{deliveries.length}</p>
+                  <p className="text-[9px] text-slate-500 uppercase">Shops</p>
+                  <p className="text-base font-bold text-slate-800">{deliveries.length}</p>
                 </div>
               </div>
-              <div className="bg-slate-50 rounded-lg px-3 py-2 text-center flex items-center justify-center gap-2">
-                <Package size={18} className="text-blue-600" />
+              <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
+                <Package size={16} className="text-slate-500" />
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase">Birds</p>
-                  <p className="text-lg font-bold text-blue-700">{totalBirds.toLocaleString()}</p>
+                  <p className="text-[9px] text-slate-500 uppercase">Birds</p>
+                  <p className="text-base font-bold text-slate-800">{totalBirds.toLocaleString()}</p>
                 </div>
               </div>
-              <div className="bg-slate-50 rounded-lg px-3 py-2 text-center flex items-center justify-center gap-2">
-                <Scale size={18} className="text-orange-600" />
+              <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
+                <Scale size={16} className="text-orange-500" />
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase">Weight</p>
-                  <p className="text-lg font-bold text-orange-600">{totalWeight.toFixed(2)} KG</p>
+                  <p className="text-[9px] text-slate-500 uppercase">Total Weight (KG)</p>
+                  <p className="text-base font-bold text-orange-500">{totalWeight.toFixed(2)} KG</p>
                 </div>
               </div>
-              <div className="bg-green-50 rounded-lg px-3 py-2 text-center border border-green-200 flex items-center justify-center gap-2">
-                <IndianRupee size={18} className="text-green-700" />
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 flex items-center gap-2">
+                <IndianRupee size={16} className="text-emerald-700" />
                 <div>
-                  <p className="text-[10px] text-green-600 uppercase">Grand Amount</p>
-                  <p className="text-lg font-bold text-green-700">₹ {grandAmount.toFixed(2)}</p>
+                  <p className="text-[9px] text-emerald-700 uppercase">Grand Amount (₹)</p>
+                  <p className="text-base font-bold text-emerald-700">₹ {formatInr(grandAmount)}</p>
                 </div>
               </div>
             </div>
 
             {!rateLocked && (
-              <div className="flex justify-end gap-3">
+              <div className="flex items-center justify-between gap-3">
                 <button
-                  onClick={onClose}
-                  className="px-6 py-2 rounded-lg border border-slate-300 text-sm font-medium hover:bg-slate-50 transition-colors"
+                  onClick={resetRates}
+                  disabled={saving}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-sky-300 text-sm font-medium text-sky-700 hover:bg-sky-50 disabled:opacity-50"
                 >
-                  Cancel
+                  <RotateCcw size={14} />
+                  Reset
                 </button>
-                <button
-                  onClick={() => confirmSave("save")}
-                  disabled={!canSave || saving}
-                  className="inline-flex items-center gap-2 px-6 py-2 rounded-lg border border-blue-300 text-sm font-medium text-blue-700 hover:bg-blue-50 transition-colors disabled:opacity-50"
-                  title="Save rates without locking"
-                >
-                  <Save size={15} />
-                  {saving ? "Saving..." : "Save"}
-                </button>
-                <button
-                  onClick={() => {
-                    if (!canSave || saving) return;
-                    setShowConfirm(true);
-                  }}
-                  disabled={!canSave || saving}
-                  className="inline-flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed bg-green-600 hover:bg-green-700 text-white"
-                >
-                  <Lock size={15} />
-                  {saving ? "Saving..." : "Save & Lock"}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={onClose}
+                    className="px-4 py-2 rounded-lg border border-slate-300 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => confirmSave("save")}
+                    disabled={saving || !isDirty || hasInvalidEnteredRate}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border text-sm font-medium disabled:opacity-50 ${
+                      isDirty
+                        ? "border-amber-400 bg-amber-50 text-amber-800 ring-2 ring-amber-200"
+                        : "border-emerald-300 bg-emerald-50 text-emerald-800"
+                    }`}
+                    title="Save entered rates without locking. Blank shops are allowed."
+                  >
+                    <Save size={14} />
+                    {saving ? "Saving..." : "Save Progress"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (saving) return;
+                      setLockAttempted(true);
+                      if (!canLock) {
+                        const firstMissing = deliveries.findIndex(
+                          (row) => !isValidSellingRate(normalizeRate(row.rate))
+                        );
+                        if (firstMissing >= 0) {
+                          setShopPage(Math.floor(firstMissing / SHOPS_PER_PAGE) + 1);
+                        }
+                        return;
+                      }
+                      setShowConfirm(true);
+                    }}
+                    disabled={saving}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold disabled:opacity-50"
+                  >
+                    <Lock size={14} className="text-orange-300" />
+                    {saving ? "Locking..." : "LOCK & SUBMIT"}
+                  </button>
+                </div>
               </div>
             )}
           </div>

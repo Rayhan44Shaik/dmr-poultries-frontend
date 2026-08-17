@@ -7,7 +7,8 @@ import BirdTypeTable from "../components/BirdTypeTable";
 import BirdTypeDialog from "../dialogs/BirdTypeDialog";
 import { useBirdTypes } from "../hooks/useBirdTypes";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
-import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
+import { exportToExcel } from "../../../../utils/exportUtils";
+import { exportBirdTypesToPDF } from "../utils/exportBirdTypePdf";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/birdTypeService";
 import type { BirdType } from "../types/birdType";
@@ -71,18 +72,20 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
       showNotification("No data to export.", "error");
       return;
     }
-    const headers = ["Bird Type No", "Bird Type", "Average Weight (kg)", "Description", "Status"];
-    const rows = filteredBirdTypes.map((bt) => [
-      bt.birdTypeNo.toString(),
-      bt.birdType,
-      bt.averageWeight.toString(),
-      bt.description || "-",
-      bt.status,
-    ]);
+
     const filename = `BirdTypes_${new Date().toISOString().split("T")[0]}`;
-    exportToPDF("Bird Types - Master List", headers, rows, filename);
-    logAuditEvent("EXPORT_PDF", "BirdTypes", undefined, { count: filteredBirdTypes.length });
-    showNotification("PDF exported successfully!", "success");
+
+    try {
+      exportBirdTypesToPDF(filteredBirdTypes, filename);
+
+      logAuditEvent("EXPORT_PDF", "BirdTypes", undefined, {
+        count: filteredBirdTypes.length,
+      });
+      showNotification("PDF exported successfully!", "success");
+    } catch (exportError) {
+      console.error("Unable to export Bird Type PDF:", exportError);
+      showNotification("Unable to export PDF. Please try again.", "error");
+    }
   };
 
   const handleExportExcel = () => {

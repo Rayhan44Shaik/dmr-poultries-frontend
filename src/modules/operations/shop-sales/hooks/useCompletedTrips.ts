@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Trip } from "../../vehicle-trips/types/trip";
 import { completedTripService } from "../services/completedTripService";
 import { handleApiError } from "../../../../api";
+import { dropLockedTripFromList, excludeKnownLockedTrips } from "./rateEntryLockList";
 
 // Helper to compute aggregates from deliveries
 function computeTripAggregates(trip: Trip) {
@@ -20,6 +21,8 @@ export default function useCompletedTrips() {
   const [currentPage, setCurrentPage] = useState(1);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const lockInFlightRef = useRef(false);
+  const locallyLockedTripIdsRef = useRef<Set<number>>(new Set());
   const pageSize = 10;
   const [filter, setFilter] = useState({
     fromDate: "",
@@ -32,7 +35,7 @@ export default function useCompletedTrips() {
   const loadTrips = useCallback(async () => {
     try {
       const data = await completedTripService.getCompletedTrips();
-      setTrips(data);
+      setTrips(excludeKnownLockedTrips(data, locallyLockedTripIdsRef.current));
       setLoadError(null);
     } catch (error) {
       console.error("Failed to load Rate Entry trips from the backend", error);
@@ -106,7 +109,8 @@ export default function useCompletedTrips() {
       setIsSaving(true);
       try {
         await completedTripService.saveOnly(selectedTrip.id, deliveries);
-        closeRateEntry();
+        const full = await completedTripService.getTrip(selectedTrip.id);
+        setSelectedTrip(full);
         await loadTrips();
         return true;
       } catch (error) {
@@ -117,24 +121,29 @@ export default function useCompletedTrips() {
         setIsSaving(false);
       }
     },
-    [selectedTrip, isSaving, closeRateEntry, loadTrips]
+    [selectedTrip, isSaving, loadTrips]
   );
 
-  /** Save & Lock — PUT save then POST lock (one-way). */
+  /** Atomic Save & Lock — POST /operations/rate-entry/:tripId/lock. */
   const saveAndLockTrip = useCallback(
     async (deliveries: Trip["deliveries"]): Promise<boolean> => {
-      if (!selectedTrip || isSaving) return false;
+      if (!selectedTrip || isSaving || lockInFlightRef.current) return false;
+      const lockedTripId = selectedTrip.id;
+      lockInFlightRef.current = true;
       setIsSaving(true);
       try {
-        await completedTripService.saveRates(selectedTrip.id, deliveries);
+        await completedTripService.saveRates(lockedTripId, deliveries);
+        locallyLockedTripIdsRef.current.add(lockedTripId);
+        setTrips((prev) => dropLockedTripFromList(prev, lockedTripId));
         closeRateEntry();
         await loadTrips();
         return true;
       } catch (error) {
-        console.error(`Failed to save & lock rates for trip ${selectedTrip.id}`, error);
+        console.error(`Failed to save & lock rates for trip ${lockedTripId}`, error);
         setLoadError(handleApiError(error));
         return false;
       } finally {
+        lockInFlightRef.current = false;
         setIsSaving(false);
       }
     },

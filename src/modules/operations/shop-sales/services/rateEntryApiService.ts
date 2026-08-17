@@ -11,6 +11,7 @@
  */
 import { apiGet, apiPost, apiPut } from "../../../../api";
 import type { Trip } from "../../vehicle-trips/types/trip";
+import type { RateEntryMarketRateMasterDto } from "../utils/rateEntryMarketMaster";
 
 const RATE_ENTRY_PATH = "/operations/rate-entry";
 
@@ -69,6 +70,20 @@ export interface RateEntryTripDto {
   deliveriesCount: number;
   totalAmount: number;
   deliveries: RateEntryDeliveryDto[];
+  marketRatesWindow?: Array<{
+    businessDate: string;
+    entered?: boolean;
+    vencobRate: number | null;
+    vencobVii: number | null;
+    vencobGun: number | null;
+    sneha: number | null;
+    associationVii: number | null;
+    vij: number | null;
+    gun: number | null;
+    rp: number | null;
+    sizeColumns?: Record<string, number | null>;
+  }>;
+  marketRateMaster?: RateEntryMarketRateMasterDto | null;
 }
 
 function num(value: unknown, fallback = 0): number {
@@ -158,7 +173,9 @@ function mapRowToTrip(row: RateEntryTripDto, withDeliveries: boolean): Trip {
     ratesEntered: row.ratesEntered,
     createdAt: now,
     updatedAt: now,
-  };
+    marketRatesWindow: row.marketRatesWindow ?? [],
+    marketRateMaster: row.marketRateMaster ?? null,
+  } as Trip;
 }
 
 /** GET /operations/rate-entry — trips currently eligible for rate entry
@@ -176,31 +193,35 @@ export async function getRateEntryTrip(tripId: number): Promise<Trip> {
 }
 
 /** PUT /operations/rate-entry/:tripId — save (draft) shop-wise rates.
- * Sends only deliveryId + rate; amount is always computed server-side. */
+ * Sends only deliveryId + rate; amount is always computed server-side.
+ * Blank shops are omitted so partial progress is persistable. */
 export async function saveRates(
   tripId: number,
   deliveries: Array<{ deliveryId: number; rate: number }>
 ): Promise<void> {
   const lines = deliveries
-    .filter((d) => d.rate != null && d.rate > 0)
+    .filter((d) => d.rate != null && Number.isFinite(d.rate) && d.rate >= 50 && d.rate <= 300)
     .map((d) => ({ deliveryId: d.deliveryId, rate: d.rate }));
   await apiPut(`${RATE_ENTRY_PATH}/${tripId}`, { rates: lines });
 }
 
-/** POST /operations/rate-entry/:tripId/lock — save & lock. After a
- * successful lock the trip is immutable and Shop Sales becomes available. */
-export async function lockRates(tripId: number, actor = "web-user"): Promise<void> {
-  await apiPost(`${RATE_ENTRY_PATH}/${tripId}/lock`, { lockedBy: actor });
+/** POST /operations/rate-entry/:tripId/lock — atomic persist + lock. */
+export async function lockRates(
+  tripId: number,
+  actor = "web-user",
+  deliveries: Array<{ deliveryId: number; rate: number }> = []
+): Promise<void> {
+  const lines = deliveries
+    .filter((d) => d.rate != null && Number.isFinite(d.rate) && d.rate >= 50 && d.rate <= 300)
+    .map((d) => ({ deliveryId: d.deliveryId, rate: d.rate }));
+  await apiPost(`${RATE_ENTRY_PATH}/${tripId}/lock`, { lockedBy: actor, rates: lines });
 }
 
-/** Save shop-wise rates then immediately lock the trip — this mirrors the
- * existing "Save & Lock Trip" single modal action. The backend still
- * performs these as two distinct, separately-enforced steps. */
+/** Atomic Save & Lock — single POST /lock with rates in the same transaction. */
 export async function saveAndLockRates(
   tripId: number,
   deliveries: Array<{ deliveryId: number; rate: number }>,
   actor = "web-user"
 ): Promise<void> {
-  await saveRates(tripId, deliveries);
-  await lockRates(tripId, actor);
+  await lockRates(tripId, actor, deliveries);
 }

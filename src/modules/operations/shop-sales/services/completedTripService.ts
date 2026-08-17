@@ -29,7 +29,7 @@ async function getTrip(id: number): Promise<Trip> {
  * lock. Throws on failure — callers should catch and surface the error. */
 async function saveOnly(tripId: number, deliveries: Trip["deliveries"]): Promise<void> {
   const lines = deliveries
-    .filter((d) => d.rate != null && d.rate > 0)
+    .filter((d) => d.rate != null && Number.isFinite(d.rate as number) && (d.rate as number) >= 50 && (d.rate as number) <= 300)
     .map((d) => ({ deliveryId: d.id, rate: d.rate as number }));
   await saveRates(tripId, lines);
 }
@@ -43,10 +43,9 @@ async function lockOnly(tripId: number): Promise<void> {
  * button). Throws on failure. */
 async function saveRatesAndLock(tripId: number, deliveries: Trip["deliveries"]): Promise<boolean> {
   const lines = deliveries
-    .filter((d) => d.rate != null && d.rate > 0)
+    .filter((d) => d.rate != null && Number.isFinite(d.rate as number) && (d.rate as number) >= 50 && (d.rate as number) <= 300)
     .map((d) => ({ deliveryId: d.id, rate: d.rate as number }));
-  await saveRates(tripId, lines);
-  await lockRates(tripId);
+  await lockRates(tripId, "web-user", lines);
   return true;
 }
 
