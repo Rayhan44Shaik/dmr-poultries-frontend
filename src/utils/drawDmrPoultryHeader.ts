@@ -17,16 +17,13 @@ export type DmrPoultryHeaderAssets = {
 };
 
 export interface DmrPoultryHeaderOptions {
-  /** Left/right page margin in millimetres. */
+  /** Left/right page margin in the same unit used by the jsPDF document. */
   margin?: number;
 
-  /** Top position of the header. */
+  /** Top edge of the header. */
   top?: number;
 
-  /**
-   * Optional hen-image URL.
-   * The connected outer background is removed automatically.
-   */
+  /** Optional hen image URL. Its outer background is removed automatically. */
   henUrl?: string;
 
   /** Optional business-name override. */
@@ -38,15 +35,18 @@ export interface DmrPoultryHeaderOptions {
   /** Optional mobile-number override. */
   mobileNumber?: string;
 
+  /** Optional email-address override. */
+  emailAddress?: string;
+
   /** Optional address override. */
   address?: string;
 }
 
 export const DMR_POULTRY_DETAILS = {
   businessName: "DMR POULTRIES",
-  proprietorName:
-    "D. Srinivas Chakrapani",
+  proprietorName: "D. Srinivas Chakrapani",
   mobileNumber: "+91 98484 17474",
+  emailAddress: "dmrpoultries@gmail.com",
   address:
     "Madhira Rd, Peddapuram, Andhra Pradesh 521181",
 } as const;
@@ -54,6 +54,22 @@ export const DMR_POULTRY_DETAILS = {
 const NAVY: RGB = [15, 35, 79];
 const RED: RGB = [178, 20, 34];
 const MUTED: RGB = [75, 85, 99];
+
+/**
+ * Creates a compressed ISO A4 PDF using millimetres.
+ */
+export function createDmrPoultryPdf(
+  orientation:
+    DmrPdfOrientation = "portrait",
+): jsPDF {
+  return new jsPDF({
+    orientation,
+    unit: "mm",
+    format: "a4",
+    compress: true,
+    putOnlyUsedFonts: true,
+  });
+}
 
 const setFill = (
   doc: jsPDF,
@@ -89,19 +105,88 @@ const setText = (
 };
 
 /**
- * Creates a compressed ISO A4 PDF.
+ * Draws a subtle vector call icon without requiring an icon font.
  */
-export function createDmrPoultryPdf(
-  orientation:
-    DmrPdfOrientation = "portrait",
-): jsPDF {
-  return new jsPDF({
-    orientation,
-    unit: "mm",
-    format: "a4",
-    compress: true,
-    putOnlyUsedFonts: true,
-  });
+function drawCallIcon(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  size = 4.1,
+): void {
+  doc.saveGraphicsState();
+
+  setDraw(doc, MUTED);
+  doc.setLineWidth(0.22);
+
+  doc.roundedRect(
+    x + size * 0.2,
+    y,
+    size * 0.58,
+    size,
+    0.38,
+    0.38,
+    "S",
+  );
+
+  doc.line(
+    x + size * 0.35,
+    y + size * 0.18,
+    x + size * 0.63,
+    y + size * 0.18,
+  );
+
+  doc.circle(
+    x + size * 0.49,
+    y + size * 0.82,
+    size * 0.045,
+    "S",
+  );
+
+  doc.restoreGraphicsState();
+}
+
+/**
+ * Draws a subtle vector email icon without requiring an icon font.
+ */
+function drawMailIcon(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  width = 4.6,
+): void {
+  const height =
+    width * 0.65;
+
+  doc.saveGraphicsState();
+
+  setDraw(doc, MUTED);
+  doc.setLineWidth(0.2);
+
+  doc.roundedRect(
+    x,
+    y,
+    width,
+    height,
+    0.28,
+    0.28,
+    "S",
+  );
+
+  doc.line(
+    x + 0.18,
+    y + 0.22,
+    x + width / 2,
+    y + height * 0.58,
+  );
+
+  doc.line(
+    x + width - 0.18,
+    y + 0.22,
+    x + width / 2,
+    y + height * 0.58,
+  );
+
+  doc.restoreGraphicsState();
 }
 
 function loadImage(
@@ -109,7 +194,8 @@ function loadImage(
 ): Promise<HTMLImageElement> {
   return new Promise(
     (resolve, reject) => {
-      const image = new Image();
+      const image =
+        new Image();
 
       image.crossOrigin =
         "anonymous";
@@ -135,7 +221,9 @@ function imageToCanvas(
   image: HTMLImageElement,
 ) {
   const canvas =
-    document.createElement("canvas");
+    document.createElement(
+      "canvas",
+    );
 
   canvas.width =
     image.naturalWidth ||
@@ -146,9 +234,13 @@ function imageToCanvas(
     image.height;
 
   const context =
-    canvas.getContext("2d", {
-      willReadFrequently: true,
-    });
+    canvas.getContext(
+      "2d",
+      {
+        willReadFrequently:
+          true,
+      },
+    );
 
   if (
     !context ||
@@ -173,7 +265,8 @@ function imageToCanvas(
 }
 
 function getBorderBackground(
-  pixels: Uint8ClampedArray,
+  pixels:
+    Uint8ClampedArray,
   width: number,
   height: number,
 ): RGB {
@@ -186,17 +279,20 @@ function getBorderBackground(
   const step = Math.max(
     1,
     Math.floor(
-      Math.min(width, height) /
-        100,
+      Math.min(
+        width,
+        height,
+      ) / 100,
     ),
   );
 
   const sample = (
     x: number,
     y: number,
-  ) => {
+  ): void => {
     const offset =
-      (y * width + x) * 4;
+      (y * width + x) *
+      4;
 
     channels[0].push(
       pixels[offset],
@@ -217,7 +313,11 @@ function getBorderBackground(
     x += step
   ) {
     sample(x, 0);
-    sample(x, height - 1);
+
+    sample(
+      x,
+      height - 1,
+    );
   }
 
   for (
@@ -226,38 +326,51 @@ function getBorderBackground(
     y += step
   ) {
     sample(0, y);
-    sample(width - 1, y);
+
+    sample(
+      width - 1,
+      y,
+    );
   }
 
   const median = (
     values: number[],
-  ) => {
+  ): number => {
     values.sort(
-      (first, second) =>
+      (
+        first,
+        second,
+      ) =>
         first - second,
     );
 
     return (
       values[
         Math.floor(
-          values.length / 2,
+          values.length /
+            2,
         )
       ] ?? 0
     );
   };
 
   return [
-    median(channels[0]),
-    median(channels[1]),
-    median(channels[2]),
+    median(
+      channels[0],
+    ),
+    median(
+      channels[1],
+    ),
+    median(
+      channels[2],
+    ),
   ];
 }
 
 /**
- * Removes only the image background connected to the outer border.
+ * Removes only background pixels connected to the outer image border.
  *
- * This protects interior feather and eye details while removing
- * rectangular JPG backgrounds.
+ * Interior feather, eye and shadow details are protected.
  */
 export async function prepareHenCutout(
   src: string,
@@ -270,8 +383,11 @@ export async function prepareHenCutout(
     context,
   } = imageToCanvas(image);
 
-  const width = canvas.width;
-  const height = canvas.height;
+  const width =
+    canvas.width;
+
+  const height =
+    canvas.height;
 
   const imageData =
     context.getImageData(
@@ -292,9 +408,12 @@ export async function prepareHenCutout(
     );
 
   const luminance =
-    background[0] * 0.2126 +
-    background[1] * 0.7152 +
-    background[2] * 0.0722;
+    background[0] *
+      0.2126 +
+    background[1] *
+      0.7152 +
+    background[2] *
+      0.0722;
 
   const tolerance =
     luminance < 45
@@ -307,10 +426,14 @@ export async function prepareHenCutout(
     width * height;
 
   const removed =
-    new Uint8Array(pixelCount);
+    new Uint8Array(
+      pixelCount,
+    );
 
   const queue =
-    new Int32Array(pixelCount);
+    new Int32Array(
+      pixelCount,
+    );
 
   let queueStart = 0;
   let queueEnd = 0;
@@ -322,7 +445,9 @@ export async function prepareHenCutout(
       position * 4;
 
     if (
-      pixels[offset + 3] === 0
+      pixels[
+        offset + 3
+      ] === 0
     ) {
       return true;
     }
@@ -333,11 +458,15 @@ export async function prepareHenCutout(
           background[0],
       ) <= tolerance &&
       Math.abs(
-        pixels[offset + 1] -
+        pixels[
+          offset + 1
+        ] -
           background[1],
       ) <= tolerance &&
       Math.abs(
-        pixels[offset + 2] -
+        pixels[
+          offset + 2
+        ] -
           background[2],
       ) <= tolerance
     );
@@ -348,17 +477,23 @@ export async function prepareHenCutout(
   ): void => {
     if (
       removed[position] ||
-      !matchesBackground(position)
+      !matchesBackground(
+        position,
+      )
     ) {
       return;
     }
 
-    removed[position] = 1;
-    queue[queueEnd] = position;
+    removed[position] =
+      1;
+
+    queue[queueEnd] =
+      position;
+
     queueEnd += 1;
   };
 
-  // Add all matching outer-border pixels.
+  // Add matching top and bottom border pixels.
   for (
     let x = 0;
     x < width;
@@ -373,12 +508,15 @@ export async function prepareHenCutout(
     );
   }
 
+  // Add matching left and right border pixels.
   for (
     let y = 0;
     y < height;
     y += 1
   ) {
-    enqueue(y * width);
+    enqueue(
+      y * width,
+    );
 
     enqueue(
       y * width +
@@ -387,9 +525,10 @@ export async function prepareHenCutout(
     );
   }
 
-  // Flood-fill only the background connected to the image border.
+  // Flood-fill only the background connected to the border.
   while (
-    queueStart < queueEnd
+    queueStart <
+    queueEnd
   ) {
     const position =
       queue[queueStart];
@@ -399,41 +538,61 @@ export async function prepareHenCutout(
     const x =
       position % width;
 
-    const y = Math.floor(
-      position / width,
-    );
+    const y =
+      Math.floor(
+        position / width,
+      );
 
     if (x > 0) {
-      enqueue(position - 1);
+      enqueue(
+        position - 1,
+      );
     }
 
-    if (x + 1 < width) {
-      enqueue(position + 1);
+    if (
+      x + 1 <
+      width
+    ) {
+      enqueue(
+        position + 1,
+      );
     }
 
     if (y > 0) {
       enqueue(
-        position - width,
+        position -
+          width,
       );
     }
 
-    if (y + 1 < height) {
+    if (
+      y + 1 <
+      height
+    ) {
       enqueue(
-        position + width,
+        position +
+          width,
       );
     }
   }
 
   const edge =
-    new Uint8Array(pixelCount);
+    new Uint8Array(
+      pixelCount,
+    );
 
-  // Remove the selected background and identify the first edge.
+  // Remove background and identify the first subject edge.
   for (
     let position = 0;
-    position < pixelCount;
+    position <
+    pixelCount;
     position += 1
   ) {
-    if (!removed[position]) {
+    if (
+      !removed[
+        position
+      ]
+    ) {
       continue;
     }
 
@@ -444,22 +603,32 @@ export async function prepareHenCutout(
     const x =
       position % width;
 
-    const y = Math.floor(
-      position / width,
-    );
+    const y =
+      Math.floor(
+        position / width,
+      );
 
     if (
       x > 0 &&
-      !removed[position - 1]
+      !removed[
+        position - 1
+      ]
     ) {
-      edge[position - 1] = 1;
+      edge[
+        position - 1
+      ] = 1;
     }
 
     if (
-      x + 1 < width &&
-      !removed[position + 1]
+      x + 1 <
+        width &&
+      !removed[
+        position + 1
+      ]
     ) {
-      edge[position + 1] = 1;
+      edge[
+        position + 1
+      ] = 1;
     }
 
     if (
@@ -474,7 +643,8 @@ export async function prepareHenCutout(
     }
 
     if (
-      y + 1 < height &&
+      y + 1 <
+        height &&
       !removed[
         position + width
       ]
@@ -486,7 +656,9 @@ export async function prepareHenCutout(
   }
 
   const secondEdge =
-    new Uint8Array(pixelCount);
+    new Uint8Array(
+      pixelCount,
+    );
 
   const markSecondEdge = (
     position: number,
@@ -495,17 +667,22 @@ export async function prepareHenCutout(
       !removed[position] &&
       !edge[position]
     ) {
-      secondEdge[position] = 1;
+      secondEdge[
+        position
+      ] = 1;
     }
   };
 
   // Feather the first edge.
   for (
     let position = 0;
-    position < pixelCount;
+    position <
+    pixelCount;
     position += 1
   ) {
-    if (!edge[position]) {
+    if (
+      !edge[position]
+    ) {
       continue;
     }
 
@@ -521,9 +698,10 @@ export async function prepareHenCutout(
     const x =
       position % width;
 
-    const y = Math.floor(
-      position / width,
-    );
+    const y =
+      Math.floor(
+        position / width,
+      );
 
     if (x > 0) {
       markSecondEdge(
@@ -531,7 +709,10 @@ export async function prepareHenCutout(
       );
     }
 
-    if (x + 1 < width) {
+    if (
+      x + 1 <
+      width
+    ) {
       markSecondEdge(
         position + 1,
       );
@@ -539,31 +720,41 @@ export async function prepareHenCutout(
 
     if (y > 0) {
       markSecondEdge(
-        position - width,
+        position -
+          width,
       );
     }
 
-    if (y + 1 < height) {
+    if (
+      y + 1 <
+      height
+    ) {
       markSecondEdge(
-        position + width,
+        position +
+          width,
       );
     }
   }
 
-  // Feather the second edge to prevent a dark JPG halo.
+  // Feather the second edge to prevent a dark JPEG halo.
   for (
     let position = 0;
-    position < pixelCount;
+    position <
+    pixelCount;
     position += 1
   ) {
     if (
-      secondEdge[position]
+      secondEdge[
+        position
+      ]
     ) {
       pixels[
         position * 4 + 3
       ] = Math.min(
         pixels[
-          position * 4 + 3
+          position *
+            4 +
+          3
         ],
         225,
       );
@@ -584,7 +775,8 @@ export async function prepareHenCutout(
 
   for (
     let position = 0;
-    position < pixelCount;
+    position <
+    pixelCount;
     position += 1
   ) {
     if (
@@ -598,9 +790,10 @@ export async function prepareHenCutout(
     const x =
       position % width;
 
-    const y = Math.floor(
-      position / width,
-    );
+    const y =
+      Math.floor(
+        position / width,
+      );
 
     minX = Math.min(
       minX,
@@ -632,15 +825,16 @@ export async function prepareHenCutout(
     );
   }
 
-  const padding = Math.max(
-    2,
-    Math.round(
-      Math.min(
-        width,
-        height,
-      ) * 0.006,
-    ),
-  );
+  const padding =
+    Math.max(
+      2,
+      Math.round(
+        Math.min(
+          width,
+          height,
+        ) * 0.006,
+      ),
+    );
 
   minX = Math.max(
     0,
@@ -673,13 +867,20 @@ export async function prepareHenCutout(
       "canvas",
     );
 
-  cropped.width = cropWidth;
-  cropped.height = cropHeight;
+  cropped.width =
+    cropWidth;
+
+  cropped.height =
+    cropHeight;
 
   const croppedContext =
-    cropped.getContext("2d");
+    cropped.getContext(
+      "2d",
+    );
 
-  if (!croppedContext) {
+  if (
+    !croppedContext
+  ) {
     throw new Error(
       "Unable to crop the hen image.",
     );
@@ -723,9 +924,13 @@ function drawSoftContactShadow(
   ];
 
   shades.forEach(
-    (shade, index) => {
+    (
+      shade,
+      index,
+    ) => {
       const scale =
-        1 - index * 0.16;
+        1 -
+        index * 0.16;
 
       doc.setFillColor(
         shade,
@@ -736,7 +941,8 @@ function drawSoftContactShadow(
       doc.ellipse(
         centerX,
         baseY,
-        (width * scale) / 2,
+        (width * scale) /
+          2,
         1.35 * scale,
         "F",
       );
@@ -747,7 +953,7 @@ function drawSoftContactShadow(
 }
 
 /**
- * Draws a vector poultry fallback when a hen image is unavailable.
+ * Draws a vector hen fallback when the source image is unavailable.
  */
 function drawHenFallback(
   doc: jsPDF,
@@ -816,14 +1022,17 @@ function drawHenFallback(
       width * 0.34,
     centerY -
       height * 0.2,
+
     centerX +
       width * 0.46,
     centerY -
       height * 0.16,
+
     centerX +
       width * 0.34,
     centerY -
       height * 0.12,
+
     "F",
   );
 
@@ -831,10 +1040,7 @@ function drawHenFallback(
 }
 
 /**
- * Prepares the optional hen image once.
- *
- * Reuse the returned asset for every page instead of processing the source
- * JPG separately on every page.
+ * Prepares the optional hen once for reuse on every PDF page.
  */
 export async function prepareDmrPoultryHeaderAssets(
   options: Pick<
@@ -842,7 +1048,9 @@ export async function prepareDmrPoultryHeaderAssets(
     "henUrl"
   > = {},
 ): Promise<DmrPoultryHeaderAssets> {
-  if (!options.henUrl) {
+  if (
+    !options.henUrl
+  ) {
     return {};
   }
 
@@ -867,13 +1075,13 @@ export async function prepareDmrPoultryHeaderAssets(
  * Draws the reusable DMR POULTRIES letterhead.
  *
  * Layout:
- * - Left: proprietor name and mobile number only
- * - Centre: DMR POULTRIES with the address directly underneath
+ * - Left: proprietor, call and email details
+ * - Centre: DMR POULTRIES with the complete address underneath
  * - Right: prepared hen image or vector fallback
  *
- * There is no left-side logo, OFFICE label or report subtitle.
+ * There is no left logo, OFFICE label, Mobile label or report subtitle.
  *
- * The returned number is the safe Y-coordinate for page content.
+ * Returns the safe Y-coordinate for page content or AutoTable.
  */
 export function drawPreparedDmrPoultryHeader(
   doc: jsPDF,
@@ -881,7 +1089,8 @@ export function drawPreparedDmrPoultryHeader(
     DmrPoultryHeaderOptions,
     "henUrl"
   > = {},
-  assets: DmrPoultryHeaderAssets = {},
+  assets:
+    DmrPoultryHeaderAssets = {},
 ): number {
   const pageWidth =
     doc.internal.pageSize.getWidth();
@@ -905,6 +1114,10 @@ export function drawPreparedDmrPoultryHeader(
       options.mobileNumber ??
       DMR_POULTRY_DETAILS.mobileNumber,
 
+    emailAddress:
+      options.emailAddress ??
+      DMR_POULTRY_DETAILS.emailAddress,
+
     address:
       options.address ??
       DMR_POULTRY_DETAILS.address,
@@ -913,16 +1126,14 @@ export function drawPreparedDmrPoultryHeader(
   doc.saveGraphicsState();
 
   /*
-   * LEFT-SIDE PROPRIETOR DETAILS
-   *
-   * Only the proprietor's name and mobile number are displayed.
+   * LEFT-SIDE PROPRIETOR BLOCK
    */
   doc.setFont(
     "helvetica",
     "bold",
   );
 
-  doc.setFontSize(7.4);
+  doc.setFontSize(8);
   setText(doc, RED);
 
   doc.text(
@@ -931,14 +1142,27 @@ export function drawPreparedDmrPoultryHeader(
     top + 2.8,
   );
 
-  // The owner name is intentionally larger and more prominent.
-  doc.setFontSize(10.5);
+  /*
+   * LARGER PROPRIETOR NAME
+   */
+  doc.setFontSize(11.5);
   setText(doc, NAVY);
 
   doc.text(
     details.proprietorName,
     margin,
-    top + 8.3,
+    top + 9,
+  );
+
+  /*
+   * LIGHT PHONE ICON AND NUMBER
+   *
+   * Extra vertical space is kept between the proprietor name and phone row.
+   */
+  drawCallIcon(
+    doc,
+    margin,
+    top + 11.7,
   );
 
   doc.setFont(
@@ -946,19 +1170,37 @@ export function drawPreparedDmrPoultryHeader(
     "normal",
   );
 
+  doc.setFontSize(8.5);
+  setText(doc, MUTED);
+
+  doc.text(
+    details.mobileNumber,
+    margin + 5.8,
+    top + 15.2,
+  );
+
+  /*
+   * LIGHT EMAIL ICON AND ADDRESS
+   *
+   * This row is placed lower to use the previously empty header space.
+   */
+  drawMailIcon(
+    doc,
+    margin,
+    top + 17.8,
+  );
+
   doc.setFontSize(8);
   setText(doc, MUTED);
 
   doc.text(
-    `Mobile: ${details.mobileNumber}`,
-    margin,
-    top + 13.5,
+    details.emailAddress,
+    margin + 5.8,
+    top + 20.7,
   );
 
   /*
    * CENTRED BUSINESS NAME
-   *
-   * pageWidth / 2 keeps it centred on both portrait and landscape A4 pages.
    */
   doc.setFont(
     "helvetica",
@@ -983,9 +1225,7 @@ export function drawPreparedDmrPoultryHeader(
   );
 
   /*
-   * CENTRED ADDRESS
-   *
-   * The address appears below DMR POULTRIES without an OFFICE label.
+   * COMPLETE ADDRESS UNDER BUSINESS NAME
    */
   doc.setFont(
     "helvetica",
@@ -994,27 +1234,35 @@ export function drawPreparedDmrPoultryHeader(
 
   doc.setFontSize(
     pageWidth < 240
-      ? 7
-      : 7.5,
+      ? 6.8
+      : 7.3,
   );
 
   setText(doc, MUTED);
 
+  const addressWidth =
+    pageWidth < 240
+      ? 88
+      : 122;
+
+  const addressLines =
+    doc.splitTextToSize(
+      details.address,
+      addressWidth,
+    ) as string[];
+
   doc.text(
-    details.address,
+    addressLines,
     pageWidth / 2,
-    top + 16.5,
+    top + 16.3,
     {
       align: "center",
-      maxWidth:
-        pageWidth < 240
-          ? 86
-          : 110,
+      lineHeightFactor: 1.15,
     },
   );
 
   /*
-   * CENTRE DECORATIVE DIVIDER
+   * DECORATIVE DIVIDER
    */
   const dividerY =
     top + 23.5;
@@ -1081,13 +1329,17 @@ export function drawPreparedDmrPoultryHeader(
   const henY =
     top - 1;
 
-  if (assets.hen) {
-    const ratio = Math.min(
-      henWidth /
-        assets.hen.width,
-      henHeight /
-        assets.hen.height,
-    );
+  if (
+    assets.hen
+  ) {
+    const ratio =
+      Math.min(
+        henWidth /
+          assets.hen.width,
+
+        henHeight /
+          assets.hen.height,
+      );
 
     const width =
       assets.hen.width *
@@ -1099,7 +1351,8 @@ export function drawPreparedDmrPoultryHeader(
 
     const x =
       henX +
-      (henWidth - width) /
+      (henWidth -
+        width) /
         2;
 
     const y =
@@ -1156,10 +1409,10 @@ export function drawPreparedDmrPoultryHeader(
 }
 
 /**
- * Convenience function for PDFs that provide a hen-image URL.
+ * Convenience function for a PDF that supplies a hen URL.
  *
- * For a multi-page PDF, prepare the asset once with
- * prepareDmrPoultryHeaderAssets() and reuse it with
+ * For a multi-page PDF, prepare the image once using
+ * prepareDmrPoultryHeaderAssets() and reuse the returned asset with
  * drawPreparedDmrPoultryHeader().
  */
 export async function drawDmrPoultryHeader(

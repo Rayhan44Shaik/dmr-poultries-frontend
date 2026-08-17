@@ -409,6 +409,19 @@ export async function listTrips(options?: { includeDeleted?: boolean }): Promise
   return data.map((trip) => mapApiTripToTrip(trip));
 }
 
+/** GET /api/operations/trip-list — completed/approved, non-deleted trips only. */
+export async function listCompletedTrips(): Promise<Trip[]> {
+  const { data } = await apiGet<ApiTripRecord[] | { data: ApiTripRecord[] }>(
+    "/operations/trip-list"
+  );
+  const rows = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+      ? data.data
+      : [];
+  return rows.map((trip) => mapApiTripToTrip(trip));
+}
+
 /** Single final Step 1 submission. No draft is created or updated before this request. */
 export async function submitStep1(trip: Partial<Trip>): Promise<Trip> {
   const payload = {

@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
-import useTrips from "../hooks/useTrips";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import TripFilters from "../components/TripFilters";
 import TripKPICards from "../components/TripKPICards";
 import TripMasterTable from "../components/TripMasterTable";
@@ -12,39 +11,64 @@ import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useBirdTypes } from "../../../masters/bird-types/hooks/useBirdTypes";
 
 import type { Trip } from "../types/trip";
-import { loadTripById } from "../services/tripHeaderApiService";
+import { listCompletedTrips, loadTripById } from "../services/tripHeaderApiService";
 
 type TripListPageProps = { embedded?: boolean };
 
 function TripListPage({ embedded = false }: TripListPageProps) {
   const { showNotification } = useSafeNotification();
 
-  const {
-    trips,
-    filteredTrips,
-    currentPage,
-    setCurrentPage,
-    search,
-    setSearch,
-    vehicle,
-    setVehicle,
-    supervisor,
-    setSupervisor,
-    farm,
-    setFarm,
-    fromDate,
-    setFromDate,
-    toDate,
-    setToDate,
-    resetFilters,
-    selectedTrip,
-    setSelectedTrip,
-    refreshTrips,
-  } = useTrips(showNotification);
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [vehicle, setVehicle] = useState("All Vehicles");
+  const [supervisor, setSupervisor] = useState("All Supervisors");
+  const [farm, setFarm] = useState("All Sources");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+
+  const refreshTrips = useCallback(async () => {
+    try {
+      setTrips(await listCompletedTrips());
+    } catch {
+      showNotification("Unable to load trips from the server.", "error");
+    }
+  }, [showNotification]);
 
   useEffect(() => {
-    refreshTrips();
-  }, []);
+    void refreshTrips();
+  }, [refreshTrips]);
+
+  const resetFilters = () => {
+    setSearch("");
+    setVehicle("All Vehicles");
+    setSupervisor("All Supervisors");
+    setFarm("All Sources");
+    setFromDate("");
+    setToDate("");
+    setCurrentPage(1);
+  };
+
+  const filteredTrips = useMemo(() => {
+    const text = search.toLowerCase();
+    return trips.filter((trip) => {
+      const searchMatched =
+        text === "" ||
+        trip.tripNo.toLowerCase().includes(text) ||
+        trip.vehicleNo.toLowerCase().includes(text) ||
+        trip.driverName.toLowerCase().includes(text) ||
+        trip.supervisorName.toLowerCase().includes(text) ||
+        trip.sourceFarm.toLowerCase().includes(text);
+      const vehicleMatched = vehicle === "All Vehicles" || trip.vehicleNo === vehicle;
+      const supervisorMatched =
+        supervisor === "All Supervisors" || trip.supervisorName === supervisor;
+      const farmMatched = farm === "All Sources" || trip.sourceFarm === farm;
+      const fromMatched = !fromDate || trip.tripDate >= fromDate;
+      const toMatched = !toDate || trip.tripDate <= toDate;
+      return searchMatched && vehicleMatched && supervisorMatched && farmMatched && fromMatched && toMatched;
+    });
+  }, [trips, search, vehicle, supervisor, farm, fromDate, toDate]);
 
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
@@ -76,9 +100,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     ...Array.from(new Set(masterVehicles.map((v) => v.vehicleNumber).filter(Boolean))),
   ];
 
-  const safeTrips = (Array.isArray(filteredTrips) && filteredTrips.length > 0)
-    ? filteredTrips
-    : (Array.isArray(trips) ? trips : []);
+  const safeTrips = Array.isArray(filteredTrips) ? filteredTrips : [];
 
   const supervisorSet = new Set(safeTrips.map((t) => t.supervisorName).filter(Boolean));
   const farmSet = new Set(safeTrips.map((t) => t.sourceFarm).filter(Boolean));
@@ -86,7 +108,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const supervisors = ["All Supervisors", ...Array.from(supervisorSet)];
   const farms = ["All Sources", ...Array.from(farmSet)];
 
-  const completedTrips = safeTrips.filter((t) => t.status === "Completed");
+  const completedTrips = safeTrips;
 
   const hasFilters =
     search !== "" ||
