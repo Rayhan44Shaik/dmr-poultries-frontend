@@ -23,7 +23,15 @@ const ExpenseBreakdownDonut = ({ data, height = 220 }: ExpenseBreakdownDonutProp
     );
   }
 
-  const totalExpense = data.reduce((sum, item) => sum + item.value, 0);
+  const totalExpense = data.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
+
+  if (totalExpense <= 0) {
+    return (
+      <div style={{ height }} className="flex items-center justify-center text-slate-400 text-sm font-medium">
+        No expense data recorded
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full" style={{ height }}>
@@ -45,7 +53,7 @@ const ExpenseBreakdownDonut = ({ data, height = 220 }: ExpenseBreakdownDonutProp
               ))}
             </Pie>
             <Tooltip
-              formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Amount']}
+              formatter={(value) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Amount']}
               contentStyle={{
                 backgroundColor: 'rgba(15, 23, 42, 0.95)',
                 borderRadius: '8px',

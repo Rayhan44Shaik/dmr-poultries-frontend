@@ -1,29 +1,39 @@
-import { memo, useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { memo, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useEmployees } from '../../masters/employees/hooks/useEmployees';
 import { useMaintenanceData } from '../hooks/useMaintenanceData';
 import { useMaintenanceForm } from '../hooks/useMaintenanceForm';
 import { isEditable, safeDate } from '../utils/maintenanceHelpers';
-import { softDeleteMaintenance, getDeletedMaintenance } from '../services/storage';
+import { maintenanceApi } from '../services/maintenanceApi';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { useFuelKMValidator } from "../../operations/fuel-expenses/hooks/useFuelKMValidator";
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import MaintenanceForm from '../components/maintenance/MaintenanceForm';
-import LatestMaintenanceTable, { type ViewMode } from '../components/maintenance/LatestMaintenanceTable';
+import LatestMaintenanceTable, { ViewMode } from '../components/maintenance/LatestMaintenanceTable';
 import ViewModal from '../components/maintenance/ViewModal';
 import { MAINTENANCE_TYPES } from '../utils/constants';
 import type { MaintenanceEvent } from '../types';
-import { RotateCcw, Save, Wrench, AlertTriangle, X, AlertCircle } from 'lucide-react';
+import { RotateCcw, Save, Wrench, AlertTriangle, X, AlertCircle, CheckCircle2 } from 'lucide-react';
 
-const MaintenanceEntryPage = ({ embedded: _embedded = false }: { embedded?: boolean }) => {
+const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
   const { employees } = useEmployees();
   const { showNotification } = useSafeNotification();
-  const { vehicles, maintenance, refresh: refreshMaintenance } = useMaintenanceData();
+  const { vehicles, maintenance, approvedMaintenance, deletedRecords, refresh: refreshMaintenance } = useMaintenanceData();
   const [loading, setLoading] = useState(false);
   const [selectKey, setSelectKey] = useState(0);
-  const [, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   
   // Updated view mode to support Pending, Approved, and Deleted
   const [viewMode, setViewMode] = useState<ViewMode>('pending');
+
+  // --- Approval Dialog State ---
+  const [approveDialog, setApproveDialog] = useState<{
+    open: boolean;
+    record: MaintenanceEvent | null;
+    message?: string;
+  }>({
+    open: false,
+    record: null,
+  });
 
   // --- Confirmation Dialog State ---
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -40,7 +50,7 @@ const MaintenanceEntryPage = ({ embedded: _embedded = false }: { embedded?: bool
     countdown: null,
   });
 
-  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     return () => {
@@ -48,16 +58,7 @@ const MaintenanceEntryPage = ({ embedded: _embedded = false }: { embedded?: bool
     };
   }, []);
 
-  // --- Deleted records ---
-  const [deletedRecords, setDeletedRecords] = useState<MaintenanceEvent[]>([]);
-  const refreshDeleted = useCallback(() => {
-    setDeletedRecords(getDeletedMaintenance());
-  }, []);
-
-  useEffect(() => {
-    refreshDeleted();
-  }, [refreshDeleted]);
-
+  // --- Deleted records (soft-deleted from backend, exposed by the hook) ---
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
 
@@ -70,16 +71,27 @@ const MaintenanceEntryPage = ({ embedded: _embedded = false }: { embedded?: bool
     handleSubmit: submitForm,
     resetForm,
     setVehicleId,
+    setDate,
+    setBillNumber,
+    setCurrentKM,
     setMaintenanceType,
+    setServiceType,
+    setGarage,
+    setMechanic,
     setDriverId,
+    setNextServiceKM,
+    setRemarks,
+    documents,
+    addDocumentFiles,
+    removeDocument,
+    markDocumentRemoval,
+    setExistingDocuments,
   } = useMaintenanceForm({
     onSuccess: () => {
       refreshMaintenance();
-      refreshDeleted();
       setCurrentPage(1);
       setSelectedId(null);
     },
-    vehicles,
   });
 
   // --- Get vehicle number for validator ---
@@ -101,20 +113,16 @@ const MaintenanceEntryPage = ({ embedded: _embedded = false }: { embedded?: bool
   }, [maintenance]);
 
   const approvedRecords = useMemo(() => {
-    const approved = maintenance.filter(rec => rec.paymentStatus === 'approved');
-    return approved.sort((a, b) => safeDate(b.date).getTime() - safeDate(a.date).getTime());
-  }, [maintenance]);
+    // Approved tab shows ONLY the latest approved maintenance record per vehicle
+    // (computed at the backend with DISTINCT ON).
+    return approvedMaintenance;
+  }, [approvedMaintenance]);
 
   const displayRecords = useMemo(() => {
     if (viewMode === 'pending') return pendingRecords;
     if (viewMode === 'approved') return approvedRecords;
     return deletedRecords;
   }, [viewMode, pendingRecords, approvedRecords, deletedRecords]);
-
-  const paginatedRecords = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return displayRecords.slice(start, start + pageSize);
-  }, [displayRecords, currentPage, pageSize]);
 
   // --- View modal ---
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -167,7 +175,10 @@ const MaintenanceEntryPage = ({ embedded: _embedded = false }: { embedded?: bool
   };
 
   const handleEdit = (record: MaintenanceEvent) => {
-    if (!isEditable(record.createdAt)) {
+    // Anchored on the record's business date (matches the backend's 10-day
+    // lock in fleetMaintenanceLock.ts — "10 days after this maintenance
+    // happened", not 10 days after it was typed in).
+    if (!isEditable(record.date)) {
       showNotification('This record is older than 10 days and cannot be edited.', 'error');
       return;
     }
@@ -193,6 +204,7 @@ const MaintenanceEntryPage = ({ embedded: _embedded = false }: { embedded?: bool
       createdAt: record.createdAt || '',
     });
     setPartsData(record.parts || [{ name: '', specification: '', quantity: 1, rate: 0, amount: 0 }]);
+    setExistingDocuments(record.documents || []);
     setSelectKey(prev => prev + 1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     showNotification('Edit mode – update the details and save.', 'info');
@@ -218,7 +230,7 @@ const MaintenanceEntryPage = ({ embedded: _embedded = false }: { embedded?: bool
     });
   }, [vehicles, showNotification]);
 
-  const startCountdown = (_id: string) => {
+  const startCountdown = (id: string) => {
     setConfirmDialog(prev => ({
       ...prev,
       step: 'countdown',
@@ -243,23 +255,18 @@ const MaintenanceEntryPage = ({ embedded: _embedded = false }: { embedded?: bool
     }, 1000);
   };
 
-  const performDeletion = (id: string) => {
+  const performDeletion = async (id: string) => {
     try {
-      const deleted = softDeleteMaintenance(id);
-      if (deleted) {
-        showNotification('Record moved to deleted list.', 'success');
-        refreshMaintenance();
-        refreshDeleted();
-        setSelectedId(null);
-        const remaining = displayRecords.length - 1;
-        const maxPage = Math.ceil(remaining / pageSize);
-        if (currentPage > maxPage && maxPage > 0) {
-          setCurrentPage(maxPage);
-        } else if (remaining === 0) {
-          setCurrentPage(1);
-        }
-      } else {
-        showNotification('Delete failed – record not found.', 'error');
+      await maintenanceApi.remove(id);
+      showNotification('Record deleted.', 'success');
+      refreshMaintenance();
+      setSelectedId(null);
+      const remaining = displayRecords.length - 1;
+      const maxPage = Math.ceil(remaining / pageSize);
+      if (currentPage > maxPage && maxPage > 0) {
+        setCurrentPage(maxPage);
+      } else if (remaining === 0) {
+        setCurrentPage(1);
       }
     } catch (err) {
       showNotification(String(err), 'error');
@@ -276,6 +283,42 @@ const MaintenanceEntryPage = ({ embedded: _embedded = false }: { embedded?: bool
     }
     setConfirmDialog(prev => ({ ...prev, open: false, step: null, countdown: null }));
     showNotification('Deletion cancelled.', 'info');
+  };
+
+  // ===== APPROVE: two-step confirmation =====
+  const handleApprove = (record: MaintenanceEvent) => {
+    if (record.paymentStatus === 'approved') {
+      showNotification('This record is already approved.', 'info');
+      return;
+    }
+    if (!record.id) {
+      showNotification('Invalid record – cannot approve.', 'error');
+      return;
+    }
+    const vehicle = vehicles.find((v: any) => String(v.id) === String(record.vehicleId));
+    const vehicleDisplay = vehicle?.vehicleNumber || record.vehicleNo || record.vehicleId || 'Unknown Vehicle';
+    setApproveDialog({
+      open: true,
+      record,
+      message: `Approve maintenance record "${record.billNumber || '-'}" for vehicle "${vehicleDisplay}"?`,
+    });
+  };
+
+  const confirmApprove = async () => {
+    const record = approveDialog.record;
+    if (!record || !record.id) return;
+    try {
+      await maintenanceApi.approve(record.id, 'system');
+      showNotification('Maintenance record approved.', 'success');
+      refreshMaintenance();
+      setSelectedId(null);
+      setViewMode('approved');
+      setCurrentPage(1);
+    } catch (err) {
+      showNotification(String(err), 'error');
+    } finally {
+      setApproveDialog({ open: false, record: null });
+    }
   };
 
   // ===== Validate KM against approved fuel reading =====
@@ -377,6 +420,10 @@ const MaintenanceEntryPage = ({ embedded: _embedded = false }: { embedded?: bool
               onMaintenanceChange={handleMaintenanceChange}
               setFormField={setFormField}
               selectKey={selectKey}
+              documents={documents}
+              onAddDocuments={addDocumentFiles}
+              onRemoveDocument={removeDocument}
+              onMarkDocumentRemoval={markDocumentRemoval}
             />
           </div>
         </div>
@@ -384,12 +431,13 @@ const MaintenanceEntryPage = ({ embedded: _embedded = false }: { embedded?: bool
         {/* Latest Records Table */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden p-5">
           <LatestMaintenanceTable
-            records={paginatedRecords}
+            records={displayRecords}
             vehicles={vehicles}
             viewMode={viewMode}
             onView={handleView}
             onEdit={handleEdit}
             onDelete={startDeletion}
+            onApprove={handleApprove}
             isEditable={isEditable}
             currentPage={currentPage}
             onPageChange={setCurrentPage}
@@ -405,6 +453,43 @@ const MaintenanceEntryPage = ({ embedded: _embedded = false }: { embedded?: bool
             vehicles={vehicles}
             onClose={() => setViewModalOpen(false)}
           />
+        )}
+
+        {/* ===== APPROVAL CONFIRMATION MODAL ===== */}
+        {approveDialog.open && approveDialog.record && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full">
+              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-3 text-emerald-600">
+                  <CheckCircle2 size={20} />
+                  <h3 className="text-sm font-bold text-slate-800">Confirm Approval</h3>
+                </div>
+                <button
+                  onClick={() => setApproveDialog({ open: false, record: null })}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-6">
+                <p className="text-sm text-slate-600">{approveDialog.message}</p>
+                <div className="flex justify-end gap-3 mt-6">
+                  <button
+                    onClick={() => setApproveDialog({ open: false, record: null })}
+                    className="px-4 py-2 text-sm font-semibold border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmApprove}
+                    className="px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition shadow-sm"
+                  >
+                    Approve
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ===== CONFIRMATION / COUNTDOWN MODAL ===== */}

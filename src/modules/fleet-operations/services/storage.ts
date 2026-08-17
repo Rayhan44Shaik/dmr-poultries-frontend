@@ -1,5 +1,4 @@
-import type { VehicleDocument } from '../types';
-import type { DocumentType } from '../utils/constants';
+import { VehicleDocument, DocumentType } from '../types';
 
 const generateId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -95,6 +94,17 @@ export const softDeleteMaintenance = (id: string): boolean => {
 
 export const getDeletedMaintenance = (): any[] => {
   return getData(FLEET_KEYS.DELETED_MAINTENANCE);
+};
+
+// Best-effort mirrors so the localStorage-backed dashboard/report/analytics
+// hooks keep seeing records saved through the backend. The binary documents
+// are NEVER stored here — only lightweight maintenance metadata.
+export const mirrorMaintenance = (record: any): void => {
+  const existing: any[] = getMaintenance();
+  const idx = existing.findIndex((r: any) => String(r.id) === String(record.id));
+  if (idx >= 0) existing[idx] = { ...existing[idx], ...record };
+  else existing.unshift(record);
+  setData(FLEET_KEYS.MAINTENANCE, existing);
 };
 
 // Update or create a document (excluding RC – we don't store RC in documents)
