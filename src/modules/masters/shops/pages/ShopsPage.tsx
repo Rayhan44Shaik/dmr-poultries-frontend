@@ -184,9 +184,10 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     const shopName = shop.shopName?.trim() ?? "";
     const ownerName = shop.ownerName?.trim() ?? "";
     const phoneNumber = shop.phoneNumber?.trim() ?? "";
+    const email = shop.email?.trim() ?? "";
     const village = shop.village?.trim() ?? "";
 
-    if (!shopName || !ownerName || !phoneNumber || !village) {
+    if (!shopName || !ownerName || !phoneNumber || !email || !village) {
       return "Please fill all required fields (marked with *).";
     }
     if (shopName.length < 3) {
@@ -197,6 +198,9 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     }
     if (!/^[0-9]{10}$/.test(phoneNumber)) {
       return "Mobile Number must be exactly 10 digits.";
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return "Please enter a valid email address.";
     }
 
     const duplicateShop = shops.some(
@@ -229,6 +233,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       shopName: shop.shopName!.trim(),
       ownerName: shop.ownerName!.trim(),
       phoneNumber: shop.phoneNumber!.trim(),
+      email: shop.email!.trim(),
       village: shop.village!.trim(),
       address: shop.address?.trim() ?? "",
       status: shop.status ?? "Active",

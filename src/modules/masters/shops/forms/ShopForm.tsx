@@ -4,6 +4,7 @@ import {
   Store,
   User,
   Phone,
+  Mail,
   MapPin,
   Home,
 } from "lucide-react";
@@ -14,6 +15,7 @@ type ShopFormProps = {
     shopName: string;
     ownerName: string;
     phoneNumber: string;
+    email: string;
     village: string;
     address: string;
     status: "Active" | "Inactive";
@@ -26,6 +28,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
   const [shopName, setShopName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [email, setEmail] = useState("");
   const [village, setVillage] = useState("");
   const [address, setAddress] = useState("");
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
@@ -34,6 +37,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
     shopName: "",
     ownerName: "",
     phoneNumber: "",
+    email: "",
     village: "",
   });
 
@@ -44,6 +48,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       setShopName(shop.shopName);
       setOwnerName(shop.ownerName);
       setPhoneNumber(shop.phoneNumber);
+      setEmail(shop.email ?? "");
       setVillage(shop.village);
       setAddress(shop.address ?? "");
       setStatus(shop.status);
@@ -51,6 +56,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       setShopName("");
       setOwnerName("");
       setPhoneNumber("");
+      setEmail("");
       setVillage("");
       setAddress("");
       setStatus("Active");
@@ -59,6 +65,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       shopName: "",
       ownerName: "",
       phoneNumber: "",
+      email: "",
       village: "",
     });
   }, [shop]);
@@ -68,6 +75,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       shopName: "",
       ownerName: "",
       phoneNumber: "",
+      email: "",
       village: "",
     };
 
@@ -80,6 +88,11 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
     if (!/^[0-9]{10}$/.test(phoneNumber)) {
       newErrors.phoneNumber = "Mobile Number must be exactly 10 digits.";
     }
+    if (email.trim() === "") {
+      newErrors.email = "Email ID is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      newErrors.email = "Please enter a valid email address.";
+    }
     if (village.trim() === "") {
       newErrors.village = "Village is required.";
     }
@@ -90,6 +103,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       newErrors.shopName ||
       newErrors.ownerName ||
       newErrors.phoneNumber ||
+      newErrors.email ||
       newErrors.village
     ) {
       return;
@@ -99,6 +113,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       shopName,
       ownerName,
       phoneNumber,
+      email,
       village,
       address,
       status,
@@ -226,6 +241,27 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
             </div>
             {errors.phoneNumber && (
               <p className="text-red-600 text-sm mt-1">{errors.phoneNumber}</p>
+            )}
+          </div>
+
+          <div className="relative">
+            <label className="block mb-2 text-sm font-semibold text-slate-700">
+              Email ID <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <div className={iconWrapperClass}>
+                <Mail size={18} />
+              </div>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter Email ID"
+                className={inputClass(!!errors.email)}
+              />
+            </div>
+            {errors.email && (
+              <p className="text-red-600 text-sm mt-1">{errors.email}</p>
             )}
           </div>
 

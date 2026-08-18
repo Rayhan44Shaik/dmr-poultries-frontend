@@ -4,6 +4,7 @@ export type Shop = {
   shopName: string;
   ownerName: string;
   phoneNumber: string;
+  email: string;
   village: string;
   address?: string;
   status: "Active" | "Inactive";

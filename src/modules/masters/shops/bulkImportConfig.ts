@@ -12,6 +12,7 @@ export type ShopBulkRow = {
   shopName: string;
   ownerName: string;
   phoneNumber: string;
+  email: string;
   village: string;
   address: string;
   status: "Active" | "Inactive";
@@ -22,6 +23,7 @@ function toShopPayload(row: ShopBulkRow): ShopInput {
     shopName: row.shopName.trim(),
     ownerName: row.ownerName.trim(),
     phoneNumber: row.phoneNumber.trim(),
+    email: row.email.trim(),
     village: row.village.trim(),
     address: row.address.trim(),
     status: row.status,
@@ -33,6 +35,7 @@ function validateShopRow(row: ShopBulkRow, existing: Shop[]): string[] {
   const shopName = row.shopName.trim();
   const ownerName = row.ownerName.trim();
   const phoneNumber = row.phoneNumber.trim();
+  const email = row.email.trim();
   const village = row.village.trim();
 
   if (!shopName) errors.push("Shop Name is required.");
@@ -43,6 +46,9 @@ function validateShopRow(row: ShopBulkRow, existing: Shop[]): string[] {
 
   if (!phoneNumber) errors.push("Mobile Number is required.");
   else if (!/^[0-9]{10}$/.test(phoneNumber)) errors.push("Mobile Number must be exactly 10 digits.");
+
+  if (!email) errors.push("Email ID is required.");
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push("Please enter a valid email address.");
 
   if (!village) errors.push("Village is required.");
 
@@ -76,6 +82,7 @@ export function buildShopBulkImportConfig({
       { key: "Shop Name", required: true, sample: "Ramesh Chicken Shop" },
       { key: "Owner Name", required: true, sample: "Ramesh Kumar" },
       { key: "Phone", aliases: ["Mobile Number", "Phone Number"], required: true, sample: "9876543210" },
+      { key: "Email", aliases: ["Email ID", "email"], required: true, sample: "shop@example.com" },
       { key: "Village", required: true, sample: "Bhimavaram" },
       { key: "Address", sample: "Main Road, 2nd Lane" },
       { key: "Status", sample: "Active" },
@@ -86,6 +93,7 @@ export function buildShopBulkImportConfig({
         shopName: String(record["Shop Name"] ?? "").trim(),
         ownerName: String(record["Owner Name"] ?? "").trim(),
         phoneNumber: String(record["Phone"] ?? "").trim(),
+        email: String(record["Email"] ?? "").trim(),
         village: String(record["Village"] ?? "").trim(),
         address: String(record["Address"] ?? "").trim(),
         status: status === "Inactive" ? "Inactive" : "Active",
