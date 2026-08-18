@@ -344,6 +344,8 @@ export async function generateShopPDF(
       body: tableRows,
       theme: "grid",
       margin: { left: margin, right: margin },
+      showHead: "everyPage",
+      rowPageBreak: "avoid",
       headStyles: {
         fillColor: COLOR.tableHeader,
         textColor: COLOR.white,
@@ -423,12 +425,15 @@ export async function generateShopPDF(
           mortalityWeightVal.toFixed(2)
         ],
         [
+          {
+            colSpan: 5,
+            content: `Delivered Birds: ${finalBirdsVal}  |  Delivered Weight: ${finalWeightVal.toFixed(2)} kg`,
+          } as any,
           "",
           "",
           "",
-          `Delivered Birds: ${finalBirdsVal}`,
-          `Delivered Weight: ${finalWeightVal.toFixed(2)} kg`
-        ]
+          "",
+        ],
       ];
 
       autoTable(doc, {
@@ -437,6 +442,8 @@ export async function generateShopPDF(
         body: summaryRows,
         theme: "grid",
         margin: { left: margin, right: margin },
+        showHead: "everyPage",
+        rowPageBreak: "avoid",
         headStyles: {
           fillColor: COLOR.tableHeader,
           textColor: COLOR.white,
@@ -469,9 +476,7 @@ export async function generateShopPDF(
           if (data.section === "body" && data.row.index === 1) {
             data.cell.styles.fontStyle = "bold";
             data.cell.styles.fillColor = COLOR.totalBg;
-            if (data.column.index >= 3) {
-              data.cell.styles.textColor = COLOR.finalDarkBlue;
-            }
+            data.cell.styles.textColor = COLOR.finalDarkBlue;
           }
         },
       });

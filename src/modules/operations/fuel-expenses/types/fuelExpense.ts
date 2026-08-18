@@ -1,27 +1,41 @@
-// src/modules/operations/fuel-expenses/types/fuelExpense.ts
+export type FuelSourceType = "TRIP" | "MANUAL";
+export type FuelUiStatus = "Pending" | "Approved" | "Rejected";
 
 export interface FuelExpense {
   id: string;
-  billNo: string;               // BILL-YYYYMMDD-XXX
-  date: string;                 // YYYY-MM-DD
+  billNo: string;
+  date: string;
+  sourceType?: FuelSourceType;
   vehicleId: number;
   vehicleNo: string;
   driverId: number;
   driverName: string;
   supervisorId: number;
   supervisorName: string;
-  meterReading: number;         // Current KM
-  amount: number;               // ₹
-  rate: number;                 // ₹/Litre
-  litres: number;               // amount / rate (auto-calc)
+  tripId?: number | null;
+  tripNo?: string | null;
+  meterReading: number;
+  amount: number;
+  rate: number;
+  litres: number;
   petrolBunk: string;
   remarks?: string;
-  status: "Pending" | "Approved";
+  gpsLat?: number | null;
+  gpsLon?: number | null;
+  gpsAccuracy?: number | null;
+  gpsCapturedAt?: string | null;
+  status: FuelUiStatus;
   createdDate: string;
   createdBy: string;
   approvedDate?: string;
   approvedBy?: string;
   updatedDate?: string;
-  image?: string;               // base64 image (optional)
-  synced?: boolean;             // flag to prevent duplicate creation from Step 5
+  image?: string;
+  imageName?: string;
+  synced?: boolean;
 }
+
+export type FuelExpenseDraft = Omit<
+  FuelExpense,
+  "id" | "billNo" | "createdDate" | "createdBy" | "status" | "sourceType"
+>;

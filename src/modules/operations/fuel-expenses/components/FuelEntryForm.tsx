@@ -3,12 +3,11 @@
 import { useState, useEffect, useImperativeHandle, forwardRef, useRef } from "react";
 import Select from "react-select";
 import { MapPin, Upload, X, Loader2 } from "lucide-react";
-import { fuelExpenseService } from "../services/fuelExpenseService";
-import type { FuelExpense } from "../types/fuelExpense";
+import type { FuelExpense, FuelExpenseDraft } from "../types/fuelExpense";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
 interface Props {
-  onSave: (data: Omit<FuelExpense, "id" | "billNo" | "createdDate" | "createdBy" | "status">) => void;
+  onSave: (data: FuelExpenseDraft) => void;
   onUpdate: (id: string, updates: Partial<FuelExpense>) => void;
   editingId?: string | null;
   initialData?: FuelExpense | null;
@@ -50,6 +49,13 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   const [petrolBunk, setPetrolBunk] = useState("");
   const [remarks, setRemarks] = useState("");
   const [image, setImage] = useState<string>("");
+  const [gpsLat, setGpsLat] = useState<number | null>(null);
+  const [gpsLon, setGpsLon] = useState<number | null>(null);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [gpsCapturedAt, setGpsCapturedAt] = useState<string | null>(null);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [imageName, setImageName] = useState("");
+  const [fileError, setFileError] = useState<string | null>(null);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
 
   const activeVehicles = vehicles.filter(v => (v.status?.toLowerCase() === "active"));
@@ -73,16 +79,21 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       setPetrolBunk(initialData.petrolBunk);
       setRemarks(initialData.remarks || "");
       setImage(initialData.image || "");
+      setImageName(initialData.imageName || "");
+      setGpsLat(initialData.gpsLat ?? null);
+      setGpsLon(initialData.gpsLon ?? null);
+      setGpsAccuracy(initialData.gpsAccuracy ?? null);
+      setGpsCapturedAt(initialData.gpsCapturedAt ?? null);
     }
   }, [initialData, editingId]);
 
   useEffect(() => {
-    if (amount > 0 && rate > 0) {
-      setLitres(parseFloat((amount / rate).toFixed(2)));
+    if (litres > 0 && rate > 0) {
+      setAmount(Number((litres * rate).toFixed(2)));
     } else {
-      setLitres(0);
+      setAmount(0);
     }
-  }, [amount, rate]);
+  }, [litres, rate]);
 
   const resetForm = () => {
     setDate(new Date().toISOString().split("T")[0]);
@@ -100,6 +111,13 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
     setPetrolBunk("");
     setRemarks("");
     setImage("");
+    setImageName("");
+    setGpsLat(null);
+    setGpsLon(null);
+    setGpsAccuracy(null);
+    setGpsCapturedAt(null);
+    setGpsError(null);
+    setFileError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -134,47 +152,59 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
     if (v) {
       setVehicleId(v.id);
       setVehicleNo(v.vehicleNumber);
-      const allBills = fuelExpenseService.getAll();
-      const approvedBills = allBills.filter(b =>
-        b.vehicleId === v.id &&
-        b.status === "Approved" &&
-        (editingId ? b.id !== editingId : true)
-      );
-      const latestApproved = approvedBills.length > 0
-        ? approvedBills.sort((a, b) => b.createdDate.localeCompare(a.createdDate))[0].meterReading
-        : 0;
-      setMinMeterReading(latestApproved);
       if (!editingId) {
-        setMeterReading(latestApproved);
+        setMeterReading(0);
+        setMinMeterReading(0);
       }
     }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    setFileError(null);
+    if (!file) return;
+    if (file.size === 0) {
+      setFileError("Bill photo is empty.");
+      return;
     }
+    if (file.size > 1_048_576) {
+      setFileError("Bill photo exceeds 1 MB.");
+      return;
+    }
+    if (!/^image\/(jpeg|jpg|png)$/i.test(file.type)) {
+      setFileError("Bill photo must be a JPEG or PNG image.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImage(reader.result as string);
+      setImageName(file.name);
+    };
+    reader.readAsDataURL(file);
   };
 
   const removeImage = () => {
     setImage("");
+    setImageName("");
+    setFileError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const fetchGPSLocation = () => {
     if (!navigator.geolocation) {
+      setGpsError("Geolocation is not supported.");
       showNotification("Geolocation not supported.", "error");
       return;
     }
     setIsFetchingLocation(true);
+    setGpsError(null);
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        const { latitude, longitude } = position.coords;
+        const { latitude, longitude, accuracy } = position.coords;
+        setGpsLat(latitude);
+        setGpsLon(longitude);
+        setGpsAccuracy(accuracy);
+        setGpsCapturedAt(new Date().toISOString());
         try {
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
@@ -182,17 +212,22 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           const data = await response.json();
           if (data && data.display_name) {
             setPetrolBunk(data.display_name);
-          } else {
-            setPetrolBunk(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
           }
         } catch {
-          setPetrolBunk(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+          /* keep coordinates even if reverse geocode fails */
         } finally {
           setIsFetchingLocation(false);
         }
       },
-      () => {
-        showNotification("Unable to fetch location.", "error");
+      (err) => {
+        const message =
+          err.code === err.PERMISSION_DENIED
+            ? "GPS permission denied."
+            : err.code === err.TIMEOUT
+              ? "GPS timed out."
+              : "GPS location unavailable.";
+        setGpsError(message);
+        showNotification(message, "error");
         setIsFetchingLocation(false);
       },
       { enableHighAccuracy: true, timeout: 10000 }
@@ -200,16 +235,16 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   };
 
   const handleSubmit = () => {
-    if (!date || !vehicleId || !driverId || !supervisorId || amount <= 0 || rate <= 0 || !petrolBunk.trim()) {
-      showNotification("Please fill all required fields.", "error");
+    if (!date || !vehicleId || litres <= 0 || rate <= 0) {
+      showNotification("Please fill date, vehicle, litres, and rate.", "error");
       return;
     }
-    if (meterReading < minMeterReading) {
-      showNotification(`Meter reading cannot be lower than the last approved fuel bill reading (${minMeterReading} KM).`, "error");
+    if (fileError) {
+      showNotification(fileError, "error");
       return;
     }
 
-    const data = {
+    const data: FuelExpenseDraft = {
       date,
       vehicleId,
       vehicleNo,
@@ -224,6 +259,11 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       petrolBunk,
       remarks,
       image,
+      imageName,
+      gpsLat,
+      gpsLon,
+      gpsAccuracy,
+      gpsCapturedAt,
     };
     if (editingId) {
       onUpdate(editingId, data);
@@ -287,10 +327,10 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
             )}
           </div>
 
-          {/* Amount */}
+          {/* Litres */}
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Fuel Amount (₹) <span className="text-red-500">*</span></label>
-            <input type="number" step="0.01" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" placeholder="0.00" />
+            <label className="text-xs font-medium text-slate-500 block mb-1">Fuel Quantity (Litres) <span className="text-red-500">*</span></label>
+            <input type="number" step="0.01" value={litres || ""} onChange={(e) => setLitres(Number(e.target.value))} className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" placeholder="0.00" />
           </div>
 
           {/* Rate */}
@@ -299,10 +339,10 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
             <input type="number" step="0.01" value={rate || ""} onChange={(e) => setRate(Number(e.target.value))} className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" placeholder="0.00" />
           </div>
 
-          {/* Litres (read-only) */}
+          {/* Amount (preview) */}
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Fuel Quantity (Litres)</label>
-            <input type="number" step="0.01" value={litres} readOnly className="no-spinner w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700" />
+            <label className="text-xs font-medium text-slate-500 block mb-1">Amount (₹) — litres × rate</label>
+            <input type="number" step="0.01" value={amount} readOnly className="no-spinner w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700" />
           </div>
 
           {/* Petrol Bunk with GPS button */}
@@ -320,6 +360,14 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
                 <span className="hidden sm:inline">GPS</span>
               </button>
             </div>
+            {gpsLat != null && gpsLon != null ? (
+              <div className="text-[10px] text-emerald-700 mt-1">
+                GPS captured: {gpsLat.toFixed(6)}, {gpsLon.toFixed(6)}
+              </div>
+            ) : (
+              <div className="text-[10px] text-slate-400 mt-1">GPS not captured</div>
+            )}
+            {gpsError && <div className="text-[10px] text-red-600 mt-1">{gpsError}</div>}
           </div>
 
           {/* Image Upload */}
@@ -340,6 +388,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
                 </button>
               )}
             </div>
+            {fileError && <div className="text-[10px] text-red-600 mt-1">{fileError}</div>}
             {image && (
               <div className="mt-1">
                 <img src={image} alt="Bill" className="max-h-12 rounded border border-slate-200" />

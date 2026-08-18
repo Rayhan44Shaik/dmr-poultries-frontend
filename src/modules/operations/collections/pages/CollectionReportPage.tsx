@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { collectionService } from "../services/collectionService";
+import type { CollectionReportSummary } from "../types/collection";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
 import { useShopSearch } from "../../../../core/hooks/useShopSearch";
@@ -43,7 +44,6 @@ type Props = {
 export default function CollectionReportPage({ embedded = false }: Props) {
   const { showNotification } = useSafeNotification();
 
-  const [allCollections, setAllCollections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { shops } = useShops();
   const allShopNames = shops.map((s) => s.shopName).sort();
@@ -67,21 +67,11 @@ export default function CollectionReportPage({ embedded = false }: Props) {
 
   const shopSearch = useShopSearch(allShopNames, shopName, setShopName);
 
-  const loadData = async () => {
-    try {
-      await collectionService.refreshFromBackend();
-      const all = collectionService.getCollections();
-      setAllCollections(all);
-      setLoading(false);
-    } catch (error) {
-      console.error("Failed to load collection data:", error);
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadData();
-  }, []);
+  // Backend-authoritative report: totals/percentages/breakdowns come from
+  // GET /collection-entry/report. This page only formats and displays them —
+  // it must never recompute totals from raw collection rows.
+  const [report, setReport] = useState<CollectionReportSummary | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   useEffect(() => {
     void collectionService.fetchWeekBounds().then((bounds) => {
@@ -91,125 +81,93 @@ export default function CollectionReportPage({ embedded = false }: Props) {
     }).catch(() => undefined);
   }, []);
 
-  const filteredData = useMemo(() => {
-    let data = allCollections.filter((c) => c.status === "Approved");
+  const loadReport = async () => {
+    if (!fromDate || !toDate) return;
+    setLoading(true);
+    setReportError(null);
+    try {
+      const shopId = shopName ? collectionService.getShopIdForName(shopName) ?? undefined : undefined;
+      const data = await collectionService.fetchCollectionReport({
+        fromDate,
+        toDate,
+        shopId,
+        collector: collector || undefined,
+        paymentMode: paymentMode || undefined,
+      });
+      setReport(data);
+    } catch (error) {
+      console.error("Failed to load collection report:", error);
+      setReportError("Failed to load the report from the server.");
+      setReport(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    if (fromDate) {
-      data = data.filter((c) => c.collectionDate >= fromDate);
-    }
-    if (toDate) {
-      data = data.filter((c) => c.collectionDate <= toDate);
-    }
-    if (shopName) {
-      data = data.filter((c) =>
-        c.shopName.toLowerCase().startsWith(shopName.toLowerCase())
-      );
-    }
-    if (collector) {
-      data = data.filter((c) => c.collectorName === collector);
-    }
-    if (paymentMode === "Others") {
-      data = data.filter((c) => !KNOWN_MODES.includes(c.paymentModeName));
-    } else if (paymentMode) {
-      data = data.filter((c) => c.paymentModeName === paymentMode);
-    }
-    return data;
-  }, [allCollections, fromDate, toDate, shopName, collector, paymentMode]);
+  useEffect(() => {
+    void loadReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromDate, toDate, shopName, collector, paymentMode]);
 
-  const totalCollections = filteredData.reduce((sum, c) => sum + c.amount, 0);
-  const totalCollectorsCount = new Set(filteredData.map((c) => c.collectorName)).size;
+  const totalCollections = report?.totalAmount ?? 0;
+  const totalCollectorsCount = report?.totalCollectors ?? 0;
 
+  // Presentation-only: bucket the backend's already-aggregated per-mode
+  // distinct-collector counts into Known modes + "Others", in a fixed
+  // display order. No amounts/sums are recomputed here.
   const collectorCountsByMode = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    filteredData.forEach((c) => {
-      if (!map.has(c.paymentModeName)) {
-        map.set(c.paymentModeName, new Set());
-      }
-      map.get(c.paymentModeName)!.add(c.collectorName);
-    });
-    const result: { mode: string; count: number }[] = [];
-    map.forEach((set, mode) => {
-      result.push({ mode, count: set.size });
-    });
-    result.sort((a, b) => b.count - a.count);
+    const rows = report?.collectorsByPaymentMode ?? [];
     const knownSet = new Set(KNOWN_MODES);
-    const others = result.filter((r) => !knownSet.has(r.mode));
-    const othersCount = others.reduce((sum, r) => sum + r.count, 0);
-    const filteredResult = result.filter((r) => knownSet.has(r.mode));
-    if (othersCount > 0) {
-      filteredResult.push({ mode: "Others", count: othersCount });
-    }
+    const result: { mode: string; count: number }[] = [];
     KNOWN_MODES.forEach((mode) => {
-      if (!filteredResult.some((r) => r.mode === mode)) {
-        filteredResult.push({ mode, count: 0 });
-      }
+      const found = rows.find((r) => r.paymentMode === mode);
+      result.push({ mode, count: found?.collectorCount ?? 0 });
     });
-    const order = ["Cash", "Union Bank", "HDFC Bank", "Others"];
-    filteredResult.sort((a, b) => order.indexOf(a.mode) - order.indexOf(b.mode));
-    return filteredResult;
-  }, [filteredData]);
+    const othersCount = rows
+      .filter((r) => !knownSet.has(r.paymentMode))
+      .reduce((sum, r) => sum + r.collectorCount, 0);
+    if (othersCount > 0 || paymentMode === "Others") {
+      result.push({ mode: "Others", count: othersCount });
+    }
+    return result;
+  }, [report, paymentMode]);
 
+  // Backend-authoritative payment-mode totals, with a display-only "Total" row appended.
   const paymentModeSummary = useMemo(() => {
-    const map = new Map<string, { count: number; amount: number }>();
-    filteredData.forEach((c) => {
-      if (!map.has(c.paymentModeName)) {
-        map.set(c.paymentModeName, { count: 0, amount: 0 });
-      }
-      const entry = map.get(c.paymentModeName)!;
-      entry.count += 1;
-      entry.amount += c.amount;
-    });
-    const total = filteredData.reduce((sum, c) => sum + c.amount, 0);
-    const result = Array.from(map.entries()).map(([mode, data]) => ({
-      mode,
-      count: data.count,
-      amount: data.amount,
-      percentage: total > 0 ? (data.amount / total) * 100 : 0,
+    const rows = (report?.paymentModeSummary ?? []).map((r) => ({
+      mode: r.paymentMode,
+      count: r.count,
+      amount: r.amount,
+      percentage: r.percentage,
     }));
-    result.sort((a, b) => b.amount - a.amount);
-    result.push({
+    rows.push({
       mode: "Total",
-      count: filteredData.length,
-      amount: total,
+      count: report?.totalCount ?? 0,
+      amount: report?.totalAmount ?? 0,
       percentage: 100,
     });
-    return result;
-  }, [filteredData]);
+    return rows;
+  }, [report]);
 
+  // Backend-authoritative collector totals; only the "top 4 + Others (N)"
+  // grouping for display is done here, summing already-authoritative
+  // per-collector totals rather than raw transaction rows.
   const collectorSummary = useMemo(() => {
+    const source = report?.collectorSummary ?? [];
     const paymentModes = Array.from(
-      new Set(filteredData.map((c) => c.paymentModeName))
+      new Set(source.flatMap((r) => Object.keys(r.amounts)))
     ).sort();
 
-    const map = new Map<
-      string,
-      { [mode: string]: number; total: number }
-    >();
-    filteredData.forEach((c) => {
-      if (!map.has(c.collectorName)) {
-        map.set(c.collectorName, { total: 0 });
-      }
-      const entry = map.get(c.collectorName)!;
-      if (!entry[c.paymentModeName]) {
-        entry[c.paymentModeName] = 0;
-      }
-      entry[c.paymentModeName] += c.amount;
-      entry.total += c.amount;
-    });
-
-    const sorted = Array.from(map.entries())
-      .sort((a, b) => b[1].total - a[1].total);
-
-    const rows: any[] = [];
+    const sorted = [...source].sort((a, b) => b.total - a.total);
     const top4 = sorted.slice(0, 4);
     const rest = sorted.slice(4);
 
-    top4.forEach(([collector, data]) => {
-      const row: any = { collector, total: data.total };
+    const rows: any[] = top4.map((r) => {
+      const row: any = { collector: r.collector, total: r.total };
       paymentModes.forEach((mode) => {
-        row[mode] = data[mode] || 0;
+        row[mode] = r.amounts[mode] || 0;
       });
-      rows.push(row);
+      return row;
     });
 
     if (rest.length > 0) {
@@ -217,11 +175,11 @@ export default function CollectionReportPage({ embedded = false }: Props) {
       paymentModes.forEach((mode) => {
         othersRow[mode] = 0;
       });
-      rest.forEach(([_, data]) => {
+      rest.forEach((r) => {
         paymentModes.forEach((mode) => {
-          othersRow[mode] += data[mode] || 0;
+          othersRow[mode] += r.amounts[mode] || 0;
         });
-        othersRow.total += data.total;
+        othersRow.total += r.total;
       });
       rows.push(othersRow);
     }
@@ -239,7 +197,7 @@ export default function CollectionReportPage({ embedded = false }: Props) {
     rows.push(totalRow);
 
     return { rows, paymentModes };
-  }, [filteredData]);
+  }, [report]);
 
   const getExportFileName = (ext: "xlsx" | "pdf") => {
     const dateStr = fromDate && toDate ? `${fromDate}_to_${toDate}` : "report";
@@ -247,7 +205,7 @@ export default function CollectionReportPage({ embedded = false }: Props) {
   };
 
   const exportExcel = useCallback(() => {
-    if (filteredData.length === 0) {
+    if (!report || report.totalCount === 0) {
       showNotification("No data to export.", "error");
       return;
     }
@@ -279,10 +237,10 @@ export default function CollectionReportPage({ embedded = false }: Props) {
     } catch (error) {
       showNotification("Failed to export Excel.", "error");
     }
-  }, [filteredData, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate]);
+  }, [report, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate]);
 
   const exportPDF = useCallback(() => {
-    if (filteredData.length === 0) {
+    if (!report || report.totalCount === 0) {
       showNotification("No data to export.", "error");
       return;
     }
@@ -347,7 +305,7 @@ export default function CollectionReportPage({ embedded = false }: Props) {
     } catch (error) {
       showNotification("Failed to export PDF.", "error");
     }
-  }, [filteredData, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate]);
+  }, [report, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate]);
 
   const resetFilters = useCallback(() => {
     setFromDate(weekBounds.from);
@@ -359,7 +317,17 @@ export default function CollectionReportPage({ embedded = false }: Props) {
     showNotification("Filters reset to default (current week).", "info");
   }, [weekBounds, shopSearch, showNotification]);
 
-  if (loading) return <div className="p-8 text-center text-slate-500">Loading...</div>;
+  if (loading && !report) return <div className="p-8 text-center text-slate-500">Loading...</div>;
+  if (reportError && !report) {
+    return (
+      <div className="p-8 text-center text-red-600">
+        {reportError}{" "}
+        <button onClick={() => void loadReport()} className="underline">
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   // Content matching the precise structural layout and spacing of RatesEntryPage
   const content = (

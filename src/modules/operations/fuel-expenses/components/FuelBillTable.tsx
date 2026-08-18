@@ -35,21 +35,26 @@ export function FuelBillTable({ bills, selectedId, onSelect }: Props) {
           <tr className="text-slate-600">
             <th className="w-8 px-2 py-2.5 text-center text-xs font-semibold uppercase tracking-wider">#</th>
             <th className="w-36 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Bill No</th>
+            <th className="w-24 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Source</th>
+            <th className="w-32 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Trip</th>
             <th className="w-28 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Date</th>
             <th className="w-40 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Vehicle</th>
-            <th className="w-32 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Supervisor</th>
-            <th className="w-28 px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider">Meter (KM)</th>
             <th className="w-20 px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider">Litres</th>
             <th className="w-24 px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider">Rate (₹/L)</th>
             <th className="w-32 px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wider">Amount (₹)</th>
-            <th className="w-40 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Bunk</th>
+            <th className="w-32 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">GPS</th>
             <th className="w-32 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Bill Image</th>
+            <th className="w-28 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Status</th>
           </tr>
         </thead>
         <tbody>
           {bills.map((bill, idx) => {
             const isSelected = selectedId === bill.id;
             const isPending = bill.status === "Pending";
+            const gpsLabel =
+              bill.gpsLat != null && bill.gpsLon != null
+                ? `${bill.gpsLat.toFixed(4)}, ${bill.gpsLon.toFixed(4)}`
+                : "—";
 
             return (
               <tr
@@ -72,12 +77,14 @@ export function FuelBillTable({ bills, selectedId, onSelect }: Props) {
                   </div>
                 </td>
                 <td className="px-3 py-2.5 font-medium text-blue-700 truncate">{bill.billNo}</td>
+                <td className="px-3 py-2.5">
+                  <span className={`text-[10px] font-bold uppercase ${bill.sourceType === "TRIP" ? "text-indigo-700" : "text-slate-600"}`}>
+                    {bill.sourceType === "TRIP" ? "TRIP" : "MANUAL"}
+                  </span>
+                </td>
+                <td className="px-3 py-2.5 truncate">{bill.tripNo || "—"}</td>
                 <td className="px-3 py-2.5 whitespace-nowrap">{formatDate(bill.date)}</td>
                 <td className="px-3 py-2.5 truncate">{bill.vehicleNo}</td>
-                <td className="px-3 py-2.5 truncate">{bill.supervisorName}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
-                  {bill.meterReading.toLocaleString()}
-                </td>
                 <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
                   {bill.litres.toFixed(2)}
                 </td>
@@ -87,7 +94,7 @@ export function FuelBillTable({ bills, selectedId, onSelect }: Props) {
                 <td className="px-3 py-2.5 text-right font-bold tabular-nums whitespace-nowrap">
                   ₹ {bill.amount.toFixed(2)}
                 </td>
-                <td className="px-3 py-2.5 truncate max-w-[150px]">{bill.petrolBunk}</td>
+                <td className="px-3 py-2.5 text-xs truncate">{gpsLabel}</td>
                 {/* Image column – show filename as clickable link */}
                 <td className="px-3 py-2.5">
                   {bill.image ? (
@@ -108,6 +115,11 @@ export function FuelBillTable({ bills, selectedId, onSelect }: Props) {
                       No image
                     </span>
                   )}
+                </td>
+                <td className="px-3 py-2.5 text-xs font-semibold">
+                  {bill.sourceType === "TRIP" && bill.status === "Approved"
+                    ? "AUTO APPROVED"
+                    : bill.status}
                 </td>
               </tr>
             );

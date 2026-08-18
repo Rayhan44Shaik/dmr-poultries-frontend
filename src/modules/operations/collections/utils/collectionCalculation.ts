@@ -99,22 +99,3 @@ export function calculatePaymentModeSummary(
     (a, b) => b.totalAmount - a.totalAmount
   );
 }
-
-/* ==========================================================
-   EDIT ELIGIBILITY
-========================================================== */
-export function canEditCollection(createdDate: string): boolean {
-  const created = new Date(createdDate);
-  const today = new Date();
-  const difference = Math.floor(
-    (today.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)
-  );
-  return difference <= 10;
-}
-
-/* ==========================================================
-   DELETE ELIGIBILITY
-========================================================== */
-export function canDeleteCollection(createdDate: string): boolean {
-  return canEditCollection(createdDate);
-}

@@ -10,6 +10,8 @@
   CollectionDashboardSummary,
   CollectionWeeklySummary,
   CollectionWeekBounds,
+  CollectionReportSummary,
+  CollectionPendingSummaryRow,
 } from "../types/collection";
 import type { ShopSale } from "../../shop-sales/types/shopSale";
 import {
@@ -154,22 +156,21 @@ async function fetchShopSales(): Promise<ShopSale[]> {
 
 /**
  * Recent collection/credit records for ONE shop — backend LIMIT 10, newest
- * first (ORDER BY collection_date DESC, id DESC). Powers the "Recent 10 Shop
- * Credits" section of the View Collection modal. Never downloads the full
- * register and never uses localStorage.
+ * first (ORDER BY collection_date DESC, created_at DESC, collection_no DESC).
+ * Calls the dedicated GET /collection-entry/recent endpoint, which is also
+ * the only endpoint that returns the backend-authoritative `canDelete` flag
+ * (CURRENT_DATE <= collection_date + 7) used by Pending Collection. Powers
+ * the "Recent 10 Shop Credits" section of the View Collection modal. Never
+ * downloads the full register and never uses localStorage.
  */
 async function fetchRecentCollectionsForShop(
   shopId: number,
   limit = 10
 ): Promise<CollectionApiEntry[]> {
-  const { data } = await apiGet<
-    | CollectionApiEntry[]
-    | { data: CollectionApiEntry[]; meta: { total: number; totalPages: number; page: number; limit: number } }
-  >(COLLECTION_PATH, {
-    params: { shopId, page: 1, limit, includeDeleted: "false" },
+  const { data } = await apiGet<Record<string, unknown>[]>(`${COLLECTION_PATH}/recent`, {
+    params: { shopId, limit },
   });
-  const rows = Array.isArray(data) ? data : data.data;
-  return (rows ?? []).map((row) => mapRawEntry(row as unknown as Record<string, unknown>));
+  return (data ?? []).map((row) => mapRawEntry(row));
 }
 
 async function fetchShops(): Promise<typeof shopsCache> {
@@ -209,6 +210,7 @@ function mapRawEntry(raw: Record<string, unknown>): CollectionApiEntry {
     createdBy: String(raw.createdBy ?? raw.created_by ?? ""),
     createdAt: raw.createdAt != null ? String(raw.createdAt) : (raw.created_at != null ? String(raw.created_at) : null),
     updatedAt: raw.updatedAt != null ? String(raw.updatedAt) : (raw.updated_at != null ? String(raw.updated_at) : null),
+    canDelete: raw.canDelete == null ? undefined : Boolean(raw.canDelete),
   };
 }
 
@@ -419,6 +421,23 @@ async function deleteCollection(id: string): Promise<boolean> {
   }
 }
 
+/**
+ * Pending Collection's own delete — a DIFFERENT endpoint from Collection
+ * Entry's deleteCollection() above. Enforces the backend's 7-day window
+ * (CURRENT_DATE <= collection_date + 7); rejects with 409 outside it. The
+ * Pending Collection UI must call this and must never call deleteCollection().
+ */
+async function deletePendingCollection(id: string): Promise<{ success: boolean; message?: string }> {
+  try {
+    await apiDelete(`${COLLECTION_PATH}/pending/${Number(id)}`);
+    await refreshFromBackend();
+    return { success: true };
+  } catch (error) {
+    const message = handleApiError(error);
+    return { success: false, message };
+  }
+}
+
 async function approveCollection(id: string, approvedBy: string = "Admin"): Promise<boolean> {
   try {
     await apiPatch(`${COLLECTION_PATH}/${Number(id)}/status`, {
@@ -509,6 +528,79 @@ async function fetchWeeklySummaries(date: string): Promise<CollectionWeeklySumma
   return (Array.isArray(data) ? data : []).map(mapWeeklySummary);
 }
 
+/**
+ * Pending Collection main table — one aggregated row per active shop
+ * (opening/balance/sales/approved/pending/recovery), all computed server-
+ * side. This is the authoritative source for the Pending Collection table
+ * and view; recoveryPercentage must be read from here, not recomputed.
+ */
+async function fetchPendingSummary(date: string): Promise<CollectionPendingSummaryRow[]> {
+  const { data } = await apiGet<Record<string, unknown>[]>(`${COLLECTION_PATH}/pending-summary`, {
+    params: { date },
+  });
+  return (data ?? []).map((row) => ({
+    shopId: Number(row.shopId),
+    shopName: String(row.shopName ?? ""),
+    weekStart: String(row.weekStart),
+    weekEnd: String(row.weekEnd),
+    openingBalance: Number(row.openingBalance ?? 0),
+    balance: Number(row.balance ?? 0),
+    weeklySales: Number(row.weeklySales ?? 0),
+    weeklyApprovedCollections: Number(row.weeklyApprovedCollections ?? 0),
+    weeklyPendingCollections: Number(row.weeklyPendingCollections ?? 0),
+    recoveryPercentage: Number(row.recoveryPercentage ?? 0),
+    overdueDays: row.overdueDays == null ? null : Number(row.overdueDays),
+    hasPendingCollections: Boolean(row.hasPendingCollections),
+  }));
+}
+
+/**
+ * Collection Report — official financial totals (payment mode + collector
+ * breakdown). Backend-authoritative; CollectionReportPage must render this
+ * as-is and must not recompute totals/percentages from raw collection rows.
+ */
+async function fetchCollectionReport(filters: {
+  fromDate: string;
+  toDate: string;
+  shopId?: number;
+  collector?: string;
+  paymentMode?: string;
+}): Promise<CollectionReportSummary> {
+  const { data } = await apiGet<CollectionReportSummary>(`${COLLECTION_PATH}/report`, {
+    params: {
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      shopId: filters.shopId,
+      collector: filters.collector,
+      paymentMode: filters.paymentMode,
+    },
+  });
+  return {
+    fromDate: String(data.fromDate),
+    toDate: String(data.toDate),
+    totalAmount: Number(data.totalAmount ?? 0),
+    totalCount: Number(data.totalCount ?? 0),
+    totalCollectors: Number(data.totalCollectors ?? 0),
+    paymentModeSummary: (data.paymentModeSummary ?? []).map((r) => ({
+      paymentMode: String(r.paymentMode),
+      count: Number(r.count ?? 0),
+      amount: Number(r.amount ?? 0),
+      percentage: Number(r.percentage ?? 0),
+    })),
+    collectorsByPaymentMode: (data.collectorsByPaymentMode ?? []).map((r) => ({
+      paymentMode: String(r.paymentMode),
+      collectorCount: Number(r.collectorCount ?? 0),
+    })),
+    collectorSummary: (data.collectorSummary ?? []).map((r) => ({
+      collector: String(r.collector),
+      amounts: Object.fromEntries(
+        Object.entries(r.amounts ?? {}).map(([mode, amt]) => [mode, Number(amt ?? 0)])
+      ),
+      total: Number(r.total ?? 0),
+    })),
+  };
+}
+
 function mapWeeklySummary(data: CollectionWeeklySummary): CollectionWeeklySummary {
   return {
     shopId: Number(data.shopId),
@@ -535,6 +627,7 @@ getShopSales,
   saveCollection: saveCollectionLegacy,
   updateCollection,
   deleteCollection,
+  deletePendingCollection,
   approveCollection,
   rejectCollection,
   getRecentCollections,
@@ -555,6 +648,8 @@ getShopSales,
   fetchWeeklySummary,
   fetchWeeklySummaries,
   fetchWeekBounds,
+  fetchCollectionReport,
+  fetchPendingSummary,
 };
 
 /** Prime the cache as soon as the module is imported (e.g. Header/dashboard). */

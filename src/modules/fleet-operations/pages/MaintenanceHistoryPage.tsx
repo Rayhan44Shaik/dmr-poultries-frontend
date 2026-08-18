@@ -3,14 +3,11 @@ import {
   AlertCircle,
   CalendarDays,
   CheckCircle2,
-  FileText,
   FilterX,
   IndianRupee,
-  Loader2,
   Paperclip,
   Search,
   Truck,
-  UserRound,
   Wrench,
 } from 'lucide-react';
 import { DatePicker } from '../../../components/common/DatePicker';
@@ -18,10 +15,8 @@ import { apiGet } from '../../../api';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import MaintenanceTimeline, { type VehicleMeterEvent } from '../components/maintenance/MaintenanceTimeline';
 import UpcomingServices from '../components/maintenance/UpcomingServices';
-import BillDetailsModal from '../components/maintenance/BillDetailsModal';
 import { useMaintenanceData } from '../hooks/useMaintenanceData';
 import { safeDate } from '../utils/maintenanceHelpers';
-import type { MaintenanceEvent } from '../types';
 
 interface MaintenanceHistoryPageProps { embedded?: boolean }
 const selectClass = 'h-10 min-w-[170px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15';
@@ -29,9 +24,6 @@ const selectClass = 'h-10 min-w-[170px] rounded-xl border border-slate-200 bg-wh
 const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProps) => {
   const data = useMaintenanceData();
   const [meterEvents, setMeterEvents] = useState<VehicleMeterEvent[]>([]);
-  const [selectedRecord, setSelectedRecord] = useState<MaintenanceEvent | null>(null);
-  const [page, setPage] = useState(1);
-  const pageSize = 10;
 
   useEffect(() => {
     let cancelled = false;
@@ -42,13 +34,8 @@ const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProp
     return () => { cancelled = true; };
   }, [data.selectedVehicle]);
 
-  useEffect(() => setPage(1), [data.selectedVehicle, data.selectedDriver, data.selectedMaintenanceType, data.selectedServiceType, data.selectedStatus, data.fromDate, data.toDate, data.searchQuery]);
-
   const sorted = useMemo(() => [...data.filtered].sort((a, b) => safeDate(b.date).getTime() - safeDate(a.date).getTime()), [data.filtered]);
-  const pages = Math.max(1, Math.ceil(sorted.length / pageSize));
-  const rows = sorted.slice((page - 1) * pageSize, page * pageSize);
   const timelineEvents = sorted.filter((record) => record.paymentStatus === 'approved' && !record.deletedAt);
-  const vehicleNumber = (record: MaintenanceEvent) => data.vehicles.find((vehicle: any) => String(vehicle.id) === String(record.vehicleId))?.vehicleNumber || record.vehicleNo || `#${record.vehicleId}`;
 
   const cards = [
     { label: 'Total Maintenance', value: data.historyStats.total, icon: Wrench, tone: 'bg-blue-50 text-blue-600' },
@@ -88,18 +75,10 @@ const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProp
 
         {(data.historyError || data.error) && <div className="flex items-center justify-between rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"><span className="flex items-center gap-2"><AlertCircle size={17} />{data.historyError || data.error}</span><button onClick={data.refresh} className="font-bold underline">Retry</button></div>}
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div><h3 className="text-sm font-bold text-slate-800">Maintenance Records</h3><p className="text-xs text-slate-400">{sorted.length} matching records</p></div></div>
-          {data.historyLoading ? <div className="flex items-center justify-center gap-2 py-20 text-sm font-semibold text-slate-500"><Loader2 size={20} className="animate-spin text-blue-500" /> Loading maintenance history…</div> : rows.length === 0 ? <div className="py-20 text-center"><FileText size={40} className="mx-auto mb-3 text-slate-300" /><p className="font-bold text-slate-700">No maintenance records</p><p className="text-sm text-slate-400">Adjust the filters or create a maintenance entry.</p></div> : <div className="overflow-x-auto"><table className="min-w-full divide-y divide-slate-100"><thead className="bg-slate-50"><tr>{['Date','Vehicle','Driver','Maintenance / Service','Garage','KM','Parts','Total Cost','Status','Actions'].map((heading) => <th key={heading} className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">{heading}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{rows.map((record) => <tr key={record.id} className="hover:bg-slate-50/70"><td className="px-4 py-3 whitespace-nowrap text-xs text-slate-600">{new Date(record.date).toLocaleDateString('en-IN')}</td><td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-slate-800">{vehicleNumber(record)}</td><td className="px-4 py-3 whitespace-nowrap text-xs text-slate-600"><span className="inline-flex items-center gap-1"><UserRound size={12} />{record.driverName || '—'}</span></td><td className="px-4 py-3 min-w-[190px]"><p className="text-xs font-semibold text-slate-700">{record.maintenanceType || '—'}</p><p className="text-[11px] text-slate-400">{record.serviceType || '—'}</p></td><td className="px-4 py-3 text-xs text-slate-600">{record.garage || '—'}</td><td className="px-4 py-3 text-right text-xs font-semibold text-slate-700">{record.currentKM.toLocaleString()}</td><td className="px-4 py-3 text-center text-xs text-slate-600">{record.parts?.length || 0}</td><td className="px-4 py-3 text-right text-xs font-bold text-blue-700">₹{record.totalCost.toLocaleString('en-IN')}</td><td className="px-4 py-3"><span className={`rounded-full border px-2 py-1 text-[10px] font-bold ${record.deletedAt ? 'border-rose-200 bg-rose-50 text-rose-700' : record.paymentStatus === 'approved' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>{record.deletedAt ? 'Deleted' : record.paymentStatus === 'approved' ? 'Approved' : 'Pending'}</span></td><td className="px-4 py-3"><button onClick={() => setSelectedRecord(record)} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100">View</button></td></tr>)}</tbody></table></div>}
-          {pages > 1 && <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-5 py-3 text-xs text-slate-500"><span>Page {page} of {pages}</span><div className="flex gap-2"><button disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="rounded-lg border bg-white px-3 py-1.5 font-bold disabled:opacity-40">Previous</button><button disabled={page === pages} onClick={() => setPage((value) => value + 1)} className="rounded-lg border bg-white px-3 py-1.5 font-bold disabled:opacity-40">Next</button></div></div>}
-        </div>
-
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-2"><div className="border-b border-slate-100 px-5 py-4"><h3 className="text-sm font-bold text-slate-800">Approved Maintenance Timeline</h3></div><div className="p-5"><MaintenanceTimeline events={timelineEvents} meterEvents={meterEvents} vehicles={data.vehicles} hasActiveFilters={data.hasActiveFilters} onClearFilters={data.resetFilters} /></div></div>
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-5 py-4"><h3 className="text-sm font-bold text-slate-800">Upcoming Service</h3></div><div className="p-5"><UpcomingServices services={data.upcomingServices} /></div></div>
         </div>
-
-        <BillDetailsModal isOpen={Boolean(selectedRecord)} bill={selectedRecord} vehicles={data.vehicles} onClose={() => setSelectedRecord(null)} />
       </div>
     </ErrorBoundary>
   );

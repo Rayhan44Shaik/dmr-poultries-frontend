@@ -44,6 +44,8 @@ export interface CollectionApiEntry {
   createdBy: string;
   createdAt: string | null;
   updatedAt?: string | null;
+  /** Backend-authoritative Pending Collection delete eligibility (from GET .../recent). UI convenience only — backend enforces on DELETE regardless. */
+  canDelete?: boolean;
 }
 
 /** Payload for POST /operations/collection-entry */
@@ -249,4 +251,50 @@ export interface CollectionWeekBounds {
   weekStart: string;
   weekEnd: string;
   isCurrentWeek: boolean;
+}
+
+/** GET /operations/collection-entry/pending-summary — one row per active
+ * shop, fully backend-aggregated (opening/balance/sales/approved/pending/
+ * recovery). This is the Pending Collection main table's authoritative
+ * source: do not recompute recoveryPercentage or balance from these fields. */
+export interface CollectionPendingSummaryRow {
+  shopId: number;
+  shopName: string;
+  weekStart: string;
+  weekEnd: string;
+  openingBalance: number;
+  balance: number;
+  weeklySales: number;
+  weeklyApprovedCollections: number;
+  weeklyPendingCollections: number;
+  recoveryPercentage: number;
+  overdueDays: number | null;
+  hasPendingCollections: boolean;
+}
+
+/** GET /operations/collection-entry/report — official financial totals for
+ * the Collection Report page/PDF/Excel export. Backend-authoritative: do not
+ * recompute these from raw collection rows. */
+export interface CollectionReportPaymentModeRow {
+  paymentMode: string;
+  count: number;
+  amount: number;
+  percentage: number;
+}
+
+export interface CollectionReportCollectorRow {
+  collector: string;
+  amounts: Record<string, number>;
+  total: number;
+}
+
+export interface CollectionReportSummary {
+  fromDate: string;
+  toDate: string;
+  totalAmount: number;
+  totalCount: number;
+  totalCollectors: number;
+  paymentModeSummary: CollectionReportPaymentModeRow[];
+  collectorsByPaymentMode: { paymentMode: string; collectorCount: number }[];
+  collectorSummary: CollectionReportCollectorRow[];
 }

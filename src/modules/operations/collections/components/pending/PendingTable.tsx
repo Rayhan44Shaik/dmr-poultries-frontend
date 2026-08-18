@@ -1,4 +1,4 @@
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Eye, Trash2 } from "lucide-react";
 import type { PendingCollection } from "../../types/collection";
 
 const formatCurrency = (amount: number) =>
@@ -29,10 +29,11 @@ interface PendingTableProps {
   onSelectShop: (shopName: string | null) => void;
   weeklySalesMap: Record<string, number>;
   weeklyCollectionsMap: Record<string, number>;
-  periodSalesMap: Record<string, number>;
-  periodCollectionsMap: Record<string, number>;
+  /** Backend-authoritative recoveryPercentage per shop (GET .../pending-summary). Never recomputed here. */
+  recoveryMap: Record<string, number>;
+  /** Backend-authoritative weekly balance per shop. Falls back to lifetime balance only when the page has no weekly row for it. */
+  balanceMap: Record<string, number>;
   onView: (shopName: string) => void;
-  onEdit: (shopName: string) => void;
   onDelete: (shopName: string) => void;
   grandTotalPending: number;
   grandTotalWeeklySales: number;
@@ -45,10 +46,9 @@ export function PendingTable({
   onSelectShop,
   weeklySalesMap,
   weeklyCollectionsMap,
-  periodSalesMap,
-  periodCollectionsMap,
+  recoveryMap,
+  balanceMap,
   onView,
-  onEdit,
   onDelete,
   grandTotalPending,
   grandTotalWeeklySales,
@@ -104,18 +104,6 @@ export function PendingTable({
             <Eye size={18} />
           </button>
           <button
-            onClick={() => selectedShop && onEdit(selectedShop.shopName)}
-            disabled={!selectedShop}
-            title="Edit"
-            className={`rounded-md p-1.5 transition ${
-              selectedShop
-                ? "text-green-600 hover:bg-green-100"
-                : "cursor-not-allowed text-slate-300"
-            }`}
-          >
-            <Pencil size={18} />
-          </button>
-          <button
             onClick={() => selectedShop && onDelete(selectedShop.shopName)}
             disabled={!selectedShop}
             title="Delete"
@@ -149,12 +137,8 @@ export function PendingTable({
             {data.map((shop, idx) => {
               const weeklySales = weeklySalesMap[shop.shopName] || 0;
               const weeklyCollections = weeklyCollectionsMap[shop.shopName] || 0;
-              const periodSales = periodSalesMap[shop.shopName] || 0;
-              const periodCollections = periodCollectionsMap[shop.shopName] || 0;
-              const recovery =
-                periodSales > 0 ? (periodCollections / periodSales) * 100 : 0;
-
-              const balance = shop.currentPending;
+              const recovery = recoveryMap[shop.shopName] ?? 0;
+              const balance = balanceMap[shop.shopName] ?? shop.currentPending;
               const balanceColor =
                 balance > 0 ? "text-red-600" :
                 balance < 0 ? "text-blue-600" :

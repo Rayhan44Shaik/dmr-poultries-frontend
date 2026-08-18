@@ -1,183 +1,193 @@
-// src/modules/operations/fuel-expenses/hooks/useFuelExpenses.ts
-
-import { useEffect, useMemo, useState } from "react";
-import { fuelExpenseService } from "../services/fuelExpenseService";
-import type { FuelExpense } from "../types/fuelExpense";
+import { useCallback, useEffect, useState } from "react";
+import { fuelExpenseService, type FuelListMeta } from "../services/fuelExpenseService";
+import type { FuelExpense, FuelExpenseDraft } from "../types/fuelExpense";
 
 type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void;
 
 export function useFuelExpenses(showNotification?: NotificationFn) {
   const [expenses, setExpenses] = useState<FuelExpense[]>([]);
+  const [meta, setMeta] = useState<FuelListMeta>({ total: 0, page: 1, limit: 10, totalPages: 1 });
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
+  const [sourceType, setSourceType] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [tripNo, setTripNo] = useState("");
+  const [billNo, setBillNo] = useState("");
 
-  const refresh = () => {
+  const refresh = useCallback(async () => {
     setLoading(true);
-    const data = fuelExpenseService.getAll();
-    setExpenses(data);
-    setLoading(false);
-  };
+    setError(null);
+    try {
+      const result = await fuelExpenseService.list({
+        page: currentPage,
+        limit: pageSize,
+        fromDate,
+        toDate,
+        vehicleNo: selectedVehicles[0] || "",
+        sourceType,
+        status: statusFilter,
+        tripNo,
+        billNo,
+      });
+      setExpenses(result.data);
+      setMeta(result.meta);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load fuel expenses.";
+      setError(message);
+      showNotification?.(message, "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    currentPage,
+    fromDate,
+    toDate,
+    selectedVehicles,
+    sourceType,
+    statusFilter,
+    tripNo,
+    billNo,
+    showNotification,
+  ]);
 
   useEffect(() => {
-    refresh();
-  }, []);
+    void refresh();
+  }, [refresh]);
 
-  const filteredData = useMemo(() => {
-    let data = [...expenses];
-    if (fromDate) data = data.filter((e) => e.date >= fromDate);
-    if (toDate) data = data.filter((e) => e.date <= toDate);
-    if (selectedVehicles.length > 0) {
-      data = data.filter((e) => selectedVehicles.includes(e.vehicleNo));
-    }
-    return data.sort((a, b) => b.createdDate.localeCompare(a.createdDate));
-  }, [expenses, fromDate, toDate, selectedVehicles]);
+  const filteredSummary = {
+    totalLitres: expenses.reduce((sum, e) => sum + e.litres, 0),
+    totalAmount: expenses.reduce((sum, e) => sum + e.amount, 0),
+    pendingCount: expenses.filter((e) => e.status === "Pending").length,
+    approvedCount: expenses.filter((e) => e.status === "Approved").length,
+    avgMileage: null as number | null,
+    recentTripMileage: null as number | null,
+  };
 
-  const filteredSummary = useMemo(() => {
-    const totalLitres = filteredData.reduce((sum, e) => sum + e.litres, 0);
-    const totalAmount = filteredData.reduce((sum, e) => sum + e.amount, 0);
-    const pendingCount = filteredData.filter((e) => e.status === "Pending").length;
-    const approvedCount = filteredData.filter((e) => e.status === "Approved").length;
-
-    const vehicleBills = new Map<number, FuelExpense[]>();
-    filteredData.forEach((bill) => {
-      if (!vehicleBills.has(bill.vehicleId)) {
-        vehicleBills.set(bill.vehicleId, []);
-      }
-      vehicleBills.get(bill.vehicleId)!.push(bill);
-    });
-
-    let totalEfficiency = 0;
-    let efficiencyCount = 0;
-    vehicleBills.forEach((bills) => {
-      bills.sort((a, b) => a.date.localeCompare(b.date) || a.createdDate.localeCompare(b.createdDate));
-      for (let i = 1; i < bills.length; i++) {
-        const prev = bills[i - 1];
-        const curr = bills[i];
-        const distance = curr.meterReading - prev.meterReading;
-        if (distance > 0 && curr.litres > 0) {
-          totalEfficiency += distance / curr.litres;
-          efficiencyCount++;
-        }
-      }
-    });
-    const avgMileage = efficiencyCount > 0 ? totalEfficiency / efficiencyCount : null;
-
-    let recentTripMileage = null;
-    if (selectedVehicles.length === 1) {
-      const vehicle = selectedVehicles[0];
-      const vehicleBillsForRecent = filteredData
-        .filter((b) => b.vehicleNo === vehicle)
-        .sort((a, b) => b.createdDate.localeCompare(a.createdDate));
-      if (vehicleBillsForRecent.length >= 2) {
-        const latest = vehicleBillsForRecent[0];
-        const previous = vehicleBillsForRecent[1];
-        const distance = latest.meterReading - previous.meterReading;
-        if (distance > 0 && previous.litres > 0) {
-          recentTripMileage = distance / previous.litres;
-        }
-      }
-    }
-
-    return {
-      totalLitres,
-      totalAmount,
-      pendingCount,
-      approvedCount,
-      avgMileage,
-      recentTripMileage,
-    };
-  }, [filteredData, selectedVehicles]);
-
-  const totalPages = Math.ceil(filteredData.length / pageSize);
-  const paginatedData = filteredData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  // ─── CRUD with saving state ──────────────────────────────────────
-  const saveExpense = (expense: Omit<FuelExpense, "id" | "billNo" | "createdDate" | "createdBy" | "status">) => {
+  const saveExpense = async (expense: FuelExpenseDraft) => {
     setIsSaving(true);
-    const ok = fuelExpenseService.save(expense);
-    if (ok) {
+    try {
+      await fuelExpenseService.save(expense);
       showNotification?.("Fuel bill saved successfully!", "success");
-      refresh();
-    } else {
-      showNotification?.("Failed to save fuel bill.", "error");
+      await refresh();
+      return true;
+    } catch (err) {
+      showNotification?.(err instanceof Error ? err.message : "Failed to save fuel bill.", "error");
+      return false;
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
-    return ok;
   };
 
-  const updateExpense = (id: string, updates: Partial<FuelExpense>) => {
+  const updateExpense = async (id: string, updates: Partial<FuelExpense>) => {
     setIsSaving(true);
-    const ok = fuelExpenseService.update(id, updates);
-    if (ok) {
+    try {
+      await fuelExpenseService.update(id, updates);
       showNotification?.("Fuel bill updated successfully!", "success");
-      refresh();
-    } else {
-      showNotification?.("Edit not allowed (approved or older than 10 days).", "error");
+      await refresh();
+      return true;
+    } catch (err) {
+      showNotification?.(err instanceof Error ? err.message : "Failed to update fuel bill.", "error");
+      return false;
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
-    return ok;
   };
 
-  const deleteExpense = (id: string) => {
+  const deleteExpense = async (id: string) => {
     setIsSaving(true);
-    const ok = fuelExpenseService.remove(id);
-    if (ok) {
+    try {
+      await fuelExpenseService.remove(id);
       showNotification?.("Fuel bill deleted successfully!", "success");
-      refresh();
-    } else {
-      showNotification?.("Delete not allowed (approved or older than 10 days).", "error");
+      await refresh();
+      return true;
+    } catch (err) {
+      showNotification?.(err instanceof Error ? err.message : "Failed to delete fuel bill.", "error");
+      return false;
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
-    return ok;
   };
 
-  const approveExpense = (id: string) => {
+  const approveExpense = async (id: string) => {
     setIsSaving(true);
-    const ok = fuelExpenseService.approve(id);
-    if (ok) {
+    try {
+      await fuelExpenseService.approve(id);
       showNotification?.("Fuel bill approved successfully!", "success");
-      refresh();
-    } else {
-      showNotification?.("Failed to approve fuel bill.", "error");
+      await refresh();
+      return true;
+    } catch (err) {
+      showNotification?.(err instanceof Error ? err.message : "Failed to approve fuel bill.", "error");
+      return false;
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
-    return ok;
+  };
+
+  const rejectExpense = async (id: string, reason: string) => {
+    setIsSaving(true);
+    try {
+      await fuelExpenseService.reject(id, reason);
+      showNotification?.("Fuel bill rejected.", "success");
+      await refresh();
+      return true;
+    } catch (err) {
+      showNotification?.(err instanceof Error ? err.message : "Failed to reject fuel bill.", "error");
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const resetFilters = () => {
     setFromDate("");
     setToDate("");
     setSelectedVehicles([]);
+    setSourceType("");
+    setStatusFilter("");
+    setTripNo("");
+    setBillNo("");
     setCurrentPage(1);
   };
 
   return {
     expenses,
-    filteredData,
-    paginatedData,
+    filteredData: expenses,
+    paginatedData: expenses,
     currentPage,
     setCurrentPage,
-    totalPages,
+    totalPages: meta.totalPages,
+    totalCount: meta.total,
     fromDate,
     setFromDate,
     toDate,
     setToDate,
     selectedVehicles,
     setSelectedVehicles,
+    sourceType,
+    setSourceType,
+    statusFilter,
+    setStatusFilter,
+    tripNo,
+    setTripNo,
+    billNo,
+    setBillNo,
     resetFilters,
     refresh,
     loading,
-    isSaving,        // ← new
+    isSaving,
+    error,
     filteredSummary,
     saveExpense,
     updateExpense,
     deleteExpense,
     approveExpense,
+    rejectExpense,
   };
 }

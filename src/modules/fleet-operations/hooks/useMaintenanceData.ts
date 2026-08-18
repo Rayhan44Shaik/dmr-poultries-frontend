@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
-import { useFuelExpenses } from '../../operations/fuel-expenses/hooks/useFuelExpenses';
+import { apiGet } from '../../../api';
 import { handleApiError } from '../../../api/errors';
 import { maintenanceApi, mapMaintenanceToEvent } from '../services/maintenanceApi';
 import type { MaintenanceEvent } from '../types';
@@ -18,12 +18,12 @@ const rowsOf = (payload: any): any[] => Array.isArray(payload) ? payload : (payl
 
 export function useMaintenanceData() {
   const { vehicles } = useVehicles();
-  const { filteredData: fuelExpenses } = useFuelExpenses(() => {});
   const [refreshKey, setRefreshKey] = useState(0);
   const [maintenance, setMaintenance] = useState<MaintenanceEvent[]>([]);
   const [approvedMaintenance, setApprovedMaintenance] = useState<MaintenanceEvent[]>([]);
   const [deletedRecords, setDeletedRecords] = useState<MaintenanceEvent[]>([]);
   const [historyRecords, setHistoryRecords] = useState<MaintenanceEvent[]>([]);
+  const [latestMeters, setLatestMeters] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +69,24 @@ export function useMaintenanceData() {
         if (!cancelled) setLoading(false);
       }
     })();
+    return () => { cancelled = true; };
+  }, [refreshKey]);
+
+  // Authoritative current KM for Upcoming Service. This comes from the backend
+  // meter ledger (trips + fuel_expenses + fleet_maintenance → vehicle_meter_events),
+  // NOT from browser localStorage. Re-fetched on every refresh.
+  useEffect(() => {
+    let cancelled = false;
+    apiGet<Array<{ vehicleId: number; meter: number }>>('/fleet/vehicles/meter-summary')
+      .then((response) => {
+        if (cancelled) return;
+        const map: Record<string, number> = {};
+        (response.data || []).forEach((event) => {
+          map[String(event.vehicleId)] = Number(event.meter) || 0;
+        });
+        setLatestMeters(map);
+      })
+      .catch(() => { if (!cancelled) setLatestMeters({}); });
     return () => { cancelled = true; };
   }, [refreshKey]);
 
@@ -166,16 +184,16 @@ export function useMaintenanceData() {
       const lastMaint = approvedHistory
         .filter((record) => String(record.vehicleId) === String(vehicle.id))
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0] || null;
-      const maxFuelKM = (fuelExpenses || [])
-        .filter((entry: any) => String(entry.vehicleNo) === String(vehicle.vehicleNumber))
-        .reduce((max: number, entry: any) => Math.max(max, Number(entry.meterReading) || 0), 0);
-      const liveCurrentKM = Math.max(Number(vehicle.currentKM) || 0, maxFuelKM, lastMaint?.currentKM || 0);
+      // Authoritative latest chronological meter from the backend ledger. The
+      // vehicle master `currentKM` is a soft fallback when no meter event exists.
+      const backendMeter = Number(latestMeters[String(vehicle.id)] || 0);
+      const liveCurrentKM = Math.max(Number(vehicle.currentKM) || 0, backendMeter, lastMaint?.currentKM || 0);
       const nextKM = lastMaint?.nextServiceKM && lastMaint.nextServiceKM > 0 ? lastMaint.nextServiceKM : liveCurrentKM + 5000;
       const dueKM = nextKM - liveCurrentKM;
       return { vehicle, lastMaint, nextKM, dueKM, isDue: dueKM <= 1000, liveCurrentKM };
     }).sort((a, b) => a.dueKM - b.dueKM);
     return selectedVehicle === 'all' ? list : list.filter((item) => String(item.vehicle.id) === selectedVehicle);
-  }, [approvedHistory, fuelExpenses, selectedVehicle, vehicles]);
+  }, [approvedHistory, latestMeters, selectedVehicle, vehicles]);
 
   const hasActiveFilters = selectedVehicle !== 'all' || selectedDriver !== 'all' ||
     selectedMaintenanceType !== 'all' || selectedServiceType !== 'all' || selectedStatus !== 'all' ||

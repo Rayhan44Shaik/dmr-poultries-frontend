@@ -16,6 +16,7 @@ import {
   Pencil,
   Trash2,
   CheckCircle,
+  XCircle,
   Plus,
   FileText,
   FileSpreadsheet,
@@ -72,9 +73,20 @@ function FuelExpensesPage() {
     updateExpense,
     deleteExpense,
     approveExpense,
+    rejectExpense,
     refresh,
     loading,
     isSaving,
+    error,
+    totalCount,
+    sourceType,
+    setSourceType,
+    statusFilter,
+    setStatusFilter,
+    tripNo,
+    setTripNo,
+    billNo,
+    setBillNo,
   } = useFuelExpenses(showNotification);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -125,6 +137,10 @@ function FuelExpensesPage() {
 
   const handleEdit = useCallback(() => {
     if (!selectedBill) return;
+    if (selectedBill.sourceType === "TRIP") {
+      showNotification("Trip diesel bills cannot be edited in Fuel Expenses.", "error");
+      return;
+    }
     if (!canEditDelete(selectedBill)) {
       showNotification("Edit not allowed – bill is older than 10 days.", "error");
       return;
@@ -152,9 +168,25 @@ function FuelExpensesPage() {
       showNotification("Bill already approved.", "info");
       return;
     }
+    if (selectedBill.sourceType === "TRIP") {
+      showNotification("Trip diesel bills are automatically approved when the trip is completed.", "info");
+      return;
+    }
     approveExpense(selectedBill.id);
     setSelectedId(null);
   }, [selectedBill, approveExpense, showNotification]);
+
+  const handleReject = useCallback(() => {
+    if (!selectedBill) return;
+    if (selectedBill.sourceType === "TRIP") {
+      showNotification("Trip diesel bills cannot be rejected from Fuel Expenses.", "info");
+      return;
+    }
+    const reason = window.prompt("Rejection reason?");
+    if (!reason?.trim()) return;
+    rejectExpense(selectedBill.id, reason.trim());
+    setSelectedId(null);
+  }, [selectedBill, rejectExpense, showNotification]);
 
   const handleFormCancel = useCallback(() => {
     setEditingId(null);
@@ -319,6 +351,14 @@ function FuelExpensesPage() {
             {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             <span>Refresh</span>
           </button>
+          {error && (
+            <button
+              onClick={() => refresh()}
+              className="inline-flex items-center gap-2 rounded-md border border-red-600 bg-white px-3 py-2 text-sm font-medium text-red-600"
+            >
+              Retry
+            </button>
+          )}
           {/* ─── Auto‑Save Indicator ────────────────────────────────── */}
           {isSaving && (
             <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
@@ -393,6 +433,31 @@ function FuelExpensesPage() {
               className="w-full text-sm"
             />
           </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Source</label>
+            <select value={sourceType} onChange={(e) => { setSourceType(e.target.value); setCurrentPage(1); }} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+              <option value="">All</option>
+              <option value="TRIP">TRIP</option>
+              <option value="MANUAL">MANUAL</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Status</label>
+            <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+              <option value="">All</option>
+              <option value="Pending">Pending</option>
+              <option value="Approved">Approved</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Trip No</label>
+            <input value={tripNo} onChange={(e) => { setTripNo(e.target.value); setCurrentPage(1); }} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Bill No</label>
+            <input value={billNo} onChange={(e) => { setBillNo(e.target.value); setCurrentPage(1); }} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+          </div>
         </div>
         <div className="mt-4 flex justify-end pt-4 border-t border-slate-100">
           <button
@@ -422,7 +487,7 @@ function FuelExpensesPage() {
         <div className="px-6 py-3 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <h3 className="text-sm font-semibold text-slate-700">Fuel Bill Table</h3>
-            <span className="text-xs text-slate-500">{filteredData.length} bills</span>
+            <span className="text-xs text-slate-500">{totalCount} bills</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {selectedBill ? (
@@ -461,14 +526,23 @@ function FuelExpensesPage() {
                 >
                   <Trash2 size={16} />
                 </button>
-                {selectedBill.status === "Pending" && (
-                  <button
-                    onClick={handleApprove}
-                    className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 transition"
-                    title="Approve"
-                  >
-                    <CheckCircle size={16} />
-                  </button>
+                {selectedBill.status === "Pending" && selectedBill.sourceType !== "TRIP" && (
+                  <>
+                    <button
+                      onClick={handleApprove}
+                      className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 transition"
+                      title="Approve"
+                    >
+                      <CheckCircle size={16} />
+                    </button>
+                    <button
+                      onClick={handleReject}
+                      className="p-1.5 rounded-md text-red-600 hover:bg-red-50 transition"
+                      title="Reject"
+                    >
+                      <XCircle size={16} />
+                    </button>
+                  </>
                 )}
               </>
             ) : (
@@ -486,7 +560,7 @@ function FuelExpensesPage() {
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
             <div className="text-sm text-slate-600">
-              Showing {paginatedData.length} of {filteredData.length} entries
+              Showing {paginatedData.length} of {totalCount} entries
             </div>
             <div className="flex items-center gap-2">
               <button
