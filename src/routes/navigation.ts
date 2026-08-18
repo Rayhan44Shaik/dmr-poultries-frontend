@@ -26,7 +26,6 @@ import {
   FileText,
   Truck,
   Wrench,
-  ShieldCheck,
   Contact,
   FileSpreadsheet,
   Users,
@@ -38,8 +37,6 @@ import {
   Car,
   Bird,
   Settings,
-  UserCog,
-  KeyRound,
   Database,
   DollarSign
 } from "lucide-react";
@@ -172,10 +169,11 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Settings",
     icon: Settings,
     children: [
-      { label: "System Settings", path: "/settings?tab=appearance", icon: Settings, keywords: "settings appearance theme language" },
-      { label: "Users & Roles", path: "/settings?tab=users", icon: UserCog, keywords: "users roles management" },
-      { label: "Permissions", path: "/settings?tab=permissions", icon: KeyRound, keywords: "permissions roles access" },
-      { label: "Profile & Security", path: "/settings?tab=profile", icon: ShieldCheck, keywords: "profile password security" },
+      // Hidden from frontend navigation — underlying modules/routes remain intact.
+       { label: "System Settings", path: "/settings?tab=appearance", icon: Settings, keywords: "settings appearance theme language" },
+      // { label: "Users & Roles", path: "/settings?tab=users", icon: UserCog, keywords: "users roles management" },
+      // { label: "Permissions", path: "/settings?tab=permissions", icon: KeyRound, keywords: "permissions roles access" },
+      // { label: "Profile & Security", path: "/settings?tab=profile", icon: ShieldCheck, keywords: "profile password security" },
     ],
   },
 ];

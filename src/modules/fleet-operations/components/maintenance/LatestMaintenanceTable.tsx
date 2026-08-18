@@ -124,12 +124,6 @@ const LatestMaintenanceTable = ({
     return types || '-';
   };
 
-  const getHeaderText = () => {
-    if (viewMode === 'pending') return 'Recent Vehicle Maintenance';
-    if (viewMode === 'approved') return 'Approved Vehicle Maintenance';
-    return 'Deleted Records';
-  };
-
   const getEmptyText = () => {
     if (searchTerm) return 'No matching records found.';
     if (viewMode === 'pending') return 'No pending maintenance records.';
@@ -146,7 +140,7 @@ const LatestMaintenanceTable = ({
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 bg-white border-b border-slate-100">
         <div className="flex items-center gap-4">
           <h4 className="text-sm font-bold text-slate-800 tracking-wide">
-            {getHeaderText()}
+            Recent Vehicle Maintenance
           </h4>
           <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-full shadow-sm">
             {totalRecords}
@@ -156,7 +150,7 @@ const LatestMaintenanceTable = ({
               onClick={() => onToggleView('pending')}
               className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
                 viewMode === 'pending'
-                  ? 'bg-blue-600 text-white shadow-sm'
+                  ? 'bg-orange-100 text-orange-700 shadow-sm'
                   : 'bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
               }`}
             >
@@ -166,7 +160,7 @@ const LatestMaintenanceTable = ({
               onClick={() => onToggleView('approved')}
               className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
                 viewMode === 'approved'
-                  ? 'bg-emerald-600 text-white shadow-sm'
+                  ? 'bg-emerald-100 text-emerald-700 shadow-sm'
                   : 'bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
               }`}
             >
@@ -176,7 +170,7 @@ const LatestMaintenanceTable = ({
               onClick={() => onToggleView('deleted')}
               className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
                 viewMode === 'deleted'
-                  ? 'bg-amber-600 text-white shadow-sm'
+                  ? 'bg-rose-100 text-rose-700 shadow-sm'
                   : 'bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
               }`}
             >
@@ -277,7 +271,7 @@ const LatestMaintenanceTable = ({
                   <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
                       <Hash size={13} className="text-slate-400 shrink-0" />
-                      <span>Mnt. No / Vehicle</span>
+                      <span>MNT. NO</span>
                     </div>
                   </th>
                   <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">
@@ -340,7 +334,6 @@ const LatestMaintenanceTable = ({
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
                 {paginatedRecords.map((rec) => {
-                  const vehicleNumber = resolveVehicleNumber(rec);
                   const isSelected = selectedId === rec.id;
                   const firstType = getFirstMaintenanceType(rec.maintenanceType);
                   const allTypes = getAllMaintenanceTypes(rec.maintenanceType);
@@ -364,16 +357,12 @@ const LatestMaintenanceTable = ({
                           <div className="flex flex-col items-start gap-1">
                             <span className={`inline-flex items-center gap-1.5 text-xs font-bold rounded-md px-2 py-0.5 border ${
                               isDeleted
-                                ? 'bg-amber-50 text-amber-700 border-amber-100/80'
+                                ? 'bg-rose-50 text-rose-700 border-rose-100/80'
                                 : isApproved
                                   ? 'bg-emerald-50 text-emerald-700 border-emerald-100/80'
-                                  : 'bg-blue-50 text-blue-700 border-blue-100/80'
+                                  : 'bg-orange-50 text-orange-700 border-orange-100/80'
                             }`}>
                               {rec.billNumber || '-'}
-                            </span>
-                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-                              <Truck size={12} className="text-slate-400 shrink-0" />
-                              {vehicleNumber}
                             </span>
                           </div>
                         </div>

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { collectionService } from "../services/collectionService";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
-import type { PendingCollection, Collection } from "../types/collection";
+import type { PendingCollection, Collection, CollectionWeeklySummary } from "../types/collection";
 import { EditCollectionModal } from "../components/pending/EditCollectionModal";
 import { useShopSearch } from "../../../../core/hooks/useShopSearch";
 import {
@@ -32,27 +32,6 @@ const formatDate = (dateStr: string) => {
   return d.toLocaleDateString("en-IN");
 };
 
-const getAllShopSales = () => {
-  try {
-    return collectionService.getShopSales();
-  } catch {
-    return [];
-  }
-};
-
-const getCurrentWeekRange = () => {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = day === 0 ? 6 : day - 1;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - diff);
-  monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
-  return { monday, sunday };
-};
-
 const PAGE_SIZE = 15;
 
 export default function PendingCollectionsPage() {
@@ -77,7 +56,7 @@ export default function PendingCollectionsPage() {
   );
 
   // ---- Filter state ----
-  const [asOnDate, setAsOnDate] = useState(new Date().toISOString().split("T")[0]);
+  const [asOnDate, setAsOnDate] = useState("");
   const [shopName, setShopName] = useState("");
   const [collector, setCollector] = useState("");
   const [sortBy, setSortBy] = useState("highestBalance");
@@ -107,6 +86,8 @@ export default function PendingCollectionsPage() {
     showSummary: false,
   });
 
+  const [weeklySummaries, setWeeklySummaries] = useState<CollectionWeeklySummary[]>([]);
+
   const loadData = async () => {
     try {
       await collectionService.refreshFromBackend();
@@ -124,6 +105,19 @@ export default function PendingCollectionsPage() {
   useEffect(() => {
     void loadData();
   }, []);
+
+  useEffect(() => {
+    void collectionService.fetchWeekBounds().then((bounds) => {
+      setAsOnDate((prev) => prev || bounds.asOfDate);
+    }).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!asOnDate) return;
+    void collectionService.fetchWeeklySummaries(asOnDate).then(setWeeklySummaries).catch(() => {
+      setWeeklySummaries([]);
+    });
+  }, [asOnDate]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -216,32 +210,37 @@ export default function PendingCollectionsPage() {
     setCurrentPage(1);
   }, [shopName, collector, fromDate, toDate, asOnDate, sortBy, recoveryThreshold]);
 
-  const totalPending = filteredData.reduce((sum, s) => sum + s.currentPending, 0);
+  const summaryByShopId = useMemo(() => {
+    const map = new Map<number, CollectionWeeklySummary>();
+    weeklySummaries.forEach((row) => map.set(row.shopId, row));
+    return map;
+  }, [weeklySummaries]);
+
+  const summaryByShopName = useMemo(() => {
+    const map = new Map<string, CollectionWeeklySummary>();
+    weeklySummaries.forEach((row) => map.set(row.shopName, row));
+    return map;
+  }, [weeklySummaries]);
+
+  function weeklyForShop(shop: PendingCollection): CollectionWeeklySummary | undefined {
+    if (shop.shopId != null) return summaryByShopId.get(shop.shopId);
+    return summaryByShopName.get(shop.shopName);
+  }
+
+  const totalPending = filteredData.reduce((sum, s) => {
+    const w = weeklyForShop(s);
+    return sum + (w ? w.currentOutstanding : s.currentPending);
+  }, 0);
 
   const weeklyStats = useMemo(() => {
-    const { monday, sunday } = getCurrentWeekRange();
-
-    const sales = getAllShopSales();
     let weeklySales = 0;
-    const shopSet = new Set<string>();
-    sales.forEach((s: any) => {
-      const saleDate = new Date(s.tripDate);
-      if (saleDate >= monday && saleDate <= sunday) {
-        weeklySales += Number(s.amount) || 0;
-        shopSet.add(s.shopName);
-      }
-    });
-
     let weeklyCollections = 0;
-    allCollections.forEach((c) => {
-      const colDate = new Date(c.collectionDate);
-      if (colDate >= monday && colDate <= sunday && c.status === "Approved") {
-        weeklyCollections += Number(c.amount) || 0;
-      }
+    weeklySummaries.forEach((row) => {
+      weeklySales += row.weeklySales;
+      weeklyCollections += row.approvedCollections;
     });
-
     return { weeklySales, weeklyCollections };
-  }, [allCollections]);
+  }, [weeklySummaries]);
 
   const weeklyRecovery =
     weeklyStats.weeklySales > 0
@@ -250,67 +249,32 @@ export default function PendingCollectionsPage() {
 
   const weeklySalesMap = useMemo(() => {
     const map: Record<string, number> = {};
-    const { monday, sunday } = getCurrentWeekRange();
-    const sales = getAllShopSales();
-    sales.forEach((s: any) => {
-      const saleDate = new Date(s.tripDate);
-      if (saleDate >= monday && saleDate <= sunday) {
-        map[s.shopName] = (map[s.shopName] || 0) + Number(s.amount);
-      }
+    weeklySummaries.forEach((row) => {
+      map[row.shopName] = row.weeklySales;
     });
     return map;
-  }, []);
+  }, [weeklySummaries]);
 
   const weeklyCollectionsMap = useMemo(() => {
     const map: Record<string, number> = {};
-    const { monday, sunday } = getCurrentWeekRange();
-    allCollections.forEach((c) => {
-      const colDate = new Date(c.collectionDate);
-      if (colDate >= monday && colDate <= sunday && c.status === "Approved") {
-        map[c.shopName] = (map[c.shopName] || 0) + Number(c.amount);
-      }
+    weeklySummaries.forEach((row) => {
+      map[row.shopName] = row.approvedCollections;
     });
     return map;
-  }, [allCollections]);
+  }, [weeklySummaries]);
 
-  const grandTotalPending = filteredData.reduce((sum, s) => sum + s.currentPending, 0);
-  const grandTotalWeeklySales = filteredData.reduce(
-    (sum, s) => sum + (weeklySalesMap[s.shopName] || 0),
-    0
-  );
-  const grandTotalWeeklyCollections = filteredData.reduce(
-    (sum, s) => sum + (weeklyCollectionsMap[s.shopName] || 0),
-    0
-  );
+  const grandTotalPending = totalPending;
+  const grandTotalWeeklySales = filteredData.reduce((sum, s) => {
+    const w = weeklyForShop(s);
+    return sum + (w ? w.weeklySales : 0);
+  }, 0);
+  const grandTotalWeeklyCollections = filteredData.reduce((sum, s) => {
+    const w = weeklyForShop(s);
+    return sum + (w ? w.approvedCollections : 0);
+  }, 0);
 
-  const periodSalesMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    const from = fromDate ? new Date(fromDate) : null;
-    const to = toDate ? new Date(toDate) : null;
-    const sales = getAllShopSales();
-    sales.forEach((s: any) => {
-      const saleDate = new Date(s.tripDate);
-      if (from && saleDate < from) return;
-      if (to && saleDate > to) return;
-      map[s.shopName] = (map[s.shopName] || 0) + Number(s.amount);
-    });
-    return map;
-  }, [fromDate, toDate]);
-
-  const periodCollectionsMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    const from = fromDate ? new Date(fromDate) : null;
-    const to = toDate ? new Date(toDate) : null;
-    allCollections.forEach((c) => {
-      const colDate = new Date(c.collectionDate);
-      if (from && colDate < from) return;
-      if (to && colDate > to) return;
-      if (c.status === "Approved") {
-        map[c.shopName] = (map[c.shopName] || 0) + Number(c.amount);
-      }
-    });
-    return map;
-  }, [allCollections, fromDate, toDate]);
+  const periodSalesMap = weeklySalesMap;
+  const periodCollectionsMap = weeklyCollectionsMap;
 
   const getLatestCollection = (shopName: string): Collection | null => {
     const shopCollections = allCollections
@@ -334,17 +298,18 @@ export default function PendingCollectionsPage() {
 
   const updateSummaryForShop = (shopName: string) => {
     const shopData = pendingData.find((s) => s.shopName === shopName);
-    if (!shopData) {
+    const week = shopData ? weeklyForShop(shopData) : summaryByShopName.get(shopName);
+    if (!week && !shopData) {
       setSummary((prev) => ({ ...prev, showSummary: false }));
       return;
     }
     setSummary({
-      openingBalance: shopData.totalSales,
-      weeklySales: shopData.totalSales,
-      weeklyCollections: shopData.totalCollections,
-      currentPending: shopData.currentPending,
-      shopName: shopData.shopName,
-      dateRange: `As on ${asOnDate}`,
+      openingBalance: week?.openingBalance ?? 0,
+      weeklySales: week?.weeklySales ?? 0,
+      weeklyCollections: week?.approvedCollections ?? 0,
+      currentPending: week?.currentOutstanding ?? shopData?.currentPending ?? 0,
+      shopName: week?.shopName ?? shopData?.shopName ?? shopName,
+      dateRange: week ? `${week.weekStart} → ${week.weekEnd}` : `As on ${asOnDate}`,
       showSummary: true,
     });
   };

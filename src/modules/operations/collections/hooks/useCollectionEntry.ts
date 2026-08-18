@@ -7,12 +7,27 @@ import type {
   PaymentMode,
   Collection,
   CollectionLegacyStatus,
+  CollectionWeeklySummary,
 } from "../types/collection";
 import { collectionService } from "../services/collectionService";
 import { loadShops, shopService } from "../../../masters/shops/services/shopService";
 import { getEmployees, loadEmployees } from "../../../masters/employees/services/employeeService";
 import { getBanks, loadBanks } from "../../../masters/banks/services/bankService";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+
+const EMPTY_WEEKLY: CollectionWeeklySummary = {
+  shopId: 0,
+  shopName: "",
+  weekStart: "",
+  weekEnd: "",
+  openingBalance: 0,
+  weeklySales: 0,
+  approvedCollections: 0,
+  pendingCollections: 0,
+  currentOutstanding: 0,
+  closingBalance: 0,
+  isCurrentWeek: false,
+};
 
 export default function useCollectionEntry() {
   const { showNotification } = useSafeNotification();
@@ -25,12 +40,13 @@ export default function useCollectionEntry() {
   const [recentCollections, setRecentCollections] = useState<RecentCollection[]>([]);
   const [allCollections, setAllCollections] = useState<Collection[]>([]); // new
   const [pendingShop, setPendingShop] = useState<PendingCollection | null>(null);
+  const [weeklySummary, setWeeklySummary] = useState<CollectionWeeklySummary>(EMPTY_WEEKLY);
   const [showSummary, setShowSummary] = useState(false);
 
   const [entry, setEntry] = useState<CollectionEntry>({
     collectionId: "",
     collectionNo: "",
-    collectionDate: new Date().toISOString().split("T")[0],
+    collectionDate: "",
     shopName: "",
     collectorName: "",
     paymentModeName: "Cash",
@@ -69,7 +85,10 @@ export default function useCollectionEntry() {
         // Fall back to all employees when no one is tagged "Collection" yet.
         setCollectors(collectorNames.length > 0 ? collectorNames : allEmployees.map((e) => e.employeeName).sort());
         const modes: PaymentMode[] = [{ id: "cash", name: "Cash" }];
-        getBanks().forEach((bank) => modes.push({ id: bank.bankName, name: bank.bankName }));
+        getBanks()
+          .slice()
+          .sort((a, b) => a.bankName.localeCompare(b.bankName))
+          .forEach((bank) => modes.push({ id: bank.bankName, name: bank.bankName }));
         setPaymentModes(modes);
         setPendingCollections(collectionService.getPendingCollections());
         setRecentCollections(collectionService.getRecentCollections("Pending"));
@@ -85,6 +104,14 @@ export default function useCollectionEntry() {
 
   useEffect(() => {
     loadMasterData();
+    collectionService
+      .fetchWeekBounds()
+      .then((bounds) => {
+        setEntry((prev) =>
+          prev.collectionDate ? prev : { ...prev, collectionDate: bounds.asOfDate }
+        );
+      })
+      .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -92,34 +119,20 @@ export default function useCollectionEntry() {
     return pendingCollections.find((shop) => shop.shopName === shopName) ?? null;
   }
 
-  function getShopSales(shopName: string) {
-    return collectionService
-      .getShopSales()
-      .filter((s) => s.shopName === shopName);
-  }
-
-  function computeShopTotals(shopName: string) {
-    const sales = getShopSales(shopName);
-    const totalSales = sales.reduce((sum: number, s) => sum + (Number(s.amount) || 0), 0);
-    const collections = collectionService.getCollectionsForShop(shopName);
-    const totalCollections = collections.reduce((sum: number, c) => sum + (Number(c.amount) || 0), 0);
-    const currentPending = collectionService.getShopBalance(shopName);
-    return { totalSales, totalCollections, currentPending };
-  }
-
   function selectShop(shopName: string) {
     const shop = findPendingShop(shopName);
-    const { totalSales, totalCollections, currentPending } = computeShopTotals(shopName);
+    const shopId = collectionService.getShopIdForName(shopName);
     const updatedShop: PendingCollection = shop
-      ? { ...shop, totalSales, totalCollections, currentPending }
+      ? { ...shop, shopId: shop.shopId ?? shopId ?? undefined }
       : {
+          shopId: shopId ?? undefined,
           shopName,
-          totalSales,
-          totalCollections,
-          currentPending,
-          openingBalance: collectionService.getShopOpeningBalance(shopName),
+          totalSales: 0,
+          totalCollections: 0,
+          currentPending: 0,
+          openingBalance: 0,
           overdueDays: 0,
-          lastCollectionDate: new Date().toISOString().split("T")[0],
+          lastCollectionDate: entry.collectionDate,
         };
     setPendingShop(updatedShop);
     setEntry((prev) => ({
@@ -128,7 +141,7 @@ export default function useCollectionEntry() {
       amount: 0,
       remarks: ""
     }));
-    setShowSummary(false);
+    setShowSummary(true);
   }
 
   function changeShop(shopName: string) {
@@ -137,20 +150,21 @@ export default function useCollectionEntry() {
 
   function resetEntry() {
     setPendingShop(null);
-    setEntry({
+    setEntry((prev) => ({
       collectionId: "",
       collectionNo: "",
-      collectionDate: new Date().toISOString().split("T")[0],
+      collectionDate: prev.collectionDate,
       shopName: "",
       collectorName: "",
       paymentModeName: "Cash",
       referenceNo: "",
       amount: 0,
       remarks: ""
-    });
+    }));
     setErrors({});
     setIsEditing(false);
     setShowSummary(false);
+    setWeeklySummary(EMPTY_WEEKLY);
   }
 
   function viewLedger() {
@@ -158,69 +172,46 @@ export default function useCollectionEntry() {
       showNotification("Please select a shop first.", "error");
       return;
     }
-    const { totalSales, totalCollections, currentPending } = computeShopTotals(pendingShop.shopName);
-    setPendingShop(prev => prev ? { ...prev, totalSales, totalCollections, currentPending } : null);
     setShowSummary(true);
-    setEntry(prev => ({ ...prev, amount: Math.max(0, currentPending) }));
   }
 
-  // ---- WEEKLY RANGE & CALCULATIONS ----
-  const weekRange = useMemo(() => {
-    const now = new Date();
-    const day = now.getDay();
-    const diff = day === 0 ? 6 : day - 1;
-    const monday = new Date(now);
-    monday.setDate(now.getDate() - diff);
-    monday.setHours(0, 0, 0, 0);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
-    return { monday, sunday };
-  }, []);
+  const shopId = pendingShop?.shopId ?? collectionService.getShopIdForName(entry.shopName);
 
-  const weekRangeFormatted = useMemo(() => {
-    const fmt = (d: Date) =>
-      d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
-    return `${fmt(weekRange.monday)} to ${fmt(weekRange.sunday)}`;
-  }, [weekRange]);
-
-  const weeklySales = useMemo(() => {
-    if (!pendingShop) return 0;
-    const sales = getShopSales(pendingShop.shopName);
-    return sales
-      .filter((s) => {
-        const saleDate = new Date(s.tripDate);
-        return saleDate >= weekRange.monday && saleDate <= weekRange.sunday;
+  useEffect(() => {
+    if (!shopId || !entry.collectionDate) {
+      setWeeklySummary(EMPTY_WEEKLY);
+      return;
+    }
+    let cancelled = false;
+    collectionService
+      .fetchWeeklySummary(shopId, entry.collectionDate)
+      .then((summary) => {
+        if (!cancelled) setWeeklySummary(summary);
       })
-      .reduce((sum: number, s) => sum + Number(s.amount), 0);
-  }, [pendingShop, weekRange]);
+      .catch(() => {
+        if (!cancelled) setWeeklySummary(EMPTY_WEEKLY);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [shopId, entry.collectionDate, pendingCollections, recentCollections, allCollections]);
 
-  const weeklyCollections = useMemo(() => {
-    if (!pendingShop) return 0;
-    const collections = collectionService.getCollectionsForShop(pendingShop.shopName);
-    return collections
-      .filter((c) => {
-        const colDate = new Date(c.collectionDate);
-        return colDate >= weekRange.monday && colDate <= weekRange.sunday && c.status === "Approved";
-      })
-      .reduce((sum: number, c) => sum + Number(c.amount), 0);
-  }, [pendingShop, weekRange]);
+  const fmtWeekDate = (iso: string) => {
+    if (!iso) return "";
+    const [y, m, d] = iso.split("-");
+    return `${d}/${m}/${y}`;
+  };
+  const weekRangeFormatted = weeklySummary.weekStart
+    ? `${fmtWeekDate(weeklySummary.weekStart)} to ${fmtWeekDate(weeklySummary.weekEnd)}`
+    : "";
 
-  const weeklyPending = useMemo(() => {
-    if (!pendingShop) return 0;
-    const collections = collectionService.getCollectionsForShop(pendingShop.shopName);
-    return collections
-      .filter((c) => {
-        const colDate = new Date(c.collectionDate);
-        return colDate >= weekRange.monday && colDate <= weekRange.sunday && c.status === "Pending";
-      })
-      .reduce((sum: number, c) => sum + Number(c.amount), 0);
-  }, [pendingShop, weekRange]);
-
-  const openingBalance = useMemo(() => pendingShop?.currentPending ?? 0, [pendingShop]);
-  const totalSales = useMemo(() => pendingShop?.totalSales ?? 0, [pendingShop]);
-  const totalCollections = useMemo(() => pendingShop?.totalCollections ?? 0, [pendingShop]);
-  const currentPending = useMemo(() => pendingShop?.currentPending ?? 0, [pendingShop]);
+  const openingBalance = weeklySummary.openingBalance;
+  const weeklySales = weeklySummary.weeklySales;
+  const weeklyCollections = weeklySummary.approvedCollections;
+  const weeklyPending = weeklySummary.pendingCollections;
+  const currentPending = weeklySummary.currentOutstanding;
+  const totalSales = weeklySummary.weeklySales;
+  const totalCollections = weeklySummary.approvedCollections;
 
   const todayCollection = useMemo(() => Number(entry.amount || 0), [entry.amount]);
 
@@ -396,8 +387,10 @@ export default function useCollectionEntry() {
     if (pending.length > 0) {
       const selected = pending.find((shop) => shop.shopName === entry.shopName);
       if (selected) {
-        const { totalSales, totalCollections, currentPending } = computeShopTotals(selected.shopName);
-        setPendingShop({ ...selected, totalSales, totalCollections, currentPending });
+        setPendingShop({
+          ...selected,
+          shopId: selected.shopId ?? collectionService.getShopIdForName(selected.shopName) ?? undefined,
+        });
       }
     }
   }
@@ -408,19 +401,19 @@ export default function useCollectionEntry() {
   }
 
   function editCollection(collection: RecentCollection) {
-    const { totalSales, totalCollections, currentPending } = computeShopTotals(collection.shopName);
-
+    const shopId = collection.numericShopId ?? collectionService.getShopIdForName(collection.shopName);
     const existingShop = findPendingShop(collection.shopName);
     const updatedShop: PendingCollection = existingShop
-      ? { ...existingShop, totalSales, totalCollections, currentPending }
+      ? { ...existingShop, shopId: existingShop.shopId ?? shopId ?? undefined }
       : {
+          shopId: shopId ?? undefined,
           shopName: collection.shopName,
-          totalSales,
-          totalCollections,
-          currentPending,
-          openingBalance: collectionService.getShopOpeningBalance(collection.shopName),
+          totalSales: 0,
+          totalCollections: 0,
+          currentPending: 0,
+          openingBalance: 0,
           overdueDays: 0,
-          lastCollectionDate: collection.collectionDate || new Date().toISOString().split("T")[0],
+          lastCollectionDate: collection.collectionDate,
         };
 
     setPendingShop(updatedShop);

@@ -36,19 +36,6 @@ const getBarColor = (percentage: number) => {
 
 const KNOWN_MODES = ["Cash", "Union Bank", "HDFC Bank"];
 
-const getCurrentWeekRange = () => {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = (day === 0 ? 6 : day - 1);
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - diff);
-  monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
-  return { monday, sunday };
-};
-
 type Props = {
   embedded?: boolean;
 };
@@ -71,12 +58,9 @@ export default function CollectionReportPage({ embedded = false }: Props) {
     [employees]
   );
 
-  const { monday, sunday } = getCurrentWeekRange();
-  const defaultFromDate = monday.toISOString().split("T")[0];
-  const defaultToDate = sunday.toISOString().split("T")[0];
-
-  const [fromDate, setFromDate] = useState(defaultFromDate);
-  const [toDate, setToDate] = useState(defaultToDate);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [weekBounds, setWeekBounds] = useState({ from: "", to: "" });
   const [shopName, setShopName] = useState("");
   const [collector, setCollector] = useState("");
   const [paymentMode, setPaymentMode] = useState("");
@@ -97,6 +81,14 @@ export default function CollectionReportPage({ embedded = false }: Props) {
 
   useEffect(() => {
     void loadData();
+  }, []);
+
+  useEffect(() => {
+    void collectionService.fetchWeekBounds().then((bounds) => {
+      setWeekBounds({ from: bounds.weekStart, to: bounds.weekEnd });
+      setFromDate((prev) => prev || bounds.weekStart);
+      setToDate((prev) => prev || bounds.weekEnd);
+    }).catch(() => undefined);
   }, []);
 
   const filteredData = useMemo(() => {
@@ -358,14 +350,14 @@ export default function CollectionReportPage({ embedded = false }: Props) {
   }, [filteredData, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate]);
 
   const resetFilters = useCallback(() => {
-    setFromDate(defaultFromDate);
-    setToDate(defaultToDate);
+    setFromDate(weekBounds.from);
+    setToDate(weekBounds.to);
     setShopName("");
     setCollector("");
     setPaymentMode("");
     shopSearch.setQuery("");
     showNotification("Filters reset to default (current week).", "info");
-  }, [defaultFromDate, defaultToDate, shopSearch, showNotification]);
+  }, [weekBounds, shopSearch, showNotification]);
 
   if (loading) return <div className="p-8 text-center text-slate-500">Loading...</div>;
 

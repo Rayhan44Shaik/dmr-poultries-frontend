@@ -81,7 +81,8 @@ export async function generateShopPDF(
   tripDate?: string,
   _logoLeftUrl?: string,
   _henIconUrl?: string,
-  deliveryTime?: string
+  deliveryTime?: string,
+  driverName?: string
 ): Promise<void> {
   try {
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -104,6 +105,12 @@ export async function generateShopPDF(
       supervisorName ||
       (row as any).supervisorName ||
       (row as any).supervisor ||
+      "";
+
+    const resolvedDriverName =
+      driverName ||
+      (row as any).driverName ||
+      (row as any).driver ||
       "";
 
     let resolvedSupervisorPhone =
@@ -197,7 +204,8 @@ export async function generateShopPDF(
 
     drawField(doc, "Supervisor Name", resolvedSupervisorName, c1, currentY + 9, 34, 48);
     drawField(doc, "Vehicle No", vehicleNo || "", c2, currentY + 9, 30, 48);
-    drawField(doc, "Mobile No", resolvedSupervisorPhone, c1, currentY + 18, 34, 48);
+    drawField(doc, "Supervisor Mobile No", resolvedSupervisorPhone, c1, currentY + 18, 40, 42);
+    drawField(doc, "Driver Name", resolvedDriverName, c2, currentY + 18, 30, 48);
 
     setDraw(doc, COLOR.borderLight);
     doc.line(margin + 2, currentY + 23, pageWidth - margin - 2, currentY + 23);
@@ -278,42 +286,14 @@ export async function generateShopPDF(
       });
     } else if (resolvedBoxes.length > 0) {
       if (isBoxMode) {
-        const netBirds = toNum(row.birds ?? 0);
-        const netWeight = toNum(row.weight ?? 0);
-        const totalFarmBirds = resolvedBoxes.reduce((acc, b) => acc + b.birds, 0);
-        const totalFarmWeight = resolvedBoxes.reduce((acc, b) => acc + b.weight, 0);
-        let birdsLeft = netBirds;
-        let weightLeft = netWeight;
-        resolvedBoxes.forEach((b, i) => {
-          const isLast = i === resolvedBoxes.length - 1;
-          let boxBirds: number;
-          if (resolvedBoxes.length === 1) {
-            boxBirds = netBirds;
-          } else if (isLast) {
-            boxBirds = Math.max(0, birdsLeft);
-          } else if (totalFarmBirds > 0) {
-            boxBirds = Math.round((b.birds / totalFarmBirds) * netBirds);
-          } else {
-            boxBirds = Math.floor(netBirds / resolvedBoxes.length);
-          }
-          birdsLeft -= boxBirds;
-
-          let boxWeight: number;
-          if (resolvedBoxes.length === 1) {
-            boxWeight = netWeight;
-          } else if (isLast) {
-            boxWeight = Math.max(0, weightLeft);
-          } else if (totalFarmWeight > 0) {
-            boxWeight = (b.weight / totalFarmWeight) * netWeight;
-          } else {
-            boxWeight = netWeight / resolvedBoxes.length;
-          }
-          weightLeft -= boxWeight;
-
-          tableRows.push([String(b.boxNo), boxBirds.toLocaleString(), boxWeight.toFixed(2)]);
+        // Box Mode: each selected box delivers its full farm load to the shop.
+        // Mortality is tracked at the shop level (row.mortality / row.mortKg),
+        // NOT distributed per-box. Keep gross per-box values synced with Step 4.
+        resolvedBoxes.forEach((b) => {
+          tableRows.push([String(b.boxNo), b.birds.toLocaleString(), b.weight.toFixed(2)]);
+          totalBirds += b.birds;
+          totalWeight += b.weight;
         });
-        totalBirds = netBirds;
-        totalWeight = netWeight;
       } else {
         const totalFarmWeight = resolvedBoxes.reduce((acc, b) => acc + b.weight, 0);
         const totalBoxBirds = resolvedBoxes.reduce((acc, b) => acc + b.birds, 0);
@@ -428,15 +408,17 @@ export async function generateShopPDF(
         0
       );
 
-      const grossBirds = totalBirds + mortalityBirdsVal;
-      const grossWeight = totalWeight + mortalityWeightVal;
+      // totalBirds/totalWeight are gross farm values in Box Mode.
+      // Delivered figures = gross - mortality, exactly as computed in Step 4.
+      const finalBirdsVal = Math.max(0, totalBirds - mortalityBirdsVal);
+      const finalWeightVal = Math.max(0, totalWeight - mortalityWeightVal);
 
       const summaryHeaders = ["Boxes", "Birds", "Weight(Kg)", "Mortality", "Mortality(KG)"];
       const summaryRows = [
         [
           boxCount,
-          grossBirds.toLocaleString(),
-          grossWeight.toFixed(2),
+          totalBirds.toLocaleString(),
+          totalWeight.toFixed(2),
           mortalityBirdsVal,
           mortalityWeightVal.toFixed(2)
         ],
@@ -444,8 +426,8 @@ export async function generateShopPDF(
           "",
           "",
           "",
-          `Delivered Birds: ${totalBirds}`,
-          `Delivered Weight: ${totalWeight.toFixed(2)} kg`
+          `Delivered Birds: ${finalBirdsVal}`,
+          `Delivered Weight: ${finalWeightVal.toFixed(2)} kg`
         ]
       ];
 

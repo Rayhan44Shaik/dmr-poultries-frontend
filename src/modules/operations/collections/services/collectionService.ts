@@ -8,6 +8,8 @@
   CollectorSummary,
   PaymentModeSummary,
   CollectionDashboardSummary,
+  CollectionWeeklySummary,
+  CollectionWeekBounds,
 } from "../types/collection";
 import type { ShopSale } from "../../shop-sales/types/shopSale";
 import {
@@ -72,34 +74,34 @@ function isApproved(e: CollectionApiEntry): boolean {
 
 function buildPending(): PendingCollection[] {
   const approved = entriesCache.filter(isApproved);
-  const salesByShop = new Map<string, number>();
+  const salesByShop = new Map<number, number>();
   shopSalesCache.forEach((s) => {
-    const key = s.shopName;
-    salesByShop.set(key, (salesByShop.get(key) ?? 0) + Number(s.amount || 0));
+    const id = s.numericShopId;
+    if (id == null || id <= 0) return;
+    salesByShop.set(id, (salesByShop.get(id) ?? 0) + Number(s.amount || 0));
   });
-  const collectionsByShop = new Map<string, number>();
-  const lastCollectionByShop = new Map<string, string>();
+  const collectionsByShop = new Map<number, number>();
+  const lastCollectionByShop = new Map<number, string>();
   approved.forEach((e) => {
-    const key = e.shopName;
-    collectionsByShop.set(key, (collectionsByShop.get(key) ?? 0) + Number(e.amount || 0));
-    const prev = lastCollectionByShop.get(key);
-    if (!prev || e.collectionDate > prev) lastCollectionByShop.set(key, e.collectionDate);
+    const id = e.shopId;
+    if (id == null || id <= 0) return;
+    collectionsByShop.set(id, (collectionsByShop.get(id) ?? 0) + Number(e.amount || 0));
+    const prev = lastCollectionByShop.get(id);
+    if (!prev || e.collectionDate > prev) lastCollectionByShop.set(id, e.collectionDate);
   });
 
   const pending: PendingCollection[] = [];
-  const now = new Date();
   shopsCache.forEach((shop) => {
-    const totalSales = salesByShop.get(shop.shopName) ?? 0;
-    const totalCollections = collectionsByShop.get(shop.shopName) ?? 0;
-    // Backend-authoritative outstanding: shops.current_balance (ledger-synced).
+    const totalSales = salesByShop.get(shop.id) ?? 0;
+    const totalCollections = collectionsByShop.get(shop.id) ?? 0;
     const currentPending = Number(shop.currentBalance ?? 0);
-    const lastCollectionDate = lastCollectionByShop.get(shop.shopName) ?? "-";
+    const lastCollectionDate = lastCollectionByShop.get(shop.id) ?? "-";
     let overdueDays = 0;
     if (lastCollectionDate && lastCollectionDate !== "-") {
-      const days = Math.floor(
-        (now.getTime() - new Date(lastCollectionDate).getTime()) / (1000 * 60 * 60 * 24)
-      );
-      overdueDays = days < 0 ? 0 : days;
+      const [y, m, d] = lastCollectionDate.slice(0, 10).split("-").map(Number);
+      const then = Date.UTC(y, m - 1, d);
+      const now = Date.now();
+      overdueDays = Math.max(0, Math.floor((now - then) / (1000 * 60 * 60 * 24)));
     }
     pending.push({
       shopId: shop.id,
@@ -481,6 +483,48 @@ function getShopOpeningBalance(shopName: string): number {
   return shopsCache.find((s) => s.shopName === shopName)?.openingBalance ?? 0;
 }
 
+async function fetchWeeklySummary(shopId: number, date: string): Promise<CollectionWeeklySummary> {
+  const { data } = await apiGet<CollectionWeeklySummary>(`${COLLECTION_PATH}/weekly-summary`, {
+    params: { shopId, date },
+  });
+  return mapWeeklySummary(data);
+}
+
+async function fetchWeekBounds(date?: string): Promise<CollectionWeekBounds> {
+  const { data } = await apiGet<CollectionWeekBounds>(`${COLLECTION_PATH}/week-bounds`, {
+    params: date ? { date } : {},
+  });
+  return {
+    asOfDate: String(data.asOfDate),
+    weekStart: String(data.weekStart),
+    weekEnd: String(data.weekEnd),
+    isCurrentWeek: Boolean(data.isCurrentWeek),
+  };
+}
+
+async function fetchWeeklySummaries(date: string): Promise<CollectionWeeklySummary[]> {
+  const { data } = await apiGet<CollectionWeeklySummary[]>(`${COLLECTION_PATH}/weekly-summaries`, {
+    params: { date },
+  });
+  return (Array.isArray(data) ? data : []).map(mapWeeklySummary);
+}
+
+function mapWeeklySummary(data: CollectionWeeklySummary): CollectionWeeklySummary {
+  return {
+    shopId: Number(data.shopId),
+    shopName: String(data.shopName ?? ""),
+    weekStart: String(data.weekStart),
+    weekEnd: String(data.weekEnd),
+    openingBalance: Number(data.openingBalance ?? 0),
+    weeklySales: Number(data.weeklySales ?? 0),
+    approvedCollections: Number(data.approvedCollections ?? 0),
+    pendingCollections: Number(data.pendingCollections ?? 0),
+    currentOutstanding: Number(data.currentOutstanding ?? 0),
+    closingBalance: Number(data.closingBalance ?? data.currentOutstanding ?? 0),
+    isCurrentWeek: Boolean(data.isCurrentWeek),
+  };
+}
+
 export const collectionService = {
 getShopSales,
   getCollections,
@@ -508,6 +552,9 @@ getShopSales,
   getShopIdForName,
   getShopBalance,
   getShopOpeningBalance,
+  fetchWeeklySummary,
+  fetchWeeklySummaries,
+  fetchWeekBounds,
 };
 
 /** Prime the cache as soon as the module is imported (e.g. Header/dashboard). */

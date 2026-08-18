@@ -227,3 +227,26 @@ export interface CollectionDashboardSummary {
   pendingApproval: number;
   approvedCollections: number;
 }
+
+/** GET /operations/collection-entry/weekly-summary */
+export interface CollectionWeeklySummary {
+  shopId: number;
+  shopName: string;
+  weekStart: string;
+  weekEnd: string;
+  openingBalance: number;
+  weeklySales: number;
+  approvedCollections: number;
+  pendingCollections: number;
+  currentOutstanding: number;
+  closingBalance: number;
+  isCurrentWeek: boolean;
+}
+
+/** GET /operations/collection-entry/week-bounds */
+export interface CollectionWeekBounds {
+  asOfDate: string;
+  weekStart: string;
+  weekEnd: string;
+  isCurrentWeek: boolean;
+}
