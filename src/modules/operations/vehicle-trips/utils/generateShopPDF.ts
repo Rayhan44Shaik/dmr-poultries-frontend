@@ -71,7 +71,7 @@ function drawField(
   doc.line(valueX, y + 1.5, valueX + lineWidth, y + 1.5);
 }
 
-export async function generateShopPDF(
+export async function generateShopPDFBlob(
   row: ShopDeliveryWithExtra,
   safeBoxDetails: BoxDetail[] = [],
   _tripNo?: string,
@@ -83,7 +83,7 @@ export async function generateShopPDF(
   _henIconUrl?: string,
   deliveryTime?: string,
   driverName?: string
-): Promise<void> {
+): Promise<Blob> {
   try {
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
@@ -195,7 +195,9 @@ export async function generateShopPDF(
 
     const c1 = margin + 6;
     const c2 = margin + 98;
-    const cardH = 44;
+    const shopEmail =
+      String((row as { shopEmail?: string; email?: string }).shopEmail || (row as { email?: string }).email || "").trim();
+    const cardH = shopEmail ? 52 : 44;
 
     setFill(doc, COLOR.cardBg);
     setDraw(doc, COLOR.borderLight);
@@ -212,35 +214,39 @@ export async function generateShopPDF(
 
     drawField(doc, "Shop Name", row.shopName || "", c1, currentY + 31, 34, 48);
     drawField(doc, "Date", dateValue, c2, currentY + 31, 30, 48);
+    const typeY = shopEmail ? currentY + 45 : currentY + 38;
+    if (shopEmail) {
+      drawField(doc, "Shop Email", shopEmail, c1, currentY + 38, 34, 48);
+    }
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
     setText(doc, COLOR.textDark);
-    doc.text("Delivery Type", c1, currentY + 38);
-    doc.text(":", c1 + 30, currentY + 38);
+    doc.text("Delivery Type", c1, typeY);
+    doc.text(":", c1 + 30, typeY);
 
     setDraw(doc, COLOR.black);
     doc.setLineWidth(0.4);
-    doc.rect(c1 + 34, currentY + 35.5, 3.5, 3.5, "S");
+    doc.rect(c1 + 34, typeY - 2.5, 3.5, 3.5, "S");
     if (!isBoxMode) {
       doc.setLineWidth(0.6);
-      doc.line(c1 + 34.8, currentY + 37.2, c1 + 35.6, currentY + 38.3);
-      doc.line(c1 + 35.6, currentY + 38.3, c1 + 37.1, currentY + 36.1);
+      doc.line(c1 + 34.8, typeY - 0.8, c1 + 35.6, typeY + 0.3);
+      doc.line(c1 + 35.6, typeY + 0.3, c1 + 37.1, typeY - 1.9);
     }
     doc.setFont("helvetica", "normal");
-    doc.text("Weight", c1 + 39, currentY + 38);
+    doc.text("Weight", c1 + 39, typeY);
 
     doc.setLineWidth(0.4);
-    doc.rect(c1 + 55, currentY + 35.5, 3.5, 3.5, "S");
+    doc.rect(c1 + 55, typeY - 2.5, 3.5, 3.5, "S");
     if (isBoxMode) {
       doc.setLineWidth(0.6);
-      doc.line(c1 + 55.8, currentY + 37.2, c1 + 56.6, currentY + 38.3);
-      doc.line(c1 + 56.6, currentY + 38.3, c1 + 58.1, currentY + 36.1);
+      doc.line(c1 + 55.8, typeY - 0.8, c1 + 56.6, typeY + 0.3);
+      doc.line(c1 + 56.6, typeY + 0.3, c1 + 58.1, typeY - 1.9);
     }
     doc.setFont("helvetica", "normal");
-    doc.text("Box", c1 + 60, currentY + 38);
+    doc.text("Box", c1 + 60, typeY);
 
-    drawField(doc, "Time", timeValue, c2, currentY + 38, 30, 48);
+    drawField(doc, "Time", timeValue, c2, typeY, 30, 48);
 
     currentY += cardH + 8;
 
@@ -510,19 +516,47 @@ export async function generateShopPDF(
     setText(doc, COLOR.textDark);
     doc.text("We appreciate your business", pageWidth / 2, thanksY + 10, { align: "center" });
 
-    const suffix = isBoxMode ? "Box" : "Weight";
-    const cleanShopName = (row.shopName || "Shop").replace(/\s+/g, "_");
-
-    const pdfBlob = doc.output("blob");
-    const blobUrl = window.URL.createObjectURL(pdfBlob);
-    const link = document.createElement("a");
-    link.href = blobUrl;
-    link.download = `DeliveryReceipt_${cleanShopName}_${suffix}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+    return doc.output("blob");
   } catch (error: any) {
     throw new Error(error?.message || "Failed to generate PDF receipt.");
   }
+}
+
+export async function generateShopPDF(
+  row: ShopDeliveryWithExtra,
+  safeBoxDetails: BoxDetail[] = [],
+  _tripNo?: string,
+  vehicleNo?: string,
+  supervisorName?: string,
+  supervisorPhone?: string,
+  tripDate?: string,
+  _logoLeftUrl?: string,
+  _henIconUrl?: string,
+  deliveryTime?: string,
+  driverName?: string
+): Promise<void> {
+  const pdfBlob = await generateShopPDFBlob(
+    row,
+    safeBoxDetails,
+    _tripNo,
+    vehicleNo,
+    supervisorName,
+    supervisorPhone,
+    tripDate,
+    _logoLeftUrl,
+    _henIconUrl,
+    deliveryTime,
+    driverName
+  );
+  const isBoxMode = row.deliveryMode === "box";
+  const suffix = isBoxMode ? "Box" : "Weight";
+  const cleanShopName = (row.shopName || "Shop").replace(/\s+/g, "_");
+  const blobUrl = window.URL.createObjectURL(pdfBlob);
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = `DeliveryReceipt_${cleanShopName}_${suffix}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
 }

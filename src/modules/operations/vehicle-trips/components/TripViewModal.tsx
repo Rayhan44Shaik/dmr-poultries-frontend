@@ -1,6 +1,7 @@
 // src/modules/operations/vehicle-trips/components/TripViewModal.tsx
 
 import React, { useState, useCallback } from "react";
+import DeliveryEmailPanel from "./DeliveryEmailPanel";
 import { X, FileText, Download, Pencil, UserCheck } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -432,6 +433,8 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, onEdit }: Props)
           <div className="mt-4">
             {renderViewStep()}
           </div>
+
+          <DeliveryEmailPanel trip={trip} shops={shops} />
 
           <TripFinalKPI trip={trip} deliveries={trip.deliveries} />
         </div>

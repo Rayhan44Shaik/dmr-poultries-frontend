@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Trip } from "../types/trip";
 import { apiPut } from "../../../../api";
 import { listTrips, changeTripStatus, deleteTripFromApi } from "../services/tripHeaderApiService";
+import { sendTripDeliveryEmails } from "../services/deliveryEmailService";
 
 type NotificationFn = (message: string, type?: "success" | "error" | "info") => void;
 
@@ -94,9 +95,12 @@ export default function useTrips(
   // Completed) are validated and persisted by the backend API.
   const changeStatus = async (trip: Trip, status: "Pending" | "Completed", approvedBy?: string) => {
     try {
-      await changeTripStatus(trip.id, status, approvedBy);
+      const updated = await changeTripStatus(trip.id, status, approvedBy);
       await refreshTrips();
       notify(status === "Completed" ? "Trip approved successfully!" : "Trip status updated.", "success");
+      if (status === "Completed") {
+        void sendTripDeliveryEmails(updated);
+      }
     } catch (err) {
       const msg = (err as { message?: string })?.message ?? "Failed to update trip status.";
       notify(`Failed to update trip status: ${msg}`, "error");
