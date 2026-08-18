@@ -1,3 +1,4 @@
+/* DEFERRED / FUTURE WORK — not part of current Fleet Operations production scope. */
 /*
 import { memo } from 'react';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';

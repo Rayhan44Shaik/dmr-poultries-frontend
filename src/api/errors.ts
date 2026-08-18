@@ -60,6 +60,15 @@ export function toApiError(error: unknown): ApiError {
       });
     }
 
+    if (axiosErr.code === "ERR_CANCELED" || axiosErr.name === "CanceledError") {
+      return new ApiError("Request cancelled.", {
+        code: "CANCELED",
+        status,
+        url,
+        method,
+      });
+    }
+
     if (!axiosErr.response) {
       return new ApiError(
         "Unable to reach the server. Check that the backend is running.",
@@ -81,6 +90,8 @@ export function toApiError(error: unknown): ApiError {
             ? "The requested resource was not found."
             : status === 409
               ? "Conflict while saving. Please refresh and try again."
+              : status === 422
+                ? "The request could not be processed."
               : status && status >= 500
                 ? "Server error. Please try again later."
                 : "Request failed. Please try again.";
@@ -107,8 +118,14 @@ export function toApiError(error: unknown): ApiError {
  * Common API error handler: log + return a user-facing message.
  * Safe to call from services later without changing UI yet.
  */
+export function isCanceledError(error: unknown): boolean {
+  const apiError = error instanceof ApiError ? error : toApiError(error);
+  return apiError.code === "CANCELED";
+}
+
 export function handleApiError(error: unknown): string {
   const apiError = toApiError(error);
+  if (apiError.code === "CANCELED") return apiError.message;
   logger.error(
     `[API ${apiError.code ?? "ERROR"}] ${apiError.method ?? ""} ${apiError.url ?? ""} → ${apiError.message}`,
     apiError.details

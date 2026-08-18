@@ -1,3 +1,4 @@
+// DEFERRED / FUTURE — historical localStorage prototype. Not used by the live FASTAG placeholder.
 import { useMemo } from 'react';
 import { startOfToday, startOfMonth, endOfMonth } from 'date-fns';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';

@@ -1,11 +1,10 @@
-import React, { memo, useState, useMemo } from 'react';
+import React, { memo, useState } from 'react';
 import Select from 'react-select';
 import { DatePicker } from '../../../../components/common/DatePicker';
 import { Car, User, Gauge, Wrench, Cog, Building2, UserCog, FileText, Hash, Paperclip, Upload, Trash2, File as FileIcon, AlertTriangle } from 'lucide-react';
 import PartsTable from './PartsTable';
 import type { PartItem } from '../../types';
 import { maintenanceApi } from '../../services/maintenanceApi';
-import { useFuelKMValidator } from "../../../operations/fuel-expenses/hooks/useFuelKMValidator";
 import { useSafeNotification } from '../../../../hooks/useSafeNotification';
 
 export interface FormDocumentItem {
@@ -49,6 +48,7 @@ interface MaintenanceFormProps {
   onAddDocuments: (files: File[]) => void;
   onRemoveDocument: (key: string) => void;
   onMarkDocumentRemoval: (key: string) => void;
+  validateKM?: (km: number) => { valid: boolean; message?: string };
 }
 
 const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
@@ -67,19 +67,10 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
   onAddDocuments,
   onRemoveDocument,
   onMarkDocumentRemoval,
+  validateKM,
 }) => {
   const { showNotification } = useSafeNotification();
   const [kmError, setKmError] = useState<string | null>(null);
-
-  // Get vehicle number from selected vehicle option
-  const selectedVehicleOption = useMemo(
-    () => vehicleOptions.find(opt => opt.value === form.vehicleId),
-    [vehicleOptions, form.vehicleId]
-  );
-  const vehicleNumber = selectedVehicleOption?.label || '';
-
-  const validator = useFuelKMValidator(vehicleNumber);
-  const pendingWarning = validator.getPendingWarning();
 
   const inputClass =
     'w-full h-10 pl-10 pr-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition bg-white';
@@ -104,9 +95,13 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
     setFormField('currentKM', val);
     
     // Validate the value
-    const { valid, message } = validator.validateKM(num);
-    if (!valid) {
-      setKmError(message || 'Invalid KM');
+    if (validateKM) {
+      const { valid, message } = validateKM(num);
+      if (!valid) {
+        setKmError(message || 'Invalid KM');
+      } else {
+        setKmError(null);
+      }
     } else {
       setKmError(null);
     }

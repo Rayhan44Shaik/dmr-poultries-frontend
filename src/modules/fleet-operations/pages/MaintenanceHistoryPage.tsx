@@ -22,8 +22,14 @@ interface MaintenanceHistoryPageProps { embedded?: boolean }
 const selectClass = 'h-10 min-w-[170px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15';
 
 const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProps) => {
-  const data = useMaintenanceData();
+  const data = useMaintenanceData('history');
   const [meterEvents, setMeterEvents] = useState<VehicleMeterEvent[]>([]);
+  const [filtersReady, setFiltersReady] = useState(false);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setFiltersReady(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,7 +54,7 @@ const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProp
 
   return (
     <ErrorBoundary>
-      <div className={`w-full space-y-5 animate-in fade-in duration-300 ${embedded ? '' : 'min-h-screen bg-slate-50 px-4 py-6 md:px-8'}`}>
+      <div className={`w-full space-y-5 ${embedded ? '' : 'min-h-screen bg-slate-50 px-4 py-6 md:px-8'}`}>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div><h2 className="text-lg font-bold text-slate-900">Maintenance History</h2><p className="text-sm text-slate-500">Approved, pending and deleted Fleet maintenance records.</p></div>
           <button onClick={data.refresh} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">Refresh</button>
@@ -65,8 +71,8 @@ const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProp
             <select value={data.selectedMaintenanceType} onChange={(e) => data.setSelectedMaintenanceType(e.target.value)} className={selectClass}><option value="all">All Maintenance Types</option>{data.maintenanceTypes.map((type) => <option key={type}>{type}</option>)}</select>
             <select value={data.selectedServiceType} onChange={(e) => data.setSelectedServiceType(e.target.value)} className={selectClass}><option value="all">All Service Types</option>{data.serviceTypes.map((type) => <option key={type}>{type}</option>)}</select>
             <select value={data.selectedStatus} onChange={(e) => data.setSelectedStatus(e.target.value)} className={`${selectClass} min-w-[140px]`}><option value="all">All Statuses</option><option value="Approved">Approved</option><option value="Pending">Pending</option><option value="Deleted">Deleted</option></select>
-            <div className="w-40"><DatePicker value={data.fromDate} onChange={data.setFromDate} placeholder="From date" /></div>
-            <div className="w-40"><DatePicker value={data.toDate} onChange={data.setToDate} placeholder="To date" /></div>
+            <div className="w-40">{filtersReady ? <DatePicker value={data.fromDate} onChange={data.setFromDate} placeholder="From date" /> : <div className="h-10 rounded-xl border border-slate-200 bg-slate-50" />}</div>
+            <div className="w-40">{filtersReady ? <DatePicker value={data.toDate} onChange={data.setToDate} placeholder="To date" /> : <div className="h-10 rounded-xl border border-slate-200 bg-slate-50" />}</div>
             <div className="relative min-w-[220px] flex-1"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={data.searchQuery} onChange={(e) => data.setSearchQuery(e.target.value)} placeholder="Search bill, vehicle, garage…" className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-semibold outline-none focus:border-blue-500 focus:bg-white" /></div>
             {data.hasActiveFilters && <button onClick={data.resetFilters} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-600 hover:bg-slate-50"><FilterX size={14} /> Clear</button>}
           </div>

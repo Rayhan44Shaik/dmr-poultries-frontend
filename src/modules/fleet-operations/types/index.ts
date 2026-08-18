@@ -152,63 +152,93 @@ export type FASTag = z.infer<typeof FASTagSchema>;
 export type FASTagTransaction = z.infer<typeof FASTagTransactionSchema>;
 export type EMIRecord = z.infer<typeof EMIRecordSchema>;
 
-// ---------- Backend-ready EMI domain ----------
-export type EmiStatus = 'active' | 'paid' | 'overdue' | 'closed';
-export type EmiPaymentMode = 'cash' | 'bank_transfer' | 'upi' | 'cheque' | 'auto_debit' | 'other';
+// ---------- Fleet → EMI (matches GET/POST /api/fleet/emis) ----------
+export type EmiStatus = 'active' | 'paid' | 'overdue';
 
-export interface EmiSchedule {
-  id: string;
+export interface VehicleEmi {
+  id: number;
   vehicleId: number;
-  vehicleNumber?: string;
-  loanReference: string;
+  vehicleNo: string;
   financeCompany: string;
-  principal: number;
-  interestRate?: number | null;
+  loanAmount: number;
   emiAmount: number;
   startDate: string;
   endDate: string;
-  totalEmis: number;
-  paidEmis: number;
-  remainingEmis: number;
-  nextEmiDate?: string | null;
+  nextEMIDate: string | null;
   status: EmiStatus;
-  createdAt?: string;
-  updatedAt?: string;
+  paidEMIs: number;
+  pendingEMIs: number;
+  totalEMIs: number;
+  createdBy: string;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
-export interface EmiPayment {
-  id: string;
-  emiId: string;
-  paymentDate: string;
+export interface VehicleEmiInstallment {
+  id: number;
+  vehicleEmiId: number;
+  installmentNo: number;
+  dueDate: string;
   amount: number;
-  paymentMode: EmiPaymentMode;
-  reference?: string;
-  remarks?: string;
-  createdAt?: string;
+  status: 'pending' | 'paid';
+  paidAt: string | null;
 }
 
-export interface EmiScheduleInput {
+export interface EmiCreateInput {
   vehicleId: number;
-  loanReference: string;
   financeCompany: string;
-  principal: number;
-  interestRate?: number | null;
-  emiAmount: number;
+  loanAmount: number;
+  totalEMIs: number;
   startDate: string;
-  endDate: string;
-  totalEmis: number;
-  paidEmis?: number;
-  nextEmiDate?: string | null;
-  status?: EmiStatus;
+  endDate?: string;
+  emiAmount?: number;
 }
 
-export interface EmiPaymentInput {
-  paymentDate: string;
-  amount: number;
-  paymentMode: EmiPaymentMode;
-  reference?: string;
-  remarks?: string;
+export interface EmiUpdateInput {
+  financeCompany?: string;
+  loanAmount?: number;
+  totalEMIs?: number;
+  startDate?: string;
+  endDate?: string;
+  emiAmount?: number;
 }
+
+export interface EmiPayInput {
+  paidBy?: string;
+  idempotencyKey?: string;
+  /** Used only to bind a stable retry key to the installment being paid. */
+  paidEMIs?: number;
+}
+
+/** EMI payment status — restricted to the two meaningful states. */
+export type EmiOverviewStatus = 'pending' | 'completed';
+
+/**
+ * Read-only EMI Management row. Derived from the Vehicle Master for EVERY
+ * Active vehicle (vehicle number, purchase amount, purchase date, total EMI,
+ * EMI day) plus the existing EMI payment schedule (completed EMI / next date).
+ * The page never creates, edits or saves a vehicle — this is a view model only.
+ */
+export interface EmiOverview {
+  vehicleId: number;
+  vehicleNo: string;
+  financeCompany: string;
+  purchaseAmount: number;
+  purchaseDate: string | null;
+  emiDay: number | null;
+  totalEMIs: number;
+  completedEMIs: number;
+  pendingEMIs: number;
+  emiDate: string | null;
+  status: EmiOverviewStatus;
+  monthlyEmi: number;
+  emiRecordId: number | null;
+  startDate: string | null;
+  endDate: string | null;
+}
+
+/** @deprecated Use VehicleEmi — kept for existing EMIRecordSchema consumers. */
+export type EmiSchedule = VehicleEmi;
 
 // ---------- Dashboard Types ----------
 export interface FleetDashboardStats {

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { collectionService } from "../services/collectionService";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
-import type { PendingCollection, Collection, CollectionPendingSummaryRow } from "../types/collection";
+import type { Collection, CollectionPendingSummaryRow, CollectionPendingSummaryTotals } from "../types/collection";
 import { EditCollectionModal } from "../components/pending/EditCollectionModal";
 import { useShopSearch } from "../../../../core/hooks/useShopSearch";
 import {
@@ -37,7 +37,6 @@ const PAGE_SIZE = 15;
 export default function PendingCollectionsPage() {
   const { showNotification } = useSafeNotification();
 
-  const [pendingData, setPendingData] = useState<PendingCollection[]>([]);
   const [allCollections, setAllCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const { shops } = useShops();
@@ -91,13 +90,19 @@ export default function PendingCollectionsPage() {
   // shop (opening/balance/sales/approved/pending/recovery). Do not recompute
   // recoveryPercentage or balance from these — read them as-is.
   const [pendingSummaryRows, setPendingSummaryRows] = useState<CollectionPendingSummaryRow[]>([]);
+  const [pendingTotals, setPendingTotals] = useState<CollectionPendingSummaryTotals>({
+    weeklySales: 0,
+    weeklyApprovedCollections: 0,
+    weeklyPendingCollections: 0,
+    balance: 0,
+    recoveryPercentage: 0,
+  });
+  const [defaultAsOnDate, setDefaultAsOnDate] = useState("");
 
   const loadData = async () => {
     try {
       await collectionService.refreshFromBackend();
-      const pending = collectionService.getPendingCollections();
       const all = collectionService.getCollections();
-      setPendingData(pending);
       setAllCollections(all);
       setLoading(false);
     } catch (error) {
@@ -112,13 +117,17 @@ export default function PendingCollectionsPage() {
 
   useEffect(() => {
     void collectionService.fetchWeekBounds().then((bounds) => {
+      setDefaultAsOnDate(bounds.asOfDate);
       setAsOnDate((prev) => prev || bounds.asOfDate);
     }).catch(() => undefined);
   }, []);
 
   useEffect(() => {
     if (!asOnDate) return;
-    void collectionService.fetchPendingSummary(asOnDate).then(setPendingSummaryRows).catch(() => {
+    void collectionService.fetchPendingSummary(asOnDate).then((payload) => {
+      setPendingSummaryRows(payload.shops);
+      setPendingTotals(payload.totals);
+    }).catch(() => {
       setPendingSummaryRows([]);
     });
   }, [asOnDate]);
@@ -133,47 +142,14 @@ export default function PendingCollectionsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const summaryByShopId = useMemo(() => {
-    const map = new Map<number, CollectionPendingSummaryRow>();
-    pendingSummaryRows.forEach((row) => map.set(row.shopId, row));
-    return map;
-  }, [pendingSummaryRows]);
-
   const summaryByShopName = useMemo(() => {
     const map = new Map<string, CollectionPendingSummaryRow>();
     pendingSummaryRows.forEach((row) => map.set(row.shopName, row));
     return map;
   }, [pendingSummaryRows]);
 
-  function weeklyForShop(shop: PendingCollection): CollectionPendingSummaryRow | undefined {
-    if (shop.shopId != null) return summaryByShopId.get(shop.shopId);
-    return summaryByShopName.get(shop.shopName);
-  }
-
-  /** Backend-authoritative sales/collections/balance/recovery for a shop row.
-   * recoveryPercentage comes straight from GET .../pending-summary — never
-   * recomputed as collections/sales*100 here. Falls back to the shop's
-   * lifetime totals (with a locally-derived recovery) only when the backend
-   * has no weekly row for it at all (e.g. an inactive shop). */
-  function reportFiguresForShop(shop: PendingCollection) {
-    const week = weeklyForShop(shop);
-    if (week) {
-      return {
-        sales: week.weeklySales,
-        collections: week.weeklyApprovedCollections,
-        balance: week.balance,
-        recovery: week.recoveryPercentage,
-      };
-    }
-    const sales = shop.totalSales;
-    const collections = shop.totalCollections;
-    const balance = shop.currentPending;
-    const recovery = sales > 0 ? (collections / sales) * 100 : 0;
-    return { sales, collections, balance, recovery };
-  }
-
   const filteredData = useMemo(() => {
-    let data = [...pendingData];
+    let data = [...pendingSummaryRows];
 
     if (shopName) {
       data = data.filter((s) =>
@@ -196,25 +172,22 @@ export default function PendingCollectionsPage() {
     }
 
     if (fromDate) {
-      data = data.filter((s) => s.lastCollectionDate >= fromDate);
+      data = data.filter((s) => (s.lastCollectionDate ?? "") >= fromDate);
     }
     if (toDate) {
-      data = data.filter((s) => s.lastCollectionDate <= toDate);
-    }
-    if (asOnDate) {
-      data = data.filter((s) => s.lastCollectionDate <= asOnDate);
+      data = data.filter((s) => (s.lastCollectionDate ?? "") <= toDate);
     }
 
     if (recoveryThreshold > 0) {
-      data = data.filter((shop) => reportFiguresForShop(shop).recovery >= recoveryThreshold);
+      data = data.filter((shop) => shop.recoveryPercentage >= recoveryThreshold);
     }
 
     switch (sortBy) {
       case "highestBalance":
-        data.sort((a, b) => reportFiguresForShop(b).balance - reportFiguresForShop(a).balance);
+        data.sort((a, b) => b.balance - a.balance);
         break;
       case "lowestBalance":
-        data.sort((a, b) => reportFiguresForShop(a).balance - reportFiguresForShop(b).balance);
+        data.sort((a, b) => a.balance - b.balance);
         break;
       case "alphabeticalAZ":
         data.sort((a, b) => a.shopName.localeCompare(b.shopName));
@@ -227,16 +200,14 @@ export default function PendingCollectionsPage() {
     }
     return data;
   }, [
-    pendingData,
+    pendingSummaryRows,
     shopName,
     collector,
     fromDate,
     toDate,
-    asOnDate,
     sortBy,
     allCollections,
     recoveryThreshold,
-    pendingSummaryRows,
   ]);
 
   const totalItems = filteredData.length;
@@ -250,64 +221,18 @@ export default function PendingCollectionsPage() {
     setCurrentPage(1);
   }, [shopName, collector, fromDate, toDate, asOnDate, sortBy, recoveryThreshold]);
 
-  const totalPending = filteredData.reduce((sum, s) => sum + reportFiguresForShop(s).balance, 0);
+  const totalPending = filteredData.reduce((sum, s) => sum + s.balance, 0);
 
-  const weeklyStats = useMemo(() => {
-    let weeklySales = 0;
-    let weeklyCollections = 0;
-    pendingSummaryRows.forEach((row) => {
-      weeklySales += row.weeklySales;
-      weeklyCollections += row.weeklyApprovedCollections;
-    });
-    return { weeklySales, weeklyCollections };
-  }, [pendingSummaryRows]);
-
-  // Aggregate recovery across the filtered/current shop set — there is no
-  // single backend field for an arbitrary multi-shop aggregate, so this
-  // divides two already-backend-summed totals (not raw transactions).
-  const weeklyRecovery =
-    weeklyStats.weeklySales > 0
-      ? (weeklyStats.weeklyCollections / weeklyStats.weeklySales) * 100
-      : 0;
-
-  const weeklySalesMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    pendingSummaryRows.forEach((row) => {
-      map[row.shopName] = row.weeklySales;
-    });
-    return map;
-  }, [pendingSummaryRows]);
-
-  const weeklyCollectionsMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    pendingSummaryRows.forEach((row) => {
-      map[row.shopName] = row.weeklyApprovedCollections;
-    });
-    return map;
-  }, [pendingSummaryRows]);
-
-  // Backend-authoritative recovery % and weekly balance per shop, read
-  // directly (never recomputed as collections/sales*100 in the table).
-  const recoveryMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    pendingSummaryRows.forEach((row) => {
-      map[row.shopName] = row.recoveryPercentage;
-    });
-    return map;
-  }, [pendingSummaryRows]);
-
-  const balanceMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    filteredData.forEach((s) => {
-      map[s.shopName] = reportFiguresForShop(s).balance;
-    });
-    return map;
-  }, [filteredData]);
+  const weeklyStats = {
+    weeklySales: pendingTotals.weeklySales,
+    weeklyCollections: pendingTotals.weeklyApprovedCollections,
+  };
+  const weeklyRecovery = pendingTotals.recoveryPercentage;
 
   const grandTotalPending = totalPending;
-  const grandTotalWeeklySales = filteredData.reduce((sum, s) => sum + reportFiguresForShop(s).sales, 0);
+  const grandTotalWeeklySales = filteredData.reduce((sum, s) => sum + s.weeklySales, 0);
   const grandTotalWeeklyCollections = filteredData.reduce(
-    (sum, s) => sum + reportFiguresForShop(s).collections,
+    (sum, s) => sum + s.weeklyApprovedCollections,
     0
   );
 
@@ -323,19 +248,18 @@ export default function PendingCollectionsPage() {
   };
 
   const updateSummaryForShop = (shopName: string) => {
-    const shopData = pendingData.find((s) => s.shopName === shopName);
-    const week = shopData ? weeklyForShop(shopData) : summaryByShopName.get(shopName);
-    if (!week && !shopData) {
+    const week = summaryByShopName.get(shopName);
+    if (!week) {
       setSummary((prev) => ({ ...prev, showSummary: false }));
       return;
     }
     setSummary({
-      openingBalance: week?.openingBalance ?? 0,
-      weeklySales: week?.weeklySales ?? 0,
-      weeklyCollections: week?.weeklyApprovedCollections ?? 0,
-      currentPending: week?.balance ?? shopData?.currentPending ?? 0,
-      shopName: week?.shopName ?? shopData?.shopName ?? shopName,
-      dateRange: week ? `${week.weekStart} → ${week.weekEnd}` : `As on ${asOnDate}`,
+      openingBalance: week.openingBalance,
+      weeklySales: week.weeklySales,
+      weeklyCollections: week.weeklyApprovedCollections,
+      currentPending: week.balance,
+      shopName: week.shopName,
+      dateRange: `${week.weekStart} → ${week.weekEnd}`,
       showSummary: true,
     });
   };
@@ -357,16 +281,15 @@ export default function PendingCollectionsPage() {
     }
 
     const tableData: any[] = filteredData.map((shop, idx) => {
-      const fig = reportFiguresForShop(shop);
       return {
         "#": idx + 1,
         "Shop Name": shop.shopName,
-        "Last Collection": formatDate(shop.lastCollectionDate),
-        "Total Sales": fig.sales,
-        "Total Collections": fig.collections,
-        Pending: fig.balance,
-        "Recovery %": Number(fig.recovery.toFixed(2)),
-        "Overdue (Days)": shop.overdueDays,
+        "Last Collection": formatDate(shop.lastCollectionDate ?? "-"),
+        "Total Sales": shop.weeklySales,
+        "Total Collections": shop.weeklyApprovedCollections,
+        Pending: shop.balance,
+        "Recovery %": Number(shop.recoveryPercentage.toFixed(2)),
+        "Overdue (Days)": shop.overdueDays ?? "",
       };
     });
 
@@ -374,9 +297,9 @@ export default function PendingCollectionsPage() {
       "#": "",
       "Shop Name": "TOTAL",
       "Last Collection": "",
-      "Total Sales": filteredData.reduce((sum, s) => sum + reportFiguresForShop(s).sales, 0),
-      "Total Collections": filteredData.reduce((sum, s) => sum + reportFiguresForShop(s).collections, 0),
-      Pending: filteredData.reduce((sum, s) => sum + reportFiguresForShop(s).balance, 0),
+      "Total Sales": filteredData.reduce((sum, s) => sum + s.weeklySales, 0),
+      "Total Collections": filteredData.reduce((sum, s) => sum + s.weeklyApprovedCollections, 0),
+      Pending: filteredData.reduce((sum, s) => sum + s.balance, 0),
       "Recovery %": "",
       "Overdue (Days)": "",
     };
@@ -416,29 +339,24 @@ export default function PendingCollectionsPage() {
     doc.text(title, margin, 18);
 
     const rows = filteredData.map((shop, idx) => {
-      const fig = reportFiguresForShop(shop);
       return [
         (idx + 1).toString(),
         shop.shopName,
-        formatDate(shop.lastCollectionDate),
-        fig.sales.toFixed(2),
-        fig.collections.toFixed(2),
-        fig.balance.toFixed(2),
-        fig.recovery.toFixed(2),
-        shop.overdueDays.toString(),
+        formatDate(shop.lastCollectionDate ?? "-"),
+        shop.weeklySales.toFixed(2),
+        shop.weeklyApprovedCollections.toFixed(2),
+        shop.balance.toFixed(2),
+        shop.recoveryPercentage.toFixed(2),
+        shop.overdueDays == null ? "—" : shop.overdueDays.toString(),
       ];
     });
 
-    const totalSalesSum = filteredData.reduce((sum, s) => sum + reportFiguresForShop(s).sales, 0);
+    const totalSalesSum = filteredData.reduce((sum, s) => sum + s.weeklySales, 0);
     const totalCollectionsSum = filteredData.reduce(
-      (sum, s) => sum + reportFiguresForShop(s).collections,
+      (sum, s) => sum + s.weeklyApprovedCollections,
       0
     );
-    const totalPendingSum = filteredData.reduce((sum, s) => sum + reportFiguresForShop(s).balance, 0);
-    const totalRecovery =
-      totalSalesSum > 0
-        ? ((totalCollectionsSum / totalSalesSum) * 100).toFixed(2)
-        : "0.00";
+    const totalPendingSum = filteredData.reduce((sum, s) => sum + s.balance, 0);
 
     rows.push([
       "",
@@ -447,7 +365,7 @@ export default function PendingCollectionsPage() {
       totalSalesSum.toFixed(2),
       totalCollectionsSum.toFixed(2),
       totalPendingSum.toFixed(2),
-      totalRecovery,
+      "",
       "",
     ]);
 
@@ -572,17 +490,16 @@ export default function PendingCollectionsPage() {
   const refreshData = async () => {
     try {
       await collectionService.refreshFromBackend();
-      const pending = collectionService.getPendingCollections();
       const all = collectionService.getCollections();
-      setPendingData(pending);
       setAllCollections(all);
       if (asOnDate) {
         try {
-          const summaries = await collectionService.fetchPendingSummary(asOnDate);
-          setPendingSummaryRows(summaries);
+          const payload = await collectionService.fetchPendingSummary(asOnDate);
+          setPendingSummaryRows(payload.shops);
+          setPendingTotals(payload.totals);
         } catch {
           // Keep prior summaries if the refetch itself fails; the page-level
-          // data (pending/collections) has already been refreshed above.
+          // collections list has already been refreshed above.
         }
       }
       if (selectedShop) {
@@ -598,7 +515,7 @@ export default function PendingCollectionsPage() {
     setCollector("");
     setFromDate("");
     setToDate("");
-    setAsOnDate(new Date().toISOString().split("T")[0]);
+    setAsOnDate(defaultAsOnDate);
     setSortBy("highestBalance");
     setRecoveryThreshold(0);
     shopSearch.setQuery("");
@@ -839,10 +756,6 @@ export default function PendingCollectionsPage() {
           data={paginatedData}
           selectedShopName={selectedShopName}
           onSelectShop={setSelectedShopName}
-          weeklySalesMap={weeklySalesMap}
-          weeklyCollectionsMap={weeklyCollectionsMap}
-          recoveryMap={recoveryMap}
-          balanceMap={balanceMap}
           onView={handleView}
           onDelete={handleDelete}
           grandTotalPending={grandTotalPending}

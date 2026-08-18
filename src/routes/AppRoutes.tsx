@@ -23,8 +23,17 @@ import OperationsPages from "../modules/operations/pages/OperationsPages";
 // Accounts Module
 import AccountsPage from "../modules/accounts/pages/AccountsPage";
 
-// Fleet Module
-import FleetPages from "../modules/fleet-operations/pages/FleetPages";
+// Fleet Module — lazy so Dashboard/Operations/etc. do not evaluate Fleet tab graphs.
+const FleetPages = React.lazy(() => import("../modules/fleet-operations/pages/FleetPages"));
+
+const fleetFallback = (
+  <div className="w-full px-4 pb-8 pt-6 sm:px-6 lg:px-8" aria-busy="true" aria-label="Loading Fleet Operations">
+    <div className="mx-auto w-full max-w-[1480px] space-y-4">
+      <div className="h-14 animate-pulse rounded-2xl bg-white border border-slate-200" />
+      <div className="h-64 animate-pulse rounded-2xl bg-white border border-slate-200" />
+    </div>
+  </div>
+);
 
 // Staff, Reports
 import StaffPages from "../modules/staff/pages/StaffPages";
@@ -80,8 +89,8 @@ function AppRoutes() {
       <Route path="/accounts/*" element={<DashboardLayout><AccountsPage /></DashboardLayout>} />
 
       {/* ============ FLEET ============ */}
-      <Route path="/fleet" element={<DashboardLayout><FleetPages /></DashboardLayout>} />
-      <Route path="/fleet/*" element={<DashboardLayout><FleetPages /></DashboardLayout>} />
+      <Route path="/fleet" element={<DashboardLayout><React.Suspense fallback={fleetFallback}><FleetPages /></React.Suspense></DashboardLayout>} />
+      <Route path="/fleet/*" element={<DashboardLayout><React.Suspense fallback={fleetFallback}><FleetPages /></React.Suspense></DashboardLayout>} />
 
       {/* ============ STAFF ============ */}
       <Route path="/staff" element={<DashboardLayout><StaffPages /></DashboardLayout>} />

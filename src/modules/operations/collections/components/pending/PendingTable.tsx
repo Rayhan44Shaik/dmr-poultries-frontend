@@ -1,5 +1,5 @@
 import { Eye, Trash2 } from "lucide-react";
-import type { PendingCollection } from "../../types/collection";
+import type { CollectionPendingSummaryRow } from "../../types/collection";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -8,13 +8,12 @@ const formatCurrency = (amount: number) =>
     minimumFractionDigits: 2,
   }).format(amount);
 
-const formatDate = (dateStr: string) => {
+const formatDate = (dateStr: string | null | undefined) => {
   if (!dateStr || dateStr === "-") return "-";
   const d = new Date(dateStr);
   return d.toLocaleDateString("en-IN");
 };
 
-// Helper to format with sign
 const formatBalance = (amount: number) => {
   const abs = Math.abs(amount);
   const formatted = formatCurrency(abs);
@@ -24,15 +23,9 @@ const formatBalance = (amount: number) => {
 };
 
 interface PendingTableProps {
-  data: PendingCollection[];
+  data: CollectionPendingSummaryRow[];
   selectedShopName: string | null;
   onSelectShop: (shopName: string | null) => void;
-  weeklySalesMap: Record<string, number>;
-  weeklyCollectionsMap: Record<string, number>;
-  /** Backend-authoritative recoveryPercentage per shop (GET .../pending-summary). Never recomputed here. */
-  recoveryMap: Record<string, number>;
-  /** Backend-authoritative weekly balance per shop. Falls back to lifetime balance only when the page has no weekly row for it. */
-  balanceMap: Record<string, number>;
   onView: (shopName: string) => void;
   onDelete: (shopName: string) => void;
   grandTotalPending: number;
@@ -44,10 +37,6 @@ export function PendingTable({
   data,
   selectedShopName,
   onSelectShop,
-  weeklySalesMap,
-  weeklyCollectionsMap,
-  recoveryMap,
-  balanceMap,
   onView,
   onDelete,
   grandTotalPending,
@@ -72,18 +61,10 @@ export function PendingTable({
     );
   }
 
-  const getOverdueBadge = (days: number) => {
-    if (days <= 7) return "bg-green-100 text-green-700";
-    if (days <= 10) return "bg-amber-100 text-amber-700";
-    return "bg-red-100 text-red-700";
-  };
-
-  // Format grand total with sign
   const formattedGrandTotal = formatBalance(grandTotalPending);
 
   return (
     <div>
-      {/* Toolbar */}
       <div className="flex items-center justify-between rounded-t-lg border border-b-0 border-green-200 bg-green-50 px-4 py-2">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-slate-700">
@@ -118,7 +99,6 @@ export function PendingTable({
         </div>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto rounded-b-lg border border-green-200 bg-white shadow">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-green-50">
@@ -135,10 +115,10 @@ export function PendingTable({
           </thead>
           <tbody className="divide-y divide-slate-200 bg-white">
             {data.map((shop, idx) => {
-              const weeklySales = weeklySalesMap[shop.shopName] || 0;
-              const weeklyCollections = weeklyCollectionsMap[shop.shopName] || 0;
-              const recovery = recoveryMap[shop.shopName] ?? 0;
-              const balance = balanceMap[shop.shopName] ?? shop.currentPending;
+              const weeklySales = shop.weeklySales;
+              const weeklyCollections = shop.weeklyApprovedCollections;
+              const recovery = shop.recoveryPercentage;
+              const balance = shop.balance;
               const balanceColor =
                 balance > 0 ? "text-red-600" :
                 balance < 0 ? "text-blue-600" :
@@ -146,7 +126,7 @@ export function PendingTable({
 
               return (
                 <tr
-                  key={shop.shopName}
+                  key={shop.shopId}
                   className={`cursor-pointer hover:bg-green-50 ${
                     selectedShopName === shop.shopName ? "bg-green-100" : ""
                   }`}
@@ -180,12 +160,8 @@ export function PendingTable({
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center text-sm">
-                    <span
-                      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${getOverdueBadge(
-                        shop.overdueDays
-                      )}`}
-                    >
-                      {shop.overdueDays} days
+                    <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-500">
+                      —
                     </span>
                   </td>
                 </tr>

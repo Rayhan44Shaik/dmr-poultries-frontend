@@ -270,6 +270,22 @@ export interface CollectionPendingSummaryRow {
   recoveryPercentage: number;
   overdueDays: number | null;
   hasPendingCollections: boolean;
+  lastCollectionDate?: string | null;
+}
+
+export interface CollectionPendingSummaryTotals {
+  weeklySales: number;
+  weeklyApprovedCollections: number;
+  weeklyPendingCollections: number;
+  balance: number;
+  recoveryPercentage: number;
+}
+
+export interface CollectionPendingSummaryResponse {
+  weekStart: string;
+  weekEnd: string;
+  shops: CollectionPendingSummaryRow[];
+  totals: CollectionPendingSummaryTotals;
 }
 
 /** GET /operations/collection-entry/report — official financial totals for

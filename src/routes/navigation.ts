@@ -107,6 +107,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Vehicles",
     icon: Truck,
     children: [
+      // DEFERRED / FUTURE: Fleet Overview (Dashboard) — files preserved, not in active nav
       //{ label: "Fleet Overview", path: "/fleet?tab=dashboard", icon: Gauge, keywords: "fleet vehicles overview status" },
       { label: "Maintenance Entry", path: "/fleet?tab=entry", icon: Wrench, keywords: "maintenance service garage" },
       { label: "Maintenance History", path: "/fleet?tab=history", icon: History, keywords: "maintenance history records" },
@@ -119,6 +120,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "FASTag", path: "/fleet?tab=fastag", icon: Contact, keywords: "fastag toll balance" },
       
       //{ label: "Fuel", path: "/operations?tab=fuel-expenses", icon: Fuel, keywords: "fuel diesel expenses" },
+      // DEFERRED / FUTURE: Expense Reports + Vehicle Reports — files preserved, not in active nav
       //{ label: "Expense Reports", path: "/fleet?tab=expenses", icon: FileText, keywords: "expense report vehicle wise" },
       //{ label: "Reports", path: "/fleet?tab=reports", icon: FileText, keywords: "reports vehicle reports" },
     ],

@@ -3,6 +3,7 @@ import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
 import { apiGet } from '../../../api';
 import { handleApiError } from '../../../api/errors';
 import { maintenanceApi, mapMaintenanceToEvent } from '../services/maintenanceApi';
+import { fleetCacheInvalidate } from '../services/fleetSessionCache';
 import type { MaintenanceEvent } from '../types';
 
 interface UpcomingService {
@@ -16,7 +17,7 @@ interface UpcomingService {
 
 const rowsOf = (payload: any): any[] => Array.isArray(payload) ? payload : (payload?.data ?? []);
 
-export function useMaintenanceData() {
+export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
   const { vehicles } = useVehicles();
   const [refreshKey, setRefreshKey] = useState(0);
   const [maintenance, setMaintenance] = useState<MaintenanceEvent[]>([]);
@@ -24,8 +25,8 @@ export function useMaintenanceData() {
   const [deletedRecords, setDeletedRecords] = useState<MaintenanceEvent[]>([]);
   const [historyRecords, setHistoryRecords] = useState<MaintenanceEvent[]>([]);
   const [latestMeters, setLatestMeters] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-  const [historyLoading, setHistoryLoading] = useState(true);
+  const [loading, setLoading] = useState(scope !== 'history');
+  const [historyLoading, setHistoryLoading] = useState(scope !== 'entry');
   const [error, setError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
 
@@ -41,6 +42,9 @@ export function useMaintenanceData() {
   // Entry workspace datasets: pending/current, latest approved per vehicle and
   // the deleted audit list. These are intentionally independent of History filters.
   useEffect(() => {
+    if (scope === 'history') {
+      return;
+    }
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -70,29 +74,50 @@ export function useMaintenanceData() {
       }
     })();
     return () => { cancelled = true; };
-  }, [refreshKey]);
+  }, [refreshKey, scope]);
 
-  // Authoritative current KM for Upcoming Service. This comes from the backend
-  // meter ledger (trips + fuel_expenses + fleet_maintenance → vehicle_meter_events),
-  // NOT from browser localStorage. Re-fetched on every refresh.
   useEffect(() => {
+    if (scope !== 'history') return;
     let cancelled = false;
-    apiGet<Array<{ vehicleId: number; meter: number }>>('/fleet/vehicles/meter-summary')
-      .then((response) => {
-        if (cancelled) return;
-        const map: Record<string, number> = {};
-        (response.data || []).forEach((event) => {
-          map[String(event.vehicleId)] = Number(event.meter) || 0;
-        });
-        setLatestMeters(map);
-      })
-      .catch(() => { if (!cancelled) setLatestMeters({}); });
+    (async () => {
+      try {
+        const approvedData = await maintenanceApi.list({ status: 'Approved', latestApproved: true, limit: 500 });
+        if (!cancelled) setApprovedMaintenance(rowsOf(approvedData).map(mapMaintenanceToEvent));
+      } catch {
+        if (!cancelled) setApprovedMaintenance([]);
+      }
+    })();
     return () => { cancelled = true; };
-  }, [refreshKey]);
+  }, [refreshKey, scope]);
+
+  // Upcoming Service meters are History-only. Entry must not load this dataset.
+  useEffect(() => {
+    if (scope !== 'history') return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      apiGet<Array<{ vehicleId: number; meter: number }>>('/fleet/vehicles/meter-summary')
+        .then((response) => {
+          if (cancelled) return;
+          const map: Record<string, number> = {};
+          (response.data || []).forEach((event) => {
+            map[String(event.vehicleId)] = Number(event.meter) || 0;
+          });
+          setLatestMeters(map);
+        })
+        .catch(() => { if (!cancelled) setLatestMeters({}); });
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [refreshKey, scope]);
 
   // History uses the established query contract. Type/service filtering remains
   // client-side because those fields are not part of the backend query contract.
   useEffect(() => {
+    if (scope === 'entry') {
+      return;
+    }
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setHistoryLoading(true);
@@ -120,11 +145,14 @@ export function useMaintenanceData() {
       }
     }, searchQuery ? 250 : 0);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [fromDate, refreshKey, searchQuery, selectedDriver, selectedStatus, selectedVehicle, toDate]);
+  }, [fromDate, refreshKey, scope, searchQuery, selectedDriver, selectedStatus, selectedVehicle, toDate]);
 
   const approvedHistory = useMemo(
-    () => maintenance.filter((record) => record.paymentStatus === 'approved' && !record.deletedAt),
-    [maintenance]
+    () => {
+      const source = approvedMaintenance.length ? approvedMaintenance : maintenance;
+      return source.filter((record) => record.paymentStatus === 'approved' && !record.deletedAt);
+    },
+    [approvedMaintenance, maintenance]
   );
 
   const maintenanceTypes = useMemo(() => {
@@ -179,11 +207,21 @@ export function useMaintenanceData() {
     documents: filtered.reduce((sum, record) => sum + (record.documents?.length || 0), 0),
   }), [filtered]);
 
+  const lastApprovedByVehicle = useMemo(() => {
+    const map = new Map<string, MaintenanceEvent>();
+    approvedHistory.forEach((record) => {
+      const id = String(record.vehicleId);
+      const previous = map.get(id);
+      if (!previous || new Date(record.date).getTime() > new Date(previous.date).getTime()) {
+        map.set(id, record);
+      }
+    });
+    return map;
+  }, [approvedHistory]);
+
   const upcomingServices = useMemo((): UpcomingService[] => {
     const list = vehicles.map((vehicle: any) => {
-      const lastMaint = approvedHistory
-        .filter((record) => String(record.vehicleId) === String(vehicle.id))
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0] || null;
+      const lastMaint = lastApprovedByVehicle.get(String(vehicle.id)) || null;
       // Authoritative latest chronological meter from the backend ledger. The
       // vehicle master `currentKM` is a soft fallback when no meter event exists.
       const backendMeter = Number(latestMeters[String(vehicle.id)] || 0);
@@ -193,7 +231,7 @@ export function useMaintenanceData() {
       return { vehicle, lastMaint, nextKM, dueKM, isDue: dueKM <= 1000, liveCurrentKM };
     }).sort((a, b) => a.dueKM - b.dueKM);
     return selectedVehicle === 'all' ? list : list.filter((item) => String(item.vehicle.id) === selectedVehicle);
-  }, [approvedHistory, latestMeters, selectedVehicle, vehicles]);
+  }, [lastApprovedByVehicle, latestMeters, selectedVehicle, vehicles]);
 
   const hasActiveFilters = selectedVehicle !== 'all' || selectedDriver !== 'all' ||
     selectedMaintenanceType !== 'all' || selectedServiceType !== 'all' || selectedStatus !== 'all' ||
@@ -204,7 +242,10 @@ export function useMaintenanceData() {
     setSelectedServiceType('all'); setSelectedStatus('all'); setFromDate(''); setToDate(''); setSearchQuery('');
   }, []);
 
-  const refresh = useCallback(() => setRefreshKey((value) => value + 1), []);
+  const refresh = useCallback(() => {
+    fleetCacheInvalidate('analytics:');
+    setRefreshKey((value) => value + 1);
+  }, []);
 
   return {
     vehicles, maintenance, approvedMaintenance, approvedHistory, deletedRecords,

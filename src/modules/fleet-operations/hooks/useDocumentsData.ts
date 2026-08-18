@@ -9,6 +9,7 @@ import {
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
 import { Vehicle } from '../../masters/vehicles/types/vehicle';
 import permitApi from '../services/permitApi';
+import { fleetCacheInvalidate, fleetSharedGet } from '../services/fleetSessionCache';
 import type { PermitDocument } from '../types';
 import { DocumentTypeEnum, VehicleDocument, DocumentType } from '../types';
 
@@ -103,13 +104,15 @@ export function useDocumentsData() {
     let cancelled = false;
     (async () => {
       try {
-        const rows = await permitApi.list();
-        if (!cancelled) setPermitDocs(rows.map(mapPermitToView));
+        const rows = await fleetSharedGet('permits:list', () => permitApi.list());
+        if (!cancelled) {
+          setPermitDocs(rows.map(mapPermitToView));
+          setError(null);
+        }
       } catch (e) {
         if (!cancelled) {
           const msg =
             e instanceof Error ? e.message : 'Failed to load permit documents';
-          console.error('[permits] failed to load:', e);
           setError(msg);
         }
       } finally {
@@ -124,7 +127,7 @@ export function useDocumentsData() {
   const documents = useMemo(() => permitDocs, [permitDocs]);
 
   const [filterType, setFilterType] = useState<string>('all');
-  const now = new Date();
+  const now = useMemo(() => new Date(), []);
   const thirtyDaysLater = addDays(now, 30);
   const sixtyDaysLater = addDays(now, 60);
 
@@ -201,6 +204,7 @@ export function useDocumentsData() {
   const formatExpiryDate = formatDate;
 
   const refetch = useCallback(() => {
+    fleetCacheInvalidate('permits:');
     setLoading(true);
     setError(null);
     setRefreshKey((prev) => prev + 1);
@@ -243,6 +247,7 @@ export function useDocumentsData() {
           await permitApi.upsert(vehicleId, type, payload);
         }
       }
+      fleetCacheInvalidate('permits:');
       setLoading(true);
       setError(null);
       setRefreshKey((prev) => prev + 1);

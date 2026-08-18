@@ -1,4 +1,16 @@
-// Export all pages
+export {
+  ACTIVE_FLEET_TABS,
+  DEFERRED_FLEET_TABS,
+  DEFAULT_FLEET_TAB,
+  PLACEHOLDER_FLEET_TABS,
+  VISIBLE_FLEET_TABS,
+  isActiveFleetTab,
+  isDeferredFleetTab,
+  isPlaceholderFleetTab,
+  isVisibleFleetTab,
+} from './activeFleetScope';
+
+// Export all pages (deferred Dashboard/Reports/Expenses remain exported for future work)
 export { default as FleetDashboardPage } from './pages/FleetDashboardPage';
 export { default as MaintenanceEntryPage } from './pages/MaintenanceEntryPage';
 export { default as MaintenanceHistoryPage } from './pages/MaintenanceHistoryPage';

@@ -1,3 +1,4 @@
+/* DEFERRED / FUTURE WORK — not part of current Fleet Operations production scope. */
 /*import { memo, useState } from 'react';
 import { useToast } from '../hooks/useToast';
 import ErrorBoundary from '../components/common/ErrorBoundary';

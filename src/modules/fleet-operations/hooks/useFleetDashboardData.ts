@@ -1,3 +1,4 @@
+// DEFERRED / FUTURE WORK — not part of current Fleet Operations production scope.
 // src/modules/fleet-operations/hooks/useFleetDashboardData.ts
 // Fleet dashboard + fleet overview data.
 //
@@ -28,6 +29,7 @@ import type { Trip } from "../../operations/vehicle-trips/types/trip";
 import { maintenanceApi, mapMaintenanceToEvent } from "../services/maintenanceApi";
 import permitApi from "../services/permitApi";
 import emiApi from "../services/emiApi";
+import { fleetSharedGet } from "../services/fleetSessionCache";
 
 export interface FleetOverviewResult {
   /** Per-vehicle status cards for the fleet overview. */
@@ -101,9 +103,9 @@ export function useFleetDashboardData(): FleetDashboardData {
   useEffect(() => {
     let cancelled = false;
     Promise.allSettled([
-      maintenanceApi.list({ status: 'Approved', limit: 500 }),
-      permitApi.list(),
-      emiApi.list({ limit: 500 }),
+      fleetSharedGet('dash:maintenance', () => maintenanceApi.list({ status: 'Approved', limit: 500 })),
+      fleetSharedGet('dash:permits', () => permitApi.list()),
+      fleetSharedGet('dash:emis', () => emiApi.list()),
     ]).then(([maintenanceResult, permitResult, emiResult]) => {
       if (cancelled) return;
       if (maintenanceResult.status === 'fulfilled') {
@@ -119,11 +121,17 @@ export function useFleetDashboardData(): FleetDashboardData {
       }
       if (emiResult.status === 'fulfilled') {
         setEmiRecords(emiResult.value.map((record) => ({
-          id: record.id, vehicleId: String(record.vehicleId), financeCompany: record.financeCompany,
-          loanAmount: record.principal, emiAmount: record.emiAmount, startDate: record.startDate,
-          endDate: record.endDate, nextEMIDate: record.nextEmiDate || record.endDate,
-          status: record.status === 'closed' ? 'paid' : record.status,
-          paidEMIs: record.paidEmis, totalEMIs: record.totalEmis,
+          id: String(record.id),
+          vehicleId: String(record.vehicleId),
+          financeCompany: record.financeCompany,
+          loanAmount: record.loanAmount,
+          emiAmount: record.emiAmount,
+          startDate: record.startDate,
+          endDate: record.endDate,
+          nextEMIDate: record.nextEMIDate || record.endDate,
+          status: record.status,
+          paidEMIs: record.paidEMIs,
+          totalEMIs: record.totalEMIs,
         })));
       }
     });

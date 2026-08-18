@@ -1,60 +1,98 @@
 import apiClient from '../../../api/client';
 import type {
-  EmiPayment,
-  EmiPaymentInput,
-  EmiSchedule,
-  EmiScheduleInput,
+  EmiCreateInput,
+  EmiPayInput,
   EmiStatus,
+  EmiUpdateInput,
+  EmiOverview,
+  VehicleEmi,
+  VehicleEmiInstallment,
 } from '../types';
+import {
+  mapEmiListResponse,
+  mapEmiOverviewResponse,
+  mapEmiResponse,
+  mapEmiScheduleResponse,
+} from './emiMappers';
 
-const BASE = '/fleet/emi';
+const BASE = '/fleet/emis';
 
 export interface EmiListParams {
   vehicleId?: number | string;
   status?: EmiStatus | 'all';
-  fromDate?: string;
-  toDate?: string;
   search?: string;
-  page?: number;
-  limit?: number;
+  signal?: AbortSignal;
 }
 
-export interface EmiListResponse {
-  data: EmiSchedule[];
-  meta?: { page: number; limit: number; total: number; totalPages: number };
-}
-
-const unwrapList = (payload: EmiSchedule[] | EmiListResponse): EmiSchedule[] =>
-  Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
-
-/**
- * Backend-ready EMI contract. The separate backend repository should expose
- * this namespace; the UI never substitutes local or synthetic production data.
- */
 export const emiApi = {
-  async list(params: EmiListParams = {}): Promise<EmiSchedule[]> {
-    const response = await apiClient.get<EmiSchedule[] | EmiListResponse>(BASE, { params });
-    return unwrapList(response.data);
+  /**
+   * EMI Management overview — every ACTIVE vehicle from the Vehicle Master
+   * with its EMI status (purchase amount/date, total EMI, completed/pending,
+   * next EMI date) derived from the master + existing payment schedule.
+   * Read-only; the page never creates or edits a vehicle here.
+   */
+  async overview(signal?: AbortSignal): Promise<EmiOverview[]> {
+    const response = await apiClient.get<unknown>(`${BASE}/overview`, { signal });
+    return mapEmiOverviewResponse(response.data);
   },
 
-  async create(payload: EmiScheduleInput): Promise<EmiSchedule> {
-    const response = await apiClient.post<EmiSchedule>(BASE, payload);
-    return response.data;
+  async list(params: EmiListParams = {}): Promise<VehicleEmi[]> {
+    const query: Record<string, string | number> = {};
+    if (params.vehicleId != null && params.vehicleId !== '' && params.vehicleId !== 'all') {
+      query.vehicleId = Number(params.vehicleId);
+    }
+    if (params.status && params.status !== 'all') query.status = params.status;
+    if (params.search?.trim()) query.search = params.search.trim();
+
+    const response = await apiClient.get<unknown>(BASE, {
+      params: query,
+      signal: params.signal,
+    });
+    return mapEmiListResponse(response.data);
   },
 
-  async update(id: string | number, payload: Partial<EmiScheduleInput>): Promise<EmiSchedule> {
-    const response = await apiClient.put<EmiSchedule>(`${BASE}/${id}`, payload);
-    return response.data;
+  async getById(id: number, signal?: AbortSignal): Promise<VehicleEmi> {
+    const response = await apiClient.get<unknown>(`${BASE}/${id}`, { signal });
+    return mapEmiResponse(response.data);
   },
 
-  async listPayments(id: string | number): Promise<EmiPayment[]> {
-    const response = await apiClient.get<EmiPayment[]>(`${BASE}/${id}/payments`);
-    return Array.isArray(response.data) ? response.data : [];
+  async create(payload: EmiCreateInput): Promise<VehicleEmi> {
+    const body: Record<string, unknown> = {
+      vehicleId: payload.vehicleId,
+      financeCompany: payload.financeCompany.trim(),
+      loanAmount: payload.loanAmount,
+      totalEMIs: payload.totalEMIs,
+      startDate: payload.startDate,
+    };
+    if (payload.endDate) body.endDate = payload.endDate;
+    if (payload.emiAmount != null) body.emiAmount = payload.emiAmount;
+    const response = await apiClient.post<unknown>(BASE, body);
+    return mapEmiResponse(response.data);
   },
 
-  async recordPayment(id: string | number, payload: EmiPaymentInput): Promise<EmiSchedule> {
-    const response = await apiClient.post<EmiSchedule>(`${BASE}/${id}/payments`, payload);
-    return response.data;
+  async update(id: number, payload: EmiUpdateInput): Promise<VehicleEmi> {
+    const body: Record<string, unknown> = {};
+    if (payload.financeCompany !== undefined) body.financeCompany = payload.financeCompany.trim();
+    if (payload.loanAmount !== undefined) body.loanAmount = payload.loanAmount;
+    if (payload.totalEMIs !== undefined) body.totalEMIs = payload.totalEMIs;
+    if (payload.startDate !== undefined) body.startDate = payload.startDate;
+    if (payload.endDate !== undefined) body.endDate = payload.endDate;
+    if (payload.emiAmount !== undefined) body.emiAmount = payload.emiAmount;
+    const response = await apiClient.put<unknown>(`${BASE}/${id}`, body);
+    return mapEmiResponse(response.data);
+  },
+
+  async listSchedule(id: number, signal?: AbortSignal): Promise<VehicleEmiInstallment[]> {
+    const response = await apiClient.get<unknown>(`${BASE}/${id}/schedule`, { signal });
+    return mapEmiScheduleResponse(response.data);
+  },
+
+  async pay(id: number, payload: EmiPayInput = {}): Promise<VehicleEmi> {
+    const body: Record<string, unknown> = {};
+    if (payload.paidBy) body.paidBy = payload.paidBy;
+    if (payload.idempotencyKey) body.idempotencyKey = payload.idempotencyKey;
+    const response = await apiClient.post<unknown>(`${BASE}/${id}/pay`, body);
+    return mapEmiResponse(response.data);
   },
 };
 

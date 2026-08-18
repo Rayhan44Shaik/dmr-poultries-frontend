@@ -1,31 +1,32 @@
 // src/modules/fleet-operations/pages/FleetPages.tsx
 
-import React, { useEffect, useMemo } from "react";
+import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-// Sub-page component imports
-import MaintenanceHistoryPage from "./MaintenanceHistoryPage";
-import MaintenanceEntryPage from "./MaintenanceEntryPage";
-import DocumentsExpiryPage from "./DocumentsExpiryPage";
-import EmiLoansPage from "./EmiLoansPage";
-import VehicleAnalyticsPage from "./VehicleAnalyticsPage";
-import VehicleReportsPage from "./VehicleReportsPage";
-import FastagDashboardPage from "./FastagDashboardPage";
-import VehicleExpenseReportPage from "./VehicleExpenseReportPage";
-import FleetDashboardPage from "./FleetDashboardPage";
+import {
+  DEFAULT_FLEET_TAB,
+  isVisibleFleetTab,
+  type VisibleFleetTab,
+} from "../activeFleetScope";
+import FleetTabSkeleton from "../components/common/FleetTabSkeleton";
 
-// Map tab keys (resolved from ?tab= sidebar deep-links) to their
-// child page components.
-const tabComponents: Record<string, React.ComponentType<{ embedded?: boolean }>> = {
-  dashboard: FleetDashboardPage,
-  entry: MaintenanceEntryPage,
-  history: MaintenanceHistoryPage,
-  permits: DocumentsExpiryPage,
-  emi: EmiLoansPage,
-  analytics: VehicleAnalyticsPage,
-  reports: VehicleReportsPage,
-  fastag: FastagDashboardPage,
-  expenses: VehicleExpenseReportPage,
+/*
+ * Tabs are lazy so opening /fleet?tab=entry does not evaluate Analytics (Recharts),
+ * EMI, History, or Permits before the first paint.
+ *
+ * DEFERRED / FUTURE — not imported:
+ *   dashboard  → ./FleetDashboardPage
+ *   reports    → ./VehicleReportsPage
+ *   expenses   → ./VehicleExpenseReportPage
+ */
+
+const tabComponents: Record<VisibleFleetTab, React.LazyExoticComponent<React.ComponentType<{ embedded?: boolean }>>> = {
+  entry: lazy(() => import("./MaintenanceEntryPage")),
+  history: lazy(() => import("./MaintenanceHistoryPage")),
+  permits: lazy(() => import("./DocumentsExpiryPage")),
+  emi: lazy(() => import("./EmiLoansPage")),
+  analytics: lazy(() => import("./VehicleAnalyticsPage")),
+  fastag: lazy(() => import("./FastagDashboardPage")),
 };
 
 function FleetPages() {
@@ -33,28 +34,43 @@ function FleetPages() {
   const navigate = useNavigate();
 
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const requestedTab = searchParams.get("tab");
+  const activeTab: VisibleFleetTab = isVisibleFleetTab(requestedTab)
+    ? requestedTab
+    : DEFAULT_FLEET_TAB;
 
-  // Read active tab from ?tab= query string
-  const activeTab = useMemo(() => {
-    return searchParams.get("tab") || "dashboard";
-  }, [searchParams]);
-
-  // Redirect to ?tab=dashboard when visiting /fleet or /fleet/ without parameters
   useEffect(() => {
-    if (!searchParams.get("tab")) {
-      navigate("/fleet?tab=dashboard", { replace: true });
-    }
-  }, [searchParams, navigate]);
+    if (isVisibleFleetTab(requestedTab)) return;
+    navigate(`/fleet?tab=${DEFAULT_FLEET_TAB}`, { replace: true });
+  }, [requestedTab, navigate]);
 
-  // Dynamic component selector
-  const ActiveComponent = useMemo(() => {
-    return tabComponents[activeTab] ?? FleetDashboardPage;
+  const [visitedTabs, setVisitedTabs] = useState<Set<VisibleFleetTab>>(() => new Set([activeTab]));
+
+  useEffect(() => {
+    setVisitedTabs((prev) => {
+      if (prev.has(activeTab)) return prev;
+      const next = new Set(prev);
+      next.add(activeTab);
+      return next;
+    });
   }, [activeTab]);
 
   return (
     <div className="w-full px-4 pb-8 pt-6 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-[1480px]">
-        <ActiveComponent embedded={true} />
+        {(Object.entries(tabComponents) as Array<
+          [VisibleFleetTab, React.LazyExoticComponent<React.ComponentType<{ embedded?: boolean }>>]
+        >).map(([tab, Component]) => {
+          if (!visitedTabs.has(tab)) return null;
+          const isActive = tab === activeTab;
+          return (
+            <div key={tab} hidden={!isActive} aria-hidden={!isActive}>
+              <Suspense fallback={<FleetTabSkeleton />}>
+                <Component embedded={true} />
+              </Suspense>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

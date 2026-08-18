@@ -47,6 +47,7 @@ const ExpenseBreakdownDonut = ({ data, height = 220 }: ExpenseBreakdownDonutProp
               outerRadius="88%"
               paddingAngle={4}
               dataKey="value"
+              isAnimationActive={false}
             >
               {data.map((_, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="focus:outline-none transition-all duration-300 hover:opacity-90" />

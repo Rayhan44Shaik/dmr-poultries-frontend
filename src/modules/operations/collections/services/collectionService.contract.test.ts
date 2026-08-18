@@ -207,17 +207,27 @@ test("PendingCollectionsPage main table sources balance/sales/approved/recovery 
 });
 
 test("PendingCollectionsPage's primary figures path returns backend recoveryPercentage as-is (not a recomputed ratio)", () => {
-  // The ratio-recompute pattern is only acceptable as a documented fallback
-  // when the backend has no weekly row at all for a shop — the primary
-  // (week-exists) branch must return the backend field verbatim.
-  assert.match(pendingPageSrc, /recovery:\s*week\.recoveryPercentage/);
+  assert.match(pendingPageSrc, /shop\.recoveryPercentage/);
+  assert.match(pendingPageSrc, /pendingTotals\.recoveryPercentage/);
+  assert.doesNotMatch(pendingPageSrc, /collections \/ sales\) \* 100/);
+  assert.doesNotMatch(pendingPageSrc, /weeklyCollections \/ weeklyStats\.weeklySales/);
 });
 
-test("PendingTable renders recovery/balance from props (recoveryMap/balanceMap), not a local ratio calculation", () => {
-  assert.match(pendingTableSrc, /recoveryMap\[shop\.shopName\]/);
-  assert.match(pendingTableSrc, /balanceMap\[shop\.shopName\]/);
+test("PendingTable renders recovery/balance from the pending-summary row, not a local ratio calculation", () => {
+  assert.match(pendingTableSrc, /shop\.recoveryPercentage/);
+  assert.match(pendingTableSrc, /shop\.balance/);
+  assert.match(pendingTableSrc, /shop\.weeklySales/);
+  assert.match(pendingTableSrc, /shop\.weeklyApprovedCollections/);
   assert.doesNotMatch(pendingTableSrc, /periodCollections/);
   assert.doesNotMatch(pendingTableSrc, /periodSales/);
+  assert.doesNotMatch(pendingTableSrc, /\/ sales\) \* 100/);
+});
+
+test("Pending table is sourced from pending-summary shops, not lifetime buildPending totals", () => {
+  assert.match(pendingPageSrc, /payload\.shops/);
+  assert.doesNotMatch(pendingPageSrc, /getPendingCollections\(\)/);
+  assert.doesNotMatch(pendingPageSrc, /shop\.totalSales/);
+  assert.doesNotMatch(pendingPageSrc, /shop\.totalCollections/);
 });
 
 test("CollectionReportPage sources totals from fetchCollectionReport(), not a client-side reduce over raw collections", () => {

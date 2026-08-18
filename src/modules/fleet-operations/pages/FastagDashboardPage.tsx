@@ -1,4 +1,9 @@
 /*
+ * HISTORICAL / FUTURE FASTAG PROTOTYPE — do not mount, do not execute.
+ * The live export below is a static Under Construction placeholder.
+ * Restore this implementation after the client visit; do not use localStorage
+ * as a production source of truth.
+ *
 import { memo } from 'react';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
 import { useFleetData } from '../hooks/useFleetData';
@@ -11,7 +16,7 @@ import { Plus } from 'lucide-react';
 
 const FastagDashboardPage = () => {
   const { vehicles } = useVehicles();
-  const { fastags } = useFleetData(); // Remove fastagTransactions - not used
+  const { fastags } = useFleetData();
   const { stats, sortedFastags, recentTransactions } = useFastagData();
 
   return (
@@ -24,8 +29,6 @@ const FastagDashboardPage = () => {
             Recharge FASTag
           </button>
         </div>
-
-        {// Summary Tiles }
         <FastagSummaryTiles
           totalFastags={stats.totalFastags}
           lowBalanceCount={stats.lowBalanceCount}
@@ -33,8 +36,6 @@ const FastagDashboardPage = () => {
           monthToll={stats.monthToll}
           avgDailyToll={stats.avgDailyToll}
         />
-
-        {// Balance & Transactions }
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">FASTag Balance Overview</h3>
@@ -54,29 +55,37 @@ const FastagDashboardPage = () => {
   );
 };
 
-export default memo(FastagDashboardPage);*/
+export default memo(FastagDashboardPage);
+*/
 
 import { memo } from 'react';
+import { Construction } from 'lucide-react';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 
 interface FastagDashboardPageProps {
   embedded?: boolean;
 }
 
+/** UNDER CONSTRUCTION — static placeholder. Zero API, cache, storage, or polling. */
 const FastagDashboardPage = ({ embedded = false }: FastagDashboardPageProps) => {
   return (
     <ErrorBoundary>
-      <div className={`w-full flex items-center justify-center animate-in fade-in duration-500 ${
-        embedded ? 'min-h-[60vh]' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
-      }`}>
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center max-w-md w-full mx-4">
-          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 border border-blue-100 shadow-sm animate-bounce">
-            🚧
+      <div
+        className={`w-full flex items-center justify-center ${
+          embedded ? 'min-h-[60vh]' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
+        }`}
+      >
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center max-w-lg w-full mx-4">
+          <div className="w-14 h-14 bg-slate-50 text-slate-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-200">
+            <Construction className="w-7 h-7" aria-hidden />
           </div>
-          <h2 className="text-xl font-bold text-slate-800 mb-2">FASTag Dashboard - Coming Soon</h2>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">FASTAG</p>
+          <h2 className="text-xl font-bold text-slate-800 mb-1">FASTAG Management</h2>
+          <p className="text-sm font-semibold text-amber-700 mb-3">Under Construction</p>
           <p className="text-sm text-slate-500 leading-relaxed">
-            This module is currently being enhanced and will be made fully available after the upcoming updates.
+            FASTAG tracking and management will be available in a future release.
           </p>
+          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">Coming Soon</p>
         </div>
       </div>
     </ErrorBoundary>

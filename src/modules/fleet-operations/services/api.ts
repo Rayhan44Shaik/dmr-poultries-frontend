@@ -4,4 +4,4 @@ export type { MaintenanceListParams, MaintenanceDocumentMetadata } from './maint
 export { permitApi } from './permitApi';
 export type { PermitSummary, PermitUpsertPayload } from './permitApi';
 export { emiApi } from './emiApi';
-export type { EmiListParams, EmiListResponse } from './emiApi';
+export type { EmiListParams } from './emiApi';

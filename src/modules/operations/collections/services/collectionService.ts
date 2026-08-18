@@ -12,6 +12,7 @@
   CollectionWeekBounds,
   CollectionReportSummary,
   CollectionPendingSummaryRow,
+  CollectionPendingSummaryResponse,
 } from "../types/collection";
 import type { ShopSale } from "../../shop-sales/types/shopSale";
 import {
@@ -534,15 +535,18 @@ async function fetchWeeklySummaries(date: string): Promise<CollectionWeeklySumma
  * side. This is the authoritative source for the Pending Collection table
  * and view; recoveryPercentage must be read from here, not recomputed.
  */
-async function fetchPendingSummary(date: string): Promise<CollectionPendingSummaryRow[]> {
-  const { data } = await apiGet<Record<string, unknown>[]>(`${COLLECTION_PATH}/pending-summary`, {
-    params: { date },
-  });
-  return (data ?? []).map((row) => ({
+async function fetchPendingSummary(date: string): Promise<CollectionPendingSummaryResponse> {
+  const { data } = await apiGet<Record<string, unknown> | Record<string, unknown>[]>(
+    `${COLLECTION_PATH}/pending-summary`,
+    { params: { date } }
+  );
+  const payload = Array.isArray(data) ? { shops: data, totals: null, weekStart: "", weekEnd: "" } : (data ?? {});
+  const rawShops = (Array.isArray(payload.shops) ? payload.shops : []) as Record<string, unknown>[];
+  const shops: CollectionPendingSummaryRow[] = rawShops.map((row) => ({
     shopId: Number(row.shopId),
     shopName: String(row.shopName ?? ""),
-    weekStart: String(row.weekStart),
-    weekEnd: String(row.weekEnd),
+    weekStart: String(row.weekStart ?? ""),
+    weekEnd: String(row.weekEnd ?? ""),
     openingBalance: Number(row.openingBalance ?? 0),
     balance: Number(row.balance ?? 0),
     weeklySales: Number(row.weeklySales ?? 0),
@@ -551,7 +555,21 @@ async function fetchPendingSummary(date: string): Promise<CollectionPendingSumma
     recoveryPercentage: Number(row.recoveryPercentage ?? 0),
     overdueDays: row.overdueDays == null ? null : Number(row.overdueDays),
     hasPendingCollections: Boolean(row.hasPendingCollections),
+    lastCollectionDate: row.lastCollectionDate == null ? null : String(row.lastCollectionDate),
   }));
+  const rawTotals = (payload.totals ?? {}) as Record<string, unknown>;
+  return {
+    weekStart: String(payload.weekStart ?? shops[0]?.weekStart ?? ""),
+    weekEnd: String(payload.weekEnd ?? shops[0]?.weekEnd ?? ""),
+    shops,
+    totals: {
+      weeklySales: Number(rawTotals.weeklySales ?? 0),
+      weeklyApprovedCollections: Number(rawTotals.weeklyApprovedCollections ?? 0),
+      weeklyPendingCollections: Number(rawTotals.weeklyPendingCollections ?? 0),
+      balance: Number(rawTotals.balance ?? 0),
+      recoveryPercentage: Number(rawTotals.recoveryPercentage ?? 0),
+    },
+  };
 }
 
 /**

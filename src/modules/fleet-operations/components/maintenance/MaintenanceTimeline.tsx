@@ -140,14 +140,16 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
     );
   }
 
+  const visibleTimeline = mergedTimeline.slice(0, 80);
+
   return (
     <>
       <div className="relative max-h-[520px] overflow-y-auto pl-2 pr-3 scrollbar-thin">
         {/* Continuous vertical connector running through the centre of every node */}
         <div className="absolute left-5 top-2 bottom-2 w-px bg-slate-200" aria-hidden="true" />
 
-        {mergedTimeline.map((row, index) => {
-          const isLast = index === mergedTimeline.length - 1;
+        {visibleTimeline.map((row, index) => {
+          const isLast = index === visibleTimeline.length - 1;
 
           if (row.kind === 'meter') {
             const m = row.data;
@@ -301,6 +303,11 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
           );
         })}
       </div>
+      {mergedTimeline.length > visibleTimeline.length && (
+        <p className="px-5 pt-3 text-center text-[11px] font-semibold text-slate-400">
+          Showing latest {visibleTimeline.length} of {mergedTimeline.length} events. Narrow the date or vehicle filter to see more.
+        </p>
+      )}
 
       {/* Bill Details Modal */}
       <BillDetailsModal

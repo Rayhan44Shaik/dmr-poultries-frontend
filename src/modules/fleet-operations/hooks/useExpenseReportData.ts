@@ -1,3 +1,4 @@
+/** DEFERRED / FUTURE WORK — not part of current Fleet Operations production scope. */
 import { useEffect, useMemo, useState } from 'react';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
@@ -87,7 +88,7 @@ export function useExpenseReportData() {
       try {
         const [res, schedules] = await Promise.all([
           maintenanceApi.list({ status: 'Approved' }),
-          emiApi.list({ limit: 500 }),
+          emiApi.list(),
         ]);
         const list = Array.isArray(res) ? res : (res?.data ?? []);
         if (!cancelled) {

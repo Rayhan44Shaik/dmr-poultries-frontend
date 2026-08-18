@@ -14,6 +14,8 @@ interface UpcomingServicesProps {
   services: UpcomingService[];
 }
 
+const VISIBLE_LIMIT = 20;
+
 const UpcomingServices = ({ services }: UpcomingServicesProps) => {
   if (!services || services.length === 0) {
     return (
@@ -29,9 +31,12 @@ const UpcomingServices = ({ services }: UpcomingServicesProps) => {
     );
   }
 
+  const visible = services.slice(0, VISIBLE_LIMIT);
+  const remaining = services.length - visible.length;
+
   return (
     <div className="space-y-3 max-h-[440px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-      {services.map((item) => {
+      {visible.map((item) => {
         const hasPassed = item.dueKM <= 0;
         
         return (
@@ -106,6 +111,11 @@ const UpcomingServices = ({ services }: UpcomingServicesProps) => {
           </div>
         );
       })}
+      {remaining > 0 && (
+        <p className="pt-1 text-center text-[11px] font-semibold text-slate-400">
+          +{remaining} more vehicle{remaining === 1 ? '' : 's'}
+        </p>
+      )}
     </div>
   );
 };

@@ -94,9 +94,12 @@ const LatestMaintenanceTable = ({
   );
 
   const actualTotalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
-  if (totalRecords > 0 && currentPage > actualTotalPages) {
-    onPageChange(1);
-  }
+
+  useEffect(() => {
+    if (totalRecords > 0 && currentPage > actualTotalPages) {
+      onPageChange(1);
+    }
+  }, [actualTotalPages, currentPage, onPageChange, totalRecords]);
 
   const handleRowClick = (id: string) => {
     setSelectedId(prev => (prev === id ? null : id));

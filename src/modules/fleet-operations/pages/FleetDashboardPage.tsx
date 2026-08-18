@@ -1,3 +1,4 @@
+/** DEFERRED / FUTURE WORK — not part of current Fleet Operations production scope. */
 import { memo, useMemo, Suspense } from 'react';
 import { useFleetDashboardData } from '../hooks/useFleetDashboardData';
 import KpiCard from '../components/common/KpiCard';

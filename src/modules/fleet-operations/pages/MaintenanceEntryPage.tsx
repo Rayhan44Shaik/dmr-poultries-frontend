@@ -5,7 +5,7 @@ import { useMaintenanceForm } from '../hooks/useMaintenanceForm';
 import { isEditable, safeDate } from '../utils/maintenanceHelpers';
 import { maintenanceApi } from '../services/maintenanceApi';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
-import { useFuelKMValidator } from "../../operations/fuel-expenses/hooks/useFuelKMValidator";
+import { useFleetFuelKmGuard } from "../hooks/useFleetFuelKmGuard";
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import MaintenanceForm from '../components/maintenance/MaintenanceForm';
 import LatestMaintenanceTable, { ViewMode } from '../components/maintenance/LatestMaintenanceTable';
@@ -17,7 +17,7 @@ import { RotateCcw, Save, Wrench, AlertTriangle, X, AlertCircle, CheckCircle2 } 
 const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
   const { employees } = useEmployees();
   const { showNotification } = useSafeNotification();
-  const { vehicles, maintenance, approvedMaintenance, deletedRecords, loading: recordsLoading, error: recordsError, refresh: refreshMaintenance } = useMaintenanceData();
+  const { vehicles, maintenance, approvedMaintenance, deletedRecords, loading: recordsLoading, error: recordsError, refresh: refreshMaintenance } = useMaintenanceData('entry');
   const [loading, setLoading] = useState(false);
   const [selectKey, setSelectKey] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -101,9 +101,8 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
   );
   const vehicleNumber = selectedVehicle?.vehicleNumber || '';
 
-  // --- Fuel KM Validator ---
-  const validator = useFuelKMValidator(vehicleNumber);
-  const pendingWarning = validator.getPendingWarning();
+  const kmGuard = useFleetFuelKmGuard(vehicleNumber);
+  const pendingWarning = kmGuard.pendingWarning;
 
   // --- Record Filtering (Pending vs Approved vs Deleted) ---
   const pendingRecords = useMemo(() => {
@@ -329,7 +328,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
     const km = parseFloat(form.currentKM);
     if (isNaN(km)) return null;
     
-    const { valid, message } = validator.validateKM(km);
+    const { valid, message } = kmGuard.validateKM(km);
     if (!valid) {
       return message || 'Invalid KM';
     }
@@ -424,6 +423,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
               onAddDocuments={addDocumentFiles}
               onRemoveDocument={removeDocument}
               onMarkDocumentRemoval={markDocumentRemoval}
+              validateKM={kmGuard.validateKM}
             />
           </div>
         </div>
