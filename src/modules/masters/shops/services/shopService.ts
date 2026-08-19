@@ -53,6 +53,7 @@ function mapShop(raw: Record<string, unknown>): Shop {
     village: String(raw.village ?? ""),
     address: String(raw.address ?? ""),
     status: normalizeStatus(raw.status),
+    openingBalance: Number(raw.openingBalance ?? raw.opening_balance ?? 0),
     currentBalance:
       raw.currentBalance != null
         ? Number(raw.currentBalance)
@@ -72,6 +73,7 @@ function toPayload(input: ShopInput | Partial<Shop>): Record<string, unknown> {
     village: input.village?.trim() ?? "",
     address: input.address?.trim() ?? "",
     status: input.status ?? "Active",
+    openingBalance: Number(input.openingBalance ?? 0),
   };
 }
 

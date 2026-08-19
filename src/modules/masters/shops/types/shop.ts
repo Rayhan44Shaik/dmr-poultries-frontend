@@ -8,5 +8,6 @@ export type Shop = {
   village: string;
   address?: string;
   status: "Active" | "Inactive";
+  openingBalance: number;
   currentBalance?: number;
 };
