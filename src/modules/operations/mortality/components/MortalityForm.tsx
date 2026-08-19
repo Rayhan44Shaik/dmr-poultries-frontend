@@ -73,8 +73,8 @@ export default function MortalityForm({ farms, onSave, saving = false }: Mortali
   }, [values.birds]);
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-xl border border-slate-200/80 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-center gap-2.5 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+    <form onSubmit={handleSubmit} className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-50/60 px-4 py-3 dark:border-slate-800">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400">
           <Bird size={15} />
         </span>

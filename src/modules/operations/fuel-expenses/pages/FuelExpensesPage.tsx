@@ -34,6 +34,19 @@ import type { FuelExpense } from "../types/fuelExpense";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
+import {
+  opsPageClass,
+  opsFilterCardClass,
+  opsFilterLabelClass,
+  opsInputClass,
+  opsPrimaryButtonClass,
+  opsSecondaryButtonClass,
+  opsPdfButtonClass,
+  opsExcelButtonClass,
+  opsTableCardClass,
+  opsTableHeaderBarClass,
+  opsReactSelectStyles,
+} from "../../../../shared/ui/operationsStyles";
 
 function FuelExpensesPage() {
   const { showNotification } = useSafeNotification();
@@ -305,66 +318,33 @@ function FuelExpensesPage() {
     [hasFilters, filteredSummary]
   );
 
-  const selectStyles = {
-    control: (base: any) => ({
-      ...base,
-      borderRadius: '0.375rem',
-      borderColor: '#cbd5e1',
-      minHeight: '40px',
-      boxShadow: 'none',
-      '&:hover': { borderColor: '#94a3b8' },
-      '&:focus-within': { borderColor: '#22c55e', boxShadow: '0 0 0 1px #22c55e' },
-    }),
-    option: (base: any, { isFocused, isSelected }: any) => ({
-      ...base,
-      backgroundColor: isSelected ? '#16a34a' : isFocused ? '#dcfce7' : 'white',
-      color: isSelected ? 'white' : '#1e293b',
-      padding: '8px 12px',
-      fontSize: '14px',
-    }),
-    menu: (base: any) => ({ ...base, zIndex: 50 }),
-    multiValue: (base: any) => ({
-      ...base,
-      backgroundColor: '#dcfce7',
-      borderRadius: '4px',
-    }),
-    multiValueLabel: (base: any) => ({
-      ...base,
-      color: '#166534',
-      fontSize: '12px',
-    }),
-    multiValueRemove: (base: any) => ({
-      ...base,
-      color: '#166534',
-      ':hover': { backgroundColor: '#bbf7d0', color: '#dc2626' },
-    }),
-  };
+  const selectStyles = opsReactSelectStyles();
 
   return (
-    <div className="space-y-6">
+    <div className={opsPageClass}>
       {/* ─── Action Buttons ──────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowForm(!showForm)}
-            className="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 cursor-pointer transition"
+            className={opsPrimaryButtonClass}
           >
-            <Plus size={16} />
+            <Plus size={15} />
             {showForm ? "Hide Form" : "Add Fuel Bill"}
           </button>
           {/* ─── Refresh Button ──────────────────────────────────────── */}
           <button
             onClick={handleRefresh}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-md border border-blue-600 bg-white px-3 py-2 text-sm font-medium text-blue-600 shadow-sm hover:bg-blue-50 transition disabled:opacity-50 cursor-pointer"
+            className={opsSecondaryButtonClass}
           >
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             <span>Refresh</span>
           </button>
           {error && (
             <button
               onClick={() => refresh()}
-              className="inline-flex items-center gap-2 rounded-md border border-red-600 bg-white px-3 py-2 text-sm font-medium text-red-600"
+              className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition-all"
             >
               Retry
             </button>
@@ -372,33 +352,29 @@ function FuelExpensesPage() {
           {/* ─── Auto‑Save Indicator ────────────────────────────────── */}
           {isSaving && (
             <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
-              <Loader2 size={14} className="animate-spin text-blue-500" />
+              <Loader2 size={14} className="animate-spin text-emerald-500" />
               Saving...
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={handleExportPDF}
             disabled={!hasFilters || filteredData.length === 0}
-            className={`inline-flex items-center gap-2 rounded-md border border-red-600 bg-white px-3 py-2 text-sm font-medium text-red-600 shadow-sm transition-all ${
-              !hasFilters || filteredData.length === 0
-                ? "opacity-50 cursor-not-allowed"
-                : "hover:bg-red-50 cursor-pointer"
+            className={`${opsPdfButtonClass} ${
+              !hasFilters || filteredData.length === 0 ? "opacity-50 cursor-not-allowed" : ""
             }`}
           >
-            <FileText size={16} /> PDF
+            <FileText size={15} /> PDF
           </button>
           <button
             onClick={handleExportExcel}
             disabled={!hasFilters || filteredData.length === 0}
-            className={`inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition-all ${
-              !hasFilters || filteredData.length === 0
-                ? "opacity-50 cursor-not-allowed"
-                : "hover:bg-green-700 cursor-pointer"
+            className={`${opsExcelButtonClass} ${
+              !hasFilters || filteredData.length === 0 ? "opacity-50 cursor-not-allowed" : ""
             }`}
           >
-            <FileSpreadsheet size={16} /> Excel
+            <FileSpreadsheet size={15} /> Excel
           </button>
         </div>
       </div>
@@ -406,7 +382,7 @@ function FuelExpensesPage() {
       {KpiCards}
 
       {/* ─── Filters ──────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6">
+      <div className={opsFilterCardClass}>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
           <div className="md:col-span-1">
             <DatePicker
@@ -427,7 +403,7 @@ function FuelExpensesPage() {
             />
           </div>
           <div className="md:col-span-2">
-            <label className="mb-1 block text-sm font-medium text-slate-700">Vehicles</label>
+            <label className={opsFilterLabelClass}>Vehicles</label>
             <Select
               isMulti
               isSearchable
@@ -444,16 +420,16 @@ function FuelExpensesPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Source</label>
-            <select value={sourceType} onChange={(e) => { setSourceType(e.target.value); setCurrentPage(1); }} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+            <label className={opsFilterLabelClass}>Source</label>
+            <select value={sourceType} onChange={(e) => { setSourceType(e.target.value); setCurrentPage(1); }} className={opsInputClass}>
               <option value="">All</option>
               <option value="TRIP">TRIP</option>
               <option value="MANUAL">MANUAL</option>
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Status</label>
-            <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+            <label className={opsFilterLabelClass}>Status</label>
+            <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }} className={opsInputClass}>
               <option value="">All</option>
               <option value="Pending">Pending</option>
               <option value="Approved">Approved</option>
@@ -461,20 +437,20 @@ function FuelExpensesPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Trip No</label>
-            <input value={tripNo} onChange={(e) => { setTripNo(e.target.value); setCurrentPage(1); }} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+            <label className={opsFilterLabelClass}>Trip No</label>
+            <input value={tripNo} onChange={(e) => { setTripNo(e.target.value); setCurrentPage(1); }} className={opsInputClass} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Bill No</label>
-            <input value={billNo} onChange={(e) => { setBillNo(e.target.value); setCurrentPage(1); }} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+            <label className={opsFilterLabelClass}>Bill No</label>
+            <input value={billNo} onChange={(e) => { setBillNo(e.target.value); setCurrentPage(1); }} className={opsInputClass} />
           </div>
         </div>
-        <div className="mt-4 flex justify-end pt-4 border-t border-slate-100">
+        <div className="flex justify-end pt-4 border-t border-slate-100">
           <button
             onClick={handleResetFilters}
-            className="inline-flex items-center gap-2 rounded-md border border-red-600 bg-white px-3 py-2 text-sm font-medium text-red-600 shadow-sm hover:bg-red-50 cursor-pointer"
+            className={opsSecondaryButtonClass}
           >
-            <RotateCcw size={16} /> Reset Filters
+            <RotateCcw size={14} /> Reset Filters
           </button>
         </div>
       </div>
@@ -493,8 +469,8 @@ function FuelExpensesPage() {
       )}
 
       {/* ─── Table Card ──────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden" ref={tableContainerRef}>
-        <div className="px-6 py-3 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between flex-wrap gap-2">
+      <div className={opsTableCardClass} ref={tableContainerRef}>
+        <div className={opsTableHeaderBarClass}>
           <div className="flex items-center gap-3">
             <h3 className="text-sm font-semibold text-slate-700">Fuel Bill Table</h3>
             <span className="text-xs text-slate-500">{totalCount} bills</span>

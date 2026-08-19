@@ -67,10 +67,10 @@ export default function OutstandingSummary({
     <div className="h-full w-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100 text-green-700">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
             <Calculator size={16} />
           </div>
-          <h2 className="text-lg font-semibold text-green-800">Outstanding Summary</h2>
+          <h2 className="text-lg font-semibold text-slate-800">Outstanding Summary</h2>
         </div>
         {shopName && (
           <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">
@@ -115,16 +115,16 @@ export default function OutstandingSummary({
 
         <div className="border-t border-dashed border-slate-200" />
 
-        <div className="flex items-center justify-between rounded-xl border border-green-200 bg-green-50 px-4 py-3.5">
+        <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3.5">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-600 text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-600 text-white">
               <Calculator size={18} />
             </div>
             <span className="text-sm font-semibold text-slate-700">
               Current Balance (Outstanding)
             </span>
           </div>
-          <span className="text-lg font-extrabold tabular-nums text-green-700">
+          <span className="text-lg font-extrabold tabular-nums text-emerald-700">
             {inr(displayPending)}
           </span>
         </div>

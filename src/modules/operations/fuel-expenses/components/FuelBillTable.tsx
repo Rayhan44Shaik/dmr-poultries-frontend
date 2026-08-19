@@ -29,9 +29,9 @@ export function FuelBillTable({ bills, selectedId, onSelect }: Props) {
   };
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="bg-slate-50 border-b border-slate-200">
+        <thead className="bg-slate-50/80 border-b border-slate-200">
           <tr className="text-slate-600">
             <th className="w-8 px-2 py-2.5 text-center text-xs font-semibold uppercase tracking-wider">#</th>
             <th className="w-36 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider">Bill No</th>
@@ -59,8 +59,8 @@ export function FuelBillTable({ bills, selectedId, onSelect }: Props) {
             return (
               <tr
                 key={bill.id}
-                className={`border-b border-slate-200 hover:bg-blue-50 transition-colors duration-150 cursor-pointer ${
-                  isSelected ? "bg-blue-100" : ""
+                className={`border-b border-slate-200 hover:bg-slate-50/70 transition-colors duration-150 cursor-pointer ${
+                  isSelected ? "bg-slate-100/80" : ""
                 } ${isStatusPending ? "border-l-4 border-l-orange-400" : ""}`}
                 onClick={() => handleRowClick(bill)}
               >

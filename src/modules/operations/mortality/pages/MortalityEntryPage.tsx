@@ -10,12 +10,13 @@ import { useMortality } from "../hooks/useMortality";
 import { mortalityService } from "../services/mortalityService";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { getCurrentUser } from "../../../settings/services";
+import { opsPageClass, opsPageTitleClass } from "../../../../shared/ui/operationsStyles";
 
 interface MortalityEntryPageProps {
   embedded?: boolean;
 }
 
-export default function MortalityEntryPage({ embedded = false }: MortalityEntryPageProps) {
+export default function MortalityEntryPage({ embedded: _embedded = false }: MortalityEntryPageProps) {
   const { records, saving, create, remove } = useMortality();
   const { showNotification } = useSafeNotification();
   const summary = useMemo(() => mortalityService.getSummary(), [records]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -53,13 +54,13 @@ export default function MortalityEntryPage({ embedded = false }: MortalityEntryP
   };
 
   return (
-    <div className={`space-y-4 ${embedded ? "" : "px-4 py-6 sm:px-6 lg:px-8"}`}>
+    <div className={opsPageClass}>
       <div className="flex items-center gap-2.5">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
           <Bird size={17} />
         </span>
         <div>
-          <h2 className="text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">Mortality Entry</h2>
+          <h2 className={opsPageTitleClass}>Mortality Entry</h2>
           <p className="text-xs text-slate-400 dark:text-slate-500">Track and analyse bird losses to keep mortality under control</p>
         </div>
       </div>

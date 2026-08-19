@@ -43,7 +43,7 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
 
   // Content matching the exact vertical layout and structure of RatesEntryPage
   const content = (
-    <div className="space-y-6">
+    <div className="w-full space-y-5">
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6">
         <CollectionInformation
           entry={vm.entry}
@@ -93,8 +93,7 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6">
-        <RecentCollectionsTable
+      <RecentCollectionsTable
           collections={vm.recentCollections}
           statusFilter={vm.statusFilter}
           pendingApprovalCount={vm.pendingApprovalCount}
@@ -109,7 +108,6 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
           onDelete={vm.deleteCollection}
           onViewShop={handleViewShop}
         />
-      </div>
 
       <EditCollectionModal
         isOpen={isEditModalOpen}

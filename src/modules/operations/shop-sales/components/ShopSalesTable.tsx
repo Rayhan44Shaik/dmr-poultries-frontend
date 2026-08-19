@@ -98,7 +98,7 @@ function ShopSalesTable({ sales, isLoading = false, onUpdateSale }: Props) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden transition-all">
+    <>
       {/* Header */}
       <div className="px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 flex items-center justify-between">
         <h3 className="text-sm font-bold text-slate-800 tracking-tight">Shop Sales</h3>
@@ -343,7 +343,7 @@ function ShopSalesTable({ sales, isLoading = false, onUpdateSale }: Props) {
           </tbody>
         </table>
       </div>
-    </div>
+    </>
   );
 }
 

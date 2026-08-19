@@ -1,6 +1,16 @@
 import { Search, FileText, FileSpreadsheet, Calendar, Truck, UserCog, Hash, RotateCcw } from "lucide-react";
 import Select from "react-select";
 import { DatePicker } from "../../../../components/common/DatePicker";
+import {
+  opsFilterCardClass,
+  opsFilterLabelClass,
+  opsInputClass,
+  opsPrimaryButtonClass,
+  opsSecondaryButtonClass,
+  opsPdfButtonClass,
+  opsExcelButtonClass,
+  opsReactSelectStyles,
+} from "../../../../shared/ui/operationsStyles";
 
 interface Props {
   fromDate: string;
@@ -44,51 +54,14 @@ export default function CompletedTripsFilters({
   onExportExcel,
 }: Props) {
   const enableExports = hasFilters && pendingTrips > 0;
-
-  const selectStyles = {
-    control: (base: any, state: any) => ({
-      ...base,
-      borderRadius: "0.75rem",
-      borderColor: state.isFocused ? "#3b82f6" : "#e2e8f0",
-      boxShadow: state.isFocused ? "0 0 0 2px rgba(59, 130, 246, 0.15)" : "none",
-      minHeight: "42px",
-      fontSize: "13px",
-      fontWeight: 500,
-      backgroundColor: "#ffffff",
-      "&:hover": { borderColor: "#cbd5e1" },
-    }),
-    option: (base: any, { isFocused, isSelected }: any) => ({
-      ...base,
-      backgroundColor: isSelected ? "#2563eb" : isFocused ? "#f8fafc" : "transparent",
-      color: isSelected ? "#ffffff" : "#334155",
-      fontSize: "13px",
-      fontWeight: isSelected ? 600 : 500,
-      padding: "8px 12px",
-      cursor: "pointer",
-    }),
-    menu: (base: any) => ({
-      ...base,
-      borderRadius: "0.75rem",
-      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
-      border: "1px solid #e2e8f0",
-      overflow: "hidden",
-      zIndex: 50,
-    }),
-    indicatorSeparator: () => ({ display: "none" }),
-    dropdownIndicator: (base: any) => ({
-      ...base,
-      color: "#94a3b8",
-      "&:hover": { color: "#64748b" },
-    }),
-  };
+  const selectStyles = opsReactSelectStyles();
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-4">
+    <div className={opsFilterCardClass}>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-        {/* From Date */}
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
-            <Calendar size={13} className="text-blue-500 flex-shrink-0" />
+          <label className={opsFilterLabelClass}>
+            <Calendar size={13} className="text-emerald-600 flex-shrink-0" />
             <span>From Date</span>
           </label>
           <DatePicker
@@ -99,10 +72,9 @@ export default function CompletedTripsFilters({
           />
         </div>
 
-        {/* To Date */}
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
-            <Calendar size={13} className="text-blue-500 flex-shrink-0" />
+          <label className={opsFilterLabelClass}>
+            <Calendar size={13} className="text-emerald-600 flex-shrink-0" />
             <span>To Date</span>
           </label>
           <DatePicker
@@ -113,10 +85,9 @@ export default function CompletedTripsFilters({
           />
         </div>
 
-        {/* Vehicle */}
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
-            <Truck size={13} className="text-indigo-500 flex-shrink-0" />
+          <label className={opsFilterLabelClass}>
+            <Truck size={13} className="text-emerald-600 flex-shrink-0" />
             <span>Vehicle</span>
           </label>
           <Select
@@ -129,10 +100,9 @@ export default function CompletedTripsFilters({
           />
         </div>
 
-        {/* Supervisor */}
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
-            <UserCog size={13} className="text-purple-500 flex-shrink-0" />
+          <label className={opsFilterLabelClass}>
+            <UserCog size={13} className="text-emerald-600 flex-shrink-0" />
             <span>Supervisor</span>
           </label>
           <Select
@@ -145,9 +115,8 @@ export default function CompletedTripsFilters({
           />
         </div>
 
-        {/* Trip No */}
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
+          <label className={opsFilterLabelClass}>
             <Hash size={13} className="text-slate-400 flex-shrink-0" />
             <span>Trip No</span>
           </label>
@@ -157,7 +126,7 @@ export default function CompletedTripsFilters({
               value={tripNo}
               onChange={(e) => setTripNo(e.target.value)}
               placeholder="Trip Number..."
-              className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 pl-10 text-xs font-medium text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white"
+              className={`${opsInputClass} pl-10`}
             />
           </div>
         </div>
@@ -168,37 +137,19 @@ export default function CompletedTripsFilters({
           Pending Trips : <span className="font-bold text-orange-600">{pendingTrips}</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={onSearch}
-            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5 whitespace-nowrap active:scale-95"
-          >
+          <button onClick={onSearch} className={opsPrimaryButtonClass}>
             <Search size={15} />
             Search
           </button>
-          <button
-            onClick={onReset}
-            className="px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
-          >
-            <RotateCcw size={14} className="text-slate-400" />
+          <button onClick={onReset} className={opsSecondaryButtonClass}>
+            <RotateCcw size={14} />
             Reset
           </button>
-          <button
-            onClick={onExportPDF}
-            disabled={!enableExports}
-            className={`px-3.5 py-2.5 rounded-xl border border-rose-200 text-rose-600 text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95 ${
-              enableExports ? "hover:bg-rose-50" : "opacity-40 cursor-not-allowed bg-slate-50/50"
-            }`}
-          >
+          <button onClick={onExportPDF} disabled={!enableExports} className={opsPdfButtonClass}>
             <FileText size={15} />
             PDF
           </button>
-          <button
-            onClick={onExportExcel}
-            disabled={!enableExports}
-            className={`px-3.5 py-2.5 rounded-xl border border-emerald-200 text-emerald-600 text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95 ${
-              enableExports ? "hover:bg-emerald-50" : "opacity-40 cursor-not-allowed bg-slate-50/50"
-            }`}
-          >
+          <button onClick={onExportExcel} disabled={!enableExports} className={opsExcelButtonClass}>
             <FileSpreadsheet size={15} />
             Excel
           </button>

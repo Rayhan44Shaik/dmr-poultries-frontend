@@ -145,59 +145,57 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
   }, [filteredSales, showNotification]);
 
   const content = (
-    <div className="space-y-4">
-      <div className="bg-white rounded-2xl p-4 md:p-6 border border-slate-200/85 shadow-sm space-y-4 text-slate-800">
-        <ShopSalesFilters
-          fromDate={filter.fromDate}
-          toDate={filter.toDate}
-          shopName={filter.shopName}
-          sortBy={filter.sortBy}
-          shopNames={shopNames}
-          totalEntries={filteredSales.length}
-          setFromDate={(v) => {
-            setFilter({ ...filter, fromDate: v });
-            if (v) showNotification(`From date set to ${v}`, "info");
-          }}
-          setToDate={(v) => {
-            setFilter({ ...filter, toDate: v });
-            if (v) showNotification(`To date set to ${v}`, "info");
-          }}
-          setShopName={(v) => setFilter({ ...filter, shopName: v })}
-          setSortBy={(v) => setFilter({ ...filter, sortBy: v })}
-          onSearch={handleSearch}
-          onReset={handleResetFilters}
-          onExportPDF={handleExportPDF}
-          onExportExcel={handleExportExcel}
-          hasFilters={
-            filter.fromDate !== "" ||
-            filter.toDate !== "" ||
-            filter.shopName.trim() !== ""
-          }
-        />
+    <div className="w-full space-y-5 animate-in fade-in duration-500">
+      <ShopSalesFilters
+        fromDate={filter.fromDate}
+        toDate={filter.toDate}
+        shopName={filter.shopName}
+        sortBy={filter.sortBy}
+        shopNames={shopNames}
+        totalEntries={filteredSales.length}
+        setFromDate={(v) => {
+          setFilter({ ...filter, fromDate: v });
+          if (v) showNotification(`From date set to ${v}`, "info");
+        }}
+        setToDate={(v) => {
+          setFilter({ ...filter, toDate: v });
+          if (v) showNotification(`To date set to ${v}`, "info");
+        }}
+        setShopName={(v) => setFilter({ ...filter, shopName: v })}
+        setSortBy={(v) => setFilter({ ...filter, sortBy: v })}
+        onSearch={handleSearch}
+        onReset={handleResetFilters}
+        onExportPDF={handleExportPDF}
+        onExportExcel={handleExportExcel}
+        hasFilters={
+          filter.fromDate !== "" ||
+          filter.toDate !== "" ||
+          filter.shopName.trim() !== ""
+        }
+      />
 
-        <ShopSalesSummary
-          summary={summary}
-          fromDate={filter.fromDate}
-          toDate={filter.toDate}
-          shopName={filter.shopName}
+      <ShopSalesSummary
+        summary={summary}
+        fromDate={filter.fromDate}
+        toDate={filter.toDate}
+        shopName={filter.shopName}
+        isLoading={isLoading}
+      />
+
+      <div className="rounded-2xl border border-slate-200/80 overflow-hidden bg-white shadow-sm text-xs md:text-sm">
+        <ShopSalesTable
+          sales={paginatedSales}
           isLoading={isLoading}
+          shopNames={shopNames}
+          onUpdateSale={handleUpdateSale}
         />
-
-        <div className="rounded-2xl border border-slate-200/70 overflow-hidden bg-white shadow-sm text-xs md:text-sm">
-          <ShopSalesTable
-            sales={paginatedSales}
-            isLoading={isLoading}
-            shopNames={shopNames}
-            onUpdateSale={handleUpdateSale}
-          />
-          {shouldShowPagination(filteredSales.length) && (
-          <ShopSalesPagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-          />
-          )}
-        </div>
+        {shouldShowPagination(filteredSales.length) && (
+        <ShopSalesPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
+        )}
       </div>
     </div>
   );

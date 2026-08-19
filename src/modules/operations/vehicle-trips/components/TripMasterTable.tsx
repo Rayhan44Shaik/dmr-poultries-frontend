@@ -12,10 +12,9 @@ interface Props {
 
 function TripMasterTable({ trips, selectedRowId, onRowClick, startIndex = 0 }: Props) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-      <div className="w-full overflow-x-auto">
-        <table className="min-w-full text-sm text-left border-collapse">
-          <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
+    <div className="w-full overflow-x-auto">
+      <table className="min-w-full text-sm text-left border-collapse">
+        <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
             <tr className="whitespace-nowrap">
               <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider w-10">#</th>
               <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
@@ -131,7 +130,6 @@ function TripMasterTable({ trips, selectedRowId, onRowClick, startIndex = 0 }: P
             )}
           </tbody>
         </table>
-      </div>
     </div>
   );
 }

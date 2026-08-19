@@ -5,6 +5,7 @@ import Select from "react-select";
 import { MapPin, Upload, X, Loader2 } from "lucide-react";
 import type { FuelExpense, FuelExpenseDraft } from "../types/fuelExpense";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import { opsReactSelectStyles } from "../../../../shared/ui/operationsStyles";
 
 interface Props {
   onSave: (data: FuelExpenseDraft) => void;
@@ -129,23 +130,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   const driverOptions = drivers.map((d) => ({ value: d.id, label: d.employeeName }));
   const supervisorOptions = supervisors.map((s) => ({ value: s.id, label: s.employeeName }));
 
-  const selectStyles = {
-    control: (base: any) => ({
-      ...base,
-      borderRadius: 8,
-      borderColor: "#e2e8f0",
-      boxShadow: "none",
-      minHeight: 38,
-      fontSize: "14px",
-      "&:hover": { borderColor: "#94a3b8" },
-    }),
-    option: (base: any, { isFocused, isSelected }: any) => ({
-      ...base,
-      backgroundColor: isSelected ? "#2563eb" : isFocused ? "#eff6ff" : "white",
-      color: isSelected ? "white" : "#1e293b",
-    }),
-    menu: (base: any) => ({ ...base, zIndex: 50 }),
-  };
+  const selectStyles = opsReactSelectStyles();
 
   const handleVehicleChange = (selected: any) => {
     const v = activeVehicles.find((x) => x.id === selected?.value);
@@ -286,7 +271,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
         }
       `}</style>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6 space-y-4">
         <h3 className="text-sm font-semibold text-slate-700">
           {editingId ? "Edit Fuel Bill" : "Add Fuel Bill"}
         </h3>
@@ -297,7 +282,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           {/* Date */}
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Date <span className="text-red-500">*</span></label>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" />
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500" />
           </div>
 
           {/* Vehicle */}
@@ -321,7 +306,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           {/* Meter Reading */}
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Meter Reading (KM) <span className="text-red-500">*</span></label>
-            <input type="number" value={meterReading || ""} onChange={(e) => setMeterReading(Number(e.target.value))} className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" placeholder="0" />
+            <input type="number" value={meterReading || ""} onChange={(e) => setMeterReading(Number(e.target.value))} className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500" placeholder="0" />
             {minMeterReading > 0 && (
               <div className="text-[10px] text-slate-400 mt-0.5">Minimum allowed: {minMeterReading} KM</div>
             )}
@@ -330,13 +315,13 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           {/* Litres */}
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Fuel Quantity (Litres) <span className="text-red-500">*</span></label>
-            <input type="number" step="0.01" value={litres || ""} onChange={(e) => setLitres(Number(e.target.value))} className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" placeholder="0.00" />
+            <input type="number" step="0.01" value={litres || ""} onChange={(e) => setLitres(Number(e.target.value))} className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500" placeholder="0.00" />
           </div>
 
           {/* Rate */}
           <div>
             <label className="text-xs font-medium text-slate-500 block mb-1">Fuel Rate (₹/Litre) <span className="text-red-500">*</span></label>
-            <input type="number" step="0.01" value={rate || ""} onChange={(e) => setRate(Number(e.target.value))} className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" placeholder="0.00" />
+            <input type="number" step="0.01" value={rate || ""} onChange={(e) => setRate(Number(e.target.value))} className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500" placeholder="0.00" />
           </div>
 
           {/* Amount (preview) */}
@@ -349,12 +334,12 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           <div className="lg:col-span-2">
             <label className="text-xs font-medium text-slate-500 block mb-1">Petrol Bunk <span className="text-red-500">*</span></label>
             <div className="flex items-center gap-2">
-              <input type="text" value={petrolBunk} onChange={(e) => setPetrolBunk(e.target.value)} className="flex-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" placeholder="Enter bunk name" />
+              <input type="text" value={petrolBunk} onChange={(e) => setPetrolBunk(e.target.value)} className="flex-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500" placeholder="Enter bunk name" />
               <button
                 type="button"
                 onClick={fetchGPSLocation}
                 disabled={isFetchingLocation}
-                className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg border border-blue-200 text-sm font-medium hover:bg-blue-100 transition disabled:opacity-60"
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg border border-slate-200 text-sm font-medium hover:bg-slate-200 transition disabled:opacity-60"
               >
                 {isFetchingLocation ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
                 <span className="hidden sm:inline">GPS</span>
@@ -399,7 +384,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           {/* Remarks */}
           <div className="lg:col-span-3">
             <label className="text-xs font-medium text-slate-500 block mb-1">Remarks (Optional)</label>
-            <input type="text" value={remarks} onChange={(e) => setRemarks(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500" placeholder="Any remarks..." />
+            <input type="text" value={remarks} onChange={(e) => setRemarks(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500" placeholder="Any remarks..." />
           </div>
         </div>
 
@@ -409,7 +394,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
               Cancel
             </button>
           )}
-          <button onClick={handleSubmit} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium shadow-sm transition active:scale-95">
+          <button onClick={handleSubmit} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium shadow-sm transition active:scale-95">
             {editingId ? "Update Bill" : "Save Bill"}
           </button>
         </div>

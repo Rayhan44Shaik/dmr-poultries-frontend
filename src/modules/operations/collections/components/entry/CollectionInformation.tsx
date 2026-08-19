@@ -3,6 +3,7 @@ import { RotateCcw, BookOpen, Wallet } from "lucide-react";
 import Select from "react-select";
 import type { CollectionEntry, CollectionErrors, PaymentMode } from "../../types/collection";
 import { DatePicker } from "../../../../../components/common/DatePicker"; // adjust path as needed
+import { opsReactSelectStyles } from "../../../../../shared/ui/operationsStyles";
 
 interface Props {
   entry: CollectionEntry;
@@ -40,31 +41,7 @@ function CollectionInformation({
 }: Props) {
   const shopOptions = shops.map((shop) => ({ value: shop, label: shop }));
 
-  const selectStyles = {
-    control: (base: any) => ({
-      ...base,
-      borderRadius: 8,
-      borderColor: "#cbd5e1",
-      boxShadow: "none",
-      minHeight: 38,
-      fontSize: "14px",
-      "&:hover": { borderColor: "#94a3b8" },
-      "&:focus-within": {
-        borderColor: "#3b82f6",
-        boxShadow: "0 0 0 3px rgba(59, 130, 246, 0.15)",
-      },
-    }),
-    option: (base: any, { isFocused, isSelected }: any) => ({
-      ...base,
-      backgroundColor: isSelected ? "#2563eb" : isFocused ? "#eff6ff" : "white",
-      color: isSelected ? "white" : "#1e293b",
-    }),
-    menu: (base: any) => ({ ...base, zIndex: 50 }),
-    placeholder: (base: any) => ({
-      ...base,
-      color: "#94a3b8",
-    }),
-  };
+  const selectStyles = opsReactSelectStyles();
 
   const isLedgerEnabled =
     entry.shopName.trim().length > 0 &&
@@ -75,7 +52,7 @@ function CollectionInformation({
     <div>
       {/* Header with green icon and larger bottom margin */}
       <div className="border-b border-slate-200 pb-3 mb-5 flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100 text-green-700">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
           <Wallet size={16} />
         </div>
         <h2 className="text-lg font-semibold text-slate-800">Collection Information</h2>
@@ -109,7 +86,7 @@ function CollectionInformation({
               id="collector"
               value={entry.collectorName}
               onChange={(e) => onCollectorChange(e.target.value)}
-              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
               aria-describedby={errors.collectorName ? "collector-error" : undefined}
             >
               <option value="">Select Collector</option>
@@ -134,7 +111,7 @@ function CollectionInformation({
               id="paymentMode"
               value={entry.paymentModeName}
               onChange={(e) => onPaymentModeChange(e.target.value)}
-              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
               aria-describedby={errors.paymentModeName ? "paymentMode-error" : undefined}
             >
               {paymentModes.map((mode) => (
@@ -161,7 +138,7 @@ function CollectionInformation({
               onChange={(e) => onReferenceChange(e.target.value)}
               placeholder="Reference Number"
               disabled={entry.paymentModeName === "Cash"}
-              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100 disabled:text-slate-400"
+              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-100 disabled:text-slate-400"
               aria-describedby={errors.referenceNo ? "referenceNo-error" : undefined}
             />
             {errors.referenceNo && (
@@ -195,7 +172,7 @@ function CollectionInformation({
             )}
           </div>
 
-          <div className="flex items-end justify-end gap-3 sm:col-span-1">
+<div className="flex items-end justify-end gap-3 sm:col-span-1">
             <button
               type="button"
               onClick={onViewLedger}
@@ -203,7 +180,7 @@ function CollectionInformation({
               title={!isLedgerEnabled ? "Please select Shop, Collector, and Payment Mode" : ""}
               className={`inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-semibold text-white shadow-sm transition ${
                 isLedgerEnabled
-                  ? "bg-green-700 hover:bg-green-800 active:scale-95"
+                  ? "bg-emerald-600 hover:bg-emerald-700"
                   : "cursor-not-allowed bg-slate-400"
               }`}
             >

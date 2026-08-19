@@ -140,10 +140,10 @@ export default function CollectionAmount({
     <div className="flex h-full w-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       {/* Header */}
       <div className="mb-4 flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100 text-green-700">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
           <Calculator size={16} />
         </div>
-        <h2 className="text-lg font-semibold text-green-800">Collection Amount</h2>
+        <h2 className="text-lg font-semibold text-slate-800">Collection Amount</h2>
       </div>
 
       {/* Amount Input */}
@@ -186,8 +186,8 @@ export default function CollectionAmount({
       </div>
 
       {/* After Collection Summary */}
-      <div className="mt-5 flex-1 rounded-xl border border-green-200 bg-green-50 p-4">
-        <h3 className="mb-3 text-base font-bold text-green-800">After Collection</h3>
+      <div className="mt-5 flex-1 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+        <h3 className="mb-3 text-base font-bold text-slate-800">After Collection</h3>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-slate-600">Opening Balance</span>
@@ -195,12 +195,12 @@ export default function CollectionAmount({
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-slate-600">Received Today</span>
-            <span className="text-base font-bold text-green-700">{inr(displayReceived)}</span>
+            <span className="text-base font-bold text-emerald-700">{inr(displayReceived)}</span>
           </div>
           <div className="flex items-center justify-between border-t border-dashed border-slate-200 pt-2">
             <span className="text-sm font-semibold text-slate-700">Remaining Balance</span>
             <span className={`text-base font-extrabold ${
-              displayRemaining < 0 ? "text-blue-600" : displayRemaining === 0 ? "text-green-700" : "text-red-600"
+              displayRemaining < 0 ? "text-blue-600" : displayRemaining === 0 ? "text-emerald-700" : "text-red-600"
             }`}>
               {formattedRemaining}
             </span>
@@ -229,7 +229,7 @@ export default function CollectionAmount({
           className={`rounded-md px-5 py-2 text-sm font-medium text-white transition ${
             disableSave || isSaving
               ? "cursor-not-allowed bg-slate-400"
-              : "bg-green-700 hover:bg-green-800"
+              : "bg-emerald-600 hover:bg-emerald-700"
           }`}
         >
           {isSaving ? "Saving..." : "Save Collection"}

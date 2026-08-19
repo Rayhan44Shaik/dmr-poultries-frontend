@@ -20,6 +20,14 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { DatePicker } from "../../../../components/common/DatePicker";
+import {
+  opsFilterCardClass,
+  opsFilterLabelClass,
+  opsInputClass,
+  opsSecondaryButtonClass,
+  opsPdfButtonClass,
+  opsExcelButtonClass,
+} from "../../../../shared/ui/operationsStyles";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -41,7 +49,7 @@ type Props = {
   embedded?: boolean;
 };
 
-export default function CollectionReportPage({ embedded = false }: Props) {
+export default function CollectionReportPage({ embedded: _embedded = false }: Props) {
   const { showNotification } = useSafeNotification();
 
   const [loading, setLoading] = useState(true);
@@ -331,31 +339,22 @@ export default function CollectionReportPage({ embedded = false }: Props) {
 
   // Content matching the precise structural layout and spacing of RatesEntryPage
   const content = (
-    <div className="space-y-6">
+    <div className="w-full space-y-5">
       {/* Action Buttons */}
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        <button
-          onClick={exportExcel}
-          className="inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 cursor-pointer"
-        >
-          <FileSpreadsheet size={16} /> Excel
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button onClick={exportExcel} className={opsExcelButtonClass}>
+          <FileSpreadsheet size={15} /> Excel
         </button>
-        <button
-          onClick={exportPDF}
-          className="inline-flex items-center gap-2 rounded-md border border-green-600 bg-white px-3 py-2 text-sm font-medium text-green-600 shadow-sm hover:bg-green-50 cursor-pointer"
-        >
-          <FileText size={16} /> PDF
+        <button onClick={exportPDF} className={opsPdfButtonClass}>
+          <FileText size={15} /> PDF
         </button>
-        <button
-          onClick={resetFilters}
-          className="inline-flex items-center gap-2 rounded-md border border-red-600 bg-white px-3 py-2 text-sm font-medium text-red-600 shadow-sm hover:bg-red-50 cursor-pointer"
-        >
-          <RotateCcw size={16} /> Reset
+        <button onClick={resetFilters} className={opsSecondaryButtonClass}>
+          <RotateCcw size={14} /> Reset
         </button>
       </div>
 
       {/* Filter Bar Card */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6">
+      <div className={opsFilterCardClass}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DatePicker
             value={fromDate}
@@ -374,7 +373,7 @@ export default function CollectionReportPage({ embedded = false }: Props) {
             required
           />
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Shop Name</label>
+            <label className={opsFilterLabelClass}>Shop Name</label>
             <div className="relative">
               <input
                 type="text"
@@ -383,7 +382,7 @@ export default function CollectionReportPage({ embedded = false }: Props) {
                 onFocus={() => shopSearch.setIsOpen(true)}
                 onBlur={() => setTimeout(() => shopSearch.setIsOpen(false), 200)}
                 placeholder="All Shops"
-                className="h-10 w-full rounded-md border border-slate-300 pl-3 pr-8 text-sm outline-none focus:border-green-500"
+                className={`${opsInputClass} pr-8`}
               />
               {shopSearch.query && (
                 <button
@@ -400,9 +399,9 @@ export default function CollectionReportPage({ embedded = false }: Props) {
               )}
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
               {shopSearch.isOpen && (
-                <ul className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border border-slate-300 bg-white py-1 text-sm shadow-lg">
+                <ul className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 text-sm shadow-lg">
                   <li
-                    className="cursor-pointer px-3 py-2 hover:bg-green-50 text-blue-600 font-medium"
+                    className="cursor-pointer px-3 py-2 hover:bg-slate-50 text-emerald-600 font-medium"
                     onMouseDown={(e) => {
                       e.preventDefault();
                       shopSearch.setQuery("");
@@ -416,7 +415,7 @@ export default function CollectionReportPage({ embedded = false }: Props) {
                     shopSearch.filteredShops.slice(0, 5).map((shop) => (
                       <li
                         key={shop}
-                        className="cursor-pointer px-3 py-2 hover:bg-green-50"
+                        className="cursor-pointer px-3 py-2 hover:bg-slate-50"
                         onMouseDown={(e) => {
                           e.preventDefault();
                           shopSearch.handleSelect(shop);
@@ -433,11 +432,11 @@ export default function CollectionReportPage({ embedded = false }: Props) {
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Collector</label>
+            <label className={opsFilterLabelClass}>Collector</label>
             <select
               value={collector}
               onChange={(e) => setCollector(e.target.value)}
-              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500 bg-white"
+              className={opsInputClass}
             >
               <option value="">All Collectors</option>
               {collectors.map((name) => (
@@ -446,11 +445,11 @@ export default function CollectionReportPage({ embedded = false }: Props) {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Payment Mode</label>
+            <label className={opsFilterLabelClass}>Payment Mode</label>
             <select
               value={paymentMode}
               onChange={(e) => setPaymentMode(e.target.value)}
-              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500 bg-white"
+              className={opsInputClass}
             >
               <option value="">All Modes</option>
               <option value="Cash">Cash</option>
@@ -502,7 +501,7 @@ export default function CollectionReportPage({ embedded = false }: Props) {
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-100">
-              <thead className="bg-slate-50/75">
+              <thead className="bg-slate-50/80">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Payment Mode</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">No.</th>
@@ -545,7 +544,7 @@ export default function CollectionReportPage({ embedded = false }: Props) {
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-100">
-              <thead className="bg-slate-50/75">
+              <thead className="bg-slate-50/80">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Collector</th>
                   {collectorSummary.paymentModes.map((mode: string) => (
@@ -584,5 +583,5 @@ export default function CollectionReportPage({ embedded = false }: Props) {
     </div>
   );
 
-  return embedded ? content : content;
+  return content;
 }

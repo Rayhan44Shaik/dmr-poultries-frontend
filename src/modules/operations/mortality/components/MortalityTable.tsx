@@ -50,7 +50,7 @@ export default function MortalityTable({ records, onDelete }: MortalityTableProp
   const rows = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
 
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900">
+    <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
         <div>
           <h3 className="text-[13.5px] font-semibold tracking-tight text-slate-800 dark:text-slate-100">Mortality register</h3>

@@ -7,6 +7,7 @@ import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import TripKPICards from "../../vehicle-trips/components/TripKPICards";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
+import { opsPageClass, opsEmptyStateClass } from "../../../../shared/ui/operationsStyles";
 
 type Props = {
   embedded?: boolean;
@@ -85,7 +86,7 @@ export default function RatesEntryPage({ embedded: _embedded = false }: Props) {
   };
 
   const content = (
-    <div className="space-y-6">
+    <div className={opsPageClass}>
       <CompletedTripsFilters
         fromDate={filter.fromDate}
         toDate={filter.toDate}
@@ -124,7 +125,7 @@ export default function RatesEntryPage({ embedded: _embedded = false }: Props) {
       )}
 
       {filteredTrips.length === 0 && !loadError ? (
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-10 text-center text-sm font-medium text-slate-500">
+        <div className={opsEmptyStateClass}>
           No completed trips awaiting rate entry.
         </div>
       ) : (

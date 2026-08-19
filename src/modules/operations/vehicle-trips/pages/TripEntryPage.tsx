@@ -570,10 +570,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         }}
         shops={shops}
         birdTypes={birdTypes}
-        onEdit={(selectedTrip: Trip) => {
-          handleEdit(selectedTrip);
-          setViewOpen(false);
-        }}
       />
     </div>
   );

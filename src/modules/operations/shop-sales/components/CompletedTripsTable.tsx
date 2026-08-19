@@ -22,7 +22,7 @@ export default function CompletedTripsTable({ trips, onEnterRate, onModifyRate, 
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
       <div className="w-full overflow-x-auto">
         <table className="w-full text-xs">
-          <thead className="bg-slate-50/75 border-b border-slate-200/70">
+          <thead className="bg-slate-50/80 border-b border-slate-200/70">
             <tr className="text-slate-600 whitespace-nowrap">
               <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider w-10">#</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider">

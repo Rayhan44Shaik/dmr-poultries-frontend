@@ -238,86 +238,79 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   };
 
   const content = (
-    <div className={`w-full space-y-4 animate-in fade-in duration-500 ${
+    <div className={`w-full space-y-5 animate-in fade-in duration-500 ${
       embedded ? '' : 'px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen text-slate-800'
     }`}>
-      <div className="bg-white rounded-2xl p-4 md:p-6 border border-slate-200/85 shadow-sm space-y-4 text-slate-800">
-        
-        <div>
-          <TripFilters
-            fromDate={fromDate}
-            toDate={toDate}
-            vehicle={vehicle}
-            supervisor={supervisor}
-            farm={farm}
-            search={search}
-            setFromDate={setFromDate}
-            setToDate={setToDate}
-            setVehicle={setVehicle}
-            setSupervisor={setSupervisor}
-            setFarm={setFarm}
-            setSearch={setSearch}
-            onSearch={() => {}}
-            onReset={handleResetFilters}
-            vehicles={vehicleOptions}
-            supervisors={supervisors}
-            farms={farms}
-            onExportPDF={handleExportPDF}
-            onExportExcel={handleExportExcel}
-            onViewSelected={handleViewSelected}
-            showViewButton={selectedRowId !== null}
-            hasFilters={hasFilters}
-            viewButtonRef={viewButtonRef}
-          />
-        </div>
+      <TripFilters
+        fromDate={fromDate}
+        toDate={toDate}
+        vehicle={vehicle}
+        supervisor={supervisor}
+        farm={farm}
+        search={search}
+        setFromDate={setFromDate}
+        setToDate={setToDate}
+        setVehicle={setVehicle}
+        setSupervisor={setSupervisor}
+        setFarm={setFarm}
+        setSearch={setSearch}
+        onSearch={() => {}}
+        onReset={handleResetFilters}
+        vehicles={vehicleOptions}
+        supervisors={supervisors}
+        farms={farms}
+        onExportPDF={handleExportPDF}
+        onExportExcel={handleExportExcel}
+        onViewSelected={handleViewSelected}
+        showViewButton={selectedRowId !== null}
+        hasFilters={hasFilters}
+        viewButtonRef={viewButtonRef}
+      />
 
-        {hasFilters && (
-          <div>
-            <TripKPICards
-              totalTrips={totalCompletedTrips}
-              totalBirds={totalCompletedBirds}
-              totalWeight={totalCompletedWeight}
-              totalMortality={totalCompletedMortality}
-              totalShops={totalCompletedShops}
-            />
-          </div>
+      {hasFilters && (
+        <TripKPICards
+          totalTrips={totalCompletedTrips}
+          totalBirds={totalCompletedBirds}
+          totalWeight={totalCompletedWeight}
+          totalMortality={totalCompletedMortality}
+          totalShops={totalCompletedShops}
+        />
+      )}
+
+      <div ref={tableContainerRef} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
+        <TripMasterTable
+          trips={paginatedTrips}
+          selectedRowId={selectedRowId}
+          onRowClick={handleRowClick}
+          startIndex={(currentPage - 1) * pageSize}
+        />
+        {shouldShowPagination(totalCompletedTrips) && (
+        <div className={paginationBarClass}>
+          <button
+            onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
+            disabled={currentPage === 1}
+            className={paginationNavBtnClass}
+          >
+            Previous
+          </button>
+          {Array.from({ length: totalPagesCompleted }, (_, i) => i + 1).map((page) => (
+            <button
+              key={page}
+              onClick={() => setCurrentPage(page)}
+              className={paginationPageBtnClass(currentPage === page)}
+            >
+              {page}
+            </button>
+          ))}
+          <button
+            onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPagesCompleted))}
+            disabled={currentPage === totalPagesCompleted || totalPagesCompleted === 0}
+            className={paginationNavBtnClass}
+          >
+            Next
+          </button>
+        </div>
         )}
-
-        <div ref={tableContainerRef} className="rounded-2xl border border-slate-200/70 overflow-hidden bg-white shadow-sm text-xs md:text-sm">
-          <TripMasterTable
-            trips={paginatedTrips}
-            selectedRowId={selectedRowId}
-            onRowClick={handleRowClick}
-            startIndex={(currentPage - 1) * pageSize}
-          />
-          {shouldShowPagination(totalCompletedTrips) && (
-          <div className={paginationBarClass}>
-            <button
-              onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
-              disabled={currentPage === 1}
-              className={paginationNavBtnClass}
-            >
-              Previous
-            </button>
-            {Array.from({ length: totalPagesCompleted }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={paginationPageBtnClass(currentPage === page)}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPagesCompleted))}
-              disabled={currentPage === totalPagesCompleted || totalPagesCompleted === 0}
-              className={paginationNavBtnClass}
-            >
-              Next
-            </button>
-          </div>
-          )}
-        </div>
       </div>
 
       <TripViewModal

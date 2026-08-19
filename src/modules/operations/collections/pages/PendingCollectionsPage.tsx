@@ -29,6 +29,14 @@ import { PendingKPICards } from "../components/pending/PendingKPICards";
 import { PendingTable } from "../components/pending/PendingTable";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { DatePicker } from "../../../../components/common/DatePicker";
+import {
+  opsFilterCardClass,
+  opsFilterLabelClass,
+  opsInputClass,
+  opsSecondaryButtonClass,
+  opsPdfButtonClass,
+  opsExcelButtonClass,
+} from "../../../../shared/ui/operationsStyles";
 
 const formatDate = (dateStr: string) => {
   if (!dateStr || dateStr === "-") return "-";
@@ -540,7 +548,7 @@ export default function PendingCollectionsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-5">
       {summary.showSummary && (
         <OutstandingSummary
           openingBalance={summary.openingBalance}
@@ -554,29 +562,20 @@ export default function PendingCollectionsPage() {
       )}
 
       {/* Action Buttons */}
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        <button
-          onClick={exportExcel}
-          className="inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 cursor-pointer"
-        >
-          <FileSpreadsheet size={16} /> Excel
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button onClick={exportExcel} className={opsExcelButtonClass}>
+          <FileSpreadsheet size={15} /> Excel
         </button>
-        <button
-          onClick={exportPDF}
-          className="inline-flex items-center gap-2 rounded-md border border-green-600 bg-white px-3 py-2 text-sm font-medium text-green-600 shadow-sm hover:bg-green-50 cursor-pointer"
-        >
-          <FileText size={16} /> PDF
+        <button onClick={exportPDF} className={opsPdfButtonClass}>
+          <FileText size={15} /> PDF
         </button>
-        <button
-          onClick={resetFilters}
-          className="inline-flex items-center gap-2 rounded-md border border-red-600 bg-white px-3 py-2 text-sm font-medium text-red-600 shadow-sm hover:bg-red-50 cursor-pointer"
-        >
-          <RotateCcw size={16} /> Reset
+        <button onClick={resetFilters} className={opsSecondaryButtonClass}>
+          <RotateCcw size={14} /> Reset
         </button>
       </div>
 
       {/* Filter Bar Card */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6">
+      <div className={opsFilterCardClass}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DatePicker
             value={asOnDate}
@@ -587,7 +586,7 @@ export default function PendingCollectionsPage() {
             required
           />
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Shop Name</label>
+            <label className={opsFilterLabelClass}>Shop Name</label>
             <div className="relative">
               <input
                 type="text"
@@ -596,7 +595,7 @@ export default function PendingCollectionsPage() {
                 onFocus={() => shopSearch.setIsOpen(true)}
                 onBlur={() => setTimeout(() => shopSearch.setIsOpen(false), 200)}
                 placeholder="All Shops"
-                className="h-10 w-full rounded-md border border-slate-300 pl-3 pr-8 text-sm outline-none focus:border-green-500"
+                className={`${opsInputClass} pr-8`}
               />
               {shopSearch.query && (
                 <button
@@ -646,11 +645,11 @@ export default function PendingCollectionsPage() {
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Sort By</label>
+            <label className={opsFilterLabelClass}>Sort By</label>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500 bg-white"
+              className={opsInputClass}
             >
               <option value="highestBalance">Highest Balance</option>
               <option value="lowestBalance">Lowest Balance</option>
@@ -663,9 +662,9 @@ export default function PendingCollectionsPage() {
         <div className="mt-4 flex items-center gap-4 pt-4 border-t border-slate-100">
           <button
             onClick={() => setShowMoreFilters(!showMoreFilters)}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 hover:text-green-800 cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-800 cursor-pointer"
           >
-            <Filter size={16} />
+            <Filter size={15} />
             {showMoreFilters ? "Hide" : "More"} Filters
           </button>
           {showMoreFilters && (
@@ -676,9 +675,9 @@ export default function PendingCollectionsPage() {
                 setCollector("");
                 setRecoveryThreshold(0);
               }}
-              className="inline-flex items-center gap-1 text-sm font-medium text-red-500 hover:text-red-700 cursor-pointer"
+              className="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 cursor-pointer"
             >
-              <X size={16} /> Clear More Filters
+              <X size={15} /> Clear More Filters
             </button>
           )}
         </div>
@@ -703,11 +702,11 @@ export default function PendingCollectionsPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Collector</label>
+              <label className={opsFilterLabelClass}>Collector</label>
               <select
                 value={collector}
                 onChange={(e) => setCollector(e.target.value)}
-                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-green-500 bg-white"
+                className={opsInputClass}
               >
                 <option value="">All Collectors</option>
                 {collectors.map((name) => (
@@ -719,10 +718,10 @@ export default function PendingCollectionsPage() {
             <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 shadow-sm">
               <div className="mb-4 flex items-center justify-between">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700">Recovery %</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Recovery %</label>
                   <p className="text-xs text-slate-500">Show shops with at least this recovery percentage</p>
                 </div>
-                <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-bold text-green-700">
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-bold text-emerald-700">
                   {recoveryThreshold}%
                 </span>
               </div>
@@ -733,7 +732,7 @@ export default function PendingCollectionsPage() {
                 step={1}
                 value={recoveryThreshold}
                 onChange={(e) => setRecoveryThreshold(Number(e.target.value))}
-                className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-green-600"
+                className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-emerald-600"
               />
               <div className="mt-2 flex justify-between text-xs text-slate-500">
                 <span>0%</span>
