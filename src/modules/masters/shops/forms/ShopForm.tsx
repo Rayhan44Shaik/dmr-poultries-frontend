@@ -7,6 +7,7 @@ import {
   Mail,
   MapPin,
   Home,
+  IndianRupee,
 } from "lucide-react";
 
 type ShopFormProps = {
@@ -19,6 +20,7 @@ type ShopFormProps = {
     village: string;
     address: string;
     status: "Active" | "Inactive";
+    openingBalance: number;
   }) => void;
   onCancel: () => void;
   isSaving?: boolean;
@@ -31,6 +33,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
   const [email, setEmail] = useState("");
   const [village, setVillage] = useState("");
   const [address, setAddress] = useState("");
+  const [openingBalance, setOpeningBalance] = useState("0.00");
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
 
   const [errors, setErrors] = useState({
@@ -39,6 +42,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
     phoneNumber: "",
     email: "",
     village: "",
+    openingBalance: "",
   });
 
   const isEditing = !!shop;
@@ -51,6 +55,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       setEmail(shop.email ?? "");
       setVillage(shop.village);
       setAddress(shop.address ?? "");
+      setOpeningBalance(shop.openingBalance !== undefined ? String(shop.openingBalance) : "0.00");
       setStatus(shop.status);
     } else {
       setShopName("");
@@ -59,6 +64,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       setEmail("");
       setVillage("");
       setAddress("");
+      setOpeningBalance("0.00");
       setStatus("Active");
     }
     setErrors({
@@ -67,6 +73,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       phoneNumber: "",
       email: "",
       village: "",
+      openingBalance: "",
     });
   }, [shop]);
 
@@ -77,6 +84,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       phoneNumber: "",
       email: "",
       village: "",
+      openingBalance: "",
     };
 
     if (shopName.trim().length < 3) {
@@ -97,6 +105,11 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       newErrors.village = "Village is required.";
     }
 
+    const parsedBalance = parseFloat(openingBalance);
+    if (openingBalance.trim() === "" || isNaN(parsedBalance)) {
+      newErrors.openingBalance = "Opening Balance is required and must be a valid number.";
+    }
+
     setErrors(newErrors);
 
     if (
@@ -104,7 +117,8 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       newErrors.ownerName ||
       newErrors.phoneNumber ||
       newErrors.email ||
-      newErrors.village
+      newErrors.village ||
+      newErrors.openingBalance
     ) {
       return;
     }
@@ -117,6 +131,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       village,
       address,
       status,
+      openingBalance: parsedBalance,
     });
   };
 
@@ -282,6 +297,28 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
             </div>
             {errors.village && (
               <p className="text-red-600 text-sm mt-1">{errors.village}</p>
+            )}
+          </div>
+
+          <div className="relative">
+            <label className="block mb-2 text-sm font-semibold text-slate-700">
+              Opening Balance <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <div className={iconWrapperClass}>
+                <IndianRupee size={18} />
+              </div>
+              <input
+                type="number"
+                step="0.01"
+                value={openingBalance}
+                onChange={(e) => setOpeningBalance(e.target.value)}
+                placeholder="0.00"
+                className={inputClass(!!errors.openingBalance)}
+              />
+            </div>
+            {errors.openingBalance && (
+              <p className="text-red-600 text-sm mt-1">{errors.openingBalance}</p>
             )}
           </div>
 

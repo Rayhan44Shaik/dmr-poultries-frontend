@@ -243,6 +243,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       village: shop.village!.trim(),
       address: shop.address?.trim() ?? "",
       status: shop.status ?? "Active",
+      openingBalance: shop.openingBalance ?? 0,
     };
 
     try {

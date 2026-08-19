@@ -27,6 +27,7 @@ function toShopPayload(row: ShopBulkRow): ShopInput {
     village: row.village.trim(),
     address: row.address.trim(),
     status: row.status,
+    openingBalance: 0,
   };
 }
 

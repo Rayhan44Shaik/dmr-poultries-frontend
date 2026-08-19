@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { Check, Play, MapPin, Package, Truck, Wallet } from "lucide-react";
+import { Check, Lock, Play, MapPin, Package, Truck, Wallet } from "lucide-react";
 import { TRIP_STEP_KEYS } from "../../../../shared/trip/workflow";
 
 export type TripWizardCompletedMask = {
@@ -16,6 +16,14 @@ interface Props {
   steps: string[];
   completedMask: TripWizardCompletedMask;
   onStepClick?: (index: number) => void;
+  /**
+   * Steps at these indexes are LOCKED (a previous step has not been
+   * submitted yet). Locked steps can never become the active step; clicking
+   * one forwards to `onLockedStepClick` so the parent can redirect to the
+   * correct next incomplete step and explain why the step is locked.
+   */
+  lockedSteps?: boolean[];
+  onLockedStepClick?: (index: number) => void;
 }
 
 const STEP_ICONS = [Play, MapPin, Package, Truck, Wallet];
