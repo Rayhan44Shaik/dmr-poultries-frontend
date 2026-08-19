@@ -106,7 +106,7 @@ export function useTripEntry(
     [applyStartFieldChange]
   );
 
-  const loadTripFromApi = useCallback(async (id: number): Promise<boolean> => {
+  const loadTripFromApi = useCallback(async (id: number): Promise<Trip | null> => {
     setHeaderLoading(true);
     try {
       const loaded = await loadTripById(id);
@@ -116,10 +116,10 @@ export function useTripEntry(
       syncEndStep(loaded);
       setIsEditing(true);
       onTripIdAssignedRef.current?.(loaded.id);
-      return true;
+      return loaded;
     } catch (error) {
       notifyRef.current?.(handleApiError(error), "error");
-      return false;
+      return null;
     } finally {
       setHeaderLoading(false);
     }

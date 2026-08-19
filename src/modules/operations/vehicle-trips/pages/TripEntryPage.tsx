@@ -84,7 +84,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     saveDeliveriesProgress,
     submitEndTrip,
     saveEndProgress,
-    loadTrip,
     loadTripFromApi,
     clearTrip,
     updateStartTrip,
@@ -101,8 +100,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   const [entryScreen, setEntryScreen] = useState<EntryScreen>("prompt");
   const [editingSubmittedStep, setEditingSubmittedStep] = useState<number | null>(null);
-  const isManualSelect = useRef(false);
-  const pinOpenedStep = useRef(false);
 
   /** Strip tripId from URL so refresh never resumes an active wizard. */
   const clearTripIdFromUrl = useCallback(() => {
@@ -130,7 +127,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       setEditingSubmittedStep(null);
       setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
       clearTripIdFromUrl();
-      isManualSelect.current = false;
     });
   }, [registerStep1SuccessCallback, clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, showNotification]);
 
@@ -145,7 +141,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       setEditingSubmittedStep(null);
       setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
       clearTripIdFromUrl();
-      isManualSelect.current = false;
     });
   }, [registerStep2SuccessCallback, clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, showNotification]);
 
@@ -160,7 +155,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       setEditingSubmittedStep(null);
       setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
       clearTripIdFromUrl();
-      isManualSelect.current = false;
     });
   }, [registerStep3SuccessCallback, clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, showNotification]);
 
@@ -191,17 +185,24 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     editSubmittedStep: number | null
   ) => {
     setEntryScreen("form");
-    setViewStepIndex(targetStep);
-    setRows(selectedTrip.deliveries || []);
     setIsEditing(true);
     setEditingSubmittedStep(editSubmittedStep);
-    isManualSelect.current = true;
-    pinOpenedStep.current = true;
     showNotification(message, "success");
-    const loadedFromApi = await loadTripFromApi(selectedTrip.id);
-    if (!loadedFromApi) {
-      loadTrip(selectedTrip);
+
+    // The backend is the source of truth for step completion. Load the full
+    // trip from the API and derive the step to open from THAT state, never
+    // from a possibly stale Recent Trips row or the URL.
+    const loaded = await loadTripFromApi(selectedTrip.id);
+    const authoritative = loaded ?? selectedTrip;
+    setRows(authoritative.deliveries || []);
+
+    let resolvedStep = targetStep;
+    if (editSubmittedStep == null) {
+      // Resume: reopen at the first incomplete step per authoritative state.
+      resolvedStep = getNextIncompleteTripStep(authoritative);
     }
+    const maxAllowed = isTripWizardComplete(authoritative) ? 4 : getNextIncompleteTripStep(authoritative);
+    setViewStepIndex(Math.min(Math.max(0, resolvedStep), maxAllowed));
   };
 
   const handleResume = (selectedTrip: Trip) => {
@@ -276,8 +277,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setEditingSubmittedStep(null);
     setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
     clearTripIdFromUrl();
-    isManualSelect.current = false;
-    pinOpenedStep.current = false;
   }, [clearTrip, clearTripIdFromUrl, setIsEditing, setTrip]);
 
   const createNewTrip = useCallback(() => {
@@ -289,8 +288,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setIsEditing(true);
     setEditingSubmittedStep(null);
     setEntryScreen("form");
-    isManualSelect.current = false;
-    pinOpenedStep.current = false;
   }, [clearTrip, clearTripIdFromUrl, setIsEditing, setTrip]);
 
   const isStartCompleted = Boolean(trip.startStepSubmitted);
@@ -303,6 +300,14 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   // Shared Desktop + Mobile workflow definition.
   const currentStep = getNextIncompleteTripStep(trip);
+  // The maximum step a user may view/edit right now. Completed steps (0..max-1)
+  // stay reopenable; the currentStep is the working step; everything after it is
+  // LOCKED until the previous step is submitted (backend-submitted state only).
+  const maxAllowedStep = isTripEnded ? 4 : currentStep;
+  const lockedSteps = TRIP_STEP_LABELS.map((_, index) => index > maxAllowedStep);
+  // Render-safe view index — the UI must never trust a requested index that
+  // bypasses the sequence (direct state/URL manipulation included).
+  const effectiveViewStepIndex = Math.min(Math.max(0, viewStepIndex), maxAllowedStep);
 
   const [vehicleOpts, setVehicleOpts] = useState<Array<{ id: number; vehicleNumber: string }>>([]);
   const [employeeOpts, setEmployeeOpts] = useState<Array<{ id: number; employeeName: string; department: string }>>([]);
@@ -351,24 +356,27 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     ]
   );
 
+  // Clamp any requested step to the highest step that is legitimately
+  // available. This runs regardless of how the step was requested (click,
+  // programmatic navigation, state restoration) and never relies on the
+  // frontend-only flag being "next".
   useEffect(() => {
-    if (pinOpenedStep.current || isManualSelect.current) return;
-    if (currentStep > viewStepIndex) {
-      setViewStepIndex(currentStep);
+    if (viewStepIndex > maxAllowedStep) {
+      setViewStepIndex(maxAllowedStep);
     }
-  }, [currentStep, viewStepIndex]);
+  }, [viewStepIndex, maxAllowedStep]);
 
   const isNewTrip = trip.id === 0 || !trip.tripNo;
 
   const isEditable = (stepCompleted: boolean) => {
     if (trip.status === "Completed") return false;
-    if (editingSubmittedStep === viewStepIndex && isEditing) {
+    if (editingSubmittedStep === effectiveViewStepIndex && isEditing) {
       return canEditTrip || trip.status === "Draft" || trip.status === "Pending";
     }
-    if (viewStepIndex === 4) {
+    if (effectiveViewStepIndex === 4) {
       return isEditing && (canEditTrip || trip.status === "Draft" || trip.status === "Pending");
     }
-    const isViewingActiveStep = !isTripEnded && viewStepIndex === currentStep;
+    const isViewingActiveStep = !isTripEnded && effectiveViewStepIndex === currentStep;
     if (isViewingActiveStep && !stepCompleted) {
       return isNewTrip || isEditing || trip.status === "Draft";
     }
@@ -376,7 +384,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   };
 
   const renderSelectedStep = () => {
-    if (viewStepIndex === 0) {
+    if (effectiveViewStepIndex === 0) {
       return (
         <StepStart
           tripId={trip.id}
@@ -411,7 +419,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       );
     }
 
-    if (viewStepIndex === 1) {
+    if (effectiveViewStepIndex === 1) {
       return (
         <StepFarm
           trip={trip}
@@ -438,7 +446,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       );
     }
 
-    if (viewStepIndex === 2) {
+    if (effectiveViewStepIndex === 2) {
       return (
         <StepPickup
           trip={trip}
@@ -455,7 +463,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       );
     }
 
-    if (viewStepIndex === 3) {
+    if (effectiveViewStepIndex === 3) {
       return (
         <StepDeliveries
           rows={rows}
@@ -477,7 +485,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       );
     }
 
-    if (viewStepIndex === 4) {
+    if (effectiveViewStepIndex === 4) {
       return (
         <StepEnd
           trip={trip}
@@ -526,16 +534,24 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           <>
             <TripWizardStepper
               steps={TRIP_STEP_LABELS}
-              currentStep={isTripEnded ? 4 : currentStep}
+              currentStep={isTripEnded ? 4 : effectiveViewStepIndex}
               completedMask={getTripWizardCompletedMask(trip)}
+              lockedSteps={lockedSteps}
               onStepClick={(idx) => {
                 setViewStepIndex(idx);
-                isManualSelect.current = true;
-                pinOpenedStep.current = true;
+              }}
+              onLockedStepClick={(idx) => {
+                // A future step is locked until the previous step is actually
+                // submitted (backend state). Redirect to the correct next step.
+                setViewStepIndex(currentStep);
+                showNotification(
+                  `Step ${idx + 1} is locked. Complete Step ${currentStep + 1} (${TRIP_STEP_LABELS[currentStep]}) first.`,
+                  "info"
+                );
               }}
             />
 
-            {editingSubmittedStep != null && editingSubmittedStep === viewStepIndex && (
+            {editingSubmittedStep != null && editingSubmittedStep === effectiveViewStepIndex && (
               <WizardStepNotice
                 notice={{
                   type: "info",

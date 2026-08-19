@@ -41,7 +41,14 @@ export function resolveStepperCompletion(completedMask: TripWizardCompletedMask)
  * Every step is selectable; the selected step is strongly highlighted with a
  * smooth transition while completed steps keep their ✓ indication.
  */
-export default function TripWizardStepper({ currentStep, steps, completedMask, onStepClick }: Props) {
+export default function TripWizardStepper({
+  currentStep,
+  steps,
+  completedMask,
+  onStepClick,
+  lockedSteps = [],
+  onLockedStepClick,
+}: Props) {
   const stepStatus = resolveStepperCompletion(completedMask);
 
   return (
@@ -49,7 +56,8 @@ export default function TripWizardStepper({ currentStep, steps, completedMask, o
       {steps.map((label, index) => {
         const isCompleted = stepStatus[index];
         const isActive = index === currentStep;
-        const isClickable = !!onStepClick;
+        const isLocked = Boolean(lockedSteps[index]);
+        const isClickable = !!onStepClick && !isLocked;
         const Icon = STEP_ICONS[index % STEP_ICONS.length];
 
         const pillClasses = `
@@ -60,9 +68,11 @@ export default function TripWizardStepper({ currentStep, steps, completedMask, o
           ${
             isActive
               ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-transparent shadow-md shadow-emerald-500/25 scale-105"
-              : isCompleted
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                : "bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-700"
+              : isLocked
+                ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-80"
+                : isCompleted
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                  : "bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-700"
           }
         `.trim();
 
@@ -72,9 +82,11 @@ export default function TripWizardStepper({ currentStep, steps, completedMask, o
           ${
             isActive
               ? "bg-white/25 text-white"
-              : isCompleted
-                ? "bg-emerald-600 text-white"
-                : "bg-slate-100 text-slate-500"
+              : isLocked
+                ? "bg-slate-200 text-slate-400"
+                : isCompleted
+                  ? "bg-emerald-600 text-white"
+                  : "bg-slate-100 text-slate-500"
           }
         `;
 
@@ -83,7 +95,11 @@ export default function TripWizardStepper({ currentStep, steps, completedMask, o
             <span className={chipClasses} aria-hidden>
               {isCompleted ? <Check size={11} strokeWidth={3.5} /> : index + 1}
             </span>
-            <Icon size={13} strokeWidth={2.5} aria-hidden />
+            {isLocked ? (
+              <Lock size={11} strokeWidth={2.5} aria-hidden />
+            ) : (
+              <Icon size={13} strokeWidth={2.5} aria-hidden />
+            )}
             <span>{label}</span>
             {isCompleted && (
               <span
@@ -110,7 +126,26 @@ export default function TripWizardStepper({ currentStep, steps, completedMask, o
                 {content}
               </button>
             ) : (
-              <div className={pillClasses}>{content}</div>
+              <button
+                type="button"
+                onClick={() => {
+                  // A locked step must never become the active step. Only the
+                  // dedicated lock handler (parent redirects to the next
+                  // incomplete step) may fire; onStepClick is never reached.
+                  if (isLocked) {
+                    onLockedStepClick?.(index);
+                    return;
+                  }
+                  onStepClick?.(index);
+                }}
+                disabled={!isLocked && !onStepClick}
+                className={pillClasses}
+                aria-current={isActive ? "step" : undefined}
+                aria-label={`Step ${index + 1}: ${label}${isLocked ? " (locked)" : ""}`}
+                title={isLocked ? "Complete the previous step first" : undefined}
+              >
+                {content}
+              </button>
             )}
             {index < steps.length - 1 && (
               <div

@@ -37,6 +37,22 @@ export function getNextIncompleteTripStep(trip: TripStepFlags): number {
   return 4;
 }
 
+/**
+ * Highest step a user may legitimately open right now (0-based).
+ * Completed steps below it stay reopenable; the returned index is the
+ * working step; anything above it is LOCKED until the previous step is
+ * actually submitted. All five steps become viewable once the trip is complete.
+ */
+export function getMaxAllowedTripStep(trip: TripStepFlags): number {
+  if (isTripWizardComplete(trip)) return 4;
+  return getNextIncompleteTripStep(trip);
+}
+
+/** True when the given step index is locked until an earlier step is submitted. */
+export function isTripStepLocked(trip: TripStepFlags, index: number): boolean {
+  return index > getMaxAllowedTripStep(trip);
+}
+
 export function getLastSubmittedTripStep(trip: TripStepFlags): number | null {
   if (isTripWizardComplete(trip)) return 4;
   if (trip.deliveryStepSubmitted) return 3;

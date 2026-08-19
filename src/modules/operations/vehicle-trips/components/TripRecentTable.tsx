@@ -9,6 +9,7 @@ import TripPagination from "./TripPagination";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
+import { getNextIncompleteTripStep, TRIP_STEP_LABELS } from "../../../../shared/trip";
 
 interface Props {
   trips?: Trip[];
@@ -175,8 +176,12 @@ function TripRecentTable({
     if (trip.status === "Pending") {
       return { label: "Pending", color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, resume: false };
     }
+    // A Draft trip always has Step 1 submitted (trips are created on Step 1
+    // submit), so it is always mid-workflow: show which step is pending next.
+    const nextStep = getNextIncompleteTripStep(trip);
+    const stepLabel = TRIP_STEP_LABELS[nextStep] ?? `Step ${nextStep + 1}`;
     return {
-      label: "Draft",
+      label: `In Progress · Step ${nextStep + 1}: ${stepLabel}`,
       color: "bg-blue-50 text-blue-700 border-blue-200",
       icon: <FileText size={12} />,
       resume: true,

@@ -32,6 +32,7 @@ import { generateShopPDF } from "../utils/generateShopPDF";
 import { generateTripReportPDF, type TripReportEmailInfo } from "../utils/generateTripPDF";
 import { useTripDeliveryEmails } from "../hooks/useTripDeliveryEmails";
 import TripViewShopCards from "./TripViewShopCards";
+import { getNextIncompleteTripStep } from "../../../../shared/trip";
 
 // --- Read-only step presentation (incomplete trips only) ---
 import TripWizardStepper from "./TripWizardStepper";
@@ -411,6 +412,13 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
   const isDeliveryCompleted = Boolean(trip.deliveryStepSubmitted);
   const isEndCompleted = isTripWizardComplete(trip);
   const completedMask = getTripWizardCompletedMask(trip);
+  // Read-only view: future steps on an incomplete trip stay locked; a completed
+  // trip can review every step.
+  const maxAllowedViewStep = isTripWizardComplete(trip)
+    ? 4
+    : getNextIncompleteTripStep(trip);
+  const lockedSteps = TRIP_STEP_LABELS.map((_, index) => index > maxAllowedViewStep);
+  const safeViewStepIndex = Math.min(Math.max(0, viewStepIndex), maxAllowedViewStep);
 
   const downloadShopPDF = async (delivery: ShopDelivery) => {
     await generateShopPDF(
@@ -702,7 +710,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
   const noopDispatch = () => {};
 
   const renderViewStep = () => {
-    if (viewStepIndex === 0 && isStartCompleted) {
+    if (safeViewStepIndex === 0 && isStartCompleted) {
       return (
         <StepStart
           tripId={trip.id}
@@ -719,10 +727,10 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
         />
       );
     }
-    if (viewStepIndex === 1) {
+    if (safeViewStepIndex === 1) {
       return <Step2View trip={trip} />;
     }
-    if (viewStepIndex === 2) {
+    if (safeViewStepIndex === 2) {
       return (
         <StepPickup
           trip={trip}
@@ -733,10 +741,10 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
         />
       );
     }
-    if (viewStepIndex === 3 && isDeliveryCompleted) {
+    if (safeViewStepIndex === 3 && isDeliveryCompleted) {
       return <StepDeliveries rows={trip.deliveries || []} setRows={noopDispatch} shops={shops} birdTypes={[]} trip={trip} updateDeliveries={noop} submitDeliveriesStep={() => false} clearForm={noop} readOnly={true} canEdit={false} />;
     }
-    if (viewStepIndex === 4 && isEndCompleted) {
+    if (safeViewStepIndex === 4 && isEndCompleted) {
       return (
         <StepEnd
           trip={trip}
@@ -756,7 +764,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
 
   /** Completed trips: show ONLY the selected step's own persisted data. */
   const renderCompletedStep = () => {
-    switch (viewStepIndex) {
+    switch (safeViewStepIndex) {
       case 0:
         return <Step1View trip={trip} />;
       case 1:
@@ -774,6 +782,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
             bulkProgress={emailState.bulkProgress}
             shopEmailFor={emailState.shopEmailFor}
             failureReasonFor={emailState.failureReasonFor}
+            sendCountFor={emailState.sendCountFor}
             onSendOne={(delivery) => void emailState.sendOne(delivery)}
             onDownloadPdf={(delivery) => void downloadShopPDF(delivery)}
             emailCounts={emailCounts}
@@ -869,11 +878,17 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
         <div className="py-6 md:py-8 px-4 md:px-8 overflow-y-auto space-y-5 flex-1">
           <TripWizardStepper
             steps={TRIP_STEP_LABELS}
-            currentStep={viewStepIndex}
+            currentStep={safeViewStepIndex}
             completedMask={completedMask}
+            lockedSteps={lockedSteps}
             onStepClick={setViewStepIndex}
+            onLockedStepClick={(idx) => {
+              if (!isTripWizardComplete(trip)) {
+                setViewStepIndex(maxAllowedViewStep);
+              }
+            }}
           />
-          <div key={`${trip.id}-step-${viewStepIndex}`} className="animate-fade-in-up">
+          <div key={`${trip.id}-step-${safeViewStepIndex}`} className="animate-fade-in-up">
             {isCompleted ? renderCompletedStep() : renderViewStep()}
           </div>
           <TripFinalKPI trip={trip} deliveries={trip.deliveries} />
