@@ -11,8 +11,7 @@ import {
 import type { Trip } from "../../types/trip";
 import { meterMustBeGreaterThan } from "../../utils/meterValidation";
 import { usePendingDelete } from "../../../../../hooks/usePendingDelete";
-import { PendingDeleteActions } from "../../../../../components/common/PendingDeleteActions";
-import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from "../../../../../shared/ui/pendingDelete";
+import { PendingDeleteNotification } from "../../../../../components/common/PendingDeleteNotification";
 
 interface DieselExpensesTableProps {
   tripId: number;
@@ -407,7 +406,7 @@ export default function DieselExpensesTable({
     }
   };
 
-  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete<number>((num) => handleDeleteSubmitted(num));
+  const { requestDelete, cancel, pendingItems } = usePendingDelete<number>((num) => handleDeleteSubmitted(num));
 
   const lastRowIndex = rowIndices[rowIndices.length - 1];
   const isLastRowSubmitted = !!sheetData[`dieselSubmitted${lastRowIndex}`];
@@ -498,7 +497,7 @@ export default function DieselExpensesTable({
               const gpsOk = isValidGps(sheetData[`dieselGpsLat${num}`], sheetData[`dieselGpsLon${num}`]);
 
               return (
-                <tr key={num} className={`border-b border-slate-100 ${isPending(num) ? PENDING_DELETE_ROW_CLASS : ""} ${isSubmitted ? "bg-emerald-50/30" : "hover:bg-slate-50/50"}`}>
+                <tr key={num} className={`border-b border-slate-100 ${isSubmitted ? "bg-emerald-50/30" : "hover:bg-slate-50/50"}`}>
                   <td className="text-slate-700 text-xs py-2 px-3 text-center bg-slate-50/85">{idx + 1}</td>
                   <td className="p-1 text-center">
                     <input type="number" step="0.01" min="0" disabled={locked} value={ltrVal} onKeyDown={blockInvalidChar}
@@ -574,14 +573,8 @@ export default function DieselExpensesTable({
                       )
                     )}
                   </td>
-                  <td className={`p-1 text-center align-middle ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
-                    {isPending(num) ? (
-                      <PendingDeleteActions
-                        secondsLeft={secondsLeft(num)}
-                        committing={isCommitting(num)}
-                        onCancel={() => cancel(num)}
-                      />
-                    ) : readOnly ? (
+                  <td className="p-1 text-center align-middle">
+                    {readOnly ? (
                       <span className="text-[11px] font-semibold text-emerald-700">Submitted</span>
                     ) : (
                       <div className="flex items-center justify-center gap-2">
@@ -591,7 +584,7 @@ export default function DieselExpensesTable({
                             <button type="button" onClick={() => setEditingRow(num)} className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full" title="Edit Row">
                               <Pencil size={14} />
                             </button>
-                            <button type="button" onClick={() => requestDelete(num)} disabled={busyRow === num} className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full" title="Delete Row">
+                            <button type="button" onClick={() => requestDelete(num, { label: `Deleting diesel row ${num}` })} disabled={busyRow === num} className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full" title="Delete Row">
                               <Trash2 size={14} />
                             </button>
                           </>
@@ -649,6 +642,7 @@ export default function DieselExpensesTable({
           </div>
         );
       })()}
+      <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
     </div>
   );
 }

@@ -11,6 +11,7 @@ import type { Payment } from '../types/payment.types';
 import { DatePicker } from '../../../components/common/DatePicker';
 import { canEditItem, canDeleteItem } from '../../../utils/dateUtils';
 import { usePendingDelete } from '../../../hooks/usePendingDelete';
+import { PendingDeleteNotification } from '../../../components/common/PendingDeleteNotification';
 import {
   Download,
   RefreshCw,
@@ -166,7 +167,7 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
     }
   };
 
-  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete<string>((id) => {
+  const { requestDelete, cancel, pendingItems } = usePendingDelete<string>((id) => {
     const success = PaymentService.deletePayment(id);
     if (success) {
       showNotification('Payment deleted successfully', 'success');
@@ -183,7 +184,7 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
         showNotification('This payment is older than 10 days and cannot be deleted.', 'error');
         return;
       }
-      requestDelete(selectedPayment.id);
+      requestDelete(selectedPayment.id, { label: `Deleting payment to ${selectedPayment.paidTo}` });
     }
   };
 
@@ -417,9 +418,9 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
             payments={payments}
             selectedId={selectedId}
             onSelect={setSelectedId}
-            pendingDelete={{ requestDelete, cancel, isPending, secondsLeft, isCommitting }}
           />
         )}
+        <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
       </div>
 
       {/* ─── MODALS ─── */}

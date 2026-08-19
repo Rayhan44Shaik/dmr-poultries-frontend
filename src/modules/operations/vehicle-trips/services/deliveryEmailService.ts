@@ -48,11 +48,14 @@ export async function fetchDeliveryEmailStatuses(tripId: number): Promise<Delive
 export async function sendDeliveryEmail(input: {
   trip: Trip;
   delivery: ShopDelivery;
+  shopEmail?: string | null;
 }): Promise<{ success: boolean; status: DeliveryEmailStatusValue; message?: string }> {
   const blob = await generateShopPDFBlob(
     {
       ...input.delivery,
-      shopEmail: (input.delivery as { shopEmail?: string }).shopEmail,
+      shopEmail:
+        input.shopEmail ||
+        (input.delivery as { shopEmail?: string }).shopEmail,
     } as typeof input.delivery & { shopEmail?: string },
     input.trip.boxDetails || [],
     input.trip.tripNo,
@@ -95,7 +98,7 @@ export async function sendTripDeliveryEmails(
       if (current?.status === "sent") return;
       if (current?.status === "failed" && !force.has(delivery.id)) return;
       try {
-        await sendDeliveryEmail({ trip, delivery });
+        await sendDeliveryEmail({ trip, delivery, shopEmail: current?.shopEmail });
       } catch {
         /* status persisted as failed on the server when possible */
       }

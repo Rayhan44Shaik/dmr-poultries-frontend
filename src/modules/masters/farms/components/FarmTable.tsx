@@ -1,8 +1,7 @@
 import { Pencil, Trash2 } from "lucide-react";
 import type { Farm } from "../types/farm";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
-import { PendingDeleteActions } from "../../../../components/common/PendingDeleteActions";
-import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from "../../../../shared/ui/pendingDelete";
+import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 
 type FarmTableProps = {
   farms: Farm[];
@@ -11,7 +10,7 @@ type FarmTableProps = {
 };
 
 function FarmTable({ farms, onEdit, onDelete }: FarmTableProps) {
-  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete(onDelete);
+  const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
   return (
     <div className="overflow-x-auto rounded-xl bg-white shadow-sm border border-slate-200">
       <table className="min-w-full divide-y divide-slate-200">
@@ -31,7 +30,7 @@ function FarmTable({ farms, onEdit, onDelete }: FarmTableProps) {
           {[...farms]
             .sort((a, b) => (a.farmNo > b.farmNo ? 1 : -1))
             .map((farm) => (
-            <tr key={farm.id} className={isPending(farm.id) ? PENDING_DELETE_ROW_CLASS : "hover:bg-slate-50 transition-colors"}>
+            <tr key={farm.id} className="hover:bg-slate-50 transition-colors">
               <td className="px-4 py-3 text-sm text-slate-600">{farm.farmNo}</td>
               <td className="px-4 py-3 text-sm font-medium text-slate-800">{farm.farmName}</td>
               <td className="px-4 py-3 text-sm text-slate-600">{farm.ownerName}</td>
@@ -49,14 +48,7 @@ function FarmTable({ farms, onEdit, onDelete }: FarmTableProps) {
                   {farm.status}
                 </span>
               </td>
-              <td className={`px-4 py-3 text-center ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
-                {isPending(farm.id) ? (
-                  <PendingDeleteActions
-                    secondsLeft={secondsLeft(farm.id)}
-                    committing={isCommitting(farm.id)}
-                    onCancel={() => cancel(farm.id)}
-                  />
-                ) : (
+              <td className="px-4 py-3 text-center">
                 <div className="flex items-center justify-center gap-2">
                   <button
                     onClick={() => onEdit(farm)}
@@ -66,14 +58,13 @@ function FarmTable({ farms, onEdit, onDelete }: FarmTableProps) {
                     <Pencil size={16} />
                   </button>
                   <button
-                    onClick={() => requestDelete(farm.id)}
+                    onClick={() => requestDelete(farm.id, { label: `Deleting Farm "${farm.farmName}"` })}
                     className="rounded p-1 text-red-600 hover:bg-red-50 transition-colors"
                     title="Delete Farm"
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
-                )}
               </td>
             </tr>
           ))}
@@ -86,6 +77,7 @@ function FarmTable({ farms, onEdit, onDelete }: FarmTableProps) {
           )}
         </tbody>
       </table>
+      <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
     </div>
   );
 }

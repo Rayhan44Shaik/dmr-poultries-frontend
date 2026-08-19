@@ -1,8 +1,7 @@
 import { Pencil, Trash2 } from "lucide-react";
 import type { Employee } from "../types/employee";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
-import { PendingDeleteActions } from "../../../../components/common/PendingDeleteActions";
-import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from "../../../../shared/ui/pendingDelete";
+import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 
 type EmployeeTableProps = {
   employees: Employee[];
@@ -11,7 +10,7 @@ type EmployeeTableProps = {
 };
 
 function EmployeeTable({ employees, onEdit, onDelete }: EmployeeTableProps) {
-  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete(onDelete);
+  const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
   const formatSalary = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -38,7 +37,7 @@ function EmployeeTable({ employees, onEdit, onDelete }: EmployeeTableProps) {
           {[...employees]
             .sort((a, b) => (a.employeeNo > b.employeeNo ? 1 : -1))
             .map((emp) => (
-            <tr key={emp.id} className={isPending(emp.id) ? PENDING_DELETE_ROW_CLASS : "hover:bg-slate-50 transition-colors"}>
+            <tr key={emp.id} className="hover:bg-slate-50 transition-colors">
               <td className="px-4 py-3 text-sm text-slate-600">{emp.employeeNo}</td>
               <td className="px-4 py-3 text-sm font-medium text-slate-800">{emp.employeeName}</td>
               <td className="px-4 py-3 text-sm text-slate-600">{emp.department}</td>
@@ -57,14 +56,7 @@ function EmployeeTable({ employees, onEdit, onDelete }: EmployeeTableProps) {
                   {emp.status}
                 </span>
               </td>
-              <td className={`px-4 py-3 text-center ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
-                {isPending(emp.id) ? (
-                  <PendingDeleteActions
-                    secondsLeft={secondsLeft(emp.id)}
-                    committing={isCommitting(emp.id)}
-                    onCancel={() => cancel(emp.id)}
-                  />
-                ) : (
+              <td className="px-4 py-3 text-center">
                 <div className="flex items-center justify-center gap-2">
                   <button
                     onClick={() => onEdit(emp)}
@@ -74,14 +66,13 @@ function EmployeeTable({ employees, onEdit, onDelete }: EmployeeTableProps) {
                     <Pencil size={16} />
                   </button>
                   <button
-                    onClick={() => requestDelete(emp.id)}
+                    onClick={() => requestDelete(emp.id, { label: `Deleting Employee "${emp.employeeName}"` })}
                     className="rounded p-1 text-red-600 hover:bg-red-50 transition-colors"
                     title="Delete"
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
-                )}
               </td>
             </tr>
           ))}
@@ -94,6 +85,7 @@ function EmployeeTable({ employees, onEdit, onDelete }: EmployeeTableProps) {
           )}
         </tbody>
       </table>
+      <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
     </div>
   );
 }

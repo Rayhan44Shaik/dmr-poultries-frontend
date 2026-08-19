@@ -1,8 +1,7 @@
 import { Pencil, Trash2 } from "lucide-react";
 import type { BirdType } from "../types/birdType";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
-import { PendingDeleteActions } from "../../../../components/common/PendingDeleteActions";
-import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from "../../../../shared/ui/pendingDelete";
+import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 
 type BirdTypeTableProps = {
   birdTypes: BirdType[];
@@ -11,7 +10,7 @@ type BirdTypeTableProps = {
 };
 
 function BirdTypeTable({ birdTypes, onEdit, onDelete }: BirdTypeTableProps) {
-  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete(onDelete);
+  const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
   return (
     <div className="overflow-x-auto rounded-xl bg-white shadow-sm border border-slate-200">
       <table className="min-w-full divide-y divide-slate-200">
@@ -29,7 +28,7 @@ function BirdTypeTable({ birdTypes, onEdit, onDelete }: BirdTypeTableProps) {
           {[...birdTypes]
             .sort((a, b) => (a.birdTypeNo > b.birdTypeNo ? 1 : -1))
             .map((bt) => (
-            <tr key={bt.id} className={isPending(bt.id) ? PENDING_DELETE_ROW_CLASS : "hover:bg-slate-50 transition-colors"}>
+            <tr key={bt.id} className="hover:bg-slate-50 transition-colors">
               <td className="px-4 py-3 text-sm text-slate-600">{bt.birdTypeNo}</td>
               <td className="px-4 py-3 text-sm font-medium text-slate-800">{bt.birdType}</td>
               <td className="px-4 py-3 text-right text-sm text-slate-600">{bt.averageWeight}</td>
@@ -45,14 +44,7 @@ function BirdTypeTable({ birdTypes, onEdit, onDelete }: BirdTypeTableProps) {
                   {bt.status}
                 </span>
               </td>
-              <td className={`px-4 py-3 text-center ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
-                {isPending(bt.id) ? (
-                  <PendingDeleteActions
-                    secondsLeft={secondsLeft(bt.id)}
-                    committing={isCommitting(bt.id)}
-                    onCancel={() => cancel(bt.id)}
-                  />
-                ) : (
+              <td className="px-4 py-3 text-center">
                 <div className="flex items-center justify-center gap-2">
                   <button
                     onClick={() => onEdit(bt)}
@@ -62,14 +54,13 @@ function BirdTypeTable({ birdTypes, onEdit, onDelete }: BirdTypeTableProps) {
                     <Pencil size={16} />
                   </button>
                   <button
-                    onClick={() => requestDelete(bt.id)}
+                    onClick={() => requestDelete(bt.id, { label: `Deleting Bird Type "${bt.birdType}"` })}
                     className="rounded p-1 text-red-600 hover:bg-red-50 transition-colors"
                     title="Delete"
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
-                )}
               </td>
             </tr>
           ))}
@@ -82,6 +73,7 @@ function BirdTypeTable({ birdTypes, onEdit, onDelete }: BirdTypeTableProps) {
           )}
         </tbody>
       </table>
+      <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
     </div>
   );
 }

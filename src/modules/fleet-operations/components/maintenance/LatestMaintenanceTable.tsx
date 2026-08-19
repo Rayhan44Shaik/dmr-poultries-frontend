@@ -9,9 +9,8 @@ import {
   paginationPageBtnClass,
   shouldShowPagination,
 } from '../../../../shared/ui/paginationStyles';
-import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from '../../../../shared/ui/pendingDelete';
 import { usePendingDelete } from '../../../../hooks/usePendingDelete';
-import { PendingDeleteActions } from '../../../../components/common/PendingDeleteActions';
+import { PendingDeleteNotification } from '../../../../components/common/PendingDeleteNotification';
 import type { MaintenanceEvent } from '../../types';
 
 export type ViewMode = 'pending' | 'approved' | 'deleted';
@@ -59,7 +58,7 @@ const LatestMaintenanceTable = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
-  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete<string>(async (id) => {
+  const { requestDelete, cancel, isPending, pendingItems } = usePendingDelete<string>(async (id) => {
     const record = records.find((item) => item.id === id);
     if (record) await Promise.resolve(onDelete(record));
   });
@@ -221,7 +220,7 @@ const LatestMaintenanceTable = ({
                     <Edit size={14} /> Edit
                   </button>
                   <button
-                    onClick={(e) => { e.stopPropagation(); if (selectedRecord.id) requestDelete(selectedRecord.id); setSelectedId(null); }}
+                    onClick={(e) => { e.stopPropagation(); if (selectedRecord.id) requestDelete(selectedRecord.id, { label: `Deleting maintenance "${resolveVehicleNumber(selectedRecord)}"` }); setSelectedId(null); }}
                     disabled={!isEditable(selectedRecord.date) || isPending(selectedRecord.id)}
                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${
                       isEditable(selectedRecord.date)
@@ -365,8 +364,6 @@ const LatestMaintenanceTable = ({
                     <tr
                       key={rec.id}
                       className={`group hover:bg-slate-50/80 transition-colors cursor-pointer ${
-                        isPending(rec.id) ? PENDING_DELETE_ROW_CLASS : ""
-                      } ${
                         isSelected ? 'bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600' : 'border-l-4 border-l-transparent'
                       }`}
                       onClick={() => handleRowClick(rec.id)}
@@ -448,14 +445,8 @@ const LatestMaintenanceTable = ({
                         </td>
                       )}
 
-                      <td className={`px-4 py-3 text-center whitespace-nowrap ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
-                        {isPending(rec.id) ? (
-                          <PendingDeleteActions
-                            secondsLeft={secondsLeft(rec.id)}
-                            committing={isCommitting(rec.id)}
-                            onCancel={() => cancel(rec.id)}
-                          />
-                        ) : Array.isArray(rec.documents) && rec.documents.length > 0 ? (
+                      <td className="px-4 py-3 text-center whitespace-nowrap">
+                        {Array.isArray(rec.documents) && rec.documents.length > 0 ? (
                           <button
                             onClick={(e) => { e.stopPropagation(); onView(rec); }}
                             className="inline-flex items-center justify-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-all shadow-sm"
@@ -499,6 +490,7 @@ const LatestMaintenanceTable = ({
           )}
         </>
       )}
+      <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
     </div>
   );
 };

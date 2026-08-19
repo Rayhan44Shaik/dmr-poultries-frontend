@@ -8,19 +8,15 @@ import {
   paginationPageBtnClass,
   shouldShowPagination,
 } from '../../../../shared/ui/paginationStyles';
-import type { PendingDeleteControls } from '../../../../hooks/usePendingDelete';
-import { PendingDeleteActions } from '../../../../components/common/PendingDeleteActions';
-import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from '../../../../shared/ui/pendingDelete';
 
 interface PaymentTableProps {
   payments: Payment[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   itemsPerPage?: number;
-  pendingDelete?: PendingDeleteControls<string>;
 }
 
-export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10, pendingDelete }: PaymentTableProps) {
+export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10 }: PaymentTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
 
   const totalPages = Math.ceil(payments.length / itemsPerPage) || 1;
@@ -123,14 +119,11 @@ export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10
               paginatedPayments.map((payment, index) => {
                 const isSelected = selectedId === payment.id;
                 const absoluteIndex = (currentPage - 1) * itemsPerPage + index;
-                const isDeletePending = pendingDelete?.isPending(payment.id) === true;
                 return (
                   <tr
                     key={payment.id}
                     onClick={() => handleRowClick(payment.id)}
                     className={`cursor-pointer transition-all duration-150 group ${
-                      isDeletePending ? PENDING_DELETE_ROW_CLASS : ""
-                    } ${
                       isSelected
                         ? 'bg-blue-50/40 shadow-[inset_0_0_0_2px_#3b82f6]'
                         : 'hover:bg-slate-50/80'
@@ -154,16 +147,8 @@ export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10
                     <td className="px-6 py-4.5 text-sm text-slate-600 whitespace-nowrap">
                       {payment.paymentMode}
                     </td>
-                    <td className={`px-6 py-4.5 text-sm text-slate-500 truncate max-w-[240px] ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
-                      {isDeletePending && pendingDelete ? (
-                        <PendingDeleteActions
-                          secondsLeft={pendingDelete.secondsLeft(payment.id)}
-                          committing={pendingDelete.isCommitting(payment.id)}
-                          onCancel={() => pendingDelete.cancel(payment.id)}
-                        />
-                      ) : (
-                        payment.remarks || '-'
-                      )}
+                    <td className="px-6 py-4.5 text-sm text-slate-500 truncate max-w-[240px]">
+                      {payment.remarks || '-'}
                     </td>
                   </tr>
                 );

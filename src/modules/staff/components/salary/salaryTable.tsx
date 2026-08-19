@@ -10,8 +10,7 @@ import {
   shouldShowPagination,
 } from "../../../../shared/ui/paginationStyles";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
-import { PendingDeleteActions } from "../../../../components/common/PendingDeleteActions";
-import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from "../../../../shared/ui/pendingDelete";
+import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 
 type Action = "view" | "edit" | "submit" | "pay" | "markUnpaid" | "unsubmit" | "delete";
 
@@ -81,7 +80,7 @@ export function SalaryTable({
   saving = false,
   onAction,
 }: SalaryTableProps) {
-  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete<string>((id) => {
+  const { requestDelete, cancel, pendingItems } = usePendingDelete<string>((id) => {
     const record = records.find((item) => item.id === id);
     if (record) return onAction("delete", record);
   });
@@ -138,7 +137,7 @@ export function SalaryTable({
                 record.correctionWindowDaysRemaining > 0;
 
               return (
-                <tr key={record.id} className={isPending(record.id) ? PENDING_DELETE_ROW_CLASS : "hover:bg-slate-50 transition-colors"}>
+                <tr key={record.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3 text-sm font-semibold text-slate-800 whitespace-nowrap">{record.employeeName}</td>
                   <td className="px-4 py-3 text-sm text-slate-600">{record.department}</td>
                   <td className="px-3 py-3 text-center text-sm text-slate-700">{record.workingDays ?? "—"}</td>
@@ -157,23 +156,15 @@ export function SalaryTable({
                     )}
                   </td>
                   <td className="px-3 py-3 text-sm text-slate-600">{record.paymentDate ?? "—"}</td>
-                  <td className={`px-4 py-3 ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
-                    {isPending(record.id) ? (
-                      <PendingDeleteActions
-                        secondsLeft={secondsLeft(record.id)}
-                        committing={isCommitting(record.id)}
-                        onCancel={() => cancel(record.id)}
-                      />
-                    ) : (
+                  <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1.5">
                       <ActionButtons
                         record={record}
                         saving={saving}
                         onAction={onAction}
-                        onDelete={() => requestDelete(record.id)}
+                        onDelete={() => requestDelete(record.id, { label: `Deleting salary for ${record.employeeName}` })}
                       />
                     </div>
-                    )}
                     {note && <div className="text-[10px] text-slate-400 text-right mt-1">{note}</div>}
                   </td>
                 </tr>
@@ -213,6 +204,7 @@ export function SalaryTable({
           </button>
         </div>
       )}
+      <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
     </div>
   );
 }

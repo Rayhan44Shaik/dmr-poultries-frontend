@@ -8,8 +8,7 @@ import {
   shouldShowPagination,
 } from "../../../../../shared/ui/paginationStyles";
 import { usePendingDelete } from "../../../../../hooks/usePendingDelete";
-import { PendingDeleteActions } from "../../../../../components/common/PendingDeleteActions";
-import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from "../../../../../shared/ui/pendingDelete";
+import { PendingDeleteNotification } from "../../../../../components/common/PendingDeleteNotification";
 
 interface Props {
   collections: RecentCollection[];
@@ -49,7 +48,7 @@ export default function RecentCollectionsTable({
   onDelete,
   onViewShop,
 }: Props) {
-  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete(onDelete);
+  const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
   // Local search state
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -189,7 +188,7 @@ export default function RecentCollectionsTable({
                     key={isGrouped ? col.shopName : col.id}
                     className={`border-t border-slate-100 hover:bg-blue-50/50 transition-colors ${
                       index % 2 === 0 ? "bg-white" : "bg-slate-50/30"
-                    } ${isPending(col.id) ? PENDING_DELETE_ROW_CLASS : ""}`}
+                    }`}
                   >
                     {isGrouped ? (
                       <td className="px-4 py-3 text-xs font-medium text-slate-700">
@@ -229,14 +228,7 @@ export default function RecentCollectionsTable({
                         </span>
                       </td>
                     )}
-                    <td className={`px-4 py-3 text-center ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
-                      {isPending(col.id) ? (
-                        <PendingDeleteActions
-                          secondsLeft={secondsLeft(col.id)}
-                          committing={isCommitting(col.id)}
-                          onCancel={() => cancel(col.id)}
-                        />
-                      ) : (
+                    <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         {isPendingStatus ? (
                           <>
@@ -259,7 +251,7 @@ export default function RecentCollectionsTable({
                               Reject
                             </button>
                             <button
-                              onClick={() => requestDelete(col.id)}
+                              onClick={() => requestDelete(col.id, { label: `Deleting collection ${col.collectionNo}` })}
                               className="rounded-lg bg-red-100 px-3 py-1 text-xs font-medium text-red-700 transition hover:bg-red-200"
                             >
                               Delete
@@ -274,7 +266,6 @@ export default function RecentCollectionsTable({
                           </button>
                         )}
                       </div>
-                      )}
                     </td>
                   </tr>
                 );
@@ -306,6 +297,7 @@ export default function RecentCollectionsTable({
           </button>
         </div>
       )}
+      <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
     </div>
   );
 }

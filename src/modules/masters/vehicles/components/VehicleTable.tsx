@@ -3,8 +3,7 @@
 import { Pencil, Trash2 } from "lucide-react";
 import type { Vehicle } from "../types/vehicle";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
-import { PendingDeleteActions } from "../../../../components/common/PendingDeleteActions";
-import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from "../../../../shared/ui/pendingDelete";
+import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 
 type VehicleTableProps = {
   vehicles: Vehicle[];
@@ -13,7 +12,7 @@ type VehicleTableProps = {
 };
 
 function VehicleTable({ vehicles, onEdit, onDelete }: VehicleTableProps) {
-  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete(onDelete);
+  const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
   return (
     <div className="overflow-x-auto rounded-xl bg-white shadow-sm border border-slate-200">
       <table className="min-w-full divide-y divide-slate-200">
@@ -30,7 +29,7 @@ function VehicleTable({ vehicles, onEdit, onDelete }: VehicleTableProps) {
         </thead>
         <tbody className="divide-y divide-slate-200 bg-white">
           {vehicles.map((vehicle, index) => (
-            <tr key={vehicle.id} className={isPending(vehicle.id) ? PENDING_DELETE_ROW_CLASS : "hover:bg-slate-50 transition-colors"}>
+            <tr key={vehicle.id} className="hover:bg-slate-50 transition-colors">
               <td className="px-4 py-3 text-sm text-slate-600">{index + 1}</td>
               <td className="px-4 py-3 text-sm font-medium text-slate-800">{vehicle.vehicleNumber}</td>
               <td className="px-4 py-3 text-sm text-slate-600">{vehicle.vehicleType}</td>
@@ -47,14 +46,7 @@ function VehicleTable({ vehicles, onEdit, onDelete }: VehicleTableProps) {
                   {vehicle.status}
                 </span>
               </td>
-              <td className={`px-4 py-3 text-center ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
-                {isPending(vehicle.id) ? (
-                  <PendingDeleteActions
-                    secondsLeft={secondsLeft(vehicle.id)}
-                    committing={isCommitting(vehicle.id)}
-                    onCancel={() => cancel(vehicle.id)}
-                  />
-                ) : (
+              <td className="px-4 py-3 text-center">
                 <div className="flex items-center justify-center gap-2">
                   <button
                     onClick={() => onEdit(vehicle)}
@@ -64,14 +56,13 @@ function VehicleTable({ vehicles, onEdit, onDelete }: VehicleTableProps) {
                     <Pencil size={16} />
                   </button>
                   <button
-                    onClick={() => requestDelete(vehicle.id)}
+                    onClick={() => requestDelete(vehicle.id, { label: `Deleting Vehicle "${vehicle.vehicleNumber}"` })}
                     className="rounded p-1 text-red-600 hover:bg-red-50 transition-colors"
                     title="Delete Vehicle"
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
-                )}
               </td>
             </tr>
           ))}
@@ -84,6 +75,7 @@ function VehicleTable({ vehicles, onEdit, onDelete }: VehicleTableProps) {
           )}
         </tbody>
       </table>
+      <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
     </div>
   );
 }

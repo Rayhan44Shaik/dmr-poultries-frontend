@@ -1,8 +1,7 @@
 import { Pencil, Trash2 } from "lucide-react";
 import type { Shop } from "../types/shop";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
-import { PendingDeleteActions } from "../../../../components/common/PendingDeleteActions";
-import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from "../../../../shared/ui/pendingDelete";
+import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 
 type ShopTableProps = {
   shops: Shop[];
@@ -11,7 +10,7 @@ type ShopTableProps = {
 };
 
 function ShopTable({ shops, onEdit, onDelete }: ShopTableProps) {
-  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete(onDelete);
+  const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
   return (
     <div className="overflow-x-auto rounded-xl bg-white shadow-sm border border-slate-200">
       <table className="min-w-full divide-y divide-slate-200">
@@ -31,7 +30,7 @@ function ShopTable({ shops, onEdit, onDelete }: ShopTableProps) {
           {[...shops]
             .sort((a, b) => (a.shopNo > b.shopNo ? 1 : -1))
             .map((shop) => (
-            <tr key={shop.id} className={isPending(shop.id) ? PENDING_DELETE_ROW_CLASS : "hover:bg-slate-50 transition-colors"}>
+            <tr key={shop.id} className="hover:bg-slate-50 transition-colors">
               <td className="px-4 py-3 text-sm text-slate-600">{shop.shopNo}</td>
               <td className="px-4 py-3 text-sm font-medium text-slate-800">{shop.shopName}</td>
               <td className="px-4 py-3 text-sm text-slate-600">{shop.ownerName}</td>
@@ -49,14 +48,7 @@ function ShopTable({ shops, onEdit, onDelete }: ShopTableProps) {
                   {shop.status}
                 </span>
               </td>
-              <td className={`px-4 py-3 text-center ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
-                {isPending(shop.id) ? (
-                  <PendingDeleteActions
-                    secondsLeft={secondsLeft(shop.id)}
-                    committing={isCommitting(shop.id)}
-                    onCancel={() => cancel(shop.id)}
-                  />
-                ) : (
+              <td className="px-4 py-3 text-center">
                 <div className="flex items-center justify-center gap-2">
                   <button
                     onClick={() => onEdit(shop)}
@@ -66,14 +58,13 @@ function ShopTable({ shops, onEdit, onDelete }: ShopTableProps) {
                     <Pencil size={16} />
                   </button>
                   <button
-                    onClick={() => requestDelete(shop.id)}
+                    onClick={() => requestDelete(shop.id, { label: `Deleting Shop "${shop.shopName}"` })}
                     className="rounded p-1 text-red-600 hover:bg-red-50 transition-colors"
                     title="Delete Shop"
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
-                )}
               </td>
             </tr>
           ))}
@@ -86,6 +77,7 @@ function ShopTable({ shops, onEdit, onDelete }: ShopTableProps) {
           )}
         </tbody>
       </table>
+      <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
     </div>
   );
 }

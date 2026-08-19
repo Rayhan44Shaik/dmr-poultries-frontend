@@ -8,8 +8,7 @@ import { formatTripRecentDateWithDay } from "../utils/formatTripListDay";
 import TripPagination from "./TripPagination";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
-import { PendingDeleteActions } from "../../../../components/common/PendingDeleteActions";
-import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from "../../../../shared/ui/pendingDelete";
+import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 
 interface Props {
   trips?: Trip[];
@@ -43,13 +42,16 @@ function TripRecentTable({
   const [deleteReason, setDeleteReason] = useState("");
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
   const pendingDeletesRef = useRef<Map<number, { trip: Trip; reason: string }>>(new Map());
+  const onDeleteRef = useRef(onDelete);
+  onDeleteRef.current = onDelete;
 
-  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete<number>(async (id) => {
+  const { requestDelete, cancel, isPending, pendingItems } = usePendingDelete<number>(async (id) => {
     const pending = pendingDeletesRef.current.get(id);
     pendingDeletesRef.current.delete(id);
-    const trip = pending?.trip ?? safeTrips.find((t) => Number(t.id) === Number(id));
+    const trip = pending?.trip ?? safeTrips.find((t) => Number(t.id) === Number(id)) ?? ({ id } as Trip);
     const reason = pending?.reason ?? "";
-    if (trip && onDelete) await Promise.resolve(onDelete(trip, reason));
+    const deleteFn = onDeleteRef.current;
+    if (deleteFn) await Promise.resolve(deleteFn(trip, reason));
     setSelectedTripId(null);
   });
 
@@ -149,14 +151,15 @@ function TripRecentTable({
   const confirmDelete = () => {
     if (!tripToDelete || deleteReason.trim() === "") return alert("Please provide a reason for deletion.");
     const id = Number(tripToDelete.id);
-    if (!Number.isFinite(id)) return;
+    if (!Number.isFinite(id) || id <= 0) return;
     const reason = deleteReason.trim();
+    const trip = tripToDelete;
     setShowDeleteModal(false);
     setTripToDelete(null);
     setDeleteReason("");
     if (isPending(id)) return;
-    pendingDeletesRef.current.set(id, { trip: tripToDelete, reason });
-    requestDelete(id);
+    pendingDeletesRef.current.set(id, { trip, reason });
+    requestDelete(id, { label: `Deleting trip ${trip.tripNo}` });
   };
 
   const cancelDelete = () => {
@@ -274,21 +277,9 @@ function TripRecentTable({
                   const showDropdown = !isDeleted && onStatusChange && trip.status === "Pending" && !isApproved;
 
                   return (
-                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isPending(Number(trip.id)) ? PENDING_DELETE_ROW_CLASS : ""} ${isDeleted ? "bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
-                      <td className={`px-4 py-3 font-bold text-emerald-700 text-xs ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100/80 ${isDeleted ? "opacity-60 line-through" : ""}`}>{trip.tripNo}</span>
-                          {isPending(Number(trip.id)) ? (
-                            <PendingDeleteActions
-                              secondsLeft={secondsLeft(Number(trip.id))}
-                              committing={isCommitting(Number(trip.id))}
-                              onCancel={() => {
-                                pendingDeletesRef.current.delete(Number(trip.id));
-                                cancel(Number(trip.id));
-                              }}
-                            />
-                          ) : null}
-                        </div>
+                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
+                      <td className="px-4 py-3 font-bold text-emerald-700 text-xs">
+                        <span className={`bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100/80 ${isDeleted ? "opacity-60 line-through" : ""}`}>{trip.tripNo}</span>
                       </td>
                       <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripRecentDateWithDay(trip.tripDate)}</td>
                       <td className="px-4 py-3 text-xs font-medium text-slate-700">{trip.vehicleNo}</td>
@@ -359,6 +350,14 @@ function TripRecentTable({
           />
         )}
       </div>
+
+      <PendingDeleteNotification
+        items={pendingItems}
+        onCancel={(id) => {
+          pendingDeletesRef.current.delete(id);
+          cancel(id);
+        }}
+      />
 
       {/* Delete Modal */}
       {showDeleteModal && (

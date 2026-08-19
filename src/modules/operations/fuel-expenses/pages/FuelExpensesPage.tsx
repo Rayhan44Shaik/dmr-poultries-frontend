@@ -33,6 +33,7 @@ import {
 import type { FuelExpense } from "../types/fuelExpense";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
+import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 
 function FuelExpensesPage() {
   const { showNotification } = useSafeNotification();
@@ -157,7 +158,7 @@ function FuelExpensesPage() {
     setShowForm(true);
   }, [selectedBill, canEditDelete, showNotification]);
 
-  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete<string>(async (id) => {
+  const { requestDelete, cancel, pendingItems } = usePendingDelete<string>(async (id) => {
     await deleteExpense(id);
     setSelectedId((current) => (current === id ? null : current));
   });
@@ -168,7 +169,7 @@ function FuelExpensesPage() {
       showNotification("Delete not allowed – bill is older than 10 days.", "error");
       return;
     }
-    requestDelete(selectedBill.id);
+    requestDelete(selectedBill.id, { label: `Deleting fuel bill ${selectedBill.billNo}` });
   }, [selectedBill, canEditDelete, requestDelete, showNotification]);
 
   const handleApprove = useCallback(() => {
@@ -564,8 +565,8 @@ function FuelExpensesPage() {
           bills={paginatedData}
           selectedId={selectedId}
           onSelect={setSelectedId}
-          pendingDelete={{ requestDelete, cancel, isPending, secondsLeft, isCommitting }}
         />
+        <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
 
         {shouldShowPagination(totalCount) && (
           <div className={paginationBarClass}>

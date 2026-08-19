@@ -2,8 +2,21 @@ export const PENDING_DELETE_SECONDS = 10;
 
 export const PENDING_DELETE_ACTION_CELL_CLASS = "pending-delete-action";
 
-export const PENDING_DELETE_ROW_CLASS =
-  "bg-rose-50/40 [&>td:not(.pending-delete-action)]:blur-[1px] [&>td:not(.pending-delete-action)]:opacity-60 [&>td:not(.pending-delete-action)]:pointer-events-none [&>td:not(.pending-delete-action)]:select-none";
+/** Kept for callers that still toggle a pending class. Must never blur the row. */
+export const PENDING_DELETE_ROW_CLASS = "";
+
+export function pendingDeleteBarPercent(
+  secondsLeft: number,
+  totalSeconds: number = PENDING_DELETE_SECONDS,
+): number {
+  if (totalSeconds <= 0) return 0;
+  return Math.max(0, Math.min(100, (Math.max(secondsLeft, 0) / totalSeconds) * 100));
+}
+
+export function pendingDeleteCountdownLabel(secondsLeft: number): string {
+  const seconds = Math.max(secondsLeft, 1);
+  return seconds === 1 ? "Deleting in 1 second..." : `Deleting in ${seconds} seconds...`;
+}
 
 export type PendingDeleteSnapshot<TId extends string | number> = {
   id: TId;
