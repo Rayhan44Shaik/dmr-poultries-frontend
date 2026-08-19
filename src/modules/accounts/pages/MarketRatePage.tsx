@@ -1,32 +1,60 @@
 // src/modules/accounts/pages/MarketRatePage.tsx
 
-import React, { useState, useEffect } from 'react';
-import { Save, Tag, ChevronLeft, ChevronRight, CheckCircle2, X, RefreshCw } from 'lucide-react';
-import { DatePicker } from '../../../components/common/DatePicker';
-import { useSafeNotification } from '../../../hooks/useSafeNotification';
+import React, { useState, useEffect, useCallback } from "react";
+import { Save, Tag, ChevronLeft, ChevronRight, CheckCircle2, X, RefreshCw, AlertCircle } from "lucide-react";
+import { DatePicker } from "../../../components/common/DatePicker";
+import { useSafeNotification } from "../../../hooks/useSafeNotification";
+import { handleApiError } from "../../../api";
+import {
+  listMarketRates,
+  saveMarketRates,
+  marketRateNum,
+  type MarketRateInput,
+} from "../services/marketRateService";
 
 interface MarketRatePageProps {
   embedded?: boolean;
 }
+
+/** Local-timezone date formatter (business dates must never use toISOString,
+ * which shifts dates by a day for non-UTC timezones). */
+function formatLocalDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Parse a YYYY-MM-DD business date as LOCAL midnight (never UTC). */
+function parseLocalDate(dateStr: string): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr).trim());
+  if (!match) return new Date(dateStr);
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+// Numeric field keys per backend column, grouped by the UI table.
+const SUMMARY_FIELDS = ["vij", "gun", "rp"] as const;
+const TABLE_ONE_FIELDS = ["sneha", "vencobRate", "vencobVii", "vencobGun", "associationVii"] as const;
+const TABLE_TWO_FIELDS = ["c17", "c15", "c13", "c12", "c10"] as const;
+const ALL_FIELDS = [...SUMMARY_FIELDS, ...TABLE_ONE_FIELDS, ...TABLE_TWO_FIELDS] as const;
 
 export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false }) => {
   const { showNotification } = useSafeNotification();
 
   // Filter tab state ("This Week" selected by default)
   const [activeTab, setActiveTab] = useState<'This Week' | 'Month' | 'Quarter' | 'Custom Range'>('This Week');
-  const [autoSaveStatus, setAutoSaveStatus] = useState<'Saved' | 'Saving...'>('Saved');
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'Saved' | 'Saving...' | 'Error'>('Saved');
 
-  // Helper to get current Monday to Sunday dates
+  // Helper to get current Monday to Sunday dates (local, date-safe)
   const getCurrentWeekRange = (dateObj: Date = new Date()) => {
     const curr = new Date(dateObj);
     const day = curr.getDay();
     const diffToMonday = curr.getDate() - day + (day === 0 ? -6 : 1);
-    
+
     const monday = new Date(curr.setDate(diffToMonday));
     const sunday = new Date(curr.setDate(monday.getDate() + 6));
 
-    const formatDate = (d: Date) => d.toISOString().split('T')[0];
-    return { from: formatDate(monday), to: formatDate(sunday) };
+    return { from: formatLocalDate(monday), to: formatLocalDate(sunday) };
   };
 
   const weekRange = getCurrentWeekRange();
@@ -36,14 +64,14 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
   // Function to navigate weeks or months back or forward using the table headers
   const handleShiftTime = (direction: 'prev' | 'next') => {
     if (activeTab === 'Month') {
-      const currentFrom = new Date(fromDate);
+      const currentFrom = parseLocalDate(fromDate);
       currentFrom.setMonth(currentFrom.getMonth() + (direction === 'next' ? 1 : -1));
-      const firstDay = new Date(currentFrom.getFullYear(), currentFrom.getMonth(), 1).toISOString().split('T')[0];
-      const lastDay = new Date(currentFrom.getFullYear(), currentFrom.getMonth() + 1, 0).toISOString().split('T')[0];
+      const firstDay = formatLocalDate(new Date(currentFrom.getFullYear(), currentFrom.getMonth(), 1));
+      const lastDay = formatLocalDate(new Date(currentFrom.getFullYear(), currentFrom.getMonth() + 1, 0));
       setFromDate(firstDay);
       setToDate(lastDay);
     } else {
-      const currentMonday = new Date(fromDate);
+      const currentMonday = parseLocalDate(fromDate);
       currentMonday.setDate(currentMonday.getDate() + (direction === 'next' ? 7 : -7));
       const newRange = getCurrentWeekRange(currentMonday);
       setFromDate(newRange.from);
@@ -60,12 +88,12 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
       return;
     }
     const days = [];
-    let currentDate = new Date(fromDate);
-    const endDate = new Date(toDate);
+    let currentDate = parseLocalDate(fromDate);
+    const endDate = parseLocalDate(toDate);
 
     while (currentDate <= endDate) {
       const dayNum = currentDate.getDate().toString();
-      const dateStr = currentDate.toISOString().split('T')[0];
+      const dateStr = formatLocalDate(currentDate);
       days.push({ label: dayNum, dateStr });
       currentDate.setDate(currentDate.getDate() + 1);
     }
@@ -77,37 +105,51 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
   const [tableTwoData, setTableTwoData] = useState<Record<string, Record<string, string>>>({});
   const [summaryData, setSummaryData] = useState<Record<string, Record<string, string>>>({});
 
-  // Load yearly data from localStorage on mount
+  // Load Market Rates from the PostgreSQL backend whenever the range changes.
+  // The backend market_rates table is the single source of truth — the same
+  // data Rate Entry reads through its own endpoint.
   useEffect(() => {
-    const savedYearlyRates = localStorage.getItem('yearly_market_rates_store');
-    if (savedYearlyRates) {
-      try {
-        const parsed = JSON.parse(savedYearlyRates);
-        setTableOneData(parsed.tableOne || {});
-        setTableTwoData(parsed.tableTwo || {});
-        setSummaryData(parsed.summary || {});
-      } catch (e) {
-        console.error('Error loading stored rates', e);
-      }
+    let cancelled = false;
+    if (!fromDate || !toDate) {
+      setTableOneData({});
+      setTableTwoData({});
+      setSummaryData({});
+      return;
     }
-  }, []);
-
-  // Auto-save yearly store with debounce mechanism whenever inputs change
-  useEffect(() => {
-    setAutoSaveStatus('Saving...');
-    const yearlyPayload = {
-      tableOne: tableOneData,
-      tableTwo: tableTwoData,
-      summary: summaryData,
+    setAutoSaveStatus("Saving...");
+    void listMarketRates(fromDate, toDate)
+      .then((rows) => {
+        if (cancelled) return;
+        const summary: Record<string, Record<string, string>> = {};
+        const tableOne: Record<string, Record<string, string>> = {};
+        const tableTwo: Record<string, Record<string, string>> = {};
+        for (const row of rows) {
+          const date = row.businessDate;
+          summary[date] = {};
+          for (const key of SUMMARY_FIELDS) summary[date][key] = String(row[key] ?? "");
+          tableOne[date] = {};
+          for (const key of TABLE_ONE_FIELDS) tableOne[date][key] = String(row[key] ?? "");
+          tableTwo[date] = {};
+          for (const key of TABLE_TWO_FIELDS) tableTwo[date][key] = String(row[key] ?? "");
+        }
+        setSummaryData(summary);
+        setTableOneData(tableOne);
+        setTableTwoData(tableTwo);
+        setAutoSaveStatus("Saved");
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setAutoSaveStatus("Error");
+        showNotification(
+          `Unable to load market rates: ${handleApiError(err)}`,
+          "error"
+        );
+      });
+    return () => {
+      cancelled = true;
     };
-
-    const timer = setTimeout(() => {
-      localStorage.setItem('yearly_market_rates_store', JSON.stringify(yearlyPayload));
-      setAutoSaveStatus('Saved');
-    }, 400);
-
-    return () => clearTimeout(timer);
-  }, [tableOneData, tableTwoData, summaryData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromDate, toDate]);
 
   // Handlers for updating specific date values dynamically
   const handleTableOneChange = (dateStr: string, field: string, value: string) => {
@@ -140,17 +182,59 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
     }));
   };
 
-  // Manual explicit save action button with soft notification support
-  const handleManualSave = () => {
-    const yearlyPayload = {
-      tableOne: tableOneData,
-      tableTwo: tableTwoData,
-      summary: summaryData,
-    };
-    localStorage.setItem('yearly_market_rates_store', JSON.stringify(yearlyPayload));
-    setAutoSaveStatus('Saved');
-    showNotification('All progress and yearly rate matrices successfully saved!', 'success');
-  };
+  // Manual explicit save — upserts every non-empty date row into the backend
+  // market_rates table (one row per business date; re-saving a date updates it).
+  const handleManualSave = useCallback(async () => {
+    const rows: MarketRateInput[] = [];
+    for (const dayObj of matrixDays) {
+      const date = dayObj.dateStr;
+      const merged = {
+        ...(summaryData[date] || {}),
+        ...(tableOneData[date] || {}),
+        ...(tableTwoData[date] || {}),
+      };
+      const hasAny = ALL_FIELDS.some((field) => String(merged[field] ?? "").trim() !== "");
+      if (!hasAny) continue;
+      const payload: MarketRateInput = { businessDate: date };
+      for (const field of ALL_FIELDS) {
+        const raw = merged[field];
+        if (String(raw ?? "").trim() !== "") {
+          payload[field] = marketRateNum(raw);
+        }
+      }
+      rows.push(payload);
+    }
+    if (rows.length === 0) {
+      showNotification("Nothing to save. Enter at least one rate first.", "info");
+      return;
+    }
+
+    setAutoSaveStatus("Saving...");
+    try {
+      const saved = await saveMarketRates(rows);
+      // Frontend state is refreshed from the backend's returned (persisted) values.
+      const summary: Record<string, Record<string, string>> = {};
+      const tableOne: Record<string, Record<string, string>> = {};
+      const tableTwo: Record<string, Record<string, string>> = {};
+      for (const row of saved) {
+        const date = row.businessDate;
+        summary[date] = {};
+        for (const key of SUMMARY_FIELDS) summary[date][key] = String(row[key] ?? "");
+        tableOne[date] = {};
+        for (const key of TABLE_ONE_FIELDS) tableOne[date][key] = String(row[key] ?? "");
+        tableTwo[date] = {};
+        for (const key of TABLE_TWO_FIELDS) tableTwo[date][key] = String(row[key] ?? "");
+      }
+      setSummaryData(summary);
+      setTableOneData(tableOne);
+      setTableTwoData(tableTwo);
+      setAutoSaveStatus("Saved");
+      showNotification("Market rates saved successfully.", "success");
+    } catch (err) {
+      setAutoSaveStatus("Error");
+      showNotification(`Unable to save market rates: ${handleApiError(err)}`, "error");
+    }
+  }, [matrixDays, summaryData, tableOneData, tableTwoData, showNotification]);
 
   // Handle Tab Switching behavior
   const handleTabClick = (tab: 'This Week' | 'Month' | 'Quarter' | 'Custom Range') => {
@@ -161,8 +245,8 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
       setToDate(range.to);
     } else if (tab === 'Month') {
       const date = new Date();
-      const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
-      const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+      const firstDay = formatLocalDate(new Date(date.getFullYear(), date.getMonth(), 1));
+      const lastDay = formatLocalDate(new Date(date.getFullYear(), date.getMonth() + 1, 0));
       setFromDate(firstDay);
       setToDate(lastDay);
     }
@@ -219,14 +303,26 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Integrated non-floating auto-save status indicator */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 font-medium">
+          {/* Integrated non-floating save status indicator */}
+          <div className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border font-medium ${
+            autoSaveStatus === 'Error'
+              ? 'text-red-700 bg-red-50 border-red-200'
+              : 'text-slate-600 bg-slate-50 border-slate-200'
+          }`}>
             {autoSaveStatus === 'Saving...' ? (
               <RefreshCw size={13} className="text-amber-500 animate-spin" />
+            ) : autoSaveStatus === 'Error' ? (
+              <AlertCircle size={13} className="text-red-600" />
             ) : (
               <CheckCircle2 size={13} className="text-emerald-600" />
             )}
-            <span>{autoSaveStatus === 'Saving...' ? 'Saving changes...' : 'All changes auto-saved'}</span>
+            <span>
+              {autoSaveStatus === 'Saving...'
+                ? 'Saving changes...'
+                : autoSaveStatus === 'Error'
+                  ? 'Failed to sync with server'
+                  : 'Synced with server'}
+            </span>
           </div>
 
           {activeTab !== 'Custom Range' ? (
