@@ -29,9 +29,10 @@ export function resolveStepperCompletion(completedMask: TripWizardCompletedMask)
 }
 
 /**
- * Read-only 5-step trip wizard for the Trip View.
- * Every step is selectable; the selected step is strongly highlighted with a
- * smooth transition while completed steps keep their ✓ indication.
+ * Five-step trip wizard.
+ * A step is selectable only when it has already been submitted or it is the
+ * single next step in sequence. Future steps remain locked until the previous
+ * step is submitted, so Step 2 cannot be opened before Step 1, etc.
  */
 export default function TripWizardStepper({ currentStep, steps, completedMask, onStepClick }: Props) {
   const stepStatus = resolveStepperCompletion(completedMask);
@@ -41,20 +42,22 @@ export default function TripWizardStepper({ currentStep, steps, completedMask, o
       {steps.map((label, index) => {
         const isCompleted = stepStatus[index];
         const isActive = index === currentStep;
-        const isClickable = !!onStepClick;
+        const isNextStep = index === currentStep && !isCompleted;
+        const isStepAvailable = isCompleted || isNextStep;
+        const isClickable = Boolean(onStepClick) && isStepAvailable;
         const Icon = STEP_ICONS[index % STEP_ICONS.length];
 
         const pillClasses = `
           inline-flex items-center gap-1.5 rounded-full border px-2.5 md:px-3 py-1.5 text-[11px] font-bold whitespace-nowrap shrink-0
           transition-all duration-300 ease-out
           focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40
-          ${isClickable ? "cursor-pointer active:scale-95" : "cursor-default"}
+          ${isClickable ? "cursor-pointer active:scale-95" : "cursor-not-allowed opacity-65"}
           ${
             isActive
               ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-transparent shadow-md shadow-emerald-500/25 scale-105"
               : isCompleted
                 ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                : "bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-700"
+                : "bg-white text-slate-400 border-slate-200"
           }
         `.trim();
 
@@ -66,7 +69,7 @@ export default function TripWizardStepper({ currentStep, steps, completedMask, o
               ? "bg-white/25 text-white"
               : isCompleted
                 ? "bg-emerald-600 text-white"
-                : "bg-slate-100 text-slate-500"
+                : "bg-slate-100 text-slate-400"
           }
         `;
 
@@ -94,7 +97,7 @@ export default function TripWizardStepper({ currentStep, steps, completedMask, o
             {isClickable ? (
               <button
                 type="button"
-                onClick={() => onStepClick(index)}
+                onClick={() => onStepClick?.(index)}
                 className={pillClasses}
                 aria-current={isActive ? "step" : undefined}
                 aria-label={`Step ${index + 1}: ${label}`}
@@ -102,7 +105,13 @@ export default function TripWizardStepper({ currentStep, steps, completedMask, o
                 {content}
               </button>
             ) : (
-              <div className={pillClasses}>{content}</div>
+              <div
+                className={pillClasses}
+                aria-disabled="true"
+                title={isCompleted ? undefined : "Submit the previous step first"}
+              >
+                {content}
+              </div>
             )}
             {index < steps.length - 1 && (
               <div
