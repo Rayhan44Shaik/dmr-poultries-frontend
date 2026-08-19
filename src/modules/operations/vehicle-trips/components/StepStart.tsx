@@ -712,26 +712,28 @@ function StepStart({
     const meterNumericBad =
       form.openingMeterText.trim() !== "" && (!Number.isFinite(meterValue) || meterValue < 0);
     // Field-level live rule: the opening reading must be strictly greater than
-    // the vehicle's latest recorded reading (equal is invalid).
+    // the vehicle's latest recorded reading (equal is invalid). This is the ONLY
+    // field with live validation — all other Step 1 fields only flag after a
+    // submit attempt (showErrors), so the user is never shown red borders while
+    // simply filling the form.
     const meterBelowLatest =
       form.openingMeterText.trim() !== "" &&
       latestMeter != null &&
       Number.isFinite(meterValue) &&
       meterValue <= latestMeter.meter;
     return {
-      vehicle: !patch.vehicleId || !patch.vehicleNo,
-      supervisor: !patch.supervisorId || !patch.supervisorName,
-      driver: !patch.driverId || !patch.driverName,
+      vehicle: showErrors && (!patch.vehicleId || !patch.vehicleNo),
+      supervisor: showErrors && (!patch.supervisorId || !patch.supervisorName),
+      driver: showErrors && (!patch.driverId || !patch.driverName),
       // KM / Advance are OPTIONAL — an empty value is valid (saved as NULL).
       // Only a non-empty value that is not a valid non-negative number is flagged.
-      openingMeter:
-        (showErrors && meterNumericBad) || meterBelowLatest,
+      openingMeter: (showErrors && meterNumericBad) || meterBelowLatest,
       advance:
         showErrors &&
         form.advanceText.trim() !== "" &&
         (!Number.isFinite(Number(form.advanceText)) || Number(form.advanceText) < 0),
-      helpers: !patch.helpers || patch.helpers.length === 0,
-      loaders: !patch.loaders || patch.loaders.length === 0,
+      helpers: showErrors && (!patch.helpers || patch.helpers.length === 0),
+      loaders: showErrors && (!patch.loaders || patch.loaders.length === 0),
     };
   }, [form, showErrors, latestMeter]);
 
