@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { endOfMonth, format, startOfMonth } from 'date-fns';
-import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
+import { useFleetVehicles } from './useFleetVehicles';
 import { handleApiError, isCanceledError } from '../../../api/errors';
 import analyticsApi from '../services/analyticsApi';
 import { fleetCacheGet, fleetCacheInvalidate, fleetSharedGet } from '../services/fleetSessionCache';
@@ -10,7 +10,7 @@ const dateString = (date: Date) => format(date, 'yyyy-MM-dd');
 
 type AnalyticsView = Pick<
   FleetAnalyticsResponse,
-  'kpis' | 'weekly' | 'costCenters' | 'topPerformers' | 'highestExpense'
+  'kpis' | 'weekly' | 'costCenters' | 'topPerformers' | 'highestExpense' | 'vehicleStats'
 >;
 
 const EMPTY: AnalyticsView = {
@@ -31,6 +31,7 @@ const EMPTY: AnalyticsView = {
   costCenters: [],
   topPerformers: [],
   highestExpense: [],
+  vehicleStats: [],
 };
 
 function filterKey(fromDate: string, toDate: string, vehicleId: number | null) {
@@ -44,11 +45,12 @@ function toView(payload: FleetAnalyticsResponse): AnalyticsView {
     costCenters: payload.costCenters,
     topPerformers: payload.topPerformers,
     highestExpense: payload.highestExpense,
+    vehicleStats: payload.vehicleStats,
   };
 }
 
 export function useAnalyticsData() {
-  const { vehicles, loading: vehiclesLoading } = useVehicles();
+  const { vehicles, loading: vehiclesLoading } = useFleetVehicles();
   const [fromDate, setFromDateState] = useState(() => dateString(startOfMonth(new Date())));
   const [toDate, setToDateState] = useState(() => dateString(endOfMonth(new Date())));
   const [selectedVehicleId, setSelectedVehicleIdState] = useState<number | null>(null);
@@ -153,13 +155,13 @@ export function useAnalyticsData() {
     () => ({
       totalTrips: kpis.totalTrips,
       totalDistance: kpis.totalDistance,
-      totalFuel: kpis.totalFuelLitres,
+      totalFuelLitres: kpis.totalFuelLitres,
       fuelCost: kpis.fuelCost,
       maintenanceCost: kpis.maintenanceCost,
-      emiCost: kpis.emiDue,
+      emiDue: kpis.emiDue,
       totalExpense: kpis.totalExpense,
-      avgMileage: kpis.averageMileage,
-      costPerKM: kpis.costPerKm,
+      averageMileage: kpis.averageMileage,
+      costPerKm: kpis.costPerKm,
     }),
     [kpis]
   );
@@ -173,12 +175,22 @@ export function useAnalyticsData() {
     [vehicles]
   );
 
+  const vehicleStatusById = useMemo(() => {
+    const map = new Map<number, string>();
+    (vehicles || []).forEach((vehicle) => {
+      map.set(Number(vehicle.id), vehicle.status || 'Active');
+    });
+    return map;
+  }, [vehicles]);
+
   return {
     stats,
     weeklyData: data.weekly,
     expenseBreakdown: data.costCenters,
     topPerformers: data.topPerformers,
     highestExpense: data.highestExpense,
+    vehicleStats: data.vehicleStats,
+    vehicleStatusById,
     fromDate,
     toDate,
     setFromDate,

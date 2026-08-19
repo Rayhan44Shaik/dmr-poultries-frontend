@@ -1,8 +1,9 @@
 // src/modules/operations/vehicle-trips/components/TripViewModal.tsx
 // Read-only Trip View. Never reuses editable Step wizard controls.
-// For completed trips it shows the Trip Summary + Shop Delivery cards
-// (with per-shop email status and "Send All Mail"). Incomplete trips keep
-// the existing read-only step presentation.
+// Completed trips are reviewed through the 5-step wizard — each step shows
+// ONLY its own persisted data. Incomplete trips keep the existing read-only
+// step presentation. Email status (Send All Mail → Total / Sent / Failed)
+// is per-shop and stays visible after the batch finishes.
 
 import React, { useState, useCallback } from "react";
 import {
@@ -12,22 +13,23 @@ import {
   ShieldCheck,
   Send,
   Loader2,
-  Route,
-  Receipt,
   Clock,
   UserCheck,
-  Box,
+  MapPin,
+  Package,
+  Receipt,
+  FileDown,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Trip, ShopDelivery } from "../types/trip";
 import {
-  getNextIncompleteTripStep,
   getTripWizardCompletedMask,
   isTripWizardComplete,
   TRIP_STEP_LABELS,
 } from "../../../../shared/trip";
 import { generateShopPDF } from "../utils/generateShopPDF";
+import { generateTripReportPDF, type TripReportEmailInfo } from "../utils/generateTripPDF";
 import { useTripDeliveryEmails } from "../hooks/useTripDeliveryEmails";
 import TripViewShopCards from "./TripViewShopCards";
 
@@ -47,6 +49,67 @@ interface Props {
   birdTypes: any[];
 }
 
+/** Read-only Step 1 (Trip Start) details. */
+function Step1View({ trip }: { trip: Trip }) {
+  return (
+    <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
+      <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+        <Clock size={15} className="text-indigo-600" />
+        Step 1 — Trip Start
+      </h3>
+      <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Trip Date</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.tripDate || "—"}</dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Start Time</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.startTime || "—"}</dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Vehicle</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.vehicleNo || "—"}</dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Supervisor</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.supervisorName || "—"}</dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Driver</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.driverName || "—"}</dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Opening Meter</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
+            {trip.openingMeter != null ? `${trip.openingMeter} KM` : "Not entered"}
+          </dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Advance / Expenses</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
+            {trip.advanceAmount != null ? `₹ ${trip.advanceAmount.toLocaleString()}` : "Not entered"}
+          </dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Helpers</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.helpers?.join(", ") || "—"}</dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Loaders</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.loaders?.join(", ") || "—"}</dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Status</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
+            {trip.startStepSubmitted ? "Submitted" : "Not submitted"}
+          </dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
+/** Read-only Step 2 (Farm / Destination) details — compact, fits the view. */
 function Step2View({ trip }: { trip: Trip }) {
   const gpsCaptured =
     trip.farmGpsLat != null &&
@@ -60,7 +123,7 @@ function Step2View({ trip }: { trip: Trip }) {
     ["Farm Name", trip.sourceFarm || "Not entered"],
     ["Farm Address", trip.farmAddress?.trim() ? trip.farmAddress : "Not entered"],
     ["Farm Meter", trip.destMeter ? `${trip.destMeter} KM` : "Not entered"],
-    ["Step 2 Reached/Farm Time", trip.reachedTime || "Not entered"],
+    ["Reached / Farm Time", trip.reachedTime || "Not entered"],
     ["Tolls", trip.pickupTolls == null ? "Not entered" : String(trip.pickupTolls)],
     ["Average Bird Weight", trip.avgBirdWeight ? `${trip.avgBirdWeight} kg` : "Not entered"],
     ["GPS Latitude", gpsCaptured ? String(trip.farmGpsLat) : "Not entered"],
@@ -70,62 +133,133 @@ function Step2View({ trip }: { trip: Trip }) {
     ["Remarks", trip.remarks?.trim() ? trip.remarks : "Not entered"],
   ];
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
-      <h3 className="text-sm font-bold text-slate-800">Step 2 — Farm Loading</h3>
-      <p className="text-xs font-semibold text-slate-600">{gpsCaptured ? "GPS captured" : "GPS: Not captured"}</p>
-      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+          <MapPin size={15} className="text-indigo-600" />
+          Step 2 — Farm / Destination
+        </h3>
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${
+            gpsCaptured
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+              : "bg-slate-100 text-slate-500 border-slate-200"
+          }`}
+        >
+          {gpsCaptured ? "GPS captured" : "GPS: Not captured"}
+        </span>
+      </div>
+      <dl className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5">
         {rows.map(([label, value]) => (
-          <div key={label} className="border border-slate-100 rounded-xl p-3">
-            <dt className="text-[10px] uppercase font-semibold text-slate-400">{label}</dt>
-            <dd className="text-xs font-semibold text-slate-800 mt-0.5">{value}</dd>
+          <div key={label} className="min-w-0 rounded-xl border border-slate-100 bg-slate-50/40 px-3 py-2.5">
+            <dt className="truncate text-[10px] uppercase font-semibold text-slate-400">{label}</dt>
+            <dd className="mt-0.5 truncate text-xs font-semibold text-slate-800" title={value}>
+              {value}
+            </dd>
           </div>
         ))}
       </dl>
-    </div>
-  );
-}
-
-/** View-only read-only detail grid. */
-function ViewSection({
-  icon,
-  title,
-  children,
-}: {
-  icon?: React.ReactNode;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
-      <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-        {icon}
-        {title}
-      </h3>
-      {children}
     </section>
   );
 }
 
-function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+/** Read-only Step 3 (Pickup) details. */
+function Step3View({ trip }: { trip: Trip }) {
+  const pickupBoxes = Array.isArray(trip.boxDetails) ? trip.boxDetails : [];
   return (
-    <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-      <dt className="text-[10px] uppercase font-semibold text-slate-400">{label}</dt>
-      <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{value || "—"}</dd>
-    </div>
+    <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
+      <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+        <Package size={15} className="text-amber-600" />
+        Step 3 — Pickup Details
+      </h3>
+      <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">DC Weight</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
+            {trip.dcWeight != null ? `${trip.dcWeight} KG` : "Not entered"}
+          </dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Total Birds</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
+            {trip.totalBirds != null ? String(trip.totalBirds) : "Not entered"}
+          </dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Boxes</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
+            {trip.boxes != null ? String(trip.boxes) : "Not entered"}
+          </dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Avg Weight</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
+            {trip.avgWeight != null ? `${trip.avgWeight} kg` : "Not entered"}
+          </dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Pickup Load Time</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.pickupLoadTime || "Not entered"}</dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Status</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
+            {trip.pickupStepSubmitted ? "Submitted" : "Not submitted"}
+          </dd>
+        </div>
+      </dl>
+      {pickupBoxes.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border border-slate-200/70">
+          <table className="w-full text-xs">
+            <thead className="bg-slate-50/80">
+              <tr>
+                {["S.No", "Box", "Birds", "Weight (KG)", "Avg WT"].map((h) => (
+                  <th key={h} className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {pickupBoxes.map((b, index) => {
+                const birds = Number(b.birds || 0);
+                const weight = Number(b.weight || 0);
+                const avg =
+                  b.avgWeight != null && Number.isFinite(Number(b.avgWeight))
+                    ? Number(b.avgWeight)
+                    : birds > 0 && weight > 0
+                      ? Number((weight / birds).toFixed(3))
+                      : null;
+                return (
+                  <tr key={b.boxNo} className="hover:bg-slate-50/60">
+                    <td className="px-3 py-2 text-slate-500">{index + 1}</td>
+                    <td className="px-3 py-2 font-semibold text-slate-800">#{b.boxNo}</td>
+                    <td className="px-3 py-2 text-slate-700">{birds}</td>
+                    <td className="px-3 py-2 text-slate-700 tabular-nums">{weight.toFixed(2)}</td>
+                    <td className="px-3 py-2 text-slate-700 tabular-nums">{avg == null ? "--" : avg.toFixed(3)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 
-/** Read-only Trip Summary used for completed trips. */
-function TripViewSummary({ trip }: { trip: Trip }) {
+/** Read-only Step 5 (End / Expenses / Diesel) details. */
+function Step5View({ trip }: { trip: Trip }) {
   const totalKm =
     trip.totalKm != null && Number.isFinite(Number(trip.totalKm))
       ? Number(trip.totalKm)
       : Number(trip.closingMeter || 0) - Number(trip.openingMeter || 0);
 
-  const pickupBoxes = Array.isArray(trip.boxDetails) ? trip.boxDetails : [];
   const submittedDiesel = Array.isArray(trip.dieselEntries)
     ? trip.dieselEntries.filter((e) => e.submitted !== false)
     : [];
+  const totalDieselLitres = submittedDiesel.reduce((acc, e) => acc + Number(e.litres || 0), 0);
+  const totalDieselAmount = submittedDiesel.reduce((acc, e) => acc + Number(e.amount || 0), 0);
 
   const expensePairs: Array<[string, number]> = [
     ["Meals", Number(trip.meals || 0)],
@@ -140,163 +274,127 @@ function TripViewSummary({ trip }: { trip: Trip }) {
     ["Others", Number(trip.others5Amt || 0)],
   ];
   const positiveExpenses = expensePairs.filter(([, amt]) => amt > 0);
+  const totalExpenses = positiveExpenses.reduce((acc, [, amt]) => acc + amt, 0);
 
   return (
-    <div className="space-y-4">
-      <ViewSection
-        icon={<Route size={15} className="text-emerald-600" />}
-        title="Trip Summary"
-      >
-        <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <DetailRow label="Trip No" value={trip.tripNo} />
-          <DetailRow label="Trip Date" value={trip.tripDate} />
-          <DetailRow label="Vehicle" value={trip.vehicleNo} />
-          <DetailRow label="Driver" value={trip.driverName} />
-          <DetailRow label="Supervisor" value={trip.supervisorName} />
-          <DetailRow label="Source Farm" value={trip.sourceFarm} />
-          <DetailRow label="Opening KM" value={trip.openingMeter != null ? `${trip.openingMeter} KM` : "Not entered"} />
-          <DetailRow label="Closing KM" value={trip.closingMeter != null ? `${trip.closingMeter} KM` : "Not entered"} />
-          <DetailRow label="Total KM" value={`${totalKm} KM`} />
-          <DetailRow label="Fuel" value={trip.fuel != null ? `${trip.fuel} Ltrs` : "Not entered"} />
-          <DetailRow label="Total Expenses" value={trip.expense != null ? `₹ ${trip.expense}` : "Not entered"} />
-          <DetailRow
-            label="Status"
-            value={
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
-                <ShieldCheck size={11} /> {trip.status}
-              </span>
-            }
-          />
-        </dl>
-      </ViewSection>
-
-      <ViewSection icon={<Clock size={15} className="text-indigo-600" />} title="Step 1 — Trip Start">
-        <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <DetailRow label="Start Time" value={trip.startTime} />
-          <DetailRow label="Advance" value={trip.advanceAmount != null ? `₹ ${trip.advanceAmount.toLocaleString()}` : "Not entered"} />
-          <DetailRow label="Helpers" value={trip.helpers?.join(", ")} />
-          <DetailRow label="Loaders" value={trip.loaders?.join(", ")} />
-        </dl>
-      </ViewSection>
-
-      <Step2View trip={trip} />
-
-      <ViewSection icon={<Box size={15} className="text-amber-600" />} title="Step 3 — Pickup Details">
-        <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <DetailRow label="DC Weight" value={trip.dcWeight != null ? `${trip.dcWeight} KG` : "Not entered"} />
-          <DetailRow label="Total Birds" value={trip.totalBirds != null ? String(trip.totalBirds) : "Not entered"} />
-          <DetailRow label="Boxes" value={trip.boxes != null ? String(trip.boxes) : "Not entered"} />
-          <DetailRow label="Avg Weight" value={trip.avgWeight != null ? `${trip.avgWeight} kg` : "Not entered"} />
-          <DetailRow label="Pickup Load Time" value={trip.pickupLoadTime || "Not entered"} />
-          <DetailRow label="Delivered Weight" value={trip.totalDeliveredWeight != null ? `${trip.totalDeliveredWeight} KG` : "Not entered"} />
-          <DetailRow label="Mortality" value={trip.totalMortality != null ? `${trip.totalMortality} birds` : "Not entered"} />
-          <DetailRow label="Last Shop" value={trip.lastShop || "Not entered"} />
-        </dl>
-        {pickupBoxes.length > 0 && (
-          <div className="overflow-x-auto rounded-xl border border-slate-200/70">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-50/80">
-                <tr>
-                  {["S.No", "Box", "Birds", "Weight (KG)", "Avg WT"].map((h) => (
-                    <th key={h} className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {pickupBoxes.map((b, index) => {
-                  const birds = Number(b.birds || 0);
-                  const weight = Number(b.weight || 0);
-                  const avg =
-                    b.avgWeight != null && Number.isFinite(Number(b.avgWeight))
-                      ? Number(b.avgWeight)
-                      : birds > 0 && weight > 0
-                        ? Number((weight / birds).toFixed(3))
-                        : null;
-                  return (
-                    <tr key={b.boxNo} className="hover:bg-slate-50/60">
-                      <td className="px-3 py-2 text-slate-500">{index + 1}</td>
-                      <td className="px-3 py-2 font-semibold text-slate-800">#{b.boxNo}</td>
-                      <td className="px-3 py-2 text-slate-700">{birds}</td>
-                      <td className="px-3 py-2 text-slate-700 tabular-nums">{weight.toFixed(2)}</td>
-                      <td className="px-3 py-2 text-slate-700 tabular-nums">{avg == null ? "--" : avg.toFixed(3)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </ViewSection>
-
-      <ViewSection icon={<Receipt size={15} className="text-orange-600" />} title="Step 5 — Expenses & Diesel">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">General Expenses</h4>
-            {positiveExpenses.length ? (
-              <div className="rounded-xl border border-slate-200/70 overflow-hidden">
-                <table className="w-full text-xs">
-                  <tbody className="divide-y divide-slate-100">
-                    {positiveExpenses.map(([label, amt]) => (
-                      <tr key={label} className="hover:bg-slate-50/60">
-                        <td className="px-3 py-2 text-slate-600">{label}</td>
-                        <td className="px-3 py-2 text-right font-semibold text-slate-800 tabular-nums">₹ {amt.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-400">No expenses recorded.</p>
-            )}
-          </div>
-          <div>
-            <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Diesel / Fuel</h4>
-            {submittedDiesel.length ? (
-              <div className="overflow-x-auto rounded-xl border border-slate-200/70">
-                <table className="w-full text-xs">
-                  <thead className="bg-slate-50/80">
-                    <tr>
-                      {["S.No", "Litres", "Rate", "Amount", "Meter", "Bunk"].map((h) => (
-                        <th key={h} className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {submittedDiesel.map((e, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/60">
-                        <td className="px-3 py-2 text-slate-500">{idx + 1}</td>
-                        <td className="px-3 py-2 text-slate-700 tabular-nums">{String(e.litres ?? "")}</td>
-                        <td className="px-3 py-2 text-slate-700 tabular-nums">{String(e.rate ?? "")}</td>
-                        <td className="px-3 py-2 text-slate-700 tabular-nums">₹ {Number(e.amount ?? 0).toFixed(2)}</td>
-                        <td className="px-3 py-2 text-slate-700">{String(e.meter ?? "--")}</td>
-                        <td className="px-3 py-2 text-slate-700">{String(e.bunkName || "--")}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-400">No diesel entries recorded.</p>
-            )}
-            <p className="text-xs text-slate-500 mt-2">
-              Mileage:{" "}
-              {trip.mileageKmL != null && Number.isFinite(Number(trip.mileageKmL))
-                ? `${Number(trip.mileageKmL).toFixed(2)} km/L`
-                : "Not available"}
-            </p>
-          </div>
+    <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
+      <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+        <Receipt size={15} className="text-orange-600" />
+        Step 5 — End, Expenses & Diesel
+      </h3>
+      <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">End Meter Reading</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
+            {trip.closingMeter != null ? `${trip.closingMeter} KM` : "Not entered"}
+          </dd>
         </div>
-      </ViewSection>
-    </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Delivery Tolls</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
+            {trip.deliveryTolls != null ? String(trip.deliveryTolls) : "Not entered"}
+          </dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Total Distance</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{Math.max(0, totalKm)} KM</dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Mileage</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
+            {trip.mileageKmL != null && Number.isFinite(Number(trip.mileageKmL))
+              ? `${Number(trip.mileageKmL).toFixed(2)} km/L`
+              : "Not available"}
+          </dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Total Expenses</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">₹ {totalExpenses.toFixed(2)}</dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Total Diesel</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
+            {totalDieselLitres} Ltrs · ₹ {totalDieselAmount.toFixed(2)}
+          </dd>
+        </div>
+        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">Status</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
+            {isTripWizardComplete(trip) ? "Submitted" : "Not submitted"}
+          </dd>
+        </div>
+      </dl>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">General Expenses</h4>
+          {positiveExpenses.length ? (
+            <div className="rounded-xl border border-slate-200/70 overflow-hidden">
+              <table className="w-full text-xs">
+                <tbody className="divide-y divide-slate-100">
+                  {positiveExpenses.map(([label, amt]) => (
+                    <tr key={label} className="hover:bg-slate-50/60">
+                      <td className="px-3 py-2 text-slate-600">{label}</td>
+                      <td className="px-3 py-2 text-right font-semibold text-slate-800 tabular-nums">₹ {amt.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400">No expenses recorded.</p>
+          )}
+        </div>
+        <div>
+          <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Diesel / Fuel</h4>
+          {submittedDiesel.length ? (
+            <div className="overflow-x-auto rounded-xl border border-slate-200/70">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50/80">
+                  <tr>
+                    {["S.No", "Litres", "Rate", "Amount", "Meter", "Bunk"].map((h) => (
+                      <th key={h} className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {submittedDiesel.map((e, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/60">
+                      <td className="px-3 py-2 text-slate-500">{idx + 1}</td>
+                      <td className="px-3 py-2 text-slate-700 tabular-nums">{String(e.litres ?? "")}</td>
+                      <td className="px-3 py-2 text-slate-700 tabular-nums">{String(e.rate ?? "")}</td>
+                      <td className="px-3 py-2 text-slate-700 tabular-nums">₹ {Number(e.amount ?? 0).toFixed(2)}</td>
+                      <td className="px-3 py-2 text-slate-700">{String(e.meter ?? "--")}</td>
+                      <td className="px-3 py-2 text-slate-700">{String(e.bunkName || "--")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400">No diesel entries recorded.</p>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
 function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Props) {
-  const [viewStepIndex, setViewStepIndex] = useState(0);
+  // Completed trips open on Step 4 (Shop Deliveries); incomplete on Step 1.
+  const [viewStepIndex, setViewStepIndex] = useState(() =>
+    trip && trip.status === "Completed" && isTripWizardComplete(trip) ? 3 : 0
+  );
+  const [lastTripId, setLastTripId] = useState<number | null>(trip?.id ?? null);
+
+  // Reset the selected step when a different trip is opened (render-phase
+  // adjustment — the official "adjust state when props change" pattern).
+  if (trip && trip.id !== lastTripId) {
+    setLastTripId(trip.id);
+    setViewStepIndex(trip.status === "Completed" && isTripWizardComplete(trip) ? 3 : 0);
+  }
 
   const noopSubscribeSaveStatus = useCallback((_listener: () => void) => () => {}, []);
   const getIdleSaveStatus = useCallback(() => "idle" as const, []);
@@ -313,7 +411,6 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
   const isDeliveryCompleted = Boolean(trip.deliveryStepSubmitted);
   const isEndCompleted = isTripWizardComplete(trip);
   const completedMask = getTripWizardCompletedMask(trip);
-  const currentStep = isEndCompleted ? 4 : getNextIncompleteTripStep(trip);
 
   const downloadShopPDF = async (delivery: ShopDelivery) => {
     await generateShopPDF(
@@ -331,7 +428,25 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
     );
   };
 
-  // ─── PDF download ──────────────────────────────────────────────
+  // ─── Create PDF — professional A4 portrait trip report ────────────
+  const downloadTripReport = async () => {
+    const emailInfo: TripReportEmailInfo | null =
+      emailCounts.total > 0
+        ? {
+            total: emailCounts.total,
+            sent: emailCounts.sent,
+            failed: emailCounts.failed,
+            pending: emailCounts.pending,
+            byShop: (trip.deliveries || []).map((delivery) => ({
+              shopName: delivery.shopName,
+              status: emailState.effectiveStatus(delivery.id),
+            })),
+          }
+        : null;
+    await generateTripReportPDF(trip, emailInfo);
+  };
+
+  // ─── PDF download (existing footer export) ─────────────────────────
   const downloadPDF = () => {
     const doc = new jsPDF("p", "mm", "a4");
     const margin = 16;
@@ -619,7 +734,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
       );
     }
     if (viewStepIndex === 3 && isDeliveryCompleted) {
-      return <StepDeliveries rows={trip.deliveries || []} setRows={noopDispatch} shops={shops} birdTypes={[]} trip={trip} updateDeliveries={noop} submitDeliveriesStep={() => false} clearForm={noop} readOnly={true} />;
+      return <StepDeliveries rows={trip.deliveries || []} setRows={noopDispatch} shops={shops} birdTypes={[]} trip={trip} updateDeliveries={noop} submitDeliveriesStep={() => false} clearForm={noop} readOnly={true} canEdit={false} />;
     }
     if (viewStepIndex === 4 && isEndCompleted) {
       return (
@@ -637,6 +752,38 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
       );
     }
     return <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">Select a completed step to view its details.</div>;
+  };
+
+  /** Completed trips: show ONLY the selected step's own persisted data. */
+  const renderCompletedStep = () => {
+    switch (viewStepIndex) {
+      case 0:
+        return <Step1View trip={trip} />;
+      case 1:
+        return <Step2View trip={trip} />;
+      case 2:
+        return <Step3View trip={trip} />;
+      case 3:
+        return (
+          <TripViewShopCards
+            trip={trip}
+            shops={shops}
+            effectiveStatus={emailState.effectiveStatus}
+            busyIds={emailState.busyIds}
+            isBulkSending={emailState.isBulkSending}
+            bulkProgress={emailState.bulkProgress}
+            shopEmailFor={emailState.shopEmailFor}
+            failureReasonFor={emailState.failureReasonFor}
+            onSendOne={(delivery) => void emailState.sendOne(delivery)}
+            onDownloadPdf={(delivery) => void downloadShopPDF(delivery)}
+            emailCounts={emailCounts}
+          />
+        );
+      case 4:
+        return <Step5View trip={trip} />;
+      default:
+        return null;
+    }
   };
 
   const emailCounts = emailState.counts;
@@ -668,10 +815,10 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
           </div>
 
           <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
-            {isCompleted && (trip as any).approvedBy && (
+            {isCompleted && trip.approvedBy && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 border border-slate-200 shadow-sm">
                 <UserCheck size={12} className="text-emerald-600" />
-                Approved By: {(trip as any).approvedBy}
+                Approved By: {trip.approvedBy}
               </span>
             )}
             {isCompleted && emailCounts.total > 0 && (
@@ -683,7 +830,8 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
                   </>
                 ) : (
                   <>
-                    {emailCounts.sent} Sent{emailCounts.pending > 0 ? ` · ${emailCounts.pending} Pending` : ""}
+                    {emailCounts.total} Shops · {emailCounts.sent} Sent
+                    {emailCounts.pending > 0 ? ` · ${emailCounts.pending} Pending` : ""}
                     {emailCounts.failed > 0 ? ` · ${emailCounts.failed} Failed` : ""}
                   </>
                 )}
@@ -705,40 +853,30 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
                 {emailState.isBulkSending ? "Sending..." : "Send All Mail"}
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => void downloadTripReport()}
+              className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white hover:bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 shadow-sm transition-all active:scale-95"
+              title="Create a professional A4 trip report PDF"
+            >
+              <FileDown size={14} />
+              Create PDF
+            </button>
           </div>
         </div>
 
         {/* ─── Body ─────────────────────────────────────────────────── */}
-        <div className="py-6 md:py-8 px-4 md:px-8 overflow-y-auto space-y-6 flex-1">
-          {isCompleted ? (
-            <>
-              <TripViewSummary trip={trip} />
-              <TripViewShopCards
-                trip={trip}
-                shops={shops}
-                effectiveStatus={emailState.effectiveStatus}
-                busyIds={emailState.busyIds}
-                isBulkSending={emailState.isBulkSending}
-                bulkProgress={emailState.bulkProgress}
-                shopEmailFor={emailState.shopEmailFor}
-                failureReasonFor={emailState.failureReasonFor}
-                onSendOne={(delivery) => void emailState.sendOne(delivery)}
-                onDownloadPdf={(delivery) => void downloadShopPDF(delivery)}
-              />
-              <TripFinalKPI trip={trip} deliveries={trip.deliveries} />
-            </>
-          ) : (
-            <>
-              <TripWizardStepper
-                steps={TRIP_STEP_LABELS}
-                currentStep={currentStep}
-                completedMask={completedMask}
-                onStepClick={setViewStepIndex}
-              />
-              <div className="mt-4">{renderViewStep()}</div>
-              <TripFinalKPI trip={trip} deliveries={trip.deliveries} />
-            </>
-          )}
+        <div className="py-6 md:py-8 px-4 md:px-8 overflow-y-auto space-y-5 flex-1">
+          <TripWizardStepper
+            steps={TRIP_STEP_LABELS}
+            currentStep={viewStepIndex}
+            completedMask={completedMask}
+            onStepClick={setViewStepIndex}
+          />
+          <div key={`${trip.id}-step-${viewStepIndex}`} className="animate-fade-in-up">
+            {isCompleted ? renderCompletedStep() : renderViewStep()}
+          </div>
+          <TripFinalKPI trip={trip} deliveries={trip.deliveries} />
         </div>
 
         {/* ─── Footer ───────────────────────────────────────────────── */}

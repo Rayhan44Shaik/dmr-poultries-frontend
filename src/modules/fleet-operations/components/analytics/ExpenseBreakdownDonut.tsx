@@ -1,6 +1,7 @@
 // src/modules/fleet-operations/components/analytics/ExpenseBreakdownDonut.tsx
-import { memo } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { memo, useMemo } from 'react';
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
+import { formatCurrencyCompact } from '../../utils/formatters';
 
 interface ExpenseData {
   name: string;
@@ -12,83 +13,108 @@ interface ExpenseBreakdownDonutProps {
   height?: number;
 }
 
-const COLORS = ['#3B82F6', '#EF4444', '#F59E0B', '#10B981', '#8B5CF6'];
+const COLOR_BY_NAME: Record<string, string> = {
+  Fuel: '#2563eb',
+  Maintenance: '#f59e0b',
+  EMI: '#10b981',
+  Toll: '#8b5cf6',
+  Other: '#64748b',
+};
 
-const ExpenseBreakdownDonut = ({ data, height = 220 }: ExpenseBreakdownDonutProps) => {
-  if (!data || data.length === 0) {
+const FALLBACK_COLORS = ['#2563eb', '#f59e0b', '#10b981', '#8b5cf6', '#64748b'];
+
+const money = (value: number) => `₹${Math.round(value).toLocaleString('en-IN')}`;
+
+const ExpenseBreakdownDonut = ({ data, height = 240 }: ExpenseBreakdownDonutProps) => {
+  const items = useMemo(
+    () => (Array.isArray(data) ? data.filter((item) => Number(item.value) > 0) : []),
+    [data]
+  );
+
+  const total = useMemo(
+    () => items.reduce((sum, item) => sum + Number(item.value || 0), 0),
+    [items]
+  );
+
+  if (items.length === 0 || total <= 0) {
     return (
-      <div style={{ height }} className="flex items-center justify-center text-slate-400 text-sm font-medium">
-        No expense data recorded
+      <div
+        style={{ height }}
+        className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-sm font-medium text-slate-400"
+      >
+        No expense data for the selected filters.
       </div>
     );
   }
 
-  const totalExpense = data.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
-
-  if (totalExpense <= 0) {
-    return (
-      <div style={{ height }} className="flex items-center justify-center text-slate-400 text-sm font-medium">
-        No expense data recorded
-      </div>
-    );
-  }
+  const chartData = items.map((item) => ({
+    ...item,
+    percentage: total > 0 ? (item.value / total) * 100 : 0,
+  }));
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full" style={{ height }}>
-      {/* Chart Block with Fixed Clipping Bounds */}
-      <div className="relative w-full sm:w-1/2 h-full flex items-center justify-center">
+    <div className="flex h-full w-full flex-col" style={{ minHeight: height }}>
+      <div className="relative mx-auto h-40 w-40 flex-shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
-              data={data}
+              data={chartData}
               cx="50%"
               cy="50%"
-              innerRadius="68%"
-              outerRadius="88%"
-              paddingAngle={4}
+              innerRadius="66%"
+              outerRadius="90%"
+              paddingAngle={3}
               dataKey="value"
               isAnimationActive={false}
             >
-              {data.map((_, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="focus:outline-none transition-all duration-300 hover:opacity-90" />
+              {chartData.map((item, index) => (
+                <Cell
+                  key={item.name}
+                  fill={COLOR_BY_NAME[item.name] ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length]}
+                />
               ))}
             </Pie>
             <Tooltip
-              formatter={(value) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Amount']}
+              formatter={(value, name) => [
+                `${money(Number(value))} · ${
+                  total > 0 ? ((Number(value) / total) * 100).toFixed(1) : '0.0'
+                }%`,
+                name,
+              ]}
               contentStyle={{
-                backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                borderRadius: '8px',
-                border: 'none',
-                color: '#fff',
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                borderRadius: '10px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 8px 20px -6px rgba(15, 23, 42, 0.15)',
+                fontSize: '12px',
               }}
             />
           </PieChart>
         </ResponsiveContainer>
-
-        {/* Dynamic Center Text Data Display */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-[10px] uppercase tracking-widest font-semibold text-slate-400">Total Outlay</span>
-          <span className="text-lg font-black text-slate-900 mt-0.5">
-            ₹{totalExpense >= 100000 ? `${(totalExpense / 100000).toFixed(1)}L` : totalExpense.toLocaleString('en-IN')}
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+            Total Cost
           </span>
+          <span className="text-base font-black text-slate-900">{formatCurrencyCompact(total)}</span>
         </div>
       </div>
 
-      {/* Premium Side Sidebar Legend Grid Layout */}
-      <div className="w-full sm:w-1/2 grid grid-cols-2 sm:grid-cols-1 gap-2.5 px-2">
-        {data.map((item, idx) => {
-          const percentage = ((item.value / totalExpense) * 100).toFixed(1);
-          return (
-            <div key={item.name} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100/80 hover:bg-slate-100/50 transition-colors">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
-                <span className="text-xs font-semibold text-slate-700 truncate">{item.name}</span>
-              </div>
-              <span className="text-xs font-bold text-slate-500 pl-2">{percentage}%</span>
-            </div>
-          );
-        })}
+      <div className="mt-3 space-y-1.5">
+        {chartData.map((item, index) => (
+          <div key={item.name} className="flex items-center gap-2 text-xs">
+            <span
+              className="h-2.5 w-2.5 flex-shrink-0 rounded-sm"
+              style={{
+                backgroundColor:
+                  COLOR_BY_NAME[item.name] ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length],
+              }}
+            />
+            <span className="min-w-0 flex-1 truncate font-semibold text-slate-600">{item.name}</span>
+            <span className="tabular-nums font-medium text-slate-400">{item.percentage.toFixed(1)}%</span>
+            <span className="w-20 text-right tabular-nums font-bold text-slate-700">
+              {money(item.value)}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );

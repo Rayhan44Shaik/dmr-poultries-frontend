@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
 import { apiGet } from '../../../api';
 import { handleApiError } from '../../../api/errors';
@@ -29,6 +29,8 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
   const [historyLoading, setHistoryLoading] = useState(scope !== 'entry');
   const [error, setError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const hasLoaded = useRef(false);
+  const historyHasLoaded = useRef(false);
 
   const [selectedVehicle, setSelectedVehicle] = useState('all');
   const [selectedDriver, setSelectedDriver] = useState('all');
@@ -47,7 +49,7 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
     }
     let cancelled = false;
     (async () => {
-      setLoading(true);
+      if (!hasLoaded.current) setLoading(true);
       setError(null);
       try {
         const [activeData, approvedData, allData] = await Promise.all([
@@ -59,14 +61,17 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
         const active = rowsOf(activeData).map(mapMaintenanceToEvent);
         const approved = rowsOf(approvedData).map(mapMaintenanceToEvent);
         const all = rowsOf(allData).map(mapMaintenanceToEvent);
+        hasLoaded.current = true;
         setMaintenance(active);
         setApprovedMaintenance(approved);
         setDeletedRecords(all.filter((record) => Boolean(record.deletedAt)));
       } catch (cause) {
         if (!cancelled) {
-          setMaintenance([]);
-          setApprovedMaintenance([]);
-          setDeletedRecords([]);
+          if (!hasLoaded.current) {
+            setMaintenance([]);
+            setApprovedMaintenance([]);
+            setDeletedRecords([]);
+          }
           setError(handleApiError(cause));
         }
       } finally {
@@ -120,7 +125,7 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
     }
     let cancelled = false;
     const timer = window.setTimeout(async () => {
-      setHistoryLoading(true);
+      if (!historyHasLoaded.current) setHistoryLoading(true);
       setHistoryError(null);
       try {
         const payload = await maintenanceApi.list({
@@ -134,10 +139,13 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
           page: 1,
           limit: 500,
         });
-        if (!cancelled) setHistoryRecords(rowsOf(payload).map(mapMaintenanceToEvent));
+        if (!cancelled) {
+          historyHasLoaded.current = true;
+          setHistoryRecords(rowsOf(payload).map(mapMaintenanceToEvent));
+        }
       } catch (cause) {
         if (!cancelled) {
-          setHistoryRecords([]);
+          if (!historyHasLoaded.current) setHistoryRecords([]);
           setHistoryError(handleApiError(cause));
         }
       } finally {

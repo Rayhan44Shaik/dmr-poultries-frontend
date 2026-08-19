@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import {
   parse,
   format,
@@ -99,18 +99,22 @@ export function useDocumentsData() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [permitDocs, setPermitDocs] = useState<PermitViewDocument[]>([]);
+  const hasLoaded = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      if (!hasLoaded.current) setLoading(true);
       try {
         const rows = await fleetSharedGet('permits:list', () => permitApi.list());
         if (!cancelled) {
+          hasLoaded.current = true;
           setPermitDocs(rows.map(mapPermitToView));
           setError(null);
         }
       } catch (e) {
         if (!cancelled) {
+          if (!hasLoaded.current) setPermitDocs([]);
           const msg =
             e instanceof Error ? e.message : 'Failed to load permit documents';
           setError(msg);
@@ -177,12 +181,14 @@ export function useDocumentsData() {
   }, [documents, now]);
 
   const matrix = useMemo<MatrixRow[]>(() => {
+    const byKey = new Map<string, VehicleDocument>();
+    documents.forEach((doc) => {
+      byKey.set(`${String(doc.vehicleId)}:${doc.type}`, doc);
+    });
     return vehicles.map((vehicle) => {
       const docMap: Partial<Record<DocumentTypeKey, VehicleDocument>> = {};
       DocumentTypeEnum.forEach((type) => {
-        const doc = documents.find(
-          (d) => String(d.vehicleId) === String(vehicle.id) && d.type === type
-        );
+        const doc = byKey.get(`${String(vehicle.id)}:${type}`);
         if (doc) {
           docMap[type as DocumentTypeKey] = doc;
         }
@@ -205,7 +211,7 @@ export function useDocumentsData() {
 
   const refetch = useCallback(() => {
     fleetCacheInvalidate('permits:');
-    setLoading(true);
+    if (!hasLoaded.current) setLoading(true);
     setError(null);
     setRefreshKey((prev) => prev + 1);
   }, []);
@@ -248,7 +254,7 @@ export function useDocumentsData() {
         }
       }
       fleetCacheInvalidate('permits:');
-      setLoading(true);
+      if (!hasLoaded.current) setLoading(true);
       setError(null);
       setRefreshKey((prev) => prev + 1);
       return { success: true };
@@ -262,6 +268,7 @@ export function useDocumentsData() {
     statusCounts,
     expiringCounts,
     matrix,
+    hasData: permitDocs.length > 0,
     filterType,
     setFilterType,
     getStatusColor,

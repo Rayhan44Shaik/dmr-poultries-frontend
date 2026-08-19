@@ -1,4 +1,5 @@
-import { Check } from "lucide-react";
+import { Fragment } from "react";
+import { Check, Play, MapPin, Package, Truck, Wallet } from "lucide-react";
 import { TRIP_STEP_KEYS } from "../../../../shared/trip/workflow";
 
 export type TripWizardCompletedMask = {
@@ -10,11 +11,14 @@ export type TripWizardCompletedMask = {
 };
 
 interface Props {
+  /** Index of the currently selected / viewed step. */
   currentStep: number;
   steps: string[];
   completedMask: TripWizardCompletedMask;
   onStepClick?: (index: number) => void;
 }
+
+const STEP_ICONS = [Play, MapPin, Package, Truck, Wallet];
 
 export function resolveStepperCompletion(completedMask: TripWizardCompletedMask): boolean[] {
   return TRIP_STEP_KEYS.map((key) => {
@@ -24,65 +28,91 @@ export function resolveStepperCompletion(completedMask: TripWizardCompletedMask)
   });
 }
 
+/**
+ * Read-only 5-step trip wizard for the Trip View.
+ * Every step is selectable; the selected step is strongly highlighted with a
+ * smooth transition while completed steps keep their ✓ indication.
+ */
 export default function TripWizardStepper({ currentStep, steps, completedMask, onStepClick }: Props) {
   const stepStatus = resolveStepperCompletion(completedMask);
 
   return (
-    <div className="relative w-full flex justify-between items-start md:items-center mb-8 px-1 md:px-4 pt-4 md:pt-2">
+    <div className="flex items-center gap-1 md:gap-1.5 overflow-x-auto scrollbar-none py-1.5 px-1 select-none">
       {steps.map((label, index) => {
         const isCompleted = stepStatus[index];
-        const isActive = !isCompleted && index === currentStep;
-        const isClickable = !!onStepClick && (isCompleted || (!isCompleted && index === currentStep));
+        const isActive = index === currentStep;
+        const isClickable = !!onStepClick;
+        const Icon = STEP_ICONS[index % STEP_ICONS.length];
 
-        // 🔹 Extracted shared classes for clean, DRY code and mobile-first responsiveness
-        const circleClasses = `
-          relative z-10 rounded-full flex items-center justify-center font-bold transition-all duration-300 border-2 shadow-sm
-          w-8 h-8 text-xs md:w-10 md:h-10 md:text-sm
-          ${isCompleted ? "bg-blue-600 border-blue-600 text-white" : isActive ? "bg-white border-blue-600 text-blue-600 ring-4 ring-blue-50" : "bg-slate-100 border-slate-300 text-slate-400"}
-          ${isClickable ? "cursor-pointer hover:scale-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2" : ""}
+        const pillClasses = `
+          inline-flex items-center gap-1.5 rounded-full border px-2.5 md:px-3 py-1.5 text-[11px] font-bold whitespace-nowrap shrink-0
+          transition-all duration-300 ease-out
+          focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40
+          ${isClickable ? "cursor-pointer active:scale-95" : "cursor-default"}
+          ${
+            isActive
+              ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-transparent shadow-md shadow-emerald-500/25 scale-105"
+              : isCompleted
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                : "bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-700"
+          }
         `.trim();
 
-        return (
-          <div key={index} className="flex flex-col items-center relative z-10 w-full group">
-            {/* Step Connector Line */}
-            {index < steps.length - 1 && (
-              <div
-                // Responsive top positioning to align perfectly with shrinking/growing circles
-                className={`absolute top-4 md:top-5 left-[50%] w-full h-[2px] -z-10 transition-colors duration-500 ${
-                  isCompleted || (index < currentStep && stepStatus[index]) ? "bg-blue-600" : "bg-slate-200"
-                }`}
-              />
-            )}
+        const chipClasses = `
+          grid place-items-center w-[18px] h-[18px] rounded-full text-[9px] font-extrabold shrink-0
+          transition-all duration-300
+          ${
+            isActive
+              ? "bg-white/25 text-white"
+              : isCompleted
+                ? "bg-emerald-600 text-white"
+                : "bg-slate-100 text-slate-500"
+          }
+        `;
 
-            {/* Circle Wrapper (Clickable vs Non-Clickable) */}
+        const content = (
+          <>
+            <span className={chipClasses} aria-hidden>
+              {isCompleted ? <Check size={11} strokeWidth={3.5} /> : index + 1}
+            </span>
+            <Icon size={13} strokeWidth={2.5} aria-hidden />
+            <span>{label}</span>
+            {isCompleted && (
+              <span
+                className={`hidden md:inline text-[9px] font-semibold ${
+                  isActive ? "text-emerald-50/90" : "text-emerald-500"
+                }`}
+              >
+                Submitted
+              </span>
+            )}
+          </>
+        );
+
+        return (
+          <Fragment key={`${index}-${label}`}>
             {isClickable ? (
               <button
+                type="button"
                 onClick={() => onStepClick(index)}
-                className={circleClasses}
+                className={pillClasses}
                 aria-current={isActive ? "step" : undefined}
                 aria-label={`Step ${index + 1}: ${label}`}
               >
-                {isCompleted ? <Check className="w-4 h-4 md:w-5 md:h-5" strokeWidth={3} /> : index + 1}
+                {content}
               </button>
             ) : (
-              <div className={circleClasses}>
-                {isCompleted ? <Check className="w-4 h-4 md:w-5 md:h-5" strokeWidth={3} /> : index + 1}
-              </div>
+              <div className={pillClasses}>{content}</div>
             )}
-
-            {/* Label */}
-            <div className="mt-2 md:mt-3 text-[10px] md:text-[11px] lg:text-xs font-bold tracking-wide text-center px-1">
-              <span className={`block transition-colors duration-300 ${isCompleted ? "text-blue-700" : isActive ? "text-slate-900" : "text-slate-400"}`}>
-                {label}
-              </span>
-              {/* Hide "Completed" on mobile to prevent overlapping text, show on tablets/laptops */}
-              {isCompleted && (
-                <span className="hidden md:block text-[9px] md:text-[10px] text-emerald-600 mt-0.5">
-                  Submitted
-                </span>
-              )}
-            </div>
-          </div>
+            {index < steps.length - 1 && (
+              <div
+                aria-hidden
+                className={`h-[2px] flex-1 min-w-3 rounded-full transition-colors duration-500 ${
+                  stepStatus[index] ? "bg-emerald-400/70" : "bg-slate-200"
+                }`}
+              />
+            )}
+          </Fragment>
         );
       })}
     </div>

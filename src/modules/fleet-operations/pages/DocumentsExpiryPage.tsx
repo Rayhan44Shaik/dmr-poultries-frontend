@@ -46,6 +46,7 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
     updateDocument,
     loading,
     error,
+    hasData,
   } = useDocumentsData();
   const { showNotification } = useSafeNotification();
 
@@ -162,7 +163,7 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
       <div className={`w-full space-y-6 animate-in fade-in duration-500 ${
         embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50/50 min-h-screen'
       }`}>
-        {loading && (
+        {loading && !hasData && (
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-8 text-center text-sm font-semibold text-slate-500 flex items-center justify-center gap-3">
             <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" /> Loading permit documents...
           </div>
