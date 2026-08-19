@@ -36,13 +36,15 @@ export function resolveStepperCompletion(completedMask: TripWizardCompletedMask)
  */
 export default function TripWizardStepper({ currentStep, steps, completedMask, onStepClick }: Props) {
   const stepStatus = resolveStepperCompletion(completedMask);
+  const firstIncompleteStep = stepStatus.findIndex((completed) => !completed);
+  const nextAvailableStep = firstIncompleteStep === -1 ? steps.length - 1 : firstIncompleteStep;
 
   return (
     <div className="flex items-center gap-1 md:gap-1.5 overflow-x-auto scrollbar-none py-1.5 px-1 select-none">
       {steps.map((label, index) => {
         const isCompleted = stepStatus[index];
         const isActive = index === currentStep;
-        const isNextStep = index === currentStep && !isCompleted;
+        const isNextStep = index === nextAvailableStep && !isCompleted;
         const isStepAvailable = isCompleted || isNextStep;
         const isClickable = Boolean(onStepClick) && isStepAvailable;
         const Icon = STEP_ICONS[index % STEP_ICONS.length];
