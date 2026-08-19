@@ -36,6 +36,7 @@ import {
   Tractor,
   Car,
   Bird,
+  UserCheck,
   Settings,
   Database,
   DollarSign
@@ -134,6 +135,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Duty Planner", path: "/staff?tab=duty-planner", icon: CalendarClock, keywords: "duty planner roster schedule" },
       { label: "Salary Register", path: "/staff?tab=salary-sheet", icon: Wallet, keywords: "salary register sheet" },
       { label: "Leaves", path: "/staff?tab=leaves", icon: CalendarDays, keywords: "leave management approval" },
+      { label: "Driver Performance", path: "/staff?tab=driver-performance", icon: Truck, keywords: "driver performance trips cost mileage" },
+      { label: "Supervisor Performance", path: "/staff?tab=supervisor-performance", icon: UserCheck, keywords: "supervisor performance shops birds mortality" },
       //{ label: "Attendance", path: "/staff?tab=duty-planner", icon: CalendarCheck, soon: true, keywords: "attendance biometric" },
       //{ label: "Deductions", path: "/staff?tab=salary-sheet", icon: Scale, soon: true, keywords: "deductions advance loan" },
     ],

@@ -3,19 +3,18 @@ import {
   AlertCircle,
   CheckCircle2,
   CircleDollarSign,
+  Clock,
+  Landmark,
   Loader2,
   RefreshCw,
   RotateCcw,
+  Wallet,
 } from 'lucide-react';
 import ErrorBoundary from '../components/common/ErrorBoundary';
+import KpiCard from '../components/common/KpiCard';
 import Pagination from '../components/common/Pagination';
-import { useEmiData, buildPlanning, type EmiFilterState } from '../hooks/useEmiData';
-import EmiKpiCards from '../components/emi/EmiKpiCards';
-import EmiPlanningSummary from '../components/emi/EmiPlanningSummary';
-import EmiTrendChart from '../components/emi/EmiTrendChart';
-import UpcomingEmiTable from '../components/emi/UpcomingEmiTable';
-import EmiFinancialAttention from '../components/emi/EmiFinancialAttention';
-import type { UpcomingEmiRow } from '../hooks/useEmiData';
+import SearchInput from '../components/common/SearchInput';
+import { useEmiData } from '../hooks/useEmiData';
 import type { EmiOverview, EmiOverviewStatus } from '../types';
 
 interface EmiLoansPageProps {
@@ -24,32 +23,12 @@ interface EmiLoansPageProps {
 
 const PAGE_SIZE = 10;
 
-const MONTH_OPTIONS = [
-  { value: 1, label: 'January' },
-  { value: 2, label: 'February' },
-  { value: 3, label: 'March' },
-  { value: 4, label: 'April' },
-  { value: 5, label: 'May' },
-  { value: 6, label: 'June' },
-  { value: 7, label: 'July' },
-  { value: 8, label: 'August' },
-  { value: 9, label: 'September' },
-  { value: 10, label: 'October' },
-  { value: 11, label: 'November' },
-  { value: 12, label: 'December' },
-];
-
-const MONTH_SHORT = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-
 const money = (value: number) => `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 const displayDate = (value?: string | null) =>
   value ? new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 const fieldClass =
-  'h-9 min-w-[110px] rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15';
+  'h-9 min-w-[120px] rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15';
 const controlClass =
   'flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50';
 
@@ -120,98 +99,56 @@ const StatusBadge = ({ row, todayKey }: { row: EmiOverview; todayKey: string }) 
 const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
   const {
     allRecords,
-    schedules,
-    vehicleOptions,
-    yearOptions,
     todayKey,
     loading,
-    schedulesLoading,
     refreshing,
     error,
-    scheduleError,
     refresh,
     refreshStatus,
     clearRefreshStatus,
     lastRefreshed,
-    payEMI,
-    payError,
   } = useEmiData();
 
-  const now = useMemo(() => new Date(), []);
-
-  // ---- Filters (apply immediately — no draft state, no re-fetch) -------
-  const [year, setYear] = useState<number>(() => now.getFullYear());
-  const [month, setMonth] = useState<number>(() => now.getMonth() + 1);
-  const [vehicleId, setVehicleId] = useState<string | number>('all');
+  // ---- Filters (applied instantly over the loaded overview — no re-fetch) --
+  const [search, setSearch] = useState('');
   const [status, setStatus] = useState<EmiOverviewStatus | 'all'>('all');
 
-  const filter = useMemo<EmiFilterState>(
-    () => ({ vehicleId, status, year, month }),
-    [vehicleId, status, year, month]
-  );
-
-  const planning = useMemo(
-    () => buildPlanning(allRecords, schedules, filter, todayKey),
-    [allRecords, schedules, filter, todayKey]
-  );
-
-  const monthLabel = useMemo(() => {
-    const isCurrent = year === now.getFullYear() && month === now.getMonth() + 1;
-    return isCurrent ? 'THIS MONTH' : `${MONTH_SHORT[month - 1]} ${year}`;
-  }, [year, month, now]);
-
   const reset = () => {
-    setYear(now.getFullYear());
-    setMonth(now.getMonth() + 1);
-    setVehicleId('all');
+    setSearch('');
     setStatus('all');
   };
 
-  // ---- Toast for refresh outcome ----------------------------------------
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 3200);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
+  const hasActiveFilters = search.trim() !== '' || status !== 'all';
 
-  useEffect(() => {
-    if (refreshStatus === 'success') {
-      setToast({ type: 'success', message: 'EMI data refreshed' });
-      clearRefreshStatus();
-    } else if (refreshStatus === 'error') {
-      setToast({ type: 'error', message: 'Unable to refresh EMI data. Please try again.' });
-      clearRefreshStatus();
-    }
-  }, [refreshStatus, clearRefreshStatus]);
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return allRecords.filter((row) => {
+      if (status !== 'all' && row.status !== status) return false;
+      if (term) {
+        const haystack = `${row.vehicleNo} ${row.financeCompany || ''}`.toLowerCase();
+        if (!haystack.includes(term)) return false;
+      }
+      return true;
+    });
+  }, [allRecords, search, status]);
 
-  useEffect(() => {
-    if (payError) {
-      setToast({ type: 'error', message: payError });
-    }
-  }, [payError]);
+  // ---- KPIs (overview arithmetic; overdue uses the next-EMI date) ---------
+  const kpis = useMemo(() => {
+    let activeLoans = 0;
+    let monthlyCommitment = 0;
+    let overdue = 0;
+    filtered.forEach((row) => {
+      if (row.status !== 'pending') return;
+      if (row.emiRecordId != null) activeLoans += 1;
+      monthlyCommitment += Number(row.monthlyEmi) || 0;
+      if (row.emiDate && row.emiDate < todayKey) {
+        overdue += Number(row.monthlyEmi) || 0;
+      }
+    });
+    return { activeLoans, monthlyCommitment, overdue };
+  }, [filtered, todayKey]);
 
-  // ---- Pay EMI actions ---------------------------------------------------
-  const [payingId, setPayingId] = useState<number | null>(null);
-
-  const handlePay = useCallback(
-    async (target: { emiRecordId: number | null; vehicleNo: string }) => {
-      const recordId = target.emiRecordId;
-      if (recordId == null || payingId != null) return;
-      if (!window.confirm(`Mark the next EMI for ${target.vehicleNo} as paid?`)) return;
-      setPayingId(recordId);
-      const ok = await payEMI(recordId);
-      setPayingId(null);
-      setToast(ok ? { type: 'success', message: 'EMI marked as paid' } : { type: 'error', message: 'Payment could not be completed. Please try again.' });
-    },
-    [payingId, payEMI]
-  );
-
-  const handlePayRow = useCallback((row: UpcomingEmiRow) => {
-    void handlePay({ emiRecordId: row.emiRecordId, vehicleNo: row.vehicleNo });
-  }, [handlePay]);
-
-  // ---- Vehicle table (same filtered dataset as every other section) -----
+  // ---- Read-only table (sort + paginate over the same filtered set) -------
   const [sortKey, setSortKey] = useState<SortKey>('status');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [page, setPage] = useState(1);
@@ -219,7 +156,7 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
   const sorted = useMemo(() => {
     const getter = SORT_GETTER[sortKey];
     const factor = sortDir === 'asc' ? 1 : -1;
-    return [...planning.rows].sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       const av = getter(a, todayKey);
       const bv = getter(b, todayKey);
       if (typeof av === 'string' && typeof bv === 'string') {
@@ -227,7 +164,7 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
       }
       return ((Number(av) || 0) - (Number(bv) || 0)) * factor;
     });
-  }, [planning.rows, sortKey, sortDir, todayKey]);
+  }, [filtered, sortKey, sortDir, todayKey]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -247,22 +184,25 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
 
   useEffect(() => {
     setPage(1);
-  }, [vehicleId, status]);
+  }, [search, status]);
 
-  const kpiValues = useMemo(
-    () => ({
-      monthlyCommitment: planning.monthlyCommitment,
-      activeLoans: planning.activeLoans,
-      dueThisMonth: planning.dueThisMonth,
-      paidThisMonth: planning.paidThisMonth,
-      pendingThisMonth: planning.pendingThisMonth,
-      overdueAmount: planning.overdueAmount,
-      remainingCommitment: planning.remainingCommitment,
-      nextDueDate: planning.nextDueDate,
-      nextDueAmount: planning.nextDueAmount,
-    }),
-    [planning]
-  );
+  // ---- Toast for refresh outcome ----------------------------------------
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 3200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    if (refreshStatus === 'success') {
+      setToast({ type: 'success', message: 'EMI data refreshed' });
+      clearRefreshStatus();
+    } else if (refreshStatus === 'error') {
+      setToast({ type: 'error', message: 'Unable to refresh EMI data. Please try again.' });
+      clearRefreshStatus();
+    }
+  }, [refreshStatus, clearRefreshStatus]);
 
   return (
     <ErrorBoundary>
@@ -298,11 +238,6 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
                 <Loader2 className="h-3 w-3 animate-spin text-emerald-600" /> Updating…
               </span>
             )}
-            {schedulesLoading && !refreshing && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-500">
-                <Loader2 className="h-3 w-3 animate-spin text-emerald-600" /> Loading schedules…
-              </span>
-            )}
             {lastRefreshed && (
               <span className="hidden sm:inline">
                 Last updated {new Date(lastRefreshed).toLocaleTimeString('en-IN')}
@@ -317,34 +252,12 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
 
         {/* Controls */}
         <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-xs">
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Year</span>
-            <select value={year} onChange={(e) => setYear(Number(e.target.value))} className={fieldClass}>
-              {yearOptions.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Month</span>
-            <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={fieldClass}>
-              {MONTH_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Vehicle</span>
-            <select
-              value={String(vehicleId)}
-              onChange={(e) => setVehicleId(e.target.value === 'all' ? 'all' : e.target.value)}
-              className={`${fieldClass} min-w-[150px]`}
-            >
-              <option value="all">All vehicles</option>
-              {vehicleOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
+          <div className="w-full min-w-[220px] sm:max-w-xs">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search vehicle no, provider…"
+            />
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status</span>
@@ -358,11 +271,13 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
               <option value="completed">Completed</option>
             </select>
           </div>
-          <div className="ml-auto flex items-center gap-2 pb-0.5">
-            <button type="button" onClick={reset} className={controlClass}>
-              <RotateCcw size={13} className="text-slate-400" /> Reset
-            </button>
-          </div>
+          {hasActiveFilters && (
+            <div className="ml-auto flex items-center gap-2 pb-0.5">
+              <button type="button" onClick={reset} className={controlClass}>
+                <RotateCcw size={13} className="text-slate-400" /> Clear filters
+              </button>
+            </div>
+          )}
         </div>
 
         {error && (
@@ -372,39 +287,26 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
           </div>
         )}
 
-        {!error && scheduleError && (
-          <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-700">
-            <AlertCircle size={14} /> {scheduleError} Other EMI sections remain available.
-          </div>
-        )}
-
         {/* KPI cards */}
-        <EmiKpiCards values={kpiValues} loading={loading} />
-
-        {/* Planning summary + trend */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <EmiPlanningSummary
-            monthLabel={monthLabel}
-            due={planning.dueThisMonth}
-            paid={planning.paidThisMonth}
-            pending={planning.pendingThisMonth}
-            overdue={planning.overdueAmount}
-            loading={loading}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <KpiCard
+            label="Active Loans"
+            value={loading ? '—' : kpis.activeLoans}
+            format="number"
+            icon={<Landmark size={18} />}
           />
-          <div className="lg:col-span-2">
-            <EmiTrendChart data={planning.trend} loading={loading || schedulesLoading} />
-          </div>
-        </div>
-
-        {/* Upcoming + attention */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <UpcomingEmiTable
-            rows={planning.upcoming}
-            loading={loading || schedulesLoading}
-            onPay={handlePayRow}
-            payingId={payingId}
+          <KpiCard
+            label="Monthly Commitment"
+            value={loading ? '—' : money(kpis.monthlyCommitment)}
+            format="currency"
+            icon={<Wallet size={18} />}
           />
-          <EmiFinancialAttention items={planning.attention} loading={loading || schedulesLoading} />
+          <KpiCard
+            label="Overdue"
+            value={loading ? '—' : money(kpis.overdue)}
+            format="currency"
+            icon={<Clock size={18} />}
+          />
         </div>
 
         {/* Vehicle EMI table */}
@@ -429,7 +331,7 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
                 There are currently no active vehicles available for EMI tracking.
               </p>
             </div>
-          ) : planning.rows.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center py-14 text-center">
               <CircleDollarSign className="mx-auto mb-3 text-slate-300" size={42} />
               <p className="font-bold text-slate-700">No vehicles match the selected filters.</p>
@@ -466,11 +368,6 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
                           </button>
                         </th>
                       ))}
-                      <th className="px-3 py-2.5 text-left">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                          Action
-                        </span>
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
@@ -506,24 +403,6 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
                         </td>
                         <td className="whitespace-nowrap px-3 py-2.5">
                           <StatusBadge row={record} todayKey={todayKey} />
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5">
-                          {record.status === 'pending' && record.emiRecordId != null && (
-                            <button
-                              type="button"
-                              onClick={() => void handlePay({ emiRecordId: record.emiRecordId, vehicleNo: record.vehicleNo })}
-                              disabled={payingId != null}
-                              className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
-                            >
-                              {payingId === record.emiRecordId ? (
-                                <>
-                                  <Loader2 className="h-3 w-3 animate-spin" /> Paying…
-                                </>
-                              ) : (
-                                'Pay'
-                              )}
-                            </button>
-                          )}
                         </td>
                       </tr>
                     ))}

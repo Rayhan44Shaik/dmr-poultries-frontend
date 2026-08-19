@@ -1,12 +1,12 @@
-// src/modules/staff/components/salary/PayModal.tsx
+// src/modules/staff/components/salary/BulkPayModal.tsx
 
 import { useState } from "react";
 import { X, CheckCircle2 } from "lucide-react";
 
-export type PayModalProps = {
-  employeeName: string;
+export type BulkPayModalProps = {
+  count: number;
+  totalNet: number;
   month: string;
-  netSalary: number;
   saving: boolean;
   onCancel: () => void;
   onConfirm: (input: { paymentDate: string; paymentMode: string }) => void;
@@ -21,10 +21,10 @@ const PAYMENT_MODES = [
   "Card",
 ];
 
-export function PayModal({
-  employeeName,
+export function BulkPayModal({
+  count,
+  totalNet,
   month,
-  netSalary,
   saving,
   onCancel,
   onConfirm,
@@ -34,7 +34,7 @@ export function PayModal({
       currency: "INR",
       minimumFractionDigits: 2,
     }).format(amt || 0),
-}: PayModalProps) {
+}: BulkPayModalProps) {
   const today = new Date().toISOString().slice(0, 10);
   const [paymentDate, setPaymentDate] = useState(today);
   const [paymentMode, setPaymentMode] = useState("Cash");
@@ -48,9 +48,9 @@ export function PayModal({
               <CheckCircle2 size={18} />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-800">Pay Salary</h3>
+              <h3 className="text-base font-bold text-slate-800">Pay Salaries</h3>
               <p className="text-xs text-slate-500">
-                {employeeName} · {month}
+                {count} record{count === 1 ? "" : "s"} · {month}
               </p>
             </div>
           </div>
@@ -65,8 +65,8 @@ export function PayModal({
         </div>
 
         <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-4 flex items-center justify-between">
-          <span className="text-xs font-semibold text-emerald-700">Net Salary Payable</span>
-          <span className="text-xl font-extrabold text-emerald-800">{formatCurrency(netSalary)}</span>
+          <span className="text-xs font-semibold text-emerald-700">Total Net Payable</span>
+          <span className="text-xl font-extrabold text-emerald-800">{formatCurrency(totalNet)}</span>
         </div>
 
         <div className="space-y-3">
@@ -100,7 +100,8 @@ export function PayModal({
         </div>
 
         <div className="text-[11px] text-slate-400">
-          The Accounts payment is created atomically with the salary transition.
+          The Accounts payments are created atomically with the salary transitions in one
+          transaction — a record that cannot be paid rejects the whole batch.
         </div>
 
         <div className="flex justify-end gap-2 pt-2">

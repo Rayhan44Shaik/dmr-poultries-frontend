@@ -1,18 +1,14 @@
 // src/modules/staff/hooks/useSalaryRegister.ts
 // Backend-authoritative salary register hook. Records are loaded from
-// GET /api/staff/salaries?month=YYYY-MM and every mutation (submit / pay /
-// mark-unpaid / edit / delete) is a backend call followed by a reload.
+// GET /api/staff/salaries?month=YYYY-MM and every mutation (bulk mark
+// paid / mark unpaid / generate) is a backend call followed by a reload.
 // No localStorage, no synthetic rows, no frontend salary calculation.
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  deleteSalary,
+  bulkUpdateSalaryStatus,
   generateSalaries,
   listSalaries,
-  paySalary,
-  submitSalary,
-  updateSalary,
-  updateSalaryStatus,
   handleApiError,
 } from "../services/salaryService";
 import type { SalaryRecord } from "../types/staffDashboard";
@@ -105,38 +101,29 @@ export function useSalaryRegister(month: string, department: string = "") {
     [loadData]
   );
 
-  const submit = useCallback(
-    (id: string) => runMutation(() => submitSalary(id), "Salary submitted and frozen."),
-    [runMutation]
-  );
-
-  const pay = useCallback(
-    (id: string, input: { paymentDate: string; paymentMode: string }) =>
-      runMutation(() => paySalary(id, input), "Salary marked as Paid."),
-    [runMutation]
-  );
-
-  const markUnpaidById = useCallback(
-    (id: string) =>
+  /** Bulk Mark as Paid — one transaction for the whole selection. */
+  const markPaidBulk = useCallback(
+    (ids: string[], input: { paymentDate: string; paymentMode: string }) =>
       runMutation(
-        () => updateSalaryStatus(id),
-        "Salary marked unpaid — returned to Pending."
+        () =>
+          bulkUpdateSalaryStatus(ids, {
+            status: "Paid",
+            paymentDate: input.paymentDate,
+            paymentMode: input.paymentMode,
+          }),
+        `Marked ${ids.length} salary record${ids.length === 1 ? "" : "s"} as Paid.`
       ),
     [runMutation]
   );
 
-  const edit = useCallback(
-    (id: string, components: Record<string, number>) =>
+  /** Bulk Mark as Unpaid — Pending/Submitted stay; Paid reverts only inside
+   *  the 7-day correction window; the batch aborts atomically otherwise. */
+  const markUnpaidBulk = useCallback(
+    (ids: string[]) =>
       runMutation(
-        () => updateSalary(id, components),
-        "Salary updated (totals recomputed by backend)."
+        () => bulkUpdateSalaryStatus(ids, { status: "Pending" }),
+        `Marked ${ids.length} salary record${ids.length === 1 ? "" : "s"} as unpaid — returned to Pending.`
       ),
-    [runMutation]
-  );
-
-  const remove = useCallback(
-    (id: string) =>
-      runMutation(() => deleteSalary(id), "Salary record deleted."),
     [runMutation]
   );
 
@@ -159,11 +146,8 @@ export function useSalaryRegister(month: string, department: string = "") {
     saving,
     error,
     refresh,
-    submit,
-    pay,
-    markUnpaid: markUnpaidById,
-    edit,
-    remove,
+    markPaidBulk,
+    markUnpaidBulk,
     generate,
     hasRecords: records.length > 0,
   };

@@ -6,6 +6,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import DutyPlannerPage from "./DutyPlannerPage";
 import LeaveManagementPage from "./LeaveManagementPage";
 import SalaryRegisterPage from "./SalaryRegisterPage";
+import DriverPerformancePage from "./DriverPerformancePage";
+import SupervisorPerformancePage from "./SupervisorPerformancePage";
 
 // Map tab keys (resolved from ?tab= sidebar deep-links / path aliases)
 // to their child page components.
@@ -13,6 +15,8 @@ const tabComponents: Record<string, React.ComponentType<{ embedded?: boolean }>>
   "duty-planner": DutyPlannerPage,
   "salary-sheet": SalaryRegisterPage,
   leaves: LeaveManagementPage,
+  "driver-performance": DriverPerformancePage,
+  "supervisor-performance": SupervisorPerformancePage,
 };
 
 function StaffPages() {

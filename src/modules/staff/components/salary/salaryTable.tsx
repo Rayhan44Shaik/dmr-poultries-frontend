@@ -1,7 +1,7 @@
 // src/modules/staff/components/salary/salaryTable.tsx
 
 import { useMemo } from "react";
-import { CheckCircle2, Eye, Lock, Pencil, Trash2, Undo2, Send, Wallet } from "lucide-react";
+import { CheckCircle2, Lock } from "lucide-react";
 import type { SalaryRecord } from "../../types/staffDashboard";
 import {
   paginationBarClass,
@@ -9,10 +9,6 @@ import {
   paginationPageBtnClass,
   shouldShowPagination,
 } from "../../../../shared/ui/paginationStyles";
-import { usePendingDelete } from "../../../../hooks/usePendingDelete";
-import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
-
-type Action = "view" | "edit" | "submit" | "pay" | "markUnpaid" | "unsubmit" | "delete";
 
 type SalaryTableProps = {
   records: SalaryRecord[];
@@ -21,7 +17,10 @@ type SalaryTableProps = {
   itemsPerPage: number;
   formatCurrency?: (amount: number) => string;
   saving?: boolean;
-  onAction: (action: Action, record: SalaryRecord) => void;
+  selectedIds: ReadonlySet<string>;
+  onToggleSelect: (id: string) => void;
+  onToggleSelectAll: (ids: string[]) => void;
+  onView: (record: SalaryRecord) => void;
 };
 
 function StatusBadge({ record }: { record: SalaryRecord }) {
@@ -60,17 +59,6 @@ function StatusBadge({ record }: { record: SalaryRecord }) {
   );
 }
 
-function actionStatus(record: SalaryRecord): string {
-  if (record.monthClosed) return "This payroll month is closed.";
-  if (record.status === "Paid") {
-    if (record.correctionWindowDaysRemaining == null || record.correctionWindowDaysRemaining <= 0) {
-      return "Correction window expired — paid salary is locked.";
-    }
-    return "";
-  }
-  return "";
-}
-
 export function SalaryTable({
   records,
   currentPage,
@@ -78,13 +66,11 @@ export function SalaryTable({
   itemsPerPage,
   formatCurrency,
   saving = false,
-  onAction,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
+  onView,
 }: SalaryTableProps) {
-  const { requestDelete, cancel, pendingItems } = usePendingDelete<string>((id) => {
-    const record = records.find((item) => item.id === id);
-    if (record) return onAction("delete", record);
-  });
-
   const formatVal = formatCurrency || ((amount: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(amount || 0));
 
@@ -100,6 +86,10 @@ export function SalaryTable({
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentRecords = sortedRecords.slice(startIndex, startIndex + itemsPerPage);
 
+  const pageIds = currentRecords.map((r) => r.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const somePageSelected = pageIds.some((id) => selectedIds.has(id));
+
   if (records.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-sm">
@@ -114,6 +104,19 @@ export function SalaryTable({
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
+              <th className="px-4 py-3 w-10">
+                <input
+                  type="checkbox"
+                  aria-label="Select all visible salaries"
+                  checked={allPageSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = somePageSelected && !allPageSelected;
+                  }}
+                  disabled={saving}
+                  onChange={() => onToggleSelectAll(pageIds)}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                />
+              </th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Employee</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Department</th>
               <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Working</th>
@@ -125,19 +128,31 @@ export function SalaryTable({
               <th className="px-3 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Net</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Status</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Payment Date</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
             {currentRecords.map((record) => {
-              const note = actionStatus(record);
               const windowOpen =
                 record.status === "Paid" &&
                 record.correctionWindowDaysRemaining != null &&
                 record.correctionWindowDaysRemaining > 0;
 
               return (
-                <tr key={record.id} className="hover:bg-slate-50 transition-colors">
+                <tr
+                  key={record.id}
+                  onClick={() => onView(record)}
+                  className="hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${record.employeeName}`}
+                      checked={selectedIds.has(record.id)}
+                      disabled={saving}
+                      onChange={() => onToggleSelect(record.id)}
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                    />
+                  </td>
                   <td className="px-4 py-3 text-sm font-semibold text-slate-800 whitespace-nowrap">{record.employeeName}</td>
                   <td className="px-4 py-3 text-sm text-slate-600">{record.department}</td>
                   <td className="px-3 py-3 text-center text-sm text-slate-700">{record.workingDays ?? "—"}</td>
@@ -156,17 +171,6 @@ export function SalaryTable({
                     )}
                   </td>
                   <td className="px-3 py-3 text-sm text-slate-600">{record.paymentDate ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <ActionButtons
-                        record={record}
-                        saving={saving}
-                        onAction={onAction}
-                        onDelete={() => requestDelete(record.id, { label: `Deleting salary for ${record.employeeName}` })}
-                      />
-                    </div>
-                    {note && <div className="text-[10px] text-slate-400 text-right mt-1">{note}</div>}
-                  </td>
                 </tr>
               );
             })}
@@ -204,74 +208,6 @@ export function SalaryTable({
           </button>
         </div>
       )}
-      <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
     </div>
-  );
-}
-
-function ActionButtons({
-  record,
-  saving,
-  onAction,
-  onDelete,
-}: {
-  record: SalaryRecord;
-  saving: boolean;
-  onAction: (action: Action, record: SalaryRecord) => void;
-  onDelete: () => void;
-}) {
-  const btn =
-    "p-1.5 rounded-lg border transition disabled:opacity-40 disabled:cursor-not-allowed";
-  const view = `${btn} border-slate-200 text-slate-600 hover:bg-slate-100`;
-  const blue = `${btn} border-blue-200 text-blue-700 hover:bg-blue-50`;
-  const emerald = `${btn} border-emerald-200 text-emerald-700 hover:bg-emerald-50`;
-  const amber = `${btn} border-amber-200 text-amber-700 hover:bg-amber-50`;
-  const rose = `${btn} border-rose-200 text-rose-700 hover:bg-rose-50`;
-
-  const windowOpen =
-    record.status === "Paid" &&
-    record.correctionWindowDaysRemaining != null &&
-    record.correctionWindowDaysRemaining > 0;
-
-  return (
-    <>
-      <button type="button" className={view} title="View" onClick={() => onAction("view", record)}>
-        <Eye size={14} />
-      </button>
-
-      {record.status === "Pending" && !record.monthClosed && (
-        <>
-          <button type="button" className={blue} title="Submit" disabled={saving} onClick={() => onAction("submit", record)}>
-            <Send size={14} />
-          </button>
-          <button type="button" className={amber} title="Edit" disabled={saving} onClick={() => onAction("edit", record)}>
-            <Pencil size={14} />
-          </button>
-          <button type="button" className={emerald} title="Pay" disabled={saving} onClick={() => onAction("pay", record)}>
-            <Wallet size={14} />
-          </button>
-          <button type="button" className={rose} title="Delete" disabled={saving} onClick={onDelete}>
-            <Trash2 size={14} />
-          </button>
-        </>
-      )}
-
-      {record.status === "Submitted" && !record.monthClosed && (
-        <>
-          <button type="button" className={emerald} title="Pay" disabled={saving} onClick={() => onAction("pay", record)}>
-            <Wallet size={14} />
-          </button>
-          <button type="button" className={amber} title="Un-submit (back to Pending)" disabled={saving} onClick={() => onAction("unsubmit", record)}>
-            <Undo2 size={14} />
-          </button>
-        </>
-      )}
-
-      {record.status === "Paid" && !record.monthClosed && windowOpen && (
-        <button type="button" className={amber} title="Mark Unpaid (correction window)" disabled={saving} onClick={() => onAction("markUnpaid", record)}>
-          <Undo2 size={14} />
-        </button>
-      )}
-    </>
   );
 }

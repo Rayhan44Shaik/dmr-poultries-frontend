@@ -20,14 +20,14 @@ import {
   Send,
   Plus,
   FileText,
+  X,
+  CheckCheck,
+  Undo2,
 } from "lucide-react";
 import { SalaryTable } from "../components/salary/salaryTable";
 import { SalaryView } from "../components/salary/SalaryView";
-import { SalaryEdit } from "../components/salary/SalaryEdit";
-import { PayModal } from "../components/salary/PayModal";
+import { BulkPayModal } from "../components/salary/BulkPayModal";
 import type { SalaryRecord } from "../types/staffDashboard";
-
-type Action = "view" | "edit" | "submit" | "pay" | "markUnpaid" | "unsubmit" | "delete";
 
 function formatMonthName(monthStr: string): string {
   if (!monthStr) return "";
@@ -97,7 +97,8 @@ function SalaryRegisterPage() {
   const [department, setDepartment] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [masterEmployees, setMasterEmployees] = useState<Array<{ department?: string; employeeName?: string }>>([]);
-  const [payTarget, setPayTarget] = useState<SalaryRecord | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkPayOpen, setBulkPayOpen] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{
     title: string;
     message: string;
@@ -119,11 +120,8 @@ function SalaryRegisterPage() {
     saving,
     error,
     refresh,
-    submit,
-    pay,
-    markUnpaid,
-    edit,
-    remove,
+    markPaidBulk,
+    markUnpaidBulk,
     generate,
     hasRecords,
   } = useSalaryRegister(month, department);
@@ -133,6 +131,21 @@ function SalaryRegisterPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentPage(1);
   }, [month, department, filter, searchQuery]);
+
+  // A different month/department/status tab invalidates the selection.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [month, department, filter]);
+
+  // Drop ids that no longer exist in the loaded register.
+  useEffect(() => {
+    setSelectedIds((current) => {
+      if (current.size === 0) return current;
+      const present = new Set(allRecords.map((r) => r.id));
+      const next = new Set([...current].filter((id) => present.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [allRecords]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -178,9 +191,39 @@ function SalaryRegisterPage() {
     void refresh().then(() => showNotification("Salary register refreshed.", "info"));
   }, [refresh, showNotification]);
 
-  // Per-action target state
+  // ---- Bulk selection -----------------------------------------------------
+  const selectedRows = useMemo(
+    () => allRecords.filter((r) => selectedIds.has(r.id)),
+    [allRecords, selectedIds]
+  );
+  const selectedTotalNet = useMemo(
+    () => selectedRows.reduce((sum, r) => sum + r.netSalary, 0),
+    [selectedRows]
+  );
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback((ids: string[]) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      const allSelected = ids.length > 0 && ids.every((id) => next.has(id));
+      if (allSelected) ids.forEach((id) => next.delete(id));
+      else ids.forEach((id) => next.add(id));
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  // ---- Actions -----------------------------------------------------------
   const [viewTarget, setViewTarget] = useState<SalaryRecord | null>(null);
-  const [editTarget, setEditTarget] = useState<SalaryRecord | null>(null);
 
   const confirm = useCallback((title: string, message: string, onConfirm: () => void) => {
     setConfirmConfig({ title, message, onConfirm });
@@ -194,69 +237,6 @@ function SalaryRegisterPage() {
     [showNotification]
   );
 
-  const handleSubmit = useCallback(
-    (record: SalaryRecord) => {
-      confirm(
-        "Submit Salary",
-        `Submit ${record.employeeName}'s salary for ${formatMonthName(record.month)}? The record will be frozen.`,
-        () => {
-          setConfirmConfig(null);
-          void runConfirm(submit(record.id));
-        }
-      );
-    },
-    [confirm, submit, runConfirm]
-  );
-
-  const handleDelete = useCallback(
-    (record: SalaryRecord) => runConfirm(remove(record.id)),
-    [remove, runConfirm]
-  );
-
-  const handleMarkUnpaid = useCallback(
-    (record: SalaryRecord) => {
-      confirm(
-        "Mark Unpaid",
-        `Revert ${record.employeeName}'s paid salary to Pending (correction window)?`,
-        () => {
-          setConfirmConfig(null);
-          void runConfirm(markUnpaid(record.id));
-        }
-      );
-    },
-    [confirm, markUnpaid, runConfirm]
-  );
-
-  const handleUnsubmit = useCallback(
-    (record: SalaryRecord) => {
-      confirm(
-        "Un-submit Salary",
-        `Move ${record.employeeName}'s submitted salary back to Pending (editable draft)?`,
-        () => {
-          setConfirmConfig(null);
-          void runConfirm(markUnpaid(record.id));
-        }
-      );
-    },
-    [confirm, markUnpaid, runConfirm]
-  );
-
-  const handlePay = useCallback(
-    (record: SalaryRecord, input: { paymentDate: string; paymentMode: string }) => {
-      setPayTarget(null);
-      void runConfirm(pay(record.id, input));
-    },
-    [pay, runConfirm]
-  );
-
-  const handleSaveEdit = useCallback(
-    (id: string, components: Record<string, number>) => {
-      setEditTarget(null);
-      void runConfirm(edit(id, components));
-    },
-    [edit, runConfirm]
-  );
-
   const handleGenerate = useCallback(() => {
     confirm(
       "Generate Salary Register",
@@ -268,21 +248,26 @@ function SalaryRegisterPage() {
     );
   }, [confirm, generate, month, runConfirm]);
 
-  // Resolve action dispatch
-  const onAction = useCallback(
-    (action: Action, record: SalaryRecord) => {
-      switch (action) {
-        case "view": return setViewTarget(record);
-        case "edit": return setEditTarget(record);
-        case "submit": return handleSubmit(record);
-        case "pay": return setPayTarget(record);
-        case "markUnpaid": return handleMarkUnpaid(record);
-        case "unsubmit": return handleUnsubmit(record);
-        case "delete": return handleDelete(record);
-      }
+  const handleBulkPay = useCallback(
+    (input: { paymentDate: string; paymentMode: string }) => {
+      const ids = [...selectedIds];
+      setBulkPayOpen(false);
+      void runConfirm(markPaidBulk(ids, input)).then(() => clearSelection());
     },
-    [handleSubmit, handleMarkUnpaid, handleUnsubmit, handleDelete]
+    [selectedIds, markPaidBulk, runConfirm, clearSelection]
   );
+
+  const handleBulkUnpaid = useCallback(() => {
+    const ids = [...selectedIds];
+    confirm(
+      "Mark Unpaid",
+      `Revert ${ids.length} selected salary record${ids.length === 1 ? "" : "s"} to Pending? Paid records revert only inside the correction window; the whole batch is rejected if any record cannot be updated.`,
+      () => {
+        setConfirmConfig(null);
+        void runConfirm(markUnpaidBulk(ids)).then(() => clearSelection());
+      }
+    );
+  }, [confirm, selectedIds, markUnpaidBulk, runConfirm, clearSelection]);
 
   const statusTab = (key: 'All' | 'Pending' | 'Submitted' | 'Paid', label: string, icon: React.ReactNode) => (
     <button
@@ -467,6 +452,43 @@ function SalaryRegisterPage() {
         </div>
       )}
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 bg-blue-50/80 border border-blue-200 rounded-xl px-4 py-3 shadow-sm animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="flex items-center gap-2 text-xs font-semibold text-blue-800">
+            <CheckCheck size={15} className="text-blue-600" />
+            {selectedIds.size} selected · Total {formatCurrency(selectedTotalNet)}
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setBulkPayOpen(true)}
+              disabled={saving}
+              className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            >
+              <Wallet size={14} /> Mark as Paid
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkUnpaid}
+              disabled={saving}
+              className="h-9 px-3.5 rounded-xl border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-semibold transition flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <Undo2 size={14} /> Mark as Unpaid
+            </button>
+            <button
+              type="button"
+              onClick={clearSelection}
+              disabled={saving}
+              className="h-9 px-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition flex items-center gap-1 text-xs font-semibold disabled:opacity-50"
+              title="Clear selection"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table / states */}
       {loading ? (
         <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 shadow-sm flex flex-col items-center justify-center space-y-2">
@@ -500,31 +522,24 @@ function SalaryRegisterPage() {
           itemsPerPage={10}
           formatCurrency={formatCurrency}
           saving={saving}
-          onAction={onAction}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onToggleSelectAll={toggleSelectAll}
+          onView={setViewTarget}
         />
       )}
 
       {/* Modals */}
       {viewTarget && <SalaryView record={viewTarget} onClose={() => setViewTarget(null)} formatCurrency={formatCurrency} />}
 
-      {editTarget && (
-        <SalaryEdit
-          record={editTarget}
+      {bulkPayOpen && (
+        <BulkPayModal
+          count={selectedIds.size}
+          totalNet={selectedTotalNet}
+          month={formatMonthName(month)}
           saving={saving}
-          onClose={() => setEditTarget(null)}
-          onSave={handleSaveEdit}
-          formatCurrency={formatCurrency}
-        />
-      )}
-
-      {payTarget && (
-        <PayModal
-          employeeName={payTarget.employeeName}
-          month={payTarget.month}
-          netSalary={payTarget.netSalary}
-          saving={saving}
-          onCancel={() => setPayTarget(null)}
-          onConfirm={(input) => handlePay(payTarget, input)}
+          onCancel={() => setBulkPayOpen(false)}
+          onConfirm={handleBulkPay}
           formatCurrency={formatCurrency}
         />
       )}

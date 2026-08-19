@@ -137,15 +137,17 @@ describe('Fleet Operations active scope', () => {
     assert.match(source, /if \(listInFlight\.current\) return/);
     assert.match(source, /emiApi/);
     assert.match(source, /\.overview\(/);
-    assert.match(source, /idempotencyKey/);
     assert.doesNotMatch(source, /setInterval/);
   });
 
-  it('EMI duplicate payment requests are blocked in the hook and keyed for retry', () => {
+  it('EMI data hook is read-only — no schedule or payment path', () => {
     const source = read('hooks/useEmiData.ts');
-    assert.match(source, /if \(savingRef\.current\) return/);
-    assert.match(source, /fleet:emi-pay:/);
-    assert.match(source, /resolvePayKey/);
+    assert.doesNotMatch(source, /savingRef/);
+    assert.doesNotMatch(source, /resolvePayKey/);
+    assert.doesNotMatch(source, /fleet:emi-pay:/);
+    assert.doesNotMatch(source, /idempotencyKey/);
+    assert.doesNotMatch(source, /\.pay\(/);
+    assert.doesNotMatch(source, /listSchedule/);
   });
 
   it('Maintenance Entry does not load History list or meter-summary', () => {

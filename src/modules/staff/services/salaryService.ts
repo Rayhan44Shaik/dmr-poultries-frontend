@@ -147,6 +147,38 @@ export async function updateSalaryStatus(id: string): Promise<SalaryRecord> {
   return mapSalary(data);
 }
 
+/** POST /api/staff/salaries/bulk-status — atomic multi-record Mark Paid /
+ *  Mark Unpaid. The backend pre-validates EVERY row and aborts the whole
+ *  batch (409) before any write when one record cannot be updated. */
+export async function bulkUpdateSalaryStatus(
+  ids: string[],
+  input: {
+    status: "Paid" | "Pending";
+    paymentDate?: string;
+    paymentMode?: string;
+    paidBy?: string;
+  }
+): Promise<{ updated: SalaryRecord[]; skipped: { id: string; reason: string }[] }> {
+  const { data } = await apiPost<Record<string, unknown>>(
+    `${SALARY_PATH}/bulk-status`,
+    {
+      ids,
+      status: input.status,
+      ...(input.paymentDate ? { paymentDate: input.paymentDate } : {}),
+      ...(input.paymentMode ? { paymentMode: input.paymentMode } : {}),
+      paidBy: input.paidBy ?? "user",
+    }
+  );
+  const raw = (data ?? {}) as Record<string, unknown>;
+  const updated = Array.isArray(raw.updated)
+    ? (raw.updated as Record<string, unknown>[]).map(mapSalary)
+    : [];
+  const skipped = Array.isArray(raw.skipped)
+    ? (raw.skipped as Array<{ id: string; reason: string }>)
+    : [];
+  return { updated, skipped };
+}
+
 /** PUT /api/staff/salaries/:id — edit only Pending records; totals recomputed
  *  by the backend from the supplied components. */
 export async function updateSalary(
