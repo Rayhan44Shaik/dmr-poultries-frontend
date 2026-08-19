@@ -2,14 +2,18 @@
 
 import { FileImage } from "lucide-react";
 import type { FuelExpense } from "../types/fuelExpense";
+import type { PendingDeleteControls } from "../../../../hooks/usePendingDelete";
+import { PendingDeleteActions } from "../../../../components/common/PendingDeleteActions";
+import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from "../../../../shared/ui/pendingDelete";
 
 interface Props {
   bills: FuelExpense[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  pendingDelete?: PendingDeleteControls<string>;
 }
 
-export function FuelBillTable({ bills, selectedId, onSelect }: Props) {
+export function FuelBillTable({ bills, selectedId, onSelect, pendingDelete }: Props) {
   if (bills.length === 0) {
     return <div className="text-center py-8 text-slate-400 text-sm">No fuel bills found.</div>;
   }
@@ -50,7 +54,8 @@ export function FuelBillTable({ bills, selectedId, onSelect }: Props) {
         <tbody>
           {bills.map((bill, idx) => {
             const isSelected = selectedId === bill.id;
-            const isPending = bill.status === "Pending";
+            const isStatusPending = bill.status === "Pending";
+            const isDeletePending = pendingDelete?.isPending(bill.id) === true;
             const gpsLabel =
               bill.gpsLat != null && bill.gpsLon != null
                 ? `${bill.gpsLat.toFixed(4)}, ${bill.gpsLon.toFixed(4)}`
@@ -61,17 +66,17 @@ export function FuelBillTable({ bills, selectedId, onSelect }: Props) {
                 key={bill.id}
                 className={`border-b border-slate-200 hover:bg-blue-50 transition-colors duration-150 cursor-pointer ${
                   isSelected ? "bg-blue-100" : ""
-                } ${isPending ? "border-l-4 border-l-orange-400" : ""}`}
+                } ${isStatusPending ? "border-l-4 border-l-orange-400" : ""} ${isDeletePending ? PENDING_DELETE_ROW_CLASS : ""}`}
                 onClick={() => handleRowClick(bill)}
               >
                 {/* Serial number with status dot */}
                 <td className="px-2 py-2.5 text-center text-xs text-slate-500">
                   <div className="flex items-center justify-center gap-1">
                     <span>{idx + 1}</span>
-                    {isPending && (
+                    {isStatusPending && (
                       <span className="inline-block h-2 w-2 rounded-full bg-orange-400" title="Pending" />
                     )}
-                    {!isPending && (
+                    {!isStatusPending && (
                       <span className="inline-block h-2 w-2 rounded-full bg-green-400" title="Approved" />
                     )}
                   </div>
@@ -116,8 +121,14 @@ export function FuelBillTable({ bills, selectedId, onSelect }: Props) {
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-2.5 text-xs font-semibold">
-                  {bill.sourceType === "TRIP" && bill.status === "Approved"
+                <td className={`px-3 py-2.5 text-xs font-semibold ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
+                  {isDeletePending && pendingDelete ? (
+                    <PendingDeleteActions
+                      secondsLeft={pendingDelete.secondsLeft(bill.id)}
+                      committing={pendingDelete.isCommitting(bill.id)}
+                      onCancel={() => pendingDelete.cancel(bill.id)}
+                    />
+                  ) : bill.sourceType === "TRIP" && bill.status === "Approved"
                     ? "AUTO APPROVED"
                     : bill.status}
                 </td>

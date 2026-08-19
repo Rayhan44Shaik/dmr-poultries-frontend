@@ -15,7 +15,6 @@ import StepFarm from "../components/StepFarm";
 import StepPickup from "../components/StepPickup";
 import StepEnd from "../components/Step_5/StepEnd";
 import TripFinalKPI from "../components/TripFinalKPI";
-import DeliveryEmailPanel from "../components/DeliveryEmailPanel";
 
 // --- Hooks ---
 import { useTripEntry } from "../hooks/useTripEntry";
@@ -122,7 +121,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   // The submitted trip is already in Recent Trips via onTripsChanged.
   useEffect(() => {
     registerStep1SuccessCallback((saved) => {
-      showNotification(`Step 1 submitted — ${saved.tripNo}.`, "success");
+      showNotification(`Step 1 submitted successfully.`, "success");
       clearTrip();
       setRows([]);
       setEntryScreen("prompt");
@@ -136,23 +135,14 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   }, [registerStep1SuccessCallback, clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, showNotification]);
 
   useEffect(() => {
-    registerStep2SuccessCallback((saved: Trip) => {
-      showNotification(`Step 2 submitted — ${saved.tripNo}.`, "success");
-      clearTrip();
-      setRows([]);
-      setEntryScreen("prompt");
-      setViewStepIndex(0);
-      setIsEditing(false);
-      setEditingSubmittedStep(null);
-      setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
-      clearTripIdFromUrl();
-      isManualSelect.current = false;
+    registerStep2SuccessCallback(() => {
+      /* Stay on the submitted trip so the locked Step 2 view is visible. */
     });
-  }, [registerStep2SuccessCallback, clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, showNotification]);
+  }, [registerStep2SuccessCallback]);
 
   useEffect(() => {
     registerStep3SuccessCallback((saved: Trip) => {
-      showNotification(`Step 3 submitted — ${saved.tripNo}.`, "success");
+      showNotification("Step 3 submitted successfully.", "success");
       clearTrip();
       setRows([]);
       setEntryScreen("prompt");
@@ -166,19 +156,10 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   }, [registerStep3SuccessCallback, clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, showNotification]);
 
   useEffect(() => {
-    registerStep4SuccessCallback((saved: Trip) => {
-      showNotification(`Step 4 submitted — ${saved.tripNo}.`, "success");
-      clearTrip();
-      setRows([]);
-      setEntryScreen("prompt");
-      setViewStepIndex(0);
-      setIsEditing(false);
-      setEditingSubmittedStep(null);
-      setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
-      clearTripIdFromUrl();
-      isManualSelect.current = false;
+    registerStep4SuccessCallback(() => {
+      /* Stay on the submitted trip so the locked Step 4 view is visible. */
     });
-  }, [registerStep4SuccessCallback, clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, showNotification]);
+  }, [registerStep4SuccessCallback]);
 
   const handleStatusChange = (trip: Trip, status: "Pending" | "Completed") => {
     changeStatus(trip, status);
@@ -240,9 +221,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     );
   };
 
-  const handleRefresh = () => {
-    refreshTrips();
-    showNotification("🔄 Refreshed", "info");
+  const handleRefresh = async () => {
+    await refreshTrips();
+    showNotification("Table refreshed", "success");
   };
 
   const isInitialMount = useRef(true);
@@ -482,6 +463,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           canEdit={canEditTrip}
           onCancel={clearForm}
           clearForm={clearForm}
+          persistedDeliveries={savedTrip.deliveries || []}
         />
       );
     }
@@ -554,8 +536,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
             )}
 
             <div className="mt-6">{renderSelectedStep()}</div>
-            {isStartCompleted && <TripFinalKPI trip={trip} deliveries={rows} />}
-            <DeliveryEmailPanel trip={trip} shops={shops} />
+            {<TripFinalKPI trip={savedTrip} deliveries={savedTrip.deliveries || []} />}
           </>
         )}
       </div>

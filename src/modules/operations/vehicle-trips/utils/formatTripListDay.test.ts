@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { formatTripListDay } from "./formatTripListDay";
+import { formatTripListDay, formatTripRecentDateWithDay } from "./formatTripListDay";
 
 describe("formatTripListDay", () => {
   it("maps each weekday from the stored trip date", () => {
@@ -20,5 +20,11 @@ describe("formatTripListDay", () => {
     assert.equal(formatTripListDay("   "), "—");
     assert.equal(formatTripListDay("not-a-date"), "—");
     assert.equal(formatTripListDay("2026-13-40"), "—");
+  });
+
+  it("formats Recent Trips as weekday only", () => {
+    assert.equal(formatTripRecentDateWithDay("2026-08-19"), "Wednesday");
+    assert.equal(formatTripRecentDateWithDay("2026-08-20"), "Thursday");
+    assert.equal(formatTripRecentDateWithDay("2026-08-21"), "Friday");
   });
 });

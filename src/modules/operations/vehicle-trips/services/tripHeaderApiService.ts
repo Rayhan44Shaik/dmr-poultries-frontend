@@ -70,11 +70,22 @@ export function formatStartTimeForDisplay(value: unknown): string {
 
 function mapDeliveriesForDisplay(value: unknown, fallback: Trip["deliveries"]): Trip["deliveries"] {
   if (!Array.isArray(value)) return fallback;
-  return value.map((row) => ({
-    ...(row as Trip["deliveries"][number]),
-    autoCaptureTime: formatStartTimeForDisplay((row as { autoCaptureTime?: unknown }).autoCaptureTime)
-      || (row as { autoCaptureTime?: string }).autoCaptureTime,
-  }));
+  return value.map((row) => {
+    const rec = row as Trip["deliveries"][number] & { selectedBoxIds?: unknown; boxNo?: unknown };
+    const selectedBoxIds = Array.isArray(rec.selectedBoxIds)
+      ? rec.selectedBoxIds
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      : [];
+    const boxNoRaw = numOrNull(rec.boxNo);
+    return {
+      ...rec,
+      selectedBoxIds,
+      boxNo: boxNoRaw ?? selectedBoxIds.length,
+      autoCaptureTime:
+        formatStartTimeForDisplay(rec.autoCaptureTime) || rec.autoCaptureTime,
+    };
+  });
 }
 
 function mapDieselEntriesForDisplay(
@@ -304,19 +315,25 @@ export function toStep5Payload(trip: Partial<Trip> & Record<string, unknown>): R
     const x = Number(v);
     return Number.isFinite(x) ? x : 0;
   };
+  const EXPENSE_KEYS = [
+    "meals",
+    "loading",
+    "mealsTiffin",
+    "vehicleMaintenance",
+    "othersRC",
+    "others1Amt",
+    "others2Amt",
+    "others3Amt",
+    "others4Amt",
+    "others5Amt",
+  ] as const;
   const payload: Record<string, unknown> = {
-    meals: n(trip.meals),
-    loading: n(trip.loading),
-    mealsTiffin: n(trip.mealsTiffin),
-    vehicleMaintenance: n(trip.vehicleMaintenance),
-    othersRC: n(trip.othersRC),
-    others1Amt: n(trip.others1Amt),
-    others2Amt: n(trip.others2Amt),
-    others3Amt: n(trip.others3Amt),
-    others4Amt: n(trip.others4Amt),
-    others5Amt: n(trip.others5Amt),
     remarks: trip.remarks ?? "",
   };
+  for (const key of EXPENSE_KEYS) {
+    const x = n(trip[key]);
+    if (x > 0) payload[key] = x;
+  }
   const raw = trip as Record<string, unknown>;
   const endRaw = raw.endMeter ?? trip.closingMeter;
   if (endRaw !== "" && endRaw != null && Number.isFinite(Number(endRaw))) {
@@ -364,26 +381,69 @@ export async function deleteTripDiesel(tripId: number, entryId: number): Promise
   return mapApiTripToTrip(data);
 }
 
+function finiteOrOmit(value: unknown): number | undefined {
+  const n = numOrNull(value);
+  return n == null ? undefined : n;
+}
+
+function sanitizePerBoxData(value: unknown): Array<{ boxNo: number; birds?: number; weight?: number }> {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    const rec = item as Record<string, unknown>;
+    const boxNo = numOrNull(rec.boxNo);
+    if (boxNo == null || boxNo <= 0) return [];
+    const birds = numOrNull(rec.birds);
+    const weight = numOrNull(rec.weight);
+    return [
+      {
+        boxNo,
+        ...(birds != null ? { birds } : {}),
+        ...(weight != null ? { weight } : {}),
+      },
+    ];
+  });
+}
+
 export function toStep4Payload(trip: Partial<Trip> & { deliveries?: Trip["deliveries"] }): Record<string, unknown> {
   const rows = Array.isArray(trip.deliveries) ? trip.deliveries : [];
   return {
-    deliveries: rows.map((d) => ({
-      id: d.id && d.id < 1e12 ? d.id : undefined,
-      clientKey: d.clientKey || undefined,
-      shopId: d.shopId || null,
-      shopName: d.shopName || "",
-      birdTypeId: d.birdTypeId || null,
-      birdType: d.birdType || "",
-      birds: d.birds ?? 0,
-      weight: d.weight ?? 0,
-      mortality: d.mortality ?? 0,
-      mortKg: d.mortKg ?? 0,
-      remarks: d.remarks ?? "",
-      deliveryMode: d.deliveryMode === "weight" ? "weight" : "box",
-      selectedBoxIds: d.selectedBoxIds ?? [],
-      perBoxData: d.perBoxData ?? [],
-      serialNo: d.serialNo,
-    })),
+    deliveries: rows.map((d) => {
+      const birds = numOrNull(d.birds) ?? 0;
+      const weight = numOrNull(d.weight) ?? 0;
+      const mortality = numOrNull(d.mortality) ?? 0;
+      const mortKg = numOrNull(d.mortKg) ?? 0;
+      const rate = numOrNull(d.rate);
+      const computedAmount =
+        rate != null ? Number((weight * rate).toFixed(2)) : 0;
+      const amount = numOrNull(d.amount) ?? computedAmount;
+      const selectedBoxIds = Array.isArray(d.selectedBoxIds)
+        ? d.selectedBoxIds.map((id) => numOrNull(id)).filter((id): id is number => id != null && id > 0)
+        : [];
+      const shopId = numOrNull(d.shopId);
+      const birdTypeId = numOrNull(d.birdTypeId);
+      return {
+        id: d.id && d.id < 1e12 ? d.id : undefined,
+        clientKey: d.clientKey || undefined,
+        shopId,
+        shopName: d.shopName || "",
+        birdTypeId,
+        birdType: d.birdType || "",
+        birds,
+        weight,
+        mortality,
+        mortKg,
+        rate,
+        amount,
+        remarks: d.remarks ?? "",
+        deliveryMode: d.deliveryMode === "weight" ? "weight" : "box",
+        selectedBoxIds,
+        perBoxData: sanitizePerBoxData(d.perBoxData),
+        boxNo: numOrNull(d.boxNo) ?? selectedBoxIds.length,
+        farmBirds: numOrNull(d.farmBirds),
+        farmWeight: numOrNull(d.farmWeight),
+        serialNo: finiteOrOmit(d.serialNo),
+      };
+    }),
   };
 }
 

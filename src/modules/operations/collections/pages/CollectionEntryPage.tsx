@@ -100,6 +100,7 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
           pendingApprovalCount={vm.pendingApprovalCount}
           currentPage={vm.currentPage}
           totalPages={vm.totalPages}
+          totalRecords={vm.recentCollectionCount}
           onStatusChange={vm.changeStatusFilter}
           onPageChange={vm.changePage}
           onApprove={vm.approveCollection}

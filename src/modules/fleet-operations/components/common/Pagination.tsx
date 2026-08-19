@@ -1,5 +1,10 @@
-import React from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import React from "react";
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  shouldShowPagination,
+} from "../../../../shared/ui/paginationStyles";
 
 interface PaginationProps {
   currentPage: number;
@@ -16,7 +21,7 @@ const Pagination: React.FC<PaginationProps> = ({
   totalItems,
   itemsPerPage,
 }) => {
-  if (totalPages <= 1) return null;
+  if (!shouldShowPagination(totalItems ?? 0)) return null;
 
   const getPageNumbers = (): number[] => {
     const pages: number[] = [];
@@ -35,73 +40,39 @@ const Pagination: React.FC<PaginationProps> = ({
     return pages;
   };
 
+  void totalItems;
+  void itemsPerPage;
+
   return (
-    <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
-      <div className="flex flex-1 justify-between sm:hidden">
+    <div className={paginationBarClass}>
+      <button
+        type="button"
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        className={paginationNavBtnClass}
+      >
+        Previous
+      </button>
+
+      {getPageNumbers().map((page) => (
         <button
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          type="button"
+          key={page}
+          onClick={() => onPageChange(page)}
+          className={paginationPageBtnClass(page === currentPage)}
         >
-          Previous
+          {page}
         </button>
-        <button
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-          className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Next
-        </button>
-      </div>
+      ))}
 
-      <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-        <div>
-          {totalItems !== undefined && itemsPerPage !== undefined && (
-            <p className="text-sm text-gray-700">
-              Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
-              <span className="font-medium">
-                {Math.min(currentPage * itemsPerPage, totalItems)}
-              </span>{' '}
-              of <span className="font-medium">{totalItems}</span> results
-            </p>
-          )}
-        </div>
-        <div>
-          <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-            <button
-              onClick={() => onPageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="sr-only">Previous</span>
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-
-            {getPageNumbers().map((page) => (
-              <button
-                key={page}
-                onClick={() => onPageChange(page)}
-                className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
-                  page === currentPage
-                    ? 'z-10 bg-blue-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600'
-                    : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-
-            <button
-              onClick={() => onPageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="sr-only">Next</span>
-              <ChevronRight className="h-5 w-5" />
-            </button>
-          </nav>
-        </div>
-      </div>
+      <button
+        type="button"
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        className={paginationNavBtnClass}
+      >
+        Next
+      </button>
     </div>
   );
 };

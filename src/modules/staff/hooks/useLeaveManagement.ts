@@ -238,7 +238,6 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
 
   const deleteLeave = useCallback(
     async (id: string) => {
-      if (!window.confirm('Delete this pending leave request?')) return;
       try {
         await deleteLeaveApi(id);
         notify('Leave request deleted.', 'info');

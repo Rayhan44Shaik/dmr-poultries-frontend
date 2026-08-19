@@ -1,8 +1,9 @@
 // src/modules/operations/vehicle-trips/components/Step_5/GeneralExpensesTable.tsx
 
-import React from "react";
+import React, { useRef } from "react";
 import { Clock, Lock } from "lucide-react";
 import { TRIP_FIELD_DEFINITIONS } from "../../../../../shared/trip/definitions";
+import { meterMustBeGreaterThan } from "../../utils/meterValidation";
 
 interface GeneralExpensesTableProps {
   sheetData: any;
@@ -17,6 +18,7 @@ interface GeneralExpensesTableProps {
   destMeter: number;
   trip?: any;
   readOnly?: boolean;
+  onMeterNotice?: (message: string) => void;
 }
 
 export default function GeneralExpensesTable({
@@ -32,7 +34,9 @@ export default function GeneralExpensesTable({
   destMeter,
   trip,
   readOnly = false,
+  onMeterNotice,
 }: GeneralExpensesTableProps) {
+  const meterInvalidRef = useRef(false);
   const blockInvalidChar = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (["e", "E", "+", "-"].includes(e.key)) {
       e.preventDefault();
@@ -63,14 +67,11 @@ export default function GeneralExpensesTable({
 
   // Min required for endMeter
   let requiredMinMeter = actualStartMeter;
-  let requiredMinLabel = `Start Meter (${actualStartMeter})`;
   if (actualDestMeter > requiredMinMeter) {
     requiredMinMeter = actualDestMeter;
-    requiredMinLabel = `Dest Meter (${actualDestMeter})`;
   }
   if (highestDieselMeter > requiredMinMeter) {
     requiredMinMeter = highestDieselMeter;
-    requiredMinLabel = `Diesel Entry (${highestDieselMeter})`;
   }
 
   const currentEndMeter = Number(sheetData.endMeter);
@@ -344,6 +345,14 @@ export default function GeneralExpensesTable({
               {totalExpenses2.toFixed(2)}
             </td>
           </tr>
+          <tr className="bg-emerald-50/80 font-bold text-slate-800 text-xs border-b border-slate-200">
+            <td className="py-2.5 px-3" colSpan={5}>
+              Combined expense total (₹)
+            </td>
+            <td colSpan={2} className="text-slate-900 px-3">
+              {(totalExpenses1 + totalExpenses2).toFixed(2)}
+            </td>
+          </tr>
 
           {/* ODOMETER SECTION */}
           <tr className="border-b border-slate-100">
@@ -376,16 +385,31 @@ export default function GeneralExpensesTable({
                   placeholder="0.00"
                   value={formatZero(sheetData.endMeter)}
                   onKeyDown={blockInvalidChar}
-                  onChange={(e) => handleChange("endMeter", e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    handleChange("endMeter", val);
+                    const n = Number(val);
+                    const invalid =
+                      val !== "" && requiredMinMeter > 0 && Number.isFinite(n) && n <= requiredMinMeter;
+                    if (invalid) {
+                      const msg = meterMustBeGreaterThan(requiredMinMeter);
+                      if (!meterInvalidRef.current) {
+                        meterInvalidRef.current = true;
+                        onMeterNotice?.(msg);
+                      }
+                    } else {
+                      meterInvalidRef.current = false;
+                    }
+                  }}
                   className={`w-full font-bold outline-none bg-transparent transition-colors ${
-                    isEndMeterInvalid ? "text-red-600" : "text-blue-600"
+                    isEndMeterInvalid ? "text-red-600 border border-red-500 rounded bg-red-50 px-1" : "text-blue-600"
                   }`}
                 />
-                {isEndMeterInvalid && (
-                  <span className="text-[10px] text-red-600 font-bold leading-tight mt-0.5 whitespace-nowrap">
-                    Must be strictly &gt; {requiredMinLabel}
-                  </span>
-                )}
+                {isEndMeterInvalid ? (
+                  <div className="mt-1 rounded border border-red-300 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700">
+                    {meterMustBeGreaterThan(requiredMinMeter)}
+                  </div>
+                ) : null}
               </div>
             </td>
             <td colSpan={2} className="font-medium text-slate-700 px-3 border-r border-slate-200 bg-slate-50/30">

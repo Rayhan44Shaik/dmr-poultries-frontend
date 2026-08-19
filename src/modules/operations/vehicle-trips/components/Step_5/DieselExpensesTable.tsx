@@ -1,7 +1,7 @@
 // src/modules/operations/vehicle-trips/components/Step_5/DieselExpensesTable.tsx
 
 import React, { useRef, useState, useEffect } from "react";
-import { Upload, X, MapPin, AlertTriangle, CheckCircle2, Plus, CircleX, Pencil, Trash2, Loader2, Gauge } from "lucide-react";
+import { Upload, X, MapPin, AlertTriangle, Plus, Pencil, Trash2, Loader2, Gauge } from "lucide-react";
 import {
   submitTripDiesel,
   updateTripDiesel,
@@ -9,6 +9,10 @@ import {
   handleApiError,
 } from "../../services/tripHeaderApiService";
 import type { Trip } from "../../types/trip";
+import { meterMustBeGreaterThan } from "../../utils/meterValidation";
+import { usePendingDelete } from "../../../../../hooks/usePendingDelete";
+import { PendingDeleteActions } from "../../../../../components/common/PendingDeleteActions";
+import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from "../../../../../shared/ui/pendingDelete";
 
 interface DieselExpensesTableProps {
   tripId: number;
@@ -60,6 +64,7 @@ export default function DieselExpensesTable({
   const [draftClientKey, setDraftClientKey] = useState<string>(() =>
     typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `diesel-${Date.now()}`
   );
+  const meterInvalidRef = useRef<Record<number, boolean>>({});
 
   const today = new Date();
   const yyyy = today.getFullYear();
@@ -250,6 +255,7 @@ export default function DieselExpensesTable({
     const currentMeter = valStr === "" ? "" : Number(valStr);
     handleChange(`dieselMeter${num}`, currentMeter);
     if (currentMeter === "" || isNaN(Number(currentMeter))) {
+      meterInvalidRef.current[num] = false;
       setMeterErrors((prev) => {
         const copy = { ...prev };
         delete copy[num];
@@ -257,10 +263,19 @@ export default function DieselExpensesTable({
       });
       return;
     }
-    const { minAllowed, referenceLabel } = getMinAllowedMeter(num);
+    const { minAllowed } = getMinAllowedMeter(num);
     if (minAllowed > 0 && Number(currentMeter) <= minAllowed) {
-      setMeterErrors((prev) => ({ ...prev, [num]: `Must be strictly > ${referenceLabel}` }));
+      const msg = meterMustBeGreaterThan(minAllowed);
+      setMeterErrors((prev) => ({
+        ...prev,
+        [num]: msg,
+      }));
+      if (!meterInvalidRef.current[num]) {
+        meterInvalidRef.current[num] = true;
+        notifyUser(msg, "warning");
+      }
     } else {
+      meterInvalidRef.current[num] = false;
       setMeterErrors((prev) => {
         const copy = { ...prev };
         delete copy[num];
@@ -280,6 +295,7 @@ export default function DieselExpensesTable({
     return (
       isPositive(ltr) &&
       isPositive(rate) &&
+      isPositive(Number(ltr) * Number(rate)) &&
       isPositive(reading) &&
       !!bunk &&
       !/^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(bunk) &&
@@ -287,6 +303,24 @@ export default function DieselExpensesTable({
       isValidGps(lat, lon) &&
       !meterErrors[num]
     );
+  };
+
+  const rowBlockReason = (num: number): string | null => {
+    if (meterErrors[num]) return meterErrors[num];
+    if (!isPositive(sheetData[`dieselLtr${num}`])) return "Diesel (Ltr) is required.";
+    if (!isPositive(sheetData[`dieselRate${num}`])) return "Rate (₹ / Ltr) is required.";
+    if (!isPositive(Number(sheetData[`dieselLtr${num}`]) * Number(sheetData[`dieselRate${num}`]))) {
+      return "Amount must be greater than 0.";
+    }
+    if (!isPositive(sheetData[`dieselMeter${num}`])) return "Reading is required.";
+    const bunk = String(sheetData[`dieselBunk${num}`] || "").trim();
+    if (!bunk) return "Bunk Address is required.";
+    if (/^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(bunk)) return "Bunk Address is required.";
+    if (!isValidGps(sheetData[`dieselGpsLat${num}`], sheetData[`dieselGpsLon${num}`])) {
+      return "GPS must be captured.";
+    }
+    if (!hasRealBill(sheetData[`dieselImage${num}`])) return "Bill Image / Slip is required.";
+    return null;
   };
 
   const handleRowSubmit = async (num: number) => {
@@ -373,6 +407,8 @@ export default function DieselExpensesTable({
     }
   };
 
+  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete<number>((num) => handleDeleteSubmitted(num));
+
   const lastRowIndex = rowIndices[rowIndices.length - 1];
   const isLastRowSubmitted = !!sheetData[`dieselSubmitted${lastRowIndex}`];
   const visibleRows = readOnly
@@ -424,18 +460,18 @@ export default function DieselExpensesTable({
           </div>
         )}
 
-        <table className="sheet-joined-table bg-white min-w-[980px] w-full border-collapse">
+        <table className="sheet-joined-table bg-white min-w-[860px] w-full border-collapse">
           <thead>
             <tr className="bg-slate-50 font-normal text-slate-700 text-[11px] tracking-wider border-b border-slate-200">
-              <th className="py-2.5 px-3 text-center w-16">S.No</th>
-              <th className="py-2.5 px-2 text-center w-28">Diesel (Ltr) <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-2 text-center w-32">Rate (₹ / Ltr) <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-2 text-center w-28">Amount (₹)</th>
-              <th className="py-2.5 px-2 text-center w-32">Reading <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-2 text-left w-56">Bunk Address <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-2 text-center w-28">GPS</th>
-              <th className="py-2.5 px-2 text-center w-44">Bill Image / Slip <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-3 text-center w-28">Status</th>
+              <th className="py-2.5 px-2 text-center w-12">S.No</th>
+              <th className="py-2.5 px-1 text-center w-20">Diesel (Ltr) <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-1 text-center w-20">Rate <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-1 text-center w-20">Amount</th>
+              <th className="py-2.5 px-1 text-center w-28">Reading <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-2 text-left">Bunk Address <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-2 text-center min-w-[8.5rem]">GPS</th>
+              <th className="py-2.5 px-1 text-center w-28">Bill Image / Slip <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-2 text-center w-28">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -460,20 +496,19 @@ export default function DieselExpensesTable({
               const isFetching = !!isFetchingGPS[num];
               const { minAllowed: rowMinAllowed } = getMinAllowedMeter(num);
               const gpsOk = isValidGps(sheetData[`dieselGpsLat${num}`], sheetData[`dieselGpsLon${num}`]);
-              const canSubmit = rowReady(num);
 
               return (
-                <tr key={num} className={`border-b border-slate-100 ${isSubmitted ? "bg-emerald-50/30" : "hover:bg-slate-50/50"}`}>
+                <tr key={num} className={`border-b border-slate-100 ${isPending(num) ? PENDING_DELETE_ROW_CLASS : ""} ${isSubmitted ? "bg-emerald-50/30" : "hover:bg-slate-50/50"}`}>
                   <td className="text-slate-700 text-xs py-2 px-3 text-center bg-slate-50/85">{idx + 1}</td>
                   <td className="p-1 text-center">
                     <input type="number" step="0.01" min="0" disabled={locked} value={ltrVal} onKeyDown={blockInvalidChar}
                       onChange={(e) => handleFieldChange(`dieselLtr${num}`, num, e.target.value === "" ? "" : Number(e.target.value))}
-                      className="w-24 text-center p-1 bg-slate-50/70 border border-slate-200 rounded text-xs mx-auto block outline-none disabled:bg-slate-100" />
+                      className="w-16 text-center p-1 bg-slate-50/70 border border-slate-200 rounded text-xs mx-auto block outline-none disabled:bg-slate-100" />
                   </td>
                   <td className="p-1 text-center">
                     <input type="number" step="0.01" min="0" disabled={locked} value={rateVal} onKeyDown={blockInvalidChar}
                       onChange={(e) => handleFieldChange(`dieselRate${num}`, num, e.target.value === "" ? "" : Number(e.target.value))}
-                      className="w-32 text-center p-1 bg-slate-50/70 border border-slate-200 rounded text-xs mx-auto block outline-none disabled:bg-slate-100" />
+                      className="w-16 text-center p-1 bg-slate-50/70 border border-slate-200 rounded text-xs mx-auto block outline-none disabled:bg-slate-100" />
                   </td>
                   <td className="p-1 text-center text-slate-800 text-xs bg-slate-50/40">
                     {amountVal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -482,17 +517,28 @@ export default function DieselExpensesTable({
                     <input type="number" min={rowMinAllowed > 0 ? rowMinAllowed + 1 : 0} disabled={locked} value={meterVal} onKeyDown={blockInvalidChar}
                       onChange={(e) => handleMeterChange(num, e.target.value)}
                       className={`w-24 text-center p-1 border ${hasError ? "border-red-500 bg-red-50" : "border-slate-200 bg-slate-50/70"} rounded text-xs mx-auto block outline-none disabled:bg-slate-100`} />
+                    {hasError ? (
+                      <div className="mt-1 mx-auto max-w-[9rem] rounded border border-red-300 bg-red-50 px-1.5 py-1 text-[10px] font-semibold text-red-700">
+                        {meterErrors[num]}
+                      </div>
+                    ) : null}
                   </td>
-                  <td className="p-1 text-left align-middle px-2">
-                    <input type="text" placeholder="Bunk Address..." disabled={locked || isFetching} value={bunkVal} title={bunkVal}
+                  <td className="p-1 text-left align-middle px-2 w-36 max-w-[9rem]">
+                    <input type="text" placeholder="Bunk..." disabled={locked || isFetching} value={bunkVal} title={bunkVal}
                       onChange={(e) => handleFieldChange(`dieselBunk${num}`, num, e.target.value)}
-                      className="w-full pl-2.5 py-1 bg-slate-50/70 border border-slate-200 rounded outline-none text-xs disabled:text-slate-500" />
+                      className="w-full max-w-[9rem] pl-2 py-1 bg-slate-50/70 border border-slate-200 rounded outline-none text-xs disabled:text-slate-500" />
                   </td>
-                  <td className="p-1 text-center align-middle">
+                  <td className="p-1 text-center align-middle min-w-[8.5rem]">
                     {gpsOk ? (
-                      <span className="text-[11px] text-emerald-700 font-semibold" title={`${sheetData[`dieselGpsLat${num}`]}, ${sheetData[`dieselGpsLon${num}`]}`}>
-                        Captured
-                      </span>
+                      <a
+                        href={`https://www.google.com/maps?q=${Number(sheetData[`dieselGpsLat${num}`])},${Number(sheetData[`dieselGpsLon${num}`])}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] text-emerald-700 font-semibold underline"
+                        title="Open in maps"
+                      >
+                        {Number(sheetData[`dieselGpsLat${num}`]).toFixed(6)}, {Number(sheetData[`dieselGpsLon${num}`]).toFixed(6)}
+                      </a>
                     ) : (
                       <span className="text-[11px] text-slate-400">GPS: Not captured</span>
                     )}
@@ -508,7 +554,7 @@ export default function DieselExpensesTable({
                     <input type="file" accept="image/*" className="hidden" ref={(el) => { fileInputRefs.current[num] = el; }} onChange={(e) => handleImageUpload(num, e)} />
                     {imageVal ? (
                       <div className="w-full px-2 flex justify-center">
-                        <div className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 flex items-center justify-between gap-2 max-w-[150px] w-full">
+                        <div className="bg-slate-50 border border-slate-200 rounded px-1.5 py-1 flex items-center justify-between gap-1 max-w-[7.5rem] w-full">
                           <a href={imageVal} target="_blank" rel="noreferrer" className="text-[11px] text-blue-600 font-medium truncate w-full text-left" title={imageNameVal}>
                             {imageNameVal}
                           </a>
@@ -528,8 +574,14 @@ export default function DieselExpensesTable({
                       )
                     )}
                   </td>
-                  <td className="p-1 text-center align-middle">
-                    {readOnly ? (
+                  <td className={`p-1 text-center align-middle ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
+                    {isPending(num) ? (
+                      <PendingDeleteActions
+                        secondsLeft={secondsLeft(num)}
+                        committing={isCommitting(num)}
+                        onCancel={() => cancel(num)}
+                      />
+                    ) : readOnly ? (
                       <span className="text-[11px] font-semibold text-emerald-700">Submitted</span>
                     ) : (
                       <div className="flex items-center justify-center gap-2">
@@ -539,23 +591,12 @@ export default function DieselExpensesTable({
                             <button type="button" onClick={() => setEditingRow(num)} className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full" title="Edit Row">
                               <Pencil size={14} />
                             </button>
-                            <button type="button" onClick={() => handleDeleteSubmitted(num)} disabled={busyRow === num} className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full" title="Delete Row">
+                            <button type="button" onClick={() => requestDelete(num)} disabled={busyRow === num} className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full" title="Delete Row">
                               <Trash2 size={14} />
                             </button>
                           </>
                         ) : (
-                          <>
-                            {!isSubmitted && (
-                              <button type="button" onClick={() => handleClearRow(num)} className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full" title="Cancel">
-                                <CircleX size={16} />
-                              </button>
-                            )}
-                            <button type="button" onClick={() => handleRowSubmit(num)} disabled={!canSubmit || busyRow === num}
-                              className={`w-7 h-7 flex items-center justify-center border rounded-full ${canSubmit ? "text-emerald-600 border-emerald-200" : "text-slate-300 border-slate-200"}`}
-                              title="Submit Row">
-                              {busyRow === num ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                            </button>
-                          </>
+                          <span className="text-[10px] font-semibold text-slate-500">Draft</span>
                         )}
                       </div>
                     )}
@@ -566,6 +607,48 @@ export default function DieselExpensesTable({
           </tbody>
         </table>
       </div>
+      {(() => {
+        const actionRow = visibleRows.find((num) => {
+          const submitted = !!sheetData[`dieselSubmitted${num}`];
+          return !readOnly && (!submitted || editingRow === num);
+        });
+        if (!actionRow) return null;
+        const reason = rowBlockReason(actionRow);
+        const canSubmit = rowReady(actionRow);
+        return (
+          <div className="space-y-2">
+            {reason ? (
+              <p className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {reason}
+              </p>
+            ) : null}
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (editingRow === actionRow) setEditingRow(null);
+                  else handleClearRow(actionRow);
+                }}
+                className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRowSubmit(actionRow)}
+                disabled={!canSubmit || busyRow === actionRow}
+                className={`px-4 py-2 rounded-lg text-xs font-bold text-white ${
+                  canSubmit && busyRow !== actionRow
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : "bg-slate-300 cursor-not-allowed"
+                }`}
+              >
+                {busyRow === actionRow ? "Submitting…" : "Submit Diesel Entry"}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

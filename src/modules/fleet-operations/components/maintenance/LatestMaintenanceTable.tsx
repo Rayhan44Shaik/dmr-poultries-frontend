@@ -1,8 +1,17 @@
 import { memo, useState, useMemo, useEffect, useRef } from 'react';
 import {
-  Eye, Edit, Trash2, CheckCircle2, ChevronLeft, ChevronRight as ChevronRightIcon,
-  Search, Paperclip, Hash, Truck, Calendar, Wrench, Store, User, Gauge, Clock, Wallet, History, X
+  Eye, Edit, Trash2, CheckCircle2,
+  Search, Paperclip, Hash, Calendar, Wrench, Store, User, Gauge, Clock, Wallet, History, X
 } from 'lucide-react';
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  shouldShowPagination,
+} from '../../../../shared/ui/paginationStyles';
+import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from '../../../../shared/ui/pendingDelete';
+import { usePendingDelete } from '../../../../hooks/usePendingDelete';
+import { PendingDeleteActions } from '../../../../components/common/PendingDeleteActions';
 import type { MaintenanceEvent } from '../../types';
 
 export type ViewMode = 'pending' | 'approved' | 'deleted';
@@ -50,6 +59,11 @@ const LatestMaintenanceTable = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
+  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete<string>(async (id) => {
+    const record = records.find((item) => item.id === id);
+    if (record) await Promise.resolve(onDelete(record));
+  });
+
   const validRecords = records.filter((r): r is MaintenanceEvent & { id: string } => !!r.id);
 
   /** Resolve the registered vehicle number from the Vehicle Master first; fall
@@ -87,6 +101,7 @@ const LatestMaintenanceTable = ({
 
   const totalRecords = filteredRecords.length;
   const startIndex = (currentPage - 1) * pageSize + 1;
+  void startIndex;
 
   const paginatedRecords = filteredRecords.slice(
     (currentPage - 1) * pageSize,
@@ -206,8 +221,8 @@ const LatestMaintenanceTable = ({
                     <Edit size={14} /> Edit
                   </button>
                   <button
-                    onClick={(e) => { e.stopPropagation(); onDelete(selectedRecord); setSelectedId(null); }}
-                    disabled={!isEditable(selectedRecord.date)}
+                    onClick={(e) => { e.stopPropagation(); if (selectedRecord.id) requestDelete(selectedRecord.id); setSelectedId(null); }}
+                    disabled={!isEditable(selectedRecord.date) || isPending(selectedRecord.id)}
                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${
                       isEditable(selectedRecord.date)
                         ? 'text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-200 shadow-sm'
@@ -350,6 +365,8 @@ const LatestMaintenanceTable = ({
                     <tr
                       key={rec.id}
                       className={`group hover:bg-slate-50/80 transition-colors cursor-pointer ${
+                        isPending(rec.id) ? PENDING_DELETE_ROW_CLASS : ""
+                      } ${
                         isSelected ? 'bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600' : 'border-l-4 border-l-transparent'
                       }`}
                       onClick={() => handleRowClick(rec.id)}
@@ -431,8 +448,14 @@ const LatestMaintenanceTable = ({
                         </td>
                       )}
 
-                      <td className="px-4 py-3 text-center whitespace-nowrap">
-                        {Array.isArray(rec.documents) && rec.documents.length > 0 ? (
+                      <td className={`px-4 py-3 text-center whitespace-nowrap ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
+                        {isPending(rec.id) ? (
+                          <PendingDeleteActions
+                            secondsLeft={secondsLeft(rec.id)}
+                            committing={isCommitting(rec.id)}
+                            onCancel={() => cancel(rec.id)}
+                          />
+                        ) : Array.isArray(rec.documents) && rec.documents.length > 0 ? (
                           <button
                             onClick={(e) => { e.stopPropagation(); onView(rec); }}
                             className="inline-flex items-center justify-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-all shadow-sm"
@@ -453,32 +476,25 @@ const LatestMaintenanceTable = ({
           </div>
 
           {/* Pagination */}
-          {actualTotalPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-3 border-t border-slate-100 bg-slate-50/80 gap-3">
-              <span className="text-xs font-medium text-slate-500">
-                Showing <span className="font-bold text-slate-700">{startIndex}</span>–<span className="font-bold text-slate-700">{Math.min(startIndex + pageSize - 1, totalRecords)}</span> of <span className="font-bold text-slate-700">{totalRecords}</span> entries
+          {shouldShowPagination(totalRecords) && (
+            <div className={paginationBarClass}>
+              <button
+                onClick={() => { setSelectedId(null); onPageChange(currentPage - 1); }}
+                disabled={currentPage === 1}
+                className={paginationNavBtnClass}
+              >
+                Previous
+              </button>
+              <span className={paginationPageBtnClass(true)}>
+                {currentPage}
               </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => { setSelectedId(null); onPageChange(currentPage - 1); }}
-                  disabled={currentPage === 1}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium border border-slate-200 bg-white rounded-xl hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
-                >
-                  <ChevronLeft size={14} />
-                  <span>Previous</span>
-                </button>
-                <span className="text-xs font-bold text-slate-700 px-1">
-                  {currentPage} / {actualTotalPages}
-                </span>
-                <button
-                  onClick={() => { setSelectedId(null); onPageChange(currentPage + 1); }}
-                  disabled={currentPage === actualTotalPages}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium border border-slate-200 bg-white rounded-xl hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
-                >
-                  <span>Next</span>
-                  <ChevronRightIcon size={14} />
-                </button>
-              </div>
+              <button
+                onClick={() => { setSelectedId(null); onPageChange(currentPage + 1); }}
+                disabled={currentPage === actualTotalPages}
+                className={paginationNavBtnClass}
+              >
+                Next
+              </button>
             </div>
           )}
         </>

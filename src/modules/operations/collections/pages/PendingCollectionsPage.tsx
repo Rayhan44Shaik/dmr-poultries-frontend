@@ -13,13 +13,17 @@ import {
   X,
   Filter,
   RotateCcw,
-  ChevronLeft,
-  ChevronRight,
   ChevronDown,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  shouldShowPagination,
+} from "../../../../shared/ui/paginationStyles";
 import OutstandingSummary from "../components/entry/OutstandingSummary";
 import { PendingKPICards } from "../components/pending/PendingKPICards";
 import { PendingTable } from "../components/pending/PendingTable";
@@ -468,16 +472,14 @@ export default function PendingCollectionsPage() {
         // backend's own gate on the delete call be authoritative.
       }
     }
-    if (window.confirm(`Delete collection for ${shopName}?`)) {
-      const result = await collectionService.deletePendingCollection(String(latest.numericId));
-      if (result.success) {
-        await refreshData();
-        setSummary((prev) => ({ ...prev, showSummary: false }));
-        setSelectedShopName(null);
-        showNotification("Collection deleted successfully.", "success");
-      } else {
-        showNotification(result.message ?? "Delete failed.", "error");
-      }
+    const result = await collectionService.deletePendingCollection(String(latest.numericId));
+    if (result.success) {
+      await refreshData();
+      setSummary((prev) => ({ ...prev, showSummary: false }));
+      setSelectedShopName(null);
+      showNotification("Collection deleted successfully.", "success");
+    } else {
+      showNotification(result.message ?? "Delete failed.", "error");
     }
   };
 
@@ -764,39 +766,25 @@ export default function PendingCollectionsPage() {
         />
 
         {/* Pagination Controls */}
-        {totalItems > 0 && (
-          <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
-            <div className="text-sm text-slate-600">
-              Showing {((currentPage - 1) * PAGE_SIZE) + 1} to{" "}
-              {Math.min(currentPage * PAGE_SIZE, totalItems)} of {totalItems} entries
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={goToPreviousPage}
-                disabled={currentPage === 1}
-                className={`rounded-md p-2 transition cursor-pointer ${
-                  currentPage === 1
-                    ? "cursor-not-allowed text-slate-300"
-                    : "text-slate-700 hover:bg-slate-100"
-                }`}
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <span className="text-sm font-medium text-slate-700">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={goToNextPage}
-                disabled={currentPage === totalPages}
-                className={`rounded-md p-2 transition cursor-pointer ${
-                  currentPage === totalPages
-                    ? "cursor-not-allowed text-slate-300"
-                    : "text-slate-700 hover:bg-slate-100"
-                }`}
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
+        {shouldShowPagination(totalItems) && (
+          <div className={paginationBarClass}>
+            <button
+              onClick={goToPreviousPage}
+              disabled={currentPage === 1}
+              className={paginationNavBtnClass}
+            >
+              Previous
+            </button>
+            <span className={paginationPageBtnClass(true)}>
+              {currentPage}
+            </span>
+            <button
+              onClick={goToNextPage}
+              disabled={currentPage === totalPages}
+              className={paginationNavBtnClass}
+            >
+              Next
+            </button>
           </div>
         )}
       </div>

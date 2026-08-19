@@ -1,5 +1,8 @@
 import { Eye, Trash2 } from "lucide-react";
 import type { CollectionPendingSummaryRow } from "../../types/collection";
+import { usePendingDelete } from "../../../../../hooks/usePendingDelete";
+import { PendingDeleteActions } from "../../../../../components/common/PendingDeleteActions";
+import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from "../../../../../shared/ui/pendingDelete";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -43,6 +46,7 @@ export function PendingTable({
   grandTotalWeeklySales,
   grandTotalWeeklyCollections,
 }: PendingTableProps) {
+  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete(onDelete);
   const handleRowClick = (shopName: string) => {
     if (selectedShopName === shopName) {
       onSelectShop(null);
@@ -85,8 +89,8 @@ export function PendingTable({
             <Eye size={18} />
           </button>
           <button
-            onClick={() => selectedShop && onDelete(selectedShop.shopName)}
-            disabled={!selectedShop}
+            onClick={() => selectedShop && requestDelete(selectedShop.shopName)}
+            disabled={!selectedShop || (selectedShop ? isPending(selectedShop.shopName) : false)}
             title="Delete"
             className={`rounded-md p-1.5 transition ${
               selectedShop
@@ -129,7 +133,7 @@ export function PendingTable({
                   key={shop.shopId}
                   className={`cursor-pointer hover:bg-green-50 ${
                     selectedShopName === shop.shopName ? "bg-green-100" : ""
-                  }`}
+                  } ${isPending(shop.shopName) ? PENDING_DELETE_ROW_CLASS : ""}`}
                   onClick={() => handleRowClick(shop.shopName)}
                 >
                   <td className="px-4 py-3 text-sm text-slate-600">{idx + 1}</td>
@@ -159,10 +163,18 @@ export function PendingTable({
                       {recovery.toFixed(1)}%
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center text-sm">
+                  <td className={`px-4 py-3 text-center text-sm ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
+                    {isPending(shop.shopName) ? (
+                      <PendingDeleteActions
+                        secondsLeft={secondsLeft(shop.shopName)}
+                        committing={isCommitting(shop.shopName)}
+                        onCancel={() => cancel(shop.shopName)}
+                      />
+                    ) : (
                     <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-500">
                       —
                     </span>
+                    )}
                   </td>
                 </tr>
               );

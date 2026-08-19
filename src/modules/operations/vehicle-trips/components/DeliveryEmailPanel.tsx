@@ -4,7 +4,6 @@ import type { Shop } from "../../../masters/shops/types/shop";
 import {
   fetchDeliveryEmailStatuses,
   sendDeliveryEmail,
-  sendTripDeliveryEmails,
   type DeliveryEmailRow,
   type DeliveryEmailStatusValue,
 } from "../services/deliveryEmailService";
@@ -40,7 +39,6 @@ export default function DeliveryEmailPanel({ trip, shops = [] }: Props) {
     if (trip.status !== "Completed") return;
     let cancelled = false;
     void (async () => {
-      await sendTripDeliveryEmails(trip);
       if (!cancelled) await refresh();
     })();
     return () => {

@@ -3,6 +3,12 @@ import TripFilters from "../components/TripFilters";
 import TripKPICards from "../components/TripKPICards";
 import TripMasterTable from "../components/TripMasterTable";
 import TripViewModal from "../components/TripViewModal";
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  shouldShowPagination,
+} from "../../../../shared/ui/paginationStyles";
 
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
@@ -133,6 +139,8 @@ function TripListPage({ embedded = false }: TripListPageProps) {
 
   const startEntry = totalCompletedTrips === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endEntry = Math.min(currentPage * pageSize, totalCompletedTrips);
+  void startEntry;
+  void endEntry;
 
   const openView = (trip: Trip) => {
     setSelectedTrip(trip);
@@ -282,19 +290,12 @@ function TripListPage({ embedded = false }: TripListPageProps) {
             onRowClick={handleRowClick}
             startIndex={(currentPage - 1) * pageSize}
           />
-        </div>
-
-        <div className="pt-2 border-t border-slate-200/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-500">
-          <div>
-            <div>
-              Showing <span className="font-bold text-slate-700">{startEntry}&ndash;{endEntry}</span> of <span className="font-bold text-slate-700">{totalCompletedTrips}</span> entries
-            </div>
-          </div>
-          <div className="inline-flex items-center gap-1 bg-white border border-slate-200/80 rounded-xl px-2 py-1.5 shadow-2xs">
+          {shouldShowPagination(totalCompletedTrips) && (
+          <div className={paginationBarClass}>
             <button
               onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
               disabled={currentPage === 1}
-              className="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className={paginationNavBtnClass}
             >
               Previous
             </button>
@@ -302,11 +303,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
               <button
                 key={page}
                 onClick={() => setCurrentPage(page)}
-                className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
-                  currentPage === page
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "text-slate-600 hover:bg-slate-100"
-                }`}
+                className={paginationPageBtnClass(currentPage === page)}
               >
                 {page}
               </button>
@@ -314,11 +311,12 @@ function TripListPage({ embedded = false }: TripListPageProps) {
             <button
               onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPagesCompleted))}
               disabled={currentPage === totalPagesCompleted || totalPagesCompleted === 0}
-              className="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className={paginationNavBtnClass}
             >
               Next
             </button>
           </div>
+          )}
         </div>
       </div>
 

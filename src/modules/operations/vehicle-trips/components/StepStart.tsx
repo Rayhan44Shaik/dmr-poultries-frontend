@@ -739,7 +739,7 @@ function StepStart({
         : await submitStartStep(patch);
     if (success) {
       setIsLocalEditing(false);
-      setNotice({ type: "success", message: "Start details submitted successfully." });
+      setNotice({ type: "success", message: "Step 1 submitted successfully." });
     }
     setIsSubmitting(false);
   }, [loadSnapshot, submitStartStep, updateStartStep, startStepSubmitted, tripId, updateTrip]);

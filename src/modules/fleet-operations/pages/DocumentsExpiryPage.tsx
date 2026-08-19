@@ -6,7 +6,13 @@ import DocumentSummaryTiles from '../components/documents/DocumentSummaryTiles';
 import DocumentMatrix from '../components/documents/DocumentMatrix';
 import DocumentEditModal from '../components/documents/DocumentEditModal';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
-import { RefreshCw, ChevronLeft, ChevronRight, Search, X, FileText, AlertCircle } from 'lucide-react';
+import { RefreshCw, Search, X, FileText, AlertCircle } from 'lucide-react';
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  shouldShowPagination,
+} from '../../../shared/ui/paginationStyles';
 
 const PAGE_SIZE = 10;
 
@@ -112,7 +118,7 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
   );
 
   const renderPagination = () => {
-    if (totalPages <= 1) return null;
+    if (!shouldShowPagination(sortedMatrix.length)) return null;
     const pageNumbers = [];
     const maxVisible = 5;
     let startPage = Math.max(1, currentPage - 2);
@@ -121,45 +127,30 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
     for (let i = startPage; i <= endPage; i++) pageNumbers.push(i);
 
     return (
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-slate-100 bg-slate-50/80">
-        <span className="text-xs font-medium text-slate-500">
-          Showing <span className="font-bold text-slate-700">{startIndex + 1}</span>–<span className="font-bold text-slate-700">{Math.min(startIndex + PAGE_SIZE, sortedMatrix.length)}</span> of <span className="font-bold text-slate-700">{sortedMatrix.length}</span> entries
-        </span>
-        <div className="flex items-center gap-1.5">
+      <div className={paginationBarClass}>
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className={paginationNavBtnClass}
+        >
+          Previous
+        </button>
+        {pageNumbers.map((num) => (
           <button
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold border border-slate-200 bg-white rounded-xl hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
+            key={num}
+            onClick={() => handlePageChange(num)}
+            className={paginationPageBtnClass(num === currentPage)}
           >
-            <ChevronLeft size={15} />
-            <span>Prev</span>
+            {num}
           </button>
-
-          <div className="flex items-center gap-1 px-1">
-            {pageNumbers.map((num) => (
-              <button
-                key={num}
-                onClick={() => handlePageChange(num)}
-                className={`h-7 w-7 rounded-lg text-xs font-bold transition-all shadow-sm ${
-                  num === currentPage
-                    ? 'bg-blue-600 text-white shadow-blue-200 shadow-md scale-105'
-                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                }`}
-              >
-                {num}
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold border border-slate-200 bg-white rounded-xl hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
-          >
-            <span>Next</span>
-            <ChevronRight size={15} />
-          </button>
-        </div>
+        ))}
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className={paginationNavBtnClass}
+        >
+          Next
+        </button>
       </div>
     );
   };

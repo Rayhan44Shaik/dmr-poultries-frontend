@@ -26,26 +26,46 @@ interface Props {
   deliveries?: ShopDelivery[];
 }
 
+function kpiNumber(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatKg(value: number | null): string {
+  return value == null ? "—" : `${value.toFixed(2)} Kg`;
+}
+
+function formatCount(value: number | null, suffix = ""): string {
+  if (value == null) return "—";
+  return suffix ? `${value}${suffix}` : String(value);
+}
+
+function formatKm(value: number | null): string {
+  return value == null ? "—" : `${value.toFixed(2)} KM`;
+}
+
 export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
-  // ─── SAFETY & STRICT SUBMISSION CHECK ─────────────────────────────────
   if (!trip) {
     return null;
   }
 
   const t = trip as any;
-  const isEndStepSubmitted = Boolean(t.expensesStepSubmitted || t.endStepSubmitted);
-  const validCompletedStatuses = ["Completed", "Submitted", "Settled", "Closed"];
-  const hasValidStatus = trip.status && validCompletedStatuses.includes(trip.status);
+  const pickupSubmitted = Boolean(trip.pickupStepSubmitted);
+  const farmSubmitted = Boolean(trip.farmStepSubmitted);
+  const deliverySubmitted = Boolean(trip.deliveryStepSubmitted);
+  const expensesSubmitted = Boolean(t.expensesStepSubmitted || t.endStepSubmitted);
 
-  // Only render if the final step has been submitted OR the trip status strictly reflects completion.
-  if (!isEndStepSubmitted && !hasValidStatus) {
-    return null;
-  }
+  const persistedDeliveries = deliverySubmitted
+    ? (Array.isArray(deliveries) && deliveries.length ? deliveries : trip.deliveries || [])
+    : [];
 
-  // Shared delivery totals are used by both Desktop and Mobile KPI views.
   const deliveryTotals = useMemo(
-    () => calculateDeliveryDisplayTotals(trip, deliveries),
-    [deliveries, trip]
+    () =>
+      deliverySubmitted
+        ? calculateDeliveryDisplayTotals(trip, persistedDeliveries)
+        : { totalBirds: 0, totalWeight: 0, totalMortality: 0, totalMortalityKg: 0 },
+    [deliverySubmitted, persistedDeliveries, trip]
   );
 
   const mortalityWeight = deliveryTotals.totalMortalityKg;
@@ -101,92 +121,113 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
     return computedExpenses > 0 ? computedExpenses : Number(t.totalExpenses || 0);
   }, [t]);
 
-  // ─── Define Row 1 Cards ─────────────────────────────────────────────
+  const dcWeight = pickupSubmitted ? kpiNumber(trip.dcWeight) : null;
+  const totalBirds = pickupSubmitted ? kpiNumber(trip.totalBirds) : null;
+  const deliveryWeight = deliverySubmitted ? kpiNumber(deliveryTotals.totalWeight) : null;
+  const deliveryBirds = deliverySubmitted ? kpiNumber(deliveryTotals.totalBirds) : null;
+  const mortalityCount = deliverySubmitted ? kpiNumber(deliveryTotals.totalMortality) : null;
+  const mortalityKg = deliverySubmitted ? kpiNumber(mortalityWeight) : null;
+  const weightLossValue =
+    pickupSubmitted && deliverySubmitted ? kpiNumber(weightLoss) : null;
+  const pickupDistValue = farmSubmitted && trip.startStepSubmitted ? kpiNumber(pickupDist) : null;
+  const deliveryDistValue = expensesSubmitted ? kpiNumber(deliveryDist) : null;
+  const totalDistValue = expensesSubmitted ? kpiNumber(totalDist) : null;
+  const pickupTollsValue = farmSubmitted ? kpiNumber(trip.pickupTolls) ?? 0 : null;
+  const deliveryTollsValue = expensesSubmitted ? kpiNumber(trip.deliveryTolls) ?? 0 : null;
+  const tollsValue =
+    pickupTollsValue == null && deliveryTollsValue == null
+      ? null
+      : (pickupTollsValue ?? 0) + (deliveryTollsValue ?? 0);
+  const mileageValue = expensesSubmitted ? kpiNumber(mileage) : null;
+  const expensesValue = expensesSubmitted ? kpiNumber(totalExpenses) : null;
+
   const row1Cards = [
     {
       label: "DC WEIGHT",
-      value: `${(trip.dcWeight || 0).toFixed(2)} Kg`,
+      value: formatKg(dcWeight),
       sub: "Load from Farm",
       bg: "bg-blue-50",
       icon: <Weight size={18} className="text-blue-600" />,
     },
     {
       label: "TOTAL BIRDS",
-      value: `${trip.totalBirds || 0}`,
+      value: formatCount(totalBirds),
       sub: "Picked up from Farm",
       bg: "bg-green-50",
       icon: <Bird size={18} className="text-green-600" />,
     },
     {
       label: "DELIVERY WEIGHT",
-      value: `${deliveryTotals.totalWeight.toFixed(2)} Kg`,
-      sub: `${deliveries.length} Shop Delivery(s)`,
+      value: formatKg(deliveryWeight),
+      sub: deliverySubmitted ? `${persistedDeliveries.length} Shop Delivery(s)` : "Not submitted",
       bg: "bg-slate-50",
       icon: <ShoppingBag size={18} className="text-slate-700" />,
     },
     {
       label: "DELIVERY BIRDS",
-      value: `${deliveryTotals.totalBirds}`,
+      value: formatCount(deliveryBirds),
       sub: "Total to Shops",
       bg: "bg-cyan-50",
       icon: <Bird size={18} className="text-cyan-600" />,
     },
     {
       label: "MORTALITY",
-      value: `${deliveryTotals.totalMortality} Birds`,
-      sub: `${mortalityWeight.toFixed(2)} Kg Total`,
+      value: mortalityCount == null ? "—" : `${mortalityCount} Birds`,
+      sub: mortalityKg == null ? "Not submitted" : `${mortalityKg.toFixed(2)} Kg Total`,
       bg: "bg-red-50",
       icon: <HeartPulse size={18} className="text-red-600" />,
     },
     {
       label: "WEIGHT LOSS",
-      value: `${weightLoss.toFixed(2)} Kg`,
+      value: formatKg(weightLossValue),
       sub: "DC - Del - Mort",
       bg: "bg-amber-50",
       icon: <TrendingDown size={18} className="text-amber-600" />,
     },
   ];
 
-  // ─── Define Row 2 Cards ─────────────────────────────────────────────
   const row2Cards = [
     {
       label: "PICKUP DIST",
-      value: `${pickupDist.toFixed(2)} KM`,
+      value: formatKm(pickupDistValue),
       sub: "Start to Farm",
       bg: "bg-indigo-50/50",
       icon: <MapPin size={18} className="text-indigo-600" />,
     },
     {
       label: "DELIVERY DIST",
-      value: `${deliveryDist.toFixed(2)} KM`,
+      value: formatKm(deliveryDistValue),
       sub: "Farm to Last Drop",
       bg: "bg-indigo-50/50",
       icon: <Map size={18} className="text-indigo-600" />,
     },
     {
       label: "TOTAL DISTANCE",
-      value: `${totalDist.toFixed(2)} KM`,
+      value: formatKm(totalDistValue),
       sub: "Full Trip Total",
       bg: "bg-indigo-50",
       icon: <Route size={18} className="text-indigo-700" />,
     },
     {
       label: "TOLL GATES",
-      value: `${(trip.pickupTolls || 0) + (trip.deliveryTolls || 0)}`,
-      sub: `P: ${trip.pickupTolls || 0} • D: ${trip.deliveryTolls || 0}`,
+      value: formatCount(tollsValue),
+      sub:
+        pickupTollsValue == null && deliveryTollsValue == null
+          ? "Not submitted"
+          : `P: ${pickupTollsValue ?? 0} • D: ${deliveryTollsValue ?? 0}`,
       bg: "bg-violet-50",
       icon: <Ticket size={18} className="text-violet-600" />,
     },
     {
       label: "MILEAGE",
-      value: `${mileage.toFixed(2)}`,
+      value: mileageValue == null ? "—" : mileageValue.toFixed(2),
       sub: "KM/Ltr Efficiency",
       bg: "bg-purple-50",
       icon: <Fuel size={18} className="text-purple-600" />,
     },
     {
       label: "EXPENSES",
-      value: `₹${totalExpenses.toFixed(0)}`,
+      value: expensesValue == null ? "—" : `₹${expensesValue.toFixed(0)}`,
       sub: "Total Trip Spends",
       bg: "bg-orange-50",
       icon: <Receipt size={18} className="text-orange-600" />,

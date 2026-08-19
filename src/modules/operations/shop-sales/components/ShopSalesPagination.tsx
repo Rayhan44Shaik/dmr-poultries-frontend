@@ -1,4 +1,9 @@
 import React from "react";
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+} from "../../../../shared/ui/paginationStyles";
 
 interface Props {
   currentPage: number;
@@ -7,7 +12,6 @@ interface Props {
 }
 
 function ShopSalesPagination({ currentPage, totalPages, onPageChange }: Props) {
-  if (totalPages <= 1) return null;
 
   // Build a window of up to 10 pages around the current page
   const getPageNumbers = () => {
@@ -30,73 +34,53 @@ function ShopSalesPagination({ currentPage, totalPages, onPageChange }: Props) {
   const showLastEllipsis = visiblePages[visiblePages.length - 1] < totalPages;
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3">
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-slate-500">
-          Page <span className="font-bold text-slate-700">{currentPage}</span> of{" "}
-          <span className="font-bold text-slate-700">{totalPages}</span>
-        </div>
-        <div className="flex gap-1">
-          {/* Previous */}
-          <button
-            disabled={currentPage === 1}
-            onClick={() => onPageChange(currentPage - 1)}
-            className="px-3 py-1 rounded-lg border disabled:opacity-40 hover:bg-slate-100 text-xs"
-          >
-            Previous
+    <div className={paginationBarClass}>
+      <button
+        type="button"
+        disabled={currentPage === 1}
+        onClick={() => onPageChange(currentPage - 1)}
+        className={paginationNavBtnClass}
+      >
+        Previous
+      </button>
+
+      {showFirstEllipsis && (
+        <>
+          <button type="button" onClick={() => onPageChange(1)} className={paginationPageBtnClass(false)}>
+            1
           </button>
+          <span className="px-1 text-slate-400">…</span>
+        </>
+      )}
 
-          {/* First page and ellipsis */}
-          {showFirstEllipsis && (
-            <>
-              <button
-                onClick={() => onPageChange(1)}
-                className="h-8 w-8 rounded-lg border text-xs hover:bg-slate-100"
-              >
-                1
-              </button>
-              <span className="px-2 text-slate-400">…</span>
-            </>
-          )}
+      {visiblePages.map((page) => (
+        <button
+          type="button"
+          key={page}
+          onClick={() => onPageChange(page)}
+          className={paginationPageBtnClass(page === currentPage)}
+        >
+          {page}
+        </button>
+      ))}
 
-          {/* Visible pages */}
-          {visiblePages.map((page) => (
-            <button
-              key={page}
-              onClick={() => onPageChange(page)}
-              className={`h-8 w-8 rounded-lg border text-xs transition ${
-                page === currentPage
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "hover:bg-slate-100"
-              }`}
-            >
-              {page}
-            </button>
-          ))}
-
-          {/* Last ellipsis and last page */}
-          {showLastEllipsis && (
-            <>
-              <span className="px-2 text-slate-400">…</span>
-              <button
-                onClick={() => onPageChange(totalPages)}
-                className="h-8 w-8 rounded-lg border text-xs hover:bg-slate-100"
-              >
-                {totalPages}
-              </button>
-            </>
-          )}
-
-          {/* Next */}
-          <button
-            disabled={currentPage === totalPages}
-            onClick={() => onPageChange(currentPage + 1)}
-            className="px-3 py-1 rounded-lg border disabled:opacity-40 hover:bg-slate-100 text-xs"
-          >
-            Next
+      {showLastEllipsis && (
+        <>
+          <span className="px-1 text-slate-400">…</span>
+          <button type="button" onClick={() => onPageChange(totalPages)} className={paginationPageBtnClass(false)}>
+            {totalPages}
           </button>
-        </div>
-      </div>
+        </>
+      )}
+
+      <button
+        type="button"
+        disabled={currentPage === totalPages}
+        onClick={() => onPageChange(currentPage + 1)}
+        className={paginationNavBtnClass}
+      >
+        Next
+      </button>
     </div>
   );
 }

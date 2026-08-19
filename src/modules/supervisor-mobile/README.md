@@ -21,4 +21,10 @@ VITE_MOBILE_API_BASE_URL=/api/mobile
 
 Use a same-origin HTTPS reverse proxy path where possible. An absolute URL is accepted only when it is HTTPS. Never configure a deployed phone with `localhost` or a PostgreSQL address.
 
+Local development login (created on first sign-in after `npm run db:migrate` in `backend`):
+
+- Username: `RuhullaShaik`
+- Password: `Supervisor@123`
+- URL: `http://localhost:5173/mobile` or `http://localhost:5173/mobile/trips`
+
 The queue retains `PENDING`, `SYNCING`, retryable failure, conflict, and permanent-failure records until an authoritative operation acknowledgement is durably recorded. A request retried after a response loss reuses the same UUID.

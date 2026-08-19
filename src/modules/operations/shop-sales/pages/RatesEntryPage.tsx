@@ -3,6 +3,7 @@ import CompletedTripsFilters from "../components/CompletedTripsFilters";
 import CompletedTripsTable from "../components/CompletedTripsTable";
 import EnterRateModal from "../components/EnterRateModal";
 import TripPagination from "../../vehicle-trips/components/TripPagination";
+import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import TripKPICards from "../../vehicle-trips/components/TripKPICards";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
@@ -131,14 +132,16 @@ export default function RatesEntryPage({ embedded: _embedded = false }: Props) {
           trips={paginatedTrips}
           onEnterRate={openRateEntry}
           onModifyRate={openModifyRate}
-        />
+        >
+          {shouldShowPagination(filteredTrips.length) && (
+          <TripPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+          )}
+        </CompletedTripsTable>
       )}
-
-      <TripPagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-      />
 
       <EnterRateModal
         open={modalOpen}

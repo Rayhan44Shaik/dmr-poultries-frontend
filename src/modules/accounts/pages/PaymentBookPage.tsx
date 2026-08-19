@@ -5,12 +5,12 @@ import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { PaymentTable } from '../components/payment-book/PaymentTable';
 import { PaymentViewModal } from '../components/payment-book/PaymentViewModal';
 import { PaymentEditModal } from '../components/payment-book/PaymentEditModal';
-import { PaymentDeleteModal } from '../components/payment-book/PaymentDeleteModal';
 import { NewPaymentModal } from '../components/payment-book/NewPaymentModal';
 import { PaymentService } from '../services/PaymentService';
 import type { Payment } from '../types/payment.types';
 import { DatePicker } from '../../../components/common/DatePicker';
 import { canEditItem, canDeleteItem } from '../../../utils/dateUtils';
+import { usePendingDelete } from '../../../hooks/usePendingDelete';
 import {
   Download,
   RefreshCw,
@@ -60,11 +60,9 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [viewingPayment, setViewingPayment] = useState<Payment | null>(null);
-  const [deletingPayment, setDeletingPayment] = useState<Payment | null>(null);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
@@ -168,20 +166,8 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
     }
   };
 
-  const handleDelete = () => {
-    if (selectedPayment) {
-      if (!canDeleteItem(selectedPayment.createdAt)) {
-        showNotification('This payment is older than 10 days and cannot be deleted.', 'error');
-        return;
-      }
-      setDeletingPayment(selectedPayment);
-      setIsDeleteModalOpen(true);
-    }
-  };
-
-  const handleDeleteConfirm = () => {
-    if (!deletingPayment) return;
-    const success = PaymentService.deletePayment(deletingPayment.id);
+  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete<string>((id) => {
+    const success = PaymentService.deletePayment(id);
     if (success) {
       showNotification('Payment deleted successfully', 'success');
       setSelectedId(null);
@@ -189,8 +175,16 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
     } else {
       showNotification('Failed to delete payment', 'error');
     }
-    setIsDeleteModalOpen(false);
-    setDeletingPayment(null);
+  });
+
+  const handleDelete = () => {
+    if (selectedPayment) {
+      if (!canDeleteItem(selectedPayment.createdAt)) {
+        showNotification('This payment is older than 10 days and cannot be deleted.', 'error');
+        return;
+      }
+      requestDelete(selectedPayment.id);
+    }
   };
 
   useEffect(() => {
@@ -423,6 +417,7 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
             payments={payments}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            pendingDelete={{ requestDelete, cancel, isPending, secondsLeft, isCommitting }}
           />
         )}
       </div>
@@ -451,16 +446,6 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
           setIsViewModalOpen(false);
           setViewingPayment(null);
         }}
-      />
-
-      <PaymentDeleteModal
-        isOpen={isDeleteModalOpen}
-        payment={deletingPayment}
-        onClose={() => {
-          setIsDeleteModalOpen(false);
-          setDeletingPayment(null);
-        }}
-        onConfirm={handleDeleteConfirm}
       />
     </div>
   );

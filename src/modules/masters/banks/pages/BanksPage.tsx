@@ -13,6 +13,12 @@ import { exportToExcel } from "../../../../utils/exportUtils";
 
 // BanksPage.tsx is inside banks/pages, while exportBankPdf is inside banks/utils.
 import { exportBanksToPDF } from "../utils/exportBankPdf";
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  shouldShowPagination,
+} from "../../../../shared/ui/paginationStyles";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/bankService";
 import type { Bank } from "../types/bank";
@@ -462,15 +468,6 @@ function BanksPage({
       return;
     }
 
-    const confirmed =
-      window.confirm(
-        `Are you sure you want to delete "${bankToDelete.bankName}"?`,
-      );
-
-    if (!confirmed) {
-      return;
-    }
-
     setDeletingId(id);
 
     try {
@@ -677,16 +674,13 @@ function BanksPage({
               onEdit={
                 handleEditBank
               }
-              onDelete={(id) => {
-                void handleDeleteBank(
-                  id,
-                );
-              }}
+              onDelete={handleDeleteBank}
             />
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 rounded-b-xl border-t border-slate-100 bg-slate-50/60 px-4 py-2.5 text-xs">
+        {shouldShowPagination(filteredBanks.length) && (
+        <div className={paginationBarClass}>
           <button
             type="button"
             onClick={() =>
@@ -702,7 +696,7 @@ function BanksPage({
               currentPage === 1 ||
               loading
             }
-            className="rounded-md border border-slate-200 bg-white px-2.5 py-1 font-medium text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+            className={paginationNavBtnClass}
           >
             Previous
           </button>
@@ -720,12 +714,9 @@ function BanksPage({
                 )
               }
               disabled={loading}
-              className={`flex h-7 w-7 items-center justify-center rounded-md text-xs font-semibold ${
-                currentPage ===
-                pageNumber
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-              }`}
+              className={paginationPageBtnClass(
+                currentPage === pageNumber,
+              )}
             >
               {pageNumber}
             </button>
@@ -747,11 +738,12 @@ function BanksPage({
                 totalPages ||
               loading
             }
-            className="rounded-md border border-slate-200 bg-white px-2.5 py-1 font-medium text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+            className={paginationNavBtnClass}
           >
             Next
           </button>
         </div>
+        )}
       </div>
 
       <BankDialog

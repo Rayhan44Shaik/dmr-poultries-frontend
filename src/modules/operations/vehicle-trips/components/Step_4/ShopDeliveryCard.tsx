@@ -162,9 +162,14 @@ export default function ShopDeliveryCard({
       ) : null}
 
       <div className="flex items-center justify-between pt-0.5 text-[11px] text-slate-400 font-medium">
-        <div className="flex items-center gap-1">
-          <Clock size={12} className="text-slate-400 stroke-[2]" />
-          <span>{row.autoCaptureTime || "Not entered"}</span>
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-1">
+            <Clock size={12} className="text-slate-400 stroke-[2]" />
+            <span>Captured {row.autoCaptureTime || "—"}</span>
+          </div>
+          {selectedBoxes.length > 0 && row.autoCaptureTime ? (
+            <span className="pl-4 text-[10px] text-slate-400">Box time {row.autoCaptureTime}</span>
+          ) : null}
         </div>
         {row.birdType ? (
           <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded-md text-[10px] border border-blue-100">

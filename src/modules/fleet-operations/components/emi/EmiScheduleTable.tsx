@@ -1,6 +1,12 @@
 import { memo, useState } from 'react';
 import { format, setDate, addMonths, isPast, isAfter } from 'date-fns';
 import { CreditCard, Truck } from 'lucide-react';
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  shouldShowPagination,
+} from '../../../../shared/ui/paginationStyles';
 
 interface EmiScheduleTableProps {
   emiRecords: any[];
@@ -188,42 +194,31 @@ const EmiScheduleTable = ({
         </table>
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-slate-200">
-          <div className="text-sm text-slate-500">
-            Showing <span className="font-medium">{startIndex + 1}</span> -{' '}
-            <span className="font-medium">{Math.min(endIndex, totalRecords)}</span> of{' '}
-            <span className="font-medium">{totalRecords}</span> vehicles
-          </div>
-          <div className="flex items-center gap-1.5">
+      {shouldShowPagination(totalRecords) && (
+        <div className={paginationBarClass}>
+          <button
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage === 1}
+            className={paginationNavBtnClass}
+          >
+            Previous
+          </button>
+          {getPageNumbers().map((page) => (
             <button
-              onClick={() => goToPage(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="px-3.5 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              key={page}
+              onClick={() => goToPage(page)}
+              className={paginationPageBtnClass(page === currentPage)}
             >
-              Previous
+              {page}
             </button>
-            {getPageNumbers().map((page) => (
-              <button
-                key={page}
-                onClick={() => goToPage(page)}
-                className={`px-3.5 py-2 text-sm border rounded-lg transition-colors ${
-                  page === currentPage
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-200'
-                    : 'border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              onClick={() => goToPage(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="px-3.5 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              Next
-            </button>
-          </div>
+          ))}
+          <button
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className={paginationNavBtnClass}
+          >
+            Next
+          </button>
         </div>
       )}
     </div>

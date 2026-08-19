@@ -11,6 +11,12 @@ import { exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/shopService";
 import type { Shop } from "../types/shop";
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  shouldShowPagination,
+} from "../../../../shared/ui/paginationStyles";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
@@ -269,7 +275,6 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   };
 
   const handleDeleteShop = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this shop?")) return;
     setDeletingId(id);
     try {
       await removeShop(id);
@@ -453,34 +458,28 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
             <ShopTable
               shops={paginatedShops}
               onEdit={handleEditShop}
-              onDelete={(id) => {
-                void handleDeleteShop(id);
-              }}
+              onDelete={handleDeleteShop}
             />
           )}
         </div>
 
-        {/* Pagination Controls - Bottom Right Aligned */}
-        <div className="px-4 py-2.5 bg-slate-50/60 border-t border-slate-100 flex items-center justify-end gap-2 text-xs rounded-b-xl">
+        {shouldShowPagination(filteredShops.length) && (
+        <div className={paginationBarClass}>
           <button
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
             disabled={currentPage === 1 || loading}
-            className="px-2.5 py-1 rounded-md border border-slate-200 bg-white font-medium text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+            className={paginationNavBtnClass}
           >
             Previous
           </button>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
               <button
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
                 disabled={loading}
-                className={`w-7 h-7 rounded-md text-xs font-semibold flex items-center justify-center ${
-                  currentPage === pageNum
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                }`}
+                className={paginationPageBtnClass(currentPage === pageNum)}
               >
                 {pageNum}
               </button>
@@ -490,11 +489,12 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
           <button
             onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages || loading}
-            className="px-2.5 py-1 rounded-md border border-slate-200 bg-white font-medium text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+            className={paginationNavBtnClass}
           >
             Next
           </button>
         </div>
+        )}
       </div>
 
       {/* Modal Dialog */}

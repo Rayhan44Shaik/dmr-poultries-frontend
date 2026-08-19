@@ -432,7 +432,7 @@ export default function StepPickup({
             });
             if (success) {
               setIsLocalEditing(false);
-              setToast({ message: "Pickup details submitted successfully.", type: "success" });
+              setToast({ message: "Step 3 submitted successfully.", type: "success" });
             } else {
               setToast({ message: "Unable to submit pickup details. Please try again.", type: "error" });
             }

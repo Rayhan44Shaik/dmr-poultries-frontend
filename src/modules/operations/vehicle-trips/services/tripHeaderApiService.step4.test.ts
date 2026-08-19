@@ -34,6 +34,8 @@ test("toStep4Payload sends only delivery rows — no KPI or timestamp", () => {
   assert.equal(row.clientKey, "ck-a");
   assert.equal(row.shopId, 3);
   assert.equal(row.birds, 40);
+  assert.equal(row.amount, 0);
+  assert.equal(Number.isNaN(row.amount), false);
   assert.equal("autoCaptureTime" in row, false);
   assert.equal("totalShops" in payload, false);
   assert.equal("deliveryStepSubmitted" in payload, false);

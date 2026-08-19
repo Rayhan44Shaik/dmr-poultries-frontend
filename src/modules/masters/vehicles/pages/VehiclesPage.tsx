@@ -11,6 +11,12 @@ import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/vehicleService";
 import type { Vehicle } from "../types/vehicle";
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  shouldShowPagination,
+} from "../../../../shared/ui/paginationStyles";
 import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
 import { buildVehicleBulkImportConfig } from "../bulkImportConfig";
 
@@ -210,7 +216,6 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
   };
 
   const handleDeleteVehicle = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this vehicle?")) return;
     setDeletingId(id);
     try {
       await removeVehicle(id);
@@ -394,34 +399,28 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
             <VehicleTable
               vehicles={paginatedVehicles}
               onEdit={handleEditVehicle}
-              onDelete={(id) => {
-                void handleDeleteVehicle(id);
-              }}
+              onDelete={handleDeleteVehicle}
             />
           )}
         </div>
 
-        {/* Pagination Controls - Bottom Right Aligned */}
-        <div className="px-4 py-2.5 bg-slate-50/60 border-t border-slate-100 flex items-center justify-end gap-2 text-xs rounded-b-xl">
+        {shouldShowPagination(filteredVehicles.length) && (
+        <div className={paginationBarClass}>
           <button
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
             disabled={currentPage === 1 || loading}
-            className="px-2.5 py-1 rounded-md border border-slate-200 bg-white font-medium text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+            className={paginationNavBtnClass}
           >
             Previous
           </button>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
               <button
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
                 disabled={loading}
-                className={`w-7 h-7 rounded-md text-xs font-semibold flex items-center justify-center ${
-                  currentPage === pageNum
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                }`}
+                className={paginationPageBtnClass(currentPage === pageNum)}
               >
                 {pageNum}
               </button>
@@ -431,11 +430,12 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
           <button
             onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages || loading}
-            className="px-2.5 py-1 rounded-md border border-slate-200 bg-white font-medium text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+            className={paginationNavBtnClass}
           >
             Next
           </button>
         </div>
+        )}
       </div>
 
       {/* Modal Dialog */}

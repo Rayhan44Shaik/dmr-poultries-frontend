@@ -1,4 +1,5 @@
 import { DollarSign, Pencil, Lock, Hash, Calendar, Truck, UserCog, Warehouse, ShoppingBag, Bird, Scale, Settings } from "lucide-react";
+import type { ReactNode } from "react";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 
 // Helper: check if trip is within 10 days
@@ -13,9 +14,10 @@ interface Props {
   trips: Trip[];
   onEnterRate: (trip: Trip) => void;
   onModifyRate: (trip: Trip) => void;
+  children?: ReactNode;
 }
 
-export default function CompletedTripsTable({ trips, onEnterRate, onModifyRate }: Props) {
+export default function CompletedTripsTable({ trips, onEnterRate, onModifyRate, children }: Props) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
       <div className="w-full overflow-x-auto">
@@ -137,6 +139,7 @@ export default function CompletedTripsTable({ trips, onEnterRate, onModifyRate }
           </tbody>
         </table>
       </div>
+      {children}
     </div>
   );
 }

@@ -1,5 +1,11 @@
 import { Eye } from "lucide-react";
 import { useMemo, useState } from "react";
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  shouldShowPagination,
+} from "../../../shared/ui/paginationStyles";
 
 type MasterDataTableProps = {
   moduleName: string;
@@ -781,48 +787,26 @@ function MasterDataTable({
 
       </div>
 
-      {moduleName !== "Routes" && (
+      {moduleName !== "Routes" && shouldShowPagination(data.length) && (
 
-        <div className="border-t bg-slate-50 px-6 py-4 flex justify-between items-center">
-
-          <span className="text-sm text-slate-500">
-
-            Page {page} of {totalPages}
-
-          </span>
-
-          <div className="flex gap-3">
-
-            <button
-
+        <div className={paginationBarClass}>
+          <button
               disabled={page===1}
-
               onClick={()=>setPage(page-1)}
-
-              className="px-4 py-2 border rounded-lg disabled:opacity-40 hover:bg-slate-100"
-
+              className={paginationNavBtnClass}
             >
-
               Previous
-
             </button>
-
+            <span className={paginationPageBtnClass(true)}>
+              {page}
+            </span>
             <button
-
               disabled={page===totalPages}
-
               onClick={()=>setPage(page+1)}
-
-              className="px-4 py-2 border rounded-lg disabled:opacity-40 hover:bg-slate-100"
-
+              className={paginationNavBtnClass}
             >
-
               Next
-
             </button>
-
-          </div>
-
         </div>
 
       )}

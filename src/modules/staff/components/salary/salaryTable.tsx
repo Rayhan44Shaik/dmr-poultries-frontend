@@ -3,6 +3,15 @@
 import { useMemo } from "react";
 import { CheckCircle2, Eye, Lock, Pencil, Trash2, Undo2, Send, Wallet } from "lucide-react";
 import type { SalaryRecord } from "../../types/staffDashboard";
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  shouldShowPagination,
+} from "../../../../shared/ui/paginationStyles";
+import { usePendingDelete } from "../../../../hooks/usePendingDelete";
+import { PendingDeleteActions } from "../../../../components/common/PendingDeleteActions";
+import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from "../../../../shared/ui/pendingDelete";
 
 type Action = "view" | "edit" | "submit" | "pay" | "markUnpaid" | "unsubmit" | "delete";
 
@@ -72,6 +81,11 @@ export function SalaryTable({
   saving = false,
   onAction,
 }: SalaryTableProps) {
+  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete<string>((id) => {
+    const record = records.find((item) => item.id === id);
+    if (record) return onAction("delete", record);
+  });
+
   const formatVal = formatCurrency || ((amount: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(amount || 0));
 
@@ -124,7 +138,7 @@ export function SalaryTable({
                 record.correctionWindowDaysRemaining > 0;
 
               return (
-                <tr key={record.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={record.id} className={isPending(record.id) ? PENDING_DELETE_ROW_CLASS : "hover:bg-slate-50 transition-colors"}>
                   <td className="px-4 py-3 text-sm font-semibold text-slate-800 whitespace-nowrap">{record.employeeName}</td>
                   <td className="px-4 py-3 text-sm text-slate-600">{record.department}</td>
                   <td className="px-3 py-3 text-center text-sm text-slate-700">{record.workingDays ?? "—"}</td>
@@ -143,14 +157,23 @@ export function SalaryTable({
                     )}
                   </td>
                   <td className="px-3 py-3 text-sm text-slate-600">{record.paymentDate ?? "—"}</td>
-                  <td className="px-4 py-3">
+                  <td className={`px-4 py-3 ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
+                    {isPending(record.id) ? (
+                      <PendingDeleteActions
+                        secondsLeft={secondsLeft(record.id)}
+                        committing={isCommitting(record.id)}
+                        onCancel={() => cancel(record.id)}
+                      />
+                    ) : (
                     <div className="flex items-center justify-end gap-1.5">
                       <ActionButtons
                         record={record}
                         saving={saving}
                         onAction={onAction}
+                        onDelete={() => requestDelete(record.id)}
                       />
                     </div>
+                    )}
                     {note && <div className="text-[10px] text-slate-400 text-right mt-1">{note}</div>}
                   </td>
                 </tr>
@@ -160,43 +183,34 @@ export function SalaryTable({
         </table>
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-t border-slate-200">
-          <span className="text-xs text-slate-500">
-            Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, sortedRecords.length)} of {sortedRecords.length} records
-          </span>
-          <div className="flex items-center gap-1.5">
+      {shouldShowPagination(sortedRecords.length) && (
+        <div className={paginationBarClass}>
+          <button
+            type="button"
+            onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
+            disabled={currentPage === 1}
+            className={paginationNavBtnClass}
+          >
+            Previous
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
             <button
+              key={page}
               type="button"
-              onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              onClick={() => setCurrentPage(page)}
+              className={paginationPageBtnClass(currentPage === page)}
             >
-              Previous
+              {page}
             </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                type="button"
-                onClick={() => setCurrentPage(page)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                  currentPage === page
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "border border-slate-300 text-slate-700 bg-white hover:bg-slate-100"
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              Next
-            </button>
-          </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPages))}
+            disabled={currentPage === totalPages}
+            className={paginationNavBtnClass}
+          >
+            Next
+          </button>
         </div>
       )}
     </div>
@@ -207,10 +221,12 @@ function ActionButtons({
   record,
   saving,
   onAction,
+  onDelete,
 }: {
   record: SalaryRecord;
   saving: boolean;
   onAction: (action: Action, record: SalaryRecord) => void;
+  onDelete: () => void;
 }) {
   const btn =
     "p-1.5 rounded-lg border transition disabled:opacity-40 disabled:cursor-not-allowed";
@@ -242,7 +258,7 @@ function ActionButtons({
           <button type="button" className={emerald} title="Pay" disabled={saving} onClick={() => onAction("pay", record)}>
             <Wallet size={14} />
           </button>
-          <button type="button" className={rose} title="Delete" disabled={saving} onClick={() => onAction("delete", record)}>
+          <button type="button" className={rose} title="Delete" disabled={saving} onClick={onDelete}>
             <Trash2 size={14} />
           </button>
         </>

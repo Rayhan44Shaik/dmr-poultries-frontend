@@ -111,6 +111,13 @@ export default function MobileLogin() {
           <p className="text-center text-[11px] leading-relaxed text-slate-400">
             Credentials are verified by the office backend and are never stored as plaintext on this device.
           </p>
+          {import.meta.env.DEV && (
+            <p className="rounded-xl bg-slate-50 px-3 py-2 text-center text-[11px] leading-relaxed text-slate-500">
+              Local development login: <span className="font-bold text-slate-700">RuhullaShaik</span>
+              {" / "}
+              <span className="font-bold text-slate-700">Supervisor@123</span>
+            </p>
+          )}
         </form>
       </section>
     </main>

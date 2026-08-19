@@ -4,9 +4,12 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Eye, Pencil, RefreshCw, History, Trash2, Clock, Layers, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
-import {
-  getResumeActionLabel,
-} from "../../../../shared/trip";
+import { formatTripRecentDateWithDay } from "../utils/formatTripListDay";
+import TripPagination from "./TripPagination";
+import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
+import { usePendingDelete } from "../../../../hooks/usePendingDelete";
+import { PendingDeleteActions } from "../../../../components/common/PendingDeleteActions";
+import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from "../../../../shared/ui/pendingDelete";
 
 interface Props {
   trips?: Trip[];
@@ -39,6 +42,16 @@ function TripRecentTable({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteReason, setDeleteReason] = useState("");
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
+  const pendingDeletesRef = useRef<Map<number, { trip: Trip; reason: string }>>(new Map());
+
+  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete<number>(async (id) => {
+    const pending = pendingDeletesRef.current.get(id);
+    pendingDeletesRef.current.delete(id);
+    const trip = pending?.trip ?? safeTrips.find((t) => Number(t.id) === Number(id));
+    const reason = pending?.reason ?? "";
+    if (trip && onDelete) await Promise.resolve(onDelete(trip, reason));
+    setSelectedTripId(null);
+  });
 
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -113,11 +126,12 @@ function TripRecentTable({
     ? canEditItem(selectedTrip.createdAt || "") && !selectedTrip.deleted
     : false;
   const canDelete = selectedTrip
-    ? canDeleteItem(selectedTrip.createdAt || "") && !selectedTrip.deleted && !!onDelete
+    ? canDeleteItem(selectedTrip.createdAt || "") && !selectedTrip.deleted && !!onDelete && !isPending(Number(selectedTrip.id))
     : false;
 
   const handleRowClick = (trip: Trip) => {
     if (trip.deleted) return;
+    if (isPending(Number(trip.id))) return;
     setSelectedTripId(trip.id === selectedTripId ? null : trip.id);
   };
 
@@ -134,11 +148,15 @@ function TripRecentTable({
 
   const confirmDelete = () => {
     if (!tripToDelete || deleteReason.trim() === "") return alert("Please provide a reason for deletion.");
-    if (onDelete) onDelete(tripToDelete, deleteReason.trim());
+    const id = Number(tripToDelete.id);
+    if (!Number.isFinite(id)) return;
+    const reason = deleteReason.trim();
     setShowDeleteModal(false);
     setTripToDelete(null);
     setDeleteReason("");
-    setSelectedTripId(null);
+    if (isPending(id)) return;
+    pendingDeletesRef.current.set(id, { trip: tripToDelete, reason });
+    requestDelete(id);
   };
 
   const cancelDelete = () => {
@@ -154,12 +172,11 @@ function TripRecentTable({
     if (trip.status === "Pending") {
       return { label: "Pending", color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, resume: false };
     }
-    const resumeLabel = getResumeActionLabel(trip);
     return {
-      label: resumeLabel ?? "Draft",
+      label: "Draft",
       color: "bg-blue-50 text-blue-700 border-blue-200",
       icon: <FileText size={12} />,
-      resume: Boolean(resumeLabel),
+      resume: true,
     };
   };
 
@@ -233,7 +250,7 @@ function TripRecentTable({
             <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
               <tr>
                 <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Trip No</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Date</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Day</th>
                 <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Vehicle</th>
                 <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Driver</th>
                 <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">Supervisor</th>
@@ -243,13 +260,12 @@ function TripRecentTable({
                 <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Weight (KG)</th>
                 <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Mortality</th>
                 <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Approved By</th>
                 <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">View</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedTrips.length === 0 ? (
-                <tr><td colSpan={13} className="py-16 text-center text-slate-400"><History size={24} className="mx-auto mb-2" /> No trips found.</td></tr>
+                <tr><td colSpan={12} className="py-16 text-center text-slate-400"><History size={24} className="mx-auto mb-2" /> No trips found.</td></tr>
               ) : (
                 paginatedTrips.map((trip) => {
                   const isSelected = trip.id === selectedTripId;
@@ -258,9 +274,23 @@ function TripRecentTable({
                   const showDropdown = !isDeleted && onStatusChange && trip.status === "Pending" && !isApproved;
 
                   return (
-                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
-                      <td className="px-4 py-3 font-bold text-emerald-700 text-xs"><span className={`bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100/80 ${isDeleted ? "opacity-60 line-through" : ""}`}>{trip.tripNo}</span></td>
-                      <td className="px-4 py-3 text-xs font-medium text-slate-600">{trip.tripDate}</td>
+                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isPending(Number(trip.id)) ? PENDING_DELETE_ROW_CLASS : ""} ${isDeleted ? "bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
+                      <td className={`px-4 py-3 font-bold text-emerald-700 text-xs ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100/80 ${isDeleted ? "opacity-60 line-through" : ""}`}>{trip.tripNo}</span>
+                          {isPending(Number(trip.id)) ? (
+                            <PendingDeleteActions
+                              secondsLeft={secondsLeft(Number(trip.id))}
+                              committing={isCommitting(Number(trip.id))}
+                              onCancel={() => {
+                                pendingDeletesRef.current.delete(Number(trip.id));
+                                cancel(Number(trip.id));
+                              }}
+                            />
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripRecentDateWithDay(trip.tripDate)}</td>
                       <td className="px-4 py-3 text-xs font-medium text-slate-700">{trip.vehicleNo}</td>
                       <td className="px-4 py-3 text-xs text-slate-600">{trip.driverName}</td>
                       <td className="px-4 py-3 text-xs text-slate-600">{trip.supervisorName}</td>
@@ -284,7 +314,7 @@ function TripRecentTable({
                               }`}
                             >
                               <option value="Pending" className="text-amber-700 font-semibold bg-white">⏳ Pending</option>
-                              <option value="Completed" className="text-emerald-700 font-semibold bg-white">✅ Approved</option>
+                              <option value="Completed" className="text-emerald-700 font-semibold bg-white">✅ Completed</option>
                             </select>
                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500">
                               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -296,28 +326,19 @@ function TripRecentTable({
                           (() => {
                             const badge = getStepBadge(trip);
                             return (
-                              <div className="flex flex-col items-center gap-0.5">
-                                {trip.status === "Draft" && (
-                                  <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Draft</span>
-                                )}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (badge.resume && onResume) onResume(trip);
-                                  }}
-                                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm border ${badge.resume ? "cursor-pointer hover:shadow-md hover:scale-105 active:scale-95" : "cursor-default"} transition-all duration-200 ${badge.color}`}
-                                >
-                                  {badge.icon}
-                                  {badge.label}
-                                </button>
-                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (badge.resume && onResume) onResume(trip);
+                                }}
+                                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm border ${badge.resume ? "cursor-pointer hover:shadow-md hover:scale-105 active:scale-95" : "cursor-default"} transition-all duration-200 ${badge.color}`}
+                              >
+                                {badge.icon}
+                                {badge.label}
+                              </button>
                             );
                           })()
                         )}
-                      </td>
-                      {/* ✅ Approved By column */}
-                      <td className="px-4 py-3 text-center text-xs font-medium text-slate-600">
-                        {trip.status === "Completed" && (trip as any).approvedBy ? (trip as any).approvedBy : "-"}
                       </td>
                       <td className="text-center px-4 py-3">
                         <button onClick={(e) => { e.stopPropagation(); onView(trip); }} className="h-8 w-8 rounded-xl bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95 group-hover:border-blue-200" title="View Trip Details"><Eye size={14} /></button>
@@ -330,22 +351,12 @@ function TripRecentTable({
           </table>
         </div>
 
-        {filteredTrips.length > pageSize && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-3.5 border-t border-slate-100 bg-slate-50/80">
-            <div className="text-xs font-medium text-slate-500">Showing <span className="font-bold text-slate-700">{startIndex + 1}</span>–<span className="font-bold text-slate-700">{Math.min(startIndex + pageSize, filteredTrips.length)}</span> of <span className="font-bold text-slate-700">{filteredTrips.length}</span> entries</div>
-            <div className="flex items-center gap-1.5">
-              <button disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)} className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white disabled:opacity-40 hover:bg-slate-100 text-xs font-semibold text-slate-600 transition-all shadow-sm active:scale-95">Previous</button>
-              <div className="flex items-center gap-1 px-1">
-                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                  const page = i + 1;
-                  return <button key={page} onClick={() => setCurrentPage(page)} className={`h-7 w-7 rounded-lg text-xs font-bold transition-all shadow-sm ${page === currentPage ? "bg-blue-600 text-white shadow-blue-200 shadow-md scale-105" : "border border-slate-200 bg-white hover:bg-slate-100 text-slate-600"}`}>{page}</button>;
-                })}
-                {totalPages > 5 && <span className="px-1 text-slate-400 font-bold">…</span>}
-                {totalPages > 5 && <button onClick={() => setCurrentPage(totalPages)} className={`h-7 w-7 rounded-lg text-xs font-bold border transition-all shadow-sm ${totalPages === currentPage ? "bg-blue-600 text-white shadow-blue-200 shadow-md scale-105" : "border border-slate-200 bg-white hover:bg-slate-100 text-slate-600"}`}>{totalPages}</button>}
-              </div>
-              <button disabled={currentPage === totalPages} onClick={() => setCurrentPage((p) => p + 1)} className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white disabled:opacity-40 hover:bg-slate-100 text-xs font-semibold text-slate-600 transition-all shadow-sm active:scale-95">Next</button>
-            </div>
-          </div>
+        {shouldShowPagination(filteredTrips.length) && (
+          <TripPagination
+            currentPage={currentPage}
+            totalPages={Math.max(totalPages, 1)}
+            onPageChange={setCurrentPage}
+          />
         )}
       </div>
 

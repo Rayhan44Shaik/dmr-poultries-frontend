@@ -209,17 +209,8 @@ function SalaryRegisterPage() {
   );
 
   const handleDelete = useCallback(
-    (record: SalaryRecord) => {
-      confirm(
-        "Delete Salary Record",
-        `Delete ${record.employeeName}'s salary for ${formatMonthName(record.month)}? This cannot be undone.`,
-        () => {
-          setConfirmConfig(null);
-          void runConfirm(remove(record.id));
-        }
-      );
-    },
-    [confirm, remove, runConfirm]
+    (record: SalaryRecord) => runConfirm(remove(record.id)),
+    [remove, runConfirm]
   );
 
   const handleMarkUnpaid = useCallback(

@@ -416,9 +416,11 @@ export default function ShopDeliveryForm({
                         <input
                           type="number"
                           value={item.birds || ""}
-                          onChange={(e) =>
-                            handlePerBoxChange(index, "birds", Number(e.target.value))
-                          }
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const parsed = raw === "" ? 0 : Number(raw);
+                            handlePerBoxChange(index, "birds", Number.isFinite(parsed) ? parsed : 0);
+                          }}
                           placeholder="0"
                           min="0"
                           className={`w-20 rounded border px-2 py-1 text-xs outline-none ${
@@ -434,9 +436,11 @@ export default function ShopDeliveryForm({
                           type="number"
                           step="0.01"
                           value={item.weight || ""}
-                          onChange={(e) =>
-                            handlePerBoxChange(index, "weight", Number(e.target.value))
-                          }
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const parsed = raw === "" ? 0 : Number(raw);
+                            handlePerBoxChange(index, "weight", Number.isFinite(parsed) ? parsed : 0);
+                          }}
                           placeholder="0.00"
                           min="0"
                           className={`w-24 rounded border px-2 py-1 text-xs outline-none ${

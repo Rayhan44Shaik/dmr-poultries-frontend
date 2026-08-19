@@ -22,7 +22,8 @@ test("toStep5Payload sends expenses only — no vehicle, advance, diesel, or tim
   assert.equal("submittedAtTimestamp" in payload, false);
   assert.equal("endTime" in payload, false);
   assert.equal(payload.meals, 500);
-  assert.equal(payload.loading, 0);
+  assert.equal("loading" in payload, false);
+  assert.equal("othersRC" in payload, false);
   assert.equal(payload.endMeter, 50400);
   assert.equal(payload.destinationTolls, 0);
 });

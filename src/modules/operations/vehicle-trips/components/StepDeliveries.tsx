@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from "react";
 import {
-  Pencil,
   Lock,
   LayoutGrid,
   BarChart3,
+  Pencil,
 } from "lucide-react";
 import UnLoadingTable from "./Step_4";
 import BoxWeightAnalysis from "./Step_4/BoxWeightAnalysis";
@@ -26,6 +26,7 @@ interface Props {
   canEdit?: boolean;
   onCancel?: () => void;
   boxDetails?: BoxDetail[];
+  persistedDeliveries?: ShopDelivery[];
 }
 
 export default function StepDeliveries({
@@ -43,6 +44,7 @@ export default function StepDeliveries({
   canEdit = true,
   onCancel: _onCancel,
   boxDetails = [],
+  persistedDeliveries,
 }: Props) {
   // Toggle view mode: 'shops' | 'analysis'
   const [viewMode, setViewMode] = useState<"shops" | "analysis">("shops");
@@ -74,10 +76,6 @@ export default function StepDeliveries({
   const handleStartEditShop = (shopId: string | number) => {
     if (isLocked) return;
     setEditingShopId(shopId);
-  };
-
-  const handleEnableStepEdit = () => {
-    setIsStepEditing(true);
   };
 
   const handleCancelStepEdit = () => {
@@ -148,24 +146,22 @@ export default function StepDeliveries({
             </button>
           </div>
 
-          {/* STEP LEVEL EDIT BUTTON (PENCIL) */}
-          {isLocked && canEdit && (
-            <button
-              type="button"
-              onClick={handleEnableStepEdit}
-              title="Edit Deliveries"
-              aria-label="Edit Deliveries"
-              className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95 flex items-center justify-center text-xs font-semibold shadow-2xs"
-            >
-              <Pencil size={14} />
-              <span className="hidden sm:inline">Edit Deliveries</span>
-            </button>
-          )}
-
           {isLocked ? (
-            <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex items-center gap-1.5">
-              <Lock size={12} className="text-slate-500" /> Submitted & Locked
-            </span>
+            <div className="flex items-center gap-2">
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => setIsStepEditing(true)}
+                  className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
+                  title="Edit Step"
+                >
+                  <Pencil size={14} />
+                </button>
+              )}
+              <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex items-center gap-1.5">
+                <Lock size={12} className="text-slate-500" /> Submitted & Locked
+              </span>
+            </div>
           ) : (
             <span className="text-xs text-blue-700 font-semibold bg-blue-50 px-3 py-1 rounded-full border border-blue-200 whitespace-nowrap">
               {editingShopId ? "Editing Shop Details" : isStepEditing ? "Editing Trip " + trip.tripNo : "Step Unlocked"}
@@ -197,7 +193,7 @@ export default function StepDeliveries({
           saveDeliveries={saveDeliveriesProgress ? async () => saveDeliveriesProgress(rows) : undefined}
           submitDeliveries={handleLockDeliveries}
           onClose={handleCancelWizard}
-          persistedRows={trip.deliveries || []}
+          persistedRows={persistedDeliveries ?? []}
         />
       ) : (
         <BoxWeightAnalysis

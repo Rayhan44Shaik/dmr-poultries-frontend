@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Loader2, Scale } from "lucide-react";
+import React, { useRef, useState } from "react";
+import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Loader2, Scale, Pencil } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { WizardActionBar, WizardStepNotice } from "./WizardStepUI";
@@ -8,6 +8,7 @@ import {
   TRIP_STEP_DEFINITIONS,
 } from "../../../../shared/trip/definitions";
 import { validateFarmStep } from "../../../../shared/trip/validation";
+import { isMeterInvalid, meterMustBeGreaterThan } from "../utils/meterValidation";
 
 interface Props {
   trip: Trip;
@@ -36,13 +37,16 @@ export default function StepFarm({
   hasUnsavedChanges = false,
   farms,
   editable = false,
+  canEdit = false,
   onCancel,
   showNotification,
 }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLocalEditing, setIsLocalEditing] = useState(false);
   const [destMeterError, setDestMeterError] = useState<string | null>(null);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" } | null>(null);
+  const meterInvalidRef = useRef(false);
 
   const notify = (msg: string, type: "success" | "error" | "warning" = "success") => {
     if (showNotification) {
@@ -167,11 +171,17 @@ export default function StepFarm({
   const handleDestMeterChange = (value: string) => {
     const num = value === "" ? 0 : Number(value);
     updateTrip({ destMeter: num });
-    if (num > 0 && trip.openingMeter != null && num <= trip.openingMeter) {
-      setDestMeterError(
-        `Farm meter (${num} KM) must be strictly greater than the Step 1 starting meter (${trip.openingMeter} KM).`
-      );
+    const prev = Number(trip.openingMeter ?? 0);
+    const invalid = isMeterInvalid(num, prev) && num > 0;
+    if (invalid) {
+      const msg = meterMustBeGreaterThan(prev);
+      setDestMeterError(msg);
+      if (!meterInvalidRef.current) {
+        meterInvalidRef.current = true;
+        notify(msg, "warning");
+      }
     } else {
+      meterInvalidRef.current = false;
       setDestMeterError(null);
     }
   };
@@ -199,9 +209,10 @@ export default function StepFarm({
     setIsSubmitting(true);
     try {
       const success = await submitFarmStep({});
-      if (success && trip.farmStepSubmitted) {
-        notify("Farm details updated successfully.", "success");
-      } else if (!success) {
+      if (success) {
+        setIsLocalEditing(false);
+        notify("Step 2 submitted successfully.", "success");
+      } else {
         notify("Submission failed. Please try again.", "error");
       }
     } finally {
@@ -220,7 +231,15 @@ export default function StepFarm({
     }
   };
 
-  if (trip.farmStepSubmitted && !editable) {
+  if (trip.farmStepSubmitted && !editable && !isLocalEditing) {
+    const destMeterLabel =
+      trip.destMeter == null || Number(trip.destMeter) === 0
+        ? "Not entered"
+        : `${trip.destMeter} KM`;
+    const avgWeightLabel =
+      trip.avgBirdWeight == null || Number(trip.avgBirdWeight) === 0
+        ? "Not entered"
+        : `${Number(trip.avgBirdWeight).toFixed(2)} kg`;
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
@@ -232,11 +251,81 @@ export default function StepFarm({
               {TRIP_STEP_DEFINITIONS[1].title.toUpperCase()}
             </h2>
           </div>
-          <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
-            Submitted & Locked
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => setIsLocalEditing(true)}
+                className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
+                title="Edit Step"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+            <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
+              Submitted & Locked
+            </span>
+          </div>
         </div>
-        <p className="text-xs text-slate-600">Use Edit on Recent Trips to update Farm Details.</p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Clock size={12} className="text-slate-500" /> Reached Time
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{trip.reachedTime || "Not entered"}</span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Store size={12} className="text-blue-500" /> Farm
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{trip.sourceFarm || "Not entered"}</span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-2">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <MapPin size={12} className="text-slate-500" /> Farm Address
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{trip.farmAddress || "Not entered"}</span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Gauge size={12} className="text-purple-500" /> Farm Meter
+            </span>
+            <span className="text-xs font-bold text-slate-800">{destMeterLabel}</span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Ticket size={12} className="text-violet-500" /> Tolls
+            </span>
+            <span className="text-xs font-bold text-slate-800">{trip.pickupTolls ?? 0}</span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Scale size={12} className="text-emerald-500" /> Avg Bird Weight
+            </span>
+            <span className="text-xs font-bold text-slate-800">{avgWeightLabel}</span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <MapPin size={12} className="text-slate-500" /> GPS
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">
+              {hasGps
+                ? `${Number(trip.farmGpsLat).toFixed(6)}, ${Number(trip.farmGpsLon).toFixed(6)}`
+                : "Not captured"}
+            </span>
+          </div>
+        </div>
+        {trip.remarks ? (
+          <p className="text-xs text-slate-600">
+            <span className="font-semibold text-slate-400 uppercase text-[10px]">Remarks </span>
+            {trip.remarks}
+          </p>
+        ) : null}
+
+        <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-center justify-between">
+          <p className="text-xs text-slate-600 font-normal">Farm details submitted successfully.</p>
+        </div>
       </div>
     );
   }
@@ -360,7 +449,9 @@ export default function StepFarm({
               placeholder="0.00"
             />
             {destMeterError ? (
-              <p className="text-[11px] text-red-500 font-medium mt-1">{destMeterError}</p>
+              <div className="mt-1 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700">
+                {destMeterError}
+              </div>
             ) : (
               <p className="text-[11px] text-slate-400 mt-1">
                 Start Meter: <span className="font-semibold text-slate-600">{trip.openingMeter ?? "Not entered"} KM</span>
@@ -425,7 +516,13 @@ export default function StepFarm({
           dirty={hasUnsavedChanges}
         />
         <WizardActionBar
-          onCancel={() => onCancel?.()}
+          onCancel={() => {
+            if (isLocalEditing) {
+              setIsLocalEditing(false);
+              return;
+            }
+            onCancel?.();
+          }}
           onSave={saveFarmProgress ? handleSaveProgress : undefined}
           onSubmit={handleSubmit}
           busy={isSubmitting}

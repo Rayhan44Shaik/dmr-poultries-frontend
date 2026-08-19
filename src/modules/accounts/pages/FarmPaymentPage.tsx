@@ -6,7 +6,13 @@ import { tripService } from '../../operations/vehicle-trips/services/tripService
 import { FarmPaymentService } from '../services/FarmPaymentService';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { FarmPayment } from '../types/farmPayment.types';
-import { ChevronLeft, ChevronRight, Save, RotateCcw } from 'lucide-react';
+import { Save, RotateCcw } from 'lucide-react';
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  shouldShowPagination,
+} from '../../../shared/ui/paginationStyles';
 
 type FarmerPaymentPageProps = { embedded?: boolean };
 
@@ -155,6 +161,8 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   const paginatedTrips = filteredTrips.slice(startIndex, startIndex + itemsPerPage);
   const startEntry = filteredTrips.length === 0 ? 0 : startIndex + 1;
   const endEntry = Math.min(startIndex + itemsPerPage, filteredTrips.length);
+  void startEntry;
+  void endEntry;
 
   const goToPage = (page: number) => {
     if (page < 1 || page > totalPages) return;
@@ -440,20 +448,14 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
             />
 
             {/* Pagination Footer */}
-            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-slate-50/50 border-t border-slate-200">
-              <div className="text-xs text-slate-500">
-                {filteredTrips.length > 0 
-                  ? `Showing ${startEntry} to ${endEntry} of ${filteredTrips.length} entries`
-                  : 'No entries found'}
-              </div>
-
-              <div className="flex items-center gap-1.5">
+            {shouldShowPagination(filteredTrips.length) && (
+            <div className={paginationBarClass}>
                 <button
                   onClick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1"
+                  className={paginationNavBtnClass}
                 >
-                  <ChevronLeft size={13} /> Prev
+                  Previous
                 </button>
 
                 {getPageNumbers().map((page, idx) =>
@@ -463,11 +465,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
                     <button
                       key={page}
                       onClick={() => goToPage(page)}
-                      className={`w-8 h-8 rounded-lg text-xs font-semibold transition ${
-                        currentPage === page
-                          ? 'bg-emerald-600 text-white shadow-sm'
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
+                      className={paginationPageBtnClass(currentPage === page)}
                     >
                       {page}
                     </button>
@@ -477,12 +475,12 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
                 <button
                   onClick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1"
+                  className={paginationNavBtnClass}
                 >
-                  Next <ChevronRight size={13} />
+                  Next
                 </button>
-              </div>
             </div>
+            )}
           </>
         )}
       </div>

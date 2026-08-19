@@ -11,6 +11,7 @@ import ShopSalesFilters from "../components/ShopSalesFilters";
 import ShopSalesSummary from "../components/ShopSalesSummary";
 import ShopSalesTable from "../components/ShopSalesTable";
 import ShopSalesPagination from "../components/ShopSalesPagination";
+import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import type { ShopSale } from "../types/shopSale";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 
@@ -189,13 +190,14 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
             shopNames={shopNames}
             onUpdateSale={handleUpdateSale}
           />
+          {shouldShowPagination(filteredSales.length) && (
+          <ShopSalesPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+          )}
         </div>
-
-        <ShopSalesPagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-        />
       </div>
     </div>
   );

@@ -2,16 +2,25 @@
 
 import { useState, useMemo } from 'react';
 import type { Payment } from '../../types/payment.types';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  shouldShowPagination,
+} from '../../../../shared/ui/paginationStyles';
+import type { PendingDeleteControls } from '../../../../hooks/usePendingDelete';
+import { PendingDeleteActions } from '../../../../components/common/PendingDeleteActions';
+import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from '../../../../shared/ui/pendingDelete';
 
 interface PaymentTableProps {
   payments: Payment[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   itemsPerPage?: number;
+  pendingDelete?: PendingDeleteControls<string>;
 }
 
-export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10 }: PaymentTableProps) {
+export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10, pendingDelete }: PaymentTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
 
   const totalPages = Math.ceil(payments.length / itemsPerPage) || 1;
@@ -71,6 +80,8 @@ export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10
 
   const startItem = (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, payments.length);
+  void startItem;
+  void endItem;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -112,11 +123,14 @@ export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10
               paginatedPayments.map((payment, index) => {
                 const isSelected = selectedId === payment.id;
                 const absoluteIndex = (currentPage - 1) * itemsPerPage + index;
+                const isDeletePending = pendingDelete?.isPending(payment.id) === true;
                 return (
                   <tr
                     key={payment.id}
                     onClick={() => handleRowClick(payment.id)}
                     className={`cursor-pointer transition-all duration-150 group ${
+                      isDeletePending ? PENDING_DELETE_ROW_CLASS : ""
+                    } ${
                       isSelected
                         ? 'bg-blue-50/40 shadow-[inset_0_0_0_2px_#3b82f6]'
                         : 'hover:bg-slate-50/80'
@@ -140,8 +154,16 @@ export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10
                     <td className="px-6 py-4.5 text-sm text-slate-600 whitespace-nowrap">
                       {payment.paymentMode}
                     </td>
-                    <td className="px-6 py-4.5 text-sm text-slate-500 truncate max-w-[240px]">
-                      {payment.remarks || '-'}
+                    <td className={`px-6 py-4.5 text-sm text-slate-500 truncate max-w-[240px] ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
+                      {isDeletePending && pendingDelete ? (
+                        <PendingDeleteActions
+                          secondsLeft={pendingDelete.secondsLeft(payment.id)}
+                          committing={pendingDelete.isCommitting(payment.id)}
+                          onCancel={() => pendingDelete.cancel(payment.id)}
+                        />
+                      ) : (
+                        payment.remarks || '-'
+                      )}
                     </td>
                   </tr>
                 );
@@ -152,19 +174,14 @@ export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 bg-slate-50/80 border-t border-slate-200">
-          <span className="text-xs font-medium text-slate-500">
-            Showing {startItem} to {endItem} of {payments.length} entries
-          </span>
-
-          <div className="flex items-center gap-1.5">
+      {shouldShowPagination(payments.length) && (
+        <div className={paginationBarClass}>
             <button
               onClick={() => setCurrentPage(currentPage - 1)}
               disabled={currentPage === 1}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 shadow-sm"
+              className={paginationNavBtnClass}
             >
-              <ChevronLeft size={14} /> Prev
+              Previous
             </button>
 
             {getPageNumbers().map((page, idx) =>
@@ -174,11 +191,7 @@ export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10
                 <button
                   key={page}
                   onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                    currentPage === page
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'border border-slate-300 text-slate-700 bg-white hover:bg-slate-100 shadow-sm'
-                  }`}
+                  className={paginationPageBtnClass(currentPage === page)}
                 >
                   {page}
                 </button>
@@ -188,11 +201,10 @@ export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10
             <button
               onClick={() => setCurrentPage(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 shadow-sm"
+              className={paginationNavBtnClass}
             >
-              Next <ChevronRight size={14} />
+              Next
             </button>
-          </div>
         </div>
       )}
     </div>

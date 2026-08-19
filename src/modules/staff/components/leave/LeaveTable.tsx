@@ -3,6 +3,9 @@
 import { memo, useState } from 'react';
 import { CheckCircle, XCircle, Trash2, Eye, X, Calendar } from 'lucide-react';
 import type { LeaveRequest } from '../../types/staffDashboard';
+import { usePendingDelete } from '../../../../hooks/usePendingDelete';
+import { PendingDeleteActions } from '../../../../components/common/PendingDeleteActions';
+import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from '../../../../shared/ui/pendingDelete';
 
 interface LeaveTableProps {
   leaves: LeaveRequest[];
@@ -12,6 +15,7 @@ interface LeaveTableProps {
 }
 
 function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) {
+  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete(onDelete);
   const [viewEmployeeModal, setViewEmployeeModal] = useState<{
     employeeName: string;
     employeeId: number | string;
@@ -94,7 +98,7 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) 
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
               {leaves.map((leave) => (
-                <tr key={leave.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={leave.id} className={isPending(leave.id) ? PENDING_DELETE_ROW_CLASS : "hover:bg-slate-50 transition-colors"}>
                   <td className="px-4 py-3 text-sm font-medium text-slate-800">{leave.employeeName}</td>
                   <td className="px-4 py-3 text-sm text-slate-600">{leave.department || '—'}</td>
                   <td className="px-4 py-3">
@@ -114,7 +118,14 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) 
                   <td className="px-4 py-3 text-sm text-slate-500 max-w-[180px] truncate" title={leave.reason}>
                     {leave.reason || '—'}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className={`px-4 py-3 text-right ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
+                    {isPending(leave.id) ? (
+                      <PendingDeleteActions
+                        secondsLeft={secondsLeft(leave.id)}
+                        committing={isCommitting(leave.id)}
+                        onCancel={() => cancel(leave.id)}
+                      />
+                    ) : (
                     <div className="flex items-center justify-end gap-1">
                       {/* View button - Opens Year/Month filter modal */}
                       <button
@@ -155,11 +166,12 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) 
 
                       {/* Delete (only for Pending) */}
                       {leave.status === 'Pending' && (
-                        <button onClick={() => onDelete(leave.id)} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition" title="Delete">
+                        <button onClick={() => requestDelete(leave.id)} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition" title="Delete">
                           <Trash2 size={16} />
                         </button>
                       )}
                     </div>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -8,6 +8,12 @@ import { FuelEntryForm } from "../components/FuelEntryForm";
 import { FuelBillTable } from "../components/FuelBillTable";
 import { FuelViewModal } from "../components/FuelViewModal";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  shouldShowPagination,
+} from "../../../../shared/ui/paginationStyles";
 import { useVehicles } from "../../../masters/vehicles/hooks/useVehicles";
 import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
@@ -26,6 +32,7 @@ import {
 } from "lucide-react";
 import type { FuelExpense } from "../types/fuelExpense";
 import { DatePicker } from "../../../../components/common/DatePicker";
+import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 
 function FuelExpensesPage() {
   const { showNotification } = useSafeNotification();
@@ -150,17 +157,19 @@ function FuelExpensesPage() {
     setShowForm(true);
   }, [selectedBill, canEditDelete, showNotification]);
 
+  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete<string>(async (id) => {
+    await deleteExpense(id);
+    setSelectedId((current) => (current === id ? null : current));
+  });
+
   const handleDelete = useCallback(() => {
     if (!selectedBill) return;
     if (!canEditDelete(selectedBill)) {
       showNotification("Delete not allowed – bill is older than 10 days.", "error");
       return;
     }
-    if (window.confirm(`Delete bill ${selectedBill.billNo}?`)) {
-      deleteExpense(selectedBill.id);
-      setSelectedId(null);
-    }
-  }, [selectedBill, canEditDelete, deleteExpense, showNotification]);
+    requestDelete(selectedBill.id);
+  }, [selectedBill, canEditDelete, requestDelete, showNotification]);
 
   const handleApprove = useCallback(() => {
     if (!selectedBill) return;
@@ -555,40 +564,28 @@ function FuelExpensesPage() {
           bills={paginatedData}
           selectedId={selectedId}
           onSelect={setSelectedId}
+          pendingDelete={{ requestDelete, cancel, isPending, secondsLeft, isCommitting }}
         />
 
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
-            <div className="text-sm text-slate-600">
-              Showing {paginatedData.length} of {totalCount} entries
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage((p) => p - 1)}
-                className={`rounded-md p-2 transition cursor-pointer ${
-                  currentPage === 1
-                    ? "cursor-not-allowed text-slate-300"
-                    : "text-slate-700 hover:bg-slate-100"
-                }`}
-              >
-                Previous
-              </button>
-              <span className="text-sm font-medium text-slate-700">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage((p) => p + 1)}
-                className={`rounded-md p-2 transition cursor-pointer ${
-                  currentPage === totalPages
-                    ? "cursor-not-allowed text-slate-300"
-                    : "text-slate-700 hover:bg-slate-100"
-                }`}
-              >
-                Next
-              </button>
-            </div>
+        {shouldShowPagination(totalCount) && (
+          <div className={paginationBarClass}>
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+              className={paginationNavBtnClass}
+            >
+              Previous
+            </button>
+            <span className={paginationPageBtnClass(true)}>
+              {currentPage}
+            </span>
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((p) => p + 1)}
+              className={paginationNavBtnClass}
+            >
+              Next
+            </button>
           </div>
         )}
       </div>

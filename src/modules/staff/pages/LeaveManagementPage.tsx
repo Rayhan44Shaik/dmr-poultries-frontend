@@ -62,9 +62,7 @@ function LeaveManagementPage() {
   );
 
   const handleDelete = useCallback(
-    (id: string) => {
-      void deleteLeave(id);
-    },
+    (id: string) => deleteLeave(id),
     [deleteLeave]
   );
 

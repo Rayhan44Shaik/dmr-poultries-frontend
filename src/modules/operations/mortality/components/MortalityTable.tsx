@@ -4,6 +4,15 @@ import { useMemo, useState } from "react";
 import { Search, Trash2 } from "lucide-react";
 import type { MortalityRecord } from "../types/mortality";
 import { formatDateShort, formatNumber, formatWeight } from "../../../../utils/format";
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  shouldShowPagination,
+} from "../../../../shared/ui/paginationStyles";
+import { usePendingDelete } from "../../../../hooks/usePendingDelete";
+import { PendingDeleteActions } from "../../../../components/common/PendingDeleteActions";
+import { PENDING_DELETE_ACTION_CELL_CLASS, PENDING_DELETE_ROW_CLASS } from "../../../../shared/ui/pendingDelete";
 
 interface MortalityTableProps {
   records: MortalityRecord[];
@@ -23,6 +32,7 @@ const PAGE_SIZE = 8;
 export default function MortalityTable({ records, onDelete }: MortalityTableProps) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  const { requestDelete, cancel, isPending, secondsLeft, isCommitting } = usePendingDelete(onDelete);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -91,7 +101,7 @@ export default function MortalityTable({ records, onDelete }: MortalityTableProp
             </thead>
             <tbody className="text-[13px]">
               {rows.map((record) => (
-                <tr key={record.id} className="border-b border-slate-50 transition-colors last:border-0 hover:bg-slate-50/60 dark:border-slate-800/60 dark:hover:bg-slate-800/30">
+                <tr key={record.id} className={`border-b border-slate-50 transition-colors last:border-0 hover:bg-slate-50/60 dark:border-slate-800/60 dark:hover:bg-slate-800/30 ${isPending(record.id) ? PENDING_DELETE_ROW_CLASS : ""}`}>
                   <td className="px-4 py-2.5 font-semibold text-slate-800 tabular-nums dark:text-slate-100">{record.entryNo}</td>
                   <td className="px-4 py-2.5 text-slate-600 dark:text-slate-300">{formatDateShort(record.date)}</td>
                   <td className="max-w-[180px] truncate px-4 py-2.5 text-slate-600 dark:text-slate-300">{record.farm}</td>
@@ -103,16 +113,24 @@ export default function MortalityTable({ records, onDelete }: MortalityTableProp
                       {record.reason}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-right">
+                  <td className={`px-4 py-2.5 text-right ${PENDING_DELETE_ACTION_CELL_CLASS}`}>
+                    {isPending(record.id) ? (
+                      <PendingDeleteActions
+                        secondsLeft={secondsLeft(record.id)}
+                        committing={isCommitting(record.id)}
+                        onCancel={() => cancel(record.id)}
+                      />
+                    ) : (
                     <button
                       type="button"
-                      onClick={() => onDelete(record.id)}
+                      onClick={() => requestDelete(record.id)}
                       className="rounded-md p-1.5 text-slate-300 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:text-slate-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
                       aria-label={`Delete record ${record.entryNo}`}
                       title="Delete record"
                     >
                       <Trash2 size={14} />
                     </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -121,29 +139,27 @@ export default function MortalityTable({ records, onDelete }: MortalityTableProp
         </div>
       )}
 
-      {pageCount > 1 && (
-        <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2.5 dark:border-slate-800">
-          <p className="text-xs text-slate-400">
-            Page {current} of {pageCount}
-          </p>
-          <div className="flex gap-1.5">
-            <button
-              type="button"
-              disabled={current === 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              disabled={current === pageCount}
-              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-              className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              Next
-            </button>
-          </div>
+      {shouldShowPagination(filtered.length) && (
+        <div className={paginationBarClass}>
+          <button
+            type="button"
+            disabled={current === 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className={paginationNavBtnClass}
+          >
+            Previous
+          </button>
+          <span className={paginationPageBtnClass(true)}>
+            {current}
+          </span>
+          <button
+            type="button"
+            disabled={current === pageCount}
+            onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+            className={paginationNavBtnClass}
+          >
+            Next
+          </button>
         </div>
       )}
     </div>

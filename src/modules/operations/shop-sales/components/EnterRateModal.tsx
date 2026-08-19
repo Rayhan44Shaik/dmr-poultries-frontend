@@ -12,12 +12,16 @@ import {
   Lock,
   Save,
   RotateCcw,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 import RateEntryMarketMasterTables from "./RateEntryMarketMasterTables";
 import type { RateEntryMarketRateMasterDto } from "../utils/rateEntryMarketMaster";
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  shouldShowPagination,
+} from "../../../../shared/ui/paginationStyles";
 
 const SHOPS_PER_PAGE = 7;
 
@@ -405,26 +409,26 @@ export default function EnterRateModal({
               </table>
             </div>
 
-            {deliveries.length > SHOPS_PER_PAGE && (
-              <div className="flex items-center justify-center gap-3 pt-2 shrink-0">
+            {shouldShowPagination(deliveries.length) && (
+              <div className={paginationBarClass}>
                 <button
                   type="button"
                   disabled={shopPage <= 1}
                   onClick={() => setShopPage((p) => Math.max(1, p - 1))}
-                  className="h-8 w-8 rounded-lg border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:bg-slate-50"
+                  className={paginationNavBtnClass}
                 >
-                  <ChevronLeft size={16} />
+                  Previous
                 </button>
-                <span className="text-xs font-medium text-slate-600">
-                  Page {shopPage} of {shopPageCount}
+                <span className={paginationPageBtnClass(true)}>
+                  {shopPage}
                 </span>
                 <button
                   type="button"
                   disabled={shopPage >= shopPageCount}
                   onClick={() => setShopPage((p) => Math.min(shopPageCount, p + 1))}
-                  className="h-8 w-8 rounded-lg border border-slate-200 flex items-center justify-center disabled:opacity-40 hover:bg-slate-50"
+                  className={paginationNavBtnClass}
                 >
-                  <ChevronRight size={16} />
+                  Next
                 </button>
               </div>
             )}

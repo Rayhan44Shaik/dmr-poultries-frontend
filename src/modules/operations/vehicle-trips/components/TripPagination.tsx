@@ -1,4 +1,9 @@
 import React from "react";
+import {
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+} from "../../../../shared/ui/paginationStyles";
 
 interface Props {
   currentPage: number;
@@ -28,25 +33,28 @@ function TripPagination({ currentPage, totalPages, onPageChange, hidePageInfo = 
   const visiblePages = hasMultiplePages ? getPageNumbers() : [1];
   const showFirstEllipsis = hasMultiplePages && visiblePages[0] > 1;
   const showLastEllipsis = hasMultiplePages && visiblePages[visiblePages.length - 1] < totalPages;
+  const atFirst = currentPage === 1;
+  const atLast = currentPage === totalPages || !hasMultiplePages;
 
-  // Navigation buttons (reused in both modes)
   const renderNavButtons = () => (
     <>
+      <button
+        type="button"
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={atFirst}
+        className={paginationNavBtnClass}
+      >
+        Previous
+      </button>
+
       {hasMultiplePages ? (
         <>
-          <button
-            onClick={() => onPageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Previous
-          </button>
-
           {showFirstEllipsis && (
             <>
               <button
+                type="button"
                 onClick={() => onPageChange(1)}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                className={paginationPageBtnClass(currentPage === 1)}
               >
                 1
               </button>
@@ -56,13 +64,10 @@ function TripPagination({ currentPage, totalPages, onPageChange, hidePageInfo = 
 
           {visiblePages.map((page) => (
             <button
+              type="button"
               key={page}
               onClick={() => onPageChange(page)}
-              className={`flex h-8 w-8 items-center justify-center rounded-md text-sm font-medium transition ${
-                page === currentPage
-                  ? "bg-green-700 text-white"
-                  : "text-slate-700 hover:bg-slate-100"
-              }`}
+              className={paginationPageBtnClass(page === currentPage)}
             >
               {page}
             </button>
@@ -72,49 +77,41 @@ function TripPagination({ currentPage, totalPages, onPageChange, hidePageInfo = 
             <>
               <span className="px-1 text-slate-400">…</span>
               <button
+                type="button"
                 onClick={() => onPageChange(totalPages)}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                className={paginationPageBtnClass(currentPage === totalPages)}
               >
                 {totalPages}
               </button>
             </>
           )}
-
-          <button
-            onClick={() => onPageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Next
-          </button>
         </>
       ) : (
-        // Single page – show just the number 1 (non‑clickable)
-        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-green-700 text-sm font-medium text-white">
-          1
-        </span>
+        <span className={paginationPageBtnClass(true)}>1</span>
       )}
+
+      <button
+        type="button"
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={atLast}
+        className={paginationNavBtnClass}
+      >
+        Next
+      </button>
     </>
   );
 
-  // If hidePageInfo is true, return only the buttons (no border, no shadow)
   if (hidePageInfo) {
     return (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center justify-end flex-wrap gap-1.5">
         {renderNavButtons()}
       </div>
     );
   }
 
-  // Full mode: page info + buttons with border and shadow
   return (
-    <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <div className="text-sm text-slate-600">
-        Page {currentPage} of {totalPages}
-      </div>
-      <div className="flex items-center gap-1">
-        {renderNavButtons()}
-      </div>
+    <div className={paginationBarClass}>
+      {renderNavButtons()}
     </div>
   );
 }

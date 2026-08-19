@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 import TripPagination from "../TripPagination";
+import { shouldShowPagination } from "../../../../../shared/ui/paginationStyles";
 import { useShopDeliveryForm } from "./useShopDeliveryForm";
 import ShopDeliveryForm from "./ShopDeliveryForm";
 import ShopDeliveryCard from "./ShopDeliveryCard";
@@ -417,7 +418,7 @@ export default function UnLoadingTable({
             }
             if (success) {
               setHasBeenSubmitted(true);
-              setToast({ message: "Deliveries submitted successfully!", type: "success" });
+              setToast({ message: "Step 4 submitted successfully.", type: "success" });
               if (showForm) closeForm();
               // Do not call onClose — parent advances to Step 5 with the same trip.
             } else {
@@ -441,7 +442,7 @@ export default function UnLoadingTable({
             const success = submitDeliveries ? (await submitDeliveries()) !== false : false;
             if (success) {
               setHasBeenSubmitted(true);
-              setToast({ message: "Delivery details submitted successfully.", type: "success" });
+              setToast({ message: "Step 4 submitted successfully.", type: "success" });
               if (showForm) closeForm();
             }
           })();
@@ -585,6 +586,10 @@ export default function UnLoadingTable({
       setToast({ message: "Please select a Shop.", type: "warning" });
       return;
     }
+    if (!formData.birdTypeId) {
+      setToast({ message: "Bird Type is required.", type: "warning" });
+      return;
+    }
 
     let finalBirds = formData.birds;
     let finalWeight = formData.weight;
@@ -700,6 +705,7 @@ export default function UnLoadingTable({
     if (mode === "box") {
       return (
         formData.shopId > 0 &&
+        formData.birdTypeId > 0 &&
         formData.selectedBoxIds.length > 0 &&
         farmBirds > 0 &&
         formData.mortality >= 0 &&
@@ -715,6 +721,7 @@ export default function UnLoadingTable({
         !validationErrors.perBoxWeightErrors.some((err: boolean) => err);
       return (
         formData.shopId > 0 &&
+        formData.birdTypeId > 0 &&
         formData.selectedBoxIds.length > 0 &&
         allBoxesFilled &&
         formData.mortality >= 0 &&
@@ -730,15 +737,17 @@ export default function UnLoadingTable({
 
   // ─── Top KPI Calculations ────────────────────────────────────
   const topKpiTotals = useMemo(() => {
-    const totalShops = safeRows.length;
-    const totalBirds = safeRows.reduce((acc, r) => acc + (r.birds || 0), 0);
-    const totalWeight = safeRows.reduce((acc, r) => acc + (r.weight || 0), 0);
-    const totalMortality = safeRows.reduce((acc, r) => acc + (r.mortality || 0), 0);
-    const totalMortKg = safeRows.reduce((acc, r) => {
+    const source = persistedRows && persistedRows.length ? persistedRows : [];
+    const totalShops = source.length;
+    const totalBirds = source.reduce((acc, r) => acc + (Number.isFinite(Number(r.birds)) ? Number(r.birds) : 0), 0);
+    const totalWeight = source.reduce((acc, r) => acc + (Number.isFinite(Number(r.weight)) ? Number(r.weight) : 0), 0);
+    const totalMortality = source.reduce((acc, r) => acc + (Number.isFinite(Number(r.mortality)) ? Number(r.mortality) : 0), 0);
+    const totalMortKg = source.reduce((acc, r) => {
       const extra = r as any;
-      return acc + (extra.mortKg || 0);
+      const kg = Number(extra.mortKg || 0);
+      return acc + (Number.isFinite(kg) ? kg : 0);
     }, 0);
-    const latestCaptured = safeRows.reduce((latest, r) => {
+    const latestCaptured = source.reduce((latest, r) => {
       const extra = r as any;
       return extra.autoCaptureTime || latest;
     }, "");
@@ -748,9 +757,9 @@ export default function UnLoadingTable({
       weight: totalWeight,
       mortality: totalMortality,
       mortKg: totalMortKg,
-      lastCaptureTime: latestCaptured || new Date().toLocaleString(),
+      lastCaptureTime: latestCaptured || "—",
     };
-  }, [safeRows]);
+  }, [persistedRows]);
 
   // ─── Filtered Search & Pagination ──────────────────────────────
   const displayRows = useMemo<ShopDelivery[]>(() => {
@@ -904,31 +913,37 @@ export default function UnLoadingTable({
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
             <Building2 size={13} className="text-slate-400" /> Shops
           </span>
-          <span className="text-base font-bold text-slate-800">{topKpiTotals.shops}</span>
+          <span className="text-base font-bold text-slate-800">{topKpiTotals.shops || "—"}</span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
             <Users size={13} className="text-emerald-600" /> Birds
           </span>
-          <span className="text-base font-bold text-slate-800">{topKpiTotals.birds}</span>
+          <span className="text-base font-bold text-slate-800">{topKpiTotals.birds || "—"}</span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
             <Scale size={13} className="text-emerald-600" /> Weight (kg)
           </span>
-          <span className="text-base font-bold text-slate-800">{topKpiTotals.weight.toFixed(2)}</span>
+          <span className="text-base font-bold text-slate-800">
+            {topKpiTotals.weight ? topKpiTotals.weight.toFixed(2) : "—"}
+          </span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
             <AlertCircle size={13} className="text-rose-500" /> Mor
           </span>
-          <span className="text-base font-bold text-slate-800">{topKpiTotals.mortality}</span>
+          <span className="text-base font-bold text-slate-800">
+            {topKpiTotals.mortality || "—"}
+          </span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
             <Scale size={13} className="text-rose-500" /> Mor (kg)
           </span>
-          <span className="text-base font-bold text-slate-800">{topKpiTotals.mortKg.toFixed(2)}</span>
+          <span className="text-base font-bold text-slate-800">
+            {topKpiTotals.mortKg ? topKpiTotals.mortKg.toFixed(2) : "—"}
+          </span>
         </div>
       </div>
 
@@ -1016,22 +1031,14 @@ export default function UnLoadingTable({
             )}
           </div>
 
-          <div className="border-t border-slate-100 bg-white px-4 py-3 rounded-2xl border">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="text-xs font-medium text-slate-500">
-                Page <span className="font-bold text-slate-700">{currentPage}</span> of{" "}
-                <span className="font-bold text-slate-700">{Math.max(totalPages, 1)}</span>
-                <span className="ml-2 text-[10px] text-slate-400">({itemsPerPage} per page)</span>
-              </div>
-              <TripPagination
-                key={totalPages}
-                currentPage={currentPage}
-                totalPages={Math.max(totalPages, 1)}
-                onPageChange={setCurrentPage}
-                hidePageInfo={true}
-              />
-            </div>
-          </div>
+          {shouldShowPagination(displayRows.length) && (
+          <TripPagination
+            key={totalPages}
+            currentPage={currentPage}
+            totalPages={Math.max(totalPages, 1)}
+            onPageChange={setCurrentPage}
+          />
+          )}
         </>
       )}
 

@@ -15,6 +15,7 @@ import {
   validateStartStep,
   validateFarmStep,
   validatePickupStep,
+  validateDeliveriesStep,
   validateEndStep,
   validateFinalTrip,
 } from "../../../../shared/trip";
@@ -372,6 +373,22 @@ export function useTripEntry(
       return false;
     }
 
+    const validation = validateDeliveriesStep(current, current.deliveries);
+    if (!validation.valid) {
+      notifyRef.current?.(validation.errors[0], "error");
+      return false;
+    }
+    for (const row of current.deliveries) {
+      if (!row.shopId) {
+        notifyRef.current?.("Shop is required.", "error");
+        return false;
+      }
+      if (!row.birdTypeId) {
+        notifyRef.current?.("Bird Type is required.", "error");
+        return false;
+      }
+    }
+
     setHeaderLoading(true);
     try {
       const submitted = await submitTripStep(current.id, "deliveries", current);
@@ -381,7 +398,13 @@ export function useTripEntry(
       }
       return true;
     } catch (error) {
-      notifyRef.current?.(handleApiError(error), "error");
+      const message = handleApiError(error);
+      const apiErr = error as { status?: number; code?: string };
+      if (apiErr?.code === "NETWORK_ERROR" || message.toLowerCase().includes("unable to reach")) {
+        notifyRef.current?.("Unable to connect. Please try again.", "error");
+      } else {
+        notifyRef.current?.(message, "error");
+      }
       return false;
     } finally {
       setHeaderLoading(false);
@@ -455,7 +478,7 @@ export function useTripEntry(
       return true;
     } catch (error) {
       console.error("Unable to submit end details:", error);
-      return false;
+      throw new Error(handleApiError(error));
     } finally {
       setHeaderLoading(false);
     }

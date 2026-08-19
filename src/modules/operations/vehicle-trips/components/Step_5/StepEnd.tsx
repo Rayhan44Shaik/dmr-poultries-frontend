@@ -5,7 +5,7 @@ import {
   Pencil,
   AlertTriangle,
 } from "lucide-react";
-import type { Trip, TripStatus } from "../../types/trip";
+import type { Trip } from "../../types/trip";
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 import { TRIP_STEP_DEFINITIONS } from "../../../../../shared/trip/definitions";
 import GeneralExpensesTable from "./GeneralExpensesTable";
@@ -243,23 +243,45 @@ export default function StepEnd({
   const remainingBalance =
     Number(trip.advanceAmount || 0) - totalAllExpenses - totalDieselAmount;
 
+  const highestDieselMeter = dieselIndices.reduce((max, idx) => {
+    const val = Number(sheetData[`dieselMeter${idx}`] || 0);
+    return val > max ? val : max;
+  }, 0);
+  const requiredMinEndMeter = Math.max(openingMeter, destMeter, highestDieselMeter, 0);
+  const endMeterInvalid =
+    sheetData.endMeter !== "" &&
+    sheetData.endMeter != null &&
+    requiredMinEndMeter > 0 &&
+    Number(sheetData.endMeter) <= requiredMinEndMeter;
+
+  const EXPENSE_KEYS = [
+    "meals",
+    "loading",
+    "mealsTiffin",
+    "vehicleMaintenance",
+    "othersRC",
+    "others1Amt",
+    "others2Amt",
+    "others3Amt",
+    "others4Amt",
+    "others5Amt",
+  ] as const;
+
+  const positiveExpense = (value: unknown): number | undefined => {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return undefined;
+    return n;
+  };
+
   const prepareFinalPayload = (stepSubmitted = false) => {
-    let newStatus: TripStatus = trip.status || "Draft";
-    if (stepSubmitted && trip.status !== "Deleted") {
-      newStatus = "Completed";
+    const expenses: Record<string, number> = {};
+    for (const key of EXPENSE_KEYS) {
+      const n = positiveExpense(sheetData[key]);
+      if (n != null) expenses[key] = n;
     }
 
     return {
-      meals: sheetData.meals,
-      loading: sheetData.loading,
-      mealsTiffin: sheetData.mealsTiffin,
-      vehicleMaintenance: sheetData.vehicleMaintenance,
-      othersRC: sheetData.othersRC,
-      others1Amt: sheetData.others1Amt,
-      others2Amt: sheetData.others2Amt,
-      others3Amt: sheetData.others3Amt,
-      others4Amt: sheetData.others4Amt,
-      others5Amt: sheetData.others5Amt,
+      ...expenses,
       endMeter: sheetData.endMeter,
       closingMeter: Number(sheetData.endMeter) || 0,
       destinationTolls: sheetData.destinationTolls === "" ? 0 : Number(sheetData.destinationTolls),
@@ -271,7 +293,6 @@ export default function StepEnd({
       pickupTolls: trip.pickupTolls || 0,
       expensesStepSubmitted: stepSubmitted,
       endStepSubmitted: stepSubmitted,
-      status: newStatus,
     };
   };
 
@@ -320,7 +341,7 @@ export default function StepEnd({
       requiredMinLabel = `Diesel Entry (${highestDieselMeter})`;
     }
     if (requiredMinMeter > 0 && endMeterNum <= requiredMinMeter) {
-      const msg = `End Meter Reading (${sheetData.endMeter}) must be strictly greater than ${requiredMinLabel}.`;
+      const msg = `Meter reading must be greater than ${requiredMinMeter}.`;
       setErrorMsg(msg);
       setToast({ message: msg, type: "warning" });
       return;
@@ -399,9 +420,7 @@ export default function StepEnd({
       if (success) {
         setIsLocalEditing(false);
         setIsSubmittedLocal(true);
-        setToast({ message: "End details submitted successfully.", type: "success" });
-        // Final step complete → return to Create New Trip (no resume).
-        if (clearForm) window.setTimeout(clearForm, 700);
+        setToast({ message: "Step 5 submitted successfully.", type: "success" });
       } else {
         setErrorMsg("Failed to save step details.");
         setToast({ message: "Failed to save step details.", type: "error" });
@@ -503,6 +522,7 @@ export default function StepEnd({
             destMeter={destMeter}
             trip={trip}
             readOnly
+            onMeterNotice={(msg) => setToast({ message: msg, type: "warning" })}
           />
           <DieselExpensesTable
             tripId={trip.id}
@@ -526,8 +546,6 @@ export default function StepEnd({
             <div className="flex items-center gap-2"><span className="text-[11px] text-slate-700 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 whitespace-nowrap">Editable View</span></div>
           </div>
 
-          {errorMsg && <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg">⚠️ {errorMsg}</div>}
-
           <GeneralExpensesTable
             key={`general-${trip.id}`}
             sheetData={sheetData}
@@ -541,6 +559,7 @@ export default function StepEnd({
             openingMeter={openingMeter}
             destMeter={destMeter}
             trip={trip}
+            onMeterNotice={(msg) => setToast({ message: msg, type: "warning" })}
           />
 
           <DieselExpensesTable
@@ -553,6 +572,12 @@ export default function StepEnd({
             totalDieselAmount={totalDieselAmount}
             destMeter={destMeter}
           />
+
+          {errorMsg ? (
+            <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg">
+              {errorMsg}
+            </div>
+          ) : null}
 
           <div className="border border-slate-200 rounded-lg p-2.5 bg-white">
             <textarea
@@ -585,6 +610,7 @@ export default function StepEnd({
             onSubmit={handleInitiateSubmit}
             busy={isSubmitting}
             saveDisabled={!hasUnsavedChanges}
+            submitDisabled={endMeterInvalid}
             submitLabel={isSubmitted ? "Update End Details" : "Submit End Details"}
           />
         </div>

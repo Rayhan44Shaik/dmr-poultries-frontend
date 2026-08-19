@@ -18,6 +18,7 @@ export function useEmiData() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshStatus, setRefreshStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [refreshNonce, setRefreshNonce] = useState(0);
 
   const loadGen = useRef(0);
@@ -28,6 +29,8 @@ export function useEmiData() {
     if (listInFlight.current) return;
     setRefreshNonce((value) => value + 1);
   }, []);
+
+  const clearRefreshStatus = useCallback(() => setRefreshStatus('idle'), []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -40,13 +43,21 @@ export function useEmiData() {
       .overview(controller.signal)
       .then((rows) => {
         if (gen !== loadGen.current) return;
+        const wasRefresh = hasLoaded.current;
         hasLoaded.current = true;
         setAllRecords(rows);
+        if (wasRefresh) setRefreshStatus('success');
       })
       .catch((cause) => {
         if (isCanceledError(cause) || gen !== loadGen.current) return;
-        if (!hasLoaded.current) setAllRecords([]);
-        setError('Unable to load EMI data.');
+        if (hasLoaded.current) {
+          // Refresh failed — retain the previous data (no blinking); surface
+          // the failure via a toast instead of blanking the page.
+          setRefreshStatus('error');
+        } else {
+          setAllRecords([]);
+          setError('Unable to load EMI data.');
+        }
       })
       .finally(() => {
         if (gen === loadGen.current) {
@@ -85,6 +96,8 @@ export function useEmiData() {
     refreshing,
     error,
     refresh,
+    refreshStatus,
+    clearRefreshStatus,
     kpis,
   };
 }
