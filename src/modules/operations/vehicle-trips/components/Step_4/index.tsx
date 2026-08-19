@@ -15,6 +15,9 @@ import { useShopDeliveryForm } from "./useShopDeliveryForm";
 import ShopDeliveryForm from "./ShopDeliveryForm";
 import ShopDeliveryCard from "./ShopDeliveryCard";
 import { generateShopPDF } from "../../utils/generateShopPDF";
+import { pendingBoxesFromRows } from "./remainingBoxes";
+import { computeDeliveryKpiTotals } from "./deliveryKpis";
+import type { DeliveriesBalanceError } from "../../../../../shared/trip/validation";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 
@@ -43,6 +46,8 @@ interface Props {
   submitDeliveries?: () => boolean | Promise<boolean>;
   onClose?: () => void;
   persistedRows?: ShopDelivery[];
+  balanceError?: DeliveriesBalanceError;
+  balanceErrorShown?: boolean;
 }
 
 // ─── Confirmation Modal Component ───────────────────────────────────
@@ -110,6 +115,47 @@ function ConfirmationModal({
   );
 }
 
+// ─── Balance Mismatch Panel ─────────────────────────────────────
+function DeliveryBalanceErrorPanel({ error }: { error: NonNullable<DeliveriesBalanceError> }) {
+  return (
+    <div className="rounded-xl border border-red-300 bg-red-50 p-4 space-y-2">
+      <p className="text-sm font-bold text-red-800 flex items-center gap-1.5">
+        <AlertCircle size={15} className="text-red-600" /> Balance mismatch — fix the values below before submitting.
+      </p>
+      {error.birds && (
+        <div className="text-xs text-red-800 space-y-0.5">
+          <p className="font-semibold">Birds</p>
+          <p className="pl-3">Pickup: <span className="font-bold">{error.birds.pickup}</span></p>
+          <p className="pl-3">
+            Delivered: <span className="font-bold">{error.birds.delivered}</span> + Mortality:{" "}
+            <span className="font-bold">{error.birds.mortality}</span> ={" "}
+            <span className="font-bold">{error.birds.delivered + error.birds.mortality}</span>
+          </p>
+          <p className="pl-3 text-red-700">
+            Pickup ({error.birds.pickup}) must equal Delivered + Mortality ({error.birds.delivered + error.birds.mortality}).
+          </p>
+        </div>
+      )}
+      {error.weight && (
+        <div className="text-xs text-red-800 space-y-0.5">
+          <p className="font-semibold">Weight</p>
+          <p className="pl-3">Farm: <span className="font-bold">{error.weight.farm.toFixed(2)} kg</span></p>
+          <p className="pl-3">Delivered: <span className="font-bold">{error.weight.delivered.toFixed(2)} kg</span></p>
+          <p className="pl-3">Mortality: <span className="font-bold">{error.weight.mortalityWeight.toFixed(2)} kg</span></p>
+          <p className="pl-3">Loss: <span className="font-bold">{error.weight.loss.toFixed(2)} kg</span></p>
+          <p className="pl-3">
+            Expected: <span className="font-bold">{error.weight.expected.toFixed(2)} kg</span>
+          </p>
+          <p className="pl-3 text-red-700">
+            Farm weight ({error.weight.farm.toFixed(2)} kg) must equal Delivered + Mortality + Loss (
+            {error.weight.expected.toFixed(2)} kg).
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function UnLoadingTable({
   rows,
   setRows,
@@ -135,6 +181,8 @@ export default function UnLoadingTable({
   submitDeliveries,
   onClose,
   persistedRows,
+  balanceError,
+  balanceErrorShown = false,
 }: Props) {
   const safeRows = rows ?? [];
   const safeShops = shops ?? [];
@@ -210,37 +258,17 @@ export default function UnLoadingTable({
   }, [editingShopId, safeRows]);
 
   // ─── Filter Pending Boxes ───────────────────────────────────────
-  const pendingBoxes = useMemo(() => {
-    const used = new Map<number, { birds: number; weight: number }>();
-    const add = (boxNo: number, birds: number, weight: number) => {
-      const cur = used.get(boxNo) ?? { birds: 0, weight: 0 };
-      used.set(boxNo, { birds: cur.birds + birds, weight: cur.weight + weight });
-    };
-    safeRows.forEach((row: any) => {
-      const per = Array.isArray(row.perBoxData) ? row.perBoxData : [];
-      const selected: number[] = Array.isArray(row.selectedBoxIds) ? row.selectedBoxIds.map(Number) : [];
-      if (per.length) {
-        per.forEach((pb: { boxNo: number; birds: number; weight: number }) => add(Number(pb.boxNo), Number(pb.birds || 0), Number(pb.weight || 0)));
-      } else if (selected.length === 1) {
-        add(
-          selected[0],
-          Number(row.birds || 0) + Number(row.mortality || 0),
-          Number(row.weight || 0) + Number(row.mortKg || 0)
-        );
-      } else {
-        selected.forEach((id) => add(id, 0, 0));
-      }
-    });
-    return safeBoxDetails
-      .map((b: any) => {
-        const boxNo = Number(b.boxNo ?? b.id);
-        const consumed = used.get(boxNo) ?? { birds: 0, weight: 0 };
-        const remainBirds = Math.max(0, Number(b.birds || 0) - consumed.birds);
-        const remainWeight = Math.max(0, Number(b.weight || 0) - consumed.weight);
-        return { ...b, boxNo, birds: remainBirds, weight: remainWeight };
-      })
-      .filter((b: any) => b.birds > 0 || b.weight > 0);
-  }, [safeRows, safeBoxDetails]);
+  const pendingBoxes = useMemo(
+    () => pendingBoxesFromRows(safeBoxDetails, safeRows),
+    [safeRows, safeBoxDetails]
+  );
+
+  // ─── Balance Error Panel visibility (shown after a blocked submit) ──
+  const [showBalanceError, setShowBalanceError] = useState<boolean>(balanceErrorShown);
+
+  useEffect(() => {
+    if (balanceError == null) setShowBalanceError(false);
+  }, [balanceError, safeRows, safeBoxDetails]);
 
   // ─── PDF Export for Pending Boxes ─────────────────────────────
   const handleDownloadPendingBoxesPDF = () => {
@@ -398,6 +426,13 @@ export default function UnLoadingTable({
   // ─── Submit / Update Deliveries Handler ──────────────────────────
   const handleSubmitOrUpdateDeliveries = () => {
     if (readOnly) return;
+
+    // Field-level balance rules block submission BEFORE any confirmation —
+    // the inline panel below the table explains exactly what is wrong.
+    if (balanceError) {
+      setShowBalanceError(true);
+      return;
+    }
 
     if (!hasBeenSubmitted) {
       setConfirmation({
@@ -735,31 +770,8 @@ export default function UnLoadingTable({
     }
   }, [mode, formData, farmBirds, validationErrors]);
 
-  // ─── Top KPI Calculations ────────────────────────────────────
-  const topKpiTotals = useMemo(() => {
-    const source = persistedRows && persistedRows.length ? persistedRows : [];
-    const totalShops = source.length;
-    const totalBirds = source.reduce((acc, r) => acc + (Number.isFinite(Number(r.birds)) ? Number(r.birds) : 0), 0);
-    const totalWeight = source.reduce((acc, r) => acc + (Number.isFinite(Number(r.weight)) ? Number(r.weight) : 0), 0);
-    const totalMortality = source.reduce((acc, r) => acc + (Number.isFinite(Number(r.mortality)) ? Number(r.mortality) : 0), 0);
-    const totalMortKg = source.reduce((acc, r) => {
-      const extra = r as any;
-      const kg = Number(extra.mortKg || 0);
-      return acc + (Number.isFinite(kg) ? kg : 0);
-    }, 0);
-    const latestCaptured = source.reduce((latest, r) => {
-      const extra = r as any;
-      return extra.autoCaptureTime || latest;
-    }, "");
-    return {
-      shops: totalShops,
-      birds: totalBirds,
-      weight: totalWeight,
-      mortality: totalMortality,
-      mortKg: totalMortKg,
-      lastCaptureTime: latestCaptured || "—",
-    };
-  }, [persistedRows]);
+  // ─── Top KPI Calculations (LIVE from current rows, not persisted) ───
+  const topKpiTotals = useMemo(() => computeDeliveryKpiTotals(safeRows), [safeRows]);
 
   // ─── Filtered Search & Pagination ──────────────────────────────
   const displayRows = useMemo<ShopDelivery[]>(() => {
@@ -931,18 +943,18 @@ export default function UnLoadingTable({
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <AlertCircle size={13} className="text-rose-500" /> Mor
+            <AlertCircle size={13} className="text-rose-500" /> Mortality
           </span>
           <span className="text-base font-bold text-slate-800">
-            {topKpiTotals.mortality || "—"}
+            {topKpiTotals.mortality > 0 ? `${topKpiTotals.mortality} bird${topKpiTotals.mortality === 1 ? "" : "s"}` : "—"}
           </span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <Scale size={13} className="text-rose-500" /> Mor (kg)
+            <Scale size={13} className="text-rose-500" /> Mortality Weight
           </span>
           <span className="text-base font-bold text-slate-800">
-            {topKpiTotals.mortKg ? topKpiTotals.mortKg.toFixed(2) : "—"}
+            {topKpiTotals.mortKg > 0 ? `${topKpiTotals.mortKg.toFixed(2)} kg` : "—"}
           </span>
         </div>
       </div>
@@ -1045,6 +1057,11 @@ export default function UnLoadingTable({
       {/* ─── BOTTOM ACTION CONTROL BAR (ONLY VISIBLE IN UNLOCKED/EDIT MODE) ─── */}
       {!showForm && !readOnly && (
         <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xs">
+          {showBalanceError && balanceError && (
+            <div className="mb-3">
+              <DeliveryBalanceErrorPanel error={balanceError} />
+            </div>
+          )}
           <WizardStepNotice
             notice={
               toast

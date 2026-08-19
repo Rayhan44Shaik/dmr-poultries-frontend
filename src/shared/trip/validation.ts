@@ -117,28 +117,87 @@ export function validatePickupStep(trip: Trip): TripValidationResult {
   return result(errors);
 }
 
-export function validateDeliveriesStep(
+export const DELIVERY_WEIGHT_TOLERANCE_KG = 0.05;
+
+/**
+ * Step 4 balance summary. Bird counts are birds-only; mortality weight (kg)
+ * never participates in the bird equation. Weight is reconciled independently:
+ * farmWeight = deliveredWeight + mortalityWeight + weightLoss (existing
+ * project definition of weight loss, checked within the accepted tolerance).
+ */
+export type DeliveriesBalanceError = {
+  birds?: {
+    pickup: number;
+    delivered: number;
+    mortality: number;
+  };
+  weight?: {
+    farm: number;
+    delivered: number;
+    mortalityWeight: number;
+    loss: number;
+    expected: number;
+  };
+} | null;
+
+export function getDeliveriesBalanceError(
   trip: Pick<Trip, "dcWeight" | "totalBirds">,
   rows: ShopDelivery[],
-  _weightToleranceKg = 0.05
-): TripValidationResult {
-  if (required("deliveries") && !rows.length) {
-    return result(["Please add at least one shop delivery."]);
-  }
+  weightToleranceKg = DELIVERY_WEIGHT_TOLERANCE_KG
+): DeliveriesBalanceError {
   const pickupBirds = Number(trip.totalBirds || 0);
   const pickupWeight = Number(trip.dcWeight || 0);
   const totalMortalityCount = rows.reduce((sum, row) => sum + Number(row.mortality || 0), 0);
   const totalBirdsDelivered = rows.reduce((sum, row) => sum + Number(row.birds || 0), 0);
   const totalDeliveredWeight = rows.reduce((sum, row) => sum + Number(row.weight || 0), 0);
   const mortalityWeight = rows.reduce((sum, row) => sum + Number(row.mortKg || 0), 0);
-  if (pickupBirds > 0 && totalBirdsDelivered + totalMortalityCount > pickupBirds) {
+
+  const error: NonNullable<DeliveriesBalanceError> = {};
+
+  if (pickupBirds > 0 && totalBirdsDelivered + totalMortalityCount !== pickupBirds) {
+    error.birds = {
+      pickup: pickupBirds,
+      delivered: totalBirdsDelivered,
+      mortality: totalMortalityCount,
+    };
+  }
+
+  if (pickupWeight > 0) {
+    const loss = Number((pickupWeight - totalDeliveredWeight - mortalityWeight).toFixed(2));
+    const expected = Number((totalDeliveredWeight + mortalityWeight + Math.max(0, loss)).toFixed(2));
+    if (loss < -weightToleranceKg) {
+      error.weight = {
+        farm: pickupWeight,
+        delivered: Number(totalDeliveredWeight.toFixed(2)),
+        mortalityWeight: Number(mortalityWeight.toFixed(2)),
+        loss: Math.max(0, loss),
+        expected,
+      };
+    }
+  }
+
+  return Object.keys(error).length > 0 ? error : null;
+}
+
+export function validateDeliveriesStep(
+  trip: Pick<Trip, "dcWeight" | "totalBirds">,
+  rows: ShopDelivery[],
+  weightToleranceKg = DELIVERY_WEIGHT_TOLERANCE_KG
+): TripValidationResult {
+  if (required("deliveries") && !rows.length) {
+    return result(["Please add at least one shop delivery."]);
+  }
+  const balanceError = getDeliveriesBalanceError(trip, rows, weightToleranceKg);
+  if (balanceError?.birds) {
+    const { pickup, delivered, mortality } = balanceError.birds;
     return result([
-      `Delivered birds plus mortality (${totalBirdsDelivered + totalMortalityCount}) exceed Pickup birds (${pickupBirds}).`,
+      `Bird count mismatch: Pickup (${pickup}) must equal Delivered (${delivered}) + Mortality (${mortality}) = ${delivered + mortality}.`,
     ]);
   }
-  if (pickupWeight > 0 && totalDeliveredWeight + mortalityWeight - pickupWeight > 0.05) {
+  if (balanceError?.weight) {
+    const { farm, delivered, mortalityWeight, loss, expected } = balanceError.weight;
     return result([
-      `Delivered weight plus mortality weight exceeds Pickup weight (${pickupWeight.toFixed(2)} Kg).`,
+      `Weight mismatch: Delivered (${delivered.toFixed(2)} Kg) + Mortality (${mortalityWeight.toFixed(2)} Kg) + Loss (${loss.toFixed(2)} Kg) = ${expected.toFixed(2)} Kg but Farm weight is ${farm.toFixed(2)} Kg.`,
     ]);
   }
   return result([]);

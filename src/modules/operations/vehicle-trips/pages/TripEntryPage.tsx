@@ -120,7 +120,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   // After Step 1 success: close the wizard and return to Create Trip Entry.
   // The submitted trip is already in Recent Trips via onTripsChanged.
   useEffect(() => {
-    registerStep1SuccessCallback((saved) => {
+    registerStep1SuccessCallback(() => {
       showNotification(`Step 1 submitted successfully.`, "success");
       clearTrip();
       setRows([]);
@@ -136,12 +136,21 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   useEffect(() => {
     registerStep2SuccessCallback(() => {
-      /* Stay on the submitted trip so the locked Step 2 view is visible. */
+      showNotification("Step 2 submitted successfully.", "success");
+      clearTrip();
+      setRows([]);
+      setEntryScreen("prompt");
+      setViewStepIndex(0);
+      setIsEditing(false);
+      setEditingSubmittedStep(null);
+      setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
+      clearTripIdFromUrl();
+      isManualSelect.current = false;
     });
-  }, [registerStep2SuccessCallback]);
+  }, [registerStep2SuccessCallback, clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, showNotification]);
 
   useEffect(() => {
-    registerStep3SuccessCallback((saved: Trip) => {
+    registerStep3SuccessCallback(() => {
       showNotification("Step 3 submitted successfully.", "success");
       clearTrip();
       setRows([]);

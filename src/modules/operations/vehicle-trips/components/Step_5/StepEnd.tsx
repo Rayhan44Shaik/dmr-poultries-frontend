@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Pencil,
   AlertTriangle,
+  X,
 } from "lucide-react";
 import type { Trip } from "../../types/trip";
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
@@ -316,7 +317,6 @@ export default function StepEnd({
     const endMeterNum = Number(sheetData.endMeter);
     if (sheetData.endMeter === "" || sheetData.endMeter === null || isNaN(endMeterNum)) {
       setErrorMsg("End Meter Reading is required.");
-      setToast({ message: "End Meter Reading is required.", type: "warning" });
       return;
     }
 
@@ -341,16 +341,13 @@ export default function StepEnd({
       requiredMinLabel = `Diesel Entry (${highestDieselMeter})`;
     }
     if (requiredMinMeter > 0 && endMeterNum <= requiredMinMeter) {
-      const msg = `Meter reading must be greater than ${requiredMinMeter}.`;
-      setErrorMsg(msg);
-      setToast({ message: msg, type: "warning" });
+      setErrorMsg(`Meter reading must be greater than ${requiredMinMeter}.`);
       return;
     }
 
     const destTollsNum = Number(sheetData.destinationTolls);
     if (sheetData.destinationTolls === "" || sheetData.destinationTolls === null || isNaN(destTollsNum) || destTollsNum < 0) {
       setErrorMsg("Total Toll Gates (Destination) must be 0 or greater.");
-      setToast({ message: "Total Toll Gates (Destination) must be 0 or greater.", type: "warning" });
       return;
     }
 
@@ -422,13 +419,13 @@ export default function StepEnd({
         setIsSubmittedLocal(true);
         setToast({ message: "Step 5 submitted successfully.", type: "success" });
       } else {
+        // Single inline presentation — the inline error box below shows the
+        // same message; do NOT duplicate it through the notice toast.
         setErrorMsg("Failed to save step details.");
-        setToast({ message: "Failed to save step details.", type: "error" });
       }
     } catch (err: any) {
       console.error("Submit error:", err);
       setErrorMsg(err?.message || "Failed to save step details.");
-      setToast({ message: err?.message || "Failed to save step details.", type: "error" });
     } finally {
       setIsSubmitting(false);
     }
@@ -469,6 +466,15 @@ export default function StepEnd({
               <h2 className="text-sm font-bold text-slate-800 tracking-tight">{TRIP_STEP_DEFINITIONS[4].title.toUpperCase()} (SUBMITTED)</h2>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleCloseView}
+                className="bg-white hover:bg-slate-50 p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
+                title="Close Trip"
+                aria-label="Close Trip"
+              >
+                <X size={14} />
+              </button>
               {canEdit && (
                 <button
                   onClick={() => setIsLocalEditing(true)}
@@ -543,7 +549,18 @@ export default function StepEnd({
               <span className="bg-blue-600 text-white w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0">5</span>
               <h2 className="text-sm font-bold text-slate-800 tracking-tight">{TRIP_STEP_DEFINITIONS[4].title.toUpperCase()}</h2>
             </div>
-            <div className="flex items-center gap-2"><span className="text-[11px] text-slate-700 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 whitespace-nowrap">Editable View</span></div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCloseView}
+                className="bg-white hover:bg-slate-50 p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
+                title="Close Trip"
+                aria-label="Close Trip"
+              >
+                <X size={14} />
+              </button>
+              <span className="text-[11px] text-slate-700 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 whitespace-nowrap">Editable View</span>
+            </div>
           </div>
 
           <GeneralExpensesTable

@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
+import { remainingBoxesByNumber } from "./remainingBoxes";
 
 export type ShopDeliveryWithExtra = ShopDelivery & {
   deliveryMode?: string;
@@ -63,35 +64,15 @@ export function useShopDeliveryForm(
     perBoxWeightErrors: [],
   });
 
-  const remainingByBox = useMemo(() => {
-    const used = new Map<number, { birds: number; weight: number }>();
-    const add = (boxNo: number, birds: number, weight: number) => {
-      const cur = used.get(boxNo) ?? { birds: 0, weight: 0 };
-      used.set(boxNo, { birds: cur.birds + birds, weight: cur.weight + weight });
-    };
-    safeRows.forEach((row: ShopDelivery) => {
-      if (editingId !== null && row.id === editingId) return;
-      const extra = row as ShopDeliveryWithExtra;
-      const per = extra.perBoxData ?? [];
-      const selected = extra.selectedBoxIds ?? [];
-      if (per.length) {
-        per.forEach((pb) => add(Number(pb.boxNo), Number(pb.birds || 0), Number(pb.weight || 0)));
-      } else if (selected.length === 1) {
-        add(selected[0], Number(row.birds || 0) + Number(row.mortality || 0), Number(row.weight || 0) + Number(extra.mortKg || 0));
-      } else {
-        selected.forEach((id) => add(Number(id), 0, 0));
-      }
-    });
-    const remaining = new Map<number, { birds: number; weight: number }>();
-    safeBoxDetails.forEach((b) => {
-      const consumed = used.get(b.boxNo) ?? { birds: 0, weight: 0 };
-      remaining.set(b.boxNo, {
-        birds: Math.max(0, Number(b.birds || 0) - consumed.birds),
-        weight: Math.max(0, Number(b.weight || 0) - consumed.weight),
-      });
-    });
-    return remaining;
-  }, [safeRows, safeBoxDetails, editingId]);
+  const remainingByBox = useMemo(
+    () =>
+      remainingBoxesByNumber(
+        safeBoxDetails,
+        safeRows,
+        editingId != null ? { excludeRowId: editingId } : {}
+      ),
+    [safeRows, safeBoxDetails, editingId]
+  );
 
   // Fully consumed boxes cannot be selected again (pending remaining stays selectable).
   const usedBoxIds = useMemo<number[]>(() => {

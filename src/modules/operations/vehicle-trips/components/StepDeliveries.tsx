@@ -4,11 +4,12 @@ import {
   LayoutGrid,
   BarChart3,
   Pencil,
+  X,
 } from "lucide-react";
 import UnLoadingTable from "./Step_4";
 import BoxWeightAnalysis from "./Step_4/BoxWeightAnalysis";
 import type { ShopDelivery, Trip, BoxDetail } from "../types/trip";
-import { validateDeliveriesStep } from "../../../../shared/trip/validation";
+import { getDeliveriesBalanceError } from "../../../../shared/trip/validation";
 import { TRIP_STEP_DEFINITIONS } from "../../../../shared/trip/definitions";
 
 interface Props {
@@ -89,15 +90,18 @@ export default function StepDeliveries({
 
   // Shared Desktop + Mobile delivery balance rules.
   const validationResult = useMemo(() => {
-    const validation = validateDeliveriesStep(trip, rows);
-    return { valid: validation.valid, reason: validation.errors[0] || "" };
+    const balanceError = getDeliveriesBalanceError(trip, rows);
+    return {
+      valid: balanceError == null,
+      reason: balanceError ? "Delivery balance mismatch." : "",
+      balanceError,
+    };
   }, [rows, trip]);
 
   const canLock = validationResult.valid;
 
   const handleLockDeliveries = async (): Promise<boolean> => {
     if (!canLock) {
-      alert(`⚠️ ${validationResult.reason}`);
       return false;
     }
     setIsStepEditing(false);
@@ -120,6 +124,15 @@ export default function StepDeliveries({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <button
+            type="button"
+            onClick={handleCancelWizard}
+            className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
+            title="Close Trip"
+            aria-label="Close Trip"
+          >
+            <X size={14} />
+          </button>
           {/* VIEW MODE TOGGLE BUTTONS */}
           <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200/60">
             <button
@@ -194,6 +207,7 @@ export default function StepDeliveries({
           submitDeliveries={handleLockDeliveries}
           onClose={handleCancelWizard}
           persistedRows={persistedDeliveries ?? []}
+          balanceError={validationResult.balanceError}
         />
       ) : (
         <BoxWeightAnalysis

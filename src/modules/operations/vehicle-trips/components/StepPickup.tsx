@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Scale, Bird, Box, Gauge, Clock, Pencil,
-  Plus, Trash2, FileText, AlertTriangle, Camera, Download
+  Plus, Trash2, FileText, AlertTriangle, Camera, Download, X
 } from "lucide-react";
 import type { Trip, BoxDetail } from "../types/trip";
 import { getVehicles } from "../../../masters/vehicles/services/vehicleService";
@@ -408,17 +408,19 @@ export default function StepPickup({
       return;
     }
 
-    const isEditMode = editable || isLocalEditing;
-    const title = isEditMode ? "Update Pickup KPI" : "Submit Pickup KPI";
+    // Persisted flag decides Create vs Update: React state (isLocalEditing) is
+    // only ever an entry-mode toggle and must NOT drive the label.
+    const isEditMode = Boolean(trip.pickupStepSubmitted) && (editable || isLocalEditing);
+    const title = isEditMode ? "Update Pickup KPI" : "Create Pickup KPI";
     const message = isEditMode
       ? "Are you sure you want to update this pickup KPI? Changes will be saved and the step will remain unlocked for further edits."
-      : "Are you sure you want to submit this pickup KPI? You won't be able to edit it unless you have admin permissions.";
+      : "Are you sure you want to create this pickup KPI? You won't be able to edit it unless you have admin permissions.";
 
     setConfirmation({
       isOpen: true,
       title,
       message,
-      confirmLabel: isEditMode ? "Yes, Update" : "Yes, Submit",
+      confirmLabel: isEditMode ? "Yes, Update" : "Yes, Create",
       cancelLabel: "Cancel",
       type: isEditMode ? "info" : "warning",
       onConfirm: () => {
@@ -590,6 +592,15 @@ export default function StepPickup({
             </h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
+              title="Close Trip"
+              aria-label="Close Trip"
+            >
+              <X size={14} />
+            </button>
             {canEdit && (
               <button
                 onClick={() => setIsLocalEditing(true)}
@@ -742,7 +753,7 @@ export default function StepPickup({
     return acc;
   }, [] as typeof entrySlots[]);
 
-  const isEditMode = editable || isLocalEditing;
+  const isEditMode = Boolean(trip.pickupStepSubmitted) && (editable || isLocalEditing);
 
   return (
     <>
@@ -820,6 +831,15 @@ export default function StepPickup({
             </h2>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
+              title="Close Trip"
+              aria-label="Close Trip"
+            >
+              <X size={14} />
+            </button>
             {(isEditMode || isLocalEditing) && trip.pickupStepSubmitted && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
                 Editing Trip {trip.tripNo}
@@ -1049,7 +1069,7 @@ export default function StepPickup({
           busy={isSaving || isSubmitting}
           saveDisabled={false}
           submitDisabled={!canSubmit || (trip.pickupStepSubmitted && !isEditMode)}
-          submitLabel={isEditMode ? "Update Pickup" : "Submit Pickup"}
+          submitLabel={isEditMode ? "Update Pickup" : "Create Pickup"}
         />
       </div>
 

@@ -17,7 +17,6 @@ import {
   validatePickupStep,
   validateDeliveriesStep,
   validateEndStep,
-  validateFinalTrip,
 } from "../../../../shared/trip";
 
 type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void;
@@ -142,7 +141,6 @@ export function useTripEntry(
     };
     const validation = validateStartStep(merged as Trip);
     if (!validation.valid) {
-      notifyRef.current?.(validation.errors[0], "error");
       return false;
     }
 
@@ -212,7 +210,6 @@ export function useTripEntry(
 
     const validation = validateFarmStep(updatedData as Trip);
     if (!validation.valid) {
-      notifyRef.current?.(validation.errors[0], "error");
       return false;
     }
 
@@ -252,7 +249,6 @@ export function useTripEntry(
         ? validateStartStep(current)
         : { valid: true, errors: [] as string[] };
     if (step !== "farm" && step !== "pickup" && !validation.valid) {
-      notifyRef.current?.(validation.errors[0], "error");
       return false;
     }
 
@@ -369,22 +365,15 @@ export function useTripEntry(
     }
     const wasSubmitted = Boolean(current.deliveryStepSubmitted);
     if (!current.deliveries || current.deliveries.length === 0) {
-      notifyRef.current?.("Please add at least one shop delivery before proceeding.", "error");
       return false;
     }
 
     const validation = validateDeliveriesStep(current, current.deliveries);
     if (!validation.valid) {
-      notifyRef.current?.(validation.errors[0], "error");
       return false;
     }
     for (const row of current.deliveries) {
-      if (!row.shopId) {
-        notifyRef.current?.("Shop is required.", "error");
-        return false;
-      }
-      if (!row.birdTypeId) {
-        notifyRef.current?.("Bird Type is required.", "error");
+      if (!row.shopId || !row.birdTypeId) {
         return false;
       }
     }
@@ -447,13 +436,6 @@ export function useTripEntry(
 
     const endValidation = validateEndStep(current);
     if (!endValidation.valid) {
-      notifyRef.current?.(endValidation.errors[0], "error");
-      return false;
-    }
-
-    const finalValidation = validateFinalTrip(current);
-    if (!finalValidation.valid) {
-      notifyRef.current?.(finalValidation.errors[0], "error");
       return false;
     }
 

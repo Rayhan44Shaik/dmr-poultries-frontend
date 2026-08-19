@@ -1,8 +1,9 @@
-import React, { useRef, useState } from "react";
-import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Loader2, Scale, Pencil } from "lucide-react";
+import React, { useState } from "react";
+import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Loader2, Scale, Pencil, X } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { WizardActionBar, WizardStepNotice } from "./WizardStepUI";
+import { GpsAddressText } from "./GpsAddressText";
 import {
   TRIP_FIELD_DEFINITIONS,
   TRIP_STEP_DEFINITIONS,
@@ -46,7 +47,6 @@ export default function StepFarm({
   const [destMeterError, setDestMeterError] = useState<string | null>(null);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" } | null>(null);
-  const meterInvalidRef = useRef(false);
 
   const notify = (msg: string, type: "success" | "error" | "warning" = "success") => {
     if (showNotification) {
@@ -173,17 +173,7 @@ export default function StepFarm({
     updateTrip({ destMeter: num });
     const prev = Number(trip.openingMeter ?? 0);
     const invalid = isMeterInvalid(num, prev) && num > 0;
-    if (invalid) {
-      const msg = meterMustBeGreaterThan(prev);
-      setDestMeterError(msg);
-      if (!meterInvalidRef.current) {
-        meterInvalidRef.current = true;
-        notify(msg, "warning");
-      }
-    } else {
-      meterInvalidRef.current = false;
-      setDestMeterError(null);
-    }
+    setDestMeterError(invalid ? meterMustBeGreaterThan(prev) : null);
   };
 
   const handleTollsChange = (value: string) => {
@@ -252,6 +242,15 @@ export default function StepFarm({
             </h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => onCancel?.()}
+              className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
+              title="Close Trip"
+              aria-label="Close Trip"
+            >
+              <X size={14} />
+            </button>
             {canEdit && (
               <button
                 type="button"
@@ -309,10 +308,19 @@ export default function StepFarm({
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <MapPin size={12} className="text-slate-500" /> GPS
             </span>
-            <span className="text-xs font-bold text-slate-800 truncate">
-              {hasGps
-                ? `${Number(trip.farmGpsLat).toFixed(6)}, ${Number(trip.farmGpsLon).toFixed(6)}`
-                : "Not captured"}
+            <span
+              className="text-xs font-bold text-slate-800 truncate"
+              title={
+                hasGps
+                  ? `${Number(trip.farmGpsLat).toFixed(6)}, ${Number(trip.farmGpsLon).toFixed(6)}`
+                  : undefined
+              }
+            >
+              {hasGps ? (
+                <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback="Location captured" />
+              ) : (
+                "Not captured"
+              )}
             </span>
           </div>
         </div>
@@ -347,11 +355,22 @@ export default function StepFarm({
               {TRIP_STEP_DEFINITIONS[1].title.toUpperCase()}
             </h2>
           </div>
-          {editable && trip.farmStepSubmitted && (
-            <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
-              Editable View
-            </span>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => onCancel?.()}
+              className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
+              title="Close Trip"
+              aria-label="Close Trip"
+            >
+              <X size={14} />
+            </button>
+            {editable && trip.farmStepSubmitted && (
+              <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
+                Editable View
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 sm:gap-x-6 gap-y-3.5 sm:gap-y-4">
@@ -403,10 +422,10 @@ export default function StepFarm({
               <MapPin size={14} className="text-slate-400" /> GPS
             </label>
             <div className="flex items-center gap-2 mt-1">
-              <div className="flex-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 flex items-center">
+              <div className="flex-1 min-w-0 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 flex items-center">
                 {hasGps ? (
-                  <span>
-                    {Number(trip.farmGpsLat).toFixed(6)}, {Number(trip.farmGpsLon).toFixed(6)}
+                  <span className="truncate" title={`${Number(trip.farmGpsLat).toFixed(6)}, ${Number(trip.farmGpsLon).toFixed(6)}`}>
+                    <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback="Location captured" />
                     {trip.farmGpsAccuracy != null ? ` (±${Number(trip.farmGpsAccuracy).toFixed(1)} m)` : ""}
                   </span>
                 ) : (

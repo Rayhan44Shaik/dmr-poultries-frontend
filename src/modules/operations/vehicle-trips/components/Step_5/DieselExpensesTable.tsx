@@ -10,6 +10,7 @@ import {
 } from "../../services/tripHeaderApiService";
 import type { Trip } from "../../types/trip";
 import { meterMustBeGreaterThan } from "../../utils/meterValidation";
+import { GpsAddressText } from "../GpsAddressText";
 import { usePendingDelete } from "../../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../../components/common/PendingDeleteNotification";
 
@@ -63,7 +64,6 @@ export default function DieselExpensesTable({
   const [draftClientKey, setDraftClientKey] = useState<string>(() =>
     typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `diesel-${Date.now()}`
   );
-  const meterInvalidRef = useRef<Record<number, boolean>>({});
 
   const today = new Date();
   const yyyy = today.getFullYear();
@@ -254,7 +254,6 @@ export default function DieselExpensesTable({
     const currentMeter = valStr === "" ? "" : Number(valStr);
     handleChange(`dieselMeter${num}`, currentMeter);
     if (currentMeter === "" || isNaN(Number(currentMeter))) {
-      meterInvalidRef.current[num] = false;
       setMeterErrors((prev) => {
         const copy = { ...prev };
         delete copy[num];
@@ -264,17 +263,11 @@ export default function DieselExpensesTable({
     }
     const { minAllowed } = getMinAllowedMeter(num);
     if (minAllowed > 0 && Number(currentMeter) <= minAllowed) {
-      const msg = meterMustBeGreaterThan(minAllowed);
       setMeterErrors((prev) => ({
         ...prev,
-        [num]: msg,
+        [num]: meterMustBeGreaterThan(minAllowed),
       }));
-      if (!meterInvalidRef.current[num]) {
-        meterInvalidRef.current[num] = true;
-        notifyUser(msg, "warning");
-      }
     } else {
-      meterInvalidRef.current[num] = false;
       setMeterErrors((prev) => {
         const copy = { ...prev };
         delete copy[num];
@@ -459,18 +452,29 @@ export default function DieselExpensesTable({
           </div>
         )}
 
-        <table className="sheet-joined-table bg-white min-w-[860px] w-full border-collapse">
+        <table className="sheet-joined-table bg-white min-w-[860px] w-full border-collapse table-fixed">
+          <colgroup>
+            <col style={{ width: "5%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "11%" }} />
+            <col style={{ width: "13%" }} />
+            <col style={{ width: "27%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "5%" }} />
+          </colgroup>
           <thead>
             <tr className="bg-slate-50 font-normal text-slate-700 text-[11px] tracking-wider border-b border-slate-200">
-              <th className="py-2.5 px-2 text-center w-12">S.No</th>
-              <th className="py-2.5 px-1 text-center w-20">Diesel (Ltr) <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-1 text-center w-20">Rate <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-1 text-center w-20">Amount</th>
-              <th className="py-2.5 px-1 text-center w-28">Reading <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-2 text-center">S.No</th>
+              <th className="py-2.5 px-1 text-center">Diesel (Ltr) <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-1 text-center">Rate <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-1 text-center">Amount</th>
+              <th className="py-2.5 px-1 text-center">Reading <span className="text-red-500">*</span></th>
               <th className="py-2.5 px-2 text-left">Bunk Address <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-2 text-center min-w-[8.5rem]">GPS</th>
-              <th className="py-2.5 px-1 text-center w-28">Bill Image / Slip <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-2 text-center w-28">Status</th>
+              <th className="py-2.5 px-2 text-center">GPS</th>
+              <th className="py-2.5 px-1 text-center">Bill Image / Slip <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-2 text-center">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -527,16 +531,20 @@ export default function DieselExpensesTable({
                       onChange={(e) => handleFieldChange(`dieselBunk${num}`, num, e.target.value)}
                       className="w-full max-w-[9rem] pl-2 py-1 bg-slate-50/70 border border-slate-200 rounded outline-none text-xs disabled:text-slate-500" />
                   </td>
-                  <td className="p-1 text-center align-middle min-w-[8.5rem]">
+                  <td className="p-1 text-center align-middle">
                     {gpsOk ? (
                       <a
                         href={`https://www.google.com/maps?q=${Number(sheetData[`dieselGpsLat${num}`])},${Number(sheetData[`dieselGpsLon${num}`])}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-[11px] text-emerald-700 font-semibold underline"
-                        title="Open in maps"
+                        className="text-[11px] text-emerald-700 font-semibold underline break-words"
+                        title={`Open in maps (${Number(sheetData[`dieselGpsLat${num}`]).toFixed(6)}, ${Number(sheetData[`dieselGpsLon${num}`]).toFixed(6)})`}
                       >
-                        {Number(sheetData[`dieselGpsLat${num}`]).toFixed(6)}, {Number(sheetData[`dieselGpsLon${num}`]).toFixed(6)}
+                        <GpsAddressText
+                          lat={sheetData[`dieselGpsLat${num}`]}
+                          lon={sheetData[`dieselGpsLon${num}`]}
+                          fallback="Location captured"
+                        />
                       </a>
                     ) : (
                       <span className="text-[11px] text-slate-400">GPS: Not captured</span>

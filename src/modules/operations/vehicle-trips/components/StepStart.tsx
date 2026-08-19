@@ -7,10 +7,11 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { Clock, User, Truck, Gauge, Wallet, Pencil } from "lucide-react";
+import { Clock, User, Truck, Gauge, Wallet, Pencil, X } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { validateStartStep } from "../../../../shared/trip/validation";
+import { fetchLastClosingMeter } from "../services/tripHeaderApiService";
 import { WizardActionBar, WizardStepNotice, type WizardNoticeState } from "./WizardStepUI";
 import {
   TRIP_FIELD_DEFINITIONS,
@@ -367,11 +368,13 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
   value,
   disabled,
   invalid,
+  error,
   onChange,
 }: {
   value: string;
   disabled: boolean;
   invalid?: boolean;
+  error?: string | null;
   onChange: (value: string) => void;
 }) {
   const handleChange = useCallback(
@@ -403,6 +406,12 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
         }`}
         placeholder="0.00"
       />
+      {error ? (
+        <p className="mt-1.5 text-xs font-medium text-red-600 flex items-start gap-1">
+          <span aria-hidden>⚠</span>
+          <span>{error}</span>
+        </p>
+      ) : null}
     </div>
   );
 });
@@ -572,10 +581,51 @@ function StepStart({
   const [isLocalEditing, setIsLocalEditing] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [notice, setNotice] = useState<WizardNoticeState>(null);
+  const [latestMeter, setLatestMeter] = useState<{
+    meter: number;
+    tripNo: string;
+    tripDate: string;
+  } | null>(null);
 
   const loadedTripIdRef = useRef(tripId);
   const formRef = useRef(form);
   formRef.current = form;
+
+  // Opening-meter reference: the vehicle's latest recorded reading. Used for
+  // field-level validation only — the backend remains the authority on submit.
+  useEffect(() => {
+    if (!form.vehicleId) {
+      setLatestMeter(null);
+      return;
+    }
+    let cancelled = false;
+    setLatestMeter(null);
+    fetchLastClosingMeter(form.vehicleId)
+      .then((data) => {
+        if (cancelled) return;
+        if (!data || data.closingMeter == null) {
+          setLatestMeter(null);
+          return;
+        }
+        // Self-exclusion when editing: the latest event may be THIS trip's own
+        // start/end meter, which must never constrain its own opening reading.
+        const isSelf =
+          tripId > 0 &&
+          (data.source === "TRIP_START" || data.source === "TRIP_END") &&
+          String(data.ref) === String(tripId);
+        setLatestMeter(
+          isSelf
+            ? null
+            : { meter: data.closingMeter, tripNo: data.tripNo, tripDate: data.tripDate }
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setLatestMeter(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [form.vehicleId, tripId]);
 
   const driverOptions = useMemo(
     () => employeeOptions.filter((employee) => employee.department === "Driver"),
@@ -657,18 +707,17 @@ function StepStart({
   }, [patchForm]);
 
   const fieldInvalid = useMemo(() => {
-    if (!showErrors) {
-      return {
-        vehicle: false,
-        supervisor: false,
-        driver: false,
-        openingMeter: false,
-        advance: false,
-        helpers: false,
-        loaders: false,
-      };
-    }
     const patch = formToTripPatch(form);
+    const meterValue = Number(form.openingMeterText);
+    const meterNumericBad =
+      form.openingMeterText.trim() !== "" && (!Number.isFinite(meterValue) || meterValue < 0);
+    // Field-level live rule: the opening reading must be strictly greater than
+    // the vehicle's latest recorded reading (equal is invalid).
+    const meterBelowLatest =
+      form.openingMeterText.trim() !== "" &&
+      latestMeter != null &&
+      Number.isFinite(meterValue) &&
+      meterValue <= latestMeter.meter;
     return {
       vehicle: !patch.vehicleId || !patch.vehicleNo,
       supervisor: !patch.supervisorId || !patch.supervisorName,
@@ -676,15 +725,34 @@ function StepStart({
       // KM / Advance are OPTIONAL — an empty value is valid (saved as NULL).
       // Only a non-empty value that is not a valid non-negative number is flagged.
       openingMeter:
-        form.openingMeterText.trim() !== "" &&
-        (!Number.isFinite(Number(form.openingMeterText)) || Number(form.openingMeterText) < 0),
+        (showErrors && meterNumericBad) || meterBelowLatest,
       advance:
+        showErrors &&
         form.advanceText.trim() !== "" &&
         (!Number.isFinite(Number(form.advanceText)) || Number(form.advanceText) < 0),
       helpers: !patch.helpers || patch.helpers.length === 0,
       loaders: !patch.loaders || patch.loaders.length === 0,
     };
-  }, [form, showErrors]);
+  }, [form, showErrors, latestMeter]);
+
+  const openingMeterError = useMemo(() => {
+    const meterValue = Number(form.openingMeterText);
+    const meterNumericBad =
+      form.openingMeterText.trim() !== "" && (!Number.isFinite(meterValue) || meterValue < 0);
+    if (showErrors && meterNumericBad) {
+      return "Enter a valid non-negative meter reading.";
+    }
+    if (
+      form.openingMeterText.trim() !== "" &&
+      latestMeter != null &&
+      Number.isFinite(meterValue) &&
+      meterValue <= latestMeter.meter
+    ) {
+      const ref = latestMeter.tripNo ? ` (from ${latestMeter.tripNo})` : "";
+      return `Reading must be greater than the vehicle's latest recorded reading of ${latestMeter.meter} KM${ref}.`;
+    }
+    return null;
+  }, [form.openingMeterText, latestMeter, showErrors]);
 
   const handleFormKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "Enter") return;
@@ -702,6 +770,16 @@ function StepStart({
       setIsLocalEditing(false);
     }
   }, [startStepSubmitted, clearForm, editable, onCancel]);
+
+  const handleCloseStep = useCallback(() => {
+    if (clearForm) {
+      clearForm();
+    } else if (onCancel) {
+      onCancel();
+    } else {
+      setIsLocalEditing(false);
+    }
+  }, [clearForm, onCancel]);
 
   const inputsLocked = headerLoading || isSubmitting;
   const submitLabel = startStepSubmitted
@@ -755,6 +833,15 @@ function StepStart({
             <h2 className="text-base font-bold text-slate-800 tracking-tight">{TRIP_STEP_DEFINITIONS[0].title.toUpperCase()}</h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleCloseStep}
+              className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
+              title="Close Trip"
+              aria-label="Close Trip"
+            >
+              <X size={14} />
+            </button>
             {canEdit && (
               <button
                 type="button"
@@ -865,6 +952,15 @@ function StepStart({
             <h2 className="text-base font-bold text-slate-800 tracking-tight">{TRIP_STEP_DEFINITIONS[0].title.toUpperCase()}</h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleCloseStep}
+              className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
+              title="Close Trip"
+              aria-label="Close Trip"
+            >
+              <X size={14} />
+            </button>
             {((editable && startStepSubmitted) || isLocalEditing) && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
                 {tripNo ? `Editing Trip ${tripNo}` : "Editable View"}
@@ -900,6 +996,7 @@ function StepStart({
             value={form.openingMeterText}
             disabled={inputsLocked}
             invalid={fieldInvalid.openingMeter}
+            error={openingMeterError}
             onChange={handleOpeningMeterChange}
           />
           <AdvanceField

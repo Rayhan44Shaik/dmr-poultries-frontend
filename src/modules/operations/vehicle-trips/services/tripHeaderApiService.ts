@@ -29,6 +29,10 @@ export type LastClosingMeter = {
   closingMeter: number;
   tripNo: string;
   tripDate: string;
+  /** Ledger event source (TRIP_START | TRIP_END | FUEL_EXPENSE | MAINTENANCE). */
+  source?: string;
+  /** Ledger event record id — the trip id for TRIP_START/TRIP_END events. */
+  ref?: string | number | null;
 };
 
 function num(value: unknown, fallback = 0): number {
