@@ -34,6 +34,7 @@ export type TripViewShopCardsProps = {
   bulkProgress: { sent: number; total: number } | null;
   shopEmailFor: (delivery: ShopDelivery) => string;
   failureReasonFor: (deliveryId: number) => string | null;
+  sendCountFor?: (deliveryId: number) => number;
   onSendOne: (delivery: ShopDelivery) => void;
   onDownloadPdf: (delivery: ShopDelivery) => void;
   /** Live email counts (real runtime values). */
@@ -44,10 +45,12 @@ function StatusBadge({
   status,
   sending,
   label,
+  sendCount = 0,
 }: {
   status: DeliveryEmailStatusValue;
   sending: boolean;
   label: string;
+  sendCount?: number;
 }) {
   const tone =
     status === "sent"
@@ -66,6 +69,9 @@ function StatusBadge({
       {status === "failed" && <XCircle size={11} />}
       {status === "pending" && !sending && <Clock size={11} />}
       {label}
+      {status === "sent" && sendCount > 1 && (
+        <span className="ml-0.5 font-bold">· {sendCount} times</span>
+      )}
     </span>
   );
 }
@@ -123,6 +129,7 @@ export function TripViewShopCards({
   isBulkSending,
   shopEmailFor,
   failureReasonFor,
+  sendCountFor,
   onSendOne,
   onDownloadPdf,
   emailCounts,
@@ -204,6 +211,7 @@ export function TripViewShopCards({
             const mortalityCount = delivery.mortality ?? 0;
             const mortKg = delivery.mortKg ?? 0;
             const failedReason = status === "failed" ? failureReasonFor(delivery.id) : null;
+            const sendCount = sendCountFor ? sendCountFor(delivery.id) : 0;
 
             return (
               <div
@@ -326,11 +334,14 @@ export function TripViewShopCards({
                     <StatusBadge
                       status={status}
                       sending={sending}
+                      sendCount={sendCount}
                       label={
                         sending
                           ? "Sending..."
                           : status === "sent"
-                            ? "Mail Sent"
+                            ? sendCount > 1
+                              ? `Mail Sent · ${sendCount} times`
+                              : "Mail Sent"
                             : status === "failed"
                               ? "Mail Failed"
                               : "Pending"

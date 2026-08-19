@@ -15,6 +15,10 @@ export type DeliveryEmailRow = {
   recipient: string | null;
   sentAt: string | null;
   failureReason: string | null;
+  /** Successful sends, persisted by the backend (survives refresh). */
+  sendCount: number;
+  /** Total send attempts (success + failure), persisted by the backend. */
+  attemptCount: number;
 };
 
 function blobToBase64(blob: Blob): Promise<string> {

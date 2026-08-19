@@ -111,6 +111,14 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
     [localErrors, rows]
   );
 
+  const sendCountFor = useCallback(
+    (deliveryId: number): number => {
+      const row = rows.find((r) => r.deliveryId === deliveryId);
+      return row?.sendCount ?? 0;
+    },
+    [rows]
+  );
+
   const counts: EmailCounts = useMemo(() => {
     const deliveries = trip?.deliveries ?? [];
     const total = deliveries.length;
@@ -258,6 +266,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
     effectiveStatus,
     shopEmailFor,
     failureReasonFor,
+    sendCountFor,
     sendOne,
     sendAll,
     refresh,
