@@ -482,6 +482,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           canEdit={canEditTrip}
           onCancel={clearForm}
           clearForm={clearForm}
+          persistedRows={savedTrip.deliveries || []}
         />
       );
     }
@@ -554,7 +555,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
             )}
 
             <div className="mt-6">{renderSelectedStep()}</div>
-            {isStartCompleted && <TripFinalKPI trip={trip} deliveries={rows} />}
+            <TripFinalKPI trip={savedTrip} deliveries={savedTrip.deliveries || []} />
             <DeliveryEmailPanel trip={trip} shops={shops} />
           </>
         )}

@@ -827,7 +827,7 @@ function SupervisorTripWorkspace({ supervisor }: { supervisor: MobileSupervisorP
               </nav>
             </section>
 
-            {startCompleted && <TripFinalKPI trip={trip} deliveries={rows} />}
+            <TripFinalKPI trip={savedTrip} deliveries={savedTrip.deliveries || []} />
           </div>
         )}
       </div>

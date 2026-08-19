@@ -428,7 +428,45 @@ function validateWizardStepPayload(
   if (step === "deliveries") {
     const deliveries = Array.isArray(body.deliveries) ? body.deliveries : [];
     if (!deliveries.length) {
-      throw new AppError(400, "At least one delivery is required");
+      throw new AppError(422, "At least one delivery is required");
+    }
+    for (const [index, delivery] of deliveries.entries()) {
+      const prefix = deliveries.length > 1 ? `Delivery ${index + 1}: ` : "";
+      const shopId = Number(delivery.shopId);
+      const birdTypeId = Number(delivery.birdTypeId);
+      const birds = Number(delivery.birds);
+      const weight = Number(delivery.weight);
+      const mortality = Number(delivery.mortality ?? 0);
+      const rawMortKg = delivery.mortKg as unknown;
+      const mortKg = rawMortKg == null || rawMortKg === "" ? 0 : Number(rawMortKg);
+      if (!Number.isFinite(shopId) || shopId <= 0 || !str(delivery.shopName)) {
+        throw new AppError(422, `${prefix}Shop is required.`);
+      }
+      if (!Number.isFinite(birdTypeId) || birdTypeId <= 0 || !str(delivery.birdType)) {
+        throw new AppError(422, `${prefix}Bird Type is required.`);
+      }
+      if (!Number.isFinite(birds)) {
+        throw new AppError(422, `${prefix}Birds must be a valid number.`);
+      }
+      if (!Number.isFinite(weight)) {
+        throw new AppError(422, `${prefix}Weight must be a valid number.`);
+      }
+      if (!Number.isFinite(mortality) || mortality < 0) {
+        throw new AppError(422, `${prefix}Mortality must be a valid number.`);
+      }
+      if (!Number.isFinite(mortKg) || mortKg < 0) {
+        throw new AppError(422, `${prefix}Mortality weight must be a valid number.`);
+      }
+      for (const boxNo of delivery.selectedBoxIds ?? []) {
+        if (!Number.isFinite(Number(boxNo))) {
+          throw new AppError(422, `${prefix}Box numbers must be valid numbers.`);
+        }
+      }
+      for (const pb of delivery.perBoxData ?? []) {
+        if (!Number.isFinite(Number(pb.boxNo)) || !Number.isFinite(Number(pb.birds)) || !Number.isFinite(Number(pb.weight))) {
+          throw new AppError(422, `${prefix}Per-box birds and weight must be valid numbers.`);
+        }
+      }
     }
     return;
   }
@@ -735,7 +773,7 @@ export const tripsService = {
       expenses: {
         expensesStepSubmitted: true,
         endStepSubmitted: true,
-        status: (body.status as TripStatus) ?? "Completed",
+        status: (body.status as TripStatus) ?? "Pending",
         submittedAt: body.submittedAt ?? new Date().toISOString(),
       },
     };

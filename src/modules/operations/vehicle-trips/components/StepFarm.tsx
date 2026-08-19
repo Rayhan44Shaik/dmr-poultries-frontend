@@ -221,6 +221,9 @@ export default function StepFarm({
   };
 
   if (trip.farmStepSubmitted && !editable) {
+    const gpsLabel = hasGps
+      ? `${Number(trip.farmGpsLat).toFixed(6)}, ${Number(trip.farmGpsLon).toFixed(6)}`
+      : "Not captured";
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
@@ -236,7 +239,69 @@ export default function StepFarm({
             Submitted & Locked
           </span>
         </div>
-        <p className="text-xs text-slate-600">Use Edit on Recent Trips to update Farm Details.</p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Store size={12} className="text-slate-500" /> Farm
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{trip.sourceFarm || "--"}</span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-2">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <MapPin size={12} className="text-slate-500" /> Destination / Address
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{trip.farmAddress?.trim() || "--"}</span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Clock size={12} className="text-slate-500" /> Arrival Time
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{trip.reachedTime || "--"}</span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Gauge size={12} className="text-purple-500" /> Farm Meter
+            </span>
+            <span className="text-xs font-bold text-slate-800">
+              {trip.destMeter ? `${trip.destMeter} KM` : "Not entered"}
+            </span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Ticket size={12} className="text-violet-500" /> Pickup Tolls
+            </span>
+            <span className="text-xs font-bold text-slate-800">
+              {trip.pickupTolls == null ? "Not entered" : trip.pickupTolls}
+            </span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Scale size={12} className="text-amber-500" /> Avg Bird Weight
+            </span>
+            <span className="text-xs font-bold text-slate-800">
+              {trip.avgBirdWeight ? `${trip.avgBirdWeight} kg` : "Not entered"}
+            </span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <MapPin size={12} className="text-emerald-500" /> GPS
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{gpsLabel}</span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-2">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <MessageSquare size={12} className="text-slate-500" /> Remarks
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{trip.remarks?.trim() || "--"}</span>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-center justify-between">
+          <p className="text-xs text-slate-600 font-normal">
+            Farm details submitted successfully. Use Edit on Recent Trips to update Farm Details.
+          </p>
+        </div>
       </div>
     );
   }

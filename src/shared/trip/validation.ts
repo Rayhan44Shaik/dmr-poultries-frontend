@@ -125,6 +125,24 @@ export function validateDeliveriesStep(
   if (required("deliveries") && !rows.length) {
     return result(["Please add at least one shop delivery."]);
   }
+  for (const [index, row] of rows.entries()) {
+    const prefix = rows.length > 1 ? `Delivery ${index + 1}: ` : "";
+    if (!row.shopId) {
+      return result([`${prefix}Shop is required.`]);
+    }
+    if (!row.birdTypeId || !String(row.birdType || "").trim()) {
+      return result([`${prefix}Bird Type is required.`]);
+    }
+    if (!Number.isFinite(Number(row.birds))) {
+      return result([`${prefix}Birds must be a valid number.`]);
+    }
+    if (!Number.isFinite(Number(row.weight))) {
+      return result([`${prefix}Weight must be a valid number.`]);
+    }
+    if (row.mortality != null && !Number.isFinite(Number(row.mortality))) {
+      return result([`${prefix}Mortality must be a valid number.`]);
+    }
+  }
   const pickupBirds = Number(trip.totalBirds || 0);
   const pickupWeight = Number(trip.dcWeight || 0);
   const totalMortalityCount = rows.reduce((sum, row) => sum + Number(row.mortality || 0), 0);

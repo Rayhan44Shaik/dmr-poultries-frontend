@@ -421,7 +421,11 @@ export default function UnLoadingTable({
               if (showForm) closeForm();
               // Do not call onClose — parent advances to Step 5 with the same trip.
             } else {
-              setToast({ message: "Unable to submit delivery details. Please try again.", type: "error" });
+              setHasBeenSubmitted(false);
+              setToast({
+                message: "Unable to submit delivery details. Please correct the validation errors and try again.",
+                type: "error",
+              });
             }
           })();
         },
@@ -443,6 +447,11 @@ export default function UnLoadingTable({
               setHasBeenSubmitted(true);
               setToast({ message: "Delivery details submitted successfully.", type: "success" });
               if (showForm) closeForm();
+            } else {
+              setToast({
+                message: "Unable to submit delivery details. Please correct the validation errors and try again.",
+                type: "error",
+              });
             }
           })();
         },
@@ -585,6 +594,10 @@ export default function UnLoadingTable({
       setToast({ message: "Please select a Shop.", type: "warning" });
       return;
     }
+    if (!formData.birdTypeId || !String(formData.birdType || "").trim()) {
+      setToast({ message: "Bird Type is required.", type: "warning" });
+      return;
+    }
 
     let finalBirds = formData.birds;
     let finalWeight = formData.weight;
@@ -619,6 +632,11 @@ export default function UnLoadingTable({
       finalWeight = totalWeight;
       mortKgVal = formData.mortWeight;
       perBoxData = formData.perBoxData.map((item) => ({ ...item }));
+    }
+
+    if (!Number.isFinite(finalBirds) || !Number.isFinite(finalWeight) || !Number.isFinite(mortKgVal)) {
+      setToast({ message: "Weight must be a valid number.", type: "warning" });
+      return;
     }
 
     const maxSerial = safeRows.reduce((max: number, r: ShopDelivery) => Math.max(max, r.serialNo || 0), 0);
@@ -700,8 +718,11 @@ export default function UnLoadingTable({
     if (mode === "box") {
       return (
         formData.shopId > 0 &&
+        formData.birdTypeId > 0 &&
+        String(formData.birdType || "").trim() !== "" &&
         formData.selectedBoxIds.length > 0 &&
         farmBirds > 0 &&
+        Number.isFinite(formData.mortality) &&
         formData.mortality >= 0 &&
         formData.mortality <= farmBirds &&
         !validationErrors.birdsExceed
@@ -715,8 +736,12 @@ export default function UnLoadingTable({
         !validationErrors.perBoxWeightErrors.some((err: boolean) => err);
       return (
         formData.shopId > 0 &&
+        formData.birdTypeId > 0 &&
+        String(formData.birdType || "").trim() !== "" &&
         formData.selectedBoxIds.length > 0 &&
         allBoxesFilled &&
+        Number.isFinite(formData.mortality) &&
+        Number.isFinite(formData.mortWeight) &&
         formData.mortality >= 0 &&
         formData.mortWeight >= 0 &&
         !validationErrors.birdsExceed &&
@@ -730,15 +755,17 @@ export default function UnLoadingTable({
 
   // ─── Top KPI Calculations ────────────────────────────────────
   const topKpiTotals = useMemo(() => {
-    const totalShops = safeRows.length;
-    const totalBirds = safeRows.reduce((acc, r) => acc + (r.birds || 0), 0);
-    const totalWeight = safeRows.reduce((acc, r) => acc + (r.weight || 0), 0);
-    const totalMortality = safeRows.reduce((acc, r) => acc + (r.mortality || 0), 0);
-    const totalMortKg = safeRows.reduce((acc, r) => {
+    const kpiRows = hasBeenSubmitted ? (persistedRows ?? []) : [];
+    const totalShops = kpiRows.length;
+    const totalBirds = kpiRows.reduce((acc, r) => acc + (Number.isFinite(Number(r.birds)) ? Number(r.birds) : 0), 0);
+    const totalWeight = kpiRows.reduce((acc, r) => acc + (Number.isFinite(Number(r.weight)) ? Number(r.weight) : 0), 0);
+    const totalMortality = kpiRows.reduce((acc, r) => acc + (Number.isFinite(Number(r.mortality)) ? Number(r.mortality) : 0), 0);
+    const totalMortKg = kpiRows.reduce((acc, r) => {
       const extra = r as any;
-      return acc + (extra.mortKg || 0);
+      const value = Number(extra.mortKg || 0);
+      return acc + (Number.isFinite(value) ? value : 0);
     }, 0);
-    const latestCaptured = safeRows.reduce((latest, r) => {
+    const latestCaptured = kpiRows.reduce((latest, r) => {
       const extra = r as any;
       return extra.autoCaptureTime || latest;
     }, "");
@@ -748,9 +775,10 @@ export default function UnLoadingTable({
       weight: totalWeight,
       mortality: totalMortality,
       mortKg: totalMortKg,
-      lastCaptureTime: latestCaptured || new Date().toLocaleString(),
+      lastCaptureTime: latestCaptured,
+      submitted: hasBeenSubmitted,
     };
-  }, [safeRows]);
+  }, [hasBeenSubmitted, persistedRows]);
 
   // ─── Filtered Search & Pagination ──────────────────────────────
   const displayRows = useMemo<ShopDelivery[]>(() => {
@@ -897,38 +925,42 @@ export default function UnLoadingTable({
             <Clock size={13} className="text-emerald-600" /> Captured Time
           </span>
           <span className="text-xs font-bold text-slate-800 mt-1 truncate" title={topKpiTotals.lastCaptureTime}>
-            {topKpiTotals.lastCaptureTime}
+            {topKpiTotals.submitted && topKpiTotals.lastCaptureTime ? topKpiTotals.lastCaptureTime : "—"}
           </span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
             <Building2 size={13} className="text-slate-400" /> Shops
           </span>
-          <span className="text-base font-bold text-slate-800">{topKpiTotals.shops}</span>
+          <span className="text-base font-bold text-slate-800">{topKpiTotals.submitted ? topKpiTotals.shops : "—"}</span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
             <Users size={13} className="text-emerald-600" /> Birds
           </span>
-          <span className="text-base font-bold text-slate-800">{topKpiTotals.birds}</span>
+          <span className="text-base font-bold text-slate-800">{topKpiTotals.submitted ? topKpiTotals.birds : "—"}</span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
             <Scale size={13} className="text-emerald-600" /> Weight (kg)
           </span>
-          <span className="text-base font-bold text-slate-800">{topKpiTotals.weight.toFixed(2)}</span>
+          <span className="text-base font-bold text-slate-800">
+            {topKpiTotals.submitted && Number.isFinite(topKpiTotals.weight) ? topKpiTotals.weight.toFixed(2) : "—"}
+          </span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
             <AlertCircle size={13} className="text-rose-500" /> Mor
           </span>
-          <span className="text-base font-bold text-slate-800">{topKpiTotals.mortality}</span>
+          <span className="text-base font-bold text-slate-800">{topKpiTotals.submitted ? topKpiTotals.mortality : "—"}</span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
             <Scale size={13} className="text-rose-500" /> Mor (kg)
           </span>
-          <span className="text-base font-bold text-slate-800">{topKpiTotals.mortKg.toFixed(2)}</span>
+          <span className="text-base font-bold text-slate-800">
+            {topKpiTotals.submitted && Number.isFinite(topKpiTotals.mortKg) ? topKpiTotals.mortKg.toFixed(2) : "—"}
+          </span>
         </div>
       </div>
 

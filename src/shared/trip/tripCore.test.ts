@@ -123,6 +123,14 @@ test("pickup and delivery calculations are shared and deterministic", () => {
     },
   ];
   assert.equal(validateDeliveriesStep(trip, deliveries).valid, true);
+  assert.equal(
+    validateDeliveriesStep(trip, [{ ...deliveries[0], birdTypeId: 0, birdType: "" }]).valid,
+    false
+  );
+  assert.equal(
+    validateDeliveriesStep(trip, [{ ...deliveries[0], birdTypeId: 0, birdType: "" }]).errors[0],
+    "Bird Type is required."
+  );
   const calculated = applyDeliveryMetrics(trip, deliveries);
   assert.equal(calculated.totalBirdsDelivered, 77);
   assert.equal(calculated.totalMortalityCount, 1);

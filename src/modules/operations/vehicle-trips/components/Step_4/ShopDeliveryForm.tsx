@@ -49,6 +49,7 @@ export interface Props {
   shopOptions: any[];
   birdOptions: any[];
   isFormValid: boolean;
+  birdTypeError?: string;
 
   rows?: ShopDelivery[];
   setRows?: React.Dispatch<React.SetStateAction<ShopDelivery[]>>;
@@ -85,6 +86,7 @@ export default function ShopDeliveryForm({
   shopOptions,
   birdOptions,
   isFormValid,
+  birdTypeError,
 }: Props) {
   const selectedBoxIds: number[] = formData.selectedBoxIds || [];
 
@@ -240,9 +242,13 @@ export default function ShopDeliveryForm({
             maxMenuHeight={150}
             styles={customSelectStyles}
           />
-          <span className="text-[10px] text-slate-400 mt-0.5 block">
-            {birdOptions.length} bird type(s) available
-          </span>
+          {birdTypeError ? (
+            <span className="text-[10px] text-rose-600 mt-0.5 block">{birdTypeError}</span>
+          ) : (
+            <span className="text-[10px] text-slate-400 mt-0.5 block">
+              {birdOptions.length} bird type(s) available
+            </span>
+          )}
         </div>
 
         {/* Box Selector Container */}
@@ -303,7 +309,14 @@ export default function ShopDeliveryForm({
               <input
                 type="number"
                 value={formData.mortality || ""}
-                onChange={(e) => handleFormChange("mortality", Number(e.target.value))}
+                onChange={(e) => {
+                  if (e.target.value === "") {
+                    handleFormChange("mortality", 0);
+                    return;
+                  }
+                  const parsed = Number(e.target.value);
+                  if (Number.isFinite(parsed)) handleFormChange("mortality", parsed);
+                }}
                 placeholder="0"
                 min="0"
                 className={`w-full rounded-lg border px-3 text-xs font-medium outline-none transition-all h-[38px] ${
@@ -416,9 +429,14 @@ export default function ShopDeliveryForm({
                         <input
                           type="number"
                           value={item.birds || ""}
-                          onChange={(e) =>
-                            handlePerBoxChange(index, "birds", Number(e.target.value))
-                          }
+                          onChange={(e) => {
+                            if (e.target.value === "") {
+                              handlePerBoxChange(index, "birds", 0);
+                              return;
+                            }
+                            const parsed = Number(e.target.value);
+                            if (Number.isFinite(parsed)) handlePerBoxChange(index, "birds", parsed);
+                          }}
                           placeholder="0"
                           min="0"
                           className={`w-20 rounded border px-2 py-1 text-xs outline-none ${
@@ -434,9 +452,14 @@ export default function ShopDeliveryForm({
                           type="number"
                           step="0.01"
                           value={item.weight || ""}
-                          onChange={(e) =>
-                            handlePerBoxChange(index, "weight", Number(e.target.value))
-                          }
+                          onChange={(e) => {
+                            if (e.target.value === "") {
+                              handlePerBoxChange(index, "weight", 0);
+                              return;
+                            }
+                            const parsed = Number(e.target.value);
+                            if (Number.isFinite(parsed)) handlePerBoxChange(index, "weight", parsed);
+                          }}
                           placeholder="0.00"
                           min="0"
                           className={`w-24 rounded border px-2 py-1 text-xs outline-none ${
@@ -461,7 +484,14 @@ export default function ShopDeliveryForm({
               <input
                 type="number"
                 value={formData.mortality || ""}
-                onChange={(e) => handleFormChange("mortality", Number(e.target.value))}
+                onChange={(e) => {
+                  if (e.target.value === "") {
+                    handleFormChange("mortality", 0);
+                    return;
+                  }
+                  const parsed = Number(e.target.value);
+                  if (Number.isFinite(parsed)) handleFormChange("mortality", parsed);
+                }}
                 placeholder="0"
                 min="0"
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs outline-none focus:border-blue-500 h-[38px]"
@@ -475,7 +505,14 @@ export default function ShopDeliveryForm({
                 type="number"
                 step="0.01"
                 value={formData.mortWeight || ""}
-                onChange={(e) => handleFormChange("mortWeight", Number(e.target.value))}
+                onChange={(e) => {
+                  if (e.target.value === "") {
+                    handleFormChange("mortWeight", 0);
+                    return;
+                  }
+                  const parsed = Number(e.target.value);
+                  if (Number.isFinite(parsed)) handleFormChange("mortWeight", parsed);
+                }}
                 placeholder="0.00"
                 min="0"
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs outline-none focus:border-blue-500 h-[38px]"

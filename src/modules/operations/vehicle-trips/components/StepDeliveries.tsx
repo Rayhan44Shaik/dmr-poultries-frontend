@@ -26,6 +26,7 @@ interface Props {
   canEdit?: boolean;
   onCancel?: () => void;
   boxDetails?: BoxDetail[];
+  persistedRows?: ShopDelivery[];
 }
 
 export default function StepDeliveries({
@@ -43,6 +44,7 @@ export default function StepDeliveries({
   canEdit = true,
   onCancel: _onCancel,
   boxDetails = [],
+  persistedRows,
 }: Props) {
   // Toggle view mode: 'shops' | 'analysis'
   const [viewMode, setViewMode] = useState<"shops" | "analysis">("shops");
@@ -197,7 +199,7 @@ export default function StepDeliveries({
           saveDeliveries={saveDeliveriesProgress ? async () => saveDeliveriesProgress(rows) : undefined}
           submitDeliveries={handleLockDeliveries}
           onClose={handleCancelWizard}
-          persistedRows={trip.deliveries || []}
+          persistedRows={persistedRows ?? (trip.deliveries || [])}
         />
       ) : (
         <BoxWeightAnalysis

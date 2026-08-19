@@ -1,12 +1,12 @@
 import { useState, useRef, useCallback, type Dispatch, type SetStateAction } from "react";
 import type { Trip, ShopDelivery, BoxDetail, TripStatus } from "../../../../shared/trip/types";
 import {
-  handleApiError,
+  formatWizardApiError,
   loadTripById,
-  saveTripDeliveries,
   saveTripStepProgress,
   submitStep1,
   submitTripStep,
+  validateStep4Deliveries,
 } from "../services/tripHeaderApiService";
 import {
   applyDeliveryMetrics,
@@ -15,6 +15,7 @@ import {
   validateStartStep,
   validateFarmStep,
   validatePickupStep,
+  validateDeliveriesStep,
   validateEndStep,
   validateFinalTrip,
 } from "../../../../shared/trip";
@@ -118,7 +119,7 @@ export function useTripEntry(
       onTripIdAssignedRef.current?.(loaded.id);
       return true;
     } catch (error) {
-      notifyRef.current?.(handleApiError(error), "error");
+      notifyRef.current?.(formatWizardApiError(error), "error");
       return false;
     } finally {
       setHeaderLoading(false);
@@ -155,7 +156,7 @@ export function useTripEntry(
       onStep1SuccessRef.current?.(submitted);
       return true;
     } catch (error) {
-      notifyRef.current?.(handleApiError(error), "error");
+      notifyRef.current?.(formatWizardApiError(error), "error");
       return false;
     } finally {
       setHeaderLoading(false);
@@ -187,7 +188,7 @@ export function useTripEntry(
       applySavedTrip(submitted);
       return true;
     } catch (error) {
-      notifyRef.current?.(handleApiError(error), "error");
+      notifyRef.current?.(formatWizardApiError(error), "error");
       return false;
     } finally {
       setHeaderLoading(false);
@@ -227,7 +228,7 @@ export function useTripEntry(
       }
       return true;
     } catch (error) {
-      notifyRef.current?.(handleApiError(error), "error");
+      notifyRef.current?.(formatWizardApiError(error), "error");
       return false;
     } finally {
       setHeaderLoading(false);
@@ -269,7 +270,7 @@ export function useTripEntry(
       return true;
     } catch (error) {
       if (step === "farm" || step === "pickup") {
-        notifyRef.current?.(handleApiError(error), "error");
+        notifyRef.current?.(formatWizardApiError(error), "error");
       } else {
         console.error(`Unable to save ${label.toLowerCase()} details:`, error);
       }
@@ -295,13 +296,18 @@ export function useTripEntry(
       ...row,
       clientKey: row.clientKey || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `ck-${row.id}`),
     }));
+    const deliveryErrors = validateStep4Deliveries(withKeys);
+    if (deliveryErrors.length) {
+      notifyRef.current?.(deliveryErrors[0], "error");
+      return false;
+    }
     setHeaderLoading(true);
     try {
-      const saved = await saveTripDeliveries(current.id, { ...current, deliveries: withKeys });
+      const saved = await saveTripStepProgress(current.id, "deliveries", { ...current, deliveries: withKeys });
       applySavedTrip(saved);
       return true;
     } catch (error) {
-      notifyRef.current?.(handleApiError(error), "error");
+      notifyRef.current?.(formatWizardApiError(error), "error");
       return false;
     } finally {
       setHeaderLoading(false);
@@ -353,7 +359,7 @@ export function useTripEntry(
       }
       return true;
     } catch (error) {
-      notifyRef.current?.(handleApiError(error), "error");
+      notifyRef.current?.(formatWizardApiError(error), "error");
       return false;
     } finally {
       setHeaderLoading(false);
@@ -371,6 +377,16 @@ export function useTripEntry(
       notifyRef.current?.("Please add at least one shop delivery before proceeding.", "error");
       return false;
     }
+    const fieldErrors = validateStep4Deliveries(current.deliveries);
+    if (fieldErrors.length) {
+      notifyRef.current?.(fieldErrors[0], "error");
+      return false;
+    }
+    const balance = validateDeliveriesStep(current, current.deliveries);
+    if (!balance.valid) {
+      notifyRef.current?.(balance.errors[0], "error");
+      return false;
+    }
 
     setHeaderLoading(true);
     try {
@@ -381,7 +397,7 @@ export function useTripEntry(
       }
       return true;
     } catch (error) {
-      notifyRef.current?.(handleApiError(error), "error");
+      notifyRef.current?.(formatWizardApiError(error), "error");
       return false;
     } finally {
       setHeaderLoading(false);

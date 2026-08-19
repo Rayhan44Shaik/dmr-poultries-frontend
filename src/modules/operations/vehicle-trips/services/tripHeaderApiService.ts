@@ -12,6 +12,7 @@ import {
   apiPatch,
   apiDelete,
   handleApiError,
+  toApiError,
 } from "../../../../api";
 import {
   createEmptyTrip,
@@ -68,13 +69,61 @@ export function formatStartTimeForDisplay(value: unknown): string {
   return raw;
 }
 
+function finiteNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function mapBoxIdList(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((id) => finiteNumber(id))
+    .filter((id): id is number => id != null);
+}
+
+function mapPerBoxData(value: unknown): NonNullable<Trip["deliveries"][number]["perBoxData"]> {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    const row = item as { boxNo?: unknown; birds?: unknown; weight?: unknown };
+    const boxNo = finiteNumber(row.boxNo);
+    const birds = finiteNumber(row.birds);
+    const weight = finiteNumber(row.weight);
+    if (boxNo == null || birds == null || weight == null) return [];
+    return [{ boxNo, birds, weight }];
+  });
+}
+
 function mapDeliveriesForDisplay(value: unknown, fallback: Trip["deliveries"]): Trip["deliveries"] {
   if (!Array.isArray(value)) return fallback;
-  return value.map((row) => ({
-    ...(row as Trip["deliveries"][number]),
-    autoCaptureTime: formatStartTimeForDisplay((row as { autoCaptureTime?: unknown }).autoCaptureTime)
-      || (row as { autoCaptureTime?: string }).autoCaptureTime,
-  }));
+  return value.map((raw) => {
+    const row = raw as Trip["deliveries"][number];
+    const selectedBoxIds = mapBoxIdList(row.selectedBoxIds);
+    const perBoxData = mapPerBoxData(row.perBoxData);
+    const derivedBoxIds = selectedBoxIds.length
+      ? selectedBoxIds
+      : perBoxData.map((item) => item.boxNo);
+    const boxCount = derivedBoxIds.length || finiteNumber(row.boxNo);
+    return {
+      ...row,
+      shopId: finiteNumber(row.shopId) ?? row.shopId,
+      birdTypeId: finiteNumber(row.birdTypeId) ?? row.birdTypeId,
+      birdType: row.birdType || "",
+      birds: finiteNumber(row.birds) ?? 0,
+      weight: finiteNumber(row.weight) ?? 0,
+      mortality: finiteNumber(row.mortality) ?? 0,
+      mortKg: finiteNumber(row.mortKg),
+      rate: row.rate == null ? null : finiteNumber(row.rate) ?? null,
+      amount: finiteNumber(row.amount) ?? 0,
+      selectedBoxIds: derivedBoxIds,
+      perBoxData,
+      boxNo: boxCount ?? 0,
+      farmBirds: finiteNumber(row.farmBirds),
+      farmWeight: finiteNumber(row.farmWeight),
+      autoCaptureTime: formatStartTimeForDisplay((row as { autoCaptureTime?: unknown }).autoCaptureTime)
+        || (row as { autoCaptureTime?: string }).autoCaptureTime,
+    };
+  });
 }
 
 function mapDieselEntriesForDisplay(
@@ -364,27 +413,116 @@ export async function deleteTripDiesel(tripId: number, entryId: number): Promise
   return mapApiTripToTrip(data);
 }
 
+export function validateStep4Deliveries(rows: Trip["deliveries"]): string[] {
+  const errors: string[] = [];
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return ["Please add at least one shop delivery."];
+  }
+  rows.forEach((d, index) => {
+    const prefix = rows.length > 1 ? `Delivery ${index + 1}: ` : "";
+    if (!finiteNumber(d.shopId)) errors.push(`${prefix}Shop is required.`);
+    if (!finiteNumber(d.birdTypeId) || !String(d.birdType || "").trim()) {
+      errors.push(`${prefix}Bird Type is required.`);
+    }
+    if (finiteNumber(d.birds) == null) errors.push(`${prefix}Birds must be a valid number.`);
+    if (finiteNumber(d.weight) == null) errors.push(`${prefix}Weight must be a valid number.`);
+    if (d.mortality != null && finiteNumber(d.mortality) == null) {
+      errors.push(`${prefix}Mortality must be a valid number.`);
+    }
+    if (d.mortKg != null && finiteNumber(d.mortKg) == null) {
+      errors.push(`${prefix}Mortality weight must be a valid number.`);
+    }
+    const boxes = mapBoxIdList(d.selectedBoxIds);
+    const perBox = mapPerBoxData(d.perBoxData);
+    if (!boxes.length && !perBox.length && !finiteNumber(d.boxNo)) {
+      errors.push(`${prefix}Box information is required.`);
+    }
+  });
+  return errors;
+}
+
 export function toStep4Payload(trip: Partial<Trip> & { deliveries?: Trip["deliveries"] }): Record<string, unknown> {
   const rows = Array.isArray(trip.deliveries) ? trip.deliveries : [];
   return {
-    deliveries: rows.map((d) => ({
-      id: d.id && d.id < 1e12 ? d.id : undefined,
-      clientKey: d.clientKey || undefined,
-      shopId: d.shopId || null,
-      shopName: d.shopName || "",
-      birdTypeId: d.birdTypeId || null,
-      birdType: d.birdType || "",
-      birds: d.birds ?? 0,
-      weight: d.weight ?? 0,
-      mortality: d.mortality ?? 0,
-      mortKg: d.mortKg ?? 0,
-      remarks: d.remarks ?? "",
-      deliveryMode: d.deliveryMode === "weight" ? "weight" : "box",
-      selectedBoxIds: d.selectedBoxIds ?? [],
-      perBoxData: d.perBoxData ?? [],
-      serialNo: d.serialNo,
-    })),
+    deliveries: rows.map((d) => {
+      const selectedBoxIds = mapBoxIdList(d.selectedBoxIds);
+      const perBoxData = mapPerBoxData(d.perBoxData);
+      const birds = finiteNumber(d.birds);
+      const weight = finiteNumber(d.weight);
+      const mortality = finiteNumber(d.mortality) ?? 0;
+      const mortKg = finiteNumber(d.mortKg) ?? 0;
+      const serialNo = finiteNumber(d.serialNo);
+      const boxNo = selectedBoxIds.length || finiteNumber(d.boxNo) || 0;
+      return {
+        id: d.id && d.id < 1e12 && Number.isFinite(Number(d.id)) ? Number(d.id) : undefined,
+        clientKey: d.clientKey || undefined,
+        shopId: finiteNumber(d.shopId) ?? null,
+        shopName: d.shopName || "",
+        birdTypeId: finiteNumber(d.birdTypeId) ?? null,
+        birdType: d.birdType || "",
+        birds,
+        weight,
+        mortality,
+        mortKg,
+        rate: d.rate == null ? null : finiteNumber(d.rate) ?? null,
+        amount: finiteNumber(d.amount) ?? 0,
+        remarks: d.remarks ?? "",
+        deliveryMode: d.deliveryMode === "weight" ? "weight" : "box",
+        selectedBoxIds,
+        perBoxData,
+        serialNo,
+        boxNo,
+        farmBirds: finiteNumber(d.farmBirds) ?? null,
+        farmWeight: finiteNumber(d.farmWeight) ?? null,
+      };
+    }),
   };
+}
+
+function firstValidationMessage(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const data = body as {
+    error?: unknown;
+    message?: unknown;
+    details?: unknown;
+    issues?: unknown;
+    errors?: unknown;
+  };
+  const collect = (value: unknown): string | null => {
+    if (!Array.isArray(value)) return null;
+    for (const item of value) {
+      if (typeof item === "string" && item.trim()) return item.trim();
+      if (item && typeof item === "object" && typeof (item as { message?: unknown }).message === "string") {
+        const message = String((item as { message: string }).message).trim();
+        if (message) return message;
+      }
+    }
+    return null;
+  };
+  return (
+    collect(data.issues) ||
+    collect(data.errors) ||
+    collect((data.details as { issues?: unknown; errors?: unknown } | undefined)?.issues) ||
+    collect((data.details as { issues?: unknown; errors?: unknown } | undefined)?.errors) ||
+    (typeof data.error === "string" && data.error.trim() ? data.error.trim() : null) ||
+    (typeof data.message === "string" && data.message.trim() ? data.message.trim() : null)
+  );
+}
+
+export function formatWizardApiError(error: unknown): string {
+  const apiError = toApiError(error);
+  if (apiError.code === "NETWORK_ERROR") return "Unable to connect. Please try again.";
+  if (apiError.status && apiError.status >= 500) return "Unable to submit. Please try again.";
+  const fromBody = firstValidationMessage(apiError.details);
+  if (fromBody && !/postgres|sql|smtp|\/home\/|stack/i.test(fromBody)) {
+    return fromBody;
+  }
+  if (apiError.status === 422) {
+    return apiError.message && apiError.message !== "The request could not be processed."
+      ? apiError.message
+      : "Please correct the highlighted delivery fields.";
+  }
+  return handleApiError(error);
 }
 
 export async function saveTripDeliveries(tripId: number, trip: Partial<Trip>): Promise<Trip> {
@@ -467,8 +605,21 @@ export async function submitTripStep(
     };
   }
   if (step === "deliveries") {
+    const payload = toStep4Payload(trip);
+    const deliveryErrors = validateStep4Deliveries((trip.deliveries || []) as Trip["deliveries"]);
+    if (deliveryErrors.length) {
+      throw toApiError(new Error(deliveryErrors[0]));
+    }
+    const rows = (payload.deliveries as Array<Record<string, unknown>>) || [];
+    for (const row of rows) {
+      for (const [key, value] of Object.entries(row)) {
+        if (typeof value === "number" && !Number.isFinite(value)) {
+          throw toApiError(new Error(`${key} must be a valid number.`));
+        }
+      }
+    }
     body = {
-      ...toStep4Payload(trip),
+      ...payload,
       mode: "submit",
     };
   }
