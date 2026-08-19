@@ -11,7 +11,7 @@ import {
 import jsPDF from "jspdf";
 import TripPagination from "../TripPagination";
 import { shouldShowPagination } from "../../../../../shared/ui/paginationStyles";
-import { useShopDeliveryForm } from "./useShopDeliveryForm";
+import { useShopDeliveryForm, EMPTY_DELIVERY_FORM } from "./useShopDeliveryForm";
 import ShopDeliveryForm from "./ShopDeliveryForm";
 import ShopDeliveryCard from "./ShopDeliveryCard";
 import { generateShopPDF } from "../../utils/generateShopPDF";
@@ -206,6 +206,7 @@ export default function UnLoadingTable({
 
   // ─── Saving & Toast State ─────────────────────────────────────────
   const [isSaving, setIsSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null);
   const hasUnsavedChanges = JSON.stringify(safeRows) !== JSON.stringify(persistedRows ?? []);
 
@@ -425,7 +426,7 @@ export default function UnLoadingTable({
 
   // ─── Submit / Update Deliveries Handler ──────────────────────────
   const handleSubmitOrUpdateDeliveries = () => {
-    if (readOnly) return;
+    if (readOnly || isSubmitting) return;
 
     // Field-level balance rules block submission BEFORE any confirmation —
     // the inline panel below the table explains exactly what is wrong.
@@ -445,19 +446,25 @@ export default function UnLoadingTable({
         onConfirm: () => {
           setConfirmation((prev) => ({ ...prev, isOpen: false }));
           void (async () => {
-            let success = true;
-            if (submitDeliveries) {
-              success = (await submitDeliveries()) !== false;
-            } else if (updateDeliveries) {
-              updateDeliveries(safeRows);
-            }
-            if (success) {
-              setHasBeenSubmitted(true);
-              setToast({ message: "Step 4 submitted successfully.", type: "success" });
-              if (showForm) closeForm();
-              // Do not call onClose — parent advances to Step 5 with the same trip.
-            } else {
-              setToast({ message: "Unable to submit delivery details. Please try again.", type: "error" });
+            if (isSubmitting) return;
+            setIsSubmitting(true);
+            try {
+              let success = true;
+              if (submitDeliveries) {
+                success = (await submitDeliveries()) !== false;
+              } else if (updateDeliveries) {
+                updateDeliveries(safeRows);
+              }
+              if (success) {
+                setHasBeenSubmitted(true);
+                setToast({ message: "Step 4 submitted successfully.", type: "success" });
+                if (showForm) closeForm();
+                // Do not call onClose — parent advances to Step 5 with the same trip.
+              } else {
+                setToast({ message: "Unable to submit delivery details. Please try again.", type: "error" });
+              }
+            } finally {
+              setIsSubmitting(false);
             }
           })();
         },
@@ -474,11 +481,17 @@ export default function UnLoadingTable({
         onConfirm: () => {
           setConfirmation((prev) => ({ ...prev, isOpen: false }));
           void (async () => {
-            const success = submitDeliveries ? (await submitDeliveries()) !== false : false;
-            if (success) {
-              setHasBeenSubmitted(true);
-              setToast({ message: "Step 4 submitted successfully.", type: "success" });
-              if (showForm) closeForm();
+            if (isSubmitting) return;
+            setIsSubmitting(true);
+            try {
+              const success = submitDeliveries ? (await submitDeliveries()) !== false : false;
+              if (success) {
+                setHasBeenSubmitted(true);
+                setToast({ message: "Step 4 submitted successfully.", type: "success" });
+                if (showForm) closeForm();
+              }
+            } finally {
+              setIsSubmitting(false);
             }
           })();
         },
@@ -517,19 +530,7 @@ export default function UnLoadingTable({
     setEditingId(null);
     setMode("box");
     setAutoCaptureTime(new Date().toLocaleString());
-    setFormData({
-      shopId: 0,
-      shopName: "",
-      birdTypeId: 0,
-      birdType: "",
-      selectedBoxIds: [],
-      birds: 0,
-      weight: 0,
-      mortality: 0,
-      mortWeight: 0,
-      remarks: "",
-      perBoxData: [],
-    });
+    setFormData({ ...EMPTY_DELIVERY_FORM });
     setShowForm(true);
   };
 
@@ -1076,7 +1077,7 @@ export default function UnLoadingTable({
             onCancel={handleCloseView}
             onSave={saveDeliveries ? handleSaveProgress : undefined}
             onSubmit={handleSubmitOrUpdateDeliveries}
-            busy={isSaving}
+            busy={isSaving || isSubmitting}
             saveDisabled={false}
             submitDisabled={safeRows.length === 0}
             submitLabel={hasBeenSubmitted ? "Update Deliveries" : "Submit Deliveries"}
