@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { computeDeliveryKpiTotals } from "./deliveryKpis";
 import { computeRemainingBoxes, pendingBoxesFromRows } from "./remainingBoxes";
+import {
+  computeValidationErrors,
+  validationIsValid,
+  EMPTY_DELIVERY_FORM,
+} from "./useShopDeliveryForm";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
 
 function box(boxNo: number, birds: number, weight: number): BoxDetail {
@@ -100,4 +105,112 @@ test("remaining boxes: editing row is excluded from consumption", () => {
   assert.deepEqual(pendingExcluded.map((b) => b.boxNo), [1]);
   const pendingIncluded = pendingBoxesFromRows(boxes, rows);
   assert.deepEqual(pendingIncluded.map((b) => b.boxNo), []);
+});
+
+// ─── Derived weight-mode validation (farm weight 29) ─────────────────
+// 30 invalid → 28.5 valid → 29.5 invalid → 28 valid, with NO stale state.
+function weightModeValidation(farmWeight: number, enteredWeight: number, farmBirds = 29) {
+  const formData = {
+    ...EMPTY_DELIVERY_FORM,
+    selectedBoxIds: [1],
+    mortality: 0,
+    mortWeight: 0,
+    perBoxData: [{ boxNo: 1, birds: farmBirds, weight: enteredWeight }],
+  };
+  return computeValidationErrors({
+    mode: "weight",
+    formData,
+    farmBirds,
+    farmWeight,
+    weightModeTotals: { birds: farmBirds, weight: enteredWeight },
+    mortKg: 0,
+    availableBoxDetails: [{ boxNo: 1, birds: farmBirds, weight: farmWeight }],
+  });
+}
+
+test("weight mode: over farm weight is invalid; correction becomes valid immediately (no stale state)", () => {
+  const over = weightModeValidation(29, 30);
+  assert.equal(over.weightExceedFarm, true);
+  assert.equal(validationIsValid(over), false);
+
+  const ok285 = weightModeValidation(29, 28.5);
+  assert.equal(ok285.weightExceedFarm, false);
+  assert.equal(validationIsValid(ok285), true);
+
+  const over295 = weightModeValidation(29, 29.5);
+  assert.equal(over295.weightExceedFarm, true);
+  assert.equal(validationIsValid(over295), false);
+
+  const ok28 = weightModeValidation(29, 28);
+  assert.equal(ok28.weightExceedFarm, false);
+  assert.equal(validationIsValid(ok28), true);
+});
+
+test("weight mode: per-box weight cannot exceed that box's remaining weight", () => {
+  const perBoxOver = computeValidationErrors({
+    mode: "weight",
+    formData: {
+      ...EMPTY_DELIVERY_FORM,
+      selectedBoxIds: [1, 2],
+      perBoxData: [
+        { boxNo: 1, birds: 12, weight: 210 },
+        { boxNo: 2, birds: 14, weight: 200 },
+      ],
+    },
+    farmBirds: 26,
+    farmWeight: 400,
+    weightModeTotals: { birds: 26, weight: 410 },
+    mortKg: 0,
+    availableBoxDetails: [
+      { boxNo: 1, birds: 12, weight: 200 },
+      { boxNo: 2, birds: 14, weight: 200 },
+    ],
+  });
+  assert.deepEqual(perBoxOver.perBoxWeightErrors, [true, false]);
+  assert.equal(validationIsValid(perBoxOver), false);
+});
+
+test("box mode: mortality cannot exceed farm birds of the selected boxes", () => {
+  const tooMany = computeValidationErrors({
+    mode: "box",
+    formData: { ...EMPTY_DELIVERY_FORM, selectedBoxIds: [1], mortality: 31 },
+    farmBirds: 30,
+    farmWeight: 500,
+    weightModeTotals: { birds: 0, weight: 0 },
+    mortKg: 0,
+    availableBoxDetails: [{ boxNo: 1, birds: 30, weight: 500 }],
+  });
+  assert.equal(tooMany.birdsExceed, true);
+  assert.equal(validationIsValid(tooMany), false);
+
+  const fine = computeValidationErrors({
+    mode: "box",
+    formData: { ...EMPTY_DELIVERY_FORM, selectedBoxIds: [1], mortality: 1 },
+    farmBirds: 30,
+    farmWeight: 500,
+    weightModeTotals: { birds: 0, weight: 0 },
+    mortKg: 0,
+    availableBoxDetails: [{ boxNo: 1, birds: 30, weight: 500 }],
+  });
+  assert.equal(fine.birdsExceed, false);
+  assert.equal(validationIsValid(fine), true);
+});
+
+test("weight mode: delivered + mortality birds must match farm birds exactly", () => {
+  const mismatch = computeValidationErrors({
+    mode: "weight",
+    formData: {
+      ...EMPTY_DELIVERY_FORM,
+      selectedBoxIds: [1],
+      mortality: 0,
+      perBoxData: [{ boxNo: 1, birds: 28, weight: 500 }],
+    },
+    farmBirds: 29,
+    farmWeight: 500,
+    weightModeTotals: { birds: 28, weight: 500 },
+    mortKg: 0,
+    availableBoxDetails: [{ boxNo: 1, birds: 29, weight: 500 }],
+  });
+  assert.equal(mismatch.birdsMismatch, true);
+  assert.equal(validationIsValid(mismatch), false);
 });

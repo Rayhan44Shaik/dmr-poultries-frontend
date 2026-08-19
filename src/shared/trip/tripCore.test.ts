@@ -9,10 +9,12 @@ import {
   calculatePickupTotals,
   createEmptyTrip,
   getLastSubmittedTripStep,
+  getMaxAllowedTripStep,
   getNextIncompleteTripStep,
   getResumeActionLabel,
   getTripWizardCompletedMask,
   isTripEnded,
+  isTripStepLocked,
   isTripWizardComplete,
   validateDeliveriesStep,
   validateFarmStep,
@@ -182,4 +184,77 @@ test("View stepper mask marks Step 5 submitted only from Step 5 flags", () => {
     delivery: true,
     end: true,
   });
+});
+
+test("Sequential step gating: future steps stay locked until the previous step is submitted", () => {
+  // New trip: Step 1 available, Steps 2-5 locked.
+  const fresh = createEmptyTrip({});
+  assert.equal(getMaxAllowedTripStep(fresh), 0);
+  assert.equal(isTripStepLocked(fresh, 0), false);
+  assert.equal(isTripStepLocked(fresh, 1), true);
+  assert.equal(isTripStepLocked(fresh, 2), true);
+  assert.equal(isTripStepLocked(fresh, 3), true);
+  assert.equal(isTripStepLocked(fresh, 4), true);
+
+  // Step 1 submitted: Step 1 + Step 2 available, Steps 3-5 locked.
+  const after1 = { ...fresh, startStepSubmitted: true };
+  assert.equal(getMaxAllowedTripStep(after1), 1);
+  assert.deepEqual(
+    [0, 1, 2, 3, 4].map((i) => isTripStepLocked(after1, i)),
+    [false, false, true, true, true]
+  );
+
+  // Step 2 submitted: Steps 1-3 available, Steps 4-5 locked.
+  const after2 = { ...after1, farmStepSubmitted: true };
+  assert.equal(getMaxAllowedTripStep(after2), 2);
+  assert.deepEqual(
+    [0, 1, 2, 3, 4].map((i) => isTripStepLocked(after2, i)),
+    [false, false, false, true, true]
+  );
+
+  // Step 3 submitted: Steps 1-4 available, Step 5 locked.
+  const after3 = { ...after2, pickupStepSubmitted: true };
+  assert.equal(getMaxAllowedTripStep(after3), 3);
+  assert.deepEqual(
+    [0, 1, 2, 3, 4].map((i) => isTripStepLocked(after3, i)),
+    [false, false, false, false, true]
+  );
+
+  // Step 4 submitted: Steps 1-5 available.
+  const after4 = { ...after3, deliveryStepSubmitted: true };
+  assert.equal(getMaxAllowedTripStep(after4), 4);
+  assert.deepEqual(
+    [0, 1, 2, 3, 4].map((i) => isTripStepLocked(after4, i)),
+    [false, false, false, false, false]
+  );
+
+  // All submitted: all steps viewable.
+  const complete = { ...after4, endStepSubmitted: true, expensesStepSubmitted: true };
+  assert.equal(getMaxAllowedTripStep(complete), 4);
+  assert.deepEqual(
+    [0, 1, 2, 3, 4].map((i) => isTripStepLocked(complete, i)),
+    [false, false, false, false, false]
+  );
+});
+
+test("Resume always opens the first incomplete step; completed steps stay reopenable", () => {
+  const after1 = createEmptyTrip({ startStepSubmitted: true });
+  assert.equal(getNextIncompleteTripStep(after1), 1);
+  assert.equal(getLastSubmittedTripStep(after1), 0);
+
+  const after2 = { ...after1, farmStepSubmitted: true };
+  assert.equal(getNextIncompleteTripStep(after2), 2);
+  assert.equal(getLastSubmittedTripStep(after2), 1);
+
+  const after3 = { ...after2, pickupStepSubmitted: true };
+  assert.equal(getNextIncompleteTripStep(after3), 3);
+  assert.equal(getLastSubmittedTripStep(after3), 2);
+
+  const after4 = { ...after3, deliveryStepSubmitted: true };
+  assert.equal(getNextIncompleteTripStep(after4), 4);
+  assert.equal(getLastSubmittedTripStep(after4), 3);
+
+  const complete = { ...after4, endStepSubmitted: true, expensesStepSubmitted: true };
+  assert.equal(getNextIncompleteTripStep(complete), 4);
+  assert.equal(getLastSubmittedTripStep(complete), 4);
 });
