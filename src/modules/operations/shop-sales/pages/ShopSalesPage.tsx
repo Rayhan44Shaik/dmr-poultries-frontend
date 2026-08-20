@@ -1,6 +1,6 @@
 // src/pages/sales/shop-sales/ShopSalesPage.tsx
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 import { handleApiError } from "../../../../api";
@@ -22,6 +22,7 @@ interface ShopSalesPageProps {
 
 function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
   const { showNotification } = useSafeNotification();
+  const [searchInput, setSearchInput] = useState("");
 
   const {
     filteredSales,
@@ -48,11 +49,13 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
 
   useEffect(() => {
     if (initialTrip && initialTrip.tripNo) {
+      const tripNo = String(initialTrip.tripNo);
       setFilter((prev) => ({
         ...prev,
-        searchQuery: initialTrip.tripNo,
+        search: tripNo,
       }));
-      showNotification(`Loaded sales for Trip #${initialTrip.tripNo}`, "success");
+      setSearchInput(tripNo);
+      showNotification(`Loaded sales for Trip #${tripNo}`, "success");
     }
   }, [initialTrip, setFilter, showNotification]);
 
@@ -64,25 +67,35 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
   ).filter(Boolean);
 
   const handleSearch = useCallback(() => {
+    const query = searchInput.trim();
+    setFilter((prev) => ({ ...prev, search: query }));
     setCurrentPage(1);
-  }, [setCurrentPage]);
+  }, [searchInput, setFilter, setCurrentPage]);
 
   const handleResetFilters = useCallback(() => {
     resetFilters();
+    setSearchInput("");
     showNotification("Filters have been reset.", "info");
   }, [resetFilters, showNotification]);
 
-  const handleUpdateSale = useCallback(async (updatedSale: ShopSale) => {
-    try {
-      await updateSale(updatedSale);
-      showNotification("Sale updated successfully", "success");
-    } catch (error) {
-      // Surface the backend's actual rejection reason (e.g. capacity
-      // exceeded, rate locked, edit window closed) through the existing
-      // notification mechanism instead of a generic message.
-      showNotification(handleApiError(error), "error");
-    }
-  }, [updateSale, showNotification]);
+  const handleUpdateSale = useCallback(
+    async (updatedSale: ShopSale) => {
+      try {
+        await updateSale(updatedSale);
+        showNotification("Sale updated successfully", "success");
+        // Re-fetch so trip-level data (totals, other sales on the same
+        // trip) reflects the edit — no stale values remain on screen.
+        // Silent: the row was already patched from the server response.
+        await refreshSales({ silent: true });
+      } catch (error) {
+        // Surface the backend's actual rejection reason (e.g. capacity
+        // exceeded, rate locked, edit window closed) through the existing
+        // notification mechanism instead of a generic message.
+        showNotification(handleApiError(error), "error");
+      }
+    },
+    [updateSale, showNotification, refreshSales]
+  );
 
   const handleExportPDF = useCallback(() => {
     if (filteredSales.length === 0) {
@@ -90,20 +103,18 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
       return;
     }
     const headers = [
-      "Trip No",
-      "Date",
+      "Shop Sales No",
+      "Day",
       "Shop Name",
-      "Birds",
       "Weight (KG)",
       "Rate (₹)",
       "Amount (₹)",
       "Remark",
     ];
     const rows = filteredSales.map((s) => [
-      s.tripNo,
+      s.saleNo || s.tripNo,
       s.tripDate,
       s.shopName,
-      s.totalBirds.toString(),
       s.totalWeight.toFixed(2),
       (s.rate ?? 0).toFixed(2),
       s.amount.toFixed(2),
@@ -120,20 +131,18 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
       return;
     }
     const headers = [
-      "Trip No",
-      "Date",
+      "Shop Sales No",
+      "Day",
       "Shop Name",
-      "Birds",
       "Weight (KG)",
       "Rate (₹)",
       "Amount (₹)",
       "Remark",
     ];
     const rows = filteredSales.map((s) => [
-      s.tripNo,
+      s.saleNo || s.tripNo,
       s.tripDate,
       s.shopName,
-      s.totalBirds,
       s.totalWeight,
       s.rate ?? 0,
       s.amount,
@@ -153,6 +162,8 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         sortBy={filter.sortBy}
         shopNames={shopNames}
         totalEntries={filteredSales.length}
+        searchQuery={searchInput}
+        setSearchQuery={setSearchInput}
         setFromDate={(v) => {
           setFilter({ ...filter, fromDate: v });
           if (v) showNotification(`From date set to ${v}`, "info");
@@ -170,7 +181,8 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         hasFilters={
           filter.fromDate !== "" ||
           filter.toDate !== "" ||
-          filter.shopName.trim() !== ""
+          filter.shopName.trim() !== "" ||
+          filter.search.trim() !== ""
         }
       />
 
@@ -186,15 +198,14 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         <ShopSalesTable
           sales={paginatedSales}
           isLoading={isLoading}
-          shopNames={shopNames}
           onUpdateSale={handleUpdateSale}
         />
         {shouldShowPagination(filteredSales.length) && (
-        <ShopSalesPagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-        />
+          <ShopSalesPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
         )}
       </div>
     </div>

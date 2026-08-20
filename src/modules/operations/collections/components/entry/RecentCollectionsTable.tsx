@@ -1,14 +1,6 @@
 import { useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 import type { RecentCollection } from "../../types/collection";
-import {
-  paginationBarClass,
-  paginationNavBtnClass,
-  paginationPageBtnClass,
-  shouldShowPagination,
-} from "../../../../../shared/ui/paginationStyles";
-import { usePendingDelete } from "../../../../../hooks/usePendingDelete";
-import { PendingDeleteNotification } from "../../../../../components/common/PendingDeleteNotification";
 
 interface Props {
   collections: RecentCollection[];
@@ -16,12 +8,10 @@ interface Props {
   pendingApprovalCount: number;
   currentPage: number;
   totalPages: number;
-  totalRecords?: number;
   pageSize?: number;
   onStatusChange: (status: "Pending" | "Approved" | "All") => void;
   onPageChange: (page: number) => void;
   onApprove: (id: string) => void;
-  onReject: (id: string) => void;
   onEdit: (collection: RecentCollection) => void;
   onDelete: (id: string) => void;
   onViewShop: (shopName: string) => void;
@@ -39,16 +29,13 @@ export default function RecentCollectionsTable({
   pendingApprovalCount,
   currentPage,
   totalPages,
-  totalRecords = 0,
   onStatusChange,
   onPageChange,
   onApprove,
-  onReject,
   onEdit,
   onDelete,
   onViewShop,
 }: Props) {
-  const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
   // Local search state
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -182,7 +169,7 @@ export default function RecentCollectionsTable({
               </tr>
             ) : (
               displayedData.map((col, index) => {
-                const isPendingStatus = col.status === "Pending";
+                const isPending = col.status === "Pending";
                 return (
                   <tr
                     key={isGrouped ? col.shopName : col.id}
@@ -230,7 +217,7 @@ export default function RecentCollectionsTable({
                     )}
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1.5">
-                        {isPendingStatus ? (
+                        {isPending ? (
                           <>
                             <button
                               onClick={() => onApprove(col.id)}
@@ -245,13 +232,7 @@ export default function RecentCollectionsTable({
                               Edit
                             </button>
                             <button
-                              onClick={() => onReject(col.id)}
-                              className="rounded-lg bg-orange-100 px-3 py-1 text-xs font-medium text-orange-700 transition hover:bg-orange-200"
-                            >
-                              Reject
-                            </button>
-                            <button
-                              onClick={() => requestDelete(col.id, { label: `Deleting collection ${col.collectionNo}` })}
+                              onClick={() => onDelete(col.id)}
                               className="rounded-lg bg-red-100 px-3 py-1 text-xs font-medium text-red-700 transition hover:bg-red-200"
                             >
                               Delete
@@ -276,28 +257,29 @@ export default function RecentCollectionsTable({
       </div>
 
       {/* Pagination */}
-      {shouldShowPagination(totalRecords) && (
-        <div className={paginationBarClass}>
-          <button
-            disabled={currentPage === 1}
-            onClick={() => onPageChange(currentPage - 1)}
-            className={paginationNavBtnClass}
-          >
-            Previous
-          </button>
-          <span className={paginationPageBtnClass(true)}>
-            {currentPage}
-          </span>
-          <button
-            disabled={currentPage === totalPages}
-            onClick={() => onPageChange(currentPage + 1)}
-            className={paginationNavBtnClass}
-          >
-            Next
-          </button>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 px-2">
+          <div className="text-xs text-slate-500">
+            Page {currentPage} of {totalPages}
+          </div>
+          <div className="flex gap-2">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => onPageChange(currentPage - 1)}
+              className="rounded-lg border border-slate-300 px-4 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => onPageChange(currentPage + 1)}
+              className="rounded-lg border border-slate-300 px-4 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
-      <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
     </div>
   );
 }

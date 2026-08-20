@@ -20,12 +20,10 @@ const EMPTY_WEEKLY: CollectionWeeklySummary = {
   shopName: "",
   weekStart: "",
   weekEnd: "",
-  openingBalance: 0,
+  balance: 0,
   weeklySales: 0,
   approvedCollections: 0,
   pendingCollections: 0,
-  currentOutstanding: 0,
-  closingBalance: 0,
   isCurrentWeek: false,
 };
 
@@ -60,8 +58,6 @@ export default function useCollectionEntry() {
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"Pending" | "Approved" | "All">("Pending");
-  const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 25;
 
   const today = useMemo(() => new Date().toLocaleDateString("en-GB"), []);
   const dashboard = useMemo(() => collectionService.getDashboardSummary(), []);
@@ -130,7 +126,6 @@ export default function useCollectionEntry() {
           totalSales: 0,
           totalCollections: 0,
           currentPending: 0,
-          openingBalance: 0,
           overdueDays: 0,
           lastCollectionDate: entry.collectionDate,
         };
@@ -205,11 +200,14 @@ export default function useCollectionEntry() {
     ? `${fmtWeekDate(weeklySummary.weekStart)} to ${fmtWeekDate(weeklySummary.weekEnd)}`
     : "";
 
-  const openingBalance = weeklySummary.openingBalance;
+  // Authoritative live shop balance — the shop's persistent outstanding,
+  // owned by the backend (shops.current_balance). NEVER a weekly figure and
+  // never reset when the week changes. The frontend only displays it.
+  const balance = weeklySummary.balance;
   const weeklySales = weeklySummary.weeklySales;
   const weeklyCollections = weeklySummary.approvedCollections;
   const weeklyPending = weeklySummary.pendingCollections;
-  const currentPending = weeklySummary.currentOutstanding;
+  const currentPending = weeklySummary.balance;
   const totalSales = weeklySummary.weeklySales;
   const totalCollections = weeklySummary.approvedCollections;
 
@@ -220,13 +218,13 @@ export default function useCollectionEntry() {
   }, [currentPending, todayCollection]);
 
   const collectionProgress = useMemo(() => {
-    if (openingBalance <= 0) return 0;
-    return Number(((todayCollection / openingBalance) * 100).toFixed(2));
-  }, [openingBalance, todayCollection]);
+    if (balance <= 0) return 0;
+    return Number(((todayCollection / balance) * 100).toFixed(2));
+  }, [balance, todayCollection]);
 
   const pageSummary = useMemo(
     () => ({
-      openingBalance,
+      balance,
       totalSales,
       totalCollections,
       currentPending,
@@ -240,7 +238,7 @@ export default function useCollectionEntry() {
       weeklyPending,
     }),
     [
-      openingBalance,
+      balance,
       totalSales,
       totalCollections,
       currentPending,
@@ -341,14 +339,21 @@ export default function useCollectionEntry() {
 
   function changeStatusFilter(status: CollectionLegacyStatus | "All") {
     setStatusFilter(status as "Pending" | "Approved" | "All");
-    setCurrentPage(1);
     setRecentCollections(collectionService.getRecentCollections(status));
   }
 
   async function approveCollection(id: string) {
-    const success = await collectionService.approveCollection(id, "Admin");
-    if (success) {
+    const result = await collectionService.approveCollection(id, "Admin");
+    if (result.success) {
       showNotification("Collection approved successfully!", "success");
+      // The backend returns the authoritative updated shop balance — apply it
+      // to the UI immediately so Balance converges without a page reload.
+      if (result.balance != null) {
+        setWeeklySummary((prev) => ({ ...prev, balance: result.balance as number }));
+        setPendingShop((prev) =>
+          prev ? { ...prev, currentPending: result.balance as number } : prev
+        );
+      }
       refreshPage();
     } else {
       showNotification("Failed to approve collection.", "error");
@@ -411,7 +416,6 @@ export default function useCollectionEntry() {
           totalSales: 0,
           totalCollections: 0,
           currentPending: 0,
-          openingBalance: 0,
           overdueDays: 0,
           lastCollectionDate: collection.collectionDate,
         };
@@ -525,21 +529,6 @@ export default function useCollectionEntry() {
 
   const recentCollectionCount = useMemo(() => recentCollections.length, [recentCollections]);
 
-  const totalPages = useMemo(() => {
-    if (recentCollections.length === 0) return 1;
-    return Math.ceil(recentCollections.length / PAGE_SIZE);
-  }, [recentCollections]);
-
-  const paginatedCollections = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return recentCollections.slice(start, start + PAGE_SIZE);
-  }, [recentCollections, currentPage]);
-
-  function changePage(page: number) {
-    if (page < 1 || page > totalPages) return;
-    setCurrentPage(page);
-  }
-
   const actions = {
     saveCollection: saveOrUpdateCollection,
     cancelCollection,
@@ -596,7 +585,7 @@ export default function useCollectionEntry() {
     changeRemarks,
     changeCollectionDate,
     resetEntry,
-    openingBalance,
+    balance,
     totalSales,
     totalCollections,
     currentPending,
@@ -609,16 +598,13 @@ export default function useCollectionEntry() {
     weeklyCollections,
     weeklyPending,
     weekRangeFormatted,
-    recentCollections: paginatedCollections,
+    recentCollections,
     selectedShopCollections,
     statusFilter,
     changeStatusFilter,
     pendingApprovalCount,
     approvedCount,
     recentCollectionCount,
-    currentPage,
-    totalPages,
-    changePage,
     formStatus,
     disableSave,
     loading,

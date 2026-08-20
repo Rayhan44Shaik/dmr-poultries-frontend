@@ -5,6 +5,8 @@
  * (rate_entry.locked = TRUE) says so.
  *
  * GET    /operations/shop-sales        -> eligible sales (Rate Entry locked, not soft-deleted)
+ *                                         supports fromDate / toDate / search / sortBy /
+ *                                         shopId / page / limit (paginated result shape)
  * PUT    /operations/shop-sales/:id    -> edit birds/weight/mortality/remarks/birdType only
  *                                          (rate/amount/shopId/shopName/tripId are backend-immutable
  *                                          once locked — see updateShopSale's diffing contract)
@@ -21,100 +23,47 @@
  */
 import { apiDelete, apiGet, apiPut } from "../../../../api";
 import type { ShopSale } from "../types/shopSale";
+import {
+  mapApiSaleToShopSale,
+  type ApiShopSale,
+} from "../utils/shopSaleMapping";
 
 const SHOP_SALES_PATH = "/operations/shop-sales";
 
-/** Raw shape returned by GET/PUT /operations/shop-sales (backend ShopSale, camelCase). */
-interface ApiShopSale {
-  id: number;
-  saleNo: string;
-  saleDate: string;
-  shopId: number | null;
-  shopName: string;
-  birdTypeId: number | null;
-  birdType: string;
-  tripId: number | null;
-  tripNo: string;
-  shopNo?: string;
-  vehicleNo: string | null;
-  farmName: string | null;
-  birds: number;
-  weight: number;
-  rate: number;
-  amount: number;
-  mortality: number;
-  remarks: string;
-  status: string;
-  deleted: boolean;
-  deletedReason: string | null;
-  tripDeleted: boolean;
-  editable: boolean;
-  windowExpiresAt: string | null;
-  approvedBy: string | null;
-  approvedAt: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-  /** Backend-authoritative Rate Entry lock / 10-day correction state. */
-  rateCompleted?: boolean;
-  rateLockedAt?: string | null;
-  rateLockedBy?: string | null;
-  correctionWindowExpired?: boolean;
-  correctionWindowClosesAt?: string | null;
-}
-
-function num(value: unknown, fallback = 0): number {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-/** Maps one backend ShopSale row onto the existing frontend ShopSale
- * shape — every field the existing components already read (totalBirds,
- * totalWeight, remark, etc.) keeps its exact name and type; the real
- * numeric ids/lock state are carried alongside additively. */
-function mapApiSaleToShopSale(row: ApiShopSale): ShopSale {
-  return {
-    id: String(row.id),
-    tripId: row.tripId == null ? "" : String(row.tripId),
-    tripNo: row.tripNo,
-    tripDate: row.saleDate,
-    shopId: row.shopId == null ? "" : String(row.shopId),
-    shopNo: row.shopNo ?? "",
-    shopName: row.shopName,
-    birdType: row.birdType,
-    totalBirds: num(row.birds),
-    totalWeight: num(row.weight),
-    rate: row.rate,
-    amount: num(row.amount),
-    remark: row.remarks,
-    status: row.status === "Approved" ? "Completed" : "Pending",
-    numericId: row.id,
-    numericTripId: row.tripId,
-    numericShopId: row.shopId,
-    mortality: num(row.mortality),
-    birdTypeId: row.birdTypeId,
-    editable: row.editable,
-    windowExpiresAt: row.windowExpiresAt,
-    rateCompleted: row.rateCompleted,
-    rateLockedAt: row.rateLockedAt,
-    rateLockedBy: row.rateLockedBy,
-    correctionWindowExpired: row.correctionWindowExpired,
-    correctionWindowClosesAt: row.correctionWindowClosesAt,
-  };
+/** Paginated shape the backend returns when page/limit are supplied. */
+export interface ShopSalesPageResult {
+  data: ApiShopSale[];
+  meta: { total: number; page: number; limit: number; totalPages: number };
 }
 
 /** GET /operations/shop-sales — only trips whose Rate Entry is locked are
  * ever returned (backend-enforced eligibility; never re-derived here).
- * fromDate/toDate are sent to the backend (real filtering); shop-name text
- * search and sort order stay client-side in the hook, same as before. */
+ * fromDate/toDate/search are sent to the backend (real filtering);
+ * shop-name text filter and sort order stay client-side in the hook
+ * (the full eligible list is loaded, so pagination remains client-side). */
 export async function listShopSales(filters: {
   fromDate?: string;
   toDate?: string;
+  search?: string;
+  sortBy?: string;
 } = {}): Promise<ShopSale[]> {
   const params: Record<string, string> = {};
   if (filters.fromDate) params.fromDate = filters.fromDate;
   if (filters.toDate) params.toDate = filters.toDate;
-  const { data } = await apiGet<ApiShopSale[]>(SHOP_SALES_PATH, { params });
-  return data.map(mapApiSaleToShopSale);
+  if (filters.search && filters.search.trim() !== "") params.search = filters.search.trim();
+  if (filters.sortBy) params.sortBy = filters.sortBy;
+
+  const { data } = await apiGet<ApiShopSale[] | ShopSalesPageResult>(
+    SHOP_SALES_PATH,
+    { params }
+  );
+
+  // Backend returns a plain array when no page/limit is supplied (the
+  // current client behaviour) and { data, meta } when pagination params are
+  // present — accept both so a future server-side pagination switch cannot
+  // silently break the page.
+  const rows = Array.isArray(data) ? data : data.data ?? [];
+  return rows.map(mapApiSaleToShopSale);
 }
 
 export interface ShopSalePatch {

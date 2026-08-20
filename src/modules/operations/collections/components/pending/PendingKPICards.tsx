@@ -22,13 +22,13 @@ export function PendingKPICards({
 }: PendingKPICardsProps) {
   return (
     <div className="flex flex-wrap gap-4">
-      {/* Total Pending */}
+      {/* Total Outstanding — sum of authoritative Shop Master balances */}
       <div className="flex min-w-[160px] items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
         <div className="rounded-full bg-red-100 p-2 text-red-600">
           <IndianRupee size={18} />
         </div>
         <div>
-          <div className="text-xs font-medium text-red-600">Total Pending</div>
+          <div className="text-xs font-medium text-red-600">Total Outstanding</div>
           <div className="text-lg font-bold text-red-700">{formatCurrency(totalPending)}</div>
         </div>
       </div>

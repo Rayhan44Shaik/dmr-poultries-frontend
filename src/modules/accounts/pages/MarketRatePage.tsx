@@ -1,7 +1,7 @@
 // src/modules/accounts/pages/MarketRatePage.tsx
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Save, Tag, ChevronLeft, ChevronRight, CheckCircle2, X, RefreshCw, AlertCircle } from "lucide-react";
+import { Save, Search, Tag, ChevronLeft, ChevronRight, CheckCircle2, X, RefreshCw, AlertCircle } from "lucide-react";
 import { DatePicker } from "../../../components/common/DatePicker";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { handleApiError } from "../../../api";
@@ -44,6 +44,7 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
   // Filter tab state ("This Week" selected by default)
   const [activeTab, setActiveTab] = useState<'This Week' | 'Month' | 'Quarter' | 'Custom Range'>('This Week');
   const [autoSaveStatus, setAutoSaveStatus] = useState<'Saved' | 'Saving...' | 'Error'>('Saved');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Helper to get current Monday to Sunday dates (local, date-safe)
   const getCurrentWeekRange = (dateObj: Date = new Date()) => {
@@ -106,8 +107,6 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
   const [summaryData, setSummaryData] = useState<Record<string, Record<string, string>>>({});
 
   // Load Market Rates from the PostgreSQL backend whenever the range changes.
-  // The backend market_rates table is the single source of truth — the same
-  // data Rate Entry reads through its own endpoint.
   useEffect(() => {
     let cancelled = false;
     if (!fromDate || !toDate) {
@@ -148,42 +147,31 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromDate, toDate]);
 
   // Handlers for updating specific date values dynamically
   const handleTableOneChange = (dateStr: string, field: string, value: string) => {
     setTableOneData(prev => ({
       ...prev,
-      [dateStr]: {
-        ...(prev[dateStr] || {}),
-        [field]: value,
-      }
+      [dateStr]: { ...(prev[dateStr] || {}), [field]: value }
     }));
   };
 
   const handleTableTwoChange = (dateStr: string, field: string, value: string) => {
     setTableTwoData(prev => ({
       ...prev,
-      [dateStr]: {
-        ...(prev[dateStr] || {}),
-        [field]: value,
-      }
+      [dateStr]: { ...(prev[dateStr] || {}), [field]: value }
     }));
   };
 
   const handleSummaryChange = (dateStr: string, field: string, value: string) => {
     setSummaryData(prev => ({
       ...prev,
-      [dateStr]: {
-        ...(prev[dateStr] || {}),
-        [field]: value,
-      }
+      [dateStr]: { ...(prev[dateStr] || {}), [field]: value }
     }));
   };
 
   // Manual explicit save — upserts every non-empty date row into the backend
-  // market_rates table (one row per business date; re-saving a date updates it).
   const handleManualSave = useCallback(async () => {
     const rows: MarketRateInput[] = [];
     for (const dayObj of matrixDays) {
@@ -195,6 +183,7 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
       };
       const hasAny = ALL_FIELDS.some((field) => String(merged[field] ?? "").trim() !== "");
       if (!hasAny) continue;
+      
       const payload: MarketRateInput = { businessDate: date };
       for (const field of ALL_FIELDS) {
         const raw = merged[field];
@@ -204,6 +193,7 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
       }
       rows.push(payload);
     }
+    
     if (rows.length === 0) {
       showNotification("Nothing to save. Enter at least one rate first.", "info");
       return;
@@ -212,7 +202,6 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
     setAutoSaveStatus("Saving...");
     try {
       const saved = await saveMarketRates(rows);
-      // Frontend state is refreshed from the backend's returned (persisted) values.
       const summary: Record<string, Record<string, string>> = {};
       const tableOne: Record<string, Record<string, string>> = {};
       const tableTwo: Record<string, Record<string, string>> = {};
@@ -252,7 +241,6 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
     }
   };
 
-  // Clear custom range filter
   const handleClearCustomRange = () => {
     setFromDate('');
     setToDate('');
@@ -281,275 +269,296 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
   );
 
   return (
-    <div className={`w-full space-y-6 animate-in fade-in duration-500 ${
-      embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
-    }`}>
-      {/* Sticky Header with Filter Tabs, Navigation, and Integrated Auto-Save Status */}
-      <div className="sticky top-0 z-30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white/95 backdrop-blur-md p-4 rounded-xl border border-slate-200/80 shadow-sm">
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl overflow-x-auto scrollbar-none">
-          {(['This Week', 'Month', 'Quarter', 'Custom Range'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => handleTabClick(tab)}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
-                activeTab === tab
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Integrated non-floating save status indicator */}
-          <div className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border font-medium ${
-            autoSaveStatus === 'Error'
-              ? 'text-red-700 bg-red-50 border-red-200'
-              : 'text-slate-600 bg-slate-50 border-slate-200'
-          }`}>
-            {autoSaveStatus === 'Saving...' ? (
-              <RefreshCw size={13} className="text-amber-500 animate-spin" />
-            ) : autoSaveStatus === 'Error' ? (
-              <AlertCircle size={13} className="text-red-600" />
-            ) : (
-              <CheckCircle2 size={13} className="text-emerald-600" />
-            )}
-            <span>
-              {autoSaveStatus === 'Saving...'
-                ? 'Saving changes...'
-                : autoSaveStatus === 'Error'
-                  ? 'Failed to sync with server'
-                  : 'Synced with server'}
-            </span>
+    <div className={`w-full space-y-6 animate-in fade-in duration-500 ${embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'}`}>
+      
+      {/* Top Toolbar: title, refresh, add, search, filters, date range, tabs */}
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 py-3 shadow-sm rounded-lg">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0 w-full max-w-[1480px] mx-auto">
+          <div className="flex flex-col sm:items-start gap-2">
+            <h1 className="font-semibold text-slate-800 text-lg sm:text-xl">Market Rate</h1>
+            <div className="flex items-center gap-2">
+              <p className="text-slate-500 text-sm sm:text-base">Manage and monitor current market rates</p>
+              {autoSaveStatus === 'Saved' && <span className="flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full"><CheckCircle2 size={12}/> Saved</span>}
+              {autoSaveStatus === 'Saving...' && <span className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full"><RefreshCw size={12} className="animate-spin"/> Saving</span>}
+              {autoSaveStatus === 'Error' && <span className="flex items-center gap-1 text-xs text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full"><AlertCircle size={12}/> Error</span>}
+            </div>
           </div>
 
-          {activeTab !== 'Custom Range' ? (
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1 rounded-lg text-xs font-semibold text-slate-700">
-              <span>{fromDate}</span>
-              <span className="text-slate-400">to</span>
-              <span>{toDate}</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <DatePicker
-                value={fromDate}
-                onChange={(d) => setFromDate(d)}
-                placeholder="From date"
-              />
-              <DatePicker
-                value={toDate}
-                onChange={(d) => setToDate(d)}
-                placeholder="To date"
-              />
-              {(fromDate || toDate) && (
-                <button
-                  onClick={handleClearCustomRange}
-                  className="inline-flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium px-2.5 py-2 rounded-lg text-xs transition-colors"
-                  title="Clear Range"
-                >
-                  <X size={14} /> Clear
-                </button>
-              )}
-            </div>
-          )}
+          <div className="flex items-center gap-3 sm:gap-2">
+            {/* Refresh button */}
+            <button
+              onClick={() => {
+                if (fromDate && toDate) {
+                  void listMarketRates(fromDate, toDate).then(() => {
+                    setAutoSaveStatus("Saved");
+                    showNotification("Market rates refreshed.", "success");
+                  });
+                }
+              }}
+              className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 hover:bg-slate-100 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+            >
+              <RefreshCw size={14} className="hidden sm:inline" />
+              <span className="hidden sm:text-sm">Refresh</span>
+            </button>
 
+            {/* Save Market Rate button */}
+            <button
+              onClick={handleManualSave}
+              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
+            >
+              <Save size={14} />
+              <span>Save Rates</span>
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 sm:gap-2">
+            {/* Search input */}
+            <div className="relative flex items-center">
+              <Search size={14} className="absolute left-2.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search market rate..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 py-1.5 rounded-lg border border-slate-300 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+              />
+            </div>
+
+            {/* Date range selector */}
+            {activeTab !== 'Custom Range' ? (
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700">
+                <span>{fromDate}</span>
+                <span className="text-slate-400">to</span>
+                <span>{toDate}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <DatePicker value={fromDate} onChange={(d) => setFromDate(d)} placeholder="From date" className="min-w-[140px]" />
+                <DatePicker value={toDate} onChange={(d) => setToDate(d)} placeholder="To date" className="min-w-[140px]" />
+                {(fromDate || toDate) && (
+                  <button
+                    onClick={handleClearCustomRange}
+                    className="inline-flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium px-2.5 py-2 rounded-lg text-xs transition-colors"
+                    title="Clear Range"
+                  >
+                    <X size={14} /> Clear
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Tab navigator */}
+            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl overflow-x-auto scrollbar-none">
+              {(['This Week', 'Month', 'Quarter', 'Custom Range'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => handleTabClick(tab)}
+                  className={`px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                    activeTab === tab
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Empty state when no date range is selected */}
+      {(!fromDate || !toDate || matrixDays.length === 0) && (
+        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-8 text-center animate-fade-in">
+          <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <Tag size={24} className="text-slate-500" />
+          </div>
+          <h3 className="font-semibold text-slate-800 text-base mb-2">No market rates found</h3>
+          <p className="text-slate-500 text-sm mb-6">Set a date range to view and manage market rates.</p>
           <button
-            onClick={handleManualSave}
-            className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-lg text-xs transition-colors shadow-sm"
+            onClick={() => {
+              setFromDate(weekRange.from);
+              setToDate(weekRange.to);
+            }}
+            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
           >
-            <Save size={15} />
-            Save Progress
+            <Save size={14} />
+            <span>Select This Week</span>
           </button>
         </div>
-      </div>
+      )}
 
-      {/* 1. Additional Metrics Entry (Vij, Gun, R.P) */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2">
-            <Tag size={16} className="text-slate-500" />
-            <h3 className="font-semibold text-slate-800 text-sm">Additional Metrics Entry (Vij, Gun, R.P)</h3>
+      {/* Tables rendering only when we have dates */}
+      {matrixDays.length > 0 && (
+        <>
+          {/* 1. Summary Metrics Table */}
+          <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col mb-6">
+            <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+              <div className="flex items-center gap-2">
+                <Tag size={16} className="text-slate-500" />
+                <h3 className="font-semibold text-slate-800 text-sm">Additional Metrics Entry (Vij, Gun, R.P)</h3>
+              </div>
+              {renderTableTimeHeader()}
+            </div>
+            <div className="overflow-x-auto max-h-[500px]">
+              <table className="w-full text-center border-collapse sm:text-sm">
+                <thead className="sticky top-0 bg-slate-100 z-10">
+                  <tr className="border-b border-slate-200">
+                    <th className="px-4 py-3 border-r border-slate-200 text-left font-medium text-slate-700">Date</th>
+                    <th className="px-4 py-3 border-r border-slate-200 text-right font-medium text-slate-700">Vij</th>
+                    <th className="px-4 py-3 border-r border-slate-200 text-right font-medium text-slate-700">Gun</th>
+                    <th className="px-4 py-3 text-right font-medium text-slate-700">R.P</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {matrixDays.map((dayObj) => {
+                    const rowData = summaryData[dayObj.dateStr] || {};
+                    return (
+                      <tr key={dayObj.dateStr} className="border-b border-slate-100/65">
+                        <td className="px-4 py-3 border-r border-slate-100 font-medium text-slate-900 bg-slate-50/50 text-left">
+                          {dayObj.dateStr}
+                        </td>
+                        <td className="px-4 py-3 border-r border-slate-100 text-right">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="0"
+                            value={rowData['vij'] || ''}
+                            onChange={(e) => handleSummaryChange(dayObj.dateStr, 'vij', e.target.value)}
+                            className="w-28 text-right px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-emerald-500 text-xs"
+                          />
+                        </td>
+                        <td className="px-4 py-3 border-r border-slate-100 text-right">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="0"
+                            value={rowData['gun'] || ''}
+                            onChange={(e) => handleSummaryChange(dayObj.dateStr, 'gun', e.target.value)}
+                            className="w-28 text-right px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-emerald-500 text-xs"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="0"
+                            value={rowData['rp'] || ''}
+                            onChange={(e) => handleSummaryChange(dayObj.dateStr, 'rp', e.target.value)}
+                            className="w-28 text-right px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-emerald-500 text-xs font-medium text-emerald-600"
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-          {renderTableTimeHeader()}
-        </div>
-        <div className="overflow-x-auto max-h-[500px]">
-          <table className="w-full text-center border border-slate-200 text-xs">
-            <thead className="sticky top-0 bg-slate-100 z-10">
-              <tr className="text-slate-700 font-bold border-b border-slate-200">
-                <th className="px-4 py-2.5 border-r border-slate-200 text-left">Date</th>
-                <th className="px-4 py-2.5 border-r border-slate-200">Vij</th>
-                <th className="px-4 py-2.5 border-r border-slate-200">Gun</th>
-                <th className="px-4 py-2.5">R.P</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {matrixDays.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="py-6 text-slate-400 text-center">No dates selected in range.</td>
-                </tr>
-              ) : (
-                matrixDays.map((dayObj) => {
-                  const rowData = summaryData[dayObj.dateStr] || {};
-                  return (
-                    <tr key={dayObj.dateStr} className="hover:bg-slate-50">
-                      <td className="px-4 py-2.5 border-r border-slate-100 text-left font-bold text-slate-900 bg-slate-50/50">
-                        {dayObj.dateStr}
-                      </td>
-                      <td className="px-4 py-2.5 border-r border-slate-100">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="0"
-                          value={rowData['vij'] || ''}
-                          onChange={(e) => handleSummaryChange(dayObj.dateStr, 'vij', e.target.value)}
-                          className="w-28 text-center px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-indigo-500 text-xs"
-                        />
-                      </td>
-                      <td className="px-4 py-2.5 border-r border-slate-100">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="0"
-                          value={rowData['gun'] || ''}
-                          onChange={(e) => handleSummaryChange(dayObj.dateStr, 'gun', e.target.value)}
-                          className="w-28 text-center px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-indigo-500 text-xs"
-                        />
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="0"
-                          value={rowData['rp'] || ''}
-                          onChange={(e) => handleSummaryChange(dayObj.dateStr, 'rp', e.target.value)}
-                          className="w-28 text-center px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-indigo-500 text-xs font-medium text-blue-600"
-                        />
-                      </td>
+
+          {/* Grid Container for Company Rates & Category Breakdown Matrices */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            
+            {/* 2. Company Rates Matrix Entry */}
+            <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
+              <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+                <h3 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
+                  <Tag size={16} className="text-slate-500" />
+                  Company Rates Matrix Entry
+                </h3>
+                {renderTableTimeHeader()}
+              </div>
+              <div className="overflow-x-auto max-h-[500px] flex-1">
+                <table className="w-full text-center border-collapse sm:text-xs">
+                  <thead className="sticky top-0 bg-slate-100 z-10">
+                    <tr className="border-b border-slate-200">
+                      <th className="px-3 py-3 border-r border-slate-200 text-left font-medium text-slate-700">Date</th>
+                      <th className="px-1 py-3 border-r border-slate-200 text-right font-medium text-slate-700">Sneha</th>
+                      <th className="px-1 py-3 border-r border-slate-200 text-right font-medium text-slate-700">VenCob Rate</th>
+                      <th className="px-1 py-3 border-r border-slate-200 text-right font-medium text-slate-700">VenCob Vii</th>
+                      <th className="px-1 py-3 border-r border-slate-200 text-right font-medium text-slate-700">VenCob Gun</th>
+                      <th className="px-1 py-3 text-right font-medium text-slate-700">Assoc. Vii</th>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Grid Container for Company Rates & Category Breakdown Matrices */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        
-        {/* 2. Company Rates Matrix Entry */}
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
-            <h3 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
-              <Tag size={16} className="text-slate-500" />
-              Company Rates Matrix Entry
-            </h3>
-            {renderTableTimeHeader()}
-          </div>
-          <div className="overflow-x-auto max-h-[500px] flex-1">
-            <table className="w-full text-center border-collapse text-xs">
-              <thead className="sticky top-0 bg-slate-100 z-10">
-                <tr className="text-slate-700 font-bold border-b border-slate-200">
-                  <th className="px-3 py-2.5 text-left border-r border-slate-200">Date</th>
-                  <th className="px-1 py-2.5 border-r border-slate-200">Sneha</th>
-                  <th className="px-1 py-2.5 border-r border-slate-200">VenCob Rate</th>
-                  <th className="px-1 py-2.5 border-r border-slate-200">VenCob Vii</th>
-                  <th className="px-1 py-2.5 border-r border-slate-200">VenCob Gun</th>
-                  <th className="px-1 py-2.5">Association Vii</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
-                {matrixDays.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-6 text-slate-400 text-center">No dates selected in range.</td>
-                  </tr>
-                ) : (
-                  matrixDays.map((dayObj) => {
-                    const rowData = tableOneData[dayObj.dateStr] || {};
-                    return (
-                      <tr key={dayObj.dateStr} className="hover:bg-slate-50/65 transition-colors">
-                        <td className="px-3 py-2.5 border-r border-slate-100 text-left font-bold text-slate-900 bg-slate-50/50">
-                          {dayObj.dateStr}
-                        </td>
-                        {(['sneha', 'vencobRate', 'vencobVii', 'vencobGun', 'associationVii']).map((colKey) => (
-                          <td key={colKey} className="px-1 py-2 border-r border-slate-100">
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              placeholder="0"
-                              value={rowData[colKey] || ''}
-                              onChange={(e) => handleTableOneChange(dayObj.dateStr, colKey, e.target.value)}
-                              className="w-16 text-center px-1 py-1 border border-slate-200 rounded focus:outline-none focus:border-indigo-500 text-xs"
-                            />
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {matrixDays.map((dayObj) => {
+                      const rowData = tableOneData[dayObj.dateStr] || {};
+                      return (
+                        <tr key={dayObj.dateStr} className="border-b border-slate-100/65 transition-colors">
+                          <td className="px-3 py-3 border-r border-slate-100 font-medium text-slate-900 bg-slate-50/50 text-left">
+                            {dayObj.dateStr}
                           </td>
-                        ))}
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                          {(['sneha', 'vencobRate', 'vencobVii', 'vencobGun', 'associationVii']).map((colKey) => (
+                            <td key={colKey} className="px-1 py-3 border-r border-slate-100 text-right">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="0"
+                                value={rowData[colKey] || ''}
+                                onChange={(e) => handleTableOneChange(dayObj.dateStr, colKey, e.target.value)}
+                                className="w-16 text-right px-1 py-1 border border-slate-200 rounded focus:outline-none focus:border-emerald-500 text-xs"
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-        {/* 3. Size & Category Breakdown Entry */}
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
-            <h3 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
-              <Tag size={16} className="text-slate-500" />
-              Size & Category Breakdown Entry
-            </h3>
-            {renderTableTimeHeader()}
-          </div>
-          <div className="overflow-x-auto max-h-[500px] flex-1">
-            <table className="w-full text-center border-collapse text-xs">
-              <thead className="sticky top-0 bg-slate-100 z-10">
-                <tr className="text-slate-700 font-bold border-b border-slate-200">
-                  <th className="px-3 py-2.5 text-left border-r border-slate-200">Date</th>
-                  <th className="px-1 py-2.5 border-r border-slate-200">17</th>
-                  <th className="px-1 py-2.5 border-r border-slate-200">15</th>
-                  <th className="px-1 py-2.5 border-r border-slate-200">13</th>
-                  <th className="px-1 py-2.5 border-r border-slate-200">12</th>
-                  <th className="px-1 py-2.5">10</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
-                {matrixDays.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-6 text-slate-400 text-center">No dates selected in range.</td>
-                  </tr>
-                ) : (
-                  matrixDays.map((dayObj) => {
-                    const rowData = tableTwoData[dayObj.dateStr] || {};
-                    return (
-                      <tr key={dayObj.dateStr} className="hover:bg-slate-50/65 transition-colors">
-                        <td className="px-3 py-2.5 border-r border-slate-100 text-left font-bold text-slate-900 bg-slate-50/50">
-                          {dayObj.dateStr}
-                        </td>
-                        {(['c17', 'c15', 'c13', 'c12', 'c10']).map((colKey) => (
-                          <td key={colKey} className="px-1 py-2 border-r border-slate-100">
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              placeholder="0"
-                              value={rowData[colKey] || ''}
-                              onChange={(e) => handleTableTwoChange(dayObj.dateStr, colKey, e.target.value)}
-                              className="w-16 text-center px-1 py-1 border border-slate-200 rounded focus:outline-none focus:border-indigo-500 text-xs"
-                            />
+            {/* 3. Size & Category Breakdown Entry */}
+            <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
+              <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+                <h3 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
+                  <Tag size={16} className="text-slate-500" />
+                  Size & Category Breakdown Entry
+                </h3>
+                {renderTableTimeHeader()}
+              </div>
+              <div className="overflow-x-auto max-h-[500px] flex-1">
+                <table className="w-full text-center border-collapse sm:text-xs">
+                  <thead className="sticky top-0 bg-slate-100 z-10">
+                    <tr className="border-b border-slate-200">
+                      <th className="px-3 py-3 border-r border-slate-200 text-left font-medium text-slate-700">Date</th>
+                      <th className="px-1 py-3 border-r border-slate-200 text-right font-medium text-slate-700">17</th>
+                      <th className="px-1 py-3 border-r border-slate-200 text-right font-medium text-slate-700">15</th>
+                      <th className="px-1 py-3 border-r border-slate-200 text-right font-medium text-slate-700">13</th>
+                      <th className="px-1 py-3 border-r border-slate-200 text-right font-medium text-slate-700">12</th>
+                      <th className="px-1 py-3 text-right font-medium text-slate-700">10</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {matrixDays.map((dayObj) => {
+                      const rowData = tableTwoData[dayObj.dateStr] || {};
+                      return (
+                        <tr key={dayObj.dateStr} className="border-b border-slate-100/65 transition-colors">
+                          <td className="px-3 py-3 border-r border-slate-100 font-medium text-slate-900 bg-slate-50/50 text-left">
+                            {dayObj.dateStr}
                           </td>
-                        ))}
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                          {(['c17', 'c15', 'c13', 'c12', 'c10']).map((colKey) => (
+                            <td key={colKey} className="px-1 py-3 border-r border-slate-100 text-right">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="0"
+                                value={rowData[colKey] || ''}
+                                onChange={(e) => handleTableTwoChange(dayObj.dateStr, colKey, e.target.value)}
+                                className="w-16 text-right px-1 py-1 border border-slate-200 rounded focus:outline-none focus:border-emerald-500 text-xs"
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-        </div>
-
-      </div>
+        </>
+      )}
     </div>
   );
 };

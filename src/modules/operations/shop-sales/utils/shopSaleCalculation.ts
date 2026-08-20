@@ -8,6 +8,15 @@ import type {
    Filter Shop Sales
 ========================================= */
 
+/**
+ * Client-side safety-net filter/sort for the Shop Sales list. The backend
+ * already applies fromDate/toDate/search via the API; this pass keeps the
+ * in-memory list correct across fetch races and applies the shop-name filter
+ * and the sort order locally (the full list is loaded, so this is instant).
+ *
+ * Sort keys mirror the backend whitelist:
+ *   latest | oldest | shop_asc | shop_desc | amount_desc | amount_asc
+ */
 export function filterShopSales(
 
   sales: ShopSale[],
@@ -64,78 +73,94 @@ export function filterShopSales(
 
   }
 
+  /* Search — Shop Sales No, Shop Name, Trip No (and remarks, like the
+     backend ILIKE). Applied again locally as a safety net; the server is
+     the primary enforcer. */
+
+  const query = filter.search.trim().toLowerCase();
+
+  if (query !== "") {
+
+    data = data.filter((x) => {
+
+      const saleNo = String(x.saleNo ?? "").toLowerCase();
+      const tripNo = String(x.tripNo ?? "").toLowerCase();
+      const shopName = String(x.shopName ?? "").toLowerCase();
+      const remark = String(x.remark ?? "").toLowerCase();
+      return (
+        saleNo.includes(query) ||
+        tripNo.includes(query) ||
+        shopName.includes(query) ||
+        remark.includes(query)
+      );
+    });
+
+  }
+
   /* Sorting */
+
+  const byDate = (a: ShopSale, b: ShopSale, dir: 1 | -1) => {
+    const cmp = String(a.tripDate || "").localeCompare(String(b.tripDate || ""));
+    return cmp === 0 ? dir : cmp * dir;
+  };
 
   switch (filter.sortBy) {
 
-    case "Shop":
+    case "oldest":
+
+      data.sort((a, b) => byDate(a, b, 1));
+
+      break;
+
+    case "shop_asc":
 
       data.sort((a, b) =>
-
-        a.shopName.localeCompare(b.shopName)
-
+        a.shopName.localeCompare(b.shopName) || byDate(b, a, 1)
       );
 
       break;
 
-    case "Birds":
+    case "shop_desc":
 
-      data.sort(
-
-        (a, b) =>
-
-          b.totalBirds - a.totalBirds
-
+      data.sort((a, b) =>
+        b.shopName.localeCompare(a.shopName) || byDate(b, a, 1)
       );
 
       break;
 
-    case "Weight":
+    case "amount_desc":
 
-      data.sort(
-
-        (a, b) =>
-
-          b.totalWeight - a.totalWeight
-
-      );
+      data.sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0) || byDate(b, a, 1));
 
       break;
 
-    case "Amount":
+    case "amount_asc":
 
-  data.sort(
-  (a, b) => (b.amount ?? 0) - (a.amount ?? 0)
-);
+      data.sort((a, b) => (a.amount ?? 0) - (b.amount ?? 0) || byDate(b, a, 1));
 
       break;
 
-    case "Rate":
-
-      data.sort(
-
-        (a, b) =>
-
-          (b.rate ?? 0) - (a.rate ?? 0)
-
-      );
-
-      break;
+    case "latest":
 
     default:
 
-      data.sort(
-
-        (a, b) =>
-
-          b.tripDate.localeCompare(a.tripDate)
-
-      );
+      data.sort((a, b) => byDate(b, a, 1));
 
   }
 
   return data;
 
+}
+
+/* =========================================
+   Pagination (page slice)
+========================================= */
+
+export function paginateSales<T>(sales: T[], page: number, pageSize: number): T[] {
+  const safePage = Math.max(1, Math.floor(page) || 1);
+  const safeSize = Math.max(1, Math.floor(pageSize) || 1);
+  const start = (safePage - 1) * safeSize;
+  return sales.slice(start, start + safeSize);
 }
 
 /* =========================================

@@ -130,7 +130,6 @@ export interface Collection {
 export interface PendingCollection {
   shopId?: number;
   shopName: string;
-  openingBalance: number;
   totalSales: number;
   totalCollections: number;
   currentPending: number;
@@ -153,6 +152,8 @@ export interface RecentCollection {
   amount: number;
   remarks: string;
   status: CollectionLegacyStatus;
+  /** Exact backend status ("Pending Approval" | "Approved" | "Rejected" | "Deleted"). */
+  rawStatus?: CollectionStatus;
   approvedBy?: string;
   approvedDate?: string;
   numericId?: number;
@@ -236,12 +237,11 @@ export interface CollectionWeeklySummary {
   shopName: string;
   weekStart: string;
   weekEnd: string;
-  openingBalance: number;
+  /** Authoritative live shop outstanding (shops.current_balance) — persistent, never weekly. */
+  balance: number;
   weeklySales: number;
   approvedCollections: number;
   pendingCollections: number;
-  currentOutstanding: number;
-  closingBalance: number;
   isCurrentWeek: boolean;
 }
 
@@ -254,15 +254,15 @@ export interface CollectionWeekBounds {
 }
 
 /** GET /operations/collection-entry/pending-summary — one row per active
- * shop, fully backend-aggregated (opening/balance/sales/approved/pending/
- * recovery). This is the Pending Collection main table's authoritative
- * source: do not recompute recoveryPercentage or balance from these fields. */
+ * shop, fully backend-aggregated (balance/sales/approved/pending/recovery).
+ * This is the Pending Collection main table's authoritative source: do not
+ * recompute recoveryPercentage or balance from these fields. */
 export interface CollectionPendingSummaryRow {
   shopId: number;
   shopName: string;
   weekStart: string;
   weekEnd: string;
-  openingBalance: number;
+  /** Authoritative live shop outstanding (shops.current_balance) — persistent, never weekly. */
   balance: number;
   weeklySales: number;
   weeklyApprovedCollections: number;

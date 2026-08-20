@@ -40,7 +40,7 @@ let entriesCache: CollectionApiEntry[] = [];
 let collectionsCache: Collection[] = [];
 let pendingCache: PendingCollection[] = [];
 let shopSalesCache: ShopSale[] = [];
-let shopsCache: { id: number; shopName: string; openingBalance: number; currentBalance: number }[] = [];
+let shopsCache: { id: number; shopName: string; currentBalance: number }[] = [];
 
 /* ==================================================================
    mapping
@@ -109,7 +109,6 @@ function buildPending(): PendingCollection[] {
     pending.push({
       shopId: shop.id,
       shopName: shop.shopName,
-      openingBalance: Number(shop.openingBalance ?? 0),
       totalSales,
       totalCollections,
       currentPending,
@@ -179,7 +178,6 @@ async function fetchShops(): Promise<typeof shopsCache> {
   return (data ?? []).map((r) => ({
     id: Number(r.id),
     shopName: String(r.shopName ?? r.shop_name ?? ""),
-    openingBalance: Number(r.openingBalance ?? r.opening_balance ?? 0),
     currentBalance: Number(r.currentBalance ?? r.current_balance ?? 0),
   }));
 }
@@ -290,6 +288,7 @@ function getRecentCollections(status: CollectionLegacyStatus | "All" = "Pending"
   const rows = status === "All"
     ? collectionsCache
     : collectionsCache.filter((c) => c.status === status);
+  const byId = new Map(entriesCache.map((e) => [String(e.id), e]));
   return rows
     .slice()
     .sort((a, b) => {
@@ -307,6 +306,7 @@ function getRecentCollections(status: CollectionLegacyStatus | "All" = "Pending"
       amount: row.amount,
       remarks: row.remarks,
       status: row.status,
+      rawStatus: byId.get(row.id)?.status,
       approvedBy: row.approvedBy,
       approvedDate: row.approvedDate,
     }));
@@ -439,17 +439,23 @@ async function deletePendingCollection(id: string): Promise<{ success: boolean; 
   }
 }
 
-async function approveCollection(id: string, approvedBy: string = "Admin"): Promise<boolean> {
+async function approveCollection(
+  id: string,
+  approvedBy: string = "Admin"
+): Promise<{ success: boolean; balance?: number }> {
   try {
-    await apiPatch(`${COLLECTION_PATH}/${Number(id)}/status`, {
+    const { data } = await apiPatch<Record<string, unknown>>(`${COLLECTION_PATH}/${Number(id)}/status`, {
       status: "Approved",
       approvedBy,
     });
+    // Backend returns the authoritative updated shop balance on approval.
+    const balance =
+      data && data.currentBalance != null ? Number(data.currentBalance) : undefined;
     await refreshFromBackend();
-    return true;
+    return { success: true, balance };
   } catch (error) {
     handleApiError(error);
-    return false;
+    return { success: false };
   }
 }
 
@@ -499,10 +505,6 @@ function getShopBalance(shopName: string): number {
   return shopsCache.find((s) => s.shopName === shopName)?.currentBalance ?? 0;
 }
 
-function getShopOpeningBalance(shopName: string): number {
-  return shopsCache.find((s) => s.shopName === shopName)?.openingBalance ?? 0;
-}
-
 async function fetchWeeklySummary(shopId: number, date: string): Promise<CollectionWeeklySummary> {
   const { data } = await apiGet<CollectionWeeklySummary>(`${COLLECTION_PATH}/weekly-summary`, {
     params: { shopId, date },
@@ -547,7 +549,6 @@ async function fetchPendingSummary(date: string): Promise<CollectionPendingSumma
     shopName: String(row.shopName ?? ""),
     weekStart: String(row.weekStart ?? ""),
     weekEnd: String(row.weekEnd ?? ""),
-    openingBalance: Number(row.openingBalance ?? 0),
     balance: Number(row.balance ?? 0),
     weeklySales: Number(row.weeklySales ?? 0),
     weeklyApprovedCollections: Number(row.weeklyApprovedCollections ?? 0),
@@ -625,12 +626,10 @@ function mapWeeklySummary(data: CollectionWeeklySummary): CollectionWeeklySummar
     shopName: String(data.shopName ?? ""),
     weekStart: String(data.weekStart),
     weekEnd: String(data.weekEnd),
-    openingBalance: Number(data.openingBalance ?? 0),
+    balance: Number(data.balance ?? 0),
     weeklySales: Number(data.weeklySales ?? 0),
     approvedCollections: Number(data.approvedCollections ?? 0),
     pendingCollections: Number(data.pendingCollections ?? 0),
-    currentOutstanding: Number(data.currentOutstanding ?? 0),
-    closingBalance: Number(data.closingBalance ?? data.currentOutstanding ?? 0),
     isCurrentWeek: Boolean(data.isCurrentWeek),
   };
 }
@@ -662,7 +661,6 @@ getShopSales,
   toEntryInput,
   getShopIdForName,
   getShopBalance,
-  getShopOpeningBalance,
   fetchWeeklySummary,
   fetchWeeklySummaries,
   fetchWeekBounds,

@@ -21,10 +21,12 @@ interface Props {
   sortBy: string;
   shopNames: string[];
   totalEntries: number;
+  searchQuery: string;
   setFromDate: (value: string) => void;
   setToDate: (value: string) => void;
   setShopName: (value: string) => void;
   setSortBy: (value: string) => void;
+  setSearchQuery: (value: string) => void;
   onSearch: () => void;
   onReset: () => void;
   onExportPDF: () => void;
@@ -42,6 +44,8 @@ function ShopSalesFilters({
   setToDate,
   setShopName,
   setSortBy,
+  searchQuery,
+  setSearchQuery,
   onSearch,
   onReset,
   onExportPDF,
@@ -59,12 +63,12 @@ function ShopSalesFilters({
   ];
 
   const sortOptions = [
-    { value: "Latest", label: "Latest Date" },
-    { value: "Shop", label: "Shop Name" },
-    { value: "Birds", label: "Highest Birds" },
-    { value: "Weight", label: "Highest Weight" },
-    { value: "Amount", label: "Highest Amount" },
-    { value: "Rate", label: "Highest Rate" },
+    { value: "latest", label: "Latest Date" },
+    { value: "oldest", label: "Oldest Date" },
+    { value: "shop_asc", label: "Shop Name A-Z" },
+    { value: "shop_desc", label: "Shop Name Z-A" },
+    { value: "amount_desc", label: "Highest Amount" },
+    { value: "amount_asc", label: "Lowest Amount" },
   ];
 
   const selectStyles = opsReactSelectStyles();
@@ -121,10 +125,35 @@ function ShopSalesFilters({
           <Select
             options={sortOptions}
             value={sortOptions.find((x) => x.value === sortBy)}
-            onChange={(e) => setSortBy(e?.value || "Latest")}
+            onChange={(e) => setSortBy(e?.value || "latest")}
             styles={selectStyles}
           />
         </div>
+      </div>
+
+      {/* Search */}
+      <div className="pt-2 border-t border-slate-100">
+        <label className={opsFilterLabelClass}>Search</label>
+        <div className="flex items-stretch gap-2">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onSearch();
+            }}
+            placeholder="Search Shop Sales No, Shop Name, Trip No..."
+            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all"
+          />
+          <button type="button" onClick={onSearch} className={opsPrimaryButtonClass}>
+            <Search size={14} />
+            Search
+          </button>
+        </div>
+        <p className="mt-1 text-[11px] text-slate-400 font-medium">
+          Tip: a full Shop Sales No (TR-20260820-001-S002) returns that sale; a Trip No
+          (TR-20260820-001) returns every sale on that trip; a shop name returns its sales.
+        </p>
       </div>
 
       {/* Action Buttons Toolbar */}

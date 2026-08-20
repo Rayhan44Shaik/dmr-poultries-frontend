@@ -89,10 +89,10 @@ export default function PendingCollectionsPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const [summary, setSummary] = useState({
-    openingBalance: 0,
+    balance: 0,
     weeklySales: 0,
     weeklyCollections: 0,
-    currentPending: 0,
+    weeklyPending: 0,
     shopName: "",
     dateRange: "",
     showSummary: false,
@@ -266,10 +266,10 @@ export default function PendingCollectionsPage() {
       return;
     }
     setSummary({
-      openingBalance: week.openingBalance,
+      balance: week.balance,
       weeklySales: week.weeklySales,
       weeklyCollections: week.weeklyApprovedCollections,
-      currentPending: week.balance,
+      weeklyPending: week.weeklyPendingCollections,
       shopName: week.shopName,
       dateRange: `${week.weekStart} → ${week.weekEnd}`,
       showSummary: true,
@@ -551,13 +551,13 @@ export default function PendingCollectionsPage() {
     <div className="w-full space-y-5">
       {summary.showSummary && (
         <OutstandingSummary
-          openingBalance={summary.openingBalance}
+          balance={summary.balance}
           weeklySales={summary.weeklySales}
           weeklyCollections={summary.weeklyCollections}
-          currentPending={summary.currentPending}
+          weeklyPending={summary.weeklyPending}
+          showSummary={summary.showSummary}
           shopName={summary.shopName}
           dateRange={summary.dateRange}
-          showSummary={summary.showSummary}
         />
       )}
 
