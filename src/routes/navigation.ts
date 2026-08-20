@@ -39,7 +39,8 @@ import {
   UserCheck,
   Settings,
   Database,
-  DollarSign
+  DollarSign,
+  Route
 } from "lucide-react";
 
 export interface NavChild {
@@ -101,6 +102,14 @@ export const NAV_SECTIONS: NavSection[] = [
       
       { label: "Mortality Entry", path: "/operations?tab=mortality", icon: Bird, keywords: "mortality death birds" },
       { label: "Fuel Expenses", path: "/operations?tab=fuel-expenses", icon: Fuel, keywords: "fuel diesel expenses bills" },
+    ],
+  },
+  {
+    id: "order",
+    label: "Order",
+    icon: Route,
+    children: [
+      { label: "Orders", path: "/order", icon: Route, keywords: "order shop requirement priority route vehicle delivery tracking" },
     ],
   },
   {
