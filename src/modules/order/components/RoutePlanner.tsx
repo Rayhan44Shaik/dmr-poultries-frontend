@@ -1,55 +1,49 @@
 // src/modules/order/components/RoutePlanner.tsx
-// Three-panel route planning screen: orders (left), route visualization
-// (center), route details (right).
+// Central decision screen: unassigned orders (left), route visualization
+// (center), vehicle comparison + route details (right).
 
 import { useMemo, useState } from "react";
-import { Truck } from "lucide-react";
+import { MapPin, Truck } from "lucide-react";
 import type { Order, VehicleAssignment as VehicleAssignmentType } from "../types/orderTypes";
-import type { DeliveryRoute } from "../types/routeTypes";
+import type { DeliveryRoute, RouteVehicle } from "../types/routeTypes";
 import PriorityBadge from "./PriorityBadge";
 import MapPlaceholder from "./MapPlaceholder";
+import RouteTimeline from "./RouteTimeline";
+import RouteCalculationCard from "./RouteCalculationCard";
 import RouteStopList from "./RouteStopList";
+import VehicleComparison from "./VehicleComparison";
 import EmptyState from "./EmptyState";
-import { ORDER_VEHICLES } from "../data/orderMockData";
-import { nextTripNumber } from "../utils/sequence";
+import { recommendVehicles } from "../services/vehicleRecommendationService";
+import { formatAddressShort } from "../utils/orderFormat";
 
 interface RoutePlannerProps {
   orders: Order[];
   routes: DeliveryRoute[];
+  vehicles: RouteVehicle[];
   isLoading: boolean;
   onAssign: (orderId: string, assignment: VehicleAssignmentType) => void;
 }
 
-export default function RoutePlanner({ orders, routes, isLoading, onAssign }: RoutePlannerProps) {
+export default function RoutePlanner({ orders, routes, vehicles, isLoading, onAssign }: RoutePlannerProps) {
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(routes[0]?.id ?? null);
-  const [assigningId, setAssigningId] = useState<string | null>(null);
-  const [vehicleChoice, setVehicleChoice] = useState("");
 
   const unassigned = useMemo(
     () => orders.filter((o) => !o.vehicleAssignment && o.status !== "Cancelled" && o.status !== "Delivered"),
     [orders],
   );
 
-  const selectedRoute = routes.find((r) => r.id === selectedRouteId) ?? routes[0] ?? null;
+  const selectedOrder = useMemo(
+    () => unassigned.find((o) => o.id === selectedOrderId) ?? null,
+    [unassigned, selectedOrderId],
+  );
 
-  const doAssign = (order: Order) => {
-    const vehicle = ORDER_VEHICLES.find((v) => v.id === vehicleChoice);
-    if (!vehicle) return;
-    onAssign(order.id, {
-      vehicleId: vehicle.id,
-      vehicleNo: vehicle.vehicleNo,
-      driverName: vehicle.driverName,
-      supervisorName: vehicle.supervisorName,
-      tripNo: nextTripNumber(),
-      pickupFarm: vehicle.pickup.farmName,
-      pickupLocation: vehicle.pickup.location,
-      orderCount: vehicle.assignedOrderCount + 1,
-      routeStatus: "Planned",
-      assignmentType: "Manually Assigned",
-    });
-    setAssigningId(null);
-    setVehicleChoice("");
-  };
+  const recommendation = useMemo(
+    () => (selectedOrder ? recommendVehicles({ order: selectedOrder, vehicles }) : null),
+    [selectedOrder, vehicles],
+  );
+
+  const selectedRoute = routes.find((r) => r.id === selectedRouteId) ?? routes[0] ?? null;
 
   if (isLoading) {
     return (
@@ -64,7 +58,7 @@ export default function RoutePlanner({ orders, routes, isLoading, onAssign }: Ro
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-      {/* Left — awaiting assignment */}
+      {/* Left — orders awaiting assignment */}
       <div className="xl:col-span-3">
         <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
@@ -73,73 +67,44 @@ export default function RoutePlanner({ orders, routes, isLoading, onAssign }: Ro
               {unassigned.length} unassigned
             </span>
           </div>
-          <div className="max-h-[520px] divide-y divide-slate-100 overflow-y-auto">
+          <div className="max-h-[560px] divide-y divide-slate-100 overflow-y-auto">
             {unassigned.length === 0 ? (
               <EmptyState icon={Truck} title="All orders assigned" description="No orders are waiting for a vehicle." />
             ) : (
-              unassigned.map((order) => (
-                <div key={order.id} className="px-4 py-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-800">{order.shop.name}</p>
-                      <p className="text-[11px] text-slate-400">
-                        {order.orderNumber} · {order.birds.toLocaleString("en-IN")} birds · {order.deliveryDeadline}
-                      </p>
-                    </div>
-                    <PriorityBadge priority={order.priority} />
-                  </div>
-                  {assigningId === order.id ? (
-                    <div className="mt-2 space-y-2">
-                      <select
-                        value={vehicleChoice}
-                        onChange={(e) => setVehicleChoice(e.target.value)}
-                        className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-brand-500"
-                      >
-                        <option value="">Select vehicle…</option>
-                        {ORDER_VEHICLES.filter((v) => v.available).map((v) => (
-                          <option key={v.id} value={v.id}>
-                            {v.vehicleNo} — {v.pickup.location}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => doAssign(order)}
-                          disabled={!vehicleChoice}
-                          className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-40"
-                        >
-                          Assign
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setAssigningId(null)}
-                          className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-50"
-                        >
-                          Cancel
-                        </button>
+              unassigned.map((order) => {
+                const active = selectedOrderId === order.id;
+                return (
+                  <button
+                    key={order.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedOrderId(order.id);
+                      setSelectedRouteId(null);
+                    }}
+                    className={`block w-full px-4 py-3 text-left transition-colors ${active ? "bg-brand-50/60" : "hover:bg-slate-50"}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-800">{order.shop.name}</p>
+                        <p className="flex items-center gap-1 text-[11px] text-slate-400">
+                          <MapPin size={10} />
+                          {formatAddressShort(order.shop.address)}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-slate-400">
+                          {order.birds.toLocaleString("en-IN")} birds · {order.boxes} boxes · {order.deadlineLabel}
+                        </p>
                       </div>
+                      <PriorityBadge priority={order.priority} />
                     </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAssigningId(order.id);
-                        setVehicleChoice("");
-                      }}
-                      className="mt-2 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-                    >
-                      Assign vehicle
-                    </button>
-                  )}
-                </div>
-              ))
+                  </button>
+                );
+              })
             )}
           </div>
         </div>
       </div>
 
-      {/* Center — visualization */}
+      {/* Center — route visualization */}
       <div className="xl:col-span-5">
         <div className="flex flex-col gap-3">
           {/* Route selector */}
@@ -151,7 +116,10 @@ export default function RoutePlanner({ orders, routes, isLoading, onAssign }: Ro
                 <button
                   key={route.id}
                   type="button"
-                  onClick={() => setSelectedRouteId(route.id)}
+                  onClick={() => {
+                    setSelectedRouteId(route.id);
+                    setSelectedOrderId(null);
+                  }}
                   className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
                     selectedRoute?.id === route.id
                       ? "border-brand-600 bg-brand-50 text-brand-700"
@@ -164,18 +132,37 @@ export default function RoutePlanner({ orders, routes, isLoading, onAssign }: Ro
               ))
             )}
           </div>
-          <MapPlaceholder route={selectedRoute} />
+
+          {selectedRoute ? (
+            <RouteTimeline route={selectedRoute} />
+          ) : (
+            <MapPlaceholder route={null} />
+          )}
         </div>
       </div>
 
-      {/* Right — route details */}
+      {/* Right — decision panel */}
       <div className="xl:col-span-4">
-        {selectedRoute ? (
-          <RouteStopList route={selectedRoute} />
+        {selectedOrder && recommendation ? (
+          <VehicleComparison
+            order={selectedOrder}
+            result={recommendation}
+            onAssign={(assignment) => {
+              onAssign(selectedOrder.id, assignment);
+              setSelectedOrderId(null);
+            }}
+          />
+        ) : selectedRoute ? (
+          <div className="space-y-4">
+            <RouteCalculationCard route={selectedRoute} />
+            <RouteStopList route={selectedRoute} />
+          </div>
         ) : (
           <div className="rounded-2xl border border-slate-200/80 bg-white p-10 text-center">
-            <p className="text-sm font-semibold text-slate-700">No route selected</p>
-            <p className="mt-1 text-xs text-slate-400">Assign orders to vehicles to build routes.</p>
+            <p className="text-sm font-semibold text-slate-700">Select an order or route</p>
+            <p className="mt-1 text-xs text-slate-400">
+              Choose an unassigned order to compare vehicles, or a route to review its plan.
+            </p>
           </div>
         )}
       </div>

@@ -6,8 +6,9 @@ import { ChevronDown, ChevronRight, Eye, MapPin } from "lucide-react";
 import type { Order } from "../types/orderTypes";
 import PriorityBadge from "./PriorityBadge";
 import StatusBadge from "./StatusBadge";
+import GPSStatus from "./GPSStatus";
 import { distanceForOrder } from "../utils/routeUtils";
-import { formatDistanceKm, formatEtaMinutes } from "../utils/orderFormat";
+import { formatDeliveryDate, formatDistanceKm, formatTravelMinutes } from "../utils/orderFormat";
 
 interface OrderTableProps {
   orders: Order[];
@@ -126,8 +127,8 @@ function FragmentRow({
         <td className="px-3 py-3 text-right text-slate-600">{order.boxes || "—"}</td>
         <td className="px-3 py-3"><PriorityBadge priority={order.priority} /></td>
         <td className="px-3 py-3"><CustomerType important={order.importantCustomer} /></td>
-        <td className="px-3 py-3 whitespace-nowrap text-slate-600">{order.deliveryDate}</td>
-        <td className="px-3 py-3 whitespace-nowrap text-slate-600">{order.deliveryDeadline}</td>
+        <td className="px-3 py-3 whitespace-nowrap text-slate-600">{formatDeliveryDate(order.deliveryDate)}</td>
+        <td className="px-3 py-3 whitespace-nowrap text-slate-600">{order.deadlineLabel}</td>
         <td className="px-3 py-3 text-slate-600">
           {order.pickupSource ? (
             <span className="inline-flex items-center gap-1.5">
@@ -148,8 +149,10 @@ function FragmentRow({
             <span className="text-slate-400">—</span>
           )}
         </td>
-        <td className="px-3 py-3 text-right font-medium text-slate-600">{distance != null ? formatDistanceKm(distance) : <span className="text-slate-400">Pending</span>}</td>
-        <td className="px-3 py-3 text-slate-600">{formatEtaMinutes(distance)}</td>
+        <td className="px-3 py-3 text-right font-medium text-slate-600">
+          {distance != null ? formatDistanceKm(distance) : <span className="text-slate-400">Pending</span>}
+        </td>
+        <td className="px-3 py-3 text-slate-600">{formatTravelMinutes(distance != null ? Math.round((distance / 40) * 60) : null)}</td>
         <td className="px-3 py-3"><StatusBadge status={order.status} /></td>
         <td className="px-3 py-3 text-center">
           <button
@@ -184,6 +187,18 @@ function FragmentRow({
                 <p>{order.deliveryWindow ?? "—"}</p>
               </div>
               <div>
+                <span className="font-semibold text-slate-400">Address</span>
+                <p>
+                  {order.shop.address.line1}, {order.shop.address.city}, {order.shop.address.pinCode}
+                </p>
+              </div>
+              <div className="col-span-2">
+                <span className="font-semibold text-slate-400">Shop GPS</span>
+                <div className="mt-1">
+                  <GPSStatus gps={order.shop.gps} status={order.shop.gpsStatus} />
+                </div>
+              </div>
+              <div className="col-span-2">
                 <span className="font-semibold text-slate-400">Remarks</span>
                 <p>{order.remarks || "—"}</p>
               </div>

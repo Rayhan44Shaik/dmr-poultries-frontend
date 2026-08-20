@@ -6,8 +6,11 @@ import type { Order } from "../types/orderTypes";
 import PriorityBadge from "./PriorityBadge";
 import StatusBadge from "./StatusBadge";
 import GPSStatus from "./GPSStatus";
+import AddressBlock from "./AddressBlock";
 import { distanceForOrder } from "../utils/routeUtils";
-import { formatDeliveryDate, formatDistanceKm, formatEtaMinutes } from "../utils/orderFormat";
+import { formatAddress, formatDeliveryDate, formatDistanceKm, formatTravelMinutes } from "../utils/orderFormat";
+import { formatClock, parseHHmm } from "../utils/businessTime";
+import { classifyBuffer, classifyFeasibility } from "../utils/feasibility";
 
 interface OrderDetailsDrawerProps {
   order: Order | null;
@@ -32,10 +35,28 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+const FEASIBILITY_LABEL: Record<string, { text: string; className: string }> = {
+  "Can Meet": { text: "✓ Can Meet", className: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+  "At Risk": { text: "⚠ At Risk", className: "text-amber-700 bg-amber-50 border-amber-200" },
+  "Cannot Meet": { text: "✕ Cannot Meet", className: "text-rose-700 bg-rose-50 border-rose-200" },
+  Unknown: { text: "—", className: "text-slate-500 bg-slate-50 border-slate-200" },
+};
+
 export default function OrderDetailsDrawer({ order, onClose }: OrderDetailsDrawerProps) {
   if (!order) return null;
   const distance = distanceForOrder(order);
   const assignment = order.vehicleAssignment;
+
+  // Delivery calculation (single-leg, pickup → shop).
+  const departureMinutes = assignment?.departureTime ? parseHHmm(assignment.departureTime) : null;
+  const travelMinutes = distance != null ? Math.round((distance / 40) * 60) : null;
+  const arrivalMinutes = departureMinutes != null && travelMinutes != null ? departureMinutes + travelMinutes : null;
+  const deadlineMinutes = parseHHmm(order.deadlineTime);
+  const bufferMinutes =
+    arrivalMinutes != null && deadlineMinutes != null ? deadlineMinutes - arrivalMinutes : null;
+  const feasibility = classifyFeasibility(bufferMinutes);
+  const bufferState = classifyBuffer(bufferMinutes);
+  const feas = FEASIBILITY_LABEL[feasibility] ?? FEASIBILITY_LABEL.Unknown;
 
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
@@ -52,7 +73,7 @@ export default function OrderDetailsDrawer({ order, onClose }: OrderDetailsDrawe
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <div className="flex items-center gap-2 px-6 pt-5">
+          <div className="flex flex-wrap items-center gap-2 px-6 pt-5">
             <PriorityBadge priority={order.priority} />
             <StatusBadge status={order.status} />
             {order.importantCustomer && (
@@ -64,33 +85,29 @@ export default function OrderDetailsDrawer({ order, onClose }: OrderDetailsDrawe
 
           <Section title="Order Information">
             <Row label="Shop" value={order.shop.name} />
+            <Row label="Address" value={formatAddress(order.shop.address)} />
             <Row label="Bird Type" value={order.birdType} />
             <Row label="Birds" value={order.birds.toLocaleString("en-IN")} />
             <Row label="Boxes" value={order.boxes || "—"} />
             <Row label="Requirement" value={order.requirementType} />
             <Row label="Expected Weight" value={order.expectedWeightKg != null ? `${order.expectedWeightKg.toLocaleString("en-IN")} kg` : "—"} />
-            <Row label="Delivery Date" value={formatDeliveryDate(order.deliveryDate)} />
-            <Row label="Deadline" value={order.deliveryDeadline} />
-            <Row label="Window" value={order.deliveryWindow ?? "—"} />
             <Row label="Remarks" value={order.remarks || "—"} />
           </Section>
 
+          <Section title="Delivery">
+            <Row label="Date" value={formatDeliveryDate(order.deliveryDate)} />
+            <Row label="Deadline" value={`${order.deadlineLabel} (${order.deadlineTime})`} />
+            <Row label="Window" value={order.deliveryWindow ?? "—"} />
+          </Section>
+
           <Section title="Location">
-            <div className="space-y-3">
-              <div>
-                <p className="mb-1 text-xs font-semibold text-slate-500">Shop GPS</p>
-                <GPSStatus gps={order.shop.gps} status={order.shop.gpsStatus} />
-              </div>
-              <div>
-                <p className="mb-1 text-xs font-semibold text-slate-500">Pickup (Farm) GPS</p>
-                {order.pickupSource ? (
-                  <GPSStatus gps={order.pickupSource.gps} status={order.pickupSource.gpsStatus} />
-                ) : (
-                  <p className="text-xs text-slate-400">Not assigned</p>
-                )}
-              </div>
-              <Row label="Distance" value={formatDistanceKm(distance)} />
-              <Row label="ETA" value={formatEtaMinutes(distance)} />
+            <AddressBlock title="Shop" address={order.shop.address} gps={order.shop.gps} gpsStatus={order.shop.gpsStatus} />
+            <div className="mt-3">
+              {order.pickupSource ? (
+                <AddressBlock title="Pickup (Farm)" address={order.pickupSource.address} gps={order.pickupSource.gps} gpsStatus={order.pickupSource.gpsStatus} />
+              ) : (
+                <p className="text-xs text-slate-400">Pickup not assigned.</p>
+              )}
             </div>
           </Section>
 
@@ -102,11 +119,24 @@ export default function OrderDetailsDrawer({ order, onClose }: OrderDetailsDrawe
                 <Row label="Supervisor" value={assignment.supervisorName} />
                 <Row label="Trip" value={assignment.tripNo} />
                 <Row label="Pickup Farm" value={assignment.pickupFarm} />
+                <Row label="Departure" value={assignment.departureTime} />
                 <Row label="Type" value={assignment.assignmentType} />
               </>
             ) : (
               <p className="text-xs text-slate-400">Awaiting vehicle assignment.</p>
             )}
+          </Section>
+
+          <Section title="Calculation">
+            <Row label="Distance" value={formatDistanceKm(distance)} />
+            <Row label="Travel Time" value={formatTravelMinutes(travelMinutes)} />
+            <Row label="Predicted Arrival" value={arrivalMinutes != null ? formatClock(arrivalMinutes) : "—"} />
+            <Row label="Buffer" value={bufferMinutes != null ? `${bufferMinutes} min (${bufferState})` : "—"} />
+            <Row
+              label="Deadline Status"
+              value={<span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${feas.className}`}>{feas.text}</span>}
+            />
+            <p className="mt-2 text-[11px] text-slate-400">Distance is a frontend estimate — real road routing not yet connected.</p>
           </Section>
 
           <Section title="Route">
@@ -119,6 +149,11 @@ export default function OrderDetailsDrawer({ order, onClose }: OrderDetailsDrawe
             ) : (
               <p className="text-xs text-slate-400">No route planned yet.</p>
             )}
+          </Section>
+
+          <Section title="Tracking">
+            <GPSStatus gps={order.shop.gps} status={order.shop.gpsStatus} label="Shop GPS" />
+            <p className="mt-2 text-[11px] text-slate-400">Live tracking requires a GPS backend.</p>
           </Section>
         </div>
       </aside>

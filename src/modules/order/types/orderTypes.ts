@@ -29,16 +29,12 @@ export type OrderStatus =
   | "Cancelled";
 
 /**
- * GPS availability state, surfaced to the user as readable text.
- * Never assume GPS is always present.
+ * GPS quality classification. Never assume GPS is always present or accurate.
+ * "Fresh"/"Stale" are derived from the coordinate timestamp; "Invalid" means
+ * the lat/lon are out of range; "Poor Accuracy" means the accuracy exceeds the
+ * configured threshold.
  */
-export type GpsAvailability =
-  | "Available"
-  | "Not Available"
-  | "Pending"
-  | "Stale"
-  | "Invalid"
-  | "Poor Accuracy";
+export type GpsQuality = "Fresh" | "Stale" | "Unavailable" | "Invalid" | "Poor Accuracy";
 
 /** Nullable GPS fields — see requirement #41. */
 export interface GpsCoordinate {
@@ -54,14 +50,26 @@ export interface GpsCoordinate {
   heading?: number | null;
 }
 
+/** Structured physical address (never a database id). */
+export interface Address {
+  line1: string;
+  line2?: string;
+  area?: string;
+  city: string;
+  district?: string;
+  state: string;
+  pinCode: string;
+}
+
 export interface OrderShop {
   /** Opaque frontend identifier — never a database id. */
   id: string;
   name: string;
-  /** Readable city / village label, e.g. "Vijayawada". */
+  /** Readable city label, e.g. "Vijayawada". */
   location: string;
+  address: Address;
   gps: GpsCoordinate | null;
-  gpsStatus: GpsAvailability;
+  gpsStatus: GpsQuality;
 }
 
 /**
@@ -72,8 +80,9 @@ export interface PickupSource {
   id: string;
   farmName: string;
   location: string;
+  address: Address;
   gps: GpsCoordinate | null;
-  gpsStatus: GpsAvailability;
+  gpsStatus: GpsQuality;
   /** Constant marker clarifying that the farm originates from the trip flow. */
   source: "Trip Entry Step 2";
   tripNo: string | null;
@@ -90,6 +99,8 @@ export interface VehicleAssignment {
   pickupLocation: string;
   orderCount: number;
   routeStatus: string;
+  /** Vehicle departure time "HH:mm" (business-local). */
+  departureTime: string;
   /** Distinguish system recommendation from manual override (requirement #20). */
   assignmentType: "System Recommended" | "Manually Assigned";
 }
@@ -106,10 +117,12 @@ export interface Order {
   remarks: string;
   priority: OrderPriority;
   importantCustomer: boolean;
-  /** ISO date string (yyyy-mm-dd). */
+  /** ISO date string (yyyy-mm-dd) — business-local. */
   deliveryDate: string;
-  /** Human readable deadline, e.g. "Before 14:00". */
-  deliveryDeadline: string;
+  /** Comparable 24h deadline "HH:mm" (business-local). */
+  deadlineTime: string;
+  /** Human display label, e.g. "Before 14:00". */
+  deadlineLabel: string;
   /** Optional delivery window, e.g. "10:00 – 14:00". */
   deliveryWindow: string | null;
   status: OrderStatus;
@@ -131,6 +144,7 @@ export interface OrderDraft {
   priority: OrderPriority;
   importantCustomer: boolean;
   deliveryDate: string;
-  deliveryDeadline: string;
+  deadlineTime: string;
+  deadlineLabel: string;
   deliveryWindow: string | null;
 }

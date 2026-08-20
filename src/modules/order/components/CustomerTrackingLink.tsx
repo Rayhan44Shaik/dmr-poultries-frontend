@@ -1,9 +1,13 @@
 // src/modules/order/components/CustomerTrackingLink.tsx
-// Frontend UI for generating/displaying a customer tracking link. The real
-// secure token is wired up by the backend later — never expose internal ids.
+// Frontend UI for generating/displaying a customer tracking link.
+//
+// IMPORTANT: this is a FRONTEND PLACEHOLDER ONLY. The Base64 order-number
+// encoding is NOT a secure production token. A real backend must issue a
+// cryptographically random public tracking token. Internal ids are never
+// exposed to the customer.
 
 import { useMemo, useState } from "react";
-import { Copy, ExternalLink, Link2 } from "lucide-react";
+import { Copy, ExternalLink, Link2, ShieldAlert } from "lucide-react";
 
 interface CustomerTrackingLinkProps {
   orderNumber: string;
@@ -64,6 +68,11 @@ export default function CustomerTrackingLink({ orderNumber, destinationShop }: C
           <ExternalLink size={13} />
           Open Tracking
         </button>
+      </div>
+
+      <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+        <ShieldAlert size={13} className="mt-0.5 shrink-0" />
+        <span>Demo tracking link — a backend secure token is required for production.</span>
       </div>
     </div>
   );

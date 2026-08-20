@@ -17,12 +17,13 @@ export default function TrackingPage() {
   const [selectedVehicleId, setSelectedVehicleId] = useState("");
 
   const vehicles = useMemo(() => {
-    const map = new Map<string, { vehicleNo: string; shop: string }>();
+    const map = new Map<string, { vehicleNo: string; shop: string; orderNumber: string }>();
     for (const o of orders) {
       if (o.vehicleAssignment && !map.has(o.vehicleAssignment.vehicleId)) {
         map.set(o.vehicleAssignment.vehicleId, {
           vehicleNo: o.vehicleAssignment.vehicleNo,
           shop: o.shop.name,
+          orderNumber: o.orderNumber,
         });
       }
     }
@@ -127,7 +128,7 @@ export default function TrackingPage() {
           <div className="space-y-4">
             <MapPlaceholder />
             {selected && (
-              <CustomerTrackingLink orderNumber={selected.id} destinationShop={selected.shop} />
+              <CustomerTrackingLink orderNumber={selected.orderNumber} destinationShop={selected.shop} />
             )}
           </div>
         </div>

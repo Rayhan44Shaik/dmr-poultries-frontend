@@ -1,5 +1,6 @@
 // src/modules/order/components/OrderForm.tsx
 // New Order entry form with strong validation and a searchable shop selector.
+// Selecting a shop immediately shows its full address + GPS (requirement #4).
 
 import { useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Search, X } from "lucide-react";
@@ -25,7 +26,8 @@ const DEFAULT_DRAFT: OrderDraft = {
   priority: "Normal",
   importantCustomer: false,
   deliveryDate: "",
-  deliveryDeadline: "Before 12:00",
+  deadlineTime: "12:00",
+  deadlineLabel: "Before 12:00",
   deliveryWindow: null,
 };
 
@@ -58,6 +60,11 @@ export default function OrderForm({ initialDraft, onSubmit, onCancel }: OrderFor
     set("shopId", shop.id);
     setShopQuery(shop.name);
     setShopOpen(false);
+  };
+
+  const selectDeadline = (label: string, time: string) => {
+    set("deadlineTime", time);
+    set("deadlineLabel", label);
   };
 
   const handleSubmit = () => {
@@ -120,13 +127,26 @@ export default function OrderForm({ initialDraft, onSubmit, onCancel }: OrderFor
             </div>
           )}
         </div>
-        {selectedShop && (
-          <div className="mt-2 flex items-center gap-3">
-            <GPSStatus gps={selectedShop.gps} status={selectedShop.gpsStatus} label="Shop GPS" />
-          </div>
-        )}
         {fieldError("shopId")}
       </div>
+
+      {/* Selected shop details */}
+      {selectedShop && (
+        <div className="mb-5 rounded-xl border border-brand-200/70 bg-brand-50/50 p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-brand-700">Shop Details</p>
+          <p className="mt-1 text-sm font-bold text-slate-800">{selectedShop.name}</p>
+          <p className="text-xs text-slate-500">
+            {selectedShop.address.line1}
+            {selectedShop.address.area ? `, ${selectedShop.address.area}` : ""}
+          </p>
+          <p className="text-xs text-slate-500">
+            {[selectedShop.address.city, selectedShop.address.state, selectedShop.address.pinCode].filter(Boolean).join(", ")}
+          </p>
+          <div className="mt-2">
+            <GPSStatus gps={selectedShop.gps} status={selectedShop.gpsStatus} label="GPS" showDetails />
+          </div>
+        </div>
+      )}
 
       {/* Bird type + requirement type */}
       <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -188,9 +208,7 @@ export default function OrderForm({ initialDraft, onSubmit, onCancel }: OrderFor
             min={0}
             step={0.1}
             value={draft.expectedWeightKg == null ? "" : draft.expectedWeightKg}
-            onChange={(e) =>
-              set("expectedWeightKg", e.target.value === "" ? null : Number(e.target.value))
-            }
+            onChange={(e) => set("expectedWeightKg", e.target.value === "" ? null : Number(e.target.value))}
             className={inputClass}
             placeholder="Optional"
           />
@@ -250,12 +268,19 @@ export default function OrderForm({ initialDraft, onSubmit, onCancel }: OrderFor
         </div>
         <div>
           <label className={labelClass}>Deadline *</label>
-          <select value={draft.deliveryDeadline} onChange={(e) => set("deliveryDeadline", e.target.value)} className={inputClass}>
-            {DEADLINE_PRESETS.map((d) => (
-              <option key={d} value={d}>{d}</option>
+          <select
+            value={draft.deadlineTime}
+            onChange={(e) => {
+              const preset = DEADLINE_PRESETS.find((p) => p.time === e.target.value);
+              if (preset) selectDeadline(preset.label, preset.time);
+            }}
+            className={inputClass}
+          >
+            {DEADLINE_PRESETS.map((p) => (
+              <option key={p.time} value={p.time}>{p.label}</option>
             ))}
           </select>
-          {fieldError("deliveryDeadline")}
+          {fieldError("deadlineTime")}
         </div>
         <div>
           <label className={labelClass}>Delivery Window (optional)</label>

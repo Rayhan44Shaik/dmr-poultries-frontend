@@ -5,6 +5,7 @@
 // -----------------------------------------------------------------------------
 
 import type { OrderDraft, OrderPriority, RequirementType } from "../types/orderTypes";
+import { isValidHHmm } from "./businessTime";
 
 export type OrderValidationErrors = Partial<Record<keyof OrderDraft | "form", string>>;
 
@@ -16,6 +17,21 @@ export interface OrderValidationResult {
 export const BIRD_TYPES: readonly string[] = ["Broiler", "Layer", "Country Chicken", "Breeder"];
 export const REQUIREMENT_TYPES: readonly RequirementType[] = ["Birds", "Boxes", "Birds + Boxes"];
 export const PRIORITIES: readonly OrderPriority[] = ["Normal", "Important", "Urgent"];
+
+/** Deadline presets — label (display) + comparable 24h time. */
+export interface DeadlinePreset {
+  label: string;
+  time: string;
+}
+
+export const DEADLINE_PRESETS: readonly DeadlinePreset[] = [
+  { label: "Before 08:00", time: "08:00" },
+  { label: "Before 10:00", time: "10:00" },
+  { label: "Before 12:00", time: "12:00" },
+  { label: "Before 14:00", time: "14:00" },
+  { label: "Before 16:00", time: "16:00" },
+  { label: "Before 18:00", time: "18:00" },
+];
 
 function isWholeNumber(value: number): boolean {
   return Number.isFinite(value) && Number.isInteger(value);
@@ -29,7 +45,7 @@ function isWholeNumber(value: number): boolean {
  *  - At least one quantity (birds or boxes) must be > 0
  *  - Priority required
  *  - Delivery date required and must be a valid, non-empty date
- *  - Deadline required
+ *  - Deadline time required and must be a valid "HH:mm"
  *  - Expected weight (optional) must be >= 0
  */
 export function validateOrderDraft(draft: OrderDraft): OrderValidationResult {
@@ -67,12 +83,14 @@ export function validateOrderDraft(draft: OrderDraft): OrderValidationResult {
 
   if (!draft.deliveryDate) {
     errors.deliveryDate = "Delivery date is required.";
-  } else if (Number.isNaN(new Date(draft.deliveryDate).getTime())) {
+  } else if (Number.isNaN(new Date(`${draft.deliveryDate}T00:00:00`).getTime())) {
     errors.deliveryDate = "Delivery date is invalid.";
   }
 
-  if (!draft.deliveryDeadline) {
-    errors.deliveryDeadline = "Delivery deadline is required.";
+  if (!draft.deadlineTime) {
+    errors.deadlineTime = "Delivery deadline is required.";
+  } else if (!isValidHHmm(draft.deadlineTime)) {
+    errors.deadlineTime = "Delivery deadline is invalid.";
   }
 
   if (draft.expectedWeightKg != null && draft.expectedWeightKg < 0) {
@@ -81,16 +99,6 @@ export function validateOrderDraft(draft: OrderDraft): OrderValidationResult {
 
   return { valid: Object.keys(errors).length === 0, errors };
 }
-
-/** Deadline presets shown in the New Order form. */
-export const DEADLINE_PRESETS: readonly string[] = [
-  "Before 08:00",
-  "Before 10:00",
-  "Before 12:00",
-  "Before 14:00",
-  "Before 16:00",
-  "Before 18:00",
-];
 
 /** Next-generation order number for a new order given the current count. */
 export function nextOrderNumber(existing: number): string {

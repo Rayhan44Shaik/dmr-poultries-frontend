@@ -7,13 +7,14 @@ import { ArrowLeft, Route as RouteIcon } from "lucide-react";
 import RoutePlanner from "../components/RoutePlanner";
 import { useOrders } from "../store/orderContext";
 import { groupOrdersByVehicle } from "../utils/routeUtils";
+import { ORDER_VEHICLES } from "../data/orderMockData";
 import type { VehicleAssignment as VehicleAssignmentType } from "../types/orderTypes";
 
 export default function RoutePlanningPage() {
   const navigate = useNavigate();
   const { orders, isLoading, assignVehicle } = useOrders();
 
-  const routes = useMemo(() => groupOrdersByVehicle(orders), [orders]);
+  const routes = useMemo(() => groupOrdersByVehicle(orders, ORDER_VEHICLES), [orders]);
   const assignedCount = useMemo(
     () => orders.filter((o) => o.vehicleAssignment != null).length,
     [orders],
@@ -57,6 +58,7 @@ export default function RoutePlanningPage() {
       <RoutePlanner
         orders={orders}
         routes={routes}
+        vehicles={ORDER_VEHICLES}
         isLoading={isLoading}
         onAssign={(orderId: string, assignment: VehicleAssignmentType) => assignVehicle(orderId, assignment)}
       />

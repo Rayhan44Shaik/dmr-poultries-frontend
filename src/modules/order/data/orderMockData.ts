@@ -9,12 +9,7 @@
 // labelled as estimates in the interface.
 // -----------------------------------------------------------------------------
 
-import type {
-  GpsCoordinate,
-  Order,
-  OrderShop,
-  PickupSource,
-} from "../types/orderTypes";
+import type { Address, GpsCoordinate, Order, OrderShop, PickupSource } from "../types/orderTypes";
 import type { RouteVehicle } from "../types/routeTypes";
 
 /* ------------------------------------------------------------------ */
@@ -40,45 +35,53 @@ const GPS = {
   TENALI: coord(16.2381, 80.6435),
 } as const;
 
+const addr = (line1: string, city: string, pinCode: string, district = "NTR District", state = "Andhra Pradesh"): Address => ({
+  line1,
+  city,
+  district,
+  state,
+  pinCode,
+});
+
 /* ------------------------------------------------------------------ */
 /*  Shops (with varied GPS states to exercise every UI branch)         */
 /* ------------------------------------------------------------------ */
 export const ORDER_SHOPS: OrderShop[] = [
-  { id: "shop-vjw-01", name: "ABC Chicken Shop", location: "Vijayawada", gps: GPS.VIJAYAWADA, gpsStatus: "Available" },
-  { id: "shop-gnv-01", name: "Sri Venkateswara Poultry", location: "Gannavaram", gps: GPS.GANNAVARAM, gpsStatus: "Available" },
-  { id: "shop-gdv-01", name: "New Market Chicken", location: "Gudivada", gps: GPS.GUDIVADA, gpsStatus: "Available" },
-  { id: "shop-mgl-01", name: "Mangalagiri Broilers", location: "Mangalagiri", gps: GPS.MANGALAGIRI, gpsStatus: "Available" },
-  { id: "shop-tnl-01", name: "Tenali Poultry Store", location: "Tenali", gps: GPS.TENALI, gpsStatus: "Available" },
-  { id: "shop-elu-01", name: "Eluru Chicken Mart", location: "Eluru", gps: GPS.ELURU, gpsStatus: "Available" },
-  { id: "shop-vuy-01", name: "Vuyyuru Fresh Birds", location: "Vuyyuru", gps: GPS.VUYYURU, gpsStatus: "Available" },
-  { id: "shop-gnt-01", name: "Guntur Poultry House", location: "Guntur", gps: GPS.GUNTUR, gpsStatus: "Available" },
-  { id: "shop-hyd-01", name: "Hyderabad Chicken Center", location: "Hyderabad", gps: GPS.HYDERABAD, gpsStatus: "Available" },
-  { id: "shop-nogps-01", name: "Old City Chicken", location: "Vijayawada", gps: null, gpsStatus: "Not Available" },
-  { id: "shop-stale-01", name: "Rural Poultry Point", location: "Gudivada", gps: coord(16.4355, 80.9955, 30, "2026-08-19T07:30:00Z"), gpsStatus: "Stale" },
-  { id: "shop-poor-01", name: "Canal Road Chicken", location: "Tenali", gps: coord(16.2381, 80.6435, 250, "2026-08-20T08:45:00Z"), gpsStatus: "Poor Accuracy" },
+  { id: "shop-vjw-01", name: "ABC Chicken Shop", location: "Vijayawada", address: addr("12-34, MG Road", "Vijayawada", "520001"), gps: GPS.VIJAYAWADA, gpsStatus: "Fresh" },
+  { id: "shop-gnv-01", name: "Sri Venkateswara Poultry", location: "Gannavaram", address: addr("3-45, Main Bazaar", "Gannavaram", "521101", "Krishna District"), gps: GPS.GANNAVARAM, gpsStatus: "Fresh" },
+  { id: "shop-gdv-01", name: "New Market Chicken", location: "Gudivada", address: addr("8-22, Market Road", "Gudivada", "521301", "Krishna District"), gps: GPS.GUDIVADA, gpsStatus: "Fresh" },
+  { id: "shop-mgl-01", name: "Mangalagiri Broilers", location: "Mangalagiri", address: addr("5-18, Temple Street", "Mangalagiri", "522503", "Guntur District"), gps: GPS.MANGALAGIRI, gpsStatus: "Fresh" },
+  { id: "shop-tnl-01", name: "Tenali Poultry Store", location: "Tenali", address: addr("9-11, Gandhi Chowk", "Tenali", "522201", "Guntur District"), gps: GPS.TENALI, gpsStatus: "Fresh" },
+  { id: "shop-elu-01", name: "Eluru Chicken Mart", location: "Eluru", address: addr("2-7, Power Pet", "Eluru", "534002", "Eluru District"), gps: GPS.ELURU, gpsStatus: "Fresh" },
+  { id: "shop-vuy-01", name: "Vuyyuru Fresh Birds", location: "Vuyyuru", address: addr("1-50, Bus Stand Road", "Vuyyuru", "521165", "Krishna District"), gps: GPS.VUYYURU, gpsStatus: "Fresh" },
+  { id: "shop-gnt-01", name: "Guntur Poultry House", location: "Guntur", address: addr("7-31, Brodipet", "Guntur", "522002", "Guntur District"), gps: GPS.GUNTUR, gpsStatus: "Fresh" },
+  { id: "shop-hyd-01", name: "Hyderabad Chicken Center", location: "Hyderabad", address: addr("4-88, Ameerpet", "Hyderabad", "500016", "Hyderabad District", "Telangana"), gps: GPS.HYDERABAD, gpsStatus: "Fresh" },
+  { id: "shop-nogps-01", name: "Old City Chicken", location: "Vijayawada", address: addr("22-4, One Town", "Vijayawada", "520001"), gps: null, gpsStatus: "Unavailable" },
+  { id: "shop-stale-01", name: "Rural Poultry Point", location: "Gudivada", address: addr("6-2, Canal Road", "Gudivada", "521301", "Krishna District"), gps: coord(16.4355, 80.9955, 30, "2026-08-19T07:30:00Z"), gpsStatus: "Stale" },
+  { id: "shop-poor-01", name: "Canal Road Chicken", location: "Tenali", address: addr("11-9, Canal Road", "Tenali", "522201", "Guntur District"), gps: coord(16.2381, 80.6435, 250, "2026-08-20T08:45:00Z"), gpsStatus: "Poor Accuracy" },
 ];
 
 /* ------------------------------------------------------------------ */
 /*  Pickup farms — inherited from Trip Entry Step 2 (display only)     */
 /* ------------------------------------------------------------------ */
 export const ORDER_PICKUPS: PickupSource[] = [
-  { id: "farm-hyd", farmName: "Hyderabad Farm", location: "Hyderabad", gps: GPS.HYDERABAD, gpsStatus: "Available", source: "Trip Entry Step 2", tripNo: null, pickupStatus: "Assigned" },
-  { id: "farm-elu", farmName: "Eluru Farm", location: "Eluru", gps: GPS.ELURU, gpsStatus: "Available", source: "Trip Entry Step 2", tripNo: null, pickupStatus: "Assigned" },
-  { id: "farm-vuy", farmName: "Vuyyuru Farm", location: "Vuyyuru", gps: GPS.VUYYURU, gpsStatus: "Available", source: "Trip Entry Step 2", tripNo: null, pickupStatus: "Assigned" },
-  { id: "farm-gnt", farmName: "Guntur Farm", location: "Guntur", gps: GPS.GUNTUR, gpsStatus: "Available", source: "Trip Entry Step 2", tripNo: null, pickupStatus: "Assigned" },
+  { id: "farm-hyd", farmName: "Hyderabad Farm", location: "Hyderabad", address: addr("Plot 12, Shamshabad", "Hyderabad", "500052", "Ranga Reddy District", "Telangana"), gps: GPS.HYDERABAD, gpsStatus: "Fresh", source: "Trip Entry Step 2", tripNo: null, pickupStatus: "Assigned" },
+  { id: "farm-elu", farmName: "Eluru Farm", location: "Eluru", address: addr("D.No 45, Tangellamudi", "Eluru", "534005", "Eluru District"), gps: GPS.ELURU, gpsStatus: "Fresh", source: "Trip Entry Step 2", tripNo: null, pickupStatus: "Assigned" },
+  { id: "farm-vuy", farmName: "Vuyyuru Farm", location: "Vuyyuru", address: addr("Katuru Road", "Vuyyuru", "521165", "Krishna District"), gps: GPS.VUYYURU, gpsStatus: "Fresh", source: "Trip Entry Step 2", tripNo: null, pickupStatus: "Assigned" },
+  { id: "farm-gnt", farmName: "Guntur Farm", location: "Guntur", address: addr("Nallapadu", "Guntur", "522005", "Guntur District"), gps: GPS.GUNTUR, gpsStatus: "Fresh", source: "Trip Entry Step 2", tripNo: null, pickupStatus: "Assigned" },
 ];
 
 /* ------------------------------------------------------------------ */
 /*  Vehicles                                                           */
 /* ------------------------------------------------------------------ */
 export const ORDER_VEHICLES: RouteVehicle[] = [
-  { id: "veh-01", vehicleNo: "AP 16 AB 1234", driverName: "Ravi", supervisorName: "Kumar", pickup: ORDER_PICKUPS[0], birdCapacity: 20000, boxCapacity: 200, available: true, assignedOrderCount: 0 },
-  { id: "veh-02", vehicleNo: "AP 16 CD 5678", driverName: "Suresh", supervisorName: "Kumar", pickup: ORDER_PICKUPS[1], birdCapacity: 15000, boxCapacity: 150, available: true, assignedOrderCount: 0 },
-  { id: "veh-03", vehicleNo: "AP 16 EF 9012", driverName: "Venkat", supervisorName: "Prasad", pickup: ORDER_PICKUPS[2], birdCapacity: 12000, boxCapacity: 120, available: true, assignedOrderCount: 0 },
-  { id: "veh-04", vehicleNo: "AP 16 GH 3456", driverName: "Mahesh", supervisorName: "Prasad", pickup: ORDER_PICKUPS[3], birdCapacity: 18000, boxCapacity: 180, available: true, assignedOrderCount: 0 },
-  { id: "veh-05", vehicleNo: "AP 16 IJ 7890", driverName: "Anil", supervisorName: "Kumar", pickup: ORDER_PICKUPS[0], birdCapacity: 16000, boxCapacity: 160, available: true, assignedOrderCount: 0 },
-  { id: "veh-06", vehicleNo: "AP 16 KL 1122", driverName: "Prakash", supervisorName: "Prasad", pickup: ORDER_PICKUPS[1], birdCapacity: 14000, boxCapacity: 140, available: false, assignedOrderCount: 0 },
-  { id: "veh-07", vehicleNo: "AP 16 MN 3344", driverName: "Ramesh", supervisorName: "Kumar", pickup: ORDER_PICKUPS[3], birdCapacity: 15000, boxCapacity: 150, available: true, assignedOrderCount: 0 },
+  { id: "veh-01", vehicleNo: "AP 16 AB 1234", driverName: "Ravi", supervisorName: "Kumar", pickup: ORDER_PICKUPS[0], birdCapacity: 20000, boxCapacity: 200, available: true, assignedOrderCount: 0, schedule: { tripSubmittedTime: "08:00", loadingCompletionTime: "08:15", departureTime: "08:15" }, currentGps: GPS.HYDERABAD, currentGpsStatus: "Fresh", existingStopCities: [] },
+  { id: "veh-02", vehicleNo: "AP 16 CD 5678", driverName: "Suresh", supervisorName: "Kumar", pickup: ORDER_PICKUPS[1], birdCapacity: 15000, boxCapacity: 150, available: true, assignedOrderCount: 0, schedule: { tripSubmittedTime: "08:15", loadingCompletionTime: "08:30", departureTime: "08:30" }, currentGps: GPS.ELURU, currentGpsStatus: "Fresh", existingStopCities: [] },
+  { id: "veh-03", vehicleNo: "AP 16 EF 9012", driverName: "Venkat", supervisorName: "Prasad", pickup: ORDER_PICKUPS[2], birdCapacity: 12000, boxCapacity: 120, available: true, assignedOrderCount: 0, schedule: { tripSubmittedTime: "09:00", loadingCompletionTime: "09:10", departureTime: "09:10" }, currentGps: GPS.VUYYURU, currentGpsStatus: "Fresh", existingStopCities: [] },
+  { id: "veh-04", vehicleNo: "AP 16 GH 3456", driverName: "Mahesh", supervisorName: "Prasad", pickup: ORDER_PICKUPS[3], birdCapacity: 18000, boxCapacity: 180, available: true, assignedOrderCount: 0, schedule: { tripSubmittedTime: "08:30", loadingCompletionTime: "08:45", departureTime: "08:45" }, currentGps: GPS.GUNTUR, currentGpsStatus: "Fresh", existingStopCities: [] },
+  { id: "veh-05", vehicleNo: "AP 16 IJ 7890", driverName: "Anil", supervisorName: "Kumar", pickup: ORDER_PICKUPS[0], birdCapacity: 16000, boxCapacity: 160, available: true, assignedOrderCount: 0, schedule: { tripSubmittedTime: "08:45", loadingCompletionTime: "09:00", departureTime: "09:00" }, currentGps: GPS.HYDERABAD, currentGpsStatus: "Fresh", existingStopCities: [] },
+  { id: "veh-06", vehicleNo: "AP 16 KL 1122", driverName: "Prakash", supervisorName: "Prasad", pickup: ORDER_PICKUPS[1], birdCapacity: 14000, boxCapacity: 140, available: false, assignedOrderCount: 0, schedule: { tripSubmittedTime: "09:00", loadingCompletionTime: "09:15", departureTime: "09:15" }, currentGps: GPS.ELURU, currentGpsStatus: "Fresh", existingStopCities: [] },
+  { id: "veh-07", vehicleNo: "AP 16 MN 3344", driverName: "Ramesh", supervisorName: "Kumar", pickup: ORDER_PICKUPS[3], birdCapacity: 15000, boxCapacity: 150, available: true, assignedOrderCount: 0, schedule: { tripSubmittedTime: "09:10", loadingCompletionTime: "09:25", departureTime: "09:25" }, currentGps: GPS.GUNTUR, currentGpsStatus: "Fresh", existingStopCities: [] },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -105,7 +108,8 @@ const order = (partial: Partial<Order> & Pick<Order, "shop" | "orderNumber">): O
     priority: "Normal",
     importantCustomer: false,
     deliveryDate: iso(1),
-    deliveryDeadline: "Before 18:00",
+    deadlineTime: "18:00",
+    deadlineLabel: "Before 18:00",
     deliveryWindow: null,
     status: "Pending",
     pickupSource: null,
@@ -124,14 +128,15 @@ export const ORDER_SEED: Order[] = [
     requirementType: "Birds",
     birds: 5000,
     priority: "Urgent",
-    deliveryDeadline: "Before 12:00",
+    deadlineTime: "12:00",
+    deadlineLabel: "Before 12:00",
     deliveryWindow: "09:00 – 12:00",
     status: "Assigned",
     pickupSource: ORDER_PICKUPS[2],
     vehicleAssignment: {
       vehicleId: "veh-03", vehicleNo: "AP 16 EF 9012", driverName: "Venkat", supervisorName: "Prasad",
       tripNo: "TRP-2041", pickupFarm: "Vuyyuru Farm", pickupLocation: "Vuyyuru", orderCount: 3,
-      routeStatus: "Ready", assignmentType: "System Recommended",
+      routeStatus: "Ready", departureTime: "09:10", assignmentType: "System Recommended",
     },
   }),
   order({
@@ -142,13 +147,14 @@ export const ORDER_SEED: Order[] = [
     birds: 3000,
     priority: "Important",
     importantCustomer: true,
-    deliveryDeadline: "Before 14:00",
+    deadlineTime: "14:00",
+    deadlineLabel: "Before 14:00",
     status: "Assigned",
     pickupSource: ORDER_PICKUPS[2],
     vehicleAssignment: {
       vehicleId: "veh-03", vehicleNo: "AP 16 EF 9012", driverName: "Venkat", supervisorName: "Prasad",
       tripNo: "TRP-2041", pickupFarm: "Vuyyuru Farm", pickupLocation: "Vuyyuru", orderCount: 3,
-      routeStatus: "Ready", assignmentType: "System Recommended",
+      routeStatus: "Ready", departureTime: "09:10", assignmentType: "System Recommended",
     },
   }),
   order({
@@ -158,13 +164,14 @@ export const ORDER_SEED: Order[] = [
     requirementType: "Birds",
     birds: 2000,
     priority: "Normal",
-    deliveryDeadline: "Before 18:00",
+    deadlineTime: "18:00",
+    deadlineLabel: "Before 18:00",
     status: "Assigned",
     pickupSource: ORDER_PICKUPS[2],
     vehicleAssignment: {
       vehicleId: "veh-03", vehicleNo: "AP 16 EF 9012", driverName: "Venkat", supervisorName: "Prasad",
       tripNo: "TRP-2041", pickupFarm: "Vuyyuru Farm", pickupLocation: "Vuyyuru", orderCount: 3,
-      routeStatus: "Ready", assignmentType: "Manually Assigned",
+      routeStatus: "Ready", departureTime: "09:10", assignmentType: "Manually Assigned",
     },
   }),
   order({
@@ -177,13 +184,14 @@ export const ORDER_SEED: Order[] = [
     expectedWeightKg: 8800,
     priority: "Important",
     importantCustomer: true,
-    deliveryDeadline: "Before 16:00",
+    deadlineTime: "16:00",
+    deadlineLabel: "Before 16:00",
     status: "In Transit",
     pickupSource: ORDER_PICKUPS[3],
     vehicleAssignment: {
       vehicleId: "veh-04", vehicleNo: "AP 16 GH 3456", driverName: "Mahesh", supervisorName: "Prasad",
       tripNo: "TRP-2042", pickupFarm: "Guntur Farm", pickupLocation: "Guntur", orderCount: 2,
-      routeStatus: "In Transit", assignmentType: "System Recommended",
+      routeStatus: "In Transit", departureTime: "08:45", assignmentType: "System Recommended",
     },
   }),
   order({
@@ -194,13 +202,14 @@ export const ORDER_SEED: Order[] = [
     boxes: 25,
     expectedWeightKg: 5500,
     priority: "Normal",
-    deliveryDeadline: "Before 18:00",
+    deadlineTime: "18:00",
+    deadlineLabel: "Before 18:00",
     status: "In Transit",
     pickupSource: ORDER_PICKUPS[3],
     vehicleAssignment: {
       vehicleId: "veh-04", vehicleNo: "AP 16 GH 3456", driverName: "Mahesh", supervisorName: "Prasad",
       tripNo: "TRP-2042", pickupFarm: "Guntur Farm", pickupLocation: "Guntur", orderCount: 2,
-      routeStatus: "In Transit", assignmentType: "System Recommended",
+      routeStatus: "In Transit", departureTime: "08:45", assignmentType: "System Recommended",
     },
   }),
   order({
@@ -211,7 +220,8 @@ export const ORDER_SEED: Order[] = [
     birds: 6000,
     priority: "Urgent",
     importantCustomer: true,
-    deliveryDeadline: "Before 10:00",
+    deadlineTime: "10:00",
+    deadlineLabel: "Before 10:00",
     status: "Awaiting Assignment",
     pickupSource: ORDER_PICKUPS[1],
   }),
@@ -222,7 +232,8 @@ export const ORDER_SEED: Order[] = [
     requirementType: "Birds",
     birds: 3500,
     priority: "Normal",
-    deliveryDeadline: "Before 18:00",
+    deadlineTime: "18:00",
+    deadlineLabel: "Before 18:00",
     status: "Awaiting Assignment",
     pickupSource: ORDER_PICKUPS[2],
   }),
@@ -234,7 +245,8 @@ export const ORDER_SEED: Order[] = [
     birds: 7000,
     priority: "Important",
     importantCustomer: true,
-    deliveryDeadline: "Before 14:00",
+    deadlineTime: "14:00",
+    deadlineLabel: "Before 14:00",
     status: "Pending",
   }),
   order({
@@ -245,13 +257,14 @@ export const ORDER_SEED: Order[] = [
     birds: 2500,
     boxes: 20,
     priority: "Normal",
-    deliveryDeadline: "Before 18:00",
+    deadlineTime: "18:00",
+    deadlineLabel: "Before 18:00",
     status: "Delivered",
     pickupSource: ORDER_PICKUPS[0],
     vehicleAssignment: {
       vehicleId: "veh-01", vehicleNo: "AP 16 AB 1234", driverName: "Ravi", supervisorName: "Kumar",
       tripNo: "TRP-2039", pickupFarm: "Hyderabad Farm", pickupLocation: "Hyderabad", orderCount: 1,
-      routeStatus: "Completed", assignmentType: "System Recommended",
+      routeStatus: "Completed", departureTime: "08:15", assignmentType: "System Recommended",
     },
   }),
   order({
@@ -261,7 +274,8 @@ export const ORDER_SEED: Order[] = [
     requirementType: "Birds",
     birds: 1500,
     priority: "Urgent",
-    deliveryDeadline: "Before 11:00",
+    deadlineTime: "11:00",
+    deadlineLabel: "Before 11:00",
     status: "Confirmed",
     remarks: "Shop GPS missing — verify address on site.",
   }),
@@ -272,7 +286,8 @@ export const ORDER_SEED: Order[] = [
     requirementType: "Birds",
     birds: 2200,
     priority: "Normal",
-    deliveryDeadline: "Before 18:00",
+    deadlineTime: "18:00",
+    deadlineLabel: "Before 18:00",
     status: "Draft",
     remarks: "Created from phone call, needs confirmation.",
   }),
@@ -284,7 +299,8 @@ export const ORDER_SEED: Order[] = [
     boxes: 18,
     priority: "Important",
     importantCustomer: true,
-    deliveryDeadline: "Before 15:00",
+    deadlineTime: "15:00",
+    deadlineLabel: "Before 15:00",
     status: "Confirmed",
     remarks: "GPS accuracy poor near canal road.",
   }),
