@@ -8,6 +8,7 @@ import {
   MapPin,
   Home,
   IndianRupee,
+  MessageSquare,
 } from "lucide-react";
 
 type ShopFormProps = {
@@ -16,6 +17,7 @@ type ShopFormProps = {
     shopName: string;
     ownerName: string;
     phoneNumber: string;
+    whatsappNumber: string;
     email: string;
     village: string;
     address: string;
@@ -30,6 +32,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
   const [shopName, setShopName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [whatsappNumber, setWhatsAppNumber] = useState("");
   const [email, setEmail] = useState("");
   const [village, setVillage] = useState("");
   const [address, setAddress] = useState("");
@@ -40,6 +43,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
     shopName: "",
     ownerName: "",
     phoneNumber: "",
+    whatsappNumber: "",
     email: "",
     village: "",
     openingBalance: "",
@@ -52,6 +56,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       setShopName(shop.shopName);
       setOwnerName(shop.ownerName);
       setPhoneNumber(shop.phoneNumber);
+      setWhatsAppNumber(shop.whatsappNumber ?? "");
       setEmail(shop.email ?? "");
       setVillage(shop.village);
       setAddress(shop.address ?? "");
@@ -61,6 +66,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       setShopName("");
       setOwnerName("");
       setPhoneNumber("");
+      setWhatsAppNumber("");
       setEmail("");
       setVillage("");
       setAddress("");
@@ -71,6 +77,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       shopName: "",
       ownerName: "",
       phoneNumber: "",
+      whatsappNumber: "",
       email: "",
       village: "",
       openingBalance: "",
@@ -82,6 +89,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       shopName: "",
       ownerName: "",
       phoneNumber: "",
+      whatsappNumber: "",
       email: "",
       village: "",
       openingBalance: "",
@@ -95,6 +103,9 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
     }
     if (!/^[0-9]{10}$/.test(phoneNumber)) {
       newErrors.phoneNumber = "Mobile Number must be exactly 10 digits.";
+    }
+    if (whatsappNumber.trim() !== "" && !/^[0-9]{10}$/.test(whatsappNumber)) {
+      newErrors.whatsappNumber = "WhatsApp Number must be exactly 10 digits.";
     }
     if (email.trim() === "") {
       newErrors.email = "Email ID is required.";
@@ -116,6 +127,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       newErrors.shopName ||
       newErrors.ownerName ||
       newErrors.phoneNumber ||
+      newErrors.whatsappNumber ||
       newErrors.email ||
       newErrors.village ||
       newErrors.openingBalance
@@ -127,6 +139,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       shopName,
       ownerName,
       phoneNumber,
+      whatsappNumber: whatsappNumber.trim() || "",
       email,
       village,
       address,
@@ -256,6 +269,27 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
             </div>
             {errors.phoneNumber && (
               <p className="text-red-600 text-sm mt-1">{errors.phoneNumber}</p>
+            )}
+          </div>
+
+          <div className="relative">
+            <label className="block mb-2 text-sm font-semibold text-slate-700">
+              WhatsApp Number
+            </label>
+            <div className="relative">
+              <div className={iconWrapperClass}>
+                <MessageSquare size={18} />
+              </div>
+              <input
+                value={whatsappNumber}
+                maxLength={10}
+                onChange={(e) => setWhatsAppNumber(e.target.value.replace(/\D/g, ""))}
+                placeholder="Enter WhatsApp Number (optional)"
+                className={inputClass(!!errors.whatsappNumber)}
+              />
+            </div>
+            {errors.whatsappNumber && (
+              <p className="text-red-600 text-sm mt-1">{errors.whatsappNumber}</p>
             )}
           </div>
 

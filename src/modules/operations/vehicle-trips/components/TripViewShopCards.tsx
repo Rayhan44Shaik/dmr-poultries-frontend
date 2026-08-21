@@ -7,7 +7,6 @@
 import React, { useMemo, useState } from "react";
 import {
   Mail,
-  FileText,
   RotateCw,
   Box,
   Bird,
@@ -20,10 +19,13 @@ import {
   X,
   CheckCircle2,
   XCircle,
+  FileDown,
 } from "lucide-react";
+import { WhatsAppIcon } from "../../../../ui/WhatsAppIcon";
 import type { Trip, ShopDelivery } from "../types/trip";
 import type { Shop } from "../../../masters/shops/types/shop";
 import type { DeliveryEmailStatusValue } from "../services/deliveryEmailService";
+import type { DeliveryWhatsAppStatusValue } from "../services/deliveryWhatsAppService";
 
 export type TripViewShopCardsProps = {
   trip: Trip;
@@ -39,6 +41,17 @@ export type TripViewShopCardsProps = {
   onDownloadPdf: (delivery: ShopDelivery) => void;
   /** Live email counts (real runtime values). */
   emailCounts?: { sent: number; pending: number; sending: number; failed: number; total: number };
+
+  // WhatsApp props
+  whatsappEffectiveStatus?: (deliveryId: number) => DeliveryWhatsAppStatusValue;
+  whatsappBusyIds?: Set<number>;
+  whatsappIsBulkSending?: boolean;
+  shopWhatsAppFor?: (delivery: ShopDelivery) => string;
+  whatsappFailureReasonFor?: (deliveryId: number) => string | null;
+  whatsappSendCountFor?: (deliveryId: number) => number;
+  onSendOneWhatsApp?: (delivery: ShopDelivery) => void;
+  /** Live WhatsApp counts (real runtime values). */
+  whatsappCounts?: { sent: number; pending: number; sending: number; failed: number; total: number };
 };
 
 function StatusBadge({
@@ -46,11 +59,13 @@ function StatusBadge({
   sending,
   label,
   sendCount = 0,
+  channel = "mail",
 }: {
-  status: DeliveryEmailStatusValue;
+  status: DeliveryEmailStatusValue | DeliveryWhatsAppStatusValue;
   sending: boolean;
-  label: string;
+  label?: string;
   sendCount?: number;
+  channel?: "mail" | "whatsapp";
 }) {
   const tone =
     status === "sent"
@@ -60,6 +75,23 @@ function StatusBadge({
         : status === "sending" || sending
           ? "bg-sky-50 text-sky-700 border-sky-200"
           : "bg-slate-100 text-slate-600 border-slate-200";
+  const sentLabel = channel === "whatsapp" ? "WhatsApp Sent" : "Mail Sent";
+  const failedLabel = channel === "whatsapp" ? "WhatsApp Failed" : "Mail Failed";
+  const pendingLabel = channel === "whatsapp" ? "WhatsApp Pending" : "Mail Pending";
+  const sendingLabel = "Sending...";
+
+  const displayLabel =
+    label ??
+    ((status === "sending" || sending) && sendingLabel
+      ? sendingLabel
+      : status === "sent"
+        ? sendCount > 1
+          ? `${sentLabel} · ${sendCount} times`
+          : sentLabel
+        : status === "failed"
+          ? failedLabel
+          : pendingLabel);
+
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap ${tone}`}
@@ -68,10 +100,7 @@ function StatusBadge({
       {status === "sent" && <CheckCircle2 size={11} />}
       {status === "failed" && <XCircle size={11} />}
       {status === "pending" && !sending && <Clock size={11} />}
-      {label}
-      {status === "sent" && sendCount > 1 && (
-        <span className="ml-0.5 font-bold">· {sendCount} times</span>
-      )}
+      {displayLabel}
     </span>
   );
 }
@@ -121,6 +150,51 @@ function EmailSummaryPanel({
   );
 }
 
+/** Live WhatsApp progress + persistent result summary for "Send All WhatsApp". */
+function WhatsAppSummaryPanel({
+  counts,
+  isBulkSending,
+}: {
+  counts: { sent: number; pending: number; sending: number; failed: number; total: number };
+  isBulkSending: boolean;
+}) {
+  const { total, sent, failed, pending, sending } = counts;
+  const processing = sending + pending;
+  const remaining = Math.max(0, total - sent);
+
+  if (isBulkSending) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-green-200 bg-green-50 px-3.5 py-2 text-xs font-semibold text-green-800"
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <Loader2 size={13} className="animate-spin" /> Sending shop WhatsApp...
+        </span>
+        <span className="text-green-900">{sent} / {total} completed</span>
+        <span className="text-emerald-700">Sent: {sent}</span>
+        <span className="text-red-700">Failed: {failed}</span>
+        <span className="text-slate-600">Remaining: {remaining}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-700"
+    >
+      <span className="text-slate-900">Total Shops: {total}</span>
+      <span className="text-emerald-700">Sent: {sent}</span>
+      <span className="text-red-700">Failed: {failed}</span>
+      <span className="text-slate-500">Pending: {pending}</span>
+      {processing > 0 && <span className="text-sky-700">Processing: {processing}</span>}
+    </div>
+  );
+}
+
 export function TripViewShopCards({
   trip,
   shops: _shops,
@@ -133,6 +207,15 @@ export function TripViewShopCards({
   onSendOne,
   onDownloadPdf,
   emailCounts,
+  // WhatsApp props
+  whatsappEffectiveStatus,
+  whatsappBusyIds,
+  whatsappIsBulkSending,
+  shopWhatsAppFor,
+  whatsappFailureReasonFor,
+  whatsappSendCountFor,
+  onSendOneWhatsApp,
+  whatsappCounts,
 }: TripViewShopCardsProps) {
   const deliveries = useMemo(
     () => (Array.isArray(trip.deliveries) ? trip.deliveries : []),
@@ -166,9 +249,6 @@ export function TripViewShopCards({
           Shop Deliveries
           <span className="normal-case font-semibold text-[11px] text-slate-400">({deliveries.length})</span>
         </h3>
-        {emailCounts && emailCounts.total > 0 && (
-          <EmailSummaryPanel counts={emailCounts} isBulkSending={isBulkSending} />
-        )}
       </div>
 
       <div className="relative">
@@ -202,6 +282,15 @@ export function TripViewShopCards({
           {filteredDeliveries.map((delivery) => {
             const status = effectiveStatus(delivery.id);
             const sending = busyIds.has(delivery.id) || status === "sending";
+            const failedReason = status === "failed" ? failureReasonFor(delivery.id) : null;
+            const sendCount = sendCountFor ? sendCountFor(delivery.id) : 0;
+
+            // WhatsApp status
+            const whatsappStatus = whatsappEffectiveStatus?.(delivery.id) ?? "pending";
+            const whatsappSending = (whatsappBusyIds?.has(delivery.id) ?? false) || whatsappStatus === "sending";
+            const whatsappFailedReason = whatsappStatus === "failed" ? whatsappFailureReasonFor?.(delivery.id) ?? null : null;
+            const whatsappSendCount = whatsappSendCountFor ? whatsappSendCountFor(delivery.id) : 0;
+
             const isWeightMode = delivery.deliveryMode === "weight";
             const selectedBoxes = Array.isArray(delivery.selectedBoxIds)
               ? delivery.selectedBoxIds
@@ -210,8 +299,6 @@ export function TripViewShopCards({
                 : [];
             const mortalityCount = delivery.mortality ?? 0;
             const mortKg = delivery.mortKg ?? 0;
-            const failedReason = status === "failed" ? failureReasonFor(delivery.id) : null;
-            const sendCount = sendCountFor ? sendCountFor(delivery.id) : 0;
 
             return (
               <div
@@ -226,6 +313,11 @@ export function TripViewShopCards({
                     <p className="text-xs text-slate-500 truncate mt-0.5">
                       Email: {shopEmailFor(delivery)}
                     </p>
+                    {shopWhatsAppFor && (
+                      <p className="text-xs text-slate-500 truncate mt-0.5">
+                        WhatsApp: {shopWhatsAppFor(delivery)}
+                      </p>
+                    )}
                   </div>
                   <span
                     className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold border ${
@@ -309,16 +401,19 @@ export function TripViewShopCards({
                 {failedReason ? (
                   <p className="text-[11px] text-red-600 px-1">{failedReason}</p>
                 ) : null}
+                {whatsappFailedReason ? (
+                  <p className="text-[11px] text-red-600 px-1">WhatsApp: {whatsappFailedReason}</p>
+                ) : null}
 
                 <div className="flex items-center gap-2 border-t border-slate-100 pt-2.5">
                   <button
                     type="button"
                     onClick={() => onDownloadPdf(delivery)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-                    title="Download shop PDF"
+                    className="inline-flex items-center justify-center rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 p-1.5 text-red-700 transition-colors"
+                    title="Create PDF"
+                    aria-label="Create PDF"
                   >
-                    <FileText size={13} />
-                    PDF
+                    <FileDown size={13} />
                   </button>
                   <button
                     type="button"
@@ -330,34 +425,59 @@ export function TripViewShopCards({
                     <Mail size={13} />
                     {sending ? "Sending..." : "Email"}
                   </button>
-                  <div className="ml-auto">
+                  {onSendOneWhatsApp && (
+                    <button
+                      type="button"
+                      onClick={() => onSendOneWhatsApp(delivery)}
+                      disabled={whatsappSending || whatsappIsBulkSending}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Send WhatsApp to this shop"
+                    >
+                      <WhatsAppIcon size={13} />
+                      {whatsappSending ? "Sending..." : "WhatsApp"}
+                    </button>
+                  )}
+                  <div className="ml-auto flex flex-col items-end gap-1">
                     <StatusBadge
                       status={status}
                       sending={sending}
                       sendCount={sendCount}
-                      label={
-                        sending
-                          ? "Sending..."
-                          : status === "sent"
-                            ? sendCount > 1
-                              ? `Mail Sent · ${sendCount} times`
-                              : "Mail Sent"
-                            : status === "failed"
-                              ? "Mail Failed"
-                              : "Pending"
-                      }
+                      channel="mail"
                     />
+                    {onSendOneWhatsApp && (
+                      <StatusBadge
+                        status={whatsappStatus}
+                        sending={whatsappSending}
+                        sendCount={whatsappSendCount}
+                        channel="whatsapp"
+                      />
+                    )}
                   </div>
-                  {status === "failed" && !sending ? (
-                    <button
-                      type="button"
-                      onClick={() => onSendOne(delivery)}
-                      disabled={isBulkSending}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <RotateCw size={12} />
-                      Retry
-                    </button>
+                  {(status === "failed" && !sending) || (whatsappStatus === "failed" && !whatsappSending) ? (
+                    <div className="flex items-center gap-1.5">
+                      {status === "failed" && !sending ? (
+                        <button
+                          type="button"
+                          onClick={() => onSendOne(delivery)}
+                          disabled={isBulkSending}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <RotateCw size={12} />
+                          Retry
+                        </button>
+                      ) : null}
+                      {whatsappStatus === "failed" && !whatsappSending && onSendOneWhatsApp ? (
+                        <button
+                          type="button"
+                          onClick={() => onSendOneWhatsApp(delivery)}
+                          disabled={whatsappIsBulkSending}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <RotateCw size={12} />
+                          Retry
+                        </button>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
               </div>

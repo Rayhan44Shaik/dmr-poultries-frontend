@@ -65,7 +65,8 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
         shop.shopName.toLowerCase().includes(keyword) ||
         shop.ownerName.toLowerCase().includes(keyword) ||
         shop.village.toLowerCase().includes(keyword) ||
-        shop.phoneNumber.includes(keyword)
+        shop.phoneNumber.includes(keyword) ||
+        (shop.whatsappNumber ?? "").includes(keyword)
     );
   }, [shops, search]);
 
@@ -190,6 +191,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     const shopName = shop.shopName?.trim() ?? "";
     const ownerName = shop.ownerName?.trim() ?? "";
     const phoneNumber = shop.phoneNumber?.trim() ?? "";
+    const whatsappNumber = shop.whatsappNumber?.trim() ?? "";
     const email = shop.email?.trim() ?? "";
     const village = shop.village?.trim() ?? "";
 
@@ -204,6 +206,9 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     }
     if (!/^[0-9]{10}$/.test(phoneNumber)) {
       return "Mobile Number must be exactly 10 digits.";
+    }
+    if (whatsappNumber !== "" && !/^[0-9]{10}$/.test(whatsappNumber)) {
+      return "WhatsApp Number must be exactly 10 digits.";
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return "Please enter a valid email address.";
@@ -239,6 +244,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       shopName: shop.shopName!.trim(),
       ownerName: shop.ownerName!.trim(),
       phoneNumber: shop.phoneNumber!.trim(),
+      whatsappNumber: shop.whatsappNumber?.trim() ?? "",
       email: shop.email!.trim(),
       village: shop.village!.trim(),
       address: shop.address?.trim() ?? "",

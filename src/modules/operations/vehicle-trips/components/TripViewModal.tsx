@@ -20,6 +20,7 @@ import {
   Receipt,
   FileDown,
 } from "lucide-react";
+import { WhatsAppIcon } from "../../../../ui/WhatsAppIcon";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Trip, ShopDelivery } from "../types/trip";
@@ -31,6 +32,7 @@ import {
 import { generateShopPDF } from "../utils/generateShopPDF";
 import { generateTripReportPDF, type TripReportEmailInfo } from "../utils/generateTripPDF";
 import { useTripDeliveryEmails } from "../hooks/useTripDeliveryEmails";
+import { useTripDeliveryWhatsApps } from "../hooks/useTripDeliveryWhatsApps";
 import TripViewShopCards from "./TripViewShopCards";
 import { getNextIncompleteTripStep } from "../../../../shared/trip";
 
@@ -383,6 +385,100 @@ function Step5View({ trip }: { trip: Trip }) {
   );
 }
 
+/** Communication Summary panel showing Mail and WhatsApp stats side by side. */
+function CommunicationSummary({
+  emailCounts,
+  whatsappCounts,
+}: {
+  emailCounts: { sent: number; pending: number; sending: number; failed: number; total: number };
+  whatsappCounts: { sent: number; pending: number; sending: number; failed: number; total: number };
+}) {
+  const emailProcessing = emailCounts.sending + emailCounts.pending;
+  const whatsappProcessing = whatsappCounts.sending + whatsappCounts.pending;
+
+  return (
+    <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm">
+      <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+        <Package size={15} className="text-emerald-600" />
+        Communication Summary
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Mail Summary */}
+        {emailCounts.total > 0 && (
+          <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Mail size={18} className="text-sky-600" />
+              <span className="text-sm font-bold text-sky-800">Mail</span>
+            </div>
+            <dl className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <dt className="text-slate-500">Total Shops</dt>
+                <dd className="font-semibold text-slate-800">{emailCounts.total}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Sent</dt>
+                <dd className="font-semibold text-emerald-700">{emailCounts.sent}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Failed</dt>
+                <dd className="font-semibold text-red-700">{emailCounts.failed}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Pending</dt>
+                <dd className="font-semibold text-slate-500">{emailCounts.pending}</dd>
+              </div>
+              {emailProcessing > 0 && (
+                <>
+                  <div>
+                    <dt className="text-slate-500">Processing</dt>
+                    <dd className="font-semibold text-sky-700">{emailProcessing}</dd>
+                  </div>
+                </>
+              )}
+            </dl>
+          </div>
+        )}
+
+        {/* WhatsApp Summary */}
+        {whatsappCounts.total > 0 && (
+          <div className="rounded-xl border border-green-200 bg-green-50 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <WhatsAppIcon size={18} className="text-green-600" />
+              <span className="text-sm font-bold text-green-800">WhatsApp</span>
+            </div>
+            <dl className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <dt className="text-slate-500">Total Shops</dt>
+                <dd className="font-semibold text-slate-800">{whatsappCounts.total}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Sent</dt>
+                <dd className="font-semibold text-emerald-700">{whatsappCounts.sent}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Failed</dt>
+                <dd className="font-semibold text-red-700">{whatsappCounts.failed}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Pending</dt>
+                <dd className="font-semibold text-slate-500">{whatsappCounts.pending}</dd>
+              </div>
+              {whatsappProcessing > 0 && (
+                <>
+                  <div>
+                    <dt className="text-slate-500">Processing</dt>
+                    <dd className="font-semibold text-sky-700">{whatsappProcessing}</dd>
+                  </div>
+                </>
+              )}
+            </dl>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Props) {
   // Completed trips open on Step 4 (Shop Deliveries); incomplete on Step 1.
   const [viewStepIndex, setViewStepIndex] = useState(() =>
@@ -401,6 +497,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
   const getIdleSaveStatus = useCallback(() => "idle" as const, []);
 
   const emailState = useTripDeliveryEmails(trip, shops);
+  const whatsappState = useTripDeliveryWhatsApps(trip, shops);
 
   // ─── Early return – ensures trip is never null after this ─────
   if (!open || !trip) return null;
@@ -786,6 +883,15 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
             onSendOne={(delivery) => void emailState.sendOne(delivery)}
             onDownloadPdf={(delivery) => void downloadShopPDF(delivery)}
             emailCounts={emailCounts}
+            // WhatsApp props
+            whatsappEffectiveStatus={whatsappState.effectiveStatus}
+            whatsappBusyIds={whatsappState.busyIds}
+            whatsappIsBulkSending={whatsappState.isBulkSending}
+            shopWhatsAppFor={whatsappState.shopWhatsAppFor}
+            whatsappFailureReasonFor={whatsappState.failureReasonFor}
+            whatsappSendCountFor={whatsappState.sendCountFor}
+            onSendOneWhatsApp={(delivery) => void whatsappState.sendOne(delivery)}
+            whatsappCounts={whatsappCounts}
           />
         );
       case 4:
@@ -796,6 +902,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
   };
 
   const emailCounts = emailState.counts;
+  const whatsappCounts = whatsappState.counts;
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto animate-fade-in">
@@ -846,6 +953,22 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
                 )}
               </span>
             )}
+            {isCompleted && whatsappCounts.total > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 border border-green-200 shadow-sm" role="status" aria-live="polite">
+                <WhatsAppIcon size={12} />
+                {whatsappState.isBulkSending ? (
+                  <>
+                    Sending... {whatsappState.bulkProgress?.sent ?? whatsappCounts.sent} / {whatsappState.bulkProgress?.total ?? whatsappCounts.total}
+                  </>
+                ) : (
+                  <>
+                    {whatsappCounts.total} Shops · {whatsappCounts.sent} Sent
+                    {whatsappCounts.pending > 0 ? ` · ${whatsappCounts.pending} Pending` : ""}
+                    {whatsappCounts.failed > 0 ? ` · ${whatsappCounts.failed} Failed` : ""}
+                  </>
+                )}
+              </span>
+            )}
             {isCompleted && emailCounts.total > 0 && (
               <button
                 type="button"
@@ -862,14 +985,30 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
                 {emailState.isBulkSending ? "Sending..." : "Send All Mail"}
               </button>
             )}
+            {isCompleted && whatsappCounts.total > 0 && (
+              <button
+                type="button"
+                onClick={() => void whatsappState.sendAll()}
+                disabled={whatsappState.isBulkSending}
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-green-500/20 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                title="Send WhatsApp to all shops in this trip"
+              >
+                {whatsappState.isBulkSending ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <WhatsAppIcon size={14} />
+                )}
+                {whatsappState.isBulkSending ? "Sending..." : "Send All WhatsApp"}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => void downloadTripReport()}
-              className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white hover:bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 shadow-sm transition-all active:scale-95"
+              className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 p-2 text-red-700 shadow-sm transition-all active:scale-95"
               title="Create a professional A4 trip report PDF"
+              aria-label="Create PDF"
             >
-              <FileDown size={14} />
-              Create PDF
+              <FileDown size={16} />
             </button>
           </div>
         </div>
@@ -891,15 +1030,18 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
           <div key={`${trip.id}-step-${safeViewStepIndex}`} className="animate-fade-in-up">
             {isCompleted ? renderCompletedStep() : renderViewStep()}
           </div>
+          {/* Communication Summary - only on Shop Deliveries step for completed trips */}
+          {isCompleted && safeViewStepIndex === 3 && (emailCounts.total > 0 || whatsappCounts.total > 0) && (
+            <CommunicationSummary
+              emailCounts={emailCounts}
+              whatsappCounts={whatsappCounts}
+            />
+          )}
           <TripFinalKPI trip={trip} deliveries={trip.deliveries} />
         </div>
 
         {/* ─── Footer ───────────────────────────────────────────────── */}
         <div className="px-6 md:px-8 py-5 border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 flex items-center justify-end gap-3">
-          <button onClick={downloadPDF} className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-xs shadow-md shadow-emerald-500/20 transition-all active:scale-95">
-            <Download size={15} />
-            Download PDF
-          </button>
           <button onClick={onClose} className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-all active:scale-95">
             Close
           </button>

@@ -21,6 +21,7 @@ function ShopTable({ shops, onEdit, onDelete }: ShopTableProps) {
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Owner</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Village</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Phone</th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">WhatsApp</th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">Email ID</th>
             <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">Opening Balance</th>
             <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">Status</th>
@@ -37,6 +38,7 @@ function ShopTable({ shops, onEdit, onDelete }: ShopTableProps) {
               <td className="px-4 py-3 text-sm text-slate-600">{shop.ownerName}</td>
               <td className="px-4 py-3 text-sm text-slate-600">{shop.village}</td>
               <td className="px-4 py-3 text-sm text-slate-600">{shop.phoneNumber}</td>
+              <td className="px-4 py-3 text-sm text-slate-600">{shop.whatsappNumber || "—"}</td>
               <td className="px-4 py-3 text-sm text-slate-600">{shop.email}</td>
               <td className="px-4 py-3 text-right text-sm font-medium text-slate-700">
                 ₹{Number(shop.openingBalance || 0).toFixed(2)}
@@ -74,7 +76,7 @@ function ShopTable({ shops, onEdit, onDelete }: ShopTableProps) {
           ))}
           {shops.length === 0 && (
             <tr>
-              <td colSpan={9} className="px-4 py-6 text-center text-sm text-slate-500">
+              <td colSpan={10} className="px-4 py-6 text-center text-sm text-slate-500">
                 No shops found.
               </td>
             </tr>

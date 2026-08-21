@@ -4,6 +4,7 @@ export type Shop = {
   shopName: string;
   ownerName: string;
   phoneNumber: string;
+  whatsappNumber?: string;
   email: string;
   village: string;
   address?: string;
