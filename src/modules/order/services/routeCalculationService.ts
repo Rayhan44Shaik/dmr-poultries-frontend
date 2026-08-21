@@ -26,8 +26,12 @@ export interface RouteCalculationService {
 }
 
 const EARTH_RADIUS_KM = 6371;
-/** Average loaded-poultry truck speed (km/h) used for demo estimates only. */
-const DEFAULT_AVG_SPEED_KMH = 40;
+/**
+ * Average loaded-poultry truck speed (km/h) used for demo estimates only.
+ * This is a named constant so the routing provider can later replace it with
+ * real road duration / traffic-aware ETA. Do NOT scatter `60` through the code.
+ */
+export const DEFAULT_AVG_SPEED_KMH = 60;
 
 function toRadians(degrees: number): number {
   return (degrees * Math.PI) / 180;
@@ -73,6 +77,8 @@ export const mockRouteCalculationService: RouteCalculationService = {
   estimateTravelMinutes(distanceKm, avgSpeedKmh = DEFAULT_AVG_SPEED_KMH) {
     if (!Number.isFinite(distanceKm) || distanceKm <= 0) return 0;
     const safeSpeed = avgSpeedKmh && avgSpeedKmh > 0 ? avgSpeedKmh : DEFAULT_AVG_SPEED_KMH;
+    // Keep the formula explicit: (distanceKm / speedKmh) * 60 minutes-per-hour.
+    // A future routing provider replaces this with real road duration.
     return Math.round((distanceKm / safeSpeed) * 60);
   },
 };

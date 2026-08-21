@@ -1,10 +1,19 @@
 // src/modules/order/components/RouteTimeline.tsx
-// Compact vertical timeline: pickup → loading → departure → stops with ETAs.
+// Compact vertical timeline: pickup → loading → departure → stops with ETAs,
+// delivery-phase badges, and deadline-conflict warnings.
 
 import { memo } from "react";
-import type { DeliveryRoute } from "../types/routeTypes";
+import { AlertTriangle } from "lucide-react";
+import type { DeliveryPhase, DeliveryRoute } from "../types/routeTypes";
 import PriorityBadge from "./PriorityBadge";
+import { PHASE_LABEL } from "../services/deliverySequencingService";
 import { formatClock, parseHHmm } from "../utils/businessTime";
+
+const PHASE_STYLES: Record<DeliveryPhase, string> = {
+  Critical: "bg-rose-50 text-rose-700 border-rose-200",
+  Important: "bg-amber-50 text-amber-700 border-amber-200",
+  Normal: "bg-slate-100 text-slate-600 border-slate-200",
+};
 
 function RouteTimeline({ route }: { route: DeliveryRoute }) {
   const departureMinutes = parseHHmm(route.schedule.departureTime);
@@ -33,35 +42,48 @@ function RouteTimeline({ route }: { route: DeliveryRoute }) {
           </p>
         </li>
 
-        {route.stops.map((stop) => (
-          <li key={stop.orderId} className="relative pb-4 last:pb-0">
-            <span className="absolute -left-[27px] flex h-4 w-4 items-center justify-center rounded-full bg-slate-300 ring-4 ring-white">
-              <span className="h-1.5 w-1.5 rounded-full bg-white" />
-            </span>
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-800">
-                  <span className="mr-1.5 text-slate-400">#{stop.stopNumber}</span>
-                  {stop.shopName}
-                </p>
-                <p className="text-[11px] text-slate-400">
-                  {stop.birds.toLocaleString("en-IN")} birds · {stop.boxes} boxes · {stop.deadlineLabel}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <PriorityBadge priority={stop.priority} />
-                <span className="w-16 text-right text-xs font-semibold text-slate-600">
-                  {stop.arrivalTime ?? "—"}
+        {route.stops.map((stop, index) => {
+          const prevPhase = index > 0 ? route.stops[index - 1].phase : null;
+          const phaseBoundary = prevPhase !== stop.phase;
+          return (
+            <li key={stop.orderId} className="relative pb-4 last:pb-0">
+              <span className="absolute -left-[27px] flex h-4 w-4 items-center justify-center rounded-full bg-slate-300 ring-4 ring-white">
+                <span className="h-1.5 w-1.5 rounded-full bg-white" />
+              </span>
+
+              {phaseBoundary && (
+                <span className={`mb-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${PHASE_STYLES[stop.phase]}`}>
+                  {PHASE_LABEL[stop.phase]} phase
                 </span>
+              )}
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-800">
+                    <span className="mr-1.5 text-slate-400">#{stop.stopNumber}</span>
+                    {stop.shopName}
+                    {stop.deadlineConflict && (
+                      <AlertTriangle size={12} className="ml-1.5 inline text-rose-500" aria-label="Deadline conflict" />
+                    )}
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    {stop.birds.toLocaleString("en-IN")} birds · {stop.boxes} boxes · {stop.deadlineLabel}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <PriorityBadge priority={stop.priority} />
+                  <span className="w-16 text-right text-xs font-semibold text-slate-600">
+                    {stop.arrivalTime ?? "—"}
+                  </span>
+                </div>
               </div>
-            </div>
-            {stop.legDistanceKm != null && (
               <p className="mt-0.5 text-[11px] text-slate-400">
-                {stop.legDistanceKm} km leg · buffer {stop.bufferMinutes != null ? `${stop.bufferMinutes} min` : "—"}
+                {stop.fromName} → {stop.shopName} · {stop.legDistanceKm != null ? `${stop.legDistanceKm} km` : "—"}
+                {stop.bufferMinutes != null ? ` · buffer ${stop.bufferMinutes} min` : ""}
               </p>
-            )}
-          </li>
-        ))}
+            </li>
+          );
+        })}
 
         {/* Final arrival */}
         {route.stops.length > 0 && (

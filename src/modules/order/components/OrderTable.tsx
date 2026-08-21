@@ -8,6 +8,7 @@ import PriorityBadge from "./PriorityBadge";
 import StatusBadge from "./StatusBadge";
 import GPSStatus from "./GPSStatus";
 import { distanceForOrder } from "../utils/routeUtils";
+import { mockRouteCalculationService } from "../services/routeCalculationService";
 import { formatDeliveryDate, formatDistanceKm, formatTravelMinutes } from "../utils/orderFormat";
 
 interface OrderTableProps {
@@ -152,7 +153,7 @@ function FragmentRow({
         <td className="px-3 py-3 text-right font-medium text-slate-600">
           {distance != null ? formatDistanceKm(distance) : <span className="text-slate-400">Pending</span>}
         </td>
-        <td className="px-3 py-3 text-slate-600">{formatTravelMinutes(distance != null ? Math.round((distance / 40) * 60) : null)}</td>
+        <td className="px-3 py-3 text-slate-600">{formatTravelMinutes(distance != null ? mockRouteCalculationService.estimateTravelMinutes(distance) : null)}</td>
         <td className="px-3 py-3"><StatusBadge status={order.status} /></td>
         <td className="px-3 py-3 text-center">
           <button

@@ -4,6 +4,7 @@
 
 import { memo } from "react";
 import type { DeliveryRoute } from "../types/routeTypes";
+import { DEFAULT_AVG_SPEED_KMH } from "../services/routeCalculationService";
 import { formatClock, parseHHmm } from "../utils/businessTime";
 import { formatDistanceKm, formatTravelMinutes } from "../utils/orderFormat";
 
@@ -46,6 +47,9 @@ function RouteCalculationCard({ route }: { route: DeliveryRoute }) {
         <Row label="Estimated Distance" value={route.totalDistanceKm != null ? formatDistanceKm(route.totalDistanceKm) : "Pending"} />
         <Row label="Travel Time" value={formatTravelMinutes(route.estimatedTravelMinutes)} />
         <Row label="Final Arrival" value={finalArrival} />
+        {route.deadlineConflicts && (
+          <Row label="Deadline" value={<span className="font-semibold text-rose-600">⚠ Conflict detected</span>} />
+        )}
       </div>
 
       <div className="border-t border-slate-100 px-5 py-3">
@@ -66,7 +70,7 @@ function RouteCalculationCard({ route }: { route: DeliveryRoute }) {
       </div>
 
       <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-2.5 text-[11px] text-slate-400">
-        Distance and ETA are straight-line estimates — real road routing not yet connected.
+        Frontend road estimate — average speed assumption {DEFAULT_AVG_SPEED_KMH} km/h. Real road routing not yet connected.
       </div>
     </div>
   );

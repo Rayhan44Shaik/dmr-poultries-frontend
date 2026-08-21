@@ -17,6 +17,18 @@ export type DeadlineFeasibility = "Can Meet" | "At Risk" | "Cannot Meet" | "Unkn
 export type BufferState = "Healthy" | "Tight" | "At Risk" | "Late" | "Unknown";
 
 /**
+ * Delivery planning phase. Distinct from OrderPriority — the phase is the
+ * *current route-planning stage*, derived from priority AND customer
+ * importance:
+ *   1 = Critical (Urgent orders, or Urgent + Important customer)
+ *   2 = Important (Important orders, or Normal + Important customer)
+ *   3 = Normal
+ */
+export type DeliveryPhase = "Critical" | "Important" | "Normal";
+
+export type DeliveryPhaseNumber = 1 | 2 | 3;
+
+/**
  * A single sequential route leg: pickup → A → B → C (not pickup → each shop).
  * Real road routing will later fill distanceKm / travelMinutes.
  */
@@ -50,6 +62,11 @@ export interface RouteStop {
   importantCustomer: boolean;
   deadlineLabel: string;
   deadlineTime: string;
+  /** Delivery phase this stop was planned within. */
+  phase: DeliveryPhase;
+  phaseNumber: DeliveryPhaseNumber;
+  /** Name of the previous point (farm or previous shop) this leg started from. */
+  fromName: string;
   /** Distance of the leg leading into this stop (previous point → stop). */
   legDistanceKm: number | null;
   /** Cumulative distance from the pickup farm along the route. */
@@ -60,6 +77,10 @@ export interface RouteStop {
   bufferMinutes: number | null;
   bufferState: BufferState;
   deadlineFeasible: DeadlineFeasibility;
+  /** Human-readable reasons for selecting this stop next. */
+  reason: string[];
+  /** True when this stop was promoted due to a cross-phase deadline conflict. */
+  deadlineConflict: boolean;
   status: OrderStatus;
 }
 
@@ -111,6 +132,8 @@ export interface DeliveryRoute {
   routePriority: RoutePriorityLevel;
   priorityReasons: string[];
   calculationState: CalculationState;
+  /** True when any stop was promoted to protect a cross-phase deadline. */
+  deadlineConflicts: boolean;
 }
 
 export type RoutePriorityLevel = "HIGH" | "MEDIUM" | "LOW";

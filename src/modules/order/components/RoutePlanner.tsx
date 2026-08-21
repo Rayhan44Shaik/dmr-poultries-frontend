@@ -11,6 +11,7 @@ import MapPlaceholder from "./MapPlaceholder";
 import RouteTimeline from "./RouteTimeline";
 import RouteCalculationCard from "./RouteCalculationCard";
 import RouteStopList from "./RouteStopList";
+import DeliveryPlanSummary from "./DeliveryPlanSummary";
 import VehicleComparison from "./VehicleComparison";
 import EmptyState from "./EmptyState";
 import { recommendVehicles } from "../services/vehicleRecommendationService";
@@ -154,6 +155,7 @@ export default function RoutePlanner({ orders, routes, vehicles, isLoading, onAs
           />
         ) : selectedRoute ? (
           <div className="space-y-4">
+            <DeliveryPlanSummary route={selectedRoute} />
             <RouteCalculationCard route={selectedRoute} />
             <RouteStopList route={selectedRoute} />
           </div>

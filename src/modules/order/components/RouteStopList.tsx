@@ -2,9 +2,17 @@
 // Per-stop delivery list with distance, ETA, buffer and deadline status.
 
 import { memo } from "react";
-import type { DeliveryRoute } from "../types/routeTypes";
+import { AlertTriangle } from "lucide-react";
+import type { DeliveryPhase, DeliveryRoute } from "../types/routeTypes";
 import PriorityBadge from "./PriorityBadge";
+import { PHASE_LABEL } from "../services/deliverySequencingService";
 import { formatDistanceKm } from "../utils/orderFormat";
+
+const PHASE_STYLES: Record<DeliveryPhase, string> = {
+  Critical: "bg-rose-50 text-rose-700 border-rose-200",
+  Important: "bg-amber-50 text-amber-700 border-amber-200",
+  Normal: "bg-slate-100 text-slate-600 border-slate-200",
+};
 
 const FEASIBILITY_LABEL: Record<string, { text: string; className: string }> = {
   "Can Meet": { text: "✓", className: "text-emerald-600" },
@@ -33,11 +41,24 @@ function RouteStopList({ route }: { route: DeliveryRoute }) {
                   {stop.stopNumber}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-slate-800">{stop.shopName}</p>
+                  <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-800">
+                    {stop.shopName}
+                    {stop.deadlineConflict && (
+                      <AlertTriangle size={12} className="shrink-0 text-rose-500" aria-label="Deadline conflict" />
+                    )}
+                  </p>
                   <p className="text-[11px] text-slate-400">
                     {stop.birds.toLocaleString("en-IN")} birds · {stop.boxes} boxes · {stop.deadlineLabel}
                   </p>
+                  {stop.reason.length > 0 && (
+                    <p className="mt-0.5 truncate text-[10px] text-slate-400" title={stop.reason.join(" · ")}>
+                      {stop.reason.join(" · ")}
+                    </p>
+                  )}
                 </div>
+                <span className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase sm:inline ${PHASE_STYLES[stop.phase]}`}>
+                  {PHASE_LABEL[stop.phase]}
+                </span>
                 <PriorityBadge priority={stop.priority} />
                 <div className="w-20 text-right">
                   <p className="text-xs font-semibold text-slate-600">

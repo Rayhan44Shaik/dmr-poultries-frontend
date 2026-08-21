@@ -2,18 +2,19 @@
 // -----------------------------------------------------------------------------
 // Pure helpers for building and summarizing delivery routes.
 //
-// Routes are built as SEQUENTIAL LEGS (pickup → A → B → C), never as a sum of
-// pickup→each-shop distances. Each stop's arrival time and delivery buffer are
-// derived from the vehicle's departure time plus cumulative leg travel time.
+// Routes are built via the delivery-phase sequencer (see
+// services/deliverySequencingService.ts), producing SEQUENTIAL LEGS
+// (pickup → A → B → C), never a sum of pickup→each-shop distances. The vehicle's
+// current location advances after every stop, and arrival/buffer values are
+// derived from the departure time plus cumulative leg travel time.
 // -----------------------------------------------------------------------------
 
 import type { Order, PickupSource } from "../types/orderTypes";
-import type { DeliveryRoute, RouteStop, RouteVehicle } from "../types/routeTypes";
+import type { DeliveryRoute, RouteLeg, RouteStop, RouteVehicle } from "../types/routeTypes";
 import { compareOrdersByDeadlineThenPriority, evaluateRoutePriority } from "../services/priorityService";
 import { computeLeg } from "../services/routeCalculationService";
-import { classifyBuffer, classifyFeasibility } from "./feasibility";
+import { buildDeliverySequence } from "../services/deliverySequencingService";
 import { formatAddressShort } from "./orderFormat";
-import { formatClock, parseHHmm } from "./businessTime";
 
 /** Straight-line (estimated) distance from an order's pickup farm to its shop. */
 export function distanceForOrder(order: Order): number | null {
@@ -29,85 +30,79 @@ export function distanceForOrder(order: Order): number | null {
   }).distanceKm;
 }
 
-/** Sort orders for sequencing: earliest deadline first, then priority. */
+/** Sort orders for sequencing (backward-compatible): earliest deadline, then priority. */
 export function sortOrdersForRoute(orders: Order[]): Order[] {
   return [...orders].sort(compareOrdersByDeadlineThenPriority);
 }
 
 /**
- * Build ordered route stops and sequential legs for a group of orders that
- * share a pickup farm and a vehicle schedule. Cumulative distances/arrivals are
- * computed leg-by-leg from the pickup point.
+ * Build ordered route stops and sequential legs for a group of orders sharing a
+ * pickup farm and a vehicle schedule, using the delivery-phase sequencer.
  */
 export function buildRoute(vehicle: RouteVehicle, orders: Order[]): DeliveryRoute {
+  const plan = buildDeliverySequence(vehicle, orders);
   const pickup = orders[0]?.pickupSource ?? vehicle.pickup;
-  const sorted = sortOrdersForRoute(orders);
-  const departureMinutes = parseHHmm(vehicle.schedule.departureTime);
+  const orderById = new Map(orders.map((o) => [o.id, o]));
 
-  const legs: DeliveryRoute["legs"] = [];
+  const legs: RouteLeg[] = [];
   const stops: RouteStop[] = [];
 
-  let previousGps = pickup.gps;
-  let previousName = pickup.farmName;
-  let cumulativeDistance = 0;
-  let cumulativeTravel = 0;
+  plan.stops.forEach((stop, index) => {
+    const order = orderById.get(stop.orderId);
+    const destinationGps = order?.shop.gps ?? null;
 
-  sorted.forEach((order, index) => {
-    const leg = computeLeg({
+    // Build the leg directly from the sequencer's already-computed values.
+    legs.push({
       legNumber: index + 1,
-      fromName: previousName,
-      fromGps: previousGps,
-      toName: order.shop.name,
-      toAddress: formatAddressShort(order.shop.address),
-      toGps: order.shop.gps,
-      departureMinutes: departureMinutes != null ? departureMinutes + cumulativeTravel : null,
+      fromName: stop.fromName,
+      fromGps: stop.fromGps,
+      toName: stop.shopName,
+      toAddress: stop.address,
+      toGps: destinationGps,
+      distanceKm: stop.legDistanceKm,
+      travelMinutes: stop.travelMinutes,
+      departureTime: stop.departureTime,
+      arrivalTime: stop.arrivalTime,
+      calculationState: stop.legDistanceKm != null ? "Estimated" : "Unavailable",
+      isEstimate: stop.legDistanceKm != null,
     });
-
-    legs.push(leg);
-
-    if (leg.distanceKm != null) cumulativeDistance += leg.distanceKm;
-    if (leg.travelMinutes != null) cumulativeTravel += leg.travelMinutes;
-
-    const arrivalMinutes =
-      departureMinutes != null && leg.travelMinutes != null ? departureMinutes + cumulativeTravel : null;
-    const deadlineMinutes = parseHHmm(order.deadlineTime);
-    const bufferMinutes =
-      arrivalMinutes != null && deadlineMinutes != null ? deadlineMinutes - arrivalMinutes : null;
 
     stops.push({
       stopNumber: index + 1,
-      orderId: order.id,
-      orderNumber: order.orderNumber,
-      shopName: order.shop.name,
-      address: formatAddressShort(order.shop.address),
-      birds: order.birds,
-      boxes: order.boxes,
-      priority: order.priority,
-      importantCustomer: order.importantCustomer,
-      deadlineLabel: order.deadlineLabel,
-      deadlineTime: order.deadlineTime,
-      legDistanceKm: leg.distanceKm,
-      cumulativeDistanceKm: leg.distanceKm != null ? Math.round(cumulativeDistance * 10) / 10 : null,
-      legTravelMinutes: leg.travelMinutes,
-      arrivalTime: arrivalMinutes != null ? formatClock(arrivalMinutes) : null,
-      etaLabel: arrivalMinutes != null ? formatClock(arrivalMinutes) : null,
-      bufferMinutes,
-      bufferState: classifyBuffer(bufferMinutes),
-      deadlineFeasible: classifyFeasibility(bufferMinutes),
-      status: order.status,
+      orderId: stop.orderId,
+      orderNumber: stop.orderNumber,
+      shopName: stop.shopName,
+      address: stop.address,
+      birds: order?.birds ?? 0,
+      boxes: order?.boxes ?? 0,
+      priority: stop.priority,
+      importantCustomer: stop.importantCustomer,
+      deadlineLabel: stop.deadlineLabel,
+      deadlineTime: stop.deadlineTime,
+      phase: stop.phase,
+      phaseNumber: stop.phaseNumber,
+      fromName: stop.fromName,
+      legDistanceKm: stop.legDistanceKm,
+      cumulativeDistanceKm: stop.cumulativeDistanceKm,
+      legTravelMinutes: stop.travelMinutes,
+      arrivalTime: stop.arrivalTime,
+      etaLabel: stop.arrivalTime,
+      bufferMinutes: stop.bufferMinutes,
+      bufferState: stop.bufferState,
+      deadlineFeasible: stop.deadlineFeasible,
+      reason: stop.reason,
+      deadlineConflict: stop.deadlineConflict,
+      status: order?.status ?? "Pending",
     });
-
-    previousGps = order.shop.gps;
-    previousName = order.shop.name;
   });
 
   const distances = legs.map((l) => l.distanceKm).filter((d): d is number => d != null);
   const travelTimes = legs.map((l) => l.travelMinutes).filter((d): d is number => d != null);
 
   const totalDistanceKm =
-    distances.length > 0 ? Math.round(distances.reduce((sum, d) => sum + d, 0) * 10) / 10 : null;
+    plan.totalDistanceKm ?? (distances.length > 0 ? Math.round(distances.reduce((sum, d) => sum + d, 0) * 10) / 10 : null);
   const estimatedTravelMinutes =
-    travelTimes.length > 0 ? travelTimes.reduce((sum, d) => sum + d, 0) : null;
+    plan.estimatedTravelMinutes ?? (travelTimes.length > 0 ? travelTimes.reduce((sum, d) => sum + d, 0) : null);
 
   const urgentCount = orders.filter((o) => o.priority === "Urgent").length;
   const importantCount = orders.filter((o) => o.importantCustomer).length;
@@ -117,7 +112,7 @@ export function buildRoute(vehicle: RouteVehicle, orders: Order[]): DeliveryRout
   const priority = evaluateRoutePriority({
     urgentOrderCount: urgentCount,
     importantCustomerCount: importantCount,
-    earliestDeadlineLabel: sorted[0]?.deadlineLabel ?? null,
+    earliestDeadlineLabel: plan.stops[0]?.deadlineLabel ?? null,
     minBufferMinutes: safeMinBuffer,
     hasLateStop: stops.some((s) => s.deadlineFeasible === "Cannot Meet"),
     hasAtRiskStop: stops.some((s) => s.deadlineFeasible === "At Risk"),
@@ -147,6 +142,7 @@ export function buildRoute(vehicle: RouteVehicle, orders: Order[]): DeliveryRout
     routePriority: priority.level,
     priorityReasons: priority.reasons,
     calculationState: legs.some((l) => l.calculationState === "Estimated") ? "Estimated" : "Pending",
+    deadlineConflicts: plan.deadlineConflicts,
   };
 }
 

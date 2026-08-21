@@ -20,7 +20,19 @@ import { isValidLatitude, isValidLongitude, isValidCoordinate, classifyGps } fro
 import { parseHHmm, formatHHmm, formatClock, formatDuration, isValidHHmm } from "./utils/businessTime";
 import { classifyBuffer, classifyFeasibility } from "./utils/feasibility";
 import { priorityRank, compareOrdersByDeadlineThenPriority, evaluateRoutePriority } from "./services/priorityService";
-import { haversineKm, computeLeg, mockRouteCalculationService } from "./services/routeCalculationService";
+import { haversineKm, computeLeg, mockRouteCalculationService, DEFAULT_AVG_SPEED_KMH } from "./services/routeCalculationService";
+import {
+  phaseOfOrder,
+  activePhaseOf,
+  selectNextDeliveryStop,
+  buildDeliverySequence,
+  recalculateDeliveryPlan,
+  computeDistanceSaving,
+  PHASE_NUMBER,
+  DEADLINE_COMPARABLE_WINDOW_MINUTES,
+  CRITICAL_BUFFER_MINUTES,
+  type SequencingState,
+} from "./services/deliverySequencingService";
 import { evaluateCandidate, finalizeRecommendation, recommendVehicles } from "./services/vehicleRecommendationService";
 import { buildRoute, groupOrdersByVehicle, sortOrdersForRoute, distanceForOrder } from "./utils/routeUtils";
 import { applyFilters, EMPTY_FILTERS } from "./utils/orderFilters";
@@ -790,5 +802,304 @@ describe("fleet size", () => {
       assert.ok(r.recommended);
       assert.ok(r.candidates.every((c) => Number.isFinite(c.score)));
     });
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  16. Delivery phase model                                           */
+/* ------------------------------------------------------------------ */
+describe("delivery phase model", () => {
+  it("maps Urgent → Critical (including urgent + important customer)", () => {
+    assert.equal(phaseOfOrder(order({ priority: "Urgent" })), "Critical");
+    assert.equal(phaseOfOrder(order({ priority: "Urgent", importantCustomer: true })), "Critical");
+  });
+  it("maps Important → Important", () => {
+    assert.equal(phaseOfOrder(order({ priority: "Important" })), "Important");
+  });
+  it("maps Normal + important customer → Important (documented behaviour)", () => {
+    assert.equal(phaseOfOrder(order({ priority: "Normal", importantCustomer: true })), "Important");
+  });
+  it("maps Normal → Normal", () => {
+    assert.equal(phaseOfOrder(order({ priority: "Normal" })), "Normal");
+  });
+  it("activePhaseOf picks the highest phase present", () => {
+    assert.equal(activePhaseOf([order({ priority: "Normal" }), order({ priority: "Urgent" })]), "Critical");
+    assert.equal(activePhaseOf([order({ priority: "Normal" }), order({ priority: "Important" })]), "Important");
+    assert.equal(activePhaseOf([order({ priority: "Normal" })]), "Normal");
+    assert.equal(activePhaseOf([]), null);
+  });
+  it("phase numbers are ordered 1 < 2 < 3", () => {
+    assert.ok(PHASE_NUMBER.Critical < PHASE_NUMBER.Important);
+    assert.ok(PHASE_NUMBER.Important < PHASE_NUMBER.Normal);
+  });
+  it("documented constants exist", () => {
+    assert.equal(typeof DEADLINE_COMPARABLE_WINDOW_MINUTES, "number");
+    assert.equal(typeof CRITICAL_BUFFER_MINUTES, "number");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  17. Delivery sequencing — next-stop selection                      */
+/* ------------------------------------------------------------------ */
+describe("delivery sequencing — next stop", () => {
+  // Current vehicle location = Vijayawada.
+  const current = gps(16.5062, 80.648);
+  const state: SequencingState = { currentGps: current, currentName: "Vijayawada Farm", currentMinutes: 540 }; // 09:00
+
+  const mk = (id: string, lat: number, lng: number, deadlineTime: string, priority: OrderPriority = "Normal") =>
+    order({
+      id, orderNumber: id.toUpperCase(),
+      shop: shop({ id: `s-${id}`, name: `Shop ${id.toUpperCase()}`, location: "Test", gps: gps(lat, lng) }),
+      deadlineTime, deadlineLabel: `Before ${deadlineTime}`, priority,
+    });
+
+  it("same priority → nearest feasible shop selected (spec #28)", () => {
+    const near = mk("B", 16.51, 80.66, "14:00", "Urgent");   // ~1-2 km
+    const far = mk("A", 16.90, 80.65, "14:00", "Urgent");    // ~45 km
+    const result = selectNextDeliveryStop(state, [far, near]);
+    assert.ok(result.stop);
+    assert.equal(result.stop.orderId, "B");
+    assert.ok(result.stop.reason.some((r) => r.includes("Nearest feasible shop")));
+  });
+
+  it("earlier deadline beats nearer shop (spec #29)", () => {
+    const farEarly = mk("A", 16.90, 80.65, "11:00", "Urgent");  // 45 km, deadline 11:00
+    const nearLate = mk("B", 16.51, 80.66, "15:00", "Urgent");   // 2 km, deadline 15:00
+    const result = selectNextDeliveryStop(state, [nearLate, farEarly]);
+    assert.ok(result.stop);
+    assert.equal(result.stop.orderId, "A");
+    assert.ok(result.stop.reason.some((r) => r.includes("Earliest deadline")));
+  });
+
+  it("urgent phase completes before normal phase when deadlines permit (spec #27)", () => {
+    const urgentFar = mk("A", 16.90, 80.65, "14:00", "Urgent");
+    const urgentNear = mk("B", 16.51, 80.66, "14:00", "Urgent");
+    const normalClose = mk("C", 16.50, 80.65, "12:00", "Normal"); // very close but lower phase
+    // Current time 09:00; C deadline 12:00 is NOT at risk (plenty of buffer).
+    const result = selectNextDeliveryStop(state, [normalClose, urgentFar, urgentNear]);
+    assert.equal(result.activePhase, "Critical");
+    assert.equal(result.stop!.orderId, "B"); // urgent nearest, NOT the close normal shop
+  });
+
+  it("deadline override: lower-phase order about to be missed is promoted (spec #17)", () => {
+    const urgent = mk("A", 16.51, 80.66, "14:00", "Urgent");       // buffer ~ healthy
+    const normalLate = mk("B", 16.90, 80.65, "09:40", "Normal");    // 45 km ≈ 45 min → arrives 09:45 > 09:40 → late
+    const result = selectNextDeliveryStop(state, [normalLate, urgent]);
+    assert.equal(result.stop!.orderId, "B"); // promoted
+    assert.equal(result.deadlineConflict, true);
+    assert.ok(result.conflictReason!.includes("DEADLINE CONFLICT"));
+  });
+
+  it("urgent + important customer stays in Critical phase (spec #15)", () => {
+    const o = order({ priority: "Urgent", importantCustomer: true });
+    assert.equal(phaseOfOrder(o), "Critical");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  18. Delivery sequence building — recalculation                     */
+/* ------------------------------------------------------------------ */
+describe("delivery sequence building", () => {
+  const vuyPickup = pickup({ id: "farm-vuy", farmName: "Vuyyuru Farm", location: "Vuyyuru", gps: gps(16.3639, 80.8444) });
+  const v = vehicle({ id: "v3", pickup: vuyPickup, schedule: schedule("09:00") });
+
+  it("builds a full sequence and completes all orders", () => {
+    const orders = [
+      order({ id: "a", orderNumber: "A", priority: "Urgent", deadlineTime: "14:00", pickupSource: vuyPickup, shop: shop({ id: "sa", gps: gps(16.5062, 80.648) }) }),
+      order({ id: "b", orderNumber: "B", priority: "Normal", deadlineTime: "18:00", pickupSource: vuyPickup, shop: shop({ id: "sb", gps: gps(16.51, 80.66) }) }),
+      order({ id: "c", orderNumber: "C", priority: "Important", deadlineTime: "16:00", pickupSource: vuyPickup, shop: shop({ id: "sc", gps: gps(16.30, 80.43) }) }),
+    ];
+    const plan = buildDeliverySequence(v, orders);
+    assert.equal(plan.stops.length, 3);
+    // Urgent (Critical) first, then Important, then Normal.
+    assert.equal(plan.stops[0].phase, "Critical");
+    assert.equal(plan.stops[1].phase, "Important");
+    assert.equal(plan.stops[2].phase, "Normal");
+  });
+
+  it("current location updates after each stop (sequential legs, not farm → each shop)", () => {
+    const orders = [
+      order({ id: "a", orderNumber: "A", priority: "Urgent", deadlineTime: "10:00", pickupSource: vuyPickup, shop: shop({ id: "sa", name: "Shop A", gps: gps(16.5062, 80.648) }) }),
+      order({ id: "b", orderNumber: "B", priority: "Urgent", deadlineTime: "11:00", pickupSource: vuyPickup, shop: shop({ id: "sb", name: "Shop B", gps: gps(16.51, 80.66) }) }),
+    ];
+    const plan = buildDeliverySequence(v, orders);
+    assert.equal(plan.stops.length, 2);
+    // Leg 1 starts at the farm.
+    assert.equal(plan.stops[0].fromName, "Vuyyuru Farm");
+    // Leg 2 starts from Shop A (previous stop), NOT the farm.
+    assert.equal(plan.stops[1].fromName, "Shop A");
+  });
+
+  it("cumulative distance is sequential and increasing", () => {
+    const orders = [
+      order({ id: "a", orderNumber: "A", priority: "Urgent", deadlineTime: "10:00", pickupSource: vuyPickup, shop: shop({ id: "sa", gps: gps(16.5062, 80.648) }) }),
+      order({ id: "b", orderNumber: "B", priority: "Urgent", deadlineTime: "11:00", pickupSource: vuyPickup, shop: shop({ id: "sb", gps: gps(16.51, 80.66) }) }),
+      order({ id: "c", orderNumber: "C", priority: "Urgent", deadlineTime: "12:00", pickupSource: vuyPickup, shop: shop({ id: "sc", gps: gps(16.30, 80.43) }) }),
+    ];
+    const plan = buildDeliverySequence(v, orders);
+    assert.equal(plan.stops.length, 3);
+    for (let i = 1; i < plan.stops.length; i++) {
+      const prev = plan.stops[i - 1].cumulativeDistanceKm ?? 0;
+      const cur = plan.stops[i].cumulativeDistanceKm ?? 0;
+      assert.ok(cur >= prev);
+    }
+    // Total = sum of legs.
+    const legSum = plan.stops.reduce((s, st) => s + (st.legDistanceKm ?? 0), 0);
+    assert.equal(plan.totalDistanceKm, Math.round(legSum * 10) / 10);
+  });
+
+  it("recalculates from a new current location (spec #36)", () => {
+    const remaining = [
+      order({ id: "b", orderNumber: "B", priority: "Urgent", deadlineTime: "14:00", pickupSource: vuyPickup, shop: shop({ id: "sb", name: "Shop B", gps: gps(16.51, 80.66) }) }),
+    ];
+    // Vehicle now at Shop A's coordinates.
+    const plan = recalculateDeliveryPlan(v, remaining, gps(16.5062, 80.648), "Shop A", 600); // 10:00
+    assert.equal(plan.stops.length, 1);
+    assert.equal(plan.stops[0].fromName, "Shop A");
+    assert.equal(plan.schedule.departureTime, "10:00");
+  });
+
+  it("normal phase uses nearest-feasible strategy (spec #7)", () => {
+    const mk = (id: string, lat: number, lng: number, deadlineTime: string) =>
+      order({ id, orderNumber: id.toUpperCase(), priority: "Normal", deadlineTime, pickupSource: vuyPickup, shop: shop({ id: `s${id}`, name: `Shop ${id.toUpperCase()}`, gps: gps(lat, lng) }) });
+    const orders = [
+      mk("a", 16.5062, 80.648, "18:00"), // Vijayawada
+      mk("b", 16.51, 80.66, "18:00"),    // nearest to a
+      mk("c", 16.30, 80.43, "18:00"),    // farther
+    ];
+    const plan = buildDeliverySequence(v, orders);
+    // All normal, comparable deadlines → nearest-feasible ordering.
+    assert.equal(plan.stops.length, 3);
+    assert.ok(plan.stops.every((s) => s.phase === "Normal"));
+  });
+
+  it("distance saving is computed vs naive farm→each-shop baseline", () => {
+    const orders = [
+      order({ id: "a", orderNumber: "A", priority: "Urgent", deadlineTime: "14:00", pickupSource: vuyPickup, shop: shop({ id: "sa", gps: gps(16.5062, 80.648) }) }),
+      order({ id: "b", orderNumber: "B", priority: "Urgent", deadlineTime: "14:00", pickupSource: vuyPickup, shop: shop({ id: "sb", gps: gps(16.51, 80.66) }) }),
+    ];
+    const plan = buildDeliverySequence(v, orders);
+    assert.equal(typeof plan.estimatedDistanceSavingKm, "number");
+    assert.ok((plan.estimatedDistanceSavingKm ?? 0) >= 0);
+  });
+
+  it("computeDistanceSaving returns null for a single order", () => {
+    const single = [order({ id: "a", orderNumber: "A", pickupSource: vuyPickup, shop: shop({ id: "sa", gps: gps(16.5062, 80.648) }) })];
+    assert.equal(computeDistanceSaving(v, single, 30), null);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  19. 60 km/h frontend estimate                                      */
+/* ------------------------------------------------------------------ */
+describe("60 km/h estimate", () => {
+  it("DEFAULT_AVG_SPEED_KMH is 60", () => {
+    assert.equal(DEFAULT_AVG_SPEED_KMH, 60);
+  });
+  it("uses the explicit formula (distance/speed)*60", () => {
+    // 60 km at 60 km/h = 60 minutes; 30 km = 30 minutes.
+    assert.equal(mockRouteCalculationService.estimateTravelMinutes(60), 60);
+    assert.equal(mockRouteCalculationService.estimateTravelMinutes(30), 30);
+    assert.equal(mockRouteCalculationService.estimateTravelMinutes(120), 120);
+  });
+  it("still honours an explicit speed override", () => {
+    assert.equal(mockRouteCalculationService.estimateTravelMinutes(40, 40), 60);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  20. Delivery-phase regression suite                                */
+/* ------------------------------------------------------------------ */
+describe("delivery-phase regression", () => {
+  const vuyPickup = pickup({ id: "farm-vuy", farmName: "Vuyyuru Farm", location: "Vuyyuru", gps: gps(16.3639, 80.8444) });
+
+  it("R1 — later-starting Vuyyuru arrives earlier than Hyderabad (recommendation)", () => {
+    const o = order({ deadlineTime: "18:00", shop: shop({ location: "Vijayawada", gps: gps(16.5062, 80.648) }) });
+    const hyd = vehicle({ id: "v-hyd", pickup: pickup({ id: "farm-hyd", farmName: "Hyderabad Farm", location: "Hyderabad", gps: gps(17.385, 78.4867) }), schedule: schedule("08:00") });
+    const vuy = vehicle({ id: "v-vuy", pickup: vuyPickup, schedule: schedule("09:00") });
+    const result = recommendVehicles({ order: o, vehicles: [hyd, vuy] });
+    assert.ok(result.recommended);
+    assert.equal(result.recommended.vehicle.id, "v-vuy");
+  });
+
+  it("R2 — same priority, nearest feasible shop selected", () => {
+    const state: SequencingState = { currentGps: gps(16.5062, 80.648), currentName: "Farm", currentMinutes: 540 };
+    const near = order({ id: "n", orderNumber: "N", priority: "Urgent", deadlineTime: "14:00", shop: shop({ id: "sn", gps: gps(16.51, 80.66) }) });
+    const far = order({ id: "f", orderNumber: "F", priority: "Urgent", deadlineTime: "14:00", shop: shop({ id: "sf", gps: gps(16.90, 80.65) }) });
+    assert.equal(selectNextDeliveryStop(state, [far, near]).stop!.orderId, "n");
+  });
+
+  it("R3 — earlier deadline beats nearer shop", () => {
+    const state: SequencingState = { currentGps: gps(16.5062, 80.648), currentName: "Farm", currentMinutes: 540 };
+    const near = order({ id: "n", orderNumber: "N", priority: "Urgent", deadlineTime: "15:00", shop: shop({ id: "sn", gps: gps(16.51, 80.66) }) });
+    const farEarly = order({ id: "f", orderNumber: "F", priority: "Urgent", deadlineTime: "11:00", shop: shop({ id: "sf", gps: gps(16.90, 80.65) }) });
+    assert.equal(selectNextDeliveryStop(state, [near, farEarly]).stop!.orderId, "f");
+  });
+
+  it("R4 — after first shop completed, next calc starts from that shop", () => {
+    const v = vehicle({ id: "v", pickup: vuyPickup, schedule: schedule("09:00") });
+    const orders = [
+      order({ id: "a", orderNumber: "A", priority: "Urgent", deadlineTime: "10:00", pickupSource: vuyPickup, shop: shop({ id: "sa", name: "Shop A", gps: gps(16.5062, 80.648) }) }),
+      order({ id: "b", orderNumber: "B", priority: "Urgent", deadlineTime: "11:00", pickupSource: vuyPickup, shop: shop({ id: "sb", name: "Shop B", gps: gps(16.51, 80.66) }) }),
+    ];
+    const plan = buildDeliverySequence(v, orders);
+    assert.equal(plan.stops[1].fromName, "Shop A");
+  });
+
+  it("R5 — urgent phase completes before normal phase when deadlines permit", () => {
+    const v = vehicle({ id: "v", pickup: vuyPickup, schedule: schedule("09:00") });
+    const orders = [
+      order({ id: "n", orderNumber: "N", priority: "Normal", deadlineTime: "18:00", pickupSource: vuyPickup, shop: shop({ id: "sn", gps: gps(16.51, 80.66) }) }),
+      order({ id: "u", orderNumber: "U", priority: "Urgent", deadlineTime: "14:00", pickupSource: vuyPickup, shop: shop({ id: "su", gps: gps(16.5062, 80.648) }) }),
+    ];
+    const plan = buildDeliverySequence(v, orders);
+    assert.equal(plan.stops[0].phase, "Critical");
+    assert.equal(plan.stops[1].phase, "Normal");
+  });
+
+  it("R6 — important phase starts after urgent phase", () => {
+    const v = vehicle({ id: "v", pickup: vuyPickup, schedule: schedule("09:00") });
+    const orders = [
+      order({ id: "i", orderNumber: "I", priority: "Important", deadlineTime: "16:00", pickupSource: vuyPickup, shop: shop({ id: "si", gps: gps(16.51, 80.66) }) }),
+      order({ id: "u", orderNumber: "U", priority: "Urgent", deadlineTime: "14:00", pickupSource: vuyPickup, shop: shop({ id: "su", gps: gps(16.5062, 80.648) }) }),
+    ];
+    const plan = buildDeliverySequence(v, orders);
+    assert.equal(plan.stops[0].phase, "Critical");
+    assert.equal(plan.stops[1].phase, "Important");
+  });
+
+  it("R7 — normal phase uses nearest-feasible route strategy", () => {
+    const v = vehicle({ id: "v", pickup: vuyPickup, schedule: schedule("09:00") });
+    const mk = (id: string, lat: number, lng: number) =>
+      order({ id, orderNumber: id.toUpperCase(), priority: "Normal", deadlineTime: "18:00", pickupSource: vuyPickup, shop: shop({ id: `s${id}`, name: id.toUpperCase(), gps: gps(lat, lng) }) });
+    const plan = buildDeliverySequence(v, [mk("b", 16.51, 80.66), mk("a", 16.5062, 80.648), mk("c", 16.30, 80.43)]);
+    assert.ok(plan.stops.every((s) => s.phase === "Normal"));
+    assert.equal(plan.stops.length, 3);
+  });
+
+  it("R8 — cumulative route distance is sequential", () => {
+    const v = vehicle({ id: "v", pickup: vuyPickup, schedule: schedule("09:00") });
+    const orders = [
+      order({ id: "a", orderNumber: "A", priority: "Urgent", deadlineTime: "10:00", pickupSource: vuyPickup, shop: shop({ id: "sa", gps: gps(16.5062, 80.648) }) }),
+      order({ id: "b", orderNumber: "B", priority: "Urgent", deadlineTime: "11:00", pickupSource: vuyPickup, shop: shop({ id: "sb", gps: gps(16.51, 80.66) }) }),
+    ];
+    const plan = buildDeliverySequence(v, orders);
+    const legSum = plan.stops.reduce((s, st) => s + (st.legDistanceKm ?? 0), 0);
+    assert.equal(plan.totalDistanceKm, Math.round(legSum * 10) / 10);
+  });
+
+  it("R9 — 60 km/h is used for the frontend estimate", () => {
+    assert.equal(DEFAULT_AVG_SPEED_KMH, 60);
+  });
+
+  it("R10 — no NaN/Infinity/negative distance or time", () => {
+    const v = vehicle({ id: "v", pickup: vuyPickup, schedule: schedule("09:00") });
+    const orders = Array.from({ length: 20 }, (_, i) =>
+      order({ id: `o${i}`, orderNumber: `O${i}`, priority: (["Normal", "Important", "Urgent"] as OrderPriority[])[i % 3], deadlineTime: String(10 + (i % 10)).padStart(2, "0") + ":00", pickupSource: vuyPickup, shop: shop({ id: `s${i}`, gps: gps(16.3 + i * 0.01, 80.4 + (i % 5) * 0.01) }) }),
+    );
+    const plan = buildDeliverySequence(v, orders);
+    assert.ok(plan.stops.every((s) => s.legDistanceKm == null || (Number.isFinite(s.legDistanceKm) && s.legDistanceKm >= 0)));
+    assert.ok(plan.stops.every((s) => s.bufferMinutes == null || Number.isFinite(s.bufferMinutes)));
+    assert.ok(plan.stops.every((s) => s.arrivalTime == null || s.arrivalTime !== "Invalid Date"));
   });
 });

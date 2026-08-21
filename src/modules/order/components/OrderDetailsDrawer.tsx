@@ -8,6 +8,7 @@ import StatusBadge from "./StatusBadge";
 import GPSStatus from "./GPSStatus";
 import AddressBlock from "./AddressBlock";
 import { distanceForOrder } from "../utils/routeUtils";
+import { mockRouteCalculationService, DEFAULT_AVG_SPEED_KMH } from "../services/routeCalculationService";
 import { formatAddress, formatDeliveryDate, formatDistanceKm, formatTravelMinutes } from "../utils/orderFormat";
 import { formatClock, parseHHmm } from "../utils/businessTime";
 import { classifyBuffer, classifyFeasibility } from "../utils/feasibility";
@@ -49,7 +50,7 @@ export default function OrderDetailsDrawer({ order, onClose }: OrderDetailsDrawe
 
   // Delivery calculation (single-leg, pickup → shop).
   const departureMinutes = assignment?.departureTime ? parseHHmm(assignment.departureTime) : null;
-  const travelMinutes = distance != null ? Math.round((distance / 40) * 60) : null;
+  const travelMinutes = distance != null ? mockRouteCalculationService.estimateTravelMinutes(distance) : null;
   const arrivalMinutes = departureMinutes != null && travelMinutes != null ? departureMinutes + travelMinutes : null;
   const deadlineMinutes = parseHHmm(order.deadlineTime);
   const bufferMinutes =
@@ -136,7 +137,9 @@ export default function OrderDetailsDrawer({ order, onClose }: OrderDetailsDrawe
               label="Deadline Status"
               value={<span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${feas.className}`}>{feas.text}</span>}
             />
-            <p className="mt-2 text-[11px] text-slate-400">Distance is a frontend estimate — real road routing not yet connected.</p>
+            <p className="mt-2 text-[11px] text-slate-400">
+              Frontend road estimate — average speed assumption {DEFAULT_AVG_SPEED_KMH} km/h. Real road routing not yet connected.
+            </p>
           </Section>
 
           <Section title="Route">
