@@ -7,10 +7,13 @@
 // (pickup → A → B → C), never a sum of pickup→each-shop distances. The vehicle's
 // current location advances after every stop, and arrival/buffer values are
 // derived from the departure time plus cumulative leg travel time.
+//
+// Unrouteable orders are surfaced as `unplannedOrders`; totals are based on the
+// SAME dataset (planned + unplanned = total), never silently dropping orders.
 // -----------------------------------------------------------------------------
 
 import type { Order, PickupSource } from "../types/orderTypes";
-import type { DeliveryRoute, RouteLeg, RouteStop, RouteVehicle } from "../types/routeTypes";
+import type { DeliveryRoute, RouteLeg, RouteStatus, RouteStop, RouteVehicle } from "../types/routeTypes";
 import { compareOrdersByDeadlineThenPriority, evaluateRoutePriority } from "../services/priorityService";
 import { computeLeg } from "../services/routeCalculationService";
 import { buildDeliverySequence } from "../services/deliverySequencingService";
@@ -35,6 +38,20 @@ export function sortOrdersForRoute(orders: Order[]): Order[] {
   return [...orders].sort(compareOrdersByDeadlineThenPriority);
 }
 
+/** Derive a route status from planned/unplanned/at-risk/conflict signals. */
+export function computeRouteStatus(
+  plannedCount: number,
+  unplannedCount: number,
+  hasDeadlineConflict: boolean,
+  atRiskCount: number,
+): RouteStatus {
+  if (plannedCount === 0 && unplannedCount > 0) return "Blocked";
+  if (unplannedCount > 0) return "Partially Planned";
+  if (hasDeadlineConflict) return "Conflict";
+  if (atRiskCount > 0) return "At Risk";
+  return "Planned";
+}
+
 /**
  * Build ordered route stops and sequential legs for a group of orders sharing a
  * pickup farm and a vehicle schedule, using the delivery-phase sequencer.
@@ -51,7 +68,6 @@ export function buildRoute(vehicle: RouteVehicle, orders: Order[]): DeliveryRout
     const order = orderById.get(stop.orderId);
     const destinationGps = order?.shop.gps ?? null;
 
-    // Build the leg directly from the sequencer's already-computed values.
     legs.push({
       legNumber: index + 1,
       fromName: stop.fromName,
@@ -65,6 +81,7 @@ export function buildRoute(vehicle: RouteVehicle, orders: Order[]): DeliveryRout
       arrivalTime: stop.arrivalTime,
       calculationState: stop.legDistanceKm != null ? "Estimated" : "Unavailable",
       isEstimate: stop.legDistanceKm != null,
+      serviceMinutes: stop.serviceMinutes,
     });
 
     stops.push({
@@ -79,8 +96,10 @@ export function buildRoute(vehicle: RouteVehicle, orders: Order[]): DeliveryRout
       importantCustomer: stop.importantCustomer,
       deadlineLabel: stop.deadlineLabel,
       deadlineTime: stop.deadlineTime,
-      phase: stop.phase,
-      phaseNumber: stop.phaseNumber,
+      basePhase: stop.basePhase,
+      effectivePlanningPhase: stop.effectivePlanningPhase,
+      deadlineException: stop.deadlineException,
+      promotionReason: stop.promotionReason,
       fromName: stop.fromName,
       legDistanceKm: stop.legDistanceKm,
       cumulativeDistanceKm: stop.cumulativeDistanceKm,
@@ -90,8 +109,9 @@ export function buildRoute(vehicle: RouteVehicle, orders: Order[]): DeliveryRout
       bufferMinutes: stop.bufferMinutes,
       bufferState: stop.bufferState,
       deadlineFeasible: stop.deadlineFeasible,
+      planningState: stop.planningState,
       reason: stop.reason,
-      deadlineConflict: stop.deadlineConflict,
+      serviceMinutes: stop.serviceMinutes,
       status: order?.status ?? "Pending",
     });
   });
@@ -108,6 +128,7 @@ export function buildRoute(vehicle: RouteVehicle, orders: Order[]): DeliveryRout
   const importantCount = orders.filter((o) => o.importantCustomer).length;
   const minBuffer = stops.length > 0 ? Math.min(...stops.map((s) => s.bufferMinutes ?? Infinity)) : null;
   const safeMinBuffer = minBuffer === Infinity ? null : minBuffer;
+  const atRiskCount = stops.filter((s) => s.deadlineFeasible === "Cannot Meet" || s.deadlineFeasible === "At Risk").length;
 
   const priority = evaluateRoutePriority({
     urgentOrderCount: urgentCount,
@@ -124,6 +145,9 @@ export function buildRoute(vehicle: RouteVehicle, orders: Order[]): DeliveryRout
       orders.reduce((sum, o) => sum + o.boxes, 0) <= vehicle.boxCapacity,
   });
 
+  const totalBirds = orders.reduce((sum, o) => sum + o.birds, 0);
+  const totalBoxes = orders.reduce((sum, o) => sum + o.boxes, 0);
+
   return {
     id: `route-${vehicle.id}`,
     vehicleId: vehicle.id,
@@ -134,15 +158,22 @@ export function buildRoute(vehicle: RouteVehicle, orders: Order[]): DeliveryRout
     schedule: vehicle.schedule,
     legs,
     stops,
+    unplannedOrders: plan.unplannedOrders,
+    totalOrderCount: plan.totalOrderCount,
     totalDistanceKm,
     estimatedTravelMinutes,
-    totalBirds: orders.reduce((sum, o) => sum + o.birds, 0),
-    totalBoxes: orders.reduce((sum, o) => sum + o.boxes, 0),
-    routeStatus: stops.length > 0 ? "Planned" : "Ready",
+    plannedBirds: plan.plannedBirds,
+    unplannedBirds: plan.unplannedBirds,
+    plannedBoxes: plan.plannedBoxes,
+    unplannedBoxes: plan.unplannedBoxes,
+    totalBirds,
+    totalBoxes,
+    routeStatus: computeRouteStatus(stops.length, plan.unplannedOrders.length, plan.deadlineConflicts, atRiskCount),
     routePriority: priority.level,
     priorityReasons: priority.reasons,
     calculationState: legs.some((l) => l.calculationState === "Estimated") ? "Estimated" : "Pending",
     deadlineConflicts: plan.deadlineConflicts,
+    atRiskCount,
   };
 }
 

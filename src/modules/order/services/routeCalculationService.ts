@@ -116,6 +116,7 @@ export function computeLeg(input: LegInput): RouteLeg {
       arrivalTime: null,
       calculationState: "Unavailable",
       isEstimate: false,
+      serviceMinutes: 0,
     };
   }
 
@@ -134,6 +135,7 @@ export function computeLeg(input: LegInput): RouteLeg {
       arrivalTime: null,
       calculationState: "Unavailable",
       isEstimate: false,
+      serviceMinutes: 0,
     };
   }
 
@@ -153,5 +155,6 @@ export function computeLeg(input: LegInput): RouteLeg {
     arrivalTime: arrivalMinutes != null ? formatHHmm(arrivalMinutes) : null,
     calculationState: "Estimated",
     isEstimate: true,
+    serviceMinutes: 0,
   };
 }

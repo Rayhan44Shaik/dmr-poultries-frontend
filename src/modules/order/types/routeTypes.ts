@@ -5,13 +5,30 @@
 
 import type { GpsCoordinate, GpsQuality, OrderPriority, OrderStatus, PickupSource } from "./orderTypes";
 
-export type RouteStatus = "Planned" | "Ready" | "In Transit" | "Completed";
+/**
+ * Route status — a route is never silently "complete" when orders remain
+ * unrouteable or at risk.
+ */
+export type RouteStatus =
+  | "Ready"
+  | "Planned"
+  | "Partially Planned"
+  | "At Risk"
+  | "Conflict"
+  | "Blocked"
+  | "Completed";
 
 /** State of a route/distance calculation — never fake a "Calculated" value. */
 export type CalculationState = "Pending" | "Estimated" | "Calculated" | "Unavailable" | "Invalid";
 
 /** Deadline feasibility of a predicted arrival vs. the required deadline. */
 export type DeadlineFeasibility = "Can Meet" | "At Risk" | "Cannot Meet" | "Unknown";
+
+/**
+ * Explicit planning state for a stop / candidate (requirement #5). UNROUTABLE
+ * means GPS/routing data is unavailable or invalid — never silently dropped.
+ */
+export type PlanningState = "Feasible" | "At Risk" | "Cannot Meet" | "Unroutable";
 
 /** Delivery buffer classification (deadline minus predicted arrival). */
 export type BufferState = "Healthy" | "Tight" | "At Risk" | "Late" | "Unknown";
@@ -47,6 +64,8 @@ export interface RouteLeg {
   arrivalTime: string | null;
   calculationState: CalculationState;
   isEstimate: boolean;
+  /** Optional on-site service time (default 0) — future arrival + service = next departure. */
+  serviceMinutes: number;
 }
 
 /** A single delivery stop along a route, enriched with arrival/buffer info. */
@@ -62,9 +81,14 @@ export interface RouteStop {
   importantCustomer: boolean;
   deadlineLabel: string;
   deadlineTime: string;
-  /** Delivery phase this stop was planned within. */
-  phase: DeliveryPhase;
-  phaseNumber: DeliveryPhaseNumber;
+  /** The order's natural phase (priority-derived). */
+  basePhase: DeliveryPhase;
+  /** The phase this stop was actually planned within (may be promoted). */
+  effectivePlanningPhase: DeliveryPhase;
+  /** True when a lower-phase order was promoted to protect its deadline. */
+  deadlineException: boolean;
+  /** Human-readable reason for the deadline exception (null when none). */
+  promotionReason: string | null;
   /** Name of the previous point (farm or previous shop) this leg started from. */
   fromName: string;
   /** Distance of the leg leading into this stop (previous point → stop). */
@@ -77,11 +101,55 @@ export interface RouteStop {
   bufferMinutes: number | null;
   bufferState: BufferState;
   deadlineFeasible: DeadlineFeasibility;
+  planningState: PlanningState;
   /** Human-readable reasons for selecting this stop next. */
   reason: string[];
-  /** True when this stop was promoted due to a cross-phase deadline conflict. */
-  deadlineConflict: boolean;
+  /** Optional on-site service time (default 0). */
+  serviceMinutes: number;
   status: OrderStatus;
+}
+
+/** A planned delivery stop (sequencing-service shape, pre-route-utils). */
+export interface DeliveryStopPlan {
+  orderId: string;
+  orderNumber: string;
+  shopName: string;
+  address: string;
+  priority: OrderPriority;
+  importantCustomer: boolean;
+  deadlineLabel: string;
+  deadlineTime: string;
+  basePhase: DeliveryPhase;
+  effectivePlanningPhase: DeliveryPhase;
+  deadlineException: boolean;
+  promotionReason: string | null;
+  fromName: string;
+  fromGps: GpsCoordinate | null;
+  legDistanceKm: number | null;
+  cumulativeDistanceKm: number | null;
+  travelMinutes: number | null;
+  departureTime: string | null;
+  arrivalTime: string | null;
+  arrivalMinutes: number | null;
+  bufferMinutes: number | null;
+  bufferState: BufferState;
+  deadlineFeasible: DeadlineFeasibility;
+  planningState: PlanningState;
+  reason: string[];
+  serviceMinutes: number;
+}
+
+/** An order that could not be routed (e.g. missing/invalid GPS). */
+export interface UnplannedOrder {
+  orderId: string;
+  orderNumber: string;
+  shopName: string;
+  birds: number;
+  boxes: number;
+  priority: OrderPriority;
+  basePhase: DeliveryPhase;
+  reason: string;
+  planningState: "Unroutable";
 }
 
 /** Vehicle schedule — each vehicle starts and departs independently. */
@@ -124,8 +192,21 @@ export interface DeliveryRoute {
   schedule: VehicleSchedule;
   legs: RouteLeg[];
   stops: RouteStop[];
+  /** Orders that could not be routed (never silently dropped). */
+  unplannedOrders: UnplannedOrder[];
+  /** stops.length + unplannedOrders.length — always equals the input order count. */
+  totalOrderCount: number;
   totalDistanceKm: number | null;
   estimatedTravelMinutes: number | null;
+  /** Birds across planned stops. */
+  plannedBirds: number;
+  /** Birds across unplanned orders. */
+  unplannedBirds: number;
+  /** Boxes across planned stops. */
+  plannedBoxes: number;
+  /** Boxes across unplanned orders. */
+  unplannedBoxes: number;
+  /** Total birds (planned + unplanned) — same dataset as totalOrderCount. */
   totalBirds: number;
   totalBoxes: number;
   routeStatus: RouteStatus;
@@ -134,6 +215,8 @@ export interface DeliveryRoute {
   calculationState: CalculationState;
   /** True when any stop was promoted to protect a cross-phase deadline. */
   deadlineConflicts: boolean;
+  /** Number of stops whose arrival is at/after deadline. */
+  atRiskCount: number;
 }
 
 export type RoutePriorityLevel = "HIGH" | "MEDIUM" | "LOW";
@@ -148,12 +231,14 @@ export type VehicleEligibility = "Eligible" | "At Risk" | "Not Eligible";
 /** Soft recommendation tier, surfaced to the supervisor. */
 export type RecommendationTier = "Best Match" | "Alternative" | "At Risk" | "Not Suitable";
 
-/** A scored candidate vehicle for a single order. */
+/** A candidate vehicle for a single order (hierarchically evaluated). */
 export interface VehicleCandidate {
   vehicle: RouteVehicle;
   eligibility: VehicleEligibility;
   /** Human-readable reasons for eligibility or exclusion. */
   eligibilityReasons: string[];
+  /** Human-readable warnings (e.g. "arrives 20 min after deadline"). */
+  warnings: string[];
   distanceKm: number | null;
   travelMinutes: number | null;
   departureTime: string | null;
@@ -162,7 +247,7 @@ export interface VehicleCandidate {
   bufferMinutes: number | null;
   bufferState: BufferState;
   deadlineFeasible: DeadlineFeasibility;
-  score: number;
+  planningState: PlanningState;
   /** Human-readable recommendation reasons. */
   reasons: string[];
   tier: RecommendationTier;

@@ -5,7 +5,7 @@
 // call sites.
 // -----------------------------------------------------------------------------
 
-import type { BufferState, DeadlineFeasibility } from "../types/routeTypes";
+import type { BufferState, DeadlineFeasibility, PlanningState } from "../types/routeTypes";
 import { BUFFER_HEALTHY_MIN, BUFFER_TIGHT_MIN } from "./businessTime";
 
 /**
@@ -34,4 +34,22 @@ export function classifyFeasibility(bufferMinutes: number | null): DeadlineFeasi
   if (bufferMinutes >= BUFFER_TIGHT_MIN) return "Can Meet";
   if (bufferMinutes >= 0) return "At Risk";
   return "Cannot Meet";
+}
+
+/**
+ * Explicit planning state (requirement #5) derived from deadline feasibility.
+ * "Unroutable" is handled separately by the sequencing/recommendation layers
+ * (it means GPS/routing data is unavailable), not here.
+ */
+export function planningStateOf(feasibility: DeadlineFeasibility): PlanningState {
+  switch (feasibility) {
+    case "Can Meet":
+      return "Feasible";
+    case "At Risk":
+      return "At Risk";
+    case "Cannot Meet":
+      return "Cannot Meet";
+    default:
+      return "Unroutable";
+  }
 }

@@ -18,7 +18,7 @@ import { describe, it } from "node:test";
 import { validateOrderDraft, nextOrderNumber, BIRD_TYPES, PRIORITIES, REQUIREMENT_TYPES, DEADLINE_PRESETS } from "./utils/orderValidation";
 import { isValidLatitude, isValidLongitude, isValidCoordinate, classifyGps } from "./utils/gps";
 import { parseHHmm, formatHHmm, formatClock, formatDuration, isValidHHmm } from "./utils/businessTime";
-import { classifyBuffer, classifyFeasibility } from "./utils/feasibility";
+import { classifyBuffer, classifyFeasibility, planningStateOf } from "./utils/feasibility";
 import { priorityRank, compareOrdersByDeadlineThenPriority, evaluateRoutePriority } from "./services/priorityService";
 import { haversineKm, computeLeg, mockRouteCalculationService, DEFAULT_AVG_SPEED_KMH } from "./services/routeCalculationService";
 import {
@@ -328,7 +328,7 @@ describe("vehicle recommendation — critical scenarios", () => {
     assert.equal(c1.predictedArrival, "10:00");
     assert.equal(c2.predictedArrival, "09:45");
 
-    const result = finalizeRecommendation([c1, c2]);
+    const result = finalizeRecommendation(o, [c1, c2]);
     assert.ok(result.recommended);
     assert.equal(result.recommended.vehicle.id, "v02");
     assert.equal(result.recommended.reasons.includes("Earliest feasible ETA"), true);
@@ -344,7 +344,7 @@ describe("vehicle recommendation — critical scenarios", () => {
     assert.equal(c1.deadlineFeasible, "Can Meet");
     assert.equal(c2.deadlineFeasible, "Cannot Meet");
 
-    const result = finalizeRecommendation([c1, c2]);
+    const result = finalizeRecommendation(o, [c1, c2]);
     assert.ok(result.recommended);
     assert.equal(result.recommended.vehicle.id, "v01");
   });
@@ -356,7 +356,7 @@ describe("vehicle recommendation — critical scenarios", () => {
 
     const c1 = evaluateCandidate(o, v01, 80, 120); // 10:00
     const c2 = evaluateCandidate(o, v02, 30, 45);  // 09:45
-    const result = finalizeRecommendation([c1, c2]);
+    const result = finalizeRecommendation(o, [c1, c2]);
     assert.ok(result.recommended);
     assert.equal(result.recommended.vehicle.id, "v02");
     assert.equal(result.recommended.reasons.includes("Lower existing route load"), true);
@@ -372,7 +372,7 @@ describe("vehicle recommendation — critical scenarios", () => {
     assert.equal(c1.eligibility, "Not Eligible");
     assert.equal(c2.eligibility, "Eligible");
 
-    const result = finalizeRecommendation([c1, c2]);
+    const result = finalizeRecommendation(o, [c1, c2]);
     assert.ok(result.recommended);
     assert.equal(result.recommended.vehicle.id, "v02");
     assert.equal(result.candidates.find((c) => c.vehicle.id === "v01")?.tier, "Not Suitable");
@@ -388,12 +388,12 @@ describe("vehicle recommendation — critical scenarios", () => {
     assert.equal(c1.deadlineFeasible, "Cannot Meet");
     assert.equal(c2.deadlineFeasible, "Cannot Meet");
 
-    const result = finalizeRecommendation([c1, c2]);
+    const result = finalizeRecommendation(o, [c1, c2]);
     assert.equal(result.allLate, true);
     assert.ok(result.recommended);
     assert.equal(result.recommended.tier, "At Risk");
     assert.notEqual(result.recommended.deadlineFeasible, "Can Meet");
-    assert.match(result.summary, /Deadline at risk/);
+    assert.match(result.summary, /No vehicle can meet the deadline/);
   });
 });
 
@@ -424,7 +424,7 @@ describe("vehicle recommendation — hard constraints", () => {
     assert.match(c.eligibilityReasons[0], /Pickup GPS/);
   });
   it("returns no recommendation when all vehicles are ineligible", () => {
-    const r = finalizeRecommendation([
+    const r = finalizeRecommendation(o, [
       evaluateCandidate(o, vehicle({ available: false }), null, null),
       evaluateCandidate(o, vehicle({ birdCapacity: 10 }), null, null),
     ]);
@@ -441,19 +441,20 @@ describe("vehicle recommendation — soft preferences", () => {
     // Cannot Meet is never re-labelled Can Meet regardless of important customer.
     const feasible = evaluateCandidate(order({ deadlineTime: "18:00" }), vehicle({ id: "v2" }), 30, 45);
     assert.equal(feasible.deadlineFeasible, "Can Meet");
-    assert.ok(feasible.score > late.score + 5000);
+    assert.notEqual(feasible.deadlineFeasible, "Cannot Meet");
   });
   it("urgent + cannot-meet is heavily penalised (never falsely 'fine')", () => {
     const o = order({ priority: "Urgent", deadlineTime: "10:00" });
     const late = evaluateCandidate(o, vehicle({ id: "v1" }), 100, 200);
     assert.equal(late.deadlineFeasible, "Cannot Meet");
-    assert.ok(late.score < -10000);
+    assert.equal(late.eligibility, "At Risk");
   });
   it("existing route alignment gives a preference", () => {
     const o = order({ shop: shop({ location: "Eluru" }) });
     const aligned = evaluateCandidate(o, vehicle({ id: "v1", existingStopCities: ["Eluru"] }), 50, 60);
     const notAligned = evaluateCandidate(o, vehicle({ id: "v2" }), 50, 60);
-    assert.ok(aligned.score > notAligned.score);
+    const alignedResult = finalizeRecommendation(o, [notAligned, aligned]);
+    assert.equal(alignedResult.recommended?.vehicle.id, "v1");
   });
 });
 
@@ -607,7 +608,7 @@ describe("bulk stability", () => {
     );
     const result = recommendVehicles({ order: orders[0], vehicles });
     assert.ok(result.candidates.length === 20);
-    assert.ok(result.candidates.every((c) => Number.isFinite(c.score)));
+    assert.ok(result.candidates.every((c) => c.bufferMinutes == null || Number.isFinite(c.bufferMinutes)));
     assert.ok(result.candidates.every((c) => c.distanceKm == null || c.distanceKm >= 0));
   });
 
@@ -660,7 +661,7 @@ describe("time scenario matrix", () => {
           assert.equal(c.bufferMinutes, buffer);
           assert.equal(c.deadlineFeasible, classifyFeasibility(buffer));
           assert.equal(c.bufferState, classifyBuffer(buffer));
-          assert.ok(Number.isFinite(c.score));
+          assert.ok(["Feasible", "At Risk", "Cannot Meet", "Unroutable"].includes(c.planningState));
         });
       }
     }
@@ -676,7 +677,7 @@ describe("recommendation decision matrix", () => {
   it("closest vehicle is NOT best when a farther vehicle arrives earlier", () => {
     const close = evaluateCandidate(o(), vehicle({ id: "close", schedule: schedule("10:30") }), 10, 60); // arrives 11:30 → late
     const far = evaluateCandidate(o(), vehicle({ id: "far", schedule: schedule("08:00") }), 200, 120); // arrives 10:00
-    const r = finalizeRecommendation([close, far]);
+    const r = finalizeRecommendation(o(), [close, far]);
     assert.ok(r.recommended);
     assert.equal(r.recommended.vehicle.id, "far");
   });
@@ -684,7 +685,7 @@ describe("recommendation decision matrix", () => {
   it("first-started vehicle is NOT best when a later starter arrives earlier", () => {
     const early = evaluateCandidate(o(), vehicle({ id: "early", schedule: schedule("07:00") }), 300, 240); // 11:00
     const later = evaluateCandidate(o(), vehicle({ id: "later", schedule: schedule("09:00") }), 50, 60); // 10:00
-    const r = finalizeRecommendation([early, later]);
+    const r = finalizeRecommendation(o(), [early, later]);
     assert.ok(r.recommended);
     assert.equal(r.recommended.vehicle.id, "later");
   });
@@ -694,14 +695,14 @@ describe("recommendation decision matrix", () => {
     const late = evaluateCandidate(o({ priority: "Urgent", deadlineTime: "10:30" }), vehicle({ id: "late", schedule: schedule("09:00") }), 30, 120); // 11:00
     assert.equal(onTime.deadlineFeasible, "Can Meet");
     assert.equal(late.deadlineFeasible, "Cannot Meet");
-    const r = finalizeRecommendation([onTime, late]);
+    const r = finalizeRecommendation(o({ priority: "Urgent", deadlineTime: "10:30" }), [onTime, late]);
     assert.equal(r.recommended?.vehicle.id, "ontime");
   });
 
   it("deadline change flips the recommendation", () => {
     const a = evaluateCandidate(o({ deadlineTime: "12:00" }), vehicle({ id: "a", schedule: schedule("08:00") }), 80, 120);
     const b = evaluateCandidate(o({ deadlineTime: "12:00" }), vehicle({ id: "b", schedule: schedule("09:00") }), 30, 45);
-    assert.equal(finalizeRecommendation([a, b]).recommended?.vehicle.id, "b"); // earlier ETA
+    assert.equal(finalizeRecommendation(o({ deadlineTime: "12:00" }), [a, b]).recommended?.vehicle.id, "b"); // earlier ETA
   });
 
   it("important customer nudges but does not flip an impossible deadline", () => {
@@ -713,7 +714,8 @@ describe("recommendation decision matrix", () => {
   it("existing assigned orders make a vehicle less preferable", () => {
     const loaded = evaluateCandidate(o(), vehicle({ id: "loaded", assignedOrderCount: 6, schedule: schedule("08:00") }), 80, 120);
     const empty = evaluateCandidate(o(), vehicle({ id: "empty", assignedOrderCount: 0, schedule: schedule("08:00") }), 80, 120);
-    assert.ok(empty.score > loaded.score);
+    const loadResult = finalizeRecommendation(o(), [loaded, empty]);
+    assert.equal(loadResult.recommended?.vehicle.id, "empty");
   });
 
   it("a predicted-late vehicle is flagged At Risk, not Can Meet", () => {
@@ -725,7 +727,7 @@ describe("recommendation decision matrix", () => {
   it("manual override: an alternative eligible vehicle remains available", () => {
     const best = evaluateCandidate(o(), vehicle({ id: "best", schedule: schedule("08:00") }), 80, 60);
     const alt = evaluateCandidate(o(), vehicle({ id: "alt", schedule: schedule("08:15") }), 90, 70);
-    const r = finalizeRecommendation([best, alt]);
+    const r = finalizeRecommendation(o(), [best, alt]);
     assert.equal(r.recommended?.vehicle.id, "best");
     const altCandidate = r.candidates.find((c) => c.vehicle.id === "alt");
     assert.equal(altCandidate?.tier, "Alternative");
@@ -800,7 +802,7 @@ describe("fleet size", () => {
       const r = recommendVehicles({ order: o, vehicles });
       assert.equal(r.candidates.length, count);
       assert.ok(r.recommended);
-      assert.ok(r.candidates.every((c) => Number.isFinite(c.score)));
+      assert.ok(r.candidates.every((c) => c.bufferMinutes == null || Number.isFinite(c.bufferMinutes)));
     });
   });
 });
@@ -877,7 +879,7 @@ describe("delivery sequencing — next stop", () => {
     const normalClose = mk("C", 16.50, 80.65, "12:00", "Normal"); // very close but lower phase
     // Current time 09:00; C deadline 12:00 is NOT at risk (plenty of buffer).
     const result = selectNextDeliveryStop(state, [normalClose, urgentFar, urgentNear]);
-    assert.equal(result.activePhase, "Critical");
+    assert.equal(result.basePhase, "Critical");
     assert.equal(result.stop!.orderId, "B"); // urgent nearest, NOT the close normal shop
   });
 
@@ -886,8 +888,8 @@ describe("delivery sequencing — next stop", () => {
     const normalLate = mk("B", 16.90, 80.65, "09:40", "Normal");    // 45 km ≈ 45 min → arrives 09:45 > 09:40 → late
     const result = selectNextDeliveryStop(state, [normalLate, urgent]);
     assert.equal(result.stop!.orderId, "B"); // promoted
-    assert.equal(result.deadlineConflict, true);
-    assert.ok(result.conflictReason!.includes("DEADLINE CONFLICT"));
+    assert.equal(result.deadlineException, true);
+    assert.ok(result.exceptionReason!.includes("deadline risk"));
   });
 
   it("urgent + important customer stays in Critical phase (spec #15)", () => {
@@ -912,9 +914,9 @@ describe("delivery sequence building", () => {
     const plan = buildDeliverySequence(v, orders);
     assert.equal(plan.stops.length, 3);
     // Urgent (Critical) first, then Important, then Normal.
-    assert.equal(plan.stops[0].phase, "Critical");
-    assert.equal(plan.stops[1].phase, "Important");
-    assert.equal(plan.stops[2].phase, "Normal");
+    assert.equal(plan.stops[0].effectivePlanningPhase, "Critical");
+    assert.equal(plan.stops[1].effectivePlanningPhase, "Important");
+    assert.equal(plan.stops[2].effectivePlanningPhase, "Normal");
   });
 
   it("current location updates after each stop (sequential legs, not farm → each shop)", () => {
@@ -970,7 +972,7 @@ describe("delivery sequence building", () => {
     const plan = buildDeliverySequence(v, orders);
     // All normal, comparable deadlines → nearest-feasible ordering.
     assert.equal(plan.stops.length, 3);
-    assert.ok(plan.stops.every((s) => s.phase === "Normal"));
+    assert.ok(plan.stops.every((s) => s.effectivePlanningPhase === "Normal"));
   });
 
   it("distance saving is computed vs naive farm→each-shop baseline", () => {
@@ -1053,8 +1055,8 @@ describe("delivery-phase regression", () => {
       order({ id: "u", orderNumber: "U", priority: "Urgent", deadlineTime: "14:00", pickupSource: vuyPickup, shop: shop({ id: "su", gps: gps(16.5062, 80.648) }) }),
     ];
     const plan = buildDeliverySequence(v, orders);
-    assert.equal(plan.stops[0].phase, "Critical");
-    assert.equal(plan.stops[1].phase, "Normal");
+    assert.equal(plan.stops[0].effectivePlanningPhase, "Critical");
+    assert.equal(plan.stops[1].effectivePlanningPhase, "Normal");
   });
 
   it("R6 — important phase starts after urgent phase", () => {
@@ -1064,8 +1066,8 @@ describe("delivery-phase regression", () => {
       order({ id: "u", orderNumber: "U", priority: "Urgent", deadlineTime: "14:00", pickupSource: vuyPickup, shop: shop({ id: "su", gps: gps(16.5062, 80.648) }) }),
     ];
     const plan = buildDeliverySequence(v, orders);
-    assert.equal(plan.stops[0].phase, "Critical");
-    assert.equal(plan.stops[1].phase, "Important");
+    assert.equal(plan.stops[0].effectivePlanningPhase, "Critical");
+    assert.equal(plan.stops[1].effectivePlanningPhase, "Important");
   });
 
   it("R7 — normal phase uses nearest-feasible route strategy", () => {
@@ -1073,7 +1075,7 @@ describe("delivery-phase regression", () => {
     const mk = (id: string, lat: number, lng: number) =>
       order({ id, orderNumber: id.toUpperCase(), priority: "Normal", deadlineTime: "18:00", pickupSource: vuyPickup, shop: shop({ id: `s${id}`, name: id.toUpperCase(), gps: gps(lat, lng) }) });
     const plan = buildDeliverySequence(v, [mk("b", 16.51, 80.66), mk("a", 16.5062, 80.648), mk("c", 16.30, 80.43)]);
-    assert.ok(plan.stops.every((s) => s.phase === "Normal"));
+    assert.ok(plan.stops.every((s) => s.effectivePlanningPhase === "Normal"));
     assert.equal(plan.stops.length, 3);
   });
 
@@ -1101,5 +1103,243 @@ describe("delivery-phase regression", () => {
     assert.ok(plan.stops.every((s) => s.legDistanceKm == null || (Number.isFinite(s.legDistanceKm) && s.legDistanceKm >= 0)));
     assert.ok(plan.stops.every((s) => s.bufferMinutes == null || Number.isFinite(s.bufferMinutes)));
     assert.ok(plan.stops.every((s) => s.arrivalTime == null || s.arrivalTime !== "Invalid Date"));
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  21. Planning states (requirement #5)                               */
+/* ------------------------------------------------------------------ */
+describe("planning states", () => {
+  it("planningStateOf maps feasibility to explicit states", () => {
+    assert.equal(planningStateOf("Can Meet"), "Feasible");
+    assert.equal(planningStateOf("At Risk"), "At Risk");
+    assert.equal(planningStateOf("Cannot Meet"), "Cannot Meet");
+    assert.equal(planningStateOf("Unknown"), "Unroutable");
+  });
+
+  it("a feasible candidate carries planningState Feasible", () => {
+    const o = order({ deadlineTime: "18:00" });
+    const c = evaluateCandidate(o, vehicle({ schedule: schedule("08:00") }), 30, 45);
+    assert.equal(c.planningState, "Feasible");
+  });
+
+  it("a late candidate carries planningState Cannot Meet", () => {
+    const o = order({ deadlineTime: "09:00" });
+    const c = evaluateCandidate(o, vehicle({ schedule: schedule("08:00") }), 100, 120); // 10:00
+    assert.equal(c.planningState, "Cannot Meet");
+  });
+
+  it("an unroutable candidate carries planningState Unroutable", () => {
+    const c = evaluateCandidate(order({ shop: shop({ gps: null, gpsStatus: "Unavailable" }) }), vehicle(), null, null);
+    assert.equal(c.planningState, "Unroutable");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  22. Unplanned / unroutable orders + route status                   */
+/* ------------------------------------------------------------------ */
+describe("unroutable orders & route status", () => {
+  const vuyPickup = pickup({ id: "farm-vuy", farmName: "Vuyyuru Farm", location: "Vuyyuru", gps: gps(16.3639, 80.8444) });
+  const v = vehicle({ id: "v", pickup: vuyPickup, schedule: schedule("09:00") });
+
+  it("R-unrouteable: missing-GPS order is unplanned, not silently dropped (spec #34)", () => {
+    const routeable = order({ id: "b", orderNumber: "B", priority: "Urgent", deadlineTime: "14:00", pickupSource: vuyPickup, shop: shop({ id: "sb", gps: gps(16.5062, 80.648) }) });
+    const unroutable = order({ id: "a", orderNumber: "A", priority: "Normal", deadlineTime: "15:00", pickupSource: vuyPickup, shop: shop({ id: "sa", gps: null, gpsStatus: "Unavailable" }) });
+    const route = buildRoute(v, [unroutable, routeable]);
+    assert.equal(route.stops.length, 1);
+    assert.equal(route.stops[0].orderId, "b");
+    assert.equal(route.unplannedOrders.length, 1);
+    assert.equal(route.unplannedOrders[0].orderId, "a");
+    assert.equal(route.unplannedOrders[0].reason, "GPS unavailable");
+    assert.equal(route.unplannedOrders[0].planningState, "Unroutable");
+    assert.equal(route.totalOrderCount, 2);
+  });
+
+  it("totals are based on the same dataset (planned + unplanned = total)", () => {
+    const orders = [
+      order({ id: "a", orderNumber: "A", priority: "Urgent", deadlineTime: "14:00", birds: 100, boxes: 2, pickupSource: vuyPickup, shop: shop({ id: "sa", gps: gps(16.5062, 80.648) }) }),
+      order({ id: "b", orderNumber: "B", priority: "Normal", deadlineTime: "15:00", birds: 50, boxes: 1, pickupSource: vuyPickup, shop: shop({ id: "sb", gps: null, gpsStatus: "Unavailable" }) }),
+    ];
+    const route = buildRoute(v, orders);
+    assert.equal(route.stops.length + route.unplannedOrders.length, route.totalOrderCount);
+    assert.equal(route.totalOrderCount, 2);
+    assert.equal(route.plannedBirds + route.unplannedBirds, route.totalBirds);
+    assert.equal(route.plannedBoxes + route.unplannedBoxes, route.totalBoxes);
+    assert.equal(route.plannedBirds, 100);
+    assert.equal(route.unplannedBirds, 50);
+  });
+
+  it("route status: Partially Planned when some orders are unrouteable", () => {
+    const orders = [
+      order({ id: "a", orderNumber: "A", priority: "Urgent", deadlineTime: "14:00", pickupSource: vuyPickup, shop: shop({ id: "sa", gps: gps(16.5062, 80.648) }) }),
+      order({ id: "b", orderNumber: "B", priority: "Normal", deadlineTime: "15:00", pickupSource: vuyPickup, shop: shop({ id: "sb", gps: null, gpsStatus: "Unavailable" }) }),
+    ];
+    assert.equal(buildRoute(v, orders).routeStatus, "Partially Planned");
+  });
+
+  it("route status: Blocked when every order is unrouteable", () => {
+    const orders = [
+      order({ id: "a", orderNumber: "A", pickupSource: vuyPickup, shop: shop({ id: "sa", gps: null, gpsStatus: "Unavailable" }) }),
+      order({ id: "b", orderNumber: "B", pickupSource: vuyPickup, shop: shop({ id: "sb", gps: null, gpsStatus: "Unavailable" }) }),
+    ];
+    assert.equal(buildRoute(v, orders).routeStatus, "Blocked");
+  });
+
+  it("route status: Conflict when a deadline exception occurs", () => {
+    const urgent = order({ id: "u", orderNumber: "U", priority: "Urgent", deadlineTime: "14:00", pickupSource: vuyPickup, shop: shop({ id: "su", gps: gps(16.5062, 80.648) }) });
+    const normalLate = order({ id: "n", orderNumber: "N", priority: "Normal", deadlineTime: "09:10", pickupSource: vuyPickup, shop: shop({ id: "sn", gps: gps(16.50, 80.63) }) });
+    const route = buildRoute(v, [normalLate, urgent]);
+    assert.equal(route.deadlineConflicts, true);
+    assert.equal(route.routeStatus, "Conflict");
+  });
+
+  it("route status: At Risk when a stop is predicted late but routable", () => {
+    const orders = [
+      order({ id: "a", orderNumber: "A", priority: "Urgent", deadlineTime: "09:05", pickupSource: vuyPickup, shop: shop({ id: "sa", gps: gps(16.5062, 80.648) }) }),
+    ];
+    const route = buildRoute(v, orders); // ~17 km ≈ 17 min → 09:17 arrival, deadline 09:05 → late
+    assert.equal(route.routeStatus, "At Risk");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  23. Base phase not redefined by a promoted order (requirement #4)  */
+/* ------------------------------------------------------------------ */
+describe("base phase vs deadline exception", () => {
+  const vuyPickup = pickup({ id: "farm-vuy", farmName: "Vuyyuru Farm", location: "Vuyyuru", gps: gps(16.3639, 80.8444) });
+
+  it("a promoted normal order keeps basePhase Normal and effectivePlanningPhase Critical", () => {
+    const state: SequencingState = { currentGps: vuyPickup.gps, currentName: "Vuyyuru Farm", currentMinutes: 540 };
+    const urgent = order({ id: "u", orderNumber: "U", priority: "Urgent", deadlineTime: "14:00", shop: shop({ id: "su", gps: gps(16.5062, 80.648) }) });
+    const normalLate = order({ id: "n", orderNumber: "N", priority: "Normal", deadlineTime: "09:10", shop: shop({ id: "sn", gps: gps(16.50, 80.63) }) });
+    const result = selectNextDeliveryStop(state, [normalLate, urgent]);
+    assert.equal(result.basePhase, "Critical"); // urgent still present
+    assert.equal(result.stop!.basePhase, "Normal"); // order priority NOT mutated
+    assert.equal(result.stop!.effectivePlanningPhase, "Critical"); // promoted
+    assert.equal(result.stop!.deadlineException, true);
+    assert.match(result.stop!.promotionReason ?? "", /deadline risk/);
+  });
+
+  it("the underlying order priority is never mutated", () => {
+    const o = order({ id: "n", priority: "Normal", deadlineTime: "09:10" });
+    const snapshot = o.priority;
+    const state: SequencingState = { currentGps: vuyPickup.gps, currentName: "F", currentMinutes: 540 };
+    selectNextDeliveryStop(state, [o, order({ id: "u", priority: "Urgent", deadlineTime: "14:00", shop: shop({ id: "su", gps: gps(16.5062, 80.648) }) })]);
+    assert.equal(o.priority, snapshot);
+  });
+
+  it("deadline exception regression (spec #33): normal promoted over urgent when deadline is imminent", () => {
+    const v = vehicle({ id: "v", pickup: vuyPickup, schedule: schedule("09:00") });
+    const urgent = order({ id: "u", orderNumber: "U", priority: "Urgent", deadlineTime: "14:00", pickupSource: vuyPickup, shop: shop({ id: "su", gps: gps(16.5062, 80.648) }) });
+    const normalLate = order({ id: "n", orderNumber: "N", priority: "Normal", deadlineTime: "09:10", pickupSource: vuyPickup, shop: shop({ id: "sn", gps: gps(16.50, 80.63) }) });
+    const plan = buildDeliverySequence(v, [normalLate, urgent]);
+    assert.equal(plan.stops[0].orderId, "n");
+    assert.equal(plan.stops[0].deadlineException, true);
+    assert.equal(plan.deadlineConflicts, true);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  24. Determinism (requirement #45)                                  */
+/* ------------------------------------------------------------------ */
+describe("determinism", () => {
+  const vuyPickup = pickup({ id: "farm-vuy", farmName: "Vuyyuru Farm", location: "Vuyyuru", gps: gps(16.3639, 80.8444) });
+  const v = vehicle({ id: "v", pickup: vuyPickup, schedule: schedule("09:00") });
+
+  const buildOrders = () => [
+    order({ id: "a", orderNumber: "A", priority: "Urgent", deadlineTime: "10:00", pickupSource: vuyPickup, shop: shop({ id: "sa", name: "Shop A", gps: gps(16.5062, 80.648) }) }),
+    order({ id: "b", orderNumber: "B", priority: "Urgent", deadlineTime: "11:00", pickupSource: vuyPickup, shop: shop({ id: "sb", name: "Shop B", gps: gps(16.51, 80.66) }) }),
+    order({ id: "c", orderNumber: "C", priority: "Important", deadlineTime: "12:00", pickupSource: vuyPickup, shop: shop({ id: "sc", name: "Shop C", gps: gps(16.30, 80.43) }) }),
+    order({ id: "d", orderNumber: "D", priority: "Normal", deadlineTime: "18:00", pickupSource: vuyPickup, shop: shop({ id: "sd", name: "Shop D", gps: gps(16.55, 80.70) }) }),
+  ];
+
+  it("produces the same sequence, ETAs, distances and reasons across 100 runs", () => {
+    let reference: string | null = null;
+    for (let i = 0; i < 100; i++) {
+      const plan = buildDeliverySequence(v, buildOrders());
+      const fingerprint = JSON.stringify({
+        seq: plan.stops.map((s) => s.orderId),
+        etas: plan.stops.map((s) => s.arrivalTime),
+        dist: plan.stops.map((s) => s.legDistanceKm),
+        reasons: plan.stops.map((s) => s.reason),
+        total: plan.totalDistanceKm,
+      });
+      if (reference == null) reference = fingerprint;
+      else assert.equal(fingerprint, reference);
+    }
+  });
+
+  it("vehicle recommendation is deterministic across 100 runs", () => {
+    const o = order({ deadlineTime: "18:00", shop: shop({ location: "Vijayawada", gps: gps(16.5062, 80.648) }) });
+    const vehicles = [
+      vehicle({ id: "v-hyd", pickup: pickup({ id: "farm-hyd", location: "Hyderabad", gps: gps(17.385, 78.4867) }), schedule: schedule("08:00") }),
+      vehicle({ id: "v-vuy", pickup: vuyPickup, schedule: schedule("09:00") }),
+    ];
+    let reference: string | null = null;
+    for (let i = 0; i < 100; i++) {
+      const r = recommendVehicles({ order: o, vehicles });
+      const fingerprint = JSON.stringify(r.candidates.map((c) => ({ id: c.vehicle.id, tier: c.tier, eta: c.predictedArrival })));
+      if (reference == null) reference = fingerprint;
+      else assert.equal(fingerprint, reference);
+    }
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  25. Performance / stress (requirement #46)                         */
+/* ------------------------------------------------------------------ */
+describe("performance stress", () => {
+  it("200 orders, 20 vehicles, 50-stop routes, mixed pickup locations — no crash / NaN / dup / silent drop", () => {
+    const pickups = [
+      pickup({ id: "p1", farmName: "Hyderabad Farm", location: "Hyderabad", gps: gps(17.385, 78.4867) }),
+      pickup({ id: "p2", farmName: "Vuyyuru Farm", location: "Vuyyuru", gps: gps(16.3639, 80.8444) }),
+      pickup({ id: "p3", farmName: "Guntur Farm", location: "Guntur", gps: gps(16.3067, 80.4365) }),
+    ];
+    const vehicles = Array.from({ length: 20 }, (_, i) =>
+      vehicle({ id: `v${i}`, vehicleNo: `V${i}`, pickup: pickups[i % 3], available: i !== 13, birdCapacity: 10000 + i * 1000, schedule: schedule(String(8 + (i % 5)).padStart(2, "0") + ":00") }),
+    );
+    const orders = Array.from({ length: 200 }, (_, i) =>
+      order({
+        id: `o${i}`, orderNumber: `O${i}`,
+        priority: (["Normal", "Important", "Urgent"] as OrderPriority[])[i % 3],
+        deadlineTime: String(9 + (i % 9)).padStart(2, "0") + ":" + String((i % 6) * 10).padStart(2, "0"),
+        birds: (i % 10) * 100,
+        boxes: i % 5,
+        pickupSource: pickups[i % 3],
+        shop: shop({ id: `s${i}`, location: ["Vijayawada", "Hyderabad", "Eluru", "Guntur", "Gudivada"][i % 5], gps: gps(16.2 + (i % 60) * 0.01, 80.3 + (i % 7) * 0.05) }),
+      }),
+    );
+
+    // Build a 50-stop route from the first 50 routeable orders for vehicle 0.
+    const v0 = vehicles[0];
+    const chunk = orders.slice(0, 50).map((o) => ({ ...o, pickupSource: v0.pickup }));
+    const route = buildRoute(v0, chunk);
+
+    assert.equal(route.stops.length + route.unplannedOrders.length, route.totalOrderCount);
+    assert.equal(new Set(route.stops.map((s) => s.orderId)).size, route.stops.length); // no dup stops
+    assert.ok(route.stops.every((s) => s.legDistanceKm == null || (Number.isFinite(s.legDistanceKm) && s.legDistanceKm >= 0)));
+    assert.ok(route.stops.every((s) => s.bufferMinutes == null || Number.isFinite(s.bufferMinutes)));
+    assert.ok(route.stops.every((s) => s.arrivalTime == null || s.arrivalTime !== "Invalid Date"));
+
+    // Vehicle recommendation over 20 vehicles never crashes and is finite.
+    const rec = recommendVehicles({ order: orders[0], vehicles });
+    assert.equal(rec.candidates.length, 20);
+    assert.ok(rec.candidates.every((c) => c.bufferMinutes == null || Number.isFinite(c.bufferMinutes)));
+  });
+
+  it("no NaN / Infinity / negative distance / invalid date across all outputs", () => {
+    const vuyPickup = pickup({ id: "f", farmName: "Farm", location: "L", gps: gps(16.3639, 80.8444) });
+    const v = vehicle({ id: "v", pickup: vuyPickup, schedule: schedule("09:00") });
+    const orders = Array.from({ length: 30 }, (_, i) =>
+      order({ id: `o${i}`, orderNumber: `O${i}`, priority: (["Normal", "Important", "Urgent"] as OrderPriority[])[i % 3], deadlineTime: String(8 + (i % 12)).padStart(2, "0") + ":00", pickupSource: vuyPickup, shop: shop({ id: `s${i}`, gps: gps(16.2 + i * 0.01, 80.3 + (i % 5) * 0.05) }) }),
+    );
+    const route = buildRoute(v, orders);
+    for (const s of route.stops) {
+      assert.ok(!Number.isNaN(s.legDistanceKm ?? 0));
+      assert.ok(s.legDistanceKm == null || s.legDistanceKm >= 0);
+      assert.ok(s.arrivalTime !== "Invalid Date");
+      assert.ok(!Number.isNaN(s.bufferMinutes ?? 0));
+    }
+    assert.ok(route.totalDistanceKm == null || route.totalDistanceKm >= 0);
   });
 });

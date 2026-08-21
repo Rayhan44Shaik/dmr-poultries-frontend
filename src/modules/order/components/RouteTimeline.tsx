@@ -43,8 +43,8 @@ function RouteTimeline({ route }: { route: DeliveryRoute }) {
         </li>
 
         {route.stops.map((stop, index) => {
-          const prevPhase = index > 0 ? route.stops[index - 1].phase : null;
-          const phaseBoundary = prevPhase !== stop.phase;
+          const prevPhase = index > 0 ? route.stops[index - 1].effectivePlanningPhase : null;
+          const phaseBoundary = prevPhase !== stop.effectivePlanningPhase;
           return (
             <li key={stop.orderId} className="relative pb-4 last:pb-0">
               <span className="absolute -left-[27px] flex h-4 w-4 items-center justify-center rounded-full bg-slate-300 ring-4 ring-white">
@@ -52,8 +52,8 @@ function RouteTimeline({ route }: { route: DeliveryRoute }) {
               </span>
 
               {phaseBoundary && (
-                <span className={`mb-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${PHASE_STYLES[stop.phase]}`}>
-                  {PHASE_LABEL[stop.phase]} phase
+                <span className={`mb-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${PHASE_STYLES[stop.effectivePlanningPhase]}`}>
+                  {PHASE_LABEL[stop.effectivePlanningPhase]} phase
                 </span>
               )}
 
@@ -62,8 +62,8 @@ function RouteTimeline({ route }: { route: DeliveryRoute }) {
                   <p className="truncate text-sm font-semibold text-slate-800">
                     <span className="mr-1.5 text-slate-400">#{stop.stopNumber}</span>
                     {stop.shopName}
-                    {stop.deadlineConflict && (
-                      <AlertTriangle size={12} className="ml-1.5 inline text-rose-500" aria-label="Deadline conflict" />
+                    {stop.deadlineException && (
+                      <AlertTriangle size={12} className="ml-1.5 inline text-rose-500" aria-label="Deadline exception" />
                     )}
                   </p>
                   <p className="text-[11px] text-slate-400">

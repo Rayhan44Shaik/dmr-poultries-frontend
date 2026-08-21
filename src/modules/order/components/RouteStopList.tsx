@@ -43,8 +43,8 @@ function RouteStopList({ route }: { route: DeliveryRoute }) {
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-800">
                     {stop.shopName}
-                    {stop.deadlineConflict && (
-                      <AlertTriangle size={12} className="shrink-0 text-rose-500" aria-label="Deadline conflict" />
+                    {stop.deadlineException && (
+                      <AlertTriangle size={12} className="shrink-0 text-rose-500" aria-label="Deadline exception" />
                     )}
                   </p>
                   <p className="text-[11px] text-slate-400">
@@ -56,8 +56,8 @@ function RouteStopList({ route }: { route: DeliveryRoute }) {
                     </p>
                   )}
                 </div>
-                <span className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase sm:inline ${PHASE_STYLES[stop.phase]}`}>
-                  {PHASE_LABEL[stop.phase]}
+                <span className={`hidden shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase sm:inline ${PHASE_STYLES[stop.effectivePlanningPhase]}`}>
+                  {PHASE_LABEL[stop.effectivePlanningPhase]}
                 </span>
                 <PriorityBadge priority={stop.priority} />
                 <div className="w-20 text-right">

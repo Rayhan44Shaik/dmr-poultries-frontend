@@ -18,11 +18,13 @@
 //   L5  Route efficiency       (existing route alignment)
 //   L6  Load balancing         (not applicable within a single vehicle's plan)
 //
-// Within the active priority phase, candidates are ranked by deadline first and
-// distance second — but a "comparable" deadline window lets distance win when
-// deadlines are effectively equal (fuel/distance reduction). A lower-phase
-// order whose deadline is about to be missed is *promoted* and surfaced as a
-// DEADLINE CONFLICT rather than silently hidden.
+// Orders that cannot be routed (missing/invalid GPS) are NEVER silently
+// dropped — they are returned as `unplannedOrders` so the total stays
+// internally consistent (planned + unplanned = total).
+//
+// A lower-phase order whose deadline is about to be missed is *promoted* as a
+// DEADLINE EXCEPTION. Its base phase is preserved (never mutated); only its
+// *effective planning phase* changes, and the UI surfaces both.
 // -----------------------------------------------------------------------------
 
 import type { GpsCoordinate, Order, PickupSource } from "../types/orderTypes";
@@ -31,10 +33,12 @@ import type {
   DeadlineFeasibility,
   DeliveryPhase,
   DeliveryPhaseNumber,
+  DeliveryStopPlan,
   RouteVehicle,
+  UnplannedOrder,
   VehicleSchedule,
 } from "../types/routeTypes";
-import { classifyBuffer, classifyFeasibility } from "../utils/feasibility";
+import { classifyBuffer, classifyFeasibility, planningStateOf } from "../utils/feasibility";
 import { isValidCoordinate } from "../utils/gps";
 import { formatClock, formatHHmm, parseHHmm } from "../utils/businessTime";
 import { haversineKm, mockRouteCalculationService } from "./routeCalculationService";
@@ -68,7 +72,7 @@ export function phaseOfOrder(order: Order): DeliveryPhase {
   return "Normal";
 }
 
-/** The active phase = highest-priority phase present among the given orders. */
+/** The base phase = highest-priority phase present among the given orders. */
 export function activePhaseOf(orders: Order[]): DeliveryPhase | null {
   if (orders.length === 0) return null;
   return orders.reduce<DeliveryPhase | null>((current, o) => {
@@ -87,62 +91,6 @@ export interface SequencingState {
   currentMinutes: number | null;
 }
 
-/** A single planned delivery stop with full sequencing rationale. */
-export interface DeliveryStopPlan {
-  orderId: string;
-  orderNumber: string;
-  shopName: string;
-  address: string;
-  priority: Order["priority"];
-  importantCustomer: boolean;
-  phase: DeliveryPhase;
-  phaseNumber: DeliveryPhaseNumber;
-  fromName: string;
-  fromGps: GpsCoordinate | null;
-  legDistanceKm: number | null;
-  cumulativeDistanceKm: number | null;
-  travelMinutes: number | null;
-  departureTime: string | null;
-  arrivalTime: string | null;
-  /** Arrival time in minutes-since-midnight (for internal recalculation). */
-  arrivalMinutes: number | null;
-  deadlineLabel: string;
-  deadlineTime: string;
-  bufferMinutes: number | null;
-  bufferState: BufferState;
-  deadlineFeasible: DeadlineFeasibility;
-  /** Why this stop was selected next. */
-  reason: string[];
-  /** True when promoted across phases to protect a deadline. */
-  deadlineConflict: boolean;
-}
-
-export interface NextStopResult {
-  stop: DeliveryStopPlan | null;
-  /** Ranked alternatives (excludes the chosen stop) for the comparison UI. */
-  alternatives: DeliveryStopPlan[];
-  activePhase: DeliveryPhase | null;
-  /** Remaining order count per phase (after this stop is chosen). */
-  remainingByPhase: Record<DeliveryPhase, number>;
-  deadlineConflict: boolean;
-  conflictReason: string | null;
-}
-
-export interface DeliveryPlan {
-  vehicleId: string;
-  vehicleNo: string;
-  pickup: PickupSource;
-  schedule: VehicleSchedule;
-  stops: DeliveryStopPlan[];
-  totalDistanceKm: number | null;
-  estimatedTravelMinutes: number | null;
-  totalBirds: number;
-  totalBoxes: number;
-  deadlineConflicts: boolean;
-  /** Distance (km) saved by the chosen sequence vs a naive nearest-first plan. */
-  estimatedDistanceSavingKm: number | null;
-}
-
 /** Feasibility + distance snapshot for one remaining order. */
 interface EvaluatedOrder {
   order: Order;
@@ -153,6 +101,63 @@ interface EvaluatedOrder {
   bufferMinutes: number | null;
   bufferState: BufferState;
   deadlineFeasible: DeadlineFeasibility;
+}
+
+export interface NextStopResult {
+  stop: DeliveryStopPlan | null;
+  /** Ranked alternatives (excludes the chosen stop) for the comparison UI. */
+  alternatives: DeliveryStopPlan[];
+  /** Base phase of the remaining orders (unaffected by any exception). */
+  basePhase: DeliveryPhase | null;
+  /** Remaining order count per phase. */
+  remainingByPhase: Record<DeliveryPhase, number>;
+  deadlineException: boolean;
+  exceptionReason: string | null;
+}
+
+export interface DeliveryPlan {
+  vehicleId: string;
+  vehicleNo: string;
+  pickup: PickupSource;
+  schedule: VehicleSchedule;
+  stops: DeliveryStopPlan[];
+  /** Orders that could not be routed (never silently dropped). */
+  unplannedOrders: UnplannedOrder[];
+  totalOrderCount: number;
+  totalDistanceKm: number | null;
+  estimatedTravelMinutes: number | null;
+  plannedBirds: number;
+  plannedBoxes: number;
+  unplannedBirds: number;
+  unplannedBoxes: number;
+  deadlineConflicts: boolean;
+  /** Distance (km) saved vs a naive farm → each-shop baseline. */
+  estimatedDistanceSavingKm: number | null;
+}
+
+/** Whether an order can be routed for a given vehicle (GPS must be valid). */
+function isRouteable(order: Order, vehicle: RouteVehicle): boolean {
+  return isValidCoordinate(order.shop.gps) && isValidCoordinate(vehicle.pickup.gps);
+}
+
+function unroutableReason(order: Order, vehicle: RouteVehicle): string {
+  if (!isValidCoordinate(order.shop.gps)) return "GPS unavailable";
+  if (!isValidCoordinate(vehicle.pickup.gps)) return "Pickup GPS unavailable";
+  return "Unable to calculate";
+}
+
+function toUnplannedOrder(order: Order, vehicle: RouteVehicle): UnplannedOrder {
+  return {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    shopName: order.shop.name,
+    birds: order.birds,
+    boxes: order.boxes,
+    priority: order.priority,
+    basePhase: phaseOfOrder(order),
+    reason: unroutableReason(order, vehicle),
+    planningState: "Unroutable",
+  };
 }
 
 function evaluateOrder(order: Order, state: SequencingState): EvaluatedOrder | null {
@@ -182,8 +187,17 @@ function isCritical(evaluated: EvaluatedOrder): boolean {
   return evaluated.bufferMinutes != null && evaluated.bufferMinutes < CRITICAL_BUFFER_MINUTES;
 }
 
-function toStopPlan(evaluated: EvaluatedOrder, state: SequencingState, cumulativeDistanceKm: number, deadlineConflict: boolean, reason: string[]): DeliveryStopPlan {
+function toStopPlan(
+  evaluated: EvaluatedOrder,
+  state: SequencingState,
+  cumulativeDistanceKm: number,
+  reason: string[],
+  deadlineException: boolean,
+  promotionReason: string | null,
+): DeliveryStopPlan {
   const o = evaluated.order;
+  const basePhase = phaseOfOrder(o);
+  const effectivePhase = deadlineException ? "Critical" : basePhase;
   return {
     orderId: o.id,
     orderNumber: o.orderNumber,
@@ -191,8 +205,12 @@ function toStopPlan(evaluated: EvaluatedOrder, state: SequencingState, cumulativ
     address: o.shop.address ? `${o.shop.address.city}` : o.shop.location,
     priority: o.priority,
     importantCustomer: o.importantCustomer,
-    phase: evaluated.phase,
-    phaseNumber: PHASE_NUMBER[evaluated.phase],
+    deadlineLabel: o.deadlineLabel,
+    deadlineTime: o.deadlineTime,
+    basePhase,
+    effectivePlanningPhase: effectivePhase,
+    deadlineException,
+    promotionReason,
     fromName: state.currentName,
     fromGps: state.currentGps,
     legDistanceKm: evaluated.distanceKm,
@@ -201,20 +219,28 @@ function toStopPlan(evaluated: EvaluatedOrder, state: SequencingState, cumulativ
     departureTime: state.currentMinutes != null ? formatClock(state.currentMinutes) : null,
     arrivalTime: evaluated.arrivalMinutes != null ? formatClock(evaluated.arrivalMinutes) : null,
     arrivalMinutes: evaluated.arrivalMinutes,
-    deadlineLabel: o.deadlineLabel,
-    deadlineTime: o.deadlineTime,
     bufferMinutes: evaluated.bufferMinutes,
     bufferState: evaluated.bufferState,
     deadlineFeasible: evaluated.deadlineFeasible,
+    planningState: planningStateOf(evaluated.deadlineFeasible),
     reason,
-    deadlineConflict,
+    serviceMinutes: 0,
   };
 }
 
 /**
  * Select the next delivery stop from the vehicle's CURRENT position.
- * Returns the chosen stop + ranked alternatives, the active phase, and any
- * cross-phase deadline conflict.
+ *
+ * Deterministic decision hierarchy (requirement #13):
+ *   STEP 1  find remaining orders (routeable subset)
+ *   STEP 2  determine base phase
+ *   STEP 3  identify deadline-critical exceptions
+ *   STEP 4  remove unroutable candidates (handled by the caller's partition)
+ *   STEP 5  protect deadline-critical deliveries
+ *   STEP 6  respect the active priority phase
+ *   STEP 7  within comparable deadlines, choose nearest feasible stop
+ *   STEP 8  route efficiency tie-break
+ *   STEP 9  return explanation
  */
 export function selectNextDeliveryStop(
   state: SequencingState,
@@ -223,30 +249,25 @@ export function selectNextDeliveryStop(
   const empty: NextStopResult = {
     stop: null,
     alternatives: [],
-    activePhase: null,
+    basePhase: null,
     remainingByPhase: { Critical: 0, Important: 0, Normal: 0 },
-    deadlineConflict: false,
-    conflictReason: null,
+    deadlineException: false,
+    exceptionReason: null,
   };
 
   const evaluated = orders
     .map((o) => evaluateOrder(o, state))
     .filter((e): e is EvaluatedOrder => e != null);
 
-  if (evaluated.length === 0) {
-    // Count remaining by phase even when none are GPS-feasible.
-    for (const o of orders) empty.remainingByPhase[phaseOfOrder(o)] += 1;
-    return empty;
-  }
-
-  const activePhase = activePhaseOf(orders)!;
-  empty.activePhase = activePhase;
+  const basePhase = activePhaseOf(orders);
+  empty.basePhase = basePhase;
   for (const o of orders) empty.remainingByPhase[phaseOfOrder(o)] += 1;
 
-  const phaseCandidates = evaluated.filter((e) => e.phase === activePhase);
+  if (evaluated.length === 0 || basePhase == null) return empty;
 
-  // 1. Within the active phase, protect deadline-critical candidates first
-  //    (earliest deadline among criticals).
+  const phaseCandidates = evaluated.filter((e) => e.phase === basePhase);
+
+  // Protect deadline-critical candidates first (earliest deadline among criticals).
   const critical = phaseCandidates.filter(isCritical).sort((a, b) => {
     const da = parseHHmm(a.order.deadlineTime) ?? Number.MAX_SAFE_INTEGER;
     const db = parseHHmm(b.order.deadlineTime) ?? Number.MAX_SAFE_INTEGER;
@@ -256,17 +277,17 @@ export function selectNextDeliveryStop(
 
   let chosen: EvaluatedOrder;
   let reason: string[];
-  let deadlineConflict = false;
+  let deadlineException = false;
+  let promotionReason: string | null = null;
 
   if (critical.length > 0) {
     chosen = critical[0];
     reason = [
+      "Deadline protected",
       "Same active priority phase",
       "Earliest constrained deadline",
-      `${chosen.distanceKm ?? "—"} km from current vehicle position`,
     ];
   } else {
-    // 2. Deadline-first within a comparable window, then nearest feasible.
     const earliest = Math.min(
       ...phaseCandidates.map((e) => parseHHmm(e.order.deadlineTime) ?? Number.MAX_SAFE_INTEGER),
     );
@@ -274,76 +295,64 @@ export function selectNextDeliveryStop(
       (e) => (parseHHmm(e.order.deadlineTime) ?? Number.MAX_SAFE_INTEGER) - earliest <= DEADLINE_COMPARABLE_WINDOW_MINUTES,
     );
     chosen = comparable.slice().sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity))[0];
-
-    // If the window narrowed to a single candidate (its deadline is meaningfully
-    // earlier than the rest), surface the deadline rationale; otherwise this is
-    // a nearest-feasible selection.
     const deadlineDriven = comparable.length === 1 && phaseCandidates.length > 1;
     reason = deadlineDriven
-      ? [
-          "Same active priority phase",
-          "Earliest deadline in phase",
-          "Deadline feasible",
-          `${chosen.distanceKm ?? "—"} km from current vehicle position`,
-        ]
-      : [
-          "Same active priority phase",
-          "Deadline feasible",
-          "Nearest feasible shop",
-          `${chosen.distanceKm ?? "—"} km from current vehicle position`,
-        ];
+      ? ["Deadline protected", "Same active priority phase", "Earliest deadline in phase"]
+      : ["Same active priority phase", "Deadline feasible", "Nearest feasible shop"];
   }
 
-  // 3. Cross-phase deadline override: a lower-phase order that will be late
-  //    must not be silently skipped behind a non-critical active-phase stop.
-  const lowerPhase = evaluated.filter(
-    (e) => e.phase !== activePhase && isCritical(e),
+  // Cross-phase deadline exception: a lower-phase order that will be late is
+  // promoted (its base phase is preserved, only the planning phase changes).
+  const lowerPhaseCritical = evaluated.filter(
+    (e) => e.phase !== basePhase && isCritical(e),
   );
-  const chosenIsCritical = isCritical(chosen);
-  if (!chosenIsCritical && lowerPhase.length > 0) {
-    const promoted = lowerPhase.slice().sort((a, b) => {
+  if (!isCritical(chosen) && lowerPhaseCritical.length > 0) {
+    const promoted = lowerPhaseCritical.slice().sort((a, b) => {
       const da = parseHHmm(a.order.deadlineTime) ?? Number.MAX_SAFE_INTEGER;
       const db = parseHHmm(b.order.deadlineTime) ?? Number.MAX_SAFE_INTEGER;
       return da - db;
     })[0];
     chosen = promoted;
-    deadlineConflict = true;
+    deadlineException = true;
+    promotionReason = `${PHASE_LABEL[promoted.phase]} order promoted because of deadline risk`;
     reason = [
-      "DEADLINE CONFLICT — lower-priority order is about to miss its deadline",
+      "Deadline Exception — lower-priority order is about to miss its deadline",
       `Deadline ${promoted.order.deadlineLabel}`,
       "Promoted ahead of priority phase to minimise deadline violations",
     ];
   }
 
-  // Build alternatives for comparison (ranked by distance within the phase).
   const alternatives = phaseCandidates
     .filter((e) => e.order.id !== chosen.order.id)
     .slice()
     .sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity))
     .slice(0, 3)
-    .map((e) => toStopPlan(e, state, 0, false, []));
+    .map((e) => toStopPlan(e, state, 0, [], false, null));
 
-  const cumulativeBase = 0;
-  const stop = toStopPlan(chosen, state, cumulativeBase, deadlineConflict, reason);
+  const stop = toStopPlan(chosen, state, 0, reason, deadlineException, promotionReason);
 
   return {
     stop,
     alternatives,
-    activePhase,
+    basePhase,
     remainingByPhase: empty.remainingByPhase,
-    deadlineConflict,
-    conflictReason: deadlineConflict
-      ? `DEADLINE CONFLICT — ${chosen.order.orderNumber} (${chosen.order.deadlineLabel}) is about to be missed`
-      : null,
+    deadlineException,
+    exceptionReason: promotionReason,
   };
 }
 
 /**
  * Build the full delivery sequence for a vehicle by greedily selecting the next
  * stop and advancing the vehicle's current location after each delivery.
+ * Unrouteable orders are returned separately (never lost).
  */
 export function buildDeliverySequence(vehicle: RouteVehicle, orders: Order[]): DeliveryPlan {
   const orderMap = new Map(orders.map((o) => [o.id, o]));
+
+  // Partition: routeable vs unrouteable (unrouteable are NEVER dropped).
+  const routeable = orders.filter((o) => isRouteable(o, vehicle));
+  const unrouteable = orders.filter((o) => !isRouteable(o, vehicle));
+
   const state: SequencingState = {
     currentGps: vehicle.pickup.gps,
     currentName: vehicle.pickup.farmName,
@@ -351,18 +360,17 @@ export function buildDeliverySequence(vehicle: RouteVehicle, orders: Order[]): D
   };
 
   const stops: DeliveryStopPlan[] = [];
-  const remaining = [...orders];
+  const remaining = [...routeable];
   let deadlineConflicts = false;
 
   while (remaining.length > 0) {
     const result = selectNextDeliveryStop(state, remaining);
-    if (!result.stop) break; // no further feasible stop
+    if (!result.stop) break; // defensive: no further feasible stop
     stops.push(result.stop);
-    if (result.deadlineConflict) deadlineConflicts = true;
+    if (result.deadlineException) deadlineConflicts = true;
 
     const delivered = orderMap.get(result.stop.orderId);
     if (delivered) {
-      // Advance the vehicle to the delivered shop (recalculation requirement).
       state.currentGps = delivered.shop.gps;
       state.currentName = delivered.shop.name;
       state.currentMinutes = result.stop.arrivalMinutes ?? state.currentMinutes;
@@ -385,7 +393,27 @@ export function buildDeliverySequence(vehicle: RouteVehicle, orders: Order[]): D
     }
   }
 
-  const estimatedDistanceSavingKm = computeDistanceSaving(vehicle, orders, totalDistanceKm);
+  // Any routeable order left unsequenced (defensive) is surfaced as unplanned
+  // rather than silently dropped — this preserves the planned + unplanned = total
+  // invariant.
+  const leftoverUnplanned = remaining.map((o) => ({
+    orderId: o.id,
+    orderNumber: o.orderNumber,
+    shopName: o.shop.name,
+    birds: o.birds,
+    boxes: o.boxes,
+    priority: o.priority,
+    basePhase: phaseOfOrder(o),
+    reason: "Unable to calculate",
+    planningState: "Unroutable" as const,
+  }));
+
+  const unplannedOrders = [...unrouteable.map((o) => toUnplannedOrder(o, vehicle)), ...leftoverUnplanned];
+  const plannedOrderIds = new Set(stops.map((s) => s.orderId));
+  const plannedBirds = orders.filter((o) => plannedOrderIds.has(o.id)).reduce((sum, o) => sum + o.birds, 0);
+  const plannedBoxes = orders.filter((o) => plannedOrderIds.has(o.id)).reduce((sum, o) => sum + o.boxes, 0);
+  const unplannedBirds = unplannedOrders.reduce((sum, o) => sum + o.birds, 0);
+  const unplannedBoxes = unplannedOrders.reduce((sum, o) => sum + o.boxes, 0);
 
   return {
     vehicleId: vehicle.id,
@@ -393,17 +421,21 @@ export function buildDeliverySequence(vehicle: RouteVehicle, orders: Order[]): D
     pickup: vehicle.pickup,
     schedule: vehicle.schedule,
     stops,
+    unplannedOrders,
+    totalOrderCount: orders.length,
     totalDistanceKm,
     estimatedTravelMinutes,
-    totalBirds: orders.reduce((sum, o) => sum + o.birds, 0),
-    totalBoxes: orders.reduce((sum, o) => sum + o.boxes, 0),
+    plannedBirds,
+    plannedBoxes,
+    unplannedBirds,
+    unplannedBoxes,
     deadlineConflicts,
-    estimatedDistanceSavingKm,
+    estimatedDistanceSavingKm: computeDistanceSaving(vehicle, routeable, totalDistanceKm),
   };
 }
 
 /**
- * Distance-efficiency estimate (requirement #9/#32): compare the sequential
+ * Distance-efficiency estimate (requirement #20/#21): compare the sequential
  * route distance against a naive "farm → each shop" baseline. This is a
  * DISTANCE saving, NOT a fuel calculation — no mileage/load/road data exists.
  */
@@ -437,17 +469,12 @@ export function recalculateDeliveryPlan(
   currentName: string,
   currentMinutes: number | null,
 ): DeliveryPlan {
-  const plan = buildDeliverySequence(
+  return buildDeliverySequence(
     {
       ...vehicle,
-      pickup: {
-        ...vehicle.pickup,
-        gps: currentGps,
-        farmName: currentName,
-      },
+      pickup: { ...vehicle.pickup, gps: currentGps, farmName: currentName },
       schedule: { ...vehicle.schedule, departureTime: currentMinutes != null ? formatHHmm(currentMinutes) : vehicle.schedule.departureTime },
     },
     remainingOrders,
   );
-  return plan;
 }
