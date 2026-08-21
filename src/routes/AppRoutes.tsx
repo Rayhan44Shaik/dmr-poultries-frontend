@@ -20,6 +20,9 @@ import BirdTypesPage from "../modules/masters/bird-types/pages/BirdTypesPage";
 // Operations Module
 import OperationsPages from "../modules/operations/pages/OperationsPages";
 
+// Order Module
+import OrderPages from "../modules/order/pages/OrderPages";
+
 // Accounts Module
 import AccountsPage from "../modules/accounts/pages/AccountsPage";
 
@@ -83,6 +86,10 @@ function AppRoutes() {
       {/* ============ OPERATIONS ============ */}
       <Route path="/operations" element={<DashboardLayout><OperationsPages /></DashboardLayout>} />
       <Route path="/operations/*" element={<DashboardLayout><OperationsPages /></DashboardLayout>} />
+
+      {/* ============ ORDER ============ */}
+      <Route path="/order" element={<DashboardLayout><OrderPages /></DashboardLayout>} />
+      <Route path="/order/*" element={<DashboardLayout><OrderPages /></DashboardLayout>} />
 
       {/* ============ ACCOUNTS ============ */}
       <Route path="/accounts" element={<DashboardLayout><AccountsPage /></DashboardLayout>} />
