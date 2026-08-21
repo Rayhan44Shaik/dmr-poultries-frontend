@@ -36,7 +36,7 @@ function buildAssignment(order: Order, vehicle: RouteVehicle, assignmentType: "S
     vehicleNo: vehicle.vehicleNo,
     driverName: vehicle.driverName,
     supervisorName: vehicle.supervisorName,
-    tripNo: nextTripNumber(),
+    tripNo: vehicle.tripNo ?? nextTripNumber(),
     pickupFarm: vehicle.pickup.farmName,
     pickupLocation: vehicle.pickup.location,
     orderCount: vehicle.assignedOrderCount + 1,
@@ -116,7 +116,9 @@ export default function VehicleComparison({ order, result, onAssign }: VehicleCo
                     {candidate.bufferMinutes != null ? `${candidate.bufferMinutes}m` : "—"}
                   </td>
                   <td className="px-3 py-2 text-slate-600">
-                    {v.birdCapacity >= order.birds && v.boxCapacity >= order.boxes ? "OK" : "Insufficient"}
+                    {(v.birdCapacity == null || v.birdCapacity >= order.birds) && (v.boxCapacity == null || v.boxCapacity >= order.boxes)
+                      ? "OK"
+                      : "Insufficient"}
                   </td>
                   <td className="px-3 py-2 text-slate-600">{v.assignedOrderCount}</td>
                   <td className="px-3 py-2">

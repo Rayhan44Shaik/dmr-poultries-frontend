@@ -141,8 +141,8 @@ export function buildRoute(vehicle: RouteVehicle, orders: Order[]): DeliveryRout
     stopCount: stops.length,
     vehicleAvailability: vehicle.available,
     capacitySufficient:
-      orders.reduce((sum, o) => sum + o.birds, 0) <= vehicle.birdCapacity &&
-      orders.reduce((sum, o) => sum + o.boxes, 0) <= vehicle.boxCapacity,
+      (vehicle.birdCapacity == null || orders.reduce((sum, o) => sum + o.birds, 0) <= vehicle.birdCapacity) &&
+      (vehicle.boxCapacity == null || orders.reduce((sum, o) => sum + o.boxes, 0) <= vehicle.boxCapacity),
   });
 
   const totalBirds = orders.reduce((sum, o) => sum + o.birds, 0);

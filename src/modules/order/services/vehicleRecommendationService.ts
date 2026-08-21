@@ -77,10 +77,10 @@ const FEASIBILITY_RANK: Record<string, number> = {
 };
 
 function reasonCapacity(order: Order, vehicle: RouteVehicle): string | null {
-  if (order.birds > vehicle.birdCapacity) {
+  if (vehicle.birdCapacity != null && order.birds > vehicle.birdCapacity) {
     return `Capacity insufficient — needs ${order.birds.toLocaleString("en-IN")} birds, has ${vehicle.birdCapacity.toLocaleString("en-IN")}`;
   }
-  if (order.boxes > vehicle.boxCapacity) {
+  if (vehicle.boxCapacity != null && order.boxes > vehicle.boxCapacity) {
     return `Capacity insufficient — needs ${order.boxes} boxes, has ${vehicle.boxCapacity}`;
   }
   return null;

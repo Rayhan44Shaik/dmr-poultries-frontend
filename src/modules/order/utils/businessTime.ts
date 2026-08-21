@@ -68,3 +68,31 @@ export function formatDuration(minutes: number): string {
 export function isValidHHmm(time: string | null | undefined): boolean {
   return parseHHmm(time) != null;
 }
+
+/**
+ * Normalize an arbitrary business-clock string (from Trip Entry, which stores
+ * either a raw "HH:mm" or a `toLocaleString()` timestamp) into a canonical
+ * "HH:mm". Returns null when the value cannot be resolved to a clock time.
+ */
+export function normalizeClockTime(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  // Already "HH:mm" (or "H:mm").
+  if (/^\d{1,2}:\d{2}$/.test(trimmed) && parseHHmm(trimmed) != null) return formatHHmm(parseHHmm(trimmed)!);
+
+  // Fall back to parsing a full timestamp (toLocaleString / ISO).
+  const parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.getTime())) {
+    return formatHHmm(parsed.getHours() * 60 + parsed.getMinutes());
+  }
+
+  // Extract the first "H:MM" occurrence inside a longer display string.
+  const embedded = trimmed.match(/(\d{1,2}):(\d{2})/);
+  if (embedded && parseHHmm(`${embedded[1]}:${embedded[2]}`) != null) {
+    return formatHHmm(parseHHmm(`${embedded[1]}:${embedded[2]}`)!);
+  }
+
+  return null;
+}

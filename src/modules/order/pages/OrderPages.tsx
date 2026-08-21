@@ -1,23 +1,20 @@
 // src/modules/order/pages/OrderPages.tsx
-// Module-level router for the Order module. Resolves the active page from the
-// pathname so every Order URL works on direct navigation / refresh.
+// Module-level router for the Order module.
+//   /order/*   → single tabbed Orders workspace
+//   /order/new → New Order form
+//   /order/tracking → live-tracking prep (kept as a standalone route)
 
 import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { OrderProvider } from "../store/OrderStore";
 import OrderPage from "./OrderPage";
 import NewOrderPage from "./NewOrderPage";
-import RoutePlanningPage from "./RoutePlanningPage";
 import TrackingPage from "./TrackingPage";
 
-type OrderPageKey = "list" | "new" | "planning" | "routes" | "tracking";
-
-function resolvePage(pathname: string): OrderPageKey {
+function resolvePage(pathname: string): "new" | "tracking" | "workspace" {
   if (pathname.endsWith("/new")) return "new";
-  if (pathname.endsWith("/planning")) return "planning";
-  if (pathname.endsWith("/routes")) return "routes";
   if (pathname.endsWith("/tracking")) return "tracking";
-  return "list";
+  return "workspace";
 }
 
 export default function OrderPages() {
@@ -28,9 +25,8 @@ export default function OrderPages() {
     <OrderProvider>
       <div className="min-h-screen bg-slate-50/50">
         {page === "new" && <NewOrderPage />}
-        {(page === "planning" || page === "routes") && <RoutePlanningPage />}
         {page === "tracking" && <TrackingPage />}
-        {page === "list" && <OrderPage />}
+        {page === "workspace" && <OrderPage />}
       </div>
     </OrderProvider>
   );

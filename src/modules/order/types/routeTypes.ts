@@ -169,9 +169,12 @@ export interface RouteVehicle {
   driverName: string;
   supervisorName: string;
   pickup: PickupSource;
-  /** Configured bird capacity, used only for recommendation checks. */
-  birdCapacity: number;
-  boxCapacity: number;
+  /**
+   * Configured bird capacity, used only for recommendation checks.
+   * Null = unknown (vehicle master unavailable) — capacity is then not enforced.
+   */
+  birdCapacity: number | null;
+  boxCapacity: number | null;
   available: boolean;
   assignedOrderCount: number;
   schedule: VehicleSchedule;
@@ -179,6 +182,9 @@ export interface RouteVehicle {
   currentGpsStatus: GpsQuality;
   /** Cities already served by this vehicle's existing route. */
   existingStopCities: string[];
+  /** Source trip (Trip Entry), when this vehicle was derived from a real trip. */
+  tripNo?: string;
+  tripId?: number;
 }
 
 /** Aggregated delivery route for one vehicle. */

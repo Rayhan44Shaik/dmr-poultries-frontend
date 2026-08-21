@@ -1,32 +1,43 @@
 // src/modules/order/components/OrderTable.tsx
-// Main orders table with horizontal scrolling and expandable rows.
+// Orders tab table — compact primary columns, expandable full detail rows, and
+// a shop cell that acts as the visual anchor (name + location + GPS status).
+// Never shows internal ids.
 
-import { memo, useState } from "react";
-import { ChevronDown, ChevronRight, Eye, MapPin } from "lucide-react";
+import { memo, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, Eye, MapPin, Sparkles, Star } from "lucide-react";
 import type { Order } from "../types/orderTypes";
+import type { RouteVehicle } from "../types/routeTypes";
 import PriorityBadge from "./PriorityBadge";
 import StatusBadge from "./StatusBadge";
 import GPSStatus from "./GPSStatus";
-import { distanceForOrder } from "../utils/routeUtils";
-import { mockRouteCalculationService } from "../services/routeCalculationService";
-import { formatDeliveryDate, formatDistanceKm, formatTravelMinutes } from "../utils/orderFormat";
+import { recommendVehicles } from "../services/vehicleRecommendationService";
+import { formatAddress } from "../utils/orderFormat";
+import { formatDeliveryDate } from "../utils/orderFormat";
 
 interface OrderTableProps {
   orders: Order[];
   isLoading: boolean;
+  vehicles: RouteVehicle[];
   onOpenDetails: (order: Order) => void;
 }
 
-function CustomerType({ important }: { important: boolean }) {
-  if (!important) return <span className="text-xs text-slate-400">Regular</span>;
+function requirementLabel(order: Order): string {
+  const birds = order.birds > 0 ? `${order.birds.toLocaleString("en-IN")} birds` : null;
+  const boxes = order.boxes > 0 ? `${order.boxes} boxes` : null;
+  if (birds && boxes) return `${birds} + ${boxes}`;
+  return birds ?? boxes ?? "—";
+}
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
-      ★ Important
-    </span>
+    <div className="flex items-start justify-between gap-4 py-1">
+      <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</span>
+      <span className="text-right text-xs font-medium text-slate-700">{value}</span>
+    </div>
   );
 }
 
-function OrderTable({ orders, isLoading, onOpenDetails }: OrderTableProps) {
+function OrderTable({ orders, isLoading, vehicles, onOpenDetails }: OrderTableProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   if (isLoading) {
@@ -52,35 +63,28 @@ function OrderTable({ orders, isLoading, onOpenDetails }: OrderTableProps) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full text-xs">
-        <thead className="border-b border-slate-200/70 bg-slate-50/80">
+        <thead className="sticky top-0 z-10 border-b border-slate-200/70 bg-slate-50/95">
           <tr className="whitespace-nowrap text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            <th className="w-8 px-2 py-3" />
-            <th className="px-3 py-3">Order No</th>
-            <th className="px-3 py-3">Shop</th>
-            <th className="px-3 py-3">Bird Type</th>
-            <th className="px-3 py-3 text-right">Birds</th>
-            <th className="px-3 py-3 text-right">Boxes</th>
-            <th className="px-3 py-3">Priority</th>
-            <th className="px-3 py-3">Customer</th>
-            <th className="px-3 py-3">Delivery Date</th>
-            <th className="px-3 py-3">Deadline</th>
-            <th className="px-3 py-3">Pickup / Farm</th>
-            <th className="px-3 py-3">Vehicle</th>
-            <th className="px-3 py-3 text-right">Distance</th>
-            <th className="px-3 py-3">ETA</th>
-            <th className="px-3 py-3">Status</th>
-            <th className="px-3 py-3 text-center">Actions</th>
+            <th className="w-8 px-2 py-2.5" />
+            <th className="px-3 py-2.5">Order No</th>
+            <th className="px-3 py-2.5">Shop</th>
+            <th className="px-3 py-2.5 text-right">Requirement</th>
+            <th className="px-3 py-2.5">Priority</th>
+            <th className="px-3 py-2.5">Customer</th>
+            <th className="px-3 py-2.5">Deadline</th>
+            <th className="px-3 py-2.5">Assignment</th>
+            <th className="px-3 py-2.5">Status</th>
+            <th className="px-3 py-2.5 text-center">Action</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {orders.map((order) => {
             const isExpanded = expanded === order.id;
-            const distance = distanceForOrder(order);
             return (
               <FragmentRow
                 key={order.id}
                 order={order}
-                distance={distance}
+                vehicles={vehicles}
                 isExpanded={isExpanded}
                 onToggle={() => setExpanded(isExpanded ? null : order.id)}
                 onOpen={() => onOpenDetails(order)}
@@ -95,65 +99,65 @@ function OrderTable({ orders, isLoading, onOpenDetails }: OrderTableProps) {
 
 function FragmentRow({
   order,
-  distance,
+  vehicles,
   isExpanded,
   onToggle,
   onOpen,
 }: {
   order: Order;
-  distance: number | null;
+  vehicles: RouteVehicle[];
   isExpanded: boolean;
   onToggle: () => void;
   onOpen: () => void;
 }) {
+  const assignment = order.vehicleAssignment;
+
+  // Light recommendation for the expanded row only.
+  const recommendation = useMemo(
+    () => (isExpanded && vehicles.length > 0 ? recommendVehicles({ order, vehicles }) : null),
+    [isExpanded, order, vehicles],
+  );
+
   return (
     <>
-      <tr
-        className={`cursor-pointer transition-colors hover:bg-slate-50/80 ${isExpanded ? "bg-slate-50/60" : ""}`}
-        onClick={onToggle}
-      >
+      <tr className={`cursor-pointer transition-colors hover:bg-slate-50/80 ${isExpanded ? "bg-slate-50/60" : ""}`} onClick={onToggle}>
         <td className="px-2 py-3 text-center text-slate-400">
           {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </td>
         <td className="px-3 py-3 font-semibold text-slate-800">{order.orderNumber}</td>
         <td className="px-3 py-3">
-          <div className="font-semibold text-slate-700">{order.shop.name}</div>
-          <div className="flex items-center gap-1 text-[11px] text-slate-400">
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-slate-700">{order.shop.name}</span>
+            {order.importantCustomer && <Star size={12} className="shrink-0 text-amber-500" aria-label="Important customer" />}
+          </div>
+          <div className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400">
             <MapPin size={10} />
             {order.shop.location}
           </div>
+          <div className="mt-1">
+            <GPSStatus gps={order.shop.gps} status={order.shop.gpsStatus} showCoordinates={false} label="GPS" />
+          </div>
         </td>
-        <td className="px-3 py-3 text-slate-600">{order.birdType}</td>
-        <td className="px-3 py-3 text-right font-semibold text-slate-700">{order.birds.toLocaleString("en-IN")}</td>
-        <td className="px-3 py-3 text-right text-slate-600">{order.boxes || "—"}</td>
+        <td className="px-3 py-3 text-right font-semibold text-slate-700">{requirementLabel(order)}</td>
         <td className="px-3 py-3"><PriorityBadge priority={order.priority} /></td>
-        <td className="px-3 py-3"><CustomerType important={order.importantCustomer} /></td>
-        <td className="px-3 py-3 whitespace-nowrap text-slate-600">{formatDeliveryDate(order.deliveryDate)}</td>
-        <td className="px-3 py-3 whitespace-nowrap text-slate-600">{order.deadlineLabel}</td>
-        <td className="px-3 py-3 text-slate-600">
-          {order.pickupSource ? (
-            <span className="inline-flex items-center gap-1.5">
-              {order.pickupSource.farmName}
-              <span className="text-[10px] text-slate-400">({order.pickupSource.location})</span>
-            </span>
+        <td className="px-3 py-3">
+          {order.importantCustomer ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Important</span>
           ) : (
-            <span className="text-slate-400">Not assigned</span>
+            <span className="text-xs text-slate-400">Regular</span>
           )}
         </td>
-        <td className="px-3 py-3 text-slate-600">
-          {order.vehicleAssignment ? (
+        <td className="px-3 py-3 whitespace-nowrap text-slate-600">{order.deadlineLabel}</td>
+        <td className="px-3 py-3">
+          {assignment ? (
             <div>
-              <div className="font-medium text-slate-700">{order.vehicleAssignment.vehicleNo}</div>
-              <div className="text-[11px] text-slate-400">{order.vehicleAssignment.driverName}</div>
+              <div className="font-medium text-slate-700">{assignment.vehicleNo}</div>
+              <div className="text-[11px] text-slate-400">{assignment.tripNo}</div>
             </div>
           ) : (
-            <span className="text-slate-400">—</span>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Unassigned</span>
           )}
         </td>
-        <td className="px-3 py-3 text-right font-medium text-slate-600">
-          {distance != null ? formatDistanceKm(distance) : <span className="text-slate-400">Pending</span>}
-        </td>
-        <td className="px-3 py-3 text-slate-600">{formatTravelMinutes(distance != null ? mockRouteCalculationService.estimateTravelMinutes(distance) : null)}</td>
         <td className="px-3 py-3"><StatusBadge status={order.status} /></td>
         <td className="px-3 py-3 text-center">
           <button
@@ -166,43 +170,39 @@ function FragmentRow({
             title="View details"
           >
             <Eye size={12} />
-            View
           </button>
         </td>
       </tr>
 
       {isExpanded && (
         <tr className="bg-slate-50/60">
-          <td colSpan={16} className="px-6 py-4">
-            <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-xs text-slate-600 md:grid-cols-4">
-              <div>
-                <span className="font-semibold text-slate-400">Requirement</span>
-                <p>{order.requirementType}</p>
-              </div>
-              <div>
-                <span className="font-semibold text-slate-400">Expected Weight</span>
-                <p>{order.expectedWeightKg != null ? `${order.expectedWeightKg.toLocaleString("en-IN")} kg` : "—"}</p>
-              </div>
-              <div>
-                <span className="font-semibold text-slate-400">Delivery Window</span>
-                <p>{order.deliveryWindow ?? "—"}</p>
-              </div>
-              <div>
-                <span className="font-semibold text-slate-400">Address</span>
-                <p>
-                  {order.shop.address.line1}, {order.shop.address.city}, {order.shop.address.pinCode}
-                </p>
-              </div>
-              <div className="col-span-2">
-                <span className="font-semibold text-slate-400">Shop GPS</span>
-                <div className="mt-1">
-                  <GPSStatus gps={order.shop.gps} status={order.shop.gpsStatus} />
-                </div>
-              </div>
-              <div className="col-span-2">
-                <span className="font-semibold text-slate-400">Remarks</span>
-                <p>{order.remarks || "—"}</p>
-              </div>
+          <td colSpan={10} className="px-6 py-4">
+            <div className="grid grid-cols-1 gap-x-8 gap-y-1 md:grid-cols-2 lg:grid-cols-3">
+              <DetailRow label="Bird Type" value={order.birdType} />
+              <DetailRow label="Birds" value={order.birds.toLocaleString("en-IN")} />
+              <DetailRow label="Boxes" value={order.boxes || "—"} />
+              <DetailRow label="Expected Weight" value={order.expectedWeightKg != null ? `${order.expectedWeightKg.toLocaleString("en-IN")} kg` : "—"} />
+              <DetailRow label="Delivery Date" value={formatDeliveryDate(order.deliveryDate)} />
+              <DetailRow label="Deadline" value={`${order.deadlineLabel} (${order.deadlineTime})`} />
+              <DetailRow label="Important Customer" value={order.importantCustomer ? "Yes" : "No"} />
+              <DetailRow label="Shop Address" value={formatAddress(order.shop.address)} />
+              <DetailRow label="Pickup / Farm" value={order.pickupSource ? `${order.pickupSource.farmName} · ${order.pickupSource.location}` : "Not assigned"} />
+              <DetailRow
+                label="Recommended Vehicle"
+                value={
+                  recommendation?.recommended ? (
+                    <span className="inline-flex items-center gap-1 text-brand-700">
+                      <Sparkles size={12} />
+                      {recommendation.recommended.vehicle.vehicleNo}
+                      <span className="text-slate-400">({recommendation.recommended.tier})</span>
+                    </span>
+                  ) : (
+                    "—"
+                  )
+                }
+              />
+              <DetailRow label="Planning State" value={recommendation?.recommended?.planningState ?? "—"} />
+              <DetailRow label="Remarks" value={order.remarks || "—"} />
             </div>
           </td>
         </tr>
