@@ -211,30 +211,32 @@ export interface EmiPayInput {
 }
 
 /** EMI payment status — restricted to the two meaningful states. */
-export type EmiOverviewStatus = 'pending' | 'completed';
+export type EmiOverviewStatus = 'PENDING' | 'COMPLETED';
 
 /**
- * Read-only EMI Management row. Derived from the Vehicle Master for EVERY
- * Active vehicle (vehicle number, purchase amount, purchase date, total EMI,
- * EMI day) plus the existing EMI payment schedule (completed EMI / next date).
- * The page never creates, edits or saves a vehicle — this is a view model only.
+ * Read-only EMI Management row. Derived from the Vehicle Master for vehicles
+ * that have EMI information. EMI schedule and completion status are computed
+ * automatically from due dates. The page never creates, edits or saves a vehicle.
  */
 export interface EmiOverview {
   vehicleId: number;
   vehicleNo: string;
-  financeCompany: string;
-  purchaseAmount: number;
-  purchaseDate: string | null;
-  emiDay: number | null;
-  totalEMIs: number;
+  vehicleNumber: string;
+  purchaseAmount: number | null;
+  totalEMIs: number | null;
   completedEMIs: number;
   pendingEMIs: number;
-  emiDate: string | null;
+  emiDay: number | null;
+  emiStartDate: string | null;
   status: EmiOverviewStatus;
-  monthlyEmi: number;
-  emiRecordId: number | null;
-  startDate: string | null;
-  endDate: string | null;
+}
+
+/** Individual EMI installment for schedule detail view */
+export interface EmiInstallment {
+  installmentNo: number;
+  dueDate: string; // YYYY-MM-DD
+  amount: number | null;
+  status: 'COMPLETED' | 'PENDING';
 }
 
 /** @deprecated Use VehicleEmi — kept for existing EMIRecordSchema consumers. */

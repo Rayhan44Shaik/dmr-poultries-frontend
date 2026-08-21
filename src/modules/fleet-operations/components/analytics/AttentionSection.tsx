@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react';
 import { AlertTriangle, CheckCircle2, Fuel, Gauge, Wrench, Truck } from 'lucide-react';
 import type { AnalyticsVehicleStat } from '../../types/analytics';
+import { formatCurrencyCompact } from '../../utils/formatters';
 
 interface AttentionItem {
   id: string;
@@ -15,8 +16,6 @@ interface AttentionItem {
 interface AttentionSectionProps {
   stats: AnalyticsVehicleStat[];
 }
-
-const money = (value: number) => `₹${Math.round(value).toLocaleString('en-IN')}`;
 
 const AttentionSection = ({ stats }: AttentionSectionProps) => {
   const items = useMemo<AttentionItem[]>(() => {
@@ -74,8 +73,8 @@ const AttentionSection = ({ stats }: AttentionSectionProps) => {
         icon: Fuel,
         tone: 'border-sky-200 bg-sky-50',
         title: 'Highest fuel spend',
-        detail: highFuel.map((row) => `${row.vehicleNumber} (${money(row.fuelCost)})`).join(', '),
-        value: money(highFuel[0].fuelCost),
+        detail: highFuel.map((row) => `${row.vehicleNumber} (${formatCurrencyCompact(row.fuelCost)})`).join(', '),
+        value: formatCurrencyCompact(highFuel[0].fuelCost),
       });
     }
 
@@ -90,8 +89,8 @@ const AttentionSection = ({ stats }: AttentionSectionProps) => {
         icon: Wrench,
         tone: 'border-violet-200 bg-violet-50',
         title: 'Highest maintenance cost',
-        detail: highMaint.map((row) => `${row.vehicleNumber} (${money(row.maintenanceCost)})`).join(', '),
-        value: money(highMaint[0].maintenanceCost),
+        detail: highMaint.map((row) => `${row.vehicleNumber} (${formatCurrencyCompact(row.maintenanceCost)})`).join(', '),
+        value: formatCurrencyCompact(highMaint[0].maintenanceCost),
       });
     }
 
@@ -108,34 +107,29 @@ const AttentionSection = ({ stats }: AttentionSectionProps) => {
 
   if (items.length === 0) {
     return (
-      <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-6">
+      <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
         <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-emerald-600" />
-        <div>
-          <p className="text-sm font-bold text-emerald-800">All clear</p>
-          <p className="text-xs font-medium text-emerald-700">
-            No vehicles need attention for the selected period.
-          </p>
-        </div>
+        <p className="text-sm font-semibold text-emerald-800">All clear</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {items.map((item) => (
         <div
           key={item.id}
-          className={`flex items-start gap-3 rounded-xl border px-3.5 py-3 ${item.tone}`}
+          className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 ${item.tone}`}
         >
-          <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-white/70">
-            <item.icon className="h-3.5 w-3.5 text-slate-600" />
+          <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-white/70">
+            <item.icon className="h-3 w-3 text-slate-600" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+            <p className="flex items-center gap-1 text-xs font-bold text-slate-800">
               <AlertTriangle className="h-3 w-3 flex-shrink-0" />
               {item.title}
             </p>
-            <p className="mt-0.5 truncate text-[11px] font-medium text-slate-600" title={item.detail}>
+            <p className="mt-0 truncate text-[11px] font-medium text-slate-600" title={item.detail}>
               {item.detail}
             </p>
           </div>

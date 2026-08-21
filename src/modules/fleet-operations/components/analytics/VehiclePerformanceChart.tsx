@@ -9,6 +9,7 @@ import {
   YAxis,
 } from 'recharts';
 import type { AnalyticsVehicleStat } from '../../types/analytics';
+import { formatNumberCompact } from '../../utils/formatters';
 
 export type VehicleMetricKey = 'distance' | 'trips' | 'fuel' | 'mileage' | 'costPerKm';
 
@@ -28,7 +29,7 @@ const METRICS: MetricDef[] = [
     unit: 'km',
     color: '#2563eb',
     pick: (row) => row.distance,
-    format: (value) => `${value.toLocaleString('en-IN')} km`,
+    format: (value) => `${formatNumberCompact(value)} km`,
   },
   {
     key: 'trips',
@@ -36,7 +37,7 @@ const METRICS: MetricDef[] = [
     unit: 'trips',
     color: '#6366f1',
     pick: (row) => row.trips,
-    format: (value) => `${value.toLocaleString('en-IN')} trips`,
+    format: (value) => `${formatNumberCompact(value)} trips`,
   },
   {
     key: 'fuel',
@@ -44,7 +45,7 @@ const METRICS: MetricDef[] = [
     unit: 'L',
     color: '#f59e0b',
     pick: (row) => row.fuelLitres,
-    format: (value) => `${value.toLocaleString('en-IN')} L`,
+    format: (value) => `${formatNumberCompact(value)} L`,
   },
   {
     key: 'mileage',
@@ -67,8 +68,9 @@ const METRICS: MetricDef[] = [
 const TOP_N = 12;
 
 const axisCompact = (value: number): string => {
-  if (value >= 100000) return `${(value / 100000).toFixed(1)}L`;
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  if (value >= 10000000) return `${(value / 10000000).toFixed(1)} Cr`;
+  if (value >= 100000) return `${(value / 100000).toFixed(1)} L`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)} K`;
   return String(Math.round(value));
 };
 
@@ -100,12 +102,11 @@ const VehiclePerformanceChart = ({ stats }: VehiclePerformanceChartProps) => {
 
   const hasData = rows.length > 0;
 
+  const maxValue = hasData ? Math.max(...rows.map((r) => r.value)) : 0;
+
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-medium text-slate-500">
-          {hasData ? `Top ${rows.length} vehicles by ${metric.label.toLowerCase()}` : 'No vehicle activity recorded'}
-        </p>
+      <div className="mb-3 flex flex-wrap items-center justify-end gap-1">
         <div className="flex flex-wrap gap-1">
           {METRICS.map((m) => (
             <button
@@ -126,49 +127,56 @@ const VehiclePerformanceChart = ({ stats }: VehiclePerformanceChartProps) => {
 
       {!hasData ? (
         <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 py-10 text-sm font-medium text-slate-400">
-          No {metric.label.toLowerCase()} data for the selected filters.
+          No data for the selected filters.
         </div>
       ) : (
         <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={rows} layout="vertical" margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-              <XAxis
-                type="number"
-                tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }}
-                tickFormatter={axisCompact}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                type="category"
-                dataKey="vehicle"
-                width={118}
-                interval={0}
-                tick={{ fontSize: 10, fill: '#475569', fontWeight: 600 }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip
-                cursor={{ fill: '#f8fafc' }}
-                contentStyle={{
-                  borderRadius: '10px',
-                  border: '1px solid #e2e8f0',
-                  boxShadow: '0 8px 20px -6px rgba(15, 23, 42, 0.15)',
-                  fontSize: '12px',
-                }}
-                formatter={(value) => [metric.format(Number(value)), metric.label]}
-                labelStyle={{ fontWeight: 700, color: '#0f172a', fontSize: 12 }}
-              />
-              <Bar
-                dataKey="value"
-                fill={metric.color}
-                radius={[0, 4, 4, 0]}
-                maxBarSize={16}
-                isAnimationActive={false}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="h-full w-full rounded-lg border border-slate-100 bg-white p-3">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} vertical={true} />
+                <XAxis
+                  type="number"
+                  domain={[0, 'dataMax']}
+                  tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }}
+                  tickFormatter={axisCompact}
+                  axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                  tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                  tickMargin={8}
+                  minTickGap={40}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="vehicle"
+                  width={118}
+                  interval={0}
+                  tick={{ fontSize: 10, fill: '#475569', fontWeight: 600 }}
+                  axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                  tickLine={false}
+                  tickMargin={8}
+                />
+                <Tooltip
+                  cursor={{ fill: '#f8fafc', stroke: '#e2e8f0', strokeWidth: 1 }}
+                  contentStyle={{
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 8px 20px -6px rgba(15, 23, 42, 0.15)',
+                    fontSize: '12px',
+                    backgroundColor: '#ffffff',
+                  }}
+                  formatter={(value) => [metric.format(Number(value)), metric.label]}
+                  labelStyle={{ fontWeight: 700, color: '#0f172a', fontSize: 12 }}
+                />
+                <Bar
+                  dataKey="value"
+                  fill={metric.color}
+                  radius={[0, 4, 4, 0]}
+                  maxBarSize={16}
+                  isAnimationActive={false}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       )}
     </div>

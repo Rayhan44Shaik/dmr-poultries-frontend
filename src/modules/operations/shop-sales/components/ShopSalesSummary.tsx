@@ -11,8 +11,6 @@ interface Props {
 }
 
 function ShopSalesSummary({ summary, fromDate, toDate, shopName, isLoading = false }: Props) {
-  const hasFilter = fromDate !== "" || toDate !== "" || shopName.trim() !== "";
-
   if (isLoading) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 text-center text-slate-400">
@@ -21,12 +19,14 @@ function ShopSalesSummary({ summary, fromDate, toDate, shopName, isLoading = fal
     );
   }
 
-  if (!hasFilter) {
-    return (
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 text-center text-slate-400">
-        Apply filters to view summary.
-      </div>
-    );
+  const hasData =
+    summary.totalShops > 0 ||
+    summary.totalBirds > 0 ||
+    summary.totalWeight > 0 ||
+    summary.totalAmount > 0;
+
+  if (!hasData) {
+    return null;
   }
 
   const cards = [

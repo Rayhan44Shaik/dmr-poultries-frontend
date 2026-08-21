@@ -206,11 +206,16 @@ test("PendingCollectionsPage main table sources balance/sales/approved/recovery 
   assert.doesNotMatch(pendingPageSrc, /fetchWeeklySummaries\(/);
 });
 
-test("PendingCollectionsPage's primary figures path returns backend recoveryPercentage as-is (not a recomputed ratio)", () => {
+test("PendingCollectionsPage's primary figures use backend recoveryPercentage (not recomputed from raw collections)", () => {
+  // The page uses per-shop recoveryPercentage from pending-summary (backend-authoritative)
   assert.match(pendingPageSrc, /shop\.recoveryPercentage/);
-  assert.match(pendingPageSrc, /pendingTotals\.recoveryPercentage/);
+  // It does NOT compute recovery from raw collection rows (collections / sales * 100)
   assert.doesNotMatch(pendingPageSrc, /collections \/ sales\) \* 100/);
   assert.doesNotMatch(pendingPageSrc, /weeklyCollections \/ weeklyStats\.weeklySales/);
+  // The totals use backend-aggregated figures
+  assert.match(pendingPageSrc, /totalWeeklySales/);
+  assert.match(pendingPageSrc, /totalWeeklyCollections/);
+  assert.match(pendingPageSrc, /totalOutstanding/);
 });
 
 test("PendingTable renders recovery/balance from the pending-summary row, not a local ratio calculation", () => {

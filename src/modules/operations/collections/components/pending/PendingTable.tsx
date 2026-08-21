@@ -1,7 +1,6 @@
 import { Eye, Trash2 } from "lucide-react";
 import type { CollectionPendingSummaryRow } from "../../types/collection";
-import { usePendingDelete } from "../../../../../hooks/usePendingDelete";
-import { PendingDeleteNotification } from "../../../../../components/common/PendingDeleteNotification";
+import { opsTableHeaderBarClass, opsTableThClass, opsTableTdClass, opsTableRowClass, opsTableDivideClass, opsTableCardClass } from "../../../../../shared/ui/operationsStyles";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -11,9 +10,10 @@ const formatCurrency = (amount: number) =>
   }).format(amount);
 
 const formatDate = (dateStr: string | null | undefined) => {
-  if (!dateStr || dateStr === "-") return "-";
+  if (!dateStr || dateStr === "-") return "—";
   const d = new Date(dateStr);
-  return d.toLocaleDateString("en-IN");
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
 };
 
 const formatBalance = (amount: number) => {
@@ -45,7 +45,6 @@ export function PendingTable({
   grandTotalWeeklySales,
   grandTotalWeeklyCollections,
 }: PendingTableProps) {
-  const { requestDelete, cancel, isPending, pendingItems } = usePendingDelete(onDelete);
   const handleRowClick = (shopName: string) => {
     if (selectedShopName === shopName) {
       onSelectShop(null);
@@ -67,56 +66,23 @@ export function PendingTable({
   const formattedGrandTotal = formatBalance(grandTotalPending);
 
   return (
-    <div>
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-4 py-2">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-slate-700">
-            {selectedShop ? `Selected: ${selectedShop.shopName}` : "No shop selected"}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => selectedShop && onView(selectedShop.shopName)}
-            disabled={!selectedShop}
-            title="View"
-            className={`rounded-md p-1.5 transition ${
-              selectedShop
-                ? "text-blue-600 hover:bg-blue-100"
-                : "cursor-not-allowed text-slate-300"
-            }`}
-          >
-            <Eye size={18} />
-          </button>
-          <button
-            onClick={() => selectedShop && requestDelete(selectedShop.shopName, { label: `Deleting pending for ${selectedShop.shopName}` })}
-            disabled={!selectedShop || (selectedShop ? isPending(selectedShop.shopName) : false)}
-            title="Delete"
-            className={`rounded-md p-1.5 transition ${
-              selectedShop
-                ? "text-red-600 hover:bg-red-100"
-                : "cursor-not-allowed text-slate-300"
-            }`}
-          >
-            <Trash2 size={18} />
-          </button>
-        </div>
-      </div>
-
+    <div className={opsTableCardClass}>
       <div className="overflow-x-auto bg-white">
-        <table className="min-w-full divide-y divide-slate-200">
+        <table className="min-w-full divide-y divide-slate-100">
           <thead className="bg-slate-50/80">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-600">#</th>
-              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-600">Shop Name</th>
-              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-600">Last Collection</th>
-              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-600">Balance</th>
-              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-600">Recent Sales</th>
-              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-600">Recent Collections</th>
-              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-slate-600">Recovery %</th>
-              <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-slate-600">Overdue</th>
+              <th className={opsTableThClass}>#</th>
+              <th className={opsTableThClass}>Shop Name</th>
+              <th className={opsTableThClass}>Last Collection</th>
+              <th className={`${opsTableThClass} text-right`}>Balance</th>
+              <th className={`${opsTableThClass} text-right`}>Recent Sales</th>
+              <th className={`${opsTableThClass} text-right`}>Recent Collections</th>
+              <th className={`${opsTableThClass} text-right`}>Recovery %</th>
+              <th className={`${opsTableThClass} text-center`}>Overdue (Days)</th>
+              <th className={`${opsTableThClass} text-center`}>Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200 bg-white">
+          <tbody className={`${opsTableDivideClass} bg-white`}>
             {data.map((shop, idx) => {
               const weeklySales = shop.weeklySales;
               const weeklyCollections = shop.weeklyApprovedCollections;
@@ -127,45 +93,50 @@ export function PendingTable({
                 balance < 0 ? "text-blue-600" :
                 "text-slate-600";
 
+              const recoveryColor =
+                recovery >= 80 ? "text-green-600" :
+                recovery >= 50 ? "text-amber-600" :
+                "text-red-600";
+
               return (
                 <tr
                   key={shop.shopId}
-                  className={`cursor-pointer hover:bg-slate-50/70 ${
-                    selectedShopName === shop.shopName ? "bg-slate-100/80" : ""
-                  }`}
+                  className={`${opsTableRowClass} ${selectedShopName === shop.shopName ? "bg-emerald-50/50" : ""}`}
                   onClick={() => handleRowClick(shop.shopName)}
                 >
-                  <td className="px-4 py-3 text-sm text-slate-600">{idx + 1}</td>
-                  <td className="px-4 py-3 text-sm font-medium text-slate-800">{shop.shopName}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">
-                    {formatDate(shop.lastCollectionDate)}
+                  <td className={opsTableTdClass}>{idx + 1}</td>
+                  <td className={`${opsTableTdClass} font-medium text-slate-800`}>{shop.shopName}</td>
+                  <td className={opsTableTdClass}>{formatDate(shop.lastCollectionDate)}</td>
+                  <td className={`${opsTableTdClass} text-right font-semibold ${balanceColor}`}>{formatBalance(balance)}</td>
+                  <td className={`${opsTableTdClass} text-right text-blue-600`}>{formatCurrency(weeklySales)}</td>
+                  <td className={`${opsTableTdClass} text-right text-green-600`}>{formatCurrency(weeklyCollections)}</td>
+                  <td className={`${opsTableTdClass} text-right font-medium ${recoveryColor}`}>{recovery.toFixed(1)}%</td>
+                  <td className={`${opsTableTdClass} text-center`}>
+                    {shop.overdueDays != null && shop.overdueDays > 0 ? (
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-50 text-red-600 text-xs font-medium">
+                        {shop.overdueDays}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
                   </td>
-                  <td className={`px-4 py-3 text-right text-sm font-semibold ${balanceColor}`}>
-                    {formatBalance(balance)}
-                  </td>
-                  <td className="px-4 py-3 text-right text-sm text-blue-600">
-                    {formatCurrency(weeklySales)}
-                  </td>
-                  <td className="px-4 py-3 text-right text-sm text-green-600">
-                    {formatCurrency(weeklyCollections)}
-                  </td>
-                  <td className="px-4 py-3 text-right text-sm font-medium">
-                    <span
-                      className={
-                        recovery >= 80
-                          ? "text-green-600"
-                          : recovery >= 50
-                          ? "text-amber-600"
-                          : "text-red-600"
-                      }
-                    >
-                      {recovery.toFixed(1)}%
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center text-sm">
-                    <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-500">
-                      —
-                    </span>
+                  <td className={`${opsTableTdClass} text-center`}>
+                    <div className="inline-flex items-center justify-center gap-1.5">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onView(shop.shopName); }}
+                        title="View Details"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50 transition"
+                      >
+                        <Eye size={18} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onDelete(shop.shopName); }}
+                        title="Delete Latest Collection"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 hover:bg-red-50 transition"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -173,24 +144,16 @@ export function PendingTable({
           </tbody>
           <tfoot className="bg-slate-50">
             <tr>
-              <td colSpan={3} className="px-4 py-3 text-sm font-bold text-slate-700">
-                Total (All Pages)
-              </td>
-              <td className="px-4 py-3 text-right text-sm font-bold text-slate-800">
-                {formattedGrandTotal}
-              </td>
-              <td className="px-4 py-3 text-right text-sm font-bold text-blue-600">
-                {formatCurrency(grandTotalWeeklySales)}
-              </td>
-              <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                {formatCurrency(grandTotalWeeklyCollections)}
-              </td>
-              <td colSpan={2}></td>
+              <td colSpan={3} className={`${opsTableTdClass} font-bold text-slate-700`}>Total (All Pages)</td>
+              <td className={`${opsTableTdClass} text-right font-bold text-slate-800`}>{formattedGrandTotal}</td>
+              <td className={`${opsTableTdClass} text-right font-bold text-blue-600`}>{formatCurrency(grandTotalWeeklySales)}</td>
+              <td className={`${opsTableTdClass} text-right font-bold text-green-600`}>{formatCurrency(grandTotalWeeklyCollections)}</td>
+              <td colSpan={2} className={opsTableTdClass}></td>
+              <td className={opsTableTdClass}></td>
             </tr>
           </tfoot>
         </table>
       </div>
-      <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
     </div>
   );
 }

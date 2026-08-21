@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import type {
   CollectionEntry,
   CollectionErrors,
@@ -8,6 +8,7 @@ import type {
   Collection,
   CollectionLegacyStatus,
   CollectionWeeklySummary,
+  CollectionWeekBounds,
 } from "../types/collection";
 import { collectionService } from "../services/collectionService";
 import { loadShops, shopService } from "../../../masters/shops/services/shopService";
@@ -27,6 +28,13 @@ const EMPTY_WEEKLY: CollectionWeeklySummary = {
   isCurrentWeek: false,
 };
 
+const EMPTY_WEEK_BOUNDS: CollectionWeekBounds = {
+  asOfDate: "",
+  weekStart: "",
+  weekEnd: "",
+  isCurrentWeek: false,
+};
+
 export default function useCollectionEntry() {
   const { showNotification } = useSafeNotification();
 
@@ -36,10 +44,13 @@ export default function useCollectionEntry() {
   const [paymentModes, setPaymentModes] = useState<PaymentMode[]>([]);
   const [pendingCollections, setPendingCollections] = useState<PendingCollection[]>([]);
   const [recentCollections, setRecentCollections] = useState<RecentCollection[]>([]);
-  const [allCollections, setAllCollections] = useState<Collection[]>([]); // new
+  const [allCollections, setAllCollections] = useState<Collection[]>([]);
   const [pendingShop, setPendingShop] = useState<PendingCollection | null>(null);
   const [weeklySummary, setWeeklySummary] = useState<CollectionWeeklySummary>(EMPTY_WEEKLY);
+  const [weekBounds, setWeekBounds] = useState<CollectionWeekBounds>(EMPTY_WEEK_BOUNDS);
   const [showSummary, setShowSummary] = useState(false);
+  const [ledgerLoaded, setLedgerLoaded] = useState(false);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
 
   const [entry, setEntry] = useState<CollectionEntry>({
     collectionId: "",
@@ -57,7 +68,7 @@ export default function useCollectionEntry() {
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<"Pending" | "Approved" | "All">("Pending");
+  const [statusFilter, setStatusFilter] = useState<"Pending" | "Approved" | "Deleted">("Pending");
 
   const today = useMemo(() => new Date().toLocaleDateString("en-GB"), []);
   const dashboard = useMemo(() => collectionService.getDashboardSummary(), []);
@@ -78,7 +89,6 @@ export default function useCollectionEntry() {
           .filter((emp) => (emp.department ?? "").toLowerCase() === "collection")
           .map((emp) => emp.employeeName)
           .sort();
-        // Fall back to all employees when no one is tagged "Collection" yet.
         setCollectors(collectorNames.length > 0 ? collectorNames : allEmployees.map((e) => e.employeeName).sort());
         const modes: PaymentMode[] = [{ id: "cash", name: "Cash" }];
         getBanks()
@@ -103,6 +113,7 @@ export default function useCollectionEntry() {
     collectionService
       .fetchWeekBounds()
       .then((bounds) => {
+        setWeekBounds(bounds);
         setEntry((prev) =>
           prev.collectionDate ? prev : { ...prev, collectionDate: bounds.asOfDate }
         );
@@ -136,7 +147,10 @@ export default function useCollectionEntry() {
       amount: 0,
       remarks: ""
     }));
-    setShowSummary(true);
+    // Clear ledger state when shop changes - require explicit View Shop Ledger click
+    setShowSummary(false);
+    setLedgerLoaded(false);
+    setWeeklySummary(EMPTY_WEEKLY);
   }
 
   function changeShop(shopName: string) {
@@ -159,22 +173,79 @@ export default function useCollectionEntry() {
     setErrors({});
     setIsEditing(false);
     setShowSummary(false);
+    setLedgerLoaded(false);
     setWeeklySummary(EMPTY_WEEKLY);
   }
 
-  function viewLedger() {
-    if (!pendingShop) {
+  async function viewLedger() {
+    if (!entry.shopName.trim()) {
       showNotification("Please select a shop first.", "error");
       return;
     }
-    setShowSummary(true);
+    if (!entry.collectorName.trim()) {
+      showNotification("Please select a collector.", "error");
+      return;
+    }
+    if (!entry.paymentModeName.trim()) {
+      showNotification("Please select a payment mode.", "error");
+      return;
+    }
+
+    const shopId = collectionService.getShopIdForName(entry.shopName);
+    if (!shopId) {
+      showNotification("Invalid shop selection.", "error");
+      return;
+    }
+
+    setLedgerLoading(true);
+    try {
+      const summary = await collectionService.fetchWeeklySummary(shopId, entry.collectionDate);
+      setWeeklySummary(summary);
+      setShowSummary(true);
+      setLedgerLoaded(true);
+    } catch (error) {
+      showNotification("Failed to load shop ledger. Please try again.", "error");
+      setWeeklySummary(EMPTY_WEEKLY);
+      setShowSummary(false);
+      setLedgerLoaded(false);
+    } finally {
+      setLedgerLoading(false);
+    }
   }
+
+  // Invalidate ledger when collector or payment mode changes
+  const handleCollectorChange = useCallback((collectorName: string) => {
+    updateEntry("collectorName", collectorName);
+    if (ledgerLoaded) {
+      setShowSummary(false);
+      setLedgerLoaded(false);
+      setWeeklySummary(EMPTY_WEEKLY);
+    }
+  }, [ledgerLoaded]);
+
+  const handlePaymentModeChange = useCallback((paymentModeName: string) => {
+    updateEntry("paymentModeName", paymentModeName);
+    if (paymentModeName === "Cash") updateEntry("referenceNo", "");
+    if (ledgerLoaded) {
+      setShowSummary(false);
+      setLedgerLoaded(false);
+      setWeeklySummary(EMPTY_WEEKLY);
+    }
+  }, [ledgerLoaded]);
+
+  // Invalidate ledger when shop changes (already handled in selectShop)
+  const handleShopChange = useCallback((shopName: string) => {
+    selectShop(shopName);
+  }, []);
 
   const shopId = pendingShop?.shopId ?? collectionService.getShopIdForName(entry.shopName);
 
+  // Only auto-fetch weekly summary if ledger has been explicitly loaded
   useEffect(() => {
-    if (!shopId || !entry.collectionDate) {
-      setWeeklySummary(EMPTY_WEEKLY);
+    if (!ledgerLoaded || !shopId || !entry.collectionDate) {
+      if (!ledgerLoaded) {
+        setWeeklySummary(EMPTY_WEEKLY);
+      }
       return;
     }
     let cancelled = false;
@@ -189,64 +260,71 @@ export default function useCollectionEntry() {
     return () => {
       cancelled = true;
     };
-  }, [shopId, entry.collectionDate, pendingCollections, recentCollections, allCollections]);
+  }, [shopId, entry.collectionDate, ledgerLoaded]);
 
   const fmtWeekDate = (iso: string) => {
     if (!iso) return "";
     const [y, m, d] = iso.split("-");
     return `${d}/${m}/${y}`;
   };
-  const weekRangeFormatted = weeklySummary.weekStart
+
+  // Week range from week bounds (always available, independent of ledgerLoaded)
+  const weekRangeFormatted = weekBounds.weekStart
+    ? `${fmtWeekDate(weekBounds.weekStart)} to ${fmtWeekDate(weekBounds.weekEnd)}`
+    : "";
+
+  // Also compute week range from weeklySummary when ledger is loaded (for backward compat)
+  const ledgerWeekRangeFormatted = weeklySummary.weekStart
     ? `${fmtWeekDate(weeklySummary.weekStart)} to ${fmtWeekDate(weeklySummary.weekEnd)}`
     : "";
 
-  // Authoritative live shop balance — the shop's persistent outstanding,
-  // owned by the backend (shops.current_balance). NEVER a weekly figure and
-  // never reset when the week changes. The frontend only displays it.
-  const balance = weeklySummary.balance;
-  const weeklySales = weeklySummary.weeklySales;
-  const weeklyCollections = weeklySummary.approvedCollections;
-  const weeklyPending = weeklySummary.pendingCollections;
-  const currentPending = weeklySummary.balance;
-  const totalSales = weeklySummary.weeklySales;
-  const totalCollections = weeklySummary.approvedCollections;
+  // Only show financial data if ledger is loaded
+  // weeklySummary.balance = Current Outstanding (closing balance)
+  // Opening Balance = Current Outstanding - Approved Sales + Approved Collections
+  const currentOutstanding = ledgerLoaded ? weeklySummary.balance : 0;
+  const approvedSales = ledgerLoaded ? weeklySummary.weeklySales : 0;
+  const approvedCollections = ledgerLoaded ? weeklySummary.approvedCollections : 0;
+  const pendingApproval = ledgerLoaded ? weeklySummary.pendingCollections : 0;
+  const openingBalance = ledgerLoaded
+    ? weeklySummary.balance - weeklySummary.weeklySales + weeklySummary.approvedCollections
+    : 0;
 
   const todayCollection = useMemo(() => Number(entry.amount || 0), [entry.amount]);
 
-  const remainingBalance = useMemo(() => {
-    return currentPending - todayCollection;
-  }, [currentPending, todayCollection]);
+  // Projected balance after this collection is approved
+  const projectedBalance = useMemo(() => {
+    return currentOutstanding - todayCollection;
+  }, [currentOutstanding, todayCollection]);
 
   const collectionProgress = useMemo(() => {
-    if (balance <= 0) return 0;
-    return Number(((todayCollection / balance) * 100).toFixed(2));
-  }, [balance, todayCollection]);
+    if (currentOutstanding <= 0) return 0;
+    return Number(((todayCollection / currentOutstanding) * 100).toFixed(2));
+  }, [currentOutstanding, todayCollection]);
 
   const pageSummary = useMemo(
     () => ({
-      balance,
-      totalSales,
-      totalCollections,
-      currentPending,
+      balance: currentOutstanding,
+      totalSales: approvedSales,
+      totalCollections: approvedCollections,
+      currentPending: currentOutstanding,
       todayCollection,
-      remainingBalance,
+      remainingBalance: projectedBalance,
       collectionProgress,
       pendingShops: dashboard.totalPendingShops,
       pendingAmount: dashboard.totalPendingAmount,
       pendingApproval: dashboard.pendingApproval,
       approvedCollections: dashboard.approvedCollections,
-      weeklyPending,
+      weeklyPending: pendingApproval,
     }),
     [
-      balance,
-      totalSales,
-      totalCollections,
-      currentPending,
+      currentOutstanding,
+      approvedSales,
+      approvedCollections,
       todayCollection,
-      remainingBalance,
+      projectedBalance,
       collectionProgress,
       dashboard,
-      weeklyPending,
+      pendingApproval,
     ]
   );
 
@@ -270,11 +348,10 @@ export default function useCollectionEntry() {
   }
 
   function changeCollector(collectorName: string) {
-    updateEntry("collectorName", collectorName);
+    handleCollectorChange(collectorName);
   }
   function changePaymentMode(paymentModeName: string) {
-    updateEntry("paymentModeName", paymentModeName);
-    if (paymentModeName === "Cash") updateEntry("referenceNo", "");
+    handlePaymentModeChange(paymentModeName);
   }
   function changeReference(referenceNo: string) {
     updateEntry("referenceNo", referenceNo);
@@ -319,8 +396,10 @@ export default function useCollectionEntry() {
       }
       showNotification("Collection saved successfully!", "success");
 
+      // After save, switch to Pending tab to show the newly created collection
+      setStatusFilter("Pending");
       setPendingCollections(collectionService.getPendingCollections());
-      setRecentCollections(collectionService.getRecentCollections(statusFilter));
+      setRecentCollections(collectionService.getRecentCollections("Pending"));
       setAllCollections(collectionService.getCollections());
 
       resetEntry();
@@ -337,8 +416,8 @@ export default function useCollectionEntry() {
     resetEntry();
   }
 
-  function changeStatusFilter(status: CollectionLegacyStatus | "All") {
-    setStatusFilter(status as "Pending" | "Approved" | "All");
+  function changeStatusFilter(status: "Pending" | "Approved" | "Deleted") {
+    setStatusFilter(status);
     setRecentCollections(collectionService.getRecentCollections(status));
   }
 
@@ -346,8 +425,6 @@ export default function useCollectionEntry() {
     const result = await collectionService.approveCollection(id, "Admin");
     if (result.success) {
       showNotification("Collection approved successfully!", "success");
-      // The backend returns the authoritative updated shop balance — apply it
-      // to the UI immediately so Balance converges without a page reload.
       if (result.balance != null) {
         setWeeklySummary((prev) => ({ ...prev, balance: result.balance as number }));
         setPendingShop((prev) =>
@@ -382,13 +459,12 @@ export default function useCollectionEntry() {
     }
   }
 
-  // ✅ REFRESH – now updates allCollections
   function refreshPage() {
     const pending = collectionService.getPendingCollections();
     const all = collectionService.getCollections();
     setPendingCollections(pending);
     setRecentCollections(collectionService.getRecentCollections(statusFilter));
-    setAllCollections(all); // ← key fix
+    setAllCollections(all);
     if (pending.length > 0) {
       const selected = pending.find((shop) => shop.shopName === entry.shopName);
       if (selected) {
@@ -437,6 +513,8 @@ export default function useCollectionEntry() {
     setErrors({});
     setIsEditing(true);
     setShowSummary(true);
+    // When editing, ledger is considered loaded since we're viewing existing collection data
+    setLedgerLoaded(true);
   }
 
   async function updateExistingCollection() {
@@ -498,7 +576,7 @@ export default function useCollectionEntry() {
 
   const formStatus = useMemo(() => {
     if (!pendingShop) return { title: "No Shop Selected", message: "Select a pending shop.", status: "empty" };
-    const rem = remainingBalance;
+    const rem = projectedBalance;
     if (rem < 0) {
       return { title: "Overpaid", message: "Shop has paid more than outstanding.", status: "overpaid" };
     }
@@ -506,7 +584,7 @@ export default function useCollectionEntry() {
       return { title: "Collection Complete", message: "Outstanding amount fully collected.", status: "completed" };
     }
     return { title: "Pending Collection", message: "Outstanding balance available.", status: "pending" };
-  }, [pendingShop, remainingBalance]);
+  }, [pendingShop, projectedBalance]);
 
   const footerState = useMemo(
     () => ({
@@ -577,7 +655,7 @@ export default function useCollectionEntry() {
     errors,
     isEditing,
     updateEntry,
-    changeShop,
+    changeShop: handleShopChange,
     changeCollector,
     changePaymentMode,
     changeReference,
@@ -585,19 +663,29 @@ export default function useCollectionEntry() {
     changeRemarks,
     changeCollectionDate,
     resetEntry,
-    balance,
-    totalSales,
-    totalCollections,
-    currentPending,
+    // New correct naming for balance calculations
+    openingBalance,
+    approvedSales,
+    approvedCollections,
+    pendingApproval,
+    currentOutstanding,
     todayCollection,
-    remainingBalance,
+    projectedBalance,
     collectionProgress,
     pageSummary,
     showSummary,
-    weeklySales,
-    weeklyCollections,
-    weeklyPending,
+    // Legacy names for backward compatibility (can be removed after all consumers updated)
+    balance: currentOutstanding,
+    totalSales: approvedSales,
+    totalCollections: approvedCollections,
+    currentPending: currentOutstanding,
+    remainingBalance: projectedBalance,
+    weeklySales: approvedSales,
+    weeklyCollections: approvedCollections,
+    weeklyPending: pendingApproval,
     weekRangeFormatted,
+    weekBounds,
+    ledgerWeekRangeFormatted,
     recentCollections,
     selectedShopCollections,
     statusFilter,
@@ -628,6 +716,8 @@ export default function useCollectionEntry() {
     noRecentCollections,
     canSaveOnServer,
     actions,
-    allCollections, // ← exposed
+    allCollections,
+    ledgerLoaded,
+    ledgerLoading,
   };
 }

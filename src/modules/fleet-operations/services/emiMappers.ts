@@ -1,4 +1,4 @@
-import type { EmiOverview, EmiOverviewStatus, EmiStatus, VehicleEmi, VehicleEmiInstallment } from '../types';
+import type { EmiStatus, VehicleEmi, VehicleEmiInstallment } from '../types';
 
 function requireNumber(value: unknown, field: string): number {
   const n = Number(value);
@@ -87,47 +87,4 @@ export function mapEmiScheduleResponse(raw: unknown): VehicleEmiInstallment[] {
     throw new Error('EMI schedule response must be an array.');
   }
   return raw.map(mapEmiInstallment);
-}
-
-function mapOverviewStatus(value: unknown): EmiOverviewStatus {
-  if (value === 'pending' || value === 'completed') return value;
-  throw new Error(`EMI overview has an unsupported status: ${String(value)}`);
-}
-
-function optionalNumber(value: unknown): number | null {
-  if (value == null || value === '') return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
-
-/** Map a backend EmiOverview DTO onto the frontend EmiOverview model. */
-export function mapEmiOverview(raw: unknown): EmiOverview {
-  if (!raw || typeof raw !== 'object') {
-    throw new Error('EMI overview response is empty.');
-  }
-  const row = raw as Record<string, unknown>;
-  return {
-    vehicleId: requireNumber(row.vehicleId, 'vehicleId'),
-    vehicleNo: requireString(row.vehicleNo, 'vehicleNo'),
-    financeCompany: typeof row.financeCompany === 'string' ? row.financeCompany : '',
-    purchaseAmount: requireNumber(row.purchaseAmount, 'purchaseAmount'),
-    purchaseDate: optionalString(row.purchaseDate),
-    emiDay: optionalNumber(row.emiDay),
-    totalEMIs: requireNumber(row.totalEMIs, 'totalEMIs'),
-    completedEMIs: requireNumber(row.completedEMIs, 'completedEMIs'),
-    pendingEMIs: requireNumber(row.pendingEMIs, 'pendingEMIs'),
-    emiDate: optionalString(row.emiDate),
-    status: mapOverviewStatus(row.status),
-    monthlyEmi: requireNumber(row.monthlyEmi, 'monthlyEmi'),
-    emiRecordId: optionalNumber(row.emiRecordId),
-    startDate: optionalString(row.startDate),
-    endDate: optionalString(row.endDate),
-  };
-}
-
-export function mapEmiOverviewResponse(raw: unknown): EmiOverview[] {
-  if (!Array.isArray(raw)) {
-    throw new Error('EMI overview response must be an array.');
-  }
-  return raw.map(mapEmiOverview);
 }

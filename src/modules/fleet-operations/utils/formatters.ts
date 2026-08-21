@@ -9,7 +9,7 @@ export const formatCurrency = (amount: number): string => {
 };
 
 /**
- * Format currency with compact notation (Lakhs/Crores)
+ * Format currency with compact notation (Lakhs/Crores) - Indian numbering
  */
 export const formatCurrencyCompact = (amount: number): string => {
   if (amount === undefined || amount === null || isNaN(amount)) {
@@ -17,8 +17,19 @@ export const formatCurrencyCompact = (amount: number): string => {
   }
   if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(2)} Cr`;
   if (amount >= 100000) return `₹${(amount / 100000).toFixed(2)} L`;
-  if (amount >= 1000) return `₹${(amount / 1000).toFixed(1)} K`;
-  return `₹${amount}`;
+  return `₹${Number(amount).toLocaleString('en-IN')}`;
+};
+
+/**
+ * Format number with compact notation (Lakhs/Crores) - Indian numbering, non-currency
+ */
+export const formatNumberCompact = (num: number): string => {
+  if (num === undefined || num === null || isNaN(num)) {
+    return '0';
+  }
+  if (num >= 10000000) return `${(num / 10000000).toFixed(2)} Cr`;
+  if (num >= 100000) return `${(num / 100000).toFixed(2)} L`;
+  return Number(num).toLocaleString('en-IN');
 };
 
 /**

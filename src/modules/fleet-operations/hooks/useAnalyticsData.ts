@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { endOfMonth, format, startOfMonth } from 'date-fns';
+import { endOfWeek, format, startOfWeek } from 'date-fns';
 import { useFleetVehicles } from './useFleetVehicles';
 import { handleApiError, isCanceledError } from '../../../api/errors';
 import analyticsApi from '../services/analyticsApi';
@@ -7,6 +7,13 @@ import { fleetCacheGet, fleetCacheInvalidate, fleetSharedGet } from '../services
 import type { FleetAnalyticsResponse } from '../types/analytics';
 
 const dateString = (date: Date) => format(date, 'yyyy-MM-dd');
+
+const getCurrentWeekRange = () => {
+  const now = new Date();
+  const start = startOfWeek(now, { weekStartsOn: 1 }); // Monday
+  const end = endOfWeek(now, { weekStartsOn: 1 }); // Sunday
+  return { start, end };
+};
 
 type AnalyticsView = Pick<
   FleetAnalyticsResponse,
@@ -51,10 +58,12 @@ function toView(payload: FleetAnalyticsResponse): AnalyticsView {
 
 export function useAnalyticsData() {
   const { vehicles, loading: vehiclesLoading } = useFleetVehicles();
-  const [fromDate, setFromDateState] = useState(() => dateString(startOfMonth(new Date())));
-  const [toDate, setToDateState] = useState(() => dateString(endOfMonth(new Date())));
+  const { start: weekStart, end: weekEnd } = getCurrentWeekRange();
+  const [fromDate, setFromDateState] = useState(() => dateString(weekStart));
+  const [toDate, setToDateState] = useState(() => dateString(weekEnd));
   const [selectedVehicleId, setSelectedVehicleIdState] = useState<number | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const initialKey = filterKey(fromDate, toDate, selectedVehicleId);
   const cached = fleetCacheGet<FleetAnalyticsResponse>(initialKey);
@@ -94,15 +103,17 @@ export function useAnalyticsData() {
   }, []);
 
   const clearFilters = useCallback(() => {
+    const { start, end } = getCurrentWeekRange();
     setSelectedVehicleIdState(null);
-    setFromDateState(dateString(startOfMonth(new Date())));
-    setToDateState(dateString(endOfMonth(new Date())));
+    setFromDateState(dateString(start));
+    setToDateState(dateString(end));
   }, []);
 
   const refresh = useCallback(() => {
     if (inFlight.current) return;
     fleetCacheInvalidate('analytics:');
     setRefreshNonce((n) => n + 1);
+    setRefreshTrigger((t) => t + 1);
   }, []);
 
   useEffect(() => {
@@ -205,5 +216,6 @@ export function useAnalyticsData() {
     error,
     refresh,
     lastRefreshed,
+    refreshTrigger,
   };
 }

@@ -2,7 +2,6 @@
 
 import { useEffect, useCallback, useState } from "react";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
-import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 import { handleApiError } from "../../../../api";
 
 import useShopSales from "../hooks/useShopSales";
@@ -83,75 +82,19 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
       try {
         await updateSale(updatedSale);
         showNotification("Sale updated successfully", "success");
-        // Re-fetch so trip-level data (totals, other sales on the same
-        // trip) reflects the edit — no stale values remain on screen.
-        // Silent: the row was already patched from the server response.
         await refreshSales({ silent: true });
       } catch (error) {
-        // Surface the backend's actual rejection reason (e.g. capacity
-        // exceeded, rate locked, edit window closed) through the existing
-        // notification mechanism instead of a generic message.
         showNotification(handleApiError(error), "error");
       }
     },
     [updateSale, showNotification, refreshSales]
   );
 
-  const handleExportPDF = useCallback(() => {
-    if (filteredSales.length === 0) {
-      showNotification("No data to export.", "error");
-      return;
-    }
-    const headers = [
-      "Shop Sales No",
-      "Day",
-      "Shop Name",
-      "Weight (KG)",
-      "Rate (₹)",
-      "Amount (₹)",
-      "Remark",
-    ];
-    const rows = filteredSales.map((s) => [
-      s.saleNo || s.tripNo,
-      s.tripDate,
-      s.shopName,
-      s.totalWeight.toFixed(2),
-      (s.rate ?? 0).toFixed(2),
-      s.amount.toFixed(2),
-      s.remark || "-",
-    ]);
-    const filename = `ShopSales_${new Date().toISOString().split("T")[0]}`;
-    exportToPDF("Shop Sales Report", headers, rows, filename);
-    showNotification("PDF exported successfully!", "success");
-  }, [filteredSales, showNotification]);
-
-  const handleExportExcel = useCallback(() => {
-    if (filteredSales.length === 0) {
-      showNotification("No data to export.", "error");
-      return;
-    }
-    const headers = [
-      "Shop Sales No",
-      "Day",
-      "Shop Name",
-      "Weight (KG)",
-      "Rate (₹)",
-      "Amount (₹)",
-      "Remark",
-    ];
-    const rows = filteredSales.map((s) => [
-      s.saleNo || s.tripNo,
-      s.tripDate,
-      s.shopName,
-      s.totalWeight,
-      s.rate ?? 0,
-      s.amount,
-      s.remark || "",
-    ]);
-    const filename = `ShopSales_${new Date().toISOString().split("T")[0]}`;
-    exportToExcel("Shop Sales Report", headers, rows, filename);
-    showNotification("Excel exported successfully!", "success");
-  }, [filteredSales, showNotification]);
+  const hasActiveFilters =
+    filter.fromDate !== "" ||
+    filter.toDate !== "" ||
+    filter.shopName.trim() !== "" ||
+    filter.search.trim() !== "";
 
   const content = (
     <div className="w-full space-y-5 animate-in fade-in duration-500">
@@ -176,23 +119,18 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         setSortBy={(v) => setFilter({ ...filter, sortBy: v })}
         onSearch={handleSearch}
         onReset={handleResetFilters}
-        onExportPDF={handleExportPDF}
-        onExportExcel={handleExportExcel}
-        hasFilters={
-          filter.fromDate !== "" ||
-          filter.toDate !== "" ||
-          filter.shopName.trim() !== "" ||
-          filter.search.trim() !== ""
-        }
+        hasFilters={hasActiveFilters}
       />
 
-      <ShopSalesSummary
-        summary={summary}
-        fromDate={filter.fromDate}
-        toDate={filter.toDate}
-        shopName={filter.shopName}
-        isLoading={isLoading}
-      />
+      {hasActiveFilters && (
+        <ShopSalesSummary
+          summary={summary}
+          fromDate={filter.fromDate}
+          toDate={filter.toDate}
+          shopName={filter.shopName}
+          isLoading={isLoading}
+        />
+      )}
 
       <div className="rounded-2xl border border-slate-200/80 overflow-hidden bg-white shadow-sm text-xs md:text-sm">
         <ShopSalesTable
@@ -215,6 +153,10 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
 
   return (
     <div className="px-3 md:px-6 py-4 max-w-[1600px] mx-auto bg-slate-50/50 min-h-screen text-slate-800">
+      <div className="mb-5">
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Shop Sales</h1>
+        <p className="text-slate-500 mt-1 text-sm">Manage sales after completed vehicle trips</p>
+      </div>
       {content}
     </div>
   );

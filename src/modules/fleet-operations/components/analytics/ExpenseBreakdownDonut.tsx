@@ -13,21 +13,19 @@ interface ExpenseBreakdownDonutProps {
   height?: number;
 }
 
+const SUPPORTED_CATEGORIES = ['Fuel', 'Maintenance', 'Other'];
+
 const COLOR_BY_NAME: Record<string, string> = {
   Fuel: '#2563eb',
   Maintenance: '#f59e0b',
-  EMI: '#10b981',
-  Toll: '#8b5cf6',
   Other: '#64748b',
 };
 
-const FALLBACK_COLORS = ['#2563eb', '#f59e0b', '#10b981', '#8b5cf6', '#64748b'];
+const FALLBACK_COLORS = ['#2563eb', '#f59e0b', '#64748b'];
 
-const money = (value: number) => `₹${Math.round(value).toLocaleString('en-IN')}`;
-
-const ExpenseBreakdownDonut = ({ data, height = 240 }: ExpenseBreakdownDonutProps) => {
+const ExpenseBreakdownDonut = ({ data, height = 280 }: ExpenseBreakdownDonutProps) => {
   const items = useMemo(
-    () => (Array.isArray(data) ? data.filter((item) => Number(item.value) > 0) : []),
+    () => (Array.isArray(data) ? data.filter((item) => Number(item.value) > 0 && SUPPORTED_CATEGORIES.includes(item.name)) : []),
     [data]
   );
 
@@ -76,7 +74,7 @@ const ExpenseBreakdownDonut = ({ data, height = 240 }: ExpenseBreakdownDonutProp
             </Pie>
             <Tooltip
               formatter={(value, name) => [
-                `${money(Number(value))} · ${
+                `${formatCurrencyCompact(Number(value))} · ${
                   total > 0 ? ((Number(value) / total) * 100).toFixed(1) : '0.0'
                 }%`,
                 name,
@@ -111,7 +109,7 @@ const ExpenseBreakdownDonut = ({ data, height = 240 }: ExpenseBreakdownDonutProp
             <span className="min-w-0 flex-1 truncate font-semibold text-slate-600">{item.name}</span>
             <span className="tabular-nums font-medium text-slate-400">{item.percentage.toFixed(1)}%</span>
             <span className="w-20 text-right tabular-nums font-bold text-slate-700">
-              {money(item.value)}
+              {formatCurrencyCompact(item.value)}
             </span>
           </div>
         ))}

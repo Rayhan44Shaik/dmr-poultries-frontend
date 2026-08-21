@@ -2,15 +2,13 @@
 
 import React from "react";
 import Select from "react-select";
-import { Search, FileText, FileSpreadsheet, RotateCcw, Filter } from "lucide-react";
+import { Search, RotateCcw, Filter } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsPrimaryButtonClass,
   opsSecondaryButtonClass,
-  opsPdfButtonClass,
-  opsExcelButtonClass,
   opsReactSelectStyles,
 } from "../../../../shared/ui/operationsStyles";
 
@@ -29,8 +27,6 @@ interface Props {
   setSearchQuery: (value: string) => void;
   onSearch: () => void;
   onReset: () => void;
-  onExportPDF: () => void;
-  onExportExcel: () => void;
   hasFilters: boolean;
 }
 
@@ -48,8 +44,6 @@ function ShopSalesFilters({
   setSearchQuery,
   onSearch,
   onReset,
-  onExportPDF,
-  onExportExcel,
   hasFilters,
   totalEntries,
 }: Props) {
@@ -72,7 +66,6 @@ function ShopSalesFilters({
   ];
 
   const selectStyles = opsReactSelectStyles();
-  const exportDisabled = !hasFilters || totalEntries === 0;
 
   return (
     <div className={opsFilterCardClass}>
@@ -82,7 +75,17 @@ function ShopSalesFilters({
           <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
             <Filter size={15} />
           </div>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Filter & Export Controls</h3>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Filters</h3>
+        </div>
+        <div className="text-xs text-slate-500 font-medium">
+          {hasFilters ? (
+            <span className="inline-flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full font-semibold border border-emerald-200/60 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+              Filters active
+            </span>
+          ) : (
+            <span>Showing all records</span>
+          )}
         </div>
       </div>
 
@@ -131,7 +134,7 @@ function ShopSalesFilters({
         </div>
       </div>
 
-      {/* Search */}
+      {/* Search with Actions */}
       <div className="pt-2 border-t border-slate-100">
         <label className={opsFilterLabelClass}>Search</label>
         <div className="flex items-stretch gap-2">
@@ -149,49 +152,15 @@ function ShopSalesFilters({
             <Search size={14} />
             Search
           </button>
+          <button type="button" onClick={onReset} className={opsSecondaryButtonClass}>
+            <RotateCcw size={13} />
+            Reset
+          </button>
         </div>
         <p className="mt-1 text-[11px] text-slate-400 font-medium">
           Tip: a full Shop Sales No (TR-20260820-001-S002) returns that sale; a Trip No
           (TR-20260820-001) returns every sale on that trip; a shop name returns its sales.
         </p>
-      </div>
-
-      {/* Action Buttons Toolbar */}
-      <div className="flex flex-wrap items-center justify-between pt-2 border-t border-slate-100 gap-3">
-        <div className="text-xs text-slate-500 font-medium">
-          {hasFilters ? (
-            <span className="inline-flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full font-semibold border border-emerald-200/60 shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
-              Filters active
-            </span>
-          ) : (
-            <span>Showing all records</span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <button type="button" onClick={onSearch} className={opsPrimaryButtonClass}>
-            <Search size={14} />
-            Search
-          </button>
-
-          <button type="button" onClick={onReset} className={opsSecondaryButtonClass}>
-            <RotateCcw size={13} />
-            Reset
-          </button>
-
-          <div className="h-4 w-[1px] bg-slate-200 mx-1 hidden sm:block"></div>
-
-          <button type="button" onClick={onExportPDF} disabled={exportDisabled} className={opsPdfButtonClass}>
-            <FileText size={14} />
-            PDF Export
-          </button>
-
-          <button type="button" onClick={onExportExcel} disabled={exportDisabled} className={opsExcelButtonClass}>
-            <FileSpreadsheet size={14} />
-            Excel Export
-          </button>
-        </div>
       </div>
     </div>
   );

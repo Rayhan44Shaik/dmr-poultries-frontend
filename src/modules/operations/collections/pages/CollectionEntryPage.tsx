@@ -58,29 +58,34 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
           onReferenceChange={vm.changeReference}
           onViewLedger={vm.viewLedger}
           onReset={vm.resetEntry}
+          ledgerLoading={vm.ledgerLoading}
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 items-stretch">
         <div className="lg:col-span-5 min-w-0">
           <OutstandingSummary
-            balance={vm.balance}
-            weeklySales={vm.weeklySales}
-            weeklyCollections={vm.weeklyCollections}
-            weeklyPending={vm.weeklyPending}
+            openingBalance={vm.openingBalance}
+            approvedSales={vm.approvedSales}
+            approvedCollections={vm.approvedCollections}
+            pendingApproval={vm.pendingApproval}
+            currentOutstanding={vm.currentOutstanding}
             showSummary={vm.showSummary}
+            ledgerLoaded={vm.ledgerLoaded}
             shopName={vm.entry.shopName}
-            dateRange={vm.weekRangeFormatted}
+            periodLabel={vm.weekRangeFormatted}
+            periodType="weekly"
           />
         </div>
         <div className="lg:col-span-5 min-w-0">
           <CollectionAmount
             amount={vm.entry.amount}
             remarks={vm.entry.remarks}
-            previousBalance={vm.currentPending}
+            currentOutstanding={vm.currentOutstanding}
             receivedToday={vm.todayCollection}
-            remainingBalance={vm.remainingBalance}
+            projectedBalance={vm.projectedBalance}
             showSummary={vm.showSummary}
+            ledgerLoaded={vm.ledgerLoaded}
             amountError={vm.errors?.amount}
             onAmountChange={vm.changeAmount}
             onRemarksChange={vm.changeRemarks}
@@ -93,16 +98,16 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
       </div>
 
       <RecentCollectionsTable
-          collections={vm.recentCollections}
-          statusFilter={vm.statusFilter}
-          pendingApprovalCount={vm.pendingApprovalCount}
-          onStatusChange={vm.changeStatusFilter}
-          onApprove={vm.approveCollection}
-          onReject={vm.rejectCollection}
-          onEdit={vm.editCollection}
-          onDelete={vm.deleteCollection}
-          onViewShop={handleViewShop}
-        />
+        collections={vm.recentCollections}
+        statusFilter={vm.statusFilter}
+        pendingApprovalCount={vm.pendingApprovalCount}
+        onStatusChange={vm.changeStatusFilter}
+        onApprove={vm.approveCollection}
+        onReject={vm.rejectCollection}
+        onEdit={vm.editCollection}
+        onDelete={vm.deleteCollection}
+        onViewShop={handleViewShop}
+      />
 
       <EditCollectionModal
         isOpen={isEditModalOpen}

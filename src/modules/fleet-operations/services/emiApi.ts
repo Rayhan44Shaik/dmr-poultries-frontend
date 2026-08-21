@@ -4,13 +4,11 @@ import type {
   EmiPayInput,
   EmiStatus,
   EmiUpdateInput,
-  EmiOverview,
   VehicleEmi,
   VehicleEmiInstallment,
 } from '../types';
 import {
   mapEmiListResponse,
-  mapEmiOverviewResponse,
   mapEmiResponse,
   mapEmiScheduleResponse,
 } from './emiMappers';
@@ -26,16 +24,9 @@ export interface EmiListParams {
 
 export const emiApi = {
   /**
-   * EMI Management overview — every ACTIVE vehicle from the Vehicle Master
-   * with its EMI status (purchase amount/date, total EMI, completed/pending,
-   * next EMI date) derived from the master + existing payment schedule.
-   * Read-only; the page never creates or edits a vehicle here.
+   * List EMI records (for future phases with manual EMI management).
+   * Not used in the current read-only EMI schedule phase.
    */
-  async overview(signal?: AbortSignal): Promise<EmiOverview[]> {
-    const response = await apiClient.get<unknown>(`${BASE}/overview`, { signal });
-    return mapEmiOverviewResponse(response.data);
-  },
-
   async list(params: EmiListParams = {}): Promise<VehicleEmi[]> {
     const query: Record<string, string | number> = {};
     if (params.vehicleId != null && params.vehicleId !== '' && params.vehicleId !== 'all') {

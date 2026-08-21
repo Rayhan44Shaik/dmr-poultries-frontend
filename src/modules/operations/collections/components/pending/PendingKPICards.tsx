@@ -20,53 +20,69 @@ export function PendingKPICards({
   weeklyCollections,
   weeklyRecovery,
 }: PendingKPICardsProps) {
+  const cards = [
+    {
+      label: "Total Outstanding",
+      value: formatCurrency(totalPending),
+      icon: IndianRupee,
+      iconBg: "bg-red-100",
+      iconColor: "text-red-600",
+      valueColor: "text-red-700",
+      labelColor: "text-red-600",
+      borderColor: "border-red-200",
+      bgColor: "bg-red-50",
+    },
+    {
+      label: "This Week Sales",
+      value: formatCurrency(weeklySales),
+      icon: ShoppingBag,
+      iconBg: "bg-blue-100",
+      iconColor: "text-blue-600",
+      valueColor: "text-blue-700",
+      labelColor: "text-blue-600",
+      borderColor: "border-blue-200",
+      bgColor: "bg-blue-50",
+    },
+    {
+      label: "This Week Collections",
+      value: formatCurrency(weeklyCollections),
+      icon: CreditCard,
+      iconBg: "bg-green-100",
+      iconColor: "text-green-600",
+      valueColor: "text-green-700",
+      labelColor: "text-green-600",
+      borderColor: "border-green-200",
+      bgColor: "bg-green-50",
+    },
+    {
+      label: "Recovery %",
+      value: `${weeklyRecovery.toFixed(2)}%`,
+      icon: TrendingUp,
+      iconBg: "bg-purple-100",
+      iconColor: "text-purple-600",
+      valueColor: "text-purple-700",
+      labelColor: "text-purple-600",
+      borderColor: "border-purple-200",
+      bgColor: "bg-purple-50",
+    },
+  ];
+
   return (
-    <div className="flex flex-wrap gap-4">
-      {/* Total Outstanding — sum of authoritative Shop Master balances */}
-      <div className="flex min-w-[160px] items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
-        <div className="rounded-full bg-red-100 p-2 text-red-600">
-          <IndianRupee size={18} />
-        </div>
-        <div>
-          <div className="text-xs font-medium text-red-600">Total Outstanding</div>
-          <div className="text-lg font-bold text-red-700">{formatCurrency(totalPending)}</div>
-        </div>
-      </div>
-
-      {/* Weekly Sales */}
-      <div className="flex min-w-[160px] items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 shadow-sm">
-        <div className="rounded-full bg-blue-100 p-2 text-blue-600">
-          <ShoppingBag size={18} />
-        </div>
-        <div>
-          <div className="text-xs font-medium text-blue-600">This Week Sales</div>
-          <div className="text-lg font-bold text-blue-700">{formatCurrency(weeklySales)}</div>
-        </div>
-      </div>
-
-      {/* Weekly Collections */}
-      <div className="flex min-w-[160px] items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 shadow-sm">
-        <div className="rounded-full bg-green-100 p-2 text-green-600">
-          <CreditCard size={18} />
-        </div>
-        <div>
-          <div className="text-xs font-medium text-green-600">This Week Collections</div>
-          <div className="text-lg font-bold text-green-700">{formatCurrency(weeklyCollections)}</div>
-        </div>
-      </div>
-
-      {/* Recovery % */}
-      <div className="flex min-w-[160px] items-center gap-3 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 shadow-sm">
-        <div className="rounded-full bg-purple-100 p-2 text-purple-600">
-          <TrendingUp size={18} />
-        </div>
-        <div>
-          <div className="text-xs font-medium text-purple-600">Recovery %</div>
-          <div className="text-lg font-bold text-purple-700">
-            {weeklyRecovery.toFixed(2)}%
+    <div className="grid grid-cols-2 gap-3">
+      {cards.map((card, idx) => (
+        <div
+          key={idx}
+          className={`flex items-center gap-2.5 rounded-lg border ${card.borderColor} ${card.bgColor} px-3 py-2.5 shadow-sm hover:shadow-md transition-shadow min-w-0`}
+        >
+          <div className={`rounded-full p-1.5 ${card.iconBg} shrink-0`}>
+            <card.icon size={16} className={card.iconColor} />
+          </div>
+          <div className="min-w-0">
+            <div className={`text-[11px] font-medium ${card.labelColor} truncate`}>{card.label}</div>
+            <div className={`text-sm font-bold ${card.valueColor} truncate`}>{card.value}</div>
           </div>
         </div>
-      </div>
+      ))}
     </div>
   );
 }

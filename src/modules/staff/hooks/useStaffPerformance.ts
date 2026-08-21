@@ -213,5 +213,6 @@ export function useStaffPerformance(kind: StaffPerformanceKind) {
     error,
     refresh,
     lastRefreshed,
+    refreshNonce,
   };
 }

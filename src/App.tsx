@@ -3,6 +3,7 @@ import { ThemeProvider } from './providers/ThemeProvider';
 import { AuthProvider } from './providers/AuthProvider';
 import { SettingsProvider } from './providers/SettingsProvider';
 import { NotificationProvider } from './providers/NotificationProvider';
+import { ToastProvider } from './components/common/ToastProvider';
 import AppRoutes from './routes/AppRoutes';
 
 function App() {
@@ -12,7 +13,9 @@ function App() {
         <AuthProvider>
           <SettingsProvider>
             <NotificationProvider>
-              <AppRoutes />
+              <ToastProvider>
+                <AppRoutes />
+              </ToastProvider>
             </NotificationProvider>
           </SettingsProvider>
         </AuthProvider>

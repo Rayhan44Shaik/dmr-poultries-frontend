@@ -4,14 +4,11 @@ import type { RecentCollection } from "../../types/collection";
 
 interface Props {
   collections: RecentCollection[];
-  statusFilter: string;
+  statusFilter: "Pending" | "Approved" | "Deleted";
   pendingApprovalCount: number;
-  currentPage: number;
-  totalPages: number;
-  pageSize?: number;
-  onStatusChange: (status: "Pending" | "Approved" | "All") => void;
-  onPageChange: (page: number) => void;
+  onStatusChange: (status: "Pending" | "Approved" | "Deleted") => void;
   onApprove: (id: string) => void;
+  onReject: (id: string) => void;
   onEdit: (collection: RecentCollection) => void;
   onDelete: (id: string) => void;
   onViewShop: (shopName: string) => void;
@@ -23,93 +20,159 @@ const inr = (n: number) =>
     maximumFractionDigits: 2,
   });
 
+function getStatusBadgeClass(status: string): string {
+  switch (status) {
+    case "Approved":
+      return "bg-green-100 text-green-700 border-green-200";
+    case "Pending Approval":
+      return "bg-orange-100 text-orange-700 border-orange-200";
+    case "Rejected":
+      return "bg-red-100 text-red-700 border-red-200";
+    case "Deleted":
+      return "bg-red-100 text-red-700 border-red-200";
+    default:
+      return "bg-slate-100 text-slate-700 border-slate-200";
+  }
+}
+
+function getRowStyle(rawStatus: string): string {
+  switch (rawStatus) {
+    case "Pending Approval":
+      return "bg-orange-50/50";
+    case "Approved":
+      return "bg-green-50/50";
+    case "Deleted":
+      return "bg-red-50/50 opacity-60";
+    default:
+      return "";
+  }
+}
+
 export default function RecentCollectionsTable({
   collections,
   statusFilter,
   pendingApprovalCount,
-  currentPage,
-  totalPages,
   onStatusChange,
-  onPageChange,
   onApprove,
+  onReject,
   onEdit,
   onDelete,
   onViewShop,
 }: Props) {
-  // Local search state
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Filter collections by search query (shop name or collection no)
+  // Filter collections by search query (collection no, shop name, collector name)
   const filteredBySearch = useMemo(() => {
     if (!searchQuery.trim()) return collections;
     const q = searchQuery.toLowerCase().trim();
     return collections.filter(
       (col) =>
+        col.collectionNo.toLowerCase().includes(q) ||
         col.shopName.toLowerCase().includes(q) ||
-        col.collectionNo.toLowerCase().includes(q)
+        col.collectorName.toLowerCase().includes(q)
     );
   }, [collections, searchQuery]);
 
   // Compute displayed data based on status filter
   const displayedData = useMemo(() => {
+    let filtered: RecentCollection[] = [];
+
     if (statusFilter === "Pending") {
-      return filteredBySearch;
+      // Pending tab: show all pending approval collections
+      filtered = filteredBySearch.filter((col) => col.rawStatus === "Pending Approval");
+    } else if (statusFilter === "Approved") {
+      // Approved tab: show ONLY the latest approved collection per shop
+      const approvedCollections = filteredBySearch.filter((col) => col.rawStatus === "Approved");
+      const shopMap = new Map<string, RecentCollection>();
+
+      approvedCollections.forEach((col) => {
+        const existing = shopMap.get(col.shopName);
+        if (!existing) {
+          shopMap.set(col.shopName, col);
+        } else {
+          // Compare by approvedDate first, then by collectionDate, then by numericId as tiebreaker
+          const existingDate = existing.approvedDate || existing.collectionDate;
+          const currentDate = col.approvedDate || col.collectionDate;
+
+          if (currentDate > existingDate) {
+            shopMap.set(col.shopName, col);
+          } else if (currentDate === existingDate) {
+            // Tiebreaker: use numericId (higher = newer)
+            const existingId = existing.numericId ?? 0;
+            const currentId = col.numericId ?? 0;
+            if (currentId > existingId) {
+              shopMap.set(col.shopName, col);
+            }
+          }
+        }
+      });
+
+      filtered = Array.from(shopMap.values());
+    } else if (statusFilter === "Deleted") {
+      // Deleted tab: show all deleted collections
+      filtered = filteredBySearch.filter((col) => col.rawStatus === "Deleted");
     }
 
-    // For "Approved" or "All": group by shop, take the latest collection
-    const shopMap = new Map<string, RecentCollection>();
-    filteredBySearch.forEach((col) => {
-      if (statusFilter === "Approved" && col.status !== "Approved") return;
-      const existing = shopMap.get(col.shopName);
-      if (!existing || col.collectionDate > existing.collectionDate) {
-        shopMap.set(col.shopName, col);
-      }
-    });
-    return Array.from(shopMap.values());
+    // Sort by collection date descending (newest first)
+    return filtered.sort((a, b) => b.collectionDate.localeCompare(a.collectionDate));
   }, [filteredBySearch, statusFilter]);
-
-  const isGrouped = statusFilter !== "Pending";
 
   const clearSearch = () => setSearchQuery("");
 
-  return (
-    <div className="mt-2">
-      {/* Header with tabs and search */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3">
-          <h3 className="text-lg font-bold text-slate-800">Recent Collections</h3>
-          <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">
-            Pending: {pendingApprovalCount}
-          </span>
-        </div>
+  const getEmptyStateMessage = (): string => {
+    switch (statusFilter) {
+      case "Pending":
+        return "No pending collections found.";
+      case "Approved":
+        return "No approved collections found.";
+      case "Deleted":
+        return "No deleted collections found.";
+      default:
+        return "No collections found.";
+    }
+  };
 
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Status Tabs */}
-          <div className="flex rounded-lg border border-slate-200 overflow-hidden bg-white">
-            {(["Pending", "Approved", "All"] as const).map((status) => (
-              <button
-                key={status}
-                onClick={() => onStatusChange(status)}
-                className={`px-4 py-1.5 text-xs font-medium transition-colors ${
-                  statusFilter === status
-                    ? "bg-green-600 text-white"
-                    : "text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                {status}
-              </button>
-            ))}
+  // Status tab classes - soft/light backgrounds with proper spacing
+  const getTabClass = (status: "Pending" | "Approved" | "Deleted", isActive: boolean): string => {
+    const base = "px-4 py-1.5 text-xs font-medium transition-colors whitespace-nowrap rounded-lg border";
+    if (isActive) {
+      switch (status) {
+        case "Pending":
+          return `${base} bg-orange-100 text-orange-700 border-orange-200 shadow-sm`;
+        case "Approved":
+          return `${base} bg-green-100 text-green-700 border-green-200 shadow-sm`;
+        case "Deleted":
+          return `${base} bg-red-100 text-red-700 border-red-200 shadow-sm`;
+      }
+    }
+    return `${base} bg-white text-slate-600 hover:bg-slate-50 border-slate-200`;
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+      {/* Table Header - Title + Search + Status Tabs on top row, week range below title */}
+      <div className="px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80">
+        {/* Top row: Title area | Search | Status Tabs */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          {/* Left: Title + Pending Count */}
+          <div className="flex flex-col gap-1 flex-shrink-0 min-w-[220px]">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-800 tracking-tight">Recent Collections</h3>
+              <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-semibold text-blue-700">
+                Pending: {pendingApprovalCount}
+              </span>
+            </div>
           </div>
 
-          {/* Search Input */}
-          <div className="relative">
+          {/* Middle: Search - expands to fill available space */}
+          <div className="relative flex-1 min-w-[200px] max-w-md">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search shop or collection..."
-              className="h-8 w-48 rounded-lg border border-slate-300 pl-8 pr-8 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200"
+              placeholder="Search collection no, shop, collector..."
+              className="h-8 w-full rounded-lg border border-slate-300 pl-8 pr-8 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
             />
             {searchQuery && (
               <button
@@ -120,128 +183,136 @@ export default function RecentCollectionsTable({
               </button>
             )}
           </div>
+
+          {/* Right: Status Tabs - soft/light backgrounds with gap between */}
+          <div className="flex gap-2 flex-shrink-0">
+            {(["Pending", "Approved", "Deleted"] as const).map((status) => (
+              <button
+                key={status}
+                onClick={() => onStatusChange(status)}
+                className={getTabClass(status, statusFilter === status)}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Table with full border */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr className="text-slate-600">
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                {isGrouped ? "Shop" : "Collection No"}
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-xs md:text-sm">
+          <thead className="bg-slate-50/80 border-b border-slate-200/70">
+            <tr className="text-slate-700 whitespace-nowrap">
+              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <div className="flex items-center justify-center gap-1.5">
+                  S.No
+                </div>
               </th>
-              {!isGrouped && (
-                <>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                    Shop
-                  </th>
-                </>
-              )}
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                {isGrouped ? "Last Collection" : "Collector"}
+              <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                Collection No
               </th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">
+              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                Date
+              </th>
+              <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                Shop
+              </th>
+              <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                Collector
+              </th>
+              <th className="px-3.5 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-700">
                 Amount
               </th>
-              {!isGrouped && (
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
-                  Status
-                </th>
-              )}
-              <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                Status
+              </th>
+              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-100">
             {displayedData.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-10 text-center text-sm text-slate-400">
+                <td colSpan={8} className="py-12 text-center text-sm text-slate-400">
                   <div className="flex flex-col items-center gap-2">
                     <span className="text-2xl">📋</span>
-                    <span>No collections found.</span>
+                    <span>{getEmptyStateMessage()}</span>
                   </div>
                 </td>
               </tr>
             ) : (
               displayedData.map((col, index) => {
-                const isPending = col.status === "Pending";
+                const isPending = col.rawStatus === "Pending Approval";
+                const isDeleted = col.rawStatus === "Deleted";
+                const rowStyle = getRowStyle(col.rawStatus || col.status);
+
                 return (
                   <tr
-                    key={isGrouped ? col.shopName : col.id}
-                    className={`border-t border-slate-100 hover:bg-blue-50/50 transition-colors ${
+                    key={`${col.id}-${index}`}
+                    className={`transition-colors hover:bg-slate-50/80 ${
                       index % 2 === 0 ? "bg-white" : "bg-slate-50/30"
-                    }`}
+                    } ${rowStyle}`}
                   >
-                    {isGrouped ? (
-                      <td className="px-4 py-3 text-xs font-medium text-slate-700">
-                        {col.shopName}
-                      </td>
-                    ) : (
-                      <td className="px-4 py-3 text-xs font-medium text-slate-700">
-                        {col.collectionNo}
-                      </td>
-                    )}
-                    {!isGrouped && (
-                      <>
-                        <td className="px-4 py-3 text-xs text-slate-600">
-                          {col.collectionDate}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-700">
-                          {col.shopName}
-                        </td>
-                      </>
-                    )}
-                    <td className="px-4 py-3 text-xs text-slate-600">
-                      {isGrouped ? col.collectionDate : col.collectorName}
+                    <td className="px-3.5 py-3 text-center text-xs font-semibold text-slate-500">
+                      {index + 1}
                     </td>
-                    <td className="px-4 py-3 text-right text-xs font-semibold text-slate-800">
+                    <td className="px-3.5 py-3 font-semibold text-slate-800 text-xs whitespace-nowrap">
+                      {col.collectionNo}
+                    </td>
+                    <td className="px-3.5 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wide">
+                      {col.collectionDate}
+                    </td>
+                    <td className="px-3.5 py-3 text-xs font-semibold text-slate-700">
+                      {col.shopName}
+                    </td>
+                    <td className="px-3.5 py-3 text-xs font-medium text-slate-700">
+                      {col.collectorName}
+                    </td>
+                    <td className="px-3.5 py-3 text-right text-xs font-bold text-slate-700">
                       {inr(col.amount)}
                     </td>
-                    {!isGrouped && (
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                            col.status === "Approved"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-yellow-100 text-yellow-700"
-                          }`}
-                        >
-                          {col.status}
-                        </span>
-                      </td>
-                    )}
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-3.5 py-3 text-center">
+                      <span
+                        className={`inline-block rounded-full px-3 py-1 text-[10px] font-medium border ${getStatusBadgeClass(col.rawStatus || col.status)}`}
+                      >
+                        {col.rawStatus || col.status}
+                      </span>
+                    </td>
+                    <td className="px-3.5 py-3 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         {isPending ? (
                           <>
                             <button
                               onClick={() => onApprove(col.id)}
-                              className="rounded-lg bg-green-100 px-3 py-1 text-xs font-medium text-green-700 transition hover:bg-green-200"
+                              className="rounded-lg bg-green-100 px-3 py-1 text-[10px] font-medium text-green-700 transition hover:bg-green-200"
+                              title="Approve"
                             >
                               Approve
                             </button>
                             <button
                               onClick={() => onEdit(col)}
-                              className="rounded-lg bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-200"
+                              className="rounded-lg bg-blue-100 px-3 py-1 text-[10px] font-medium text-blue-700 transition hover:bg-blue-200"
+                              title="Edit"
                             >
                               Edit
                             </button>
                             <button
                               onClick={() => onDelete(col.id)}
-                              className="rounded-lg bg-red-100 px-3 py-1 text-xs font-medium text-red-700 transition hover:bg-red-200"
+                              className="rounded-lg bg-red-100 px-3 py-1 text-[10px] font-medium text-red-700 transition hover:bg-red-200"
+                              title="Delete"
                             >
                               Delete
                             </button>
                           </>
+                        ) : isDeleted ? (
+                          <span className="text-xs text-slate-400 font-medium">Deleted</span>
                         ) : (
                           <button
                             onClick={() => onViewShop(col.shopName)}
-                            className="rounded-lg bg-blue-100 px-4 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-200"
+                            className="rounded-lg bg-blue-100 px-4 py-1 text-[10px] font-medium text-blue-700 transition hover:bg-blue-200"
+                            title="View"
                           >
                             View
                           </button>
@@ -255,31 +326,6 @@ export default function RecentCollectionsTable({
           </tbody>
         </table>
       </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-2">
-          <div className="text-xs text-slate-500">
-            Page {currentPage} of {totalPages}
-          </div>
-          <div className="flex gap-2">
-            <button
-              disabled={currentPage === 1}
-              onClick={() => onPageChange(currentPage - 1)}
-              className="rounded-lg border border-slate-300 px-4 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            <button
-              disabled={currentPage === totalPages}
-              onClick={() => onPageChange(currentPage + 1)}
-              className="rounded-lg border border-slate-300 px-4 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

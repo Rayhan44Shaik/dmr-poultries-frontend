@@ -284,10 +284,19 @@ function getNextCollectionNumber(): string {
 function getPendingCollections(): PendingCollection[] {
   return pendingCache;
 }
-function getRecentCollections(status: CollectionLegacyStatus | "All" = "Pending"): RecentCollection[] {
-  const rows = status === "All"
-    ? collectionsCache
-    : collectionsCache.filter((c) => c.status === status);
+function getRecentCollections(status: "Pending" | "Approved" | "Deleted" = "Pending"): RecentCollection[] {
+  let rows: Collection[];
+
+  if (status === "Deleted") {
+    // For deleted collections, read directly from entriesCache (including deleted ones)
+    const deletedEntries = entriesCache.filter((e) => e.deleted);
+    rows = deletedEntries.map(mapEntryToCollection);
+  } else if (status === "Approved") {
+    rows = collectionsCache.filter((c) => c.status === "Approved");
+  } else {
+    rows = collectionsCache.filter((c) => c.status === "Pending");
+  }
+
   const byId = new Map(entriesCache.map((e) => [String(e.id), e]));
   return rows
     .slice()
@@ -309,6 +318,8 @@ function getRecentCollections(status: CollectionLegacyStatus | "All" = "Pending"
       rawStatus: byId.get(row.id)?.status,
       approvedBy: row.approvedBy,
       approvedDate: row.approvedDate,
+      numericId: row.numericId,
+      numericShopId: row.numericShopId,
     }));
 }
 function getPendingApprovalCount(): number {

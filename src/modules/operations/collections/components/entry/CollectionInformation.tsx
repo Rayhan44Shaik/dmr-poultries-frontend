@@ -1,8 +1,8 @@
 import React from "react";
-import { RotateCcw, BookOpen, Wallet } from "lucide-react";
+import { RotateCcw, BookOpen, Wallet, Loader2 } from "lucide-react";
 import Select from "react-select";
 import type { CollectionEntry, CollectionErrors, PaymentMode } from "../../types/collection";
-import { DatePicker } from "../../../../../components/common/DatePicker"; // adjust path as needed
+import { DatePicker } from "../../../../../components/common/DatePicker";
 import { opsReactSelectStyles } from "../../../../../shared/ui/operationsStyles";
 
 interface Props {
@@ -18,6 +18,7 @@ interface Props {
   onReferenceChange: (value: string) => void;
   onViewLedger: () => void;
   onReset: () => void;
+  ledgerLoading?: boolean;
 }
 
 const startsWithFilter = (option: any, inputValue: string) => {
@@ -38,6 +39,7 @@ function CollectionInformation({
   onReferenceChange,
   onViewLedger,
   onReset,
+  ledgerLoading = false,
 }: Props) {
   const shopOptions = shops.map((shop) => ({ value: shop, label: shop }));
 
@@ -172,20 +174,29 @@ function CollectionInformation({
             )}
           </div>
 
-<div className="flex items-end justify-end gap-3 sm:col-span-1">
+          <div className="flex items-end justify-end gap-3 sm:col-span-1">
             <button
               type="button"
               onClick={onViewLedger}
-              disabled={!isLedgerEnabled}
-              title={!isLedgerEnabled ? "Please select Shop, Collector, and Payment Mode" : ""}
+              disabled={!isLedgerEnabled || ledgerLoading}
+              title={!isLedgerEnabled ? "Please select Shop, Collector, and Payment Mode" : ledgerLoading ? "Loading ledger..." : ""}
               className={`inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-semibold text-white shadow-sm transition ${
-                isLedgerEnabled
+                isLedgerEnabled && !ledgerLoading
                   ? "bg-emerald-600 hover:bg-emerald-700"
                   : "cursor-not-allowed bg-slate-400"
               }`}
             >
-              <BookOpen size={16} />
-              View Shop Ledger
+              {ledgerLoading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <BookOpen size={16} />
+                  View Shop Ledger
+                </>
+              )}
             </button>
             <button
               type="button"

@@ -26,11 +26,12 @@ export type Vehicle = {
 
   fitnessExpiry: string;
 
-   purchaseDate?: string;      // date string (e.g., "2025-01-01")
-  purchaseAmount?: number;        // amount in rupees
-  emiStartDate?: string;  
+  purchaseDate?: string;
+  purchaseAmount?: number;
+  emiStartDate?: string;
+  emiDay?: number;
+  totalEMIs?: number;
   rcDate?: string;
-  
 
   /** Master-record status — the persisted backend contract is Active/Inactive only. */
   status: "Active" | "Inactive";

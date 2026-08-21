@@ -1,13 +1,14 @@
-import { Calculator } from "lucide-react";
+import { Calculator, AlertTriangle, CheckCircle, Clock, ArrowRight } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
-interface Props {
+interface CollectionAmountProps {
   amount: number;
   remarks: string;
-  previousBalance: number;
+  currentOutstanding: number;
   receivedToday: number;
-  remainingBalance: number; // can be negative
+  projectedBalance: number;
   showSummary: boolean;
+  ledgerLoaded: boolean;
   amountError?: string;
   onAmountChange: (value: number) => void;
   onRemarksChange: (value: string) => void;
@@ -42,10 +43,11 @@ const formatWithCommas = (num: number): string => {
 export default function CollectionAmount({
   amount,
   remarks,
-  previousBalance,
+  currentOutstanding,
   receivedToday,
-  remainingBalance,
+  projectedBalance,
   showSummary,
+  ledgerLoaded,
   amountError,
   onAmountChange,
   onRemarksChange,
@@ -53,7 +55,7 @@ export default function CollectionAmount({
   onCancel,
   isSaving,
   disableSave,
-}: Props) {
+}: CollectionAmountProps) {
   // Local input state – stores the raw number string (without commas) while editing
   const [inputValue, setInputValue] = useState<string>(
     amount ? amount.toFixed(2) : ""
@@ -95,55 +97,55 @@ export default function CollectionAmount({
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Allow only digits, decimal point, and minus sign (for negative)
-    let val = e.target.value.replace(/[^0-9.-]/g, "");
+    // Allow only digits and decimal point
+    let val = e.target.value.replace(/[^0-9.]/g, "");
     // Allow only one decimal point
     const parts = val.split(".");
     if (parts.length > 2) {
       val = parts[0] + "." + parts.slice(1).join("");
     }
-    // Allow only one minus sign at the start
-    if (val.startsWith("-")) {
-      val = "-" + val.slice(1).replace(/-/g, "");
-    } else {
-      val = val.replace(/-/g, "");
-    }
     setInputValue(val);
   };
 
-  // Determine status and display
-  const displayPrevious = showSummary ? previousBalance : 0;
-  const displayReceived = showSummary ? receivedToday : 0;
-  const displayRemaining = showSummary ? remainingBalance : 0;
+  // Determine display values - show zeros when ledger not loaded
+  const displayOutstanding = (showSummary && ledgerLoaded) ? currentOutstanding : 0;
+  const displayReceived = (showSummary && ledgerLoaded) ? receivedToday : 0;
+  const displayProjected = (showSummary && ledgerLoaded) ? projectedBalance : 0;
 
   let statusText = "";
   let statusClass = "";
-  if (!showSummary) {
-    statusText = "N/A";
-    statusClass = "bg-gray-200 text-gray-700";
-  } else if (displayRemaining < 0) {
-    statusText = "Overpaid";
-    statusClass = "bg-blue-200 text-blue-800";
-  } else if (displayRemaining === 0) {
-    statusText = "Completed";
-    statusClass = "bg-green-200 text-green-800";
+  let statusIcon = null;
+  
+  if (!showSummary || !ledgerLoaded) {
+    statusText = "Select Shop & View Ledger";
+    statusClass = "bg-slate-100 text-slate-600";
+    statusIcon = <Clock size={10} />;
+  } else if (displayProjected < 0) {
+    statusText = "Overpaid — Exceeds Outstanding";
+    statusClass = "bg-blue-100 text-blue-800 border-blue-200";
+    statusIcon = <AlertTriangle size={10} />;
+  } else if (displayProjected === 0) {
+    statusText = "Fully Collected — Balance Zero";
+    statusClass = "bg-green-100 text-green-800 border-green-200";
+    statusIcon = <CheckCircle size={10} />;
   } else {
-    statusText = "Pending";
-    statusClass = "bg-yellow-200 text-yellow-800";
+    statusText = "Pending Approval — Not Yet Deducted";
+    statusClass = "bg-amber-100 text-amber-800 border-amber-200";
+    statusIcon = <Clock size={10} />;
   }
 
-  const formattedRemaining = displayRemaining < 0
-    ? `- ${inr(Math.abs(displayRemaining))}`
-    : inr(displayRemaining);
+  const formattedProjected = displayProjected < 0
+    ? `- ${inr(Math.abs(displayProjected))}`
+    : inr(displayProjected);
 
   return (
     <div className="flex h-full w-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       {/* Header */}
       <div className="mb-4 flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100 text-green-700">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
           <Calculator size={16} />
         </div>
-        <h2 className="text-lg font-semibold text-green-800">Collection Amount</h2>
+        <h2 className="text-lg font-semibold text-emerald-800">Collection Amount</h2>
       </div>
 
       {/* Amount Input */}
@@ -162,7 +164,7 @@ export default function CollectionAmount({
             onChange={handleChange}
             onFocus={handleFocus}
             onBlur={handleBlur}
-            className={`h-10 w-full rounded-md border ${amountError ? "border-red-500" : "border-slate-300"} pl-8 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+            className={`h-10 w-full rounded-md border ${amountError ? "border-red-500" : "border-slate-300"} pl-8 pr-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
             placeholder="0.00"
           />
         </div>
@@ -181,34 +183,80 @@ export default function CollectionAmount({
           value={remarks}
           onChange={(e) => onRemarksChange(e.target.value)}
           placeholder="Enter remarks..."
-          className="h-10 flex-1 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+          className="h-10 flex-1 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
         />
       </div>
 
-      {/* After Collection Summary */}
-      <div className="mt-5 flex-1 rounded-xl border border-green-200 bg-green-50 p-4">
-        <h3 className="mb-3 text-base font-bold text-green-800">After Collection</h3>
+      {/* Collection Preview Calculation */}
+      <div className="mt-5 flex-1 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+        <h3 className="mb-3 text-base font-bold text-emerald-800 flex items-center gap-2">
+          <Calculator size={16} />
+          Collection Preview
+        </h3>
+        
+        {/* BEFORE COLLECTION */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-slate-600">Opening Balance</span>
-            <span className="text-base font-bold text-slate-800">{inr(displayPrevious)}</span>
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-slate-600">BEFORE COLLECTION</span>
+            <span className="font-bold text-emerald-700">Current Outstanding</span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-slate-600">Received Today</span>
-            <span className="text-base font-bold text-green-700">{inr(displayReceived)}</span>
+          <div className="flex items-center justify-between text-base font-bold text-slate-800 bg-white rounded-lg px-3 py-2 border border-slate-200">
+            <span>Current Outstanding</span>
+            <span>{inr(displayOutstanding)}</span>
           </div>
-          <div className="flex items-center justify-between border-t border-dashed border-slate-200 pt-2">
-            <span className="text-sm font-semibold text-slate-700">Remaining Balance</span>
-            <span className={`text-base font-extrabold ${
-              displayRemaining < 0 ? "text-blue-600" : displayRemaining === 0 ? "text-green-700" : "text-red-600"
-            }`}>
-              {formattedRemaining}
+
+          <div className="my-2 border-t border-dashed border-slate-200" />
+
+          {/* COLLECTION */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-slate-600">COLLECTION ENTRY</span>
+            <span className="font-bold text-emerald-700">Pending Approval</span>
+          </div>
+          <div className="flex items-center justify-between text-base font-bold text-emerald-700 bg-white rounded-lg px-3 py-2 border border-emerald-200">
+            <span className="flex items-center gap-1.5">
+              <ArrowRight size={14} className="text-emerald-600" />
+              Received Today
+            </span>
+            <span>{inr(displayReceived)}</span>
+          </div>
+
+          <div className="my-2 border-t border-dashed border-slate-200" />
+
+          {/* AFTER APPROVAL */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-slate-600">AFTER APPROVAL</span>
+            <span className="font-bold text-slate-700">Projected Balance</span>
+          </div>
+          <div className="flex items-center justify-between text-base font-extrabold bg-white rounded-lg px-3 py-2 border border-slate-200">
+            <span>Projected Balance After Approval</span>
+            <span className={displayProjected < 0 ? "text-blue-600" : displayProjected === 0 ? "text-emerald-700" : "text-rose-600"}>
+              {formattedProjected}
             </span>
           </div>
-          <div className="pt-1">
-            <span className={`inline-block rounded-full px-3 py-0.5 text-xs font-medium ${statusClass}`}>
+
+          {/* Status Badge */}
+          <div className="pt-2">
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium border ${statusClass}`}>
+              {statusIcon}
               {statusText}
             </span>
+            {!showSummary || !ledgerLoaded ? (
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                Click "View Shop Ledger" to load current outstanding
+              </p>
+            ) : displayProjected < 0 ? (
+              <p className="mt-1.5 text-[11px] text-blue-600">
+                Collection exceeds current outstanding. Verify amount before saving.
+              </p>
+            ) : displayProjected === 0 ? (
+              <p className="mt-1.5 text-[11px] text-emerald-600">
+                This collection will fully settle the outstanding balance.
+              </p>
+            ) : (
+              <p className="mt-1.5 text-[11px] text-amber-600">
+                This collection will reduce outstanding ONLY after approval.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -229,7 +277,7 @@ export default function CollectionAmount({
           className={`rounded-md px-5 py-2 text-sm font-medium text-white transition ${
             disableSave || isSaving
               ? "cursor-not-allowed bg-slate-400"
-              : "bg-green-700 hover:bg-green-800"
+              : "bg-emerald-700 hover:bg-emerald-800"
           }`}
         >
           {isSaving ? "Saving..." : "Save Collection"}

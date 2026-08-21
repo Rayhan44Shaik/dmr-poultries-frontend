@@ -2,6 +2,7 @@ import { memo, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import type { AnalyticsVehicleStat } from '../../types/analytics';
 import Pagination from '../common/Pagination';
+import { formatCurrencyCompact, formatNumberCompact } from '../../utils/formatters';
 
 type SortKey =
   | 'vehicleNumber'
@@ -29,9 +30,6 @@ const COLUMNS: { key: SortKey; label: string; align: 'left' | 'right' }[] = [
   { key: 'totalExpense', label: 'Total Cost', align: 'right' },
   { key: 'costPerKm', label: 'Cost/KM', align: 'right' },
 ];
-
-const num = (value: number) => value.toLocaleString('en-IN');
-const money = (value: number) => `₹${Math.round(value).toLocaleString('en-IN')}`;
 
 const SORT_GETTER: Record<SortKey, (row: AnalyticsVehicleStat) => number | string> = {
   vehicleNumber: (row) => row.vehicleNumber,
@@ -144,25 +142,25 @@ const VehiclePerformanceTable = ({ stats, statusById }: VehiclePerformanceTableP
                     </div>
                   </td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-semibold tabular-nums text-slate-600">
-                    {num(row.trips)}
+                    {formatNumberCompact(row.trips)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs tabular-nums text-slate-600">
-                    {num(row.distance)}
+                    {formatNumberCompact(row.distance)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs tabular-nums text-slate-600">
-                    {num(row.fuelLitres)}
+                    {formatNumberCompact(row.fuelLitres)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-semibold tabular-nums text-slate-700">
                     {row.mileage > 0 ? row.mileage.toFixed(2) : '—'}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs tabular-nums text-slate-600">
-                    {row.fuelCost > 0 ? money(row.fuelCost) : '—'}
+                    {row.fuelCost > 0 ? formatCurrencyCompact(row.fuelCost) : '—'}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs tabular-nums text-slate-600">
-                    {row.maintenanceCost > 0 ? money(row.maintenanceCost) : '—'}
+                    {row.maintenanceCost > 0 ? formatCurrencyCompact(row.maintenanceCost) : '—'}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-bold tabular-nums text-slate-800">
-                    {money(row.totalExpense)}
+                    {formatCurrencyCompact(row.totalExpense)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs font-semibold tabular-nums text-slate-700">
                     {costPerKm > 0 ? `₹${costPerKm.toFixed(2)}` : '—'}

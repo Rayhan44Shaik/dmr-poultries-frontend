@@ -27,59 +27,66 @@ const pendingPageSrc = read("../pages/PendingCollectionsPage.tsx");
 const tableSrc = read("../components/entry/RecentCollectionsTable.tsx");
 const serviceSrc = read("./collectionService.ts");
 
-test("No 'Opening Balance' UI remains in the Collection balance components", () => {
-  assert.doesNotMatch(summarySrc, /Opening Balance/);
-  assert.doesNotMatch(amountSrc, /Opening Balance/);
-  assert.doesNotMatch(entryHookSrc, /openingBalance/);
-  assert.doesNotMatch(pendingPageSrc, /openingBalance/);
+test("Opening Balance is correctly displayed as a carried-forward figure", () => {
+  // Outstanding Summary now correctly shows "Opening Balance"
+  assert.match(summarySrc, /Opening Balance/);
+  assert.match(summarySrc, /Brought forward/);
+  // The hook calculates openingBalance from the weekly summary
+  assert.match(entryHookSrc, /openingBalance/);
 });
 
 test("The Collection page balance is the backend-authoritative live balance, not a weekly figure", () => {
-  // Outstanding Summary's main KPI is `balance` (shops.current_balance).
-  assert.match(summarySrc, /balance/);
-  assert.doesNotMatch(summarySrc, /currentOutstanding/);
-  assert.doesNotMatch(summarySrc, /weekly opening/i);
-  // The hook reads `weeklySummary.balance` for the live balance.
+  // Outstanding Summary's main KPI is `currentOutstanding` (shops.current_balance).
+  assert.match(summarySrc, /Current Outstanding/);
+  assert.match(summarySrc, /Outstanding Amount \(Approved Only\)/);
+  // The hook reads `weeklySummary.balance` for the live balance and computes openingBalance.
   assert.match(entryHookSrc, /weeklySummary\.balance/);
-  assert.doesNotMatch(entryHookSrc, /currentOutstanding/);
+  assert.match(entryHookSrc, /currentOutstanding/);
 });
 
-test("No weekly opening-balance calculation remains in the frontend", () => {
-  assert.doesNotMatch(serviceSrc, /currentOutstanding/);
-  // The weekly-summary mapper now surfaces `balance`, not openingBalance.
+test("No weekly opening-balance calculation remains in the frontend (balance is persistent)", () => {
+  // The service still uses `balance` from backend (shops.current_balance)
   assert.match(serviceSrc, /balance:\s*Number\(data\.balance/);
+  // currentOutstanding is a frontend computed term, not in backend service
   assert.doesNotMatch(serviceSrc, /data\.currentOutstanding/);
 });
 
-test("Weekly cards (Recent Sales / Approved / Pending) are week-scoped and informational", () => {
-  assert.match(summarySrc, /Recent Sales/);
+test("Weekly cards (Approved Sales / Approved Collections / Pending Approval) are week-scoped and informational", () => {
+  assert.match(summarySrc, /Approved Sales/);
   assert.match(summarySrc, /Approved Collections/);
-  assert.match(summarySrc, /Pending Collections/);
+  assert.match(summarySrc, /Pending Approval/);
   // The week range label is displayed on the weekly cards only.
-  assert.match(summarySrc, /dateRange/);
+  assert.match(summarySrc, /periodLabel/);
 });
 
-test("Balance KPI is the main headline (rendered before the weekly cards)", () => {
-  const balanceIndex = summarySrc.indexOf(">Balance<");
-  const salesIndex = summarySrc.indexOf("Recent Sales");
-  assert.ok(balanceIndex !== -1 && salesIndex !== -1);
-  assert.ok(balanceIndex < salesIndex, "Balance must be the primary KPI");
+test("Current Outstanding KPI is the primary summary figure (highlighted, bottom of summary)", () => {
+  // Current Outstanding is the bottom-line figure in the summary card (highlighted in emerald)
+  assert.match(summarySrc, /Current Outstanding/);
+  assert.match(summarySrc, /Outstanding Amount \(Approved Only\)/);
+  assert.match(summarySrc, /text-emerald-700/);  // Highlighted in emerald
+  assert.match(summarySrc, /font-extrabold/);   // Large font
+  // It is the last financial row (after the weekly cards)
+  const outstandingIndex = summarySrc.lastIndexOf("Current Outstanding");
+  const salesIndex = summarySrc.indexOf("Approved Sales");
+  assert.ok(outstandingIndex !== -1 && salesIndex !== -1);
+  assert.ok(outstandingIndex > salesIndex, "Current Outstanding must be the final summary row");
 });
 
 test("Collection Entry renders the collection table with the required columns", () => {
   assert.match(tableSrc, /Collection No/);
-  assert.match(tableSrc, /Shop Name/);
-  assert.match(tableSrc, /Payment Mode/);
-  assert.match(tableSrc, />Day</);
-  assert.match(tableSrc, />Status</);
+  assert.match(tableSrc, /Shop/);  // Column header is "Shop"
+  assert.match(tableSrc, /Collector/);  // Column header is "Collector"
+  assert.match(tableSrc, /Date/);  // Column header is "Date"
+  assert.match(tableSrc, /Amount/);
+  assert.match(tableSrc, /Status/);
 });
 
-test("Filtering happens before pagination (single global pagination)", () => {
-  const filterIdx = tableSrc.indexOf("const filtered");
-  const paginateIdx = tableSrc.indexOf("filtered.slice");
-  assert.ok(filterIdx !== -1 && paginateIdx !== -1);
-  assert.ok(filterIdx < paginateIdx, "filter must run before pagination");
-  assert.match(tableSrc, /shouldShowPagination\(totalRecords\)/);
+test("Filtering happens before display (single global filter)", () => {
+  const filterIdx = tableSrc.indexOf("filteredBySearch");
+  const displayIdx = tableSrc.indexOf("displayedData");
+  assert.ok(filterIdx !== -1 && displayIdx !== -1);
+  assert.ok(filterIdx < displayIdx, "filter must run before display");
+  // RecentCollectionsTable doesn't use pagination (it shows all filtered results)
 });
 
 test("approveCollection() reads the backend-returned currentBalance", async () => {

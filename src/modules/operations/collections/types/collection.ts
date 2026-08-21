@@ -11,7 +11,7 @@ export type CollectionStatus =
   | "Draft";
 
 /** Legacy 2-state view used by some modules. Do not extend UI logic on this. */
-export type CollectionLegacyStatus = "Pending" | "Approved" | "All";
+export type CollectionLegacyStatus = "Pending" | "Approved" | "Deleted";
 
 /* ==========================================================
    COLLECTION API ENTRY
@@ -271,6 +271,23 @@ export interface CollectionPendingSummaryRow {
   overdueDays: number | null;
   hasPendingCollections: boolean;
   lastCollectionDate?: string | null;
+}
+
+export interface PendingReportRow {
+  shopId: number;
+  shopName: string;
+  ownerName: string;
+  phoneNumber: string;
+  weekStart: string;
+  weekEnd: string;
+  balance: number;
+  weeklySales: number;
+  weeklyApprovedCollections: number;
+  weeklyPendingCollections: number;
+  recoveryPercentage: number;
+  overdueDays: number | null;
+  lastCollectionDate: string | null | undefined;
+  hasPendingCollections: boolean;
 }
 
 export interface CollectionPendingSummaryTotals {
