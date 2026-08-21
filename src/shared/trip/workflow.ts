@@ -100,3 +100,63 @@ export function isTripStatus(value: unknown): value is TripStatus {
 export function isDraftStatus(status: TripStatus): boolean {
   return status === "Draft";
 }
+
+/* ------------------------------------------------------------------ */
+/*  Trip lifecycle stage (derived — the authoritative assignment gate) */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Explicit, human-readable trip stage. Derived from the existing step-submitted
+ * flags + status (NOT a new persisted status enum — the persisted `status`
+ * remains Draft/Pending/Completed/Deleted to avoid breaking the backend
+ * contract). Only the first three steps gate shop assignment.
+ */
+export type TripStage =
+  | "Draft"
+  | "VehicleStarted"
+  | "FarmReached"
+  | "PickupPending"
+  | "Active"
+  | "Delivering"
+  | "Completed"
+  | "Deleted";
+
+export function deriveTripStage(
+  trip: Pick<
+    Trip,
+    | "status"
+    | "startStepSubmitted"
+    | "farmStepSubmitted"
+    | "pickupStepSubmitted"
+    | "deliveryStepSubmitted"
+    | "endStepSubmitted"
+    | "expensesStepSubmitted"
+  >
+): TripStage {
+  if (trip.status === "Deleted") return "Deleted";
+  if (trip.status === "Completed" || isTripWizardComplete(trip)) return "Completed";
+  if (trip.deliveryStepSubmitted) return "Delivering";
+  if (trip.pickupStepSubmitted) return "Active";
+  if (trip.farmStepSubmitted) return "PickupPending";
+  if (trip.startStepSubmitted) return "FarmReached";
+  return "Draft";
+}
+
+/**
+ * SINGLE source of truth for whether a trip may receive shop assignments.
+ *
+ * A trip is assignable ONLY when:
+ *   - Step 1 (vehicle start) is submitted,
+ *   - Step 2 (farm reached) is submitted,
+ *   - Step 3 (pickup) is submitted, AND
+ *   - the trip is neither completed nor deleted.
+ *
+ * Orders MUST consume this rule rather than re-deriving the condition.
+ */
+export function canAssignShopsToTrip(
+  trip: Pick<Trip, "status" | "startStepSubmitted" | "farmStepSubmitted" | "pickupStepSubmitted" | "endStepSubmitted" | "expensesStepSubmitted">
+): boolean {
+  if (trip.status === "Deleted" || trip.status === "Completed") return false;
+  if (isTripWizardComplete(trip)) return false;
+  return Boolean(trip.startStepSubmitted && trip.farmStepSubmitted && trip.pickupStepSubmitted);
+}

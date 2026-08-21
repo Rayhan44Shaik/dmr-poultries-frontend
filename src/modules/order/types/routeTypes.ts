@@ -154,12 +154,12 @@ export interface UnplannedOrder {
 
 /** Vehicle schedule — each vehicle starts and departs independently. */
 export interface VehicleSchedule {
-  /** Trip submission time "HH:mm". */
-  tripSubmittedTime: string;
-  /** Loading completion time "HH:mm". */
-  loadingCompletionTime: string;
-  /** Vehicle departure time "HH:mm". */
-  departureTime: string;
+  /** Trip submission time "HH:mm" — null when not yet captured. */
+  tripSubmittedTime: string | null;
+  /** Loading completion time "HH:mm" — null when not yet captured. */
+  loadingCompletionTime: string | null;
+  /** Vehicle departure time "HH:mm" — null when unknown (→ "Calculation Pending"). */
+  departureTime: string | null;
 }
 
 /** A vehicle that can be recommended / assigned (frontend representation). */

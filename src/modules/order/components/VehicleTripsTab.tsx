@@ -68,7 +68,7 @@ export default function VehicleTripsTab({ onNavigate }: VehicleTripsTabProps) {
               <p className="flex items-center gap-1.5"><User size={13} className="text-slate-400" />{t.driverName} — Driver</p>
               <p className="flex items-center gap-1.5"><User size={13} className="text-slate-400" />{t.supervisorName} — Supervisor</p>
               <p className="flex items-center gap-1.5"><MapPin size={13} className="text-slate-400" />{t.pickupFarm}</p>
-              <p className="flex items-center gap-1.5"><Clock size={13} className="text-slate-400" />Departure: {t.departureTime}</p>
+              <p className="flex items-center gap-1.5"><Clock size={13} className="text-slate-400" />Departure: {t.departureTime ?? "Calculation Pending"}</p>
             </div>
 
             <div className="mt-2">

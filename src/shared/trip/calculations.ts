@@ -5,6 +5,46 @@ export function calculateAvgWeight(dcWeight: number, totalBirds: number): number
   return Number((dcWeight / totalBirds).toFixed(3));
 }
 
+/**
+ * Canonical average bird weight (kg/bird). Returns null for invalid input
+ * (zero/negative/NaN/Infinity) rather than silently producing 0 or NaN.
+ */
+export function calculateAverageBirdWeight(totalWeight: number, totalBirds: number): number | null {
+  if (!Number.isFinite(totalWeight) || !Number.isFinite(totalBirds)) return null;
+  if (totalWeight <= 0 || totalBirds <= 0) return null;
+  return Number((totalWeight / totalBirds).toFixed(3));
+}
+
+export interface PickupVariance {
+  birds: number;
+  weight: number;
+  averageBirdWeight: number | null;
+}
+
+/**
+ * Expected (Step 2) vs actual (Step 3) pickup variance. Expected birds/weight
+ * come from the Step 2 farm expectation when provided; the actual average is
+ * always derived from actual totals. Values are kept separate — never silently
+ * substituted.
+ */
+export function calculatePickupVariance(
+  expectedBirds: number | null,
+  expectedWeight: number | null,
+  expectedAverage: number | null,
+  actualBirds: number,
+  actualWeight: number,
+  actualAverage: number | null
+): PickupVariance {
+  return {
+    birds: expectedBirds != null ? actualBirds - expectedBirds : actualBirds,
+    weight: expectedWeight != null ? Number((actualWeight - expectedWeight).toFixed(2)) : actualWeight,
+    averageBirdWeight:
+      expectedAverage != null && actualAverage != null
+        ? Number((actualAverage - expectedAverage).toFixed(3))
+        : null,
+  };
+}
+
 export function calculateTripKPIs(
   dcWeight: number,
   totalBirds: number,

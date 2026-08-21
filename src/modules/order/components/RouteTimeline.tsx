@@ -34,11 +34,11 @@ function RouteTimeline({ route }: { route: DeliveryRoute }) {
               <p className="text-[11px] text-slate-400">Pickup · {route.pickup.location}</p>
             </div>
             <span className="text-xs font-semibold text-slate-500">
-              {route.schedule.tripSubmittedTime}
+              {route.schedule.tripSubmittedTime ?? "—"}
             </span>
           </div>
           <p className="mt-0.5 text-[11px] text-slate-400">
-            Loading done {route.schedule.loadingCompletionTime} · Departs {route.schedule.departureTime}
+            Loading done {route.schedule.loadingCompletionTime ?? "—"} · Departs {route.schedule.departureTime ?? "Calculation Pending"}
           </p>
         </li>
 

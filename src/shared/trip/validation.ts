@@ -14,6 +14,28 @@ function required(field: TripFieldDefinitionName): boolean {
   return TRIP_FIELD_DEFINITIONS[field].required;
 }
 
+/** Reject NaN / Infinity / negative / zero bird counts. */
+export function isValidBirdCount(value: unknown): boolean {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0;
+}
+
+/** Reject NaN / Infinity / negative / zero weights. */
+export function isValidWeight(value: unknown): boolean {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0;
+}
+
+/**
+ * Average bird weight must be a finite positive number. Averages are DERIVED
+ * from totalWeight/totalBirds elsewhere; this validates the Step 2 expected
+ * average (or any manually supplied average) and rejects NaN/Infinity/<=0.
+ */
+export function isValidAverageBirdWeight(value: unknown): boolean {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0;
+}
+
 export function validateStartStep(trip: Trip): TripValidationResult {
   const errors: string[] = [];
   if (required("tripDate") && !trip.tripDate) errors.push("Trip Date is required.");
@@ -80,6 +102,11 @@ export function validateFarmStep(trip: Trip): TripValidationResult {
   }
   if (required("avgBirdWeight") && (!trip.avgBirdWeight || trip.avgBirdWeight <= 0)) {
     errors.push("Please enter a valid Average Bird Weight.");
+  } else if (
+    trip.avgBirdWeight != null &&
+    !isValidAverageBirdWeight(trip.avgBirdWeight)
+  ) {
+    errors.push("Average Bird Weight must be a valid positive number.");
   }
   return result(errors);
 }

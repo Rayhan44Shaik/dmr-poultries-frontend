@@ -120,7 +120,7 @@ export default function OrderDetailsDrawer({ order, onClose }: OrderDetailsDrawe
                 <Row label="Supervisor" value={assignment.supervisorName} />
                 <Row label="Trip" value={assignment.tripNo} />
                 <Row label="Pickup Farm" value={assignment.pickupFarm} />
-                <Row label="Departure" value={assignment.departureTime} />
+                <Row label="Departure" value={assignment.departureTime ?? "Calculation Pending"} />
                 <Row label="Type" value={assignment.assignmentType} />
               </>
             ) : (

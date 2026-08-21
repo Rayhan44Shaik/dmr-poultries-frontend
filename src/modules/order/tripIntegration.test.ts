@@ -13,8 +13,7 @@
 import assert from "node:assert/strict";
 import { before, describe, it } from "node:test";
 
-import { createEmptyTrip } from "../../shared/trip";
-import type { Trip } from "../../operations/vehicle-trips/types/trip";
+import { createEmptyTrip, type Trip } from "../../shared/trip";
 import {
   tripToRouteVehicle,
   tripToPickupSource,
@@ -125,7 +124,13 @@ describe("trip → route vehicle mapping", () => {
     const trip = seedTrip({ pickupLoadTime: "2026-08-21T09:30:00.000Z" });
     // normalizes to a valid HH:mm (exact local value depends on TZ, but must parse).
     const v = tripToRouteVehicle(trip);
-    assert.match(v.schedule.departureTime, /^\d{2}:\d{2}$/);
+    assert.ok(v.schedule.departureTime != null);
+    assert.match(v.schedule.departureTime!, /^\d{2}:\d{2}$/);
+  });
+
+  it("returns null departure (no fake 08:00) when no trip time exists", () => {
+    const trip = seedTrip({ pickupLoadTime: "", reachedTime: "", startTime: "" });
+    assert.equal(tripToRouteVehicle(trip).schedule.departureTime, null);
   });
 
   it("marks GPS Unavailable when farm GPS is missing", () => {
@@ -139,16 +144,18 @@ describe("trip → route vehicle mapping", () => {
 describe("getActiveTrips", () => {
   before(() => {
     writeTrips([
-      seedTrip({ id: 1, status: "Pending", farmStepSubmitted: true }),
-      seedTrip({ id: 2, status: "Pending", farmStepSubmitted: false }), // not yet Step 2
-      seedTrip({ id: 3, status: "Completed", farmStepSubmitted: true }),
-      seedTrip({ id: 4, status: "Draft", farmStepSubmitted: true }),
+      seedTrip({ id: 1, status: "Pending", startStepSubmitted: true, farmStepSubmitted: true, pickupStepSubmitted: true }),
+      seedTrip({ id: 2, status: "Pending", startStepSubmitted: true, farmStepSubmitted: true, pickupStepSubmitted: false }), // Step 3 not submitted
+      seedTrip({ id: 3, status: "Completed", startStepSubmitted: true, farmStepSubmitted: true, pickupStepSubmitted: true }),
+      seedTrip({ id: 4, status: "Draft", startStepSubmitted: true, farmStepSubmitted: true, pickupStepSubmitted: true }),
+      seedTrip({ id: 5, status: "Deleted", startStepSubmitted: true, farmStepSubmitted: true, pickupStepSubmitted: true }),
     ]);
   });
 
-  it("returns only in-progress trips that have completed Step 2 (farm/pickup)", () => {
+  it("returns only trips where Step 1 + Step 2 + Step 3 are all submitted (and not completed/deleted)", () => {
     const active = getActiveTrips();
-    assert.deepEqual(active.map((t) => t.id), [1]);
+    // id 1 and 4 are eligible (Step 3 done, not completed/deleted); 2 lacks Step 3; 3 completed; 5 deleted.
+    assert.deepEqual(active.map((t) => t.id), [1, 4]);
   });
 });
 

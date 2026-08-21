@@ -105,7 +105,7 @@ export default function VehicleComparison({ order, result, onAssign }: VehicleCo
                     {isRecommended && <span className="ml-1.5 rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">BEST</span>}
                   </td>
                   <td className="px-3 py-2 text-slate-600">{v.pickup.location}</td>
-                  <td className="px-3 py-2 text-slate-600">{v.schedule.departureTime}</td>
+                  <td className="px-3 py-2 text-slate-600">{v.schedule.departureTime ?? "Pending"}</td>
                   <td className="px-3 py-2 text-slate-600">
                     {candidate.travelMinutes != null ? `~${candidate.travelMinutes}m` : "—"}
                   </td>

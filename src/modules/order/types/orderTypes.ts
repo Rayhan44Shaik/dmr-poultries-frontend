@@ -100,7 +100,7 @@ export interface VehicleAssignment {
   orderCount: number;
   routeStatus: string;
   /** Vehicle departure time "HH:mm" (business-local). */
-  departureTime: string;
+  departureTime: string | null;
   /** Distinguish system recommendation from manual override (requirement #20). */
   assignmentType: "System Recommended" | "Manually Assigned";
 }

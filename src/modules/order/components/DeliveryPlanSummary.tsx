@@ -60,7 +60,7 @@ function DeliveryPlanSummary({ route }: { route: DeliveryRoute }) {
         <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
           <HeaderStat label="Vehicle" value={route.vehicleNo} />
           <HeaderStat label="Pickup" value={route.pickup.farmName} />
-          <HeaderStat label="Departure" value={route.schedule.departureTime} />
+          <HeaderStat label="Departure" value={route.schedule.departureTime ?? "Calculation Pending"} />
           <HeaderStat label="Planned" value={String(route.stops.length)} />
           <HeaderStat label="Unplanned" value={String(route.unplannedOrders.length)} />
           <HeaderStat label="Total Orders" value={String(route.totalOrderCount)} />

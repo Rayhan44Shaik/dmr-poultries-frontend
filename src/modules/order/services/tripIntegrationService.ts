@@ -3,36 +3,42 @@
 // Trip Entry → Orders integration adapter.
 //
 // The Order module does NOT create or edit trips, vehicles, farms, or pickup
-// data. It READS the existing Trip Entry / Trip Header data (tripService) and
-// maps each *active* trip into the order module's RouteVehicle shape so the
-// recommendation + delivery-sequencing services can run against REAL trip data.
+// data. It READS the authoritative Trip Entry data via the shared read model
+// (shared/trip/readModel.ts) and maps each *assignment-eligible* trip into the
+// order module's RouteVehicle shape.
 //
-// Active trip = trip that is in progress (status "Pending") and has completed
-// Trip Entry Step 2 (farm/pickup submitted), so a pickup + GPS + schedule exist.
+// Eligibility is the single shared rule `canAssignShopsToTrip(trip)`: a trip is
+// usable by Orders ONLY after Step 1 (vehicle start) + Step 2 (farm reached) +
+// Step 3 (pickup) are all submitted, and it is not completed/deleted.
 //
-// Capacity is read from the vehicle master when available; otherwise it is
-// null (unknown) and the capacity hard-constraint is simply not enforced
-// (rather than fabricating a capacity number).
+// No fabricated fallbacks: missing departure time stays null (→ "Calculation
+// Pending") and missing farm GPS stays null (→ "Unavailable"). Farm GPS is the
+// Step 2 captured GPS — never farm-master GPS, never vehicle-start GPS.
 // -----------------------------------------------------------------------------
 
 import { tripService } from "../../operations/vehicle-trips/services/tripService";
 import type { Trip } from "../../operations/vehicle-trips/types/trip";
 import { getVehicles } from "../../masters/vehicles/services/vehicleService";
+import {
+  canAssignShopsToTrip,
+  toActiveDeliveryTrip,
+  type ActiveDeliveryTrip,
+} from "../../../shared/trip";
 import type { Address, GpsCoordinate, PickupSource } from "../types/orderTypes";
 import type { RouteVehicle } from "../types/routeTypes";
 import { classifyGps, isValidCoordinate } from "../utils/gps";
 import { normalizeClockTime } from "../utils/businessTime";
 
-/** A trip is active when in progress AND farm/pickup (Step 2) is known. */
+/** Trips that are assignment-eligible (Step 1 + 2 + 3 submitted, not done). */
 export function getActiveTrips(): Trip[] {
   try {
-    return tripService.getAll().filter((t) => t.status === "Pending" && t.farmStepSubmitted);
+    return tripService.getAll().filter(canAssignShopsToTrip);
   } catch {
     return [];
   }
 }
 
-/** Build a GPS coordinate from a trip's farm GPS fields (null when absent/invalid). */
+/** Build a GPS coordinate from the trip's Step 2 farm GPS (null when absent/invalid). */
 function tripFarmGps(trip: Trip): GpsCoordinate | null {
   if (!isValidCoordinate({ latitude: trip.farmGpsLat ?? null, longitude: trip.farmGpsLon ?? null })) {
     return null;
@@ -54,17 +60,21 @@ function tripAddress(trip: Trip): Address {
   };
 }
 
-/** Resolve a departure "HH:mm" from the trip schedule (loading done → reached → start). */
-function resolveDepartureTime(trip: Trip): string {
+/**
+ * Resolve the delivery-ready departure clock from the trip event model:
+ * pickup completion (Step 3) → farm reached (Step 2) → vehicle start (Step 1).
+ * Returns null when no real trip timestamp exists — NEVER a fabricated "08:00".
+ */
+function resolveDepartureTime(trip: Trip): string | null {
   return (
     normalizeClockTime(trip.pickupLoadTime) ??
     normalizeClockTime(trip.reachedTime) ??
     normalizeClockTime(trip.startTime) ??
-    "08:00"
+    null
   );
 }
 
-/** Resolve vehicle capacity from the vehicle master (by vehicle number), else null. */
+/** Resolve vehicle capacity from the vehicle master (by number), else null. */
 function resolveCapacity(trip: Trip): { birdCapacity: number | null; boxCapacity: number | null } {
   try {
     const vehicles = getVehicles();
@@ -103,7 +113,7 @@ export function tripToPickupSource(trip: Trip): PickupSource {
   };
 }
 
-/** Map an active Trip Entry record into an Order-module RouteVehicle. */
+/** Map an assignment-eligible Trip Entry record into an Order-module RouteVehicle. */
 export function tripToRouteVehicle(trip: Trip): RouteVehicle {
   const gps = tripFarmGps(trip);
   const gpsStatus = classifyGps(gps, Date.now());
@@ -121,7 +131,7 @@ export function tripToRouteVehicle(trip: Trip): RouteVehicle {
     available: true,
     assignedOrderCount: trip.deliveries?.length ?? 0,
     schedule: {
-      tripSubmittedTime: normalizeClockTime(trip.startTime) ?? "08:00",
+      tripSubmittedTime: normalizeClockTime(trip.startTime) ?? null,
       loadingCompletionTime: normalizeClockTime(trip.pickupLoadTime) ?? departure,
       departureTime: departure,
     },
@@ -133,15 +143,19 @@ export function tripToRouteVehicle(trip: Trip): RouteVehicle {
   };
 }
 
-/** All active trip-derived vehicles for the Order module. */
+/** All assignment-eligible trip-derived vehicles for the Order module. */
 export function getActiveVehicles(): RouteVehicle[] {
   return getActiveTrips().map(tripToRouteVehicle);
 }
 
-/**
- * Rich per-trip info for the Vehicle Trips tab (trip number, status, remaining
- * capacity, assigned-shop counts including Order-module assignments).
- */
+/** Authoritative read model for a trip (single shared source). */
+export function getActiveDeliveryTrip(trip: Trip): ActiveDeliveryTrip | null {
+  return toActiveDeliveryTrip(trip);
+}
+
+export type { ActiveDeliveryTrip };
+
+/** Rich per-trip info for the Vehicle Trips tab. */
 export interface ActiveTripSummary {
   trip: Trip;
   vehicle: RouteVehicle;
@@ -151,12 +165,10 @@ export interface ActiveTripSummary {
   supervisorName: string;
   pickupFarm: string;
   pickupLocation: string;
-  departureTime: string;
+  departureTime: string | null;
   tripStatus: string;
   gpsStatus: string;
-  /** Shops already delivered per Trip Entry. */
   tripDeliveries: number;
-  /** Orders assigned from the Order module to this trip's vehicle. */
   orderAssignments: number;
   totalAssignedShops: number;
   remainingBirds: number | null;
