@@ -1,4 +1,5 @@
 import { Wallet, ShoppingCart, Download, Calculator, Clock, ArrowRight, AlertTriangle } from "lucide-react";
+import { useI18n } from "../../../../../i18n";
 
 interface OutstandingSummaryProps {
   openingBalance: number;
@@ -72,6 +73,7 @@ export default function OutstandingSummary({
   periodLabel,
   periodType,
 }: OutstandingSummaryProps) {
+  const { t } = useI18n();
 
   const displayOpeningBalance = ledgerLoaded ? openingBalance : 0;
   const displayApprovedSales = ledgerLoaded ? approvedSales : 0;
@@ -79,7 +81,7 @@ export default function OutstandingSummary({
   const displayPendingApproval = ledgerLoaded ? pendingApproval : 0;
   const displayCurrentOutstanding = ledgerLoaded ? currentOutstanding : 0;
 
-  const periodSubtitle = periodLabel || (periodType === "weekly" ? "Mon–Sun Business Week" : "Daily Business Period");
+  const periodSubtitle = periodLabel || (periodType === "weekly" ? t("ops.collection.mon_sun_week") : t("ops.collection.daily_period"));
 
   return (
     <div className="h-full w-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -89,7 +91,7 @@ export default function OutstandingSummary({
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
             <Calculator size={18} />
           </div>
-          <h2 className="text-lg font-semibold text-slate-800">Outstanding Summary</h2>
+          <h2 className="text-lg font-semibold text-slate-800">{t("operations.outstanding_summary")}</h2>
         </div>
         {shopName && showSummary && (
           <span className="rounded-full bg-blue-100/80 border border-blue-200 px-3 py-1 text-xs font-semibold text-blue-700">
@@ -106,15 +108,15 @@ export default function OutstandingSummary({
       {/* Financial rows */}
       <div className="space-y-3 animate-in fade-in duration-500">
         <Row
-          title="Opening Balance"
+          title={t("ops.collection.opening_balance")}
           value={displayOpeningBalance}
           iconBg="bg-violet-100"
           iconColor="text-violet-600"
           icon={<Wallet size={18} />}
-          subtitle={periodType === "weekly" ? "Brought forward from previous week" : "Brought forward from previous day"}
+          subtitle={periodType === "weekly" ? t("ops.collection.brought_forward_week") : t("ops.collection.brought_forward_day")}
         />
         <Row
-          title="Approved Sales"
+          title={t("ops.collection.approved_sales")}
           value={displayApprovedSales}
           iconBg="bg-blue-100"
           iconColor="text-blue-600"
@@ -123,7 +125,7 @@ export default function OutstandingSummary({
           isPositive
         />
         <Row
-          title="Approved Collections"
+          title={t("ops.collection.approved_collections")}
           value={displayApprovedCollections}
           iconBg="bg-green-100"
           iconColor="text-green-600"
@@ -135,12 +137,12 @@ export default function OutstandingSummary({
         <div className="my-2 border-t border-dashed border-slate-200" />
 
         <Row
-          title="Pending Approval"
+          title={t("operations.pending_approval")}
           value={displayPendingApproval}
           iconBg="bg-amber-100"
           iconColor="text-amber-700"
           icon={<AlertTriangle size={18} />}
-          subtitle="Informational only — does not reduce outstanding"
+          subtitle={t("ops.collection.informational_only")}
           isInfo
         />
 
@@ -153,10 +155,10 @@ export default function OutstandingSummary({
             </div>
             <div className="flex flex-col">
               <span className="text-sm font-bold text-slate-800">
-                Current Outstanding
+                {t("ops.collection.current_outstanding")}
               </span>
               <span className="text-[11px] font-medium text-emerald-700">
-                Outstanding Amount (Approved Only)
+                {t("ops.collection.outstanding_approved_only")}
               </span>
             </div>
           </div>
@@ -170,11 +172,11 @@ export default function OutstandingSummary({
           <div className="mt-3 pt-3 border-t border-dashed border-slate-200 text-xs text-slate-500">
             <div className="flex items-center gap-1.5 text-violet-600">
               <ArrowRight size={12} />
-              <span>Calculation: Opening Balance + Approved Sales - Approved Collections = Current Outstanding</span>
+              <span>{t("ops.collection.calculation_hint")}</span>
             </div>
             <div className="flex items-center gap-1.5 text-amber-600 mt-1">
               <AlertTriangle size={12} />
-              <span>Pending Approval ({inr(displayPendingApproval)}) is NOT deducted until approved</span>
+              <span>{t("ops.collection.pending_not_deducted", { amount: inr(displayPendingApproval) })}</span>
             </div>
           </div>
         )}

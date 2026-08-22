@@ -11,6 +11,7 @@ import {
   TrendingUp,
   TrendingDown,
 } from "lucide-react";
+import { useI18n } from "../../../../i18n";
 
 // ---------- Type Definitions ----------
 export interface DashboardMetrics {
@@ -118,6 +119,23 @@ interface KPICardProps {
   breakdown?: { fuel: number; trip: number };
 }
 
+const kpiCardLabel = (label: CardLabel): string => {
+  switch (label) {
+    case "Total Trips":
+      return "ops.dashboard.kpi_total_trips";
+    case "Total Weight (KG)":
+      return "ops.dashboard.kpi_total_weight";
+    case "Total Sales Amount":
+      return "ops.dashboard.kpi_total_sales";
+    case "Total Collections":
+      return "ops.dashboard.kpi_total_collections";
+    case "Pending Collections":
+      return "ops.dashboard.kpi_pending_collections";
+    case "Total Expenses":
+      return "ops.dashboard.kpi_total_expenses";
+  }
+};
+
 const KPICard = memo(function KPICard({
   label,
   value,
@@ -126,6 +144,7 @@ const KPICard = memo(function KPICard({
   rangeDays,
   breakdown,
 }: KPICardProps) {
+  const { t } = useI18n();
   const config = cardConfig[label];
   const Icon = config.icon;
 
@@ -151,9 +170,9 @@ const KPICard = memo(function KPICard({
   }
 
   // Shortened comparison label
-  let rangeLabel = "vs 7d";
+  let rangeLabel = t("ops.dashboard.vs_7d");
   if (rangeDays && rangeDays > 0) {
-    rangeLabel = `vs ${rangeDays}d`;
+    rangeLabel = `${t("ops.dashboard.vs")} ${rangeDays}d`;
   }
 
   let badgeClasses =
@@ -183,9 +202,9 @@ const KPICard = memo(function KPICard({
         <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${config.bg}`} />
         <p
           className="text-xs font-medium text-slate-500 truncate whitespace-nowrap"
-          title={label}
+          title={t(kpiCardLabel(label))}
         >
-          {label}
+          {t(kpiCardLabel(label))}
         </p>
       </div>
 
@@ -238,15 +257,15 @@ const KPICard = memo(function KPICard({
         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
           <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-4 text-sm">
             <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-2">
-              <span className="font-medium text-slate-600">Breakdown</span>
+              <span className="font-medium text-slate-600">{t("ops.dashboard.breakdown")}</span>
             </div>
             <div className="space-y-1.5">
               <div className="flex justify-between">
-                <span className="text-slate-600">Fuel Expense</span>
+                <span className="text-slate-600">{t("ops.dashboard.fuel_expense")}</span>
                 <span className="font-medium text-slate-800">₹{breakdown.fuel.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-600">Trip Expense</span>
+                <span className="text-slate-600">{t("ops.dashboard.trip_expense")}</span>
                 <span className="font-medium text-slate-800">₹{breakdown.trip.toLocaleString()}</span>
               </div>
             </div>

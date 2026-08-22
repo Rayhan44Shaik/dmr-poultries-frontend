@@ -1,6 +1,7 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout/DashboardLayout";
+import { useI18n } from "../i18n";
 
 // Auth
 import LoginPage from "../modules/auth/LoginPage";
@@ -26,14 +27,17 @@ import AccountsPage from "../modules/accounts/pages/AccountsPage";
 // Fleet Module — lazy so Dashboard/Operations/etc. do not evaluate Fleet tab graphs.
 const FleetPages = React.lazy(() => import("../modules/fleet-operations/pages/FleetPages"));
 
-const fleetFallback = (
-  <div className="w-full px-4 pb-8 pt-6 sm:px-6 lg:px-8" aria-busy="true" aria-label="Loading Fleet Operations">
-    <div className="mx-auto w-full max-w-[1480px] space-y-4">
-      <div className="h-14 animate-pulse rounded-2xl bg-white border border-slate-200" />
-      <div className="h-64 animate-pulse rounded-2xl bg-white border border-slate-200" />
+function FleetFallback() {
+  const { t } = useI18n();
+  return (
+    <div className="w-full px-4 pb-8 pt-6 sm:px-6 lg:px-8" aria-busy="true" aria-label={t("loading.fleet")}>
+      <div className="mx-auto w-full max-w-[1480px] space-y-4">
+        <div className="h-14 animate-pulse rounded-2xl bg-white border border-slate-200" />
+        <div className="h-64 animate-pulse rounded-2xl bg-white border border-slate-200" />
+      </div>
     </div>
-  </div>
-);
+  );
+}
 
 // Staff, Reports
 import StaffPages from "../modules/staff/pages/StaffPages";
@@ -46,11 +50,32 @@ const SupervisorMobilePage = React.lazy(
   () => import("../modules/supervisor-mobile/pages/SupervisorMobilePage")
 );
 
-const mobileFallback = (
-  <div className="flex min-h-dvh items-center justify-center bg-slate-100 text-sm font-semibold text-slate-500">
-    Loading Supervisor Trip Entry…
-  </div>
-);
+function MobileFallback() {
+  const { t } = useI18n();
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-slate-100 text-sm font-semibold text-slate-500">
+      {t("loading.mobile")}
+    </div>
+  );
+}
+
+function NotFoundPage() {
+  const { t } = useI18n();
+  return (
+    <div className="flex h-screen items-center justify-center bg-slate-50">
+      <div className="text-center">
+        <h1 className="text-6xl font-bold tracking-tight text-slate-800">404</h1>
+        <p className="mt-2 text-lg text-slate-600">{t("error.page_not_found")}</p>
+        <a
+          href="/dashboard"
+          className="mt-4 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700"
+        >
+          {t("error.go_dashboard")}
+        </a>
+      </div>
+    </div>
+  );
+}
 
 function AppRoutes() {
   return (
@@ -61,11 +86,11 @@ function AppRoutes() {
       {/* ============ SUPERVISOR MOBILE — Trip Entry Steps 1–5 only ============ */}
       <Route
         path="/mobile"
-        element={<React.Suspense fallback={mobileFallback}><SupervisorMobilePage /></React.Suspense>}
+        element={<React.Suspense fallback={<MobileFallback />}><SupervisorMobilePage /></React.Suspense>}
       />
       <Route
         path="/mobile/trips"
-        element={<React.Suspense fallback={mobileFallback}><SupervisorMobilePage /></React.Suspense>}
+        element={<React.Suspense fallback={<MobileFallback />}><SupervisorMobilePage /></React.Suspense>}
       />
 
       {/* ============ DASHBOARD ============ */}
@@ -89,8 +114,8 @@ function AppRoutes() {
       <Route path="/accounts/*" element={<DashboardLayout><AccountsPage /></DashboardLayout>} />
 
       {/* ============ FLEET ============ */}
-      <Route path="/fleet" element={<DashboardLayout><React.Suspense fallback={fleetFallback}><FleetPages /></React.Suspense></DashboardLayout>} />
-      <Route path="/fleet/*" element={<DashboardLayout><React.Suspense fallback={fleetFallback}><FleetPages /></React.Suspense></DashboardLayout>} />
+      <Route path="/fleet" element={<DashboardLayout><React.Suspense fallback={<FleetFallback />}><FleetPages /></React.Suspense></DashboardLayout>} />
+      <Route path="/fleet/*" element={<DashboardLayout><React.Suspense fallback={<FleetFallback />}><FleetPages /></React.Suspense></DashboardLayout>} />
 
       {/* ============ STAFF ============ */}
       <Route path="/staff" element={<DashboardLayout><StaffPages /></DashboardLayout>} />
@@ -121,23 +146,7 @@ function AppRoutes() {
       />
 
       {/* ============ 404 - Not Found ============ */}
-      <Route
-        path="*"
-        element={
-          <div className="flex h-screen items-center justify-center bg-slate-50">
-            <div className="text-center">
-              <h1 className="text-6xl font-bold tracking-tight text-slate-800">404</h1>
-              <p className="mt-2 text-lg text-slate-600">Page not found</p>
-              <a
-                href="/dashboard"
-                className="mt-4 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700"
-              >
-                Go to Dashboard
-              </a>
-            </div>
-          </div>
-        }
-      />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

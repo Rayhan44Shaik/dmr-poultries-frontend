@@ -1,5 +1,6 @@
 import React, { memo, useState } from 'react';
 import Select from 'react-select';
+import { useI18n } from '../../../../i18n';
 import { DatePicker } from '../../../../components/common/DatePicker';
 import { Car, User, Gauge, Wrench, Cog, Building2, UserCog, FileText, Hash, Paperclip, Upload, Trash2, File as FileIcon, AlertTriangle } from 'lucide-react';
 import PartsTable from './PartsTable';
@@ -69,6 +70,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
   onMarkDocumentRemoval,
   validateKM,
 }) => {
+  const { t } = useI18n();
   const { showNotification } = useSafeNotification();
   const [kmError, setKmError] = useState<string | null>(null);
 
@@ -87,7 +89,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
     
     const num = parseFloat(val);
     if (isNaN(num)) {
-      setKmError('Please enter a valid number');
+      setKmError(t('validation.invalid_number'));
       return;
     }
     
@@ -98,7 +100,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
     if (validateKM) {
       const { valid, message } = validateKM(num);
       if (!valid) {
-        setKmError(message || 'Invalid KM');
+        setKmError(message || t('fleet.maintenance_form.invalid_km'));
       } else {
         setKmError(null);
       }
@@ -137,7 +139,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
         {/* 1. Maintenance Number (server-generated, globally unique) */}
         <div>
           <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            Maintenance Number
+            {t('fleet.maintenance_form.maintenance_number')}
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -148,7 +150,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               value={form.billNumber}
               readOnly
               disabled
-              placeholder="Auto-generated on save"
+              placeholder={t('fleet.maintenance_form.auto_generated')}
               className={`${inputClass} bg-slate-50 text-slate-400 cursor-not-allowed`}
             />
           </div>
@@ -157,7 +159,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
         {/* 2. Vehicle */}
         <div>
           <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            Vehicle <span className="text-red-500">*</span>
+            {t('common.vehicle')} <span className="text-red-500">*</span>
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
@@ -168,7 +170,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               options={vehicleOptions}
               value={vehicleOptions.find(opt => opt.value === form.vehicleId)}
               onChange={onVehicleChange}
-              placeholder="Select vehicle"
+              placeholder={t('operations.select_vehicle')}
               isClearable
               className="text-sm"
               styles={{
@@ -190,18 +192,18 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
         {/* 3. Date */}
         <div>
           <DatePicker
-            label="Date"
+            label={t('common.date')}
             required
             value={form.date}
             onChange={(dateStr) => setFormField('date', dateStr)}
-            placeholder="Select date"
+            placeholder={t('placeholder.enter_date')}
           />
         </div>
 
         {/* 4. Driver */}
         <div>
           <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            Driver
+            {t('common.driver')}
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
@@ -212,7 +214,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               options={driverOptions}
               value={driverOptions.find(opt => opt.value === form.driverId)}
               onChange={onDriverChange}
-              placeholder="Select driver"
+              placeholder={t('operations.select_driver')}
               isClearable
               className="text-sm"
               styles={{
@@ -237,7 +239,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
         {/* 5. Current KM */}
         <div>
           <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            Current KM <span className="text-red-500">*</span>
+            {t('fleet.maintenance_form.current_km')} <span className="text-red-500">*</span>
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -247,7 +249,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               type="number"
               value={form.currentKM}
               onChange={handleCurrentKMChange}
-              placeholder="e.g. 45000"
+              placeholder={t('fleet.maintenance_form.number_placeholder', { value: '45000' })}
               className={`${inputClass} ${kmError ? 'border-red-500' : ''} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
             />
           </div>
@@ -257,7 +259,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
         {/* 6. Next Service KM */}
         <div>
           <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            Next Service KM
+            {t('fleet.maintenance_form.next_service_km')}
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -267,7 +269,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               type="number"
               value={form.nextServiceKM}
               onChange={(e) => setFormField('nextServiceKM', e.target.value)}
-              placeholder="e.g. 50000"
+              placeholder={t('fleet.maintenance_form.number_placeholder', { value: '50000' })}
               className={`${inputClass} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
             />
           </div>
@@ -276,7 +278,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
         {/* 7. Garage */}
         <div>
           <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            Garage
+            {t('operations.maintenance_garage')}
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -286,7 +288,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               type="text"
               value={form.garage}
               onChange={(e) => setFormField('garage', e.target.value)}
-              placeholder="Garage name"
+              placeholder={t('fleet.maintenance_form.garage_placeholder')}
               className={inputClass}
             />
           </div>
@@ -295,7 +297,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
         {/* 8. Mechanic */}
         <div>
           <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            Mechanic
+            {t('fleet.maintenance_form.mechanic')}
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -305,7 +307,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               type="text"
               value={form.mechanic}
               onChange={(e) => setFormField('mechanic', e.target.value)}
-              placeholder="Mechanic name"
+              placeholder={t('fleet.maintenance_form.mechanic_placeholder')}
               className={inputClass}
             />
           </div>
@@ -317,7 +319,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
         {/* 9. Maintenance Type - big box (multi) */}
         <div>
           <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            Maintenance Type <span className="text-red-500">*</span>
+            {t('operations.maintenance_type')} <span className="text-red-500">*</span>
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
@@ -328,7 +330,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               options={maintenanceOptions}
               value={maintenanceOptions.filter(opt => form.maintenanceType.includes(opt.value))}
               onChange={onMaintenanceChange}
-              placeholder="Select types"
+              placeholder={t('fleet.maintenance_form.select_types')}
               isMulti
               isClearable
               className="text-sm"
@@ -351,7 +353,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
         {/* 10. Service Type */}
         <div>
           <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            Service Type <span className="text-red-500">*</span>
+            {t('fleet.maintenance_form.service_type')} <span className="text-red-500">*</span>
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -361,7 +363,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               type="text"
               value={form.serviceType}
               onChange={(e) => setFormField('serviceType', e.target.value)}
-              placeholder="e.g. Oil Change"
+              placeholder={t('fleet.maintenance_form.service_type_example')}
               className={inputClass}
             />
           </div>
@@ -370,7 +372,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
         {/* 11. Remarks */}
         <div>
           <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            Remarks
+            {t('common.remarks')}
           </label>
           <div className="relative">
             <div className="absolute top-2.5 left-3 pointer-events-none">
@@ -380,7 +382,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               value={form.remarks}
               onChange={(e) => setFormField('remarks', e.target.value)}
               rows={1}
-              placeholder="Any additional notes..."
+              placeholder={t('fleet.maintenance_form.remarks_placeholder')}
               className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition resize-y bg-white"
             />
           </div>
@@ -398,18 +400,17 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
           <div>
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
               <Paperclip size={16} className="text-slate-500" />
-              Bill / Spare‑part Documents <span className="text-red-500">*</span>
+              {t('fleet.maintenance_form.documents_title')} <span className="text-red-500">*</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              PNG, JPG/JPEG or PDF. Max 10 MB each, up to 10 files. Adding files always
-              appends to the existing ones.
+              {t('fleet.maintenance_form.documents_hint')}
             </p>
           </div>
           <label
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition cursor-pointer shrink-0"
           >
             <Upload size={14} />
-            Add Document
+            {t('fleet.maintenance_form.add_document')}
             <input
               type="file"
               accept=".png,.jpg,.jpeg,.pdf"
@@ -422,7 +423,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
         {documents.length === 0 ? (
           <p className="text-sm text-slate-400 italic">
-            No documents added yet — a bill / spare‑part document is required to save.
+            {t('fleet.maintenance_form.no_documents')}
           </p>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -460,7 +461,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                       </span>
                       {doc.markedForRemoval ? (
                         <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-red-500">
-                          <AlertTriangle size={10} /> Will remove
+                          <AlertTriangle size={10} /> {t('fleet.maintenance_form.will_remove')}
                         </span>
                       ) : (
                         <button
@@ -471,7 +472,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               : onRemoveDocument(doc.key)
                           }
                           className="text-slate-400 hover:text-red-500 transition"
-                          title="Remove document"
+                          title={t('fleet.maintenance_form.remove_document')}
                         >
                           <Trash2 size={14} />
                         </button>

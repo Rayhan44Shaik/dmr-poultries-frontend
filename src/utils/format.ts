@@ -4,6 +4,8 @@
 // Indian locale conventions: ₹1,25,000.00 · 1,245.50 kg · 94,600
 // -----------------------------------------------------------------------------
 
+import { translate } from "../i18n";
+
 const inrFormatter = new Intl.NumberFormat("en-IN", {
   style: "currency",
   currency: "INR",
@@ -91,22 +93,22 @@ export function formatRelativeTime(value: string | Date): string {
   if (Number.isNaN(date.getTime())) return "—";
   const diffMs = Date.now() - date.getTime();
   const minutes = Math.floor(diffMs / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return translate("time.just_now");
+  if (minutes < 60) return translate("time.min_ago", { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return translate("time.hr_ago", { count: hours });
   const days = Math.floor(hours / 24);
-  if (days === 1) return "yesterday";
-  if (days < 7) return `${days}d ago`;
+  if (days === 1) return translate("time.yesterday");
+  if (days < 7) return translate("time.day_ago", { count: days });
   return formatDayMonth(date);
 }
 
 /** Greeting based on local time of day. */
 export function greetingForHour(hour = new Date().getHours()): string {
-  if (hour < 5) return "Working late";
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
+  if (hour < 5) return translate("time.greeting_late");
+  if (hour < 12) return translate("time.greeting_morning");
+  if (hour < 17) return translate("time.greeting_afternoon");
+  return translate("time.greeting_evening");
 }
 
 /** ISO date for a day offset from today (e.g. -1 for yesterday). */

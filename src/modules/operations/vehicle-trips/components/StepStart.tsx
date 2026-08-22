@@ -15,8 +15,8 @@ import { fetchLastClosingMeter } from "../services/tripHeaderApiService";
 import { WizardActionBar, WizardStepNotice, type WizardNoticeState } from "./WizardStepUI";
 import {
   TRIP_FIELD_DEFINITIONS,
-  TRIP_STEP_DEFINITIONS,
 } from "../../../../shared/trip/definitions";
+import { useI18n } from "../../../../i18n";
 
 type VehicleOption = { id: number; vehicleNumber: string };
 type EmployeeOption = { id: number; employeeName: string; department: string };
@@ -188,16 +188,17 @@ const selectStyles: any = {
 };
 
 const StartTimeField = React.memo(function StartTimeField({ startTime }: { startTime: string }) {
+  const { t } = useI18n();
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <Clock size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.startTime.label} {TRIP_FIELD_DEFINITIONS.startTime.required && <span className="text-red-500">*</span>}
+        <Clock size={14} className="text-slate-400" /> {t("ops.trip.field.start_time")} {TRIP_FIELD_DEFINITIONS.startTime.required && <span className="text-red-500">*</span>}
       </label>
       <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
         {startTime ? (
           startTime
         ) : (
-          <span className="text-slate-400 font-normal text-xs">Will be captured when trip starts</span>
+          <span className="text-slate-400 font-normal text-xs">{t("ops.trip.will_be_captured")}</span>
         )}
       </div>
     </div>
@@ -236,6 +237,7 @@ const VehicleField = React.memo(function VehicleField({
   invalid?: boolean;
   onSelect: (vehicleId: number, vehicleNo: string) => void;
 }) {
+  const { t } = useI18n();
   const value = useMemo(
     () => options.find((option) => option.id === vehicleId) || null,
     [options, vehicleId]
@@ -251,7 +253,7 @@ const VehicleField = React.memo(function VehicleField({
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <Truck size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.vehicleId.label} {TRIP_FIELD_DEFINITIONS.vehicleId.required && <span className="text-red-500">*</span>}
+        <Truck size={14} className="text-slate-400" /> {t("operations.vehicle_no")} {TRIP_FIELD_DEFINITIONS.vehicleId.required && <span className="text-red-500">*</span>}
       </label>
       <Select<VehicleOption, false>
         options={options}
@@ -260,7 +262,7 @@ const VehicleField = React.memo(function VehicleField({
         value={value}
         onChange={handleChange}
         className="mt-1 text-sm"
-        placeholder="Search Vehicle..."
+        placeholder={t("ops.trip.search_vehicle")}
         isSearchable
         isDisabled={disabled}
         styles={styles}
@@ -283,6 +285,7 @@ const SupervisorField = React.memo(function SupervisorField({
   invalid?: boolean;
   onSelect: (supervisorId: number, supervisorName: string) => void;
 }) {
+  const { t } = useI18n();
   const value = useMemo(
     () => options.find((option) => option.employeeName === supervisorName) || null,
     [options, supervisorName]
@@ -298,7 +301,7 @@ const SupervisorField = React.memo(function SupervisorField({
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.supervisorId.label} {TRIP_FIELD_DEFINITIONS.supervisorId.required && <span className="text-red-500">*</span>}
+        <User size={14} className="text-slate-400" /> {t("common.supervisor")} {TRIP_FIELD_DEFINITIONS.supervisorId.required && <span className="text-red-500">*</span>}
       </label>
       <Select<EmployeeOption, false>
         options={options}
@@ -307,7 +310,7 @@ const SupervisorField = React.memo(function SupervisorField({
         value={value}
         onChange={handleChange}
         className="mt-1 text-sm"
-        placeholder="Search Supervisor..."
+        placeholder={t("ops.trip.search_supervisor")}
         isSearchable
         isDisabled={disabled}
         styles={styles}
@@ -330,6 +333,7 @@ const DriverField = React.memo(function DriverField({
   invalid?: boolean;
   onSelect: (driverId: number, driverName: string) => void;
 }) {
+  const { t } = useI18n();
   const value = useMemo(
     () => options.find((option) => option.employeeName === driverName) || null,
     [options, driverName]
@@ -345,7 +349,7 @@ const DriverField = React.memo(function DriverField({
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.driverId.label} {TRIP_FIELD_DEFINITIONS.driverId.required && <span className="text-red-500">*</span>}
+        <User size={14} className="text-slate-400" /> {t("common.driver")} {TRIP_FIELD_DEFINITIONS.driverId.required && <span className="text-red-500">*</span>}
       </label>
       <Select<EmployeeOption, false>
         options={options}
@@ -354,7 +358,7 @@ const DriverField = React.memo(function DriverField({
         value={value}
         onChange={handleChange}
         className="mt-1 text-sm"
-        placeholder="Search Driver..."
+        placeholder={t("ops.trip.search_driver")}
         isSearchable
         isDisabled={disabled}
         styles={styles}
@@ -377,6 +381,7 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
   error?: string | null;
   onChange: (value: string) => void;
 }) {
+  const { t } = useI18n();
   const handleChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       onChange(event.target.value);
@@ -390,7 +395,7 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <Gauge size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.openingMeter.label} {TRIP_FIELD_DEFINITIONS.openingMeter.required && <span className="text-red-500">*</span>}
+        <Gauge size={14} className="text-slate-400" /> {t("ops.trip.field.opening_meter")} {TRIP_FIELD_DEFINITIONS.openingMeter.required && <span className="text-red-500">*</span>}
       </label>
       <input
         type="text"
@@ -427,6 +432,7 @@ const AdvanceField = React.memo(function AdvanceField({
   invalid?: boolean;
   onChange: (value: string) => void;
 }) {
+  const { t } = useI18n();
   const handleChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       onChange(event.target.value);
@@ -440,7 +446,7 @@ const AdvanceField = React.memo(function AdvanceField({
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <Wallet size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.advanceAmount.label} {TRIP_FIELD_DEFINITIONS.advanceAmount.required && <span className="text-red-500">*</span>}
+        <Wallet size={14} className="text-slate-400" /> {t("operations.advance")} {TRIP_FIELD_DEFINITIONS.advanceAmount.required && <span className="text-red-500">*</span>}
       </label>
       <input
         type="text"
@@ -473,6 +479,7 @@ const HelpersField = React.memo(function HelpersField({
   invalid?: boolean;
   onChange: (helpers: string[]) => void;
 }) {
+  const { t } = useI18n();
   const value = useMemo(
     () => options.filter((option) => helpers.includes(option.employeeName)),
     [options, helpers]
@@ -488,7 +495,7 @@ const HelpersField = React.memo(function HelpersField({
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-slate-400" /> {TRIP_FIELD_DEFINITIONS.helpers.label} {TRIP_FIELD_DEFINITIONS.helpers.required && <span className="text-red-500">*</span>}
+        <User size={14} className="text-slate-400" /> {t("ops.trip.field.helpers")} {TRIP_FIELD_DEFINITIONS.helpers.required && <span className="text-red-500">*</span>}
       </label>
       <Select<EmployeeOption, true>
         options={options}
@@ -497,7 +504,7 @@ const HelpersField = React.memo(function HelpersField({
         value={value}
         onChange={handleChange}
         className="mt-1 text-sm"
-        placeholder="Select helpers..."
+        placeholder={t("ops.trip.select_helpers")}
         isMulti
         isSearchable
         isDisabled={disabled}
@@ -521,6 +528,7 @@ const LoadersField = React.memo(function LoadersField({
   invalid?: boolean;
   onChange: (loaders: string[]) => void;
 }) {
+  const { t } = useI18n();
   const value = useMemo(
     () => options.filter((option) => loaders.includes(option.employeeName)),
     [options, loaders]
@@ -536,7 +544,7 @@ const LoadersField = React.memo(function LoadersField({
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-amber-500" /> {TRIP_FIELD_DEFINITIONS.loaders.label} {TRIP_FIELD_DEFINITIONS.loaders.required && <span className="text-red-500">*</span>}
+        <User size={14} className="text-amber-500" /> {t("ops.trip.field.loaders")} {TRIP_FIELD_DEFINITIONS.loaders.required && <span className="text-red-500">*</span>}
       </label>
       <Select<EmployeeOption, true>
         options={options}
@@ -545,7 +553,7 @@ const LoadersField = React.memo(function LoadersField({
         value={value}
         onChange={handleChange}
         className="mt-1 text-sm"
-        placeholder="Select loaders..."
+        placeholder={t("ops.trip.select_loaders")}
         isMulti
         isSearchable
         isDisabled={disabled}
@@ -576,6 +584,7 @@ function StepStart({
   subscribeHeaderSaveStatus: _subscribeHeaderSaveStatus,
   getHeaderSaveStatus: _getHeaderSaveStatus,
 }: Props) {
+  const { t } = useI18n();
   const [form, setForm] = useState<Step1FormState>(() => tripToForm(loadSnapshot));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(false);
@@ -742,7 +751,7 @@ function StepStart({
     const meterNumericBad =
       form.openingMeterText.trim() !== "" && (!Number.isFinite(meterValue) || meterValue < 0);
     if (showErrors && meterNumericBad) {
-      return "Enter a valid non-negative meter reading.";
+      return t("ops.trip.invalid_meter_reading");
     }
     if (
       form.openingMeterText.trim() !== "" &&
@@ -750,11 +759,11 @@ function StepStart({
       Number.isFinite(meterValue) &&
       meterValue <= latestMeter.meter
     ) {
-      const ref = latestMeter.tripNo ? ` (from ${latestMeter.tripNo})` : "";
-      return `Reading must be greater than the vehicle's latest recorded reading of ${latestMeter.meter} KM${ref}.`;
+      const ref = latestMeter.tripNo ? ` (${t("ops.trip.from_trip", { no: latestMeter.tripNo })})` : "";
+      return t("ops.trip.meter_must_exceed", { meter: latestMeter.meter, ref });
     }
     return null;
-  }, [form.openingMeterText, latestMeter, showErrors]);
+  }, [form.openingMeterText, latestMeter, showErrors, t]);
 
   const handleFormKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "Enter") return;
@@ -785,8 +794,8 @@ function StepStart({
 
   const inputsLocked = headerLoading || isSubmitting;
   const submitLabel = startStepSubmitted
-    ? "Update Start Details"
-    : "Submit Start Details";
+    ? "ops.trip.update_start_details"
+    : "ops.trip.submit_start_details";
 
   const handleSubmit = useCallback(async () => {
     const patch = formToTripPatch(formRef.current);
@@ -799,7 +808,7 @@ function StepStart({
     const validation = validateStartStep(candidate);
     if (!validation.valid) {
       setShowErrors(true);
-      setNotice({ type: "error", message: validation.errors[0] || "Please complete required fields." });
+      setNotice({ type: "error", message: validation.errors[0] || t("ops.trip.complete_required_fields") });
       return;
     }
 
@@ -819,10 +828,10 @@ function StepStart({
         : await submitStartStep(patch);
     if (success) {
       setIsLocalEditing(false);
-      setNotice({ type: "success", message: "Step 1 submitted successfully." });
+      setNotice({ type: "success", message: t("ops.trip.step1_submitted") });
     }
     setIsSubmitting(false);
-  }, [loadSnapshot, submitStartStep, updateStartStep, startStepSubmitted, tripId, updateTrip]);
+  }, [loadSnapshot, submitStartStep, updateStartStep, startStepSubmitted, tripId, updateTrip, t]);
 
   if (startStepSubmitted && !editable && !isLocalEditing) {
     return (
@@ -832,15 +841,15 @@ function StepStart({
             <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
               1
             </span>
-            <h2 className="text-base font-bold text-slate-800 tracking-tight">{TRIP_STEP_DEFINITIONS[0].title.toUpperCase()}</h2>
+            <h2 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.title.start").toUpperCase()}</h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={handleCloseStep}
               className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
-              title="Close Trip"
-              aria-label="Close Trip"
+              title={t("ops.trip.close_trip")}
+              aria-label={t("ops.trip.close_trip")}
             >
               <X size={14} />
             </button>
@@ -849,13 +858,13 @@ function StepStart({
                 type="button"
                 onClick={() => setIsLocalEditing(true)}
                 className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
-                title="Edit Step"
+                title={t("ops.trip.edit_step")}
               >
                 <Pencil size={14} />
               </button>
             )}
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
-              Submitted & Locked
+              {t("ops.trip.submitted_locked")}
             </span>
           </div>
         </div>
@@ -863,63 +872,63 @@ function StepStart({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              Trip Number
+              {t("operations.trip_no")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.tripNo || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Clock size={12} className="text-slate-500" /> Start Time
+              <Clock size={12} className="text-slate-500" /> {t("ops.trip.field.start_time")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{startTime || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Truck size={12} className="text-blue-500" /> Vehicle No.
+              <Truck size={12} className="text-blue-500" /> {t("operations.vehicle_no")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.vehicleNo || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <User size={12} className="text-indigo-500" /> Supervisor
+              <User size={12} className="text-indigo-500" /> {t("common.supervisor")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.supervisorName || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <User size={12} className="text-emerald-500" /> Driver
+              <User size={12} className="text-emerald-500" /> {t("common.driver")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.driverName || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Gauge size={12} className="text-purple-500" /> Opening Meter
+              <Gauge size={12} className="text-purple-500" /> {t("ops.trip.field.opening_meter")}
             </span>
             <span className="text-xs font-bold text-slate-800">
               {loadSnapshot.openingMeter == null
-                ? "Not entered"
+                ? t("ops.trip.not_entered")
                 : `${loadSnapshot.openingMeter} KM`}
             </span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Wallet size={12} className="text-amber-500" /> Advance / Expenses
+              <Wallet size={12} className="text-amber-500" /> {t("operations.advance")}
             </span>
             <span className="text-xs font-bold text-slate-800">
               {loadSnapshot.advanceAmount == null
-                ? "Not entered"
+                ? t("ops.trip.not_entered")
                 : `₹${loadSnapshot.advanceAmount.toLocaleString()}`}
             </span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <User size={12} className="text-slate-500" /> Helpers
+              <User size={12} className="text-slate-500" /> {t("ops.trip.field.helpers")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.helpers?.join(", ") || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <User size={12} className="text-amber-500" /> Loaders
+              <User size={12} className="text-amber-500" /> {t("ops.trip.field.loaders")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">
               {loadSnapshot.loaders?.join(", ") || "--"}
@@ -928,7 +937,7 @@ function StepStart({
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-center justify-between">
-          <p className="text-xs text-slate-600 font-normal">Start details submitted successfully.</p>
+          <p className="text-xs text-slate-600 font-normal">{t("ops.trip.start_submitted_ok")}</p>
         </div>
       </div>
     );
@@ -945,27 +954,27 @@ function StepStart({
         className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm"
         onKeyDown={handleFormKeyDown}
       >
-        {headerLoading && <p className="text-xs text-slate-500">Loading trip header...</p>}
+        {headerLoading && <p className="text-xs text-slate-500">{t("ops.trip.loading_trip_header")}</p>}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
           <div className="flex items-center gap-2.5">
             <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
               1
             </span>
-            <h2 className="text-base font-bold text-slate-800 tracking-tight">{TRIP_STEP_DEFINITIONS[0].title.toUpperCase()}</h2>
+            <h2 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.title.start").toUpperCase()}</h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={handleCloseStep}
               className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
-              title="Close Trip"
-              aria-label="Close Trip"
+              title={t("ops.trip.close_trip")}
+              aria-label={t("ops.trip.close_trip")}
             >
               <X size={14} />
             </button>
             {((editable && startStepSubmitted) || isLocalEditing) && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
-                {tripNo ? `Editing Trip ${tripNo}` : "Editable View"}
+                {tripNo ? t("ops.trip.editing_trip", { no: tripNo }) : t("ops.trip.editable_view")}
               </span>
             )}
           </div>

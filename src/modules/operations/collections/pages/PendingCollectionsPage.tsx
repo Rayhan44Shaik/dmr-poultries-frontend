@@ -13,6 +13,7 @@ import PendingCollectionsSummary from "../components/pending/PendingCollectionsS
 import PendingCollectionsTable from "../components/pending/PendingCollectionsTable";
 import ShopSalesPagination from "../components/pending/ShopSalesPagination";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
+import { useI18n } from "../../../../i18n";
 
 const getCurrentWeekRange = (): { fromDate: string; toDate: string } => {
   const today = new Date();
@@ -64,6 +65,7 @@ interface PendingReportRow {
 }
 
 export default function PendingCollectionsPage() {
+  const { t } = useI18n();
   const toast = useToast();
 
   // Load ALL shops from Master → Shops (Active + Inactive)
@@ -307,7 +309,7 @@ export default function PendingCollectionsPage() {
   const handleDelete = async (shopName: string) => {
     const latest = getLatestCollection(shopName);
     if (!latest || latest.numericId == null) {
-      toast.error("No collection to delete.");
+      toast.error(t("ops.collection.no_collection_to_delete"));
       return;
     }
     const shopId = collectionService.getShopIdForName(shopName);
@@ -315,7 +317,7 @@ export default function PendingCollectionsPage() {
       try {
         const recent = await collectionService.fetchRecentCollectionsForShop(shopId, 1);
         if (recent[0]?.canDelete === false) {
-          toast.error("Cannot delete – collection is outside the 7-day deletion window.");
+          toast.error(t("ops.collection.cannot_delete_window"));
           return;
         }
       } catch {
@@ -325,9 +327,9 @@ export default function PendingCollectionsPage() {
     const result = await collectionService.deletePendingCollection(String(latest.numericId));
     if (result.success) {
       await refreshData();
-      toast.success("Collection deleted successfully.");
+      toast.success(t("ops.collection.deleted_success"));
     } else {
-      toast.error(result.message ?? "Delete failed.");
+      toast.error(result.message ?? t("ops.collection.delete_failed"));
     }
   };
 
@@ -353,9 +355,9 @@ export default function PendingCollectionsPage() {
           // Keep prior summaries if refetch fails
         }
       }
-      toast.success("Collection refreshed");
+      toast.success(t("ops.collection.refreshed"));
     } catch (error) {
-      toast.error("Failed to refresh data.");
+      toast.error(t("ops.collection.failed_refresh"));
     }
   };
 
@@ -374,7 +376,7 @@ export default function PendingCollectionsPage() {
     setAppliedRecoveryThreshold(0);
     setAppliedSearchQuery("");
     setCurrentPage(1);
-    toast.info("Filters reset successfully.");
+    toast.info(t("ops.collection.filters_reset"));
   };
 
   const hasPendingFilters =
@@ -399,7 +401,7 @@ export default function PendingCollectionsPage() {
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center">
           <div className="inline-flex items-center gap-2 text-slate-400 text-sm font-medium">
             <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin" />
-            Loading pending collections...
+            {t("ops.collection.loading_pending")}
           </div>
         </div>
       </div>

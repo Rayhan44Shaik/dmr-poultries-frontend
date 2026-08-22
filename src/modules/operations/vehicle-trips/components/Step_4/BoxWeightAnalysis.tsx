@@ -3,6 +3,7 @@ import { Scale, AlertTriangle, AlertCircle, Box, FileText } from "lucide-react";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { useI18n } from "../../../../../i18n";
 
 interface Props {
   boxDetails?: BoxDetail[];
@@ -25,6 +26,7 @@ export default function BoxWeightAnalysis({
   supervisorName = "N/A",
   tripDate = new Date().toLocaleDateString(),
 }: Props) {
+  const { t } = useI18n();
   // Aggregate unloaded details per box across all shop deliveries
   const analysisData = useMemo(() => {
     return boxDetails.map((box, index) => {
@@ -54,7 +56,7 @@ export default function BoxWeightAnalysis({
       ).join(", ");
 
       return {
-        boxNo: rawBox.boxNo ? `Box ${rawBox.boxNo}` : `Box ${index + 1}`,
+        boxNo: rawBox.boxNo ? `${t("ops.trip.box")} ${rawBox.boxNo}` : `${t("ops.trip.box")} ${index + 1}`,
         farmBirds,
         farmWeight,
         unloadedBirds,
@@ -62,10 +64,10 @@ export default function BoxWeightAnalysis({
         mortality,
         weightLoss,
         lossPercentage,
-        deliveredShops: deliveredShops || "Not Unloaded",
+        deliveredShops: deliveredShops || t("ops.trip.not_unloaded"),
       };
     });
-  }, [boxDetails, deliveries]);
+  }, [boxDetails, deliveries, t]);
 
   // Overall Totals
   const totalFarmWeight =
@@ -188,13 +190,13 @@ export default function BoxWeightAnalysis({
       {/* Top Header Bar with PDF Icon Button */}
       <div className="flex items-center justify-between pb-1">
         <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-          Box Weight Variance Summary
+          {t("ops.trip.box_weight_variance")}
         </h3>
         <button
           type="button"
           onClick={handleDownloadPDF}
           className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200/60 transition-colors flex items-center justify-center shrink-0"
-          title="Download PDF Report"
+          title={t("ops.trip.download_pdf_report")}
         >
           <FileText size={16} className="stroke-[2]" />
         </button>
@@ -204,7 +206,7 @@ export default function BoxWeightAnalysis({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl">
           <span className="text-[11px] font-semibold text-slate-500 uppercase flex items-center gap-1">
-            <Scale size={13} className="text-blue-600" /> Loaded Farm Wt
+            <Scale size={13} className="text-blue-600" /> {t("ops.trip.loaded_farm_wt")}
           </span>
           <p className="text-base font-bold text-slate-800 mt-1">
             {totalFarmWeight.toFixed(2)} Kg
@@ -213,7 +215,7 @@ export default function BoxWeightAnalysis({
 
         <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl">
           <span className="text-[11px] font-semibold text-slate-500 uppercase flex items-center gap-1">
-            <Scale size={13} className="text-emerald-600" /> Unloaded Wt
+            <Scale size={13} className="text-emerald-600" /> {t("ops.trip.unloaded_wt")}
           </span>
           <p className="text-base font-bold text-slate-800 mt-1">
             {totalUnloadedWeight.toFixed(2)} Kg
@@ -228,7 +230,7 @@ export default function BoxWeightAnalysis({
           }`}
         >
           <span className="text-[11px] font-semibold text-amber-700 uppercase flex items-center gap-1">
-            <AlertCircle size={13} className="text-amber-600" /> Transit Wt Loss
+            <AlertCircle size={13} className="text-amber-600" /> {t("ops.trip.transit_wt_loss")}
           </span>
           <p className="text-base font-bold text-amber-900 mt-1">
             {totalWeightLoss.toFixed(2)} Kg{" "}
@@ -246,7 +248,7 @@ export default function BoxWeightAnalysis({
           }`}
         >
           <span className="text-[11px] font-semibold text-rose-700 uppercase flex items-center gap-1">
-            <AlertTriangle size={13} className="text-rose-600" /> Total Mortality
+            <AlertTriangle size={13} className="text-rose-600" /> {t("operations.total_mortality")}
           </span>
           <p className="text-base font-bold text-rose-900 mt-1">
             {totalMortality} Birds

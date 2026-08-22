@@ -1,20 +1,22 @@
-const CONFIG_MESSAGE =
-  "Email service is not configured. Please contact the administrator.";
+import { translate } from "../../../../i18n";
 
-const GENERIC_MESSAGE =
-  "Unable to send the email. Please try again or contact the administrator.";
+const CONFIG_MESSAGE = () =>
+  translate("ops.trip.email_not_configured");
+
+const GENERIC_MESSAGE = () =>
+  translate("ops.trip.email_send_failed");
 
 const SECRETISH = /smtp[_-]?host|smtp[_-]?user|smtp[_-]?pass|password|api[_-]?key|secret|stack/i;
 
 export function userFacingDeliveryEmailError(message?: string | null): string {
   const text = String(message ?? "").trim();
-  if (!text) return GENERIC_MESSAGE;
-  if (/not configured/i.test(text)) return CONFIG_MESSAGE;
-  if (SECRETISH.test(text)) return GENERIC_MESSAGE;
+  if (!text) return GENERIC_MESSAGE();
+  if (/not configured/i.test(text)) return CONFIG_MESSAGE();
+  if (SECRETISH.test(text)) return GENERIC_MESSAGE();
   return text;
 }
 
-export const EMAIL_SENT_TOAST = "✓ Email sent successfully";
+export const EMAIL_SENT_TOAST = () => translate("ops.trip.email_sent_toast");
 
 export type DeliveryEmailAttemptResult = {
   success: boolean;

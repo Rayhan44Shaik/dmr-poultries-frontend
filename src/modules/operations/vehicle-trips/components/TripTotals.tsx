@@ -1,12 +1,14 @@
 import React, { useMemo } from "react";
 import { Store, Bird, Scale, HeartPulse } from "lucide-react";
 import type { ShopDelivery } from "../types/trip";
+import { useI18n } from "../../../../i18n";
 
 interface Props {
   rows: ShopDelivery[];
 }
 
 function TripTotals({ rows }: Props) {
+  const { t } = useI18n();
   const safeRows = rows ?? [];
 
   const totals = useMemo(() => {
@@ -19,7 +21,7 @@ function TripTotals({ rows }: Props) {
 
   const cards = [
     {
-      label: "Total Shops",
+      label: t("ops.trip.total_shops"),
       value: totals.totalShops,
       icon: <Store size={18} />,
       bg: "bg-blue-50",
@@ -27,7 +29,7 @@ function TripTotals({ rows }: Props) {
       border: "border-blue-200"
     },
     {
-      label: "Total Birds",
+      label: t("ops.trip.total_birds"),
       value: totals.totalBirds.toLocaleString(),
       icon: <Bird size={18} />,
       bg: "bg-green-50",
@@ -35,7 +37,7 @@ function TripTotals({ rows }: Props) {
       border: "border-green-200"
     },
     {
-      label: "Total Weight",
+      label: t("ops.trip.total_weight"),
       value: `${totals.totalWeight.toFixed(2)} Kg`,
       icon: <Scale size={18} />,
       bg: "bg-orange-50",
@@ -43,7 +45,7 @@ function TripTotals({ rows }: Props) {
       border: "border-orange-200"
     },
     {
-      label: "Total Mortality",
+      label: t("operations.total_mortality"),
       value: totals.totalMortality,
       icon: <HeartPulse size={18} />,
       bg: "bg-red-50",

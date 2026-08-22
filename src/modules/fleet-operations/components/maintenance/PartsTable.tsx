@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Trash2, Plus, ShoppingBag } from 'lucide-react';
+import { useI18n } from '../../../../i18n';
 import type { PartItem } from '../../types';
 
 interface PartsTableProps {
@@ -9,6 +10,7 @@ interface PartsTableProps {
 }
 
 const PartsTable = ({ parts, setParts, hideSubline = false }: PartsTableProps) => {
+  const { t } = useI18n();
   const updatePart = (index: number, field: keyof PartItem, value: any) => {
     const newParts = [...parts];
     newParts[index] = { ...newParts[index], [field]: value };
@@ -80,10 +82,10 @@ const PartsTable = ({ parts, setParts, hideSubline = false }: PartsTableProps) =
           </div>
           <div>
             <h4 className="text-sm font-semibold text-gray-800 tracking-wide">
-              Parts / Items Used <span className="text-red-500">*</span>
+              {t('fleet.maintenance_form.parts_title')} <span className="text-red-500">*</span>
             </h4>
             {!hideSubline && (
-              <p className="text-[10px] text-gray-400 font-medium -mt-0.5">Track inventory and repair costs</p>
+              <p className="text-[10px] text-gray-400 font-medium -mt-0.5">{t('fleet.maintenance_form.parts_subtitle')}</p>
             )}
           </div>
         </div>
@@ -93,7 +95,7 @@ const PartsTable = ({ parts, setParts, hideSubline = false }: PartsTableProps) =
           className="inline-flex items-center gap-1.5 h-8 px-3 text-[11px] font-bold uppercase tracking-wider bg-green-600 text-white border border-green-700 rounded-lg hover:bg-green-700 transition-all shadow-sm"
         >
           <Plus className="w-3.5 h-3.5" />
-          Add Row
+          {t('fleet.maintenance_form.add_row')}
         </button>
       </div>
 
@@ -103,22 +105,22 @@ const PartsTable = ({ parts, setParts, hideSubline = false }: PartsTableProps) =
           <thead className="bg-gray-50/80">
             <tr>
               <th className="w-[28%] px-3 py-2.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                Item Name <span className="text-red-500">*</span>
+                {t('fleet.parts.item_name')} <span className="text-red-500">*</span>
               </th>
               <th className="w-[22%] px-3 py-2.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                Specification
+                {t('fleet.parts.specification')}
               </th>
               <th className="w-[12%] px-3 py-2.5 text-center text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                QTY
+                {t('fleet.parts.qty')}
               </th>
               <th className="w-[16%] px-3 py-2.5 text-right text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                RATE (₹)
+                {t('fleet.parts.rate')}
               </th>
               <th className="w-[16%] px-3 py-2.5 text-right text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                AMOUNT (₹)
+                {t('fleet.parts.amount')}
               </th>
               <th className="w-[6%] px-3 py-2.5 text-center text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                ACTION
+                {t('common.actions')}
               </th>
             </tr>
           </thead>
@@ -132,7 +134,7 @@ const PartsTable = ({ parts, setParts, hideSubline = false }: PartsTableProps) =
                       type="text"
                       value={part.name}
                       onChange={(e) => updatePart(index, 'name', e.target.value)}
-                      placeholder="e.g., Engine Oil Filter"
+                      placeholder={t('fleet.parts.item_placeholder')}
                       className="w-full h-9 px-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 placeholder-gray-400 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
                     />
                   </td>
@@ -141,7 +143,7 @@ const PartsTable = ({ parts, setParts, hideSubline = false }: PartsTableProps) =
                       type="text"
                       value={part.specification || ''}
                       onChange={(e) => updatePart(index, 'specification', e.target.value)}
-                      placeholder="e.g., OEM - 15W40"
+                      placeholder={t('fleet.parts.spec_placeholder')}
                       className="w-full h-9 px-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 placeholder-gray-400 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
                     />
                   </td>
@@ -180,7 +182,7 @@ const PartsTable = ({ parts, setParts, hideSubline = false }: PartsTableProps) =
                       onClick={() => removeRow(index)}
                       disabled={parts.length === 1}
                       className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-all disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
-                      title={parts.length === 1 ? "Cannot delete the only row" : "Remove item"}
+                      title={parts.length === 1 ? t('fleet.parts.cannot_delete_only_row') : t('fleet.parts.remove_item')}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -192,7 +194,7 @@ const PartsTable = ({ parts, setParts, hideSubline = false }: PartsTableProps) =
           <tfoot className="bg-gray-50/80 border-t border-gray-200">
             <tr>
               <td colSpan={4} className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">
-                Total Cost
+                {t('fleet.parts.total_cost')}
               </td>
               <td className="px-4 py-3 text-right">
                 <span className="inline-flex items-center px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-sm font-bold text-blue-700 shadow-sm">

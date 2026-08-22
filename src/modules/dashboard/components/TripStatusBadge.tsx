@@ -1,6 +1,8 @@
 // src/modules/dashboard/components/TripStatusBadge.tsx
 
 import { memo } from "react";
+import { translateStatus } from "../../../i18n";
+import { useI18n } from "../../../i18n";
 
 const STATUS_STYLES: Record<string, string> = {
   Draft: "bg-slate-100 text-slate-600 ring-slate-500/10 dark:bg-slate-700/60 dark:text-slate-300",
@@ -10,13 +12,15 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 function TripStatusBadge({ status }: { status: string }) {
+  const { t } = useI18n();
   const style = STATUS_STYLES[status] ?? STATUS_STYLES.Draft;
+  const displayStatus = translateStatus(t, status);
   return (
     <span
       className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${style}`}
     >
       <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
-      {status}
+      {displayStatus}
     </span>
   );
 }

@@ -1,6 +1,7 @@
 import { memo, useState, useCallback, useMemo } from 'react';
+import { useI18n } from '../../../i18n';
 import { useDocumentsData } from '../hooks/useDocumentsData';
-import { DOCUMENT_LABELS, DOCUMENT_TYPE_ORDER } from '../utils/constants';
+import { DOCUMENT_TYPE_ORDER } from '../utils/constants';
 import ErrorBoundary from '../../../components/common/ErrorBoundary';
 import DocumentSummaryTiles from '../components/documents/DocumentSummaryTiles';
 import DocumentMatrix from '../components/documents/DocumentMatrix';
@@ -36,6 +37,7 @@ interface DocumentsExpiryPageProps {
 }
 
 const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => {
+  const { t } = useI18n();
   const {
     totalCounts,
     statusCounts,
@@ -79,13 +81,13 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
     setIsRefreshing(true);
     try {
       await refetch?.();
-      showNotification('Data refreshed successfully', 'success');
+      showNotification(t('notification.data_refreshed'), 'success');
     } catch (error) {
-      showNotification('Failed to refresh data', 'error');
+      showNotification(t('fleet.documents.refresh_failed'), 'error');
     } finally {
       setIsRefreshing(false);
     }
-  }, [refetch, isRefreshing, showNotification]);
+  }, [refetch, isRefreshing, showNotification, t]);
 
   const handleEdit = useCallback((vehicle: any, docMap: any) => {
     const normalizedVehicle = {
@@ -109,13 +111,13 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
     ) => {
       try {
         await updateDocument(vehicleId, updates, files, removes);
-        showNotification('Document dates updated successfully', 'success');
+        showNotification(t('fleet.documents.updated_success'), 'success');
         setEditData(null);
       } catch (error: any) {
-        showNotification(error?.message || 'Failed to update documents', 'error');
+        showNotification(error?.message || t('fleet.documents.update_failed'), 'error');
       }
     },
-    [updateDocument, showNotification]
+    [updateDocument, showNotification, t]
   );
 
   const renderPagination = () => {
@@ -134,7 +136,7 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
           disabled={currentPage === 1}
           className={paginationNavBtnClass}
         >
-          Previous
+          {t('common.previous')}
         </button>
         {pageNumbers.map((num) => (
           <button
@@ -150,13 +152,18 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
           disabled={currentPage === totalPages}
           className={paginationNavBtnClass}
         >
-          Next
+          {t('common.next')}
         </button>
       </div>
     );
   };
 
   const editableDocTypes = DOCUMENT_TYPE_ORDER as unknown as string[];
+
+  const translatedDocLabels = useMemo(
+    () => Object.fromEntries(DOCUMENT_TYPE_ORDER.map((type) => [type, t(`fleet.doc_label.${type}`)])),
+    [t]
+  );
 
   return (
     <ErrorBoundary>
@@ -165,7 +172,7 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
       }`}>
         {loading && !hasData && (
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-8 text-center text-sm font-semibold text-slate-500 flex items-center justify-center gap-3">
-            <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" /> Loading permit documents...
+            <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" /> {t('fleet.documents.loading')}
           </div>
         )}
 
@@ -176,7 +183,7 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
               <span>{error}</span>
             </div>
             <button onClick={handleRefresh} className="px-4 py-1.5 bg-white border border-rose-200 rounded-lg text-xs font-bold text-rose-600 hover:bg-rose-100 transition-colors shadow-sm">
-              Retry
+              {t('common.retry')}
             </button>
           </div>
         )}
@@ -184,7 +191,7 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
         <DocumentSummaryTiles
           counts={totalCounts}
           statusCounts={statusCounts}
-          docLabels={DOCUMENT_LABELS}
+          docLabels={translatedDocLabels}
         />
 
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden">
@@ -196,7 +203,7 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
                 <FileText className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-800 tracking-tight">Vehicle Document Status</h3>
+                <h3 className="text-base font-bold text-slate-800 tracking-tight">{t('fleet.documents.vehicle_document_status')}</h3>
               </div>
             </div>
 
@@ -211,7 +218,7 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
                     setSearchTerm(e.target.value);
                     setCurrentPage(1);
                   }}
-                  placeholder="Search by vehicle..."
+                  placeholder={t('fleet.documents.search_placeholder')}
                   className="w-full sm:w-72 pl-9 pr-8 py-2 text-sm border border-slate-200/80 rounded-xl bg-slate-50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm text-slate-700 placeholder:text-slate-400"
                 />
                 {searchTerm && (
@@ -234,7 +241,7 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
                 className="h-[38px] px-3.5 inline-flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 hover:text-blue-600 text-slate-600 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
-                <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                <span className="hidden sm:inline">{isRefreshing ? t('fleet.documents.refreshing') : t('common.refresh')}</span>
               </button>
             </div>
           </div>
@@ -245,14 +252,14 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
               <DocumentMatrix
                 matrix={paginatedMatrix}
                 docTypes={DOCUMENT_TYPE_ORDER as unknown as string[]}
-                docLabels={DOCUMENT_LABELS}
+                docLabels={translatedDocLabels}
                 getStatusColor={getStatusColor}
                 formatExpiryDate={formatExpiryDate}
                 onEdit={handleEdit}
               />
             ) : (
               <div className="py-16 text-center text-slate-400 text-sm font-medium">
-                No vehicles found matching your criteria.
+                {t('fleet.documents.no_vehicles_match')}
               </div>
             )}
           </div>

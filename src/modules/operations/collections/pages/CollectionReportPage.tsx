@@ -28,6 +28,7 @@ import {
   opsPdfButtonClass,
   opsExcelButtonClass,
 } from "../../../../shared/ui/operationsStyles";
+import { useI18n } from "../../../../i18n";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -50,6 +51,7 @@ type Props = {
 };
 
 export default function CollectionReportPage({ embedded: _embedded = false }: Props) {
+  const { t } = useI18n();
   const { showNotification } = useSafeNotification();
 
   const [loading, setLoading] = useState(true);
@@ -105,7 +107,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
       setReport(data);
     } catch (error) {
       console.error("Failed to load collection report:", error);
-      setReportError("Failed to load the report from the server.");
+      setReportError(t("ops.collection.report_load_failed"));
       setReport(null);
     } finally {
       setLoading(false);
@@ -179,7 +181,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
     });
 
     if (rest.length > 0) {
-      const othersRow: any = { collector: `Others (${rest.length})`, total: 0 };
+      const othersRow: any = { collector: `${t("common.other")} (${rest.length})`, total: 0 };
       paymentModes.forEach((mode) => {
         othersRow[mode] = 0;
       });
@@ -214,42 +216,42 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
 
   const exportExcel = useCallback(() => {
     if (!report || report.totalCount === 0) {
-      showNotification("No data to export.", "error");
+      showNotification(t("ops.collection.no_data_export"), "error");
       return;
     }
     try {
       const wb = XLSX.utils.book_new();
 
       const pmData = paymentModeSummary.map((row) => ({
-        "Payment Mode": row.mode,
-        "No. of Collections": row.count,
-        "Amount Received": row.amount,
-        "Percentage (%)": row.percentage.toFixed(2),
+        [t("ops.collection.payment_mode")]: row.mode,
+        [t("ops.collection.no_of_collections")]: row.count,
+        [t("operations.amount_received")]: row.amount,
+        [t("ops.collection.percentage")]: row.percentage.toFixed(2),
       }));
       const ws1 = XLSX.utils.json_to_sheet(pmData);
-      XLSX.utils.book_append_sheet(wb, ws1, "Payment Mode Summary");
+      XLSX.utils.book_append_sheet(wb, ws1, t("ops.collection.payment_mode_summary"));
 
       const collectorRows = collectorSummary.rows.map((row: any) => {
-        const obj: any = { Collector: row.collector };
+        const obj: any = { [t("common.collector")]: row.collector };
         collectorSummary.paymentModes.forEach((mode: string) => {
           obj[mode] = row[mode] || 0;
         });
-        obj["Total"] = row.total;
+        obj[t("common.total")] = row.total;
         return obj;
       });
       const ws2 = XLSX.utils.json_to_sheet(collectorRows);
-      XLSX.utils.book_append_sheet(wb, ws2, "Collector Summary");
+      XLSX.utils.book_append_sheet(wb, ws2, t("ops.collection.collector_summary"));
 
       XLSX.writeFile(wb, getExportFileName("xlsx"));
-      showNotification("Excel exported successfully!", "success");
+      showNotification(t("notification.export_success"), "success");
     } catch (error) {
-      showNotification("Failed to export Excel.", "error");
+      showNotification(t("ops.collection.excel_failed"), "error");
     }
-  }, [report, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate]);
+  }, [report, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate, t]);
 
   const exportPDF = useCallback(() => {
     if (!report || report.totalCount === 0) {
-      showNotification("No data to export.", "error");
+      showNotification(t("ops.collection.no_data_export"), "error");
       return;
     }
     try {
@@ -259,16 +261,16 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
 
       doc.setFontSize(16);
       doc.setTextColor(30, 58, 138);
-      doc.text("Collection Report", margin, y);
+      doc.text(t("ops.collection.collection_report_title"), margin, y);
       y += 10;
       doc.setFontSize(10);
       doc.setTextColor(0, 0, 0);
-      doc.text(`Period: ${fromDate || "N/A"} to ${toDate || "N/A"}`, margin, y);
+      doc.text(`${t("common.from")}: ${fromDate || "N/A"} ${t("common.to")}: ${toDate || "N/A"}`, margin, y);
       y += 10;
 
       doc.setFontSize(12);
       doc.setTextColor(30, 58, 138);
-      doc.text("Collection Summary by Payment Mode", margin, y);
+      doc.text(t("ops.collection.payment_mode_summary"), margin, y);
       y += 5;
       const pmData = paymentModeSummary.map((row) => [
         row.mode,
@@ -277,7 +279,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
         row.percentage.toFixed(2) + "%",
       ]);
       autoTable(doc, {
-        head: [["Payment Mode", "No. of Collections", "Amount Received", "Percentage (%)"]],
+        head: [[t("ops.collection.payment_mode"), t("ops.collection.no_of_collections"), t("operations.amount_received"), t("ops.collection.percentage")]],
         body: pmData,
         startY: y,
         theme: "striped",
@@ -288,9 +290,9 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
 
       doc.setFontSize(12);
       doc.setTextColor(30, 58, 138);
-      doc.text("Collection Summary by Collector", margin, y);
+      doc.text(t("ops.collection.collector_summary"), margin, y);
       y += 5;
-      const header = ["Collector", ...collectorSummary.paymentModes, "Total"];
+      const header = [t("common.collector"), ...collectorSummary.paymentModes, t("common.total")];
       const body = collectorSummary.rows.map((row: any) => {
         const rowData: any[] = [row.collector];
         collectorSummary.paymentModes.forEach((mode: string) => {
@@ -309,11 +311,11 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
       });
 
       doc.save(getExportFileName("pdf"));
-      showNotification("PDF exported successfully!", "success");
+      showNotification(t("notification.export_success"), "success");
     } catch (error) {
-      showNotification("Failed to export PDF.", "error");
+      showNotification(t("ops.collection.pdf_failed"), "error");
     }
-  }, [report, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate]);
+  }, [report, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate, t]);
 
   const resetFilters = useCallback(() => {
     setFromDate(weekBounds.from);
@@ -322,16 +324,16 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
     setCollector("");
     setPaymentMode("");
     shopSearch.setQuery("");
-    showNotification("Filters reset to default (current week).", "info");
-  }, [weekBounds, shopSearch, showNotification]);
+    showNotification(t("ops.collection.filters_reset_default"), "info");
+  }, [weekBounds, shopSearch, showNotification, t]);
 
-  if (loading && !report) return <div className="p-8 text-center text-slate-500">Loading...</div>;
+  if (loading && !report) return <div className="p-8 text-center text-slate-500">{t("common.loading")}</div>;
   if (reportError && !report) {
     return (
       <div className="p-8 text-center text-red-600">
         {reportError}{" "}
         <button onClick={() => void loadReport()} className="underline">
-          Retry
+          {t("common.retry")}
         </button>
       </div>
     );
@@ -349,7 +351,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
           <FileText size={15} /> PDF
         </button>
         <button onClick={resetFilters} className={opsSecondaryButtonClass}>
-          <RotateCcw size={14} /> Reset
+          <RotateCcw size={14} /> {t("common.reset")}
         </button>
       </div>
 
@@ -359,21 +361,21 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
           <DatePicker
             value={fromDate}
             onChange={setFromDate}
-            label="From Date *"
+            label={t("common.from") + " *"}
             className="w-full"
-            placeholder="Select date"
+            placeholder={t("placeholder.enter_date")}
             required
           />
           <DatePicker
             value={toDate}
             onChange={setToDate}
-            label="To Date *"
+            label={t("common.to") + " *"}
             className="w-full"
-            placeholder="Select date"
+            placeholder={t("placeholder.enter_date")}
             required
           />
           <div>
-            <label className={opsFilterLabelClass}>Shop Name</label>
+            <label className={opsFilterLabelClass}>{t("operations.shop_name")}</label>
             <div className="relative">
               <input
                 type="text"
@@ -381,7 +383,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                 onChange={(e) => shopSearch.handleInputChange(e.target.value)}
                 onFocus={() => shopSearch.setIsOpen(true)}
                 onBlur={() => setTimeout(() => shopSearch.setIsOpen(false), 200)}
-                placeholder="All Shops"
+                placeholder={t("ops.collection.all_shops")}
                 className={`${opsInputClass} pr-8`}
               />
               {shopSearch.query && (
@@ -409,7 +411,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                       shopSearch.setIsOpen(false);
                     }}
                   >
-                    All Shops
+                    {t("ops.collection.all_shops")}
                   </li>
                   {shopSearch.filteredShops.length > 0 ? (
                     shopSearch.filteredShops.slice(0, 5).map((shop) => (
@@ -425,37 +427,37 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                       </li>
                     ))
                   ) : (
-                    <li className="px-3 py-2 text-slate-500">No shops found</li>
+                    <li className="px-3 py-2 text-slate-500">{t("empty.no_shops")}</li>
                   )}
                 </ul>
               )}
             </div>
           </div>
           <div>
-            <label className={opsFilterLabelClass}>Collector</label>
+            <label className={opsFilterLabelClass}>{t("common.collector")}</label>
             <select
               value={collector}
               onChange={(e) => setCollector(e.target.value)}
               className={opsInputClass}
             >
-              <option value="">All Collectors</option>
+              <option value="">{t("ops.collection.all_collectors")}</option>
               {collectors.map((name) => (
                 <option key={name} value={name}>{name}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className={opsFilterLabelClass}>Payment Mode</label>
+            <label className={opsFilterLabelClass}>{t("operations.payment_mode")}</label>
             <select
               value={paymentMode}
               onChange={(e) => setPaymentMode(e.target.value)}
               className={opsInputClass}
             >
-              <option value="">All Modes</option>
-              <option value="Cash">Cash</option>
+              <option value="">{t("ops.collection.all_modes")}</option>
+              <option value="Cash">{t("accounts.cash")}</option>
               <option value="Union Bank">Union Bank</option>
               <option value="HDFC Bank">HDFC Bank</option>
-              <option value="Others">Others</option>
+              <option value="Others">{t("common.other")}</option>
             </select>
           </div>
         </div>
@@ -468,7 +470,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
             <Wallet size={24} />
           </div>
           <div>
-            <div className="text-sm font-medium text-slate-500">Total Collections</div>
+            <div className="text-sm font-medium text-slate-500">{t("ops.collection.total_collections")}</div>
             <div className="text-2xl font-bold text-slate-800">{formatCurrency(totalCollections)}</div>
           </div>
         </div>
@@ -478,7 +480,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
               <Users size={24} />
             </div>
             <div>
-              <div className="text-sm font-medium text-slate-500">Total Collectors</div>
+              <div className="text-sm font-medium text-slate-500">{t("ops.collection.total_collectors")}</div>
               <div className="text-2xl font-bold text-slate-800">{totalCollectorsCount}</div>
             </div>
           </div>
@@ -497,15 +499,15 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100">
-            <h4 className="text-sm font-semibold text-slate-800">Payment Mode Summary</h4>
+            <h4 className="text-sm font-semibold text-slate-800">{t("ops.collection.payment_mode_summary")}</h4>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-100">
               <thead className="bg-slate-50/80">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Payment Mode</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">No.</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">Amount</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.payment_mode")}</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.no_short")}</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("table.amount")}</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-600">%</th>
                 </tr>
               </thead>
@@ -515,7 +517,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                     key={row.mode}
                     className={row.mode === "Total" ? "bg-amber-50/60 font-semibold" : "hover:bg-slate-50/50"}
                   >
-                    <td className="px-4 py-3 text-xs text-slate-800">{row.mode}</td>
+                    <td className="px-4 py-3 text-xs text-slate-800">{row.mode === "Total" ? t("common.total") : row.mode}</td>
                     <td className="px-4 py-3 text-right text-xs text-slate-600">{row.count}</td>
                     <td className="px-4 py-3 text-right text-xs text-slate-600">{formatCurrency(row.amount)}</td>
                     <td className="px-4 py-3 text-center">
@@ -540,19 +542,19 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
 
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100">
-            <h4 className="text-sm font-semibold text-slate-800">Collector Summary</h4>
+            <h4 className="text-sm font-semibold text-slate-800">{t("ops.collection.collector_summary")}</h4>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-100">
               <thead className="bg-slate-50/80">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Collector</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">{t("common.collector")}</th>
                   {collectorSummary.paymentModes.map((mode: string) => (
                     <th key={mode} className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
                       {mode}
                     </th>
                   ))}
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">Total</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("common.total")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
@@ -563,7 +565,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                       key={idx}
                       className={isTotal ? "bg-amber-50/60 font-semibold" : "hover:bg-slate-50/50"}
                     >
-                      <td className="px-4 py-3 text-xs text-slate-800">{row.collector}</td>
+                      <td className="px-4 py-3 text-xs text-slate-800">{row.collector === "Total" ? t("common.total") : row.collector}</td>
                       {collectorSummary.paymentModes.map((mode: string) => (
                         <td key={mode} className="px-4 py-3 text-right text-xs text-slate-600">
                           {formatCurrency(row[mode] || 0)}

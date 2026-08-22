@@ -5,6 +5,7 @@ import type { Shop } from "../../../../masters/shops/types/shop";
 import { collectionService } from "../../services/collectionService";
 import { useSafeNotification } from "../../../../../hooks/useSafeNotification";
 import { opsSecondaryButtonClass, opsPrimaryButtonClass } from "../../../../../shared/ui/operationsStyles";
+import { useI18n } from "../../../../../i18n";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -39,6 +40,7 @@ export function ShopCollectionDetailModal({
   latestCollection,
   onRefresh,
 }: ShopCollectionDetailModalProps) {
+  const { t } = useI18n();
   const { showNotification } = useSafeNotification();
 
   const shopCollections = allCollections
@@ -89,7 +91,7 @@ export function ShopCollectionDetailModal({
 
   const handleStageDelete = (collection: CollectionApiEntry) => {
     if (!collection.canDelete) {
-      showNotification("Cannot delete – collection is outside the 7-day deletion window.", "error");
+      showNotification(t("ops.collection.cannot_delete_window"), "error");
       return;
     }
     setDeletingIds((prev) => {
@@ -116,17 +118,17 @@ export function ShopCollectionDetailModal({
       try {
         const result = await collectionService.deletePendingCollection(String(id));
         if (!result.success) {
-          showNotification(result.message ?? `Failed to delete collection ${id}.`, "error");
+          showNotification(result.message ?? t("ops.collection.failed_delete_collection", { id }), "error");
           hasError = true;
         }
       } catch {
-        showNotification(`Failed to delete collection ${id}.`, "error");
+        showNotification(t("ops.collection.failed_delete_collection", { id }), "error");
         hasError = true;
       }
     }
 
     if (!hasError && deletingIds.size > 0) {
-      showNotification(`${deletingIds.size} collection(s) deleted successfully.`, "success");
+      showNotification(t("ops.collection.deleted_count_success", { count: deletingIds.size }), "success");
       await onRefresh();
     }
 
@@ -152,19 +154,19 @@ export function ShopCollectionDetailModal({
               <Eye size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-800">Shop Collection Details</h3>
+              <h3 className="text-lg font-semibold text-slate-800">{t("ops.collection.shop_collection_details")}</h3>
               <p className="text-sm text-slate-600 font-medium mt-0.5">{shopName}</p>
               {shopInfo && (
                 <div className="flex flex-wrap gap-4 mt-2 text-sm text-slate-600">
                   <span className="flex items-center gap-1">
                     <User size={14} className="text-slate-400" />
-                    <span>Owner: <span className="font-medium text-slate-800">{shopInfo.ownerName || "—"}</span></span>
+                    <span>{t("ops.collection.owner_label")}: <span className="font-medium text-slate-800">{shopInfo.ownerName || "—"}</span></span>
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="flex items-center gap-1">
                       <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                     </span>
-                    <span>Mobile: <span className="font-medium text-slate-800">{shopInfo.phoneNumber || "—"}</span></span>
+                    <span>{t("ops.collection.mobile_label")}: <span className="font-medium text-slate-800">{shopInfo.phoneNumber || "—"}</span></span>
                   </span>
                 </div>
               )}
@@ -173,7 +175,7 @@ export function ShopCollectionDetailModal({
           <button
             onClick={onClose}
             className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 shrink-0"
-            aria-label="Close"
+            aria-label={t("common.close")}
             disabled={deleting.size > 0}
           >
             <X size={18} />
@@ -187,21 +189,21 @@ export function ShopCollectionDetailModal({
             <div className="rounded-xl border border-red-200 bg-red-50 p-4">
               <div className="flex items-center gap-2 text-xs font-medium text-red-600 mb-1">
                 <IndianRupee size={14} />
-                Current Outstanding
+                {t("ops.collection.current_outstanding")}
               </div>
               <div className="text-lg font-bold text-red-700">{formatCurrency(currentOutstanding)}</div>
             </div>
             <div className="rounded-xl border border-green-200 bg-green-50 p-4">
               <div className="flex items-center gap-2 text-xs font-medium text-green-600 mb-1">
                 <CreditCard size={14} />
-                Total Collections
+                {t("ops.collection.total_collections")}
               </div>
               <div className="text-lg font-bold text-green-700">{formatCurrency(totalCollections)}</div>
             </div>
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
               <div className="flex items-center gap-2 text-xs font-medium text-blue-600 mb-1">
                 <Calendar size={14} />
-                Last Collection
+                {t("ops.collection.last_collection")}
               </div>
               <div className="text-lg font-bold text-blue-700">{formatDate(lastCollectionDate)}</div>
             </div>
@@ -212,27 +214,27 @@ export function ShopCollectionDetailModal({
             <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
               <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <FileText size={14} className="text-slate-500" />
-                Recent Collection Transactions
+                {t("ops.collection.recent_transactions")}
               </h4>
-              <span className="text-xs text-slate-500">Latest 10 transactions</span>
+              <span className="text-xs text-slate-500">{t("ops.collection.latest_10_transactions")}</span>
             </div>
             {recentLoading && recentList.length === 0 ? (
               <div className="p-8 text-center text-slate-500">
                 <Loader2 size={24} className="animate-spin mx-auto mb-2 text-slate-400" />
-                Loading recent collections...
+                {t("ops.collection.loading_recent")}
               </div>
             ) : recentList.length === 0 ? (
-              <div className="p-8 text-center text-slate-500">No collections found for this shop.</div>
+              <div className="p-8 text-center text-slate-500">{t("ops.collection.no_collections_for_shop")}</div>
             ) : (
               <div className="overflow-x-auto max-h-[400px]">
                 <table className="min-w-full divide-y divide-slate-100">
                   <thead className="bg-slate-50 sticky top-0 z-10">
                     <tr>
-                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Collection ID</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Date</th>
-                      <th className="px-4 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Amount</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Mode</th>
-                      <th className="px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-slate-500">Action</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t("ops.collection.collection_id")}</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t("table.date")}</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-slate-500">{t("table.amount")}</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t("table.mode")}</th>
+                      <th className="px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-slate-500">{t("table.actions")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
@@ -257,7 +259,7 @@ export function ShopCollectionDetailModal({
                               <button
                                 onClick={() => handleStageDelete(col)}
                                 disabled={isDeleting}
-                                title="Undo delete"
+                                title={t("ops.collection.undo_delete")}
                                 className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-green-600 hover:bg-green-50 transition disabled:opacity-50"
                               >
                                 {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
@@ -266,7 +268,7 @@ export function ShopCollectionDetailModal({
                               <button
                                 onClick={() => handleStageDelete(col)}
                                 disabled={isDeleting || !col.canDelete || col.status !== "Approved" || col.deleted}
-                                title={!col.canDelete || col.status !== "Approved" || col.deleted ? "Cannot delete – outside 7-day window or not approved" : "Stage for deletion"}
+                                title={!col.canDelete || col.status !== "Approved" || col.deleted ? t("ops.collection.cannot_delete_7day") : t("ops.collection.stage_delete")}
                                 className="inline-flex items-center justify-center w-8 h-8 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
                               >
                                 {isDeleting ? (
@@ -285,7 +287,7 @@ export function ShopCollectionDetailModal({
                 {recentList.length >= 10 && (
                   <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/50">
                     <p className="text-xs text-slate-400 text-center">
-                      Showing latest 10 of {recentList.length}+ collections — full history is available in Shop Ledger.
+                      {t("ops.collection.showing_latest_10", { count: recentList.length })}
                     </p>
                   </div>
                 )}
@@ -302,7 +304,7 @@ export function ShopCollectionDetailModal({
             className={opsSecondaryButtonClass}
           >
             <X size={16} className="mr-1" />
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             onClick={handleSaveAndClose}
@@ -312,17 +314,17 @@ export function ShopCollectionDetailModal({
             {deleting.size > 0 ? (
               <>
                 <Loader2 size={16} className="animate-spin mr-1" />
-                Saving...
+                {t("common.saving")}
               </>
             ) : deletingIds.size > 0 ? (
               <>
                 <Save size={16} className="mr-1" />
-                Save & Close ({deletingIds.size})
+                {t("ops.collection.save_and_close", { count: deletingIds.size })}
               </>
             ) : (
               <>
                 <X size={16} className="mr-1" />
-                Close
+                {t("common.close")}
               </>
             )}
           </button>

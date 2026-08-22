@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useI18n } from "../../../../i18n";
 import {
   ComposedChart,
   Bar,
@@ -22,7 +23,7 @@ const formatDate = (dateStr: string): string => {
   if (!dateStr) return "";
   if (dateStr.includes("W")) {
     const weekNum = dateStr.split("W")[1];
-    return `Week ${weekNum}`;
+    return `W${weekNum}`;
   }
   if (/^\d{4}-\d{1,2}$/.test(dateStr)) {
     const [year, month] = dateStr.split("-").map(Number);
@@ -72,13 +73,14 @@ const aggregateData = (
 };
 
 const CustomTooltip = ({ active, payload, _label }: any) => {
+  const { t } = useI18n();
   if (!active || !payload) return null;
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3">
       <p className="text-xs font-medium text-slate-600 mb-1">{formatDate(_label)}</p>
       {payload.map((item: any, idx: number) => (
         <p key={idx} className="text-sm" style={{ color: item.color }}>
-          {item.name}: {item.name === "Trips" ? item.value : `${item.value.toLocaleString()} ${item.name === "Sales (KG)" ? "KG" : "Birds"}`}
+          {item.name}: {item.name === t("ops.dashboard.trips") ? item.value : `${item.value.toLocaleString()} ${item.name === t("ops.dashboard.sales_kg") ? "KG" : "Birds"}`}
         </p>
       ))}
     </div>
@@ -104,6 +106,7 @@ const CustomLegend = ({ payload }: any) => (
 );
 
 export default function TrendChart({ data }: TrendChartProps) {
+  const { t } = useI18n();
   const [granularity, setGranularity] = useState<Granularity>("daily");
 
   const chartData = data || [];
@@ -111,7 +114,7 @@ export default function TrendChart({ data }: TrendChartProps) {
   if (chartData.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
-        <p className="text-sm">No data available</p>
+        <p className="text-sm">{t("empty.no_data")}</p>
       </div>
     );
   }
@@ -129,16 +132,16 @@ export default function TrendChart({ data }: TrendChartProps) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-slate-700">Trips & Sales Trend</h3>
+        <h3 className="text-sm font-semibold text-slate-700">{t("ops.dashboard.trips_sales_trend")}</h3>
 
         <select
           value={granularity}
           onChange={(e) => setGranularity(e.target.value as Granularity)}
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         >
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
+          <option value="daily">{t("ops.dashboard.daily")}</option>
+          <option value="weekly">{t("ops.dashboard.weekly")}</option>
+          <option value="monthly">{t("ops.dashboard.monthly")}</option>
         </select>
       </div>
 
@@ -170,7 +173,7 @@ export default function TrendChart({ data }: TrendChartProps) {
             domain={[0, tripsMax]}
             tickCount={6}
           >
-            <Label value="Trips" angle={-90} position="insideLeft" style={{ textAnchor: "middle", fill: "#64748b", fontSize: 11 }} offset={-10} />
+            <Label value={t("ops.dashboard.trips")} angle={-90} position="insideLeft" style={{ textAnchor: "middle", fill: "#64748b", fontSize: 11 }} offset={-10} />
           </YAxis>
 
           {/* ── Right Y-axis 1: Sales (KG) ── */}
@@ -184,7 +187,7 @@ export default function TrendChart({ data }: TrendChartProps) {
             tickCount={6}
             tickFormatter={(value) => (value >= 1000 ? `${(value / 1000).toFixed(0)}K` : value.toString())}
           >
-            <Label value="Sales (KG)" angle={90} position="insideRight" style={{ textAnchor: "middle", fill: "#22c55e", fontSize: 11 }} offset={-5} />
+            <Label value={t("ops.dashboard.sales_kg")} angle={90} position="insideRight" style={{ textAnchor: "middle", fill: "#22c55e", fontSize: 11 }} offset={-5} />
           </YAxis>
 
           {/* ── Right Y-axis 2: Mortality (Birds) ── */}
@@ -205,7 +208,7 @@ export default function TrendChart({ data }: TrendChartProps) {
           <Legend content={<CustomLegend />} />
 
           {/* Blue bar: Trips */}
-          <Bar yAxisId="left" dataKey="trips" fill="#3b82f6" name="Trips" barSize={20} radius={[4, 4, 0, 0]} />
+          <Bar yAxisId="left" dataKey="trips" fill="#3b82f6" name={t("ops.dashboard.trips")} barSize={20} radius={[4, 4, 0, 0]} />
 
           {/* Green line: Sales (KG) */}
           <Line
@@ -216,7 +219,7 @@ export default function TrendChart({ data }: TrendChartProps) {
             strokeWidth={3}
             dot={{ r: 3, fill: "#22c55e", stroke: "#22c55e", strokeWidth: 0 }}
             activeDot={{ r: 5 }}
-            name="Sales (KG)"
+            name={t("ops.dashboard.sales_kg")}
           />
 
           {/* Red line: Mortality (Birds) */}
@@ -228,7 +231,7 @@ export default function TrendChart({ data }: TrendChartProps) {
             strokeWidth={3}
             dot={{ r: 3, fill: "#ef4444", stroke: "#ef4444", strokeWidth: 0 }}
             activeDot={{ r: 5 }}
-            name="Mortality (Birds)"
+            name={t("ops.dashboard.mortality_birds")}
           />
         </ComposedChart>
       </ResponsiveContainer>

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { X, Save, Eye, Calendar, User, CreditCard, Hash, IndianRupee, FileText, Loader2 } from "lucide-react";
 import type { Collection, CollectionApiEntry } from "../../types/collection";
 import { collectionService } from "../../services/collectionService";
+import { useI18n } from "../../../../../i18n";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -40,6 +41,7 @@ export function EditCollectionModal({
   collection,
   onRefresh,
 }: EditCollectionModalProps) {
+  const { t } = useI18n();
   const shopCollections = allCollections
     .filter((c) => c.shopName === shopName)
     .sort((a, b) => b.collectionDate.localeCompare(a.collectionDate));
@@ -115,7 +117,7 @@ export function EditCollectionModal({
 
   const handleSave = async () => {
     if (!selected) {
-      alert("No collection to edit. Please create a new collection.");
+      alert(t("ops.collection.no_collection_to_edit"));
       return;
     }
     const updated: Collection = {
@@ -132,7 +134,7 @@ export function EditCollectionModal({
       onRefresh();
       onClose();
     } else {
-      alert("Failed to update. The collection may be locked or deleted.");
+      alert(t("ops.collection.failed_update_locked"));
     }
   };
 
@@ -230,7 +232,7 @@ export function EditCollectionModal({
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-slate-800">
-                  {isView ? "View Collection" : "Edit Collection"}
+                  {isView ? t("ops.collection.view_collection") : t("ops.collection.edit_collection")}
                 </h3>
                 <p className="text-sm text-slate-500">{shopName}</p>
               </div>
@@ -250,40 +252,40 @@ export function EditCollectionModal({
             <>
               {/* Selected Collection Details */}
               <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-                <h4 className="mb-2 text-sm font-semibold text-slate-700">Selected Collection Details</h4>
+                <h4 className="mb-2 text-sm font-semibold text-slate-700">{t("ops.collection.selected_details")}</h4>
                 {renderField({
-                  label: "Collection No.",
+                  label: t("ops.collection.collection_no_label"),
                   value: formData.collectionNo || "-",
                   icon: Hash,
                 })}
                 {renderField({
-                  label: "Collection Date",
+                  label: t("operations.collection_date"),
                   value: formatDate(formData.collectionDate),
                   icon: Calendar,
                 })}
                 {renderField({
-                  label: "Collector",
+                  label: t("common.collector"),
                   value: formData.collectorName || "-",
                   icon: User,
                 })}
                 {renderField({
-                  label: "Payment Mode",
+                  label: t("operations.payment_mode"),
                   value: formData.paymentModeName,
                   icon: CreditCard,
                 })}
                 {renderField({
-                  label: "Reference No.",
+                  label: t("operations.reference_no"),
                   value: formData.referenceNo || "-",
                   icon: Hash,
                 })}
                 {renderField({
-                  label: "Amount Received",
+                  label: t("operations.amount_received"),
                   value: formData.amount,
                   icon: IndianRupee,
                   type: "number",
                 })}
                 {renderField({
-                  label: "Remarks",
+                  label: t("common.remarks"),
                   value: formData.remarks || "-",
                   icon: FileText,
                 })}
@@ -293,41 +295,41 @@ export function EditCollectionModal({
               <div className="mt-6">
                 <div className="mb-3 flex items-center justify-between">
                   <h4 className="text-sm font-semibold text-slate-700">
-                    Recent 10 Shop Credits
+                    {t("ops.collection.recent_10_credits")}
                   </h4>
                   {recentLoading && (
                     <span className="inline-flex items-center gap-1 text-xs text-slate-400">
                       <Loader2 size={12} className="animate-spin" />
-                      Loading...
+                      {t("common.loading")}
                     </span>
                   )}
                 </div>
                 {recentLoading && recentList.length === 0 ? (
-                  <p className="text-sm text-slate-500">Loading recent collections...</p>
+                  <p className="text-sm text-slate-500">{t("ops.collection.loading_recent")}</p>
                 ) : recentList.length === 0 ? (
-                  <p className="text-sm text-slate-500">No collections found for this shop.</p>
+                  <p className="text-sm text-slate-500">{t("ops.collection.no_collections_for_shop")}</p>
                 ) : (
                   <div className="overflow-x-auto rounded-lg border border-slate-200">
                     <table className="min-w-full divide-y divide-slate-200">
                       <thead className="bg-slate-50">
                         <tr>
                           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                            Date
+                            {t("table.date")}
                           </th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                            Collection No.
+                            {t("table.collection_no")}
                           </th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                            Amount
+                            {t("table.amount")}
                           </th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                            Collector
+                            {t("table.collector")}
                           </th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                            Payment Mode
+                            {t("operations.payment_mode")}
                           </th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                            Status
+                            {t("table.status")}
                           </th>
                         </tr>
                       </thead>
@@ -350,7 +352,11 @@ export function EditCollectionModal({
                               {col.paymentMode || "-"}
                             </td>
                             <td className="px-3 py-2 text-sm text-slate-600">
-                              {col.status || "-"}
+                              {(() => {
+                                const k = "status." + String(col.status).toLowerCase().replace(/\s+/g, "_");
+                                const label = t(k);
+                                return label === k ? col.status || "-" : label;
+                              })()}
                             </td>
                           </tr>
                         ))}
@@ -358,8 +364,7 @@ export function EditCollectionModal({
                     </table>
                     {recentList.length >= 10 && (
                       <p className="px-3 py-2 text-xs text-slate-400">
-                        Showing latest 10 of {recentList.length}+ collections — full history is
-                        available in Shop Ledger.
+                        {t("ops.collection.showing_latest_10", { count: recentList.length })}
                       </p>
                     )}
                   </div>
@@ -371,7 +376,7 @@ export function EditCollectionModal({
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 {renderField({
-                  label: "Collection Date",
+                  label: t("operations.collection_date"),
                   value: formData.collectionDate,
                   icon: Calendar,
                   type: "date",
@@ -379,7 +384,7 @@ export function EditCollectionModal({
               </div>
               <div>
                 {renderField({
-                  label: "Collector",
+                  label: t("common.collector"),
                   value: formData.collectorName,
                   icon: User,
                   type: "text",
@@ -387,20 +392,20 @@ export function EditCollectionModal({
               </div>
               <div>
                 {renderField({
-                  label: "Payment Mode",
+                  label: t("operations.payment_mode"),
                   value: formData.paymentModeName,
                   icon: CreditCard,
                   type: "select",
                   options: [
-                    { value: "Cash", label: "Cash" },
-                    { value: "Bank Transfer", label: "Bank Transfer" },
-                    { value: "Cheque", label: "Cheque" },
+                    { value: "Cash", label: t("accounts.cash") },
+                    { value: "Bank Transfer", label: t("accounts.bank_transfer") },
+                    { value: "Cheque", label: t("accounts.cheque") },
                   ],
                 })}
               </div>
               <div>
                 {renderField({
-                  label: "Reference No.",
+                  label: t("operations.reference_no"),
                   value: formData.referenceNo,
                   icon: Hash,
                   type: "text",
@@ -409,7 +414,7 @@ export function EditCollectionModal({
               </div>
               <div>
                 {renderField({
-                  label: "Amount Received",
+                  label: t("operations.amount_received"),
                   value: formData.amount,
                   icon: IndianRupee,
                   type: "number",
@@ -419,14 +424,14 @@ export function EditCollectionModal({
                 <div>
                   <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">
                     <FileText size={14} className="text-slate-400" />
-                    Remarks (Optional)
+                    {t("ops.collection.remarks_optional")}
                   </label>
                   <textarea
                     value={formData.remarks}
                     onChange={(e) => handleChange("remarks", e.target.value)}
                     rows={2}
                     className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                    placeholder="Add any notes..."
+                    placeholder={t("ops.collection.add_notes")}
                   />
                 </div>
               </div>
@@ -440,7 +445,7 @@ export function EditCollectionModal({
             onClick={onClose}
             className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           >
-            {isView ? "Close" : "Cancel"}
+            {isView ? t("common.close") : t("common.cancel")}
           </button>
           {!isView && (
             <button
@@ -448,7 +453,7 @@ export function EditCollectionModal({
               className="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-5 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
             >
               <Save size={16} />
-              Save Changes
+              {t("ops.collection.save_changes")}
             </button>
           )}
           {isView && (
@@ -457,7 +462,7 @@ export function EditCollectionModal({
               className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-500"
             >
               <Eye size={16} />
-              Read Only
+              {t("ops.collection.read_only")}
             </button>
           )}
         </div>

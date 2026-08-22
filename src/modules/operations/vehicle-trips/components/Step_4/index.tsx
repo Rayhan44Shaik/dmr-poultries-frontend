@@ -20,6 +20,7 @@ import { computeDeliveryKpiTotals } from "./deliveryKpis";
 import type { DeliveriesBalanceError } from "../../../../../shared/trip/validation";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
+import { useI18n } from "../../../../../i18n";
 
 interface Props {
   rows: ShopDelivery[];
@@ -55,8 +56,8 @@ function ConfirmationModal({
   isOpen,
   title,
   message,
-  confirmLabel = "Yes, Proceed",
-  cancelLabel = "Cancel",
+  confirmLabel = "ops.trip.yes_proceed",
+  cancelLabel = "common.cancel",
   onConfirm,
   onCancel,
   type = "warning",
@@ -70,6 +71,7 @@ function ConfirmationModal({
   onCancel: () => void;
   type?: "warning" | "info";
 }) {
+  const { t } = useI18n();
   if (!isOpen) return null;
 
   const iconColor = type === "warning" ? "text-amber-600" : "text-emerald-600";
@@ -97,7 +99,7 @@ function ConfirmationModal({
             onClick={onCancel}
             className="px-5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-xs"
           >
-            {cancelLabel}
+            {t(cancelLabel)}
           </button>
           <button
             onClick={onConfirm}
@@ -107,7 +109,7 @@ function ConfirmationModal({
                 : "bg-emerald-600 hover:bg-emerald-700"
             }`}
           >
-            {confirmLabel}
+            {t(confirmLabel)}
           </button>
         </div>
       </div>
@@ -117,38 +119,38 @@ function ConfirmationModal({
 
 // ─── Balance Mismatch Panel ─────────────────────────────────────
 function DeliveryBalanceErrorPanel({ error }: { error: NonNullable<DeliveriesBalanceError> }) {
+  const { t } = useI18n();
   return (
     <div className="rounded-xl border border-red-300 bg-red-50 p-4 space-y-2">
       <p className="text-sm font-bold text-red-800 flex items-center gap-1.5">
-        <AlertCircle size={15} className="text-red-600" /> Balance mismatch — fix the values below before submitting.
+        <AlertCircle size={15} className="text-red-600" /> {t("ops.trip.balance_mismatch_fix")}
       </p>
       {error.birds && (
         <div className="text-xs text-red-800 space-y-0.5">
-          <p className="font-semibold">Birds</p>
-          <p className="pl-3">Pickup: <span className="font-bold">{error.birds.pickup}</span></p>
+          <p className="font-semibold">{t("common.birds")}</p>
+          <p className="pl-3">{t("ops.trip.pickup")}: <span className="font-bold">{error.birds.pickup}</span></p>
           <p className="pl-3">
-            Delivered: <span className="font-bold">{error.birds.delivered}</span> + Mortality:{" "}
+            {t("ops.trip.delivered")}: <span className="font-bold">{error.birds.delivered}</span> + {t("operations.mortality_count")}:{" "}
             <span className="font-bold">{error.birds.mortality}</span> ={" "}
             <span className="font-bold">{error.birds.delivered + error.birds.mortality}</span>
           </p>
           <p className="pl-3 text-red-700">
-            Pickup ({error.birds.pickup}) must equal Delivered + Mortality ({error.birds.delivered + error.birds.mortality}).
+            {t("ops.trip.pickup_must_equal", { pickup: error.birds.pickup, total: error.birds.delivered + error.birds.mortality })}
           </p>
         </div>
       )}
       {error.weight && (
         <div className="text-xs text-red-800 space-y-0.5">
-          <p className="font-semibold">Weight</p>
-          <p className="pl-3">Farm: <span className="font-bold">{error.weight.farm.toFixed(2)} kg</span></p>
-          <p className="pl-3">Delivered: <span className="font-bold">{error.weight.delivered.toFixed(2)} kg</span></p>
-          <p className="pl-3">Mortality: <span className="font-bold">{error.weight.mortalityWeight.toFixed(2)} kg</span></p>
-          <p className="pl-3">Loss: <span className="font-bold">{error.weight.loss.toFixed(2)} kg</span></p>
+          <p className="font-semibold">{t("common.weight")}</p>
+          <p className="pl-3">{t("ops.trip.farm")}: <span className="font-bold">{error.weight.farm.toFixed(2)} kg</span></p>
+          <p className="pl-3">{t("ops.trip.delivered")}: <span className="font-bold">{error.weight.delivered.toFixed(2)} kg</span></p>
+          <p className="pl-3">{t("operations.mortality_count")}: <span className="font-bold">{error.weight.mortalityWeight.toFixed(2)} kg</span></p>
+          <p className="pl-3">{t("ops.trip.loss")}: <span className="font-bold">{error.weight.loss.toFixed(2)} kg</span></p>
           <p className="pl-3">
-            Expected: <span className="font-bold">{error.weight.expected.toFixed(2)} kg</span>
+            {t("ops.trip.expected")}: <span className="font-bold">{error.weight.expected.toFixed(2)} kg</span>
           </p>
           <p className="pl-3 text-red-700">
-            Farm weight ({error.weight.farm.toFixed(2)} kg) must equal Delivered + Mortality + Loss (
-            {error.weight.expected.toFixed(2)} kg).
+            {t("ops.trip.farm_must_equal", { farm: error.weight.farm.toFixed(2), expected: error.weight.expected.toFixed(2) })}
           </p>
         </div>
       )}
@@ -184,6 +186,7 @@ export default function UnLoadingTable({
   balanceError,
   balanceErrorShown = false,
 }: Props) {
+  const { t } = useI18n();
   const safeRows = rows ?? [];
   const safeShops = shops ?? [];
   const safeBirdTypes = birdTypes ?? [];
@@ -274,7 +277,7 @@ export default function UnLoadingTable({
   // ─── PDF Export for Pending Boxes ─────────────────────────────
   const handleDownloadPendingBoxesPDF = () => {
     if (pendingBoxes.length === 0) {
-      setToast({ message: "No pending boxes available to generate PDF.", type: "warning" });
+      setToast({ message: t("ops.trip.no_pending_boxes_pdf"), type: "warning" });
       return;
     }
 
@@ -402,7 +405,7 @@ export default function UnLoadingTable({
     }
 
     doc.save(`Pending_Boxes_${tripNo || "Report"}.pdf`);
-    setToast({ message: "Pending Boxes PDF generated successfully!", type: "success" });
+    setToast({ message: t("ops.trip.pending_boxes_pdf_ok"), type: "success" });
   };
 
   // ─── Manual Save Progress Handler ──────────────────────────────
@@ -412,13 +415,13 @@ export default function UnLoadingTable({
     try {
       const success = await saveDeliveries();
       if (success) {
-        setToast({ message: "Progress saved successfully.", type: "success" });
+        setToast({ message: t("ops.trip.progress_saved"), type: "success" });
       } else {
-        setToast({ message: "Unable to save delivery details. Please try again.", type: "error" });
+        setToast({ message: t("ops.trip.failed_save_delivery"), type: "error" });
       }
     } catch (error) {
       console.error("Save progress error:", error);
-      setToast({ message: "Unable to save delivery details. Please try again.", type: "error" });
+      setToast({ message: t("ops.trip.failed_save_delivery"), type: "error" });
     } finally {
       setIsSaving(false);
     }
@@ -438,10 +441,10 @@ export default function UnLoadingTable({
     if (!hasBeenSubmitted) {
       setConfirmation({
         isOpen: true,
-        title: "Submit Shop Deliveries",
-        message: "Are you sure you want to submit all shop deliveries?",
-        confirmLabel: "Yes, Submit",
-        cancelLabel: "Cancel",
+        title: t("ops.trip.submit_shop_deliveries"),
+        message: t("ops.trip.confirm_submit_deliveries"),
+        confirmLabel: t("ops.trip.yes_submit"),
+        cancelLabel: t("common.cancel"),
         type: "info",
         onConfirm: () => {
           setConfirmation((prev) => ({ ...prev, isOpen: false }));
@@ -457,11 +460,11 @@ export default function UnLoadingTable({
               }
               if (success) {
                 setHasBeenSubmitted(true);
-                setToast({ message: "Step 4 submitted successfully.", type: "success" });
+                setToast({ message: t("ops.trip.step4_submitted"), type: "success" });
                 if (showForm) closeForm();
                 // Do not call onClose — parent advances to Step 5 with the same trip.
               } else {
-                setToast({ message: "Unable to submit delivery details. Please try again.", type: "error" });
+                setToast({ message: t("ops.trip.failed_submit_delivery"), type: "error" });
               }
             } finally {
               setIsSubmitting(false);
@@ -473,10 +476,10 @@ export default function UnLoadingTable({
     } else {
       setConfirmation({
         isOpen: true,
-        title: "Update Deliveries",
-        message: "Are you sure you want to update submitted shop deliveries with recent edits?",
-        confirmLabel: "Yes, Update",
-        cancelLabel: "Cancel",
+        title: t("ops.trip.update_deliveries"),
+        message: t("ops.trip.confirm_update_deliveries"),
+        confirmLabel: t("ops.trip.yes_update"),
+        cancelLabel: t("common.cancel"),
         type: "info",
         onConfirm: () => {
           setConfirmation((prev) => ({ ...prev, isOpen: false }));
@@ -487,7 +490,7 @@ export default function UnLoadingTable({
               const success = submitDeliveries ? (await submitDeliveries()) !== false : false;
               if (success) {
                 setHasBeenSubmitted(true);
-                setToast({ message: "Step 4 submitted successfully.", type: "success" });
+                setToast({ message: t("ops.trip.step4_submitted"), type: "success" });
                 if (showForm) closeForm();
               }
             } finally {
@@ -505,7 +508,7 @@ export default function UnLoadingTable({
     if (showForm) {
       closeForm();
       if (hasBeenSubmitted) {
-        setToast({ message: "Edit cancelled. Details locked to previously submitted state.", type: "info" });
+        setToast({ message: t("ops.trip.edit_cancelled_locked"), type: "info" });
       }
       return;
     }
@@ -606,24 +609,24 @@ export default function UnLoadingTable({
 
   const handleSubmit = () => {
     if (validationErrors.birdsExceedFarm) {
-      setToast({ message: `Cannot exceed Temple Birds (${farmBirds}).`, type: "warning" });
+      setToast({ message: t("ops.trip.cannot_exceed_farm_birds", { count: farmBirds }), type: "warning" });
       return;
     }
     if (validationErrors.weightExceedFarm) {
-      setToast({ message: `Cannot exceed Temple Weight (${farmWeight.toFixed(2)} Kg).`, type: "warning" });
+      setToast({ message: t("ops.trip.cannot_exceed_farm_weight", { weight: farmWeight.toFixed(2) }), type: "warning" });
       return;
     }
     if (!validate()) {
-      setToast({ message: "Please resolve form validation issues before saving.", type: "warning" });
+      setToast({ message: t("ops.trip.resolve_validation"), type: "warning" });
       return;
     }
 
     if (formData.shopId === 0) {
-      setToast({ message: "Please select a Shop.", type: "warning" });
+      setToast({ message: t("ops.trip.select_shop_required"), type: "warning" });
       return;
     }
     if (!formData.birdTypeId) {
-      setToast({ message: "Bird Type is required.", type: "warning" });
+      setToast({ message: t("ops.trip.bird_type_required"), type: "warning" });
       return;
     }
 
@@ -637,7 +640,7 @@ export default function UnLoadingTable({
 
     if (mode === "box") {
       if (formData.selectedBoxIds.length === 0) {
-        setToast({ message: "Please select at least one box.", type: "warning" });
+        setToast({ message: t("ops.trip.select_one_box"), type: "warning" });
         return;
       }
       selectedBoxIds = formData.selectedBoxIds;
@@ -648,7 +651,7 @@ export default function UnLoadingTable({
       finalWeight = farmWeight - mortKg;
     } else {
       if (formData.selectedBoxIds.length === 0) {
-        setToast({ message: "Please select at least one box.", type: "warning" });
+        setToast({ message: t("ops.trip.select_one_box"), type: "warning" });
         return;
       }
       selectedBoxIds = formData.selectedBoxIds;
@@ -697,7 +700,7 @@ export default function UnLoadingTable({
       setRows((prev) => [newRow, ...prev]);
     }
 
-    setToast({ message: `Shop "${formData.shopName}" saved successfully!`, type: "success" });
+    setToast({ message: t("ops.trip.shop_saved", { name: formData.shopName }), type: "success" });
     closeForm();
     setCurrentPage(1);
   };
@@ -705,7 +708,7 @@ export default function UnLoadingTable({
   // ─── Select Options ───────────────────────────────────────────────
   const shopOptions = useMemo(() => {
     if (!safeShops || safeShops.length === 0) {
-      return [{ value: 0, label: "No shops available", isDisabled: true }];
+      return [{ value: 0, label: t("ops.trip.no_shops_available"), isDisabled: true }];
     }
     const opts = safeShops
       .filter((shop: any) => {
@@ -726,7 +729,7 @@ export default function UnLoadingTable({
 
   const birdOptions = useMemo(() => {
     if (!safeBirdTypes || safeBirdTypes.length === 0) {
-      return [{ value: 0, label: "No bird types available", isDisabled: true }];
+      return [{ value: 0, label: t("ops.trip.no_bird_types_available"), isDisabled: true }];
     }
     return safeBirdTypes
       .map((bird: any) => {
@@ -826,7 +829,7 @@ export default function UnLoadingTable({
       );
     } catch (error: any) {
       console.error("PDF download failed:", error);
-      setToast({ message: "Failed to generate PDF report.", type: "error" });
+      setToast({ message: t("ops.trip.failed_pdf_report"), type: "error" });
     }
   };
 
@@ -850,7 +853,7 @@ export default function UnLoadingTable({
                 }`}
               >
                 <LayoutGrid size={13} />
-                Shop View
+                {t("ops.trip.shop_view")}
               </button>
               <button
                 onClick={() => onViewModeChange("box")}
@@ -861,7 +864,7 @@ export default function UnLoadingTable({
                 }`}
               >
                 <BarChart2 size={13} />
-                Box Analysis
+                {t("ops.trip.box_analysis")}
               </button>
             </div>
           )}
@@ -875,7 +878,7 @@ export default function UnLoadingTable({
               type="text"
               value={searchTerm}
               onChange={handleSearchChange}
-              placeholder="Search shop name, bird type..."
+              placeholder={t("ops.trip.search_shop_bird")}
               className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 rounded-lg text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-xs"
             />
             {searchTerm && (
@@ -894,10 +897,10 @@ export default function UnLoadingTable({
           <button
             onClick={handleDownloadPendingBoxesPDF}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 text-emerald-800 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
-            title="Download PDF of Pending Boxes"
+            title={t("ops.trip.download_pending_boxes_pdf")}
           >
             <Package size={15} className="text-emerald-600" />
-            <span>Boxes ({pendingBoxes.length})</span>
+            <span>{t("ops.trip.boxes")} ({pendingBoxes.length})</span>
           </button>
 
           {!readOnly && !showForm && (
@@ -906,7 +909,7 @@ export default function UnLoadingTable({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
             >
               <Plus size={15} className="text-emerald-100" />
-              <span>Add Shop</span>
+              <span>{t("ops.trip.add_shop")}</span>
             </button>
           )}
         </div>
@@ -916,7 +919,7 @@ export default function UnLoadingTable({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-emerald-50/70 border border-emerald-100 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-semibold text-emerald-900 flex items-center gap-1">
-            <Clock size={13} className="text-emerald-600" /> Captured Time
+            <Clock size={13} className="text-emerald-600" /> {t("ops.trip.captured_time")}
           </span>
           <span className="text-xs font-bold text-slate-800 mt-1 truncate" title={topKpiTotals.lastCaptureTime}>
             {topKpiTotals.lastCaptureTime}
@@ -924,19 +927,19 @@ export default function UnLoadingTable({
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <Building2 size={13} className="text-slate-400" /> Shops
+            <Building2 size={13} className="text-slate-400" /> {t("ops.trip.shops")}
           </span>
           <span className="text-base font-bold text-slate-800">{topKpiTotals.shops || "—"}</span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <Users size={13} className="text-emerald-600" /> Birds
+            <Users size={13} className="text-emerald-600" /> {t("common.birds")}
           </span>
           <span className="text-base font-bold text-slate-800">{topKpiTotals.birds || "—"}</span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <Scale size={13} className="text-emerald-600" /> Weight (kg)
+            <Scale size={13} className="text-emerald-600" /> {t("ops.trip.weight_kg")}
           </span>
           <span className="text-base font-bold text-slate-800">
             {topKpiTotals.weight ? topKpiTotals.weight.toFixed(2) : "—"}
@@ -944,7 +947,7 @@ export default function UnLoadingTable({
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <AlertCircle size={13} className="text-rose-500" /> Mortality
+            <AlertCircle size={13} className="text-rose-500" /> {t("operations.mortality_count")}
           </span>
           <span className="text-base font-bold text-slate-800">
             {topKpiTotals.mortality > 0 ? `${topKpiTotals.mortality} bird${topKpiTotals.mortality === 1 ? "" : "s"}` : "—"}
@@ -952,7 +955,7 @@ export default function UnLoadingTable({
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <Scale size={13} className="text-rose-500" /> Mortality Weight
+            <Scale size={13} className="text-rose-500" /> {t("ops.trip.mortality_weight")}
           </span>
           <span className="text-base font-bold text-slate-800">
             {topKpiTotals.mortKg > 0 ? `${topKpiTotals.mortKg.toFixed(2)} kg` : "—"}
@@ -1003,20 +1006,20 @@ export default function UnLoadingTable({
                   </div>
                   {searchTerm ? (
                     <>
-                      <p className="font-medium text-slate-600">No matching shops found</p>
+                      <p className="font-medium text-slate-600">{t("ops.trip.no_matching_shops")}</p>
                       <p className="text-xs text-slate-400">
-                        Try searching for another keyword or{" "}
+                        {t("ops.trip.try_another_keyword")}{" "}
                         <button onClick={clearSearch} className="font-semibold text-emerald-600 hover:underline">
-                          clear search
+                          {t("ops.trip.clear_search")}
                         </button>.
                       </p>
                     </>
                   ) : (
                     <>
-                      <p className="font-medium text-slate-600">No shops added yet</p>
+                      <p className="font-medium text-slate-600">{t("ops.trip.no_shops_added")}</p>
                       {!readOnly && (
                         <p className="text-xs text-slate-400">
-                          Click <span className="font-semibold text-emerald-600">Add Shop</span> to begin recording entries.
+                          {t("ops.trip.click_add_shop")} <span className="font-semibold text-emerald-600">{t("ops.trip.add_shop")}</span> {t("ops.trip.to_begin")}
                         </p>
                       )}
                     </>
@@ -1068,7 +1071,7 @@ export default function UnLoadingTable({
               toast
                 ? { type: toast.type === "warning" ? "info" : toast.type, message: toast.message }
                 : hasUnsavedChanges
-                  ? { type: "info", message: "Unsaved changes" }
+                  ? { type: "info", message: t("ops.trip.unsaved_changes") }
                   : null
             }
             dirty={false}
@@ -1080,7 +1083,7 @@ export default function UnLoadingTable({
             busy={isSaving || isSubmitting}
             saveDisabled={false}
             submitDisabled={safeRows.length === 0}
-            submitLabel={hasBeenSubmitted ? "Update Deliveries" : "Submit Deliveries"}
+            submitLabel={hasBeenSubmitted ? "ops.trip.update_deliveries" : "ops.trip.submit_deliveries"}
           />
         </div>
       )}

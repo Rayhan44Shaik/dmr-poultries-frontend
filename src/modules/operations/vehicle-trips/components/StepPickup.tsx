@@ -11,8 +11,8 @@ import { WizardActionBar, WizardStepNotice } from "./WizardStepUI";
 import { calculatePickupTotals, calculateBoxAvgWeight } from "../../../../shared/trip/calculations";
 import {
   TRIP_FIELD_DEFINITIONS,
-  TRIP_STEP_DEFINITIONS,
 } from "../../../../shared/trip/definitions";
+import { useI18n } from "../../../../i18n";
 
 interface Props {
   trip: Trip;
@@ -80,12 +80,13 @@ function ConfirmationModal({
   isOpen,
   title,
   message,
-  confirmLabel = "Yes, Proceed",
-  cancelLabel = "Cancel",
+  confirmLabel = "ops.trip.yes_proceed",
+  cancelLabel = "common.cancel",
   onConfirm,
   onCancel,
   type = "warning",
 }: ConfirmationModalProps) {
+  const { t } = useI18n();
   if (!isOpen) return null;
 
   const iconColor = type === "warning" ? "text-amber-600" : "text-blue-600";
@@ -113,7 +114,7 @@ function ConfirmationModal({
             onClick={onCancel}
             className="px-5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all hover:shadow-sm"
           >
-            {cancelLabel}
+            {t(cancelLabel)}
           </button>
           <button
             onClick={onConfirm}
@@ -123,7 +124,7 @@ function ConfirmationModal({
                 : "bg-blue-600 hover:bg-blue-700"
             }`}
           >
-            {confirmLabel}
+            {t(confirmLabel)}
           </button>
         </div>
       </div>
@@ -143,6 +144,7 @@ export default function StepPickup({
   onCancel,
   clearForm,
 }: Props) {
+  const { t } = useI18n();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(false);
@@ -219,7 +221,7 @@ export default function StepPickup({
   const addRow = () => {
     if (maxBoxes > 0 && rows.length >= maxBoxes) {
       setToast({
-        message: `Box limit exceeded! Maximum allowed boxes for this vehicle is ${maxBoxes}.`,
+        message: t("ops.trip.box_limit_exceeded", { max: maxBoxes }),
         type: "error",
       });
       return;
@@ -228,7 +230,7 @@ export default function StepPickup({
       const lastRow = rows[rows.length - 1];
       if (!(lastRow.birds > 0) || !(lastRow.weight > 0)) {
         setToast({
-          message: "Please fill the current box (Birds & Weight) before adding a new one.",
+          message: t("ops.trip.fill_current_box"),
           type: "error",
         });
         return;
@@ -242,7 +244,7 @@ export default function StepPickup({
       if (prev.length <= 1) return prev;
       const last = prev[prev.length - 1];
       if (last.uid !== uid) {
-        setToast({ message: "Remove the last box first.", type: "error" });
+        setToast({ message: t("ops.trip.remove_last_box"), type: "error" });
         return prev;
       }
       setRemovedBoxNos((ids) => [...ids, last.boxNo]);
@@ -289,15 +291,15 @@ export default function StepPickup({
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      setToast({ message: "Please select a valid image file.", type: "error" });
+      setToast({ message: t("ops.trip.valid_image"), type: "error" });
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      setToast({ message: "Image size must be less than 5MB.", type: "error" });
+      setToast({ message: t("ops.trip.image_size_5mb"), type: "error" });
       return;
     }
     if (photos.length >= 2) {
-      setToast({ message: "A maximum of 2 photos is allowed.", type: "error" });
+      setToast({ message: t("ops.trip.max_2_photos"), type: "error" });
       return;
     }
 
@@ -309,7 +311,7 @@ export default function StepPickup({
         reader.readAsDataURL(file);
       });
       if (!data.startsWith("data:image/")) {
-        setToast({ message: "Please select a valid image file.", type: "error" });
+        setToast({ message: t("ops.trip.valid_image"), type: "error" });
         return;
       }
       const next: PickupPhoto = {
@@ -329,7 +331,7 @@ export default function StepPickup({
       });
     } catch (error) {
       console.error("Failed to read image:", error);
-      setToast({ message: "Failed to read image. Please try again.", type: "error" });
+      setToast({ message: t("ops.trip.failed_read_image"), type: "error" });
     }
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -361,7 +363,7 @@ export default function StepPickup({
       document.body.removeChild(link);
     } catch (error) {
       console.error("Failed to download image:", error);
-      setToast({ message: "Failed to download image.", type: "error" });
+      setToast({ message: t("ops.trip.failed_download_image"), type: "error" });
     }
   };
 
@@ -375,8 +377,8 @@ export default function StepPickup({
       ...photoFields(),
     } as Partial<Trip>);
     setToast(success
-      ? { message: "Progress saved successfully.", type: "success" }
-      : { message: "Unable to save pickup details. Please try again.", type: "error" });
+      ? { message: t("ops.trip.progress_saved"), type: "success" }
+      : { message: t("ops.trip.failed_save_pickup"), type: "error" });
     if (success) {
       savedPhotosRef.current = photos;
       setRemovedBoxNos([]);
@@ -404,24 +406,24 @@ export default function StepPickup({
     if (trip.pickupStepSubmitted && !editable && !isLocalEditing) return;
 
     if (!photos.length) {
-      setToast({ message: "Please upload a DC photo before submitting.", type: "error" });
+      setToast({ message: t("ops.trip.upload_dc_photo"), type: "error" });
       return;
     }
 
     // Persisted flag decides Create vs Update: React state (isLocalEditing) is
     // only ever an entry-mode toggle and must NOT drive the label.
     const isEditMode = Boolean(trip.pickupStepSubmitted) && (editable || isLocalEditing);
-    const title = isEditMode ? "Update Pickup KPI" : "Create Pickup KPI";
+    const title = isEditMode ? t("ops.trip.update_pickup_kpi") : t("ops.trip.create_pickup_kpi");
     const message = isEditMode
-      ? "Are you sure you want to update this pickup KPI? Changes will be saved and the step will remain unlocked for further edits."
-      : "Are you sure you want to create this pickup KPI? You won't be able to edit it unless you have admin permissions.";
+      ? t("ops.trip.confirm_update_pickup")
+      : t("ops.trip.confirm_create_pickup");
 
     setConfirmation({
       isOpen: true,
       title,
       message,
-      confirmLabel: isEditMode ? "Yes, Update" : "Yes, Create",
-      cancelLabel: "Cancel",
+      confirmLabel: isEditMode ? t("ops.trip.yes_update") : t("ops.trip.yes_create"),
+      cancelLabel: t("common.cancel"),
       type: isEditMode ? "info" : "warning",
       onConfirm: () => {
         setConfirmation((prev) => ({ ...prev, isOpen: false }));
@@ -434,9 +436,9 @@ export default function StepPickup({
             });
             if (success) {
               setIsLocalEditing(false);
-              setToast({ message: "Step 3 submitted successfully.", type: "success" });
+              setToast({ message: t("ops.trip.step3_submitted"), type: "success" });
             } else {
-              setToast({ message: "Unable to submit pickup details. Please try again.", type: "error" });
+              setToast({ message: t("ops.trip.failed_submit_pickup"), type: "error" });
             }
           } finally {
             setIsSubmitting(false);
@@ -568,7 +570,7 @@ export default function StepPickup({
       doc.save(`Trip_${trip.tripNo || 'report'}_PickupKPI.pdf`);
     } catch (error) {
       console.error('PDF generation error:', error);
-      alert('Failed to generate PDF. Please try again.');
+      alert(t('ops.trip.pdf_generation_failed'));
     }
   };
 
@@ -588,7 +590,7 @@ export default function StepPickup({
               3
             </span>
             <h2 className="text-base font-bold text-slate-800 tracking-tight">
-              {TRIP_STEP_DEFINITIONS[2].title.toUpperCase()}
+              {t("ops.trip.title.pickup").toUpperCase()}
             </h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -596,8 +598,8 @@ export default function StepPickup({
               type="button"
               onClick={handleClose}
               className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
-              title="Close Trip"
-              aria-label="Close Trip"
+              title={t("ops.trip.close_trip")}
+              aria-label={t("ops.trip.close_trip")}
             >
               <X size={14} />
             </button>
@@ -605,13 +607,13 @@ export default function StepPickup({
               <button
                 onClick={() => setIsLocalEditing(true)}
                 className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
-                title="Edit Pickup KPI"
+                title={t("ops.trip.edit_pickup_kpi")}
               >
                 <Pencil size={14} />
               </button>
             )}
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
-              Submitted & Locked
+              {t("ops.trip.submitted_locked")}
             </span>
           </div>
         </div>
@@ -620,31 +622,31 @@ export default function StepPickup({
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-2">
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Clock size={12} className="text-slate-500" /> Time
+              <Clock size={12} className="text-slate-500" /> {t("ops.trip.time")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{trip.pickupLoadTime || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Scale size={12} className="text-emerald-500" /> DC Wt
+              <Scale size={12} className="text-emerald-500" /> {t("ops.trip.dc_wt")}
             </span>
-            <span className="text-xs font-bold text-slate-800">{trip.dcWeight ? `${Number(trip.dcWeight).toFixed(2)} Kg` : "Not entered"}</span>
+            <span className="text-xs font-bold text-slate-800">{trip.dcWeight ? `${Number(trip.dcWeight).toFixed(2)} Kg` : t("ops.trip.not_entered")}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Bird size={12} className="text-blue-500" /> Birds
+              <Bird size={12} className="text-blue-500" /> {t("common.birds")}
             </span>
             <span className="text-xs font-bold text-slate-800">{trip.totalBirds}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Box size={12} className="text-amber-500" /> Boxes
+              <Box size={12} className="text-amber-500" /> {t("common.boxes")}
             </span>
             <span className="text-xs font-bold text-slate-800">{trip.boxes} / {maxBoxes}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Gauge size={12} className="text-purple-500" /> Avg Wt
+              <Gauge size={12} className="text-purple-500" /> {t("ops.trip.avg_wt")}
             </span>
             <span className="text-xs font-bold text-slate-800">{trip.avgWeight ? `${trip.avgWeight} Kg` : "—"}</span>
           </div>
@@ -654,7 +656,7 @@ export default function StepPickup({
         {photos.length > 0 && (
           <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center gap-3 text-xs font-medium text-slate-700 flex-wrap">
             <Camera size={16} className="text-slate-400" />
-            <span>{photos.length} photo{photos.length === 1 ? "" : "s"} uploaded</span>
+            <span>{t("ops.trip.photos_uploaded", { count: photos.length })}</span>
             {photos.map((p) => (
               <img key={p.key} src={p.data} alt="Pickup" className="h-12 w-12 object-cover rounded-lg border border-slate-200" />
             ))}
@@ -674,10 +676,10 @@ export default function StepPickup({
                 <tr className="bg-slate-50 text-slate-600 text-[10px] uppercase sticky top-0 z-10 border-b border-slate-200">
                   {[1, 2, 3].map((i, idx) => (
                     <React.Fragment key={i}>
-                      <th className={`text-center px-2 py-2 font-bold bg-slate-50 text-slate-600 border-r border-slate-200 ${idx > 0 ? 'pl-4' : ''}`}>BOX</th>
-                      <th className="text-center px-2 py-2 font-bold bg-slate-50 text-slate-600 border-r border-slate-200">BIRDS</th>
-                      <th className="text-center px-2 py-2 font-bold bg-slate-50 text-slate-600 border-r border-slate-200">WT(KG)</th>
-                      <th className={`text-center px-2 py-2 font-bold bg-slate-50 text-slate-600 ${idx < 2 ? 'border-r-2 border-slate-300' : ''}`}>AVG WT(KG)</th>
+                      <th className={`text-center px-2 py-2 font-bold bg-slate-50 text-slate-600 border-r border-slate-200 ${idx > 0 ? 'pl-4' : ''}`}>{t("ops.trip.box")}</th>
+                      <th className="text-center px-2 py-2 font-bold bg-slate-50 text-slate-600 border-r border-slate-200">{t("common.birds")}</th>
+                      <th className="text-center px-2 py-2 font-bold bg-slate-50 text-slate-600 border-r border-slate-200">{t("ops.trip.wt_kg")}</th>
+                      <th className={`text-center px-2 py-2 font-bold bg-slate-50 text-slate-600 ${idx < 2 ? 'border-r-2 border-slate-300' : ''}`}>{t("ops.trip.avg_wt_kg")}</th>
                     </React.Fragment>
                   ))}
                 </tr>
@@ -688,8 +690,8 @@ export default function StepPickup({
                     {group.map((r, colIdx) => (
                       <React.Fragment key={r.boxNo}>
                         <td className={`text-center px-2 py-2 font-semibold text-slate-800 border-r border-slate-200 ${colIdx > 0 ? 'pl-4' : ''}`}>{r.boxNo}</td>
-                        <td className="text-center px-2 py-2 font-bold text-slate-800 border-r border-slate-200">{r.birds || "Not entered"}</td>
-                        <td className="text-center px-2 py-2 font-semibold text-slate-800 border-r border-slate-200">{r.weight ? Number(r.weight).toFixed(2) : "Not entered"}</td>
+                        <td className="text-center px-2 py-2 font-bold text-slate-800 border-r border-slate-200">{r.birds || t("ops.trip.not_entered")}</td>
+                        <td className="text-center px-2 py-2 font-semibold text-slate-800 border-r border-slate-200">{r.weight ? Number(r.weight).toFixed(2) : t("ops.trip.not_entered")}</td>
                         <td className={`text-center px-2 py-2 font-semibold text-slate-800 ${colIdx < 2 ? 'border-r-2 border-slate-300' : ''}`}>
                           {formatAvg(Number(r.birds), Number(r.weight), r.avgWeight)}
                         </td>
@@ -717,14 +719,14 @@ export default function StepPickup({
         {/* Bottom Banner with Actions */}
         <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-center justify-between flex-wrap gap-2">
           <p className="text-xs text-slate-600 font-normal">
-            Pickup KPI details submitted successfully.
+            {t("ops.trip.pickup_submitted_ok")}
           </p>
           <div className="flex items-center gap-2 flex-wrap">
             {photos.length > 0 && (
               <button
                 onClick={downloadImage}
                 className="flex items-center justify-center p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-xs transition-all active:scale-95"
-                title="Download Image"
+                title={t("ops.trip.download_image")}
               >
                 <Download size={16} />
               </button>
@@ -732,7 +734,7 @@ export default function StepPickup({
             <button
               onClick={generatePDF}
               className="flex items-center justify-center p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs transition-all active:scale-95"
-              title="Download PDF"
+              title={t("ops.trip.download_pdf")}
             >
               <FileText size={16} />
             </button>
@@ -827,7 +829,7 @@ export default function StepPickup({
               3
             </span>
             <h2 className="text-base font-bold text-slate-800 tracking-tight">
-              {TRIP_STEP_DEFINITIONS[2].title.toUpperCase()}
+              {t("ops.trip.title.pickup").toUpperCase()}
             </h2>
           </div>
           <div className="flex items-center gap-3">
@@ -835,14 +837,14 @@ export default function StepPickup({
               type="button"
               onClick={handleClose}
               className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
-              title="Close Trip"
-              aria-label="Close Trip"
+              title={t("ops.trip.close_trip")}
+              aria-label={t("ops.trip.close_trip")}
             >
               <X size={14} />
             </button>
             {(isEditMode || isLocalEditing) && trip.pickupStepSubmitted && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
-                Editing Trip {trip.tripNo}
+                {t("ops.trip.editing_trip", { no: trip.tripNo })}
               </span>
             )}
           </div>
@@ -851,7 +853,7 @@ export default function StepPickup({
         {/* Auto time */}
         <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
           <Clock size={14} className="text-slate-400" />
-          <span>{trip.pickupLoadTime || "Auto time on submit"}</span>
+          <span>{trip.pickupLoadTime || t("ops.trip.auto_time_on_submit")}</span>
         </div>
 
         {/* Image Upload Section */}
@@ -860,7 +862,7 @@ export default function StepPickup({
             <div className="flex-1">
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
                 <Camera size={14} className="text-slate-400" />
-                {TRIP_FIELD_DEFINITIONS.dcPhotoKey.label} {TRIP_FIELD_DEFINITIONS.dcPhotoKey.required && <span className="text-red-500">*</span>}
+                {t("ops.trip.field.dc_photo")} {TRIP_FIELD_DEFINITIONS.dcPhotoKey.required && <span className="text-red-500">*</span>}
               </label>
               <div className="mt-1 flex items-center gap-3 flex-wrap">
                 {photos.length < 2 && (
@@ -869,11 +871,11 @@ export default function StepPickup({
                     onClick={() => fileInputRef.current?.click()}
                     className="px-3 py-1.5 text-xs font-semibold bg-white text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-all shadow-xs"
                   >
-                    Choose Image
+                    {t("ops.trip.choose_image")}
                   </button>
                 )}
                 <span className="text-xs text-slate-500">
-                  {photos.length ? `${photos.length} of 2 uploaded` : "No image selected"}
+                  {photos.length ? t("ops.trip.photos_of_2", { count: photos.length }) : t("ops.trip.no_image_selected")}
                 </span>
               </div>
               <input
@@ -883,7 +885,7 @@ export default function StepPickup({
                 onChange={handleFileSelect}
                 className="hidden"
               />
-              <p className="text-[10px] text-slate-400 mt-1">Max 2 photos, 5MB each, JPG/PNG. Submit requires at least 1.</p>
+              <p className="text-[10px] text-slate-400 mt-1">{t("ops.trip.photo_requirements")}</p>
             </div>
             {photos.length > 0 && (
               <div className="flex-shrink-0 flex gap-2">
@@ -894,7 +896,7 @@ export default function StepPickup({
                       type="button"
                       onClick={() => void removeImage(p.key)}
                       className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 text-[10px] leading-5"
-                      title="Remove photo"
+                      title={t("ops.trip.remove_photo")}
                     >
                       ×
                     </button>
@@ -909,7 +911,7 @@ export default function StepPickup({
         <div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-slate-600">
-              Box entries (Max limit: {maxBoxes || "—"} boxes)
+              {t("ops.trip.box_entries", { max: maxBoxes || "—" })}
             </span>
           </div>
 
@@ -924,10 +926,10 @@ export default function StepPickup({
                 <tr className="bg-slate-50 text-slate-600 text-[10px] uppercase font-bold sticky top-0 z-10 border-b border-slate-200">
                   {[1, 2, 3].map((blockIdx) => (
                     <React.Fragment key={blockIdx}>
-                      <th className={`text-center px-1 py-2 font-bold text-slate-600 bg-slate-50 border-r border-slate-200 ${blockIdx > 1 ? 'pl-4' : ''}`}>BOX</th>
-                      <th className="text-center px-1 py-2 font-bold text-slate-600 bg-slate-50 border-r border-slate-200">BIRDS</th>
-                      <th className="text-center px-1 py-2 font-bold text-slate-600 bg-slate-50 border-r border-slate-200">WT(KG)</th>
-                      <th className={`text-center px-1 py-2 font-bold text-slate-600 bg-slate-50 ${blockIdx < 3 ? 'border-r-2 border-slate-300' : ''}`}>AVG WT(KG)</th>
+                      <th className={`text-center px-1 py-2 font-bold text-slate-600 bg-slate-50 border-r border-slate-200 ${blockIdx > 1 ? 'pl-4' : ''}`}>{t("ops.trip.box")}</th>
+                      <th className="text-center px-1 py-2 font-bold text-slate-600 bg-slate-50 border-r border-slate-200">{t("common.birds")}</th>
+                      <th className="text-center px-1 py-2 font-bold text-slate-600 bg-slate-50 border-r border-slate-200">{t("ops.trip.wt_kg")}</th>
+                      <th className={`text-center px-1 py-2 font-bold text-slate-600 bg-slate-50 ${blockIdx < 3 ? 'border-r-2 border-slate-300' : ''}`}>{t("ops.trip.avg_wt_kg")}</th>
                     </React.Fragment>
                   ))}
                 </tr>
@@ -948,7 +950,7 @@ export default function StepPickup({
                               onClick={addRow}
                               className="w-full h-8 text-[10px] font-bold uppercase tracking-wide text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg"
                             >
-                              <Plus size={12} className="inline mr-1" /> Add Box
+                              <Plus size={12} className="inline mr-1" /> {t("ops.trip.add_box")}
                             </button>
                           </td>
                         );
@@ -988,7 +990,7 @@ export default function StepPickup({
                               onClick={() => removeRow(row.uid)}
                               disabled={rows.length === 1 || row.uid !== rows[rows.length - 1]?.uid}
                               className="mini-delete shrink-0"
-                              title="Delete box"
+                              title={t("ops.trip.delete_box")}
                             >
                               <Trash2 size={12} />
                             </button>
@@ -1018,12 +1020,12 @@ export default function StepPickup({
             </table>
           </div>
           <p className="text-[10px] text-slate-400 mt-1.5">
-            Use <kbd className="px-1.5 py-0.5 bg-slate-100 border rounded text-[9px] font-semibold">Tab</kbd> to navigate.
+            {t("ops.trip.use_tab_navigate")}
             {!isLastRowComplete && rows.length > 0 && (
-              <span className="text-amber-600 ml-2">⚠️ Fill the current box before adding another.</span>
+              <span className="text-amber-600 ml-2">⚠️ {t("ops.trip.fill_current_box_warn")}</span>
             )}
             {rows.length >= maxBoxes && (
-              <span className="text-red-600 ml-2 font-bold">🚫 Box limit ({maxBoxes}) reached for this vehicle.</span>
+              <span className="text-red-600 ml-2 font-bold">🚫 {t("ops.trip.box_limit_reached", { max: maxBoxes })}</span>
             )}
           </p>
         </div>
@@ -1032,25 +1034,25 @@ export default function StepPickup({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Box size={12} className="text-amber-500" /> Boxes
+              <Box size={12} className="text-amber-500" /> {t("common.boxes")}
             </span>
             <span className="text-xs font-bold text-slate-800">{totals.boxes} / {maxBoxes}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Bird size={12} className="text-blue-500" /> Birds
+              <Bird size={12} className="text-blue-500" /> {t("common.birds")}
             </span>
             <span className="text-xs font-bold text-slate-800">{totals.totalBirds}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Scale size={12} className="text-emerald-500" /> DC Wt
+              <Scale size={12} className="text-emerald-500" /> {t("ops.trip.dc_wt")}
             </span>
             <span className="text-xs font-bold text-slate-800">{totals.dcWeight.toFixed(2)} Kg</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Gauge size={12} className="text-purple-500" /> Avg Wt
+              <Gauge size={12} className="text-purple-500" /> {t("ops.trip.avg_wt")}
             </span>
             <span className="text-xs font-bold text-slate-800">
               {totals.avgWeight > 0 ? `${totals.avgWeight} Kg` : "—"}
@@ -1069,7 +1071,7 @@ export default function StepPickup({
           busy={isSaving || isSubmitting}
           saveDisabled={false}
           submitDisabled={!canSubmit || (trip.pickupStepSubmitted && !isEditMode)}
-          submitLabel={isEditMode ? "Update Pickup" : "Create Pickup"}
+          submitLabel={isEditMode ? "ops.trip.update_pickup" : "ops.trip.create_pickup"}
         />
       </div>
 

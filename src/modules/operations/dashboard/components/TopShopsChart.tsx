@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+import { useI18n } from "../../../../i18n";
 
 interface TopShopsChartProps {
   data: any;
@@ -24,6 +25,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 };
 
 export default function TopShopsChart({ data }: TopShopsChartProps) {
+  const { t } = useI18n();
   const chartData = useMemo(() => {
     if (!data) return [];
 
@@ -97,13 +99,13 @@ export default function TopShopsChart({ data }: TopShopsChartProps) {
   if (chartData.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-slate-400 h-[338px] w-full flex flex-col items-center justify-center overflow-hidden min-w-0">
-        <p className="text-sm">No sales data available</p>
+        <p className="text-sm">{t("ops.dashboard.no_sales_data")}</p>
         <p className="text-xs text-slate-300 mt-1 break-words">
-          (all shops have zero or no positive sales)
+          ({t("ops.dashboard.all_shops_zero")})
         </p>
         <details className="mt-2 text-left w-full">
           <summary className="text-xs cursor-pointer text-blue-500 hover:text-blue-700 truncate">
-            🔍 Click to see raw data
+            🔍 {t("ops.dashboard.click_raw_data")}
           </summary>
           <pre className="text-xs bg-slate-100 p-2 rounded mt-1 overflow-auto max-h-40 whitespace-pre-wrap break-words">
             {JSON.stringify(data, null, 2)}
@@ -116,7 +118,7 @@ export default function TopShopsChart({ data }: TopShopsChartProps) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm h-[338px] w-full min-w-0 overflow-hidden flex flex-col">
       <h3 className="text-sm font-semibold text-slate-700 mb-2 flex-shrink-0 text-center">
-        Sales Amount by Shop (Top 5)
+        {t("ops.dashboard.sales_by_shop_top5")}
       </h3>
 
       {/* ✅ Chart centred, legend below */}
@@ -160,7 +162,7 @@ export default function TopShopsChart({ data }: TopShopsChartProps) {
                 className="fill-slate-400 font-normal"
                 style={{ fontSize: "10px" }}
               >
-                Total
+                {t("common.total")}
               </text>
             </PieChart>
           </ResponsiveContainer>

@@ -1,6 +1,7 @@
 import React, { useCallback } from "react";
 import { Pencil, X } from "lucide-react";
 import type { Trip } from "../types/trip";
+import { useI18n } from "../../../../i18n";
 
 interface Props {
   open: boolean;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 function TripEditModal({ open, trip, onClose, onEdit }: Props) {
+  const { t } = useI18n();
   const handleEdit = useCallback(() => {
     if (trip) {
       onClose();
@@ -28,8 +30,8 @@ function TripEditModal({ open, trip, onClose, onEdit }: Props) {
               <Pencil size={22} className="text-green-700" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-800">Edit Trip</h2>
-              <p className="text-sm text-slate-500">Edit selected trip</p>
+              <h2 className="text-xl font-bold text-slate-800">{t("ops.trip.edit_trip")}</h2>
+              <p className="text-sm text-slate-500">{t("ops.trip.edit_selected_trip")}</p>
             </div>
           </div>
           <button
@@ -41,36 +43,36 @@ function TripEditModal({ open, trip, onClose, onEdit }: Props) {
         </div>
         <div className="px-6 py-6 space-y-5">
           <div className="text-slate-700">
-            This trip will be loaded into the Trip Entry screen for editing.
+            {t("ops.trip.edit_load_hint")}
           </div>
           <div className="rounded-xl border bg-slate-50 p-5 space-y-3">
             <div className="flex justify-between">
-              <span className="text-slate-500">Trip No</span>
+              <span className="text-slate-500">{t("operations.trip_no")}</span>
               <span className="font-semibold">{trip.tripNo}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Vehicle</span>
+              <span className="text-slate-500">{t("common.vehicle")}</span>
               <span>{trip.vehicleNo}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Driver</span>
+              <span className="text-slate-500">{t("common.driver")}</span>
               <span>{trip.driverName}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Date</span>
+              <span className="text-slate-500">{t("common.date")}</span>
               <span>{trip.tripDate}</span>
             </div>
           </div>
         </div>
         <div className="flex justify-end gap-3 px-6 py-5 border-t">
           <button onClick={onClose} className="px-5 py-2 rounded-xl border">
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             onClick={handleEdit}
             className="px-5 py-2 rounded-xl bg-green-700 hover:bg-green-800 text-white"
           >
-            Edit Trip
+            {t("ops.trip.edit_trip")}
           </button>
         </div>
       </div>

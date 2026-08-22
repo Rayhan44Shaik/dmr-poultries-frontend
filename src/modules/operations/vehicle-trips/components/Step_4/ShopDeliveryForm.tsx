@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import BoxSelector from "./BoxSelector";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
+import { useI18n } from "../../../../../i18n";
 
 export interface Props {
   mode: "box" | "weight";
@@ -86,6 +87,7 @@ export default function ShopDeliveryForm({
   birdOptions,
   isFormValid,
 }: Props) {
+  const { t } = useI18n();
   const selectedBoxIds: number[] = formData.selectedBoxIds || [];
 
   // Compact & Clean React-Select Styles
@@ -139,11 +141,11 @@ export default function ShopDeliveryForm({
       <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
         <div>
           <h3 className="text-base font-semibold text-slate-800">
-            {editingId !== null ? "Edit Shop Delivery" : "Add New Shop Delivery"}
+            {editingId !== null ? t("ops.trip.edit_shop_delivery") : t("ops.trip.add_new_shop_delivery")}
           </h3>
           <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
             <Clock size={12} className="text-slate-400" />
-            Auto-Captured: <span className="font-medium text-slate-600">{autoCaptureTime}</span>
+            {t("ops.trip.auto_captured")}: <span className="font-medium text-slate-600">{autoCaptureTime}</span>
           </p>
         </div>
         <button
@@ -160,7 +162,7 @@ export default function ShopDeliveryForm({
         {/* Delivery Mode Toggle */}
         <div className="sm:col-span-5">
           <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-            Delivery Mode
+            {t("ops.trip.delivery_mode")}
           </label>
           <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200/60 h-[38px]">
             <button
@@ -173,7 +175,7 @@ export default function ShopDeliveryForm({
               }`}
             >
               <Box size={13} />
-              Box Mode
+              {t("ops.trip.box_mode")}
             </button>
             <button
               type="button"
@@ -185,7 +187,7 @@ export default function ShopDeliveryForm({
               }`}
             >
               <Scale size={13} />
-              Weight Mode
+              {t("ops.trip.weight_mode")}
             </button>
           </div>
         </div>
@@ -194,7 +196,7 @@ export default function ShopDeliveryForm({
         <div className="sm:col-span-7">
           <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
             <ShoppingCart size={13} className="text-slate-400" />
-            Shop Name <span className="text-rose-500">*</span>
+            {t("operations.shop_name")} <span className="text-rose-500">*</span>
           </label>
           <Select
             key={`shop-${shopOptions.length}`}
@@ -204,7 +206,7 @@ export default function ShopDeliveryForm({
                 : null
             }
             options={shopOptions}
-            placeholder={shopOptions.length > 0 ? "Select Shop..." : "No shops available"}
+            placeholder={shopOptions.length > 0 ? t("ops.trip.select_shop_ellipsis") : t("ops.trip.no_shops_available")}
             isSearchable
             isDisabled={shopOptions.length === 0 || shopOptions[0]?.isDisabled}
             onChange={handleShopSelect}
@@ -212,7 +214,7 @@ export default function ShopDeliveryForm({
             styles={customSelectStyles}
           />
           <span className="text-[10px] text-slate-400 mt-0.5 block">
-            {shopOptions.length} shop(s) available
+            {t("ops.trip.shops_available", { count: shopOptions.length })}
           </span>
         </div>
       </div>
@@ -223,7 +225,7 @@ export default function ShopDeliveryForm({
         <div className="sm:col-span-5">
           <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
             <Layers size={13} className="text-slate-400" />
-            Bird Type <span className="text-rose-500">*</span>
+            {t("operations.bird_type")} <span className="text-rose-500">*</span>
           </label>
           <Select
             key={`bird-${birdOptions.length}`}
@@ -233,7 +235,7 @@ export default function ShopDeliveryForm({
                 : null
             }
             options={birdOptions}
-            placeholder={birdOptions.length > 0 ? "Select Bird..." : "No bird types available"}
+            placeholder={birdOptions.length > 0 ? t("ops.trip.select_bird") : t("ops.trip.no_bird_types_available")}
             isSearchable
             isDisabled={birdOptions.length === 0 || birdOptions[0]?.isDisabled}
             onChange={handleBirdSelect}
@@ -241,7 +243,7 @@ export default function ShopDeliveryForm({
             styles={customSelectStyles}
           />
           <span className="text-[10px] text-slate-400 mt-0.5 block">
-            {birdOptions.length} bird type(s) available
+            {t("ops.trip.bird_types_available", { count: birdOptions.length })}
           </span>
         </div>
 
@@ -249,7 +251,7 @@ export default function ShopDeliveryForm({
         <div className="sm:col-span-7">
           <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
             <PackageCheck size={13} className="text-slate-400" />
-            Select Available Boxes
+            {t("ops.trip.select_available_boxes")}
           </label>
           {safeBoxDetails.length > 0 ? (
             <div className="bg-slate-50/50 p-2 border border-slate-200 rounded-lg">
@@ -264,7 +266,7 @@ export default function ShopDeliveryForm({
           ) : (
             <div className="border border-slate-200 rounded-lg p-2 bg-slate-50 text-center flex items-center justify-center gap-1.5 h-[38px]">
               <AlertCircle size={14} className="text-slate-400" />
-              <p className="text-xs text-slate-500">No boxes available from pickup.</p>
+              <p className="text-xs text-slate-500">{t("ops.trip.no_boxes_from_pickup")}</p>
             </div>
           )}
         </div>
@@ -278,7 +280,7 @@ export default function ShopDeliveryForm({
             {/* 1. Selected Boxes Count Box */}
             <div>
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                Selected Boxes
+                {t("ops.trip.selected_boxes")}
               </label>
               <div className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-800 flex items-center h-[38px]">
                 {boxCount}
@@ -288,7 +290,7 @@ export default function ShopDeliveryForm({
             {/* 2. Farm Birds */}
             <div>
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                Farm Birds
+                {t("ops.trip.farm_birds")}
               </label>
               <div className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 flex items-center h-[38px]">
                 {farmBirds}
@@ -298,7 +300,7 @@ export default function ShopDeliveryForm({
             {/* 3. Mortality Birds */}
             <div>
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                Mortality (Birds)
+                {t("ops.trip.mortality_birds")}
               </label>
               <input
                 type="number"
@@ -322,7 +324,7 @@ export default function ShopDeliveryForm({
             {/* 4. Delivered Birds */}
             <div>
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                Delivered Birds
+                {t("ops.trip.delivered_birds")}
               </label>
               <div className="w-full rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 text-xs font-bold text-emerald-700 flex items-center h-[38px]">
                 {deliveredBirds}
@@ -335,7 +337,7 @@ export default function ShopDeliveryForm({
             {/* Box Numbers Tag List (Placed directly in lower-left space) */}
             <div className="flex flex-col justify-start">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                Box Nos List
+                {t("ops.trip.box_nos_list")}
               </label>
               <div className="p-2 bg-white border border-slate-200 rounded-lg min-h-[38px] max-h-[85px] overflow-y-auto flex flex-wrap gap-1">
                 {selectedBoxIds.length > 0 ? (
@@ -349,7 +351,7 @@ export default function ShopDeliveryForm({
                     </span>
                   ))
                 ) : (
-                  <span className="text-xs text-slate-400 italic">None selected</span>
+                  <span className="text-xs text-slate-400 italic">{t("ops.trip.none_selected")}</span>
                 )}
               </div>
             </div>
@@ -357,7 +359,7 @@ export default function ShopDeliveryForm({
             {/* Farm Weight */}
             <div>
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                Farm Weight (kg)
+                {t("ops.trip.farm_weight_kg")}
               </label>
               <div className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 flex items-center h-[38px]">
                 {farmWeight.toFixed(2)}
@@ -367,7 +369,7 @@ export default function ShopDeliveryForm({
             {/* Mortality Weight */}
             <div>
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                Mortality Weight (kg)
+                {t("ops.trip.mortality_weight_kg")}
               </label>
               <div className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 flex items-center h-[38px]">
                 {mortKg > 0 ? mortKg.toFixed(2) : "0.00"}
@@ -377,7 +379,7 @@ export default function ShopDeliveryForm({
             {/* Delivered Weight */}
             <div>
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                Delivered Weight (kg)
+                {t("ops.trip.delivered_weight_kg")}
               </label>
               <div className="w-full rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 text-xs font-bold text-emerald-700 flex items-center h-[38px]">
                 {deliveredWeight > 0 ? deliveredWeight.toFixed(2) : "0.00"}
@@ -392,14 +394,14 @@ export default function ShopDeliveryForm({
             <table className="w-full text-left text-xs border-collapse">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase">
                 <tr>
-                  <th className="px-3 py-2">Box No</th>
-                  <th className="px-3 py-2">Farm Birds</th>
+                  <th className="px-3 py-2">{t("ops.trip.box_no")}</th>
+                  <th className="px-3 py-2">{t("ops.trip.farm_birds")}</th>
                   <th className="px-3 py-2">
-                    Delivered Birds <span className="text-rose-500">*</span>
+                    {t("ops.trip.delivered_birds")} <span className="text-rose-500">*</span>
                   </th>
-                  <th className="px-3 py-2">Farm Weight (kg)</th>
+                  <th className="px-3 py-2">{t("ops.trip.farm_weight_kg")}</th>
                   <th className="px-3 py-2">
-                    Delivered Weight (kg) <span className="text-rose-500">*</span>
+                    {t("ops.trip.delivered_weight_kg")} <span className="text-rose-500">*</span>
                   </th>
                 </tr>
               </thead>
@@ -460,7 +462,7 @@ export default function ShopDeliveryForm({
           <div className="grid grid-cols-2 gap-3 bg-slate-50/60 p-2.5 rounded-lg border border-slate-200">
             <div>
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                Mortality (Birds)
+                {t("ops.trip.mortality_birds")}
               </label>
               <input
                 type="number"
@@ -473,7 +475,7 @@ export default function ShopDeliveryForm({
             </div>
             <div>
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                Mortality Weight (kg)
+                {t("ops.trip.mortality_weight_kg")}
               </label>
               <input
                 type="number"
@@ -493,12 +495,12 @@ export default function ShopDeliveryForm({
       <div>
         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
           <MessageSquare size={13} className="text-slate-400" />
-          Remarks
+          {t("common.remarks")}
         </label>
         <input
           value={formData.remarks || ""}
           onChange={(e) => handleFormChange("remarks", e.target.value)}
-          placeholder="Optional delivery notes..."
+          placeholder={t("ops.trip.optional_delivery_notes")}
           className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-800 outline-none focus:border-blue-500 h-[38px]"
         />
       </div>
@@ -510,7 +512,7 @@ export default function ShopDeliveryForm({
           onClick={onClose}
           className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-colors"
         >
-          Cancel
+          {t("common.cancel")}
         </button>
         <button
           type="button"
@@ -522,7 +524,7 @@ export default function ShopDeliveryForm({
               : "bg-slate-200 text-slate-400 cursor-not-allowed"
           }`}
         >
-          {editingId !== null ? "Update Delivery" : "Save Delivery"}
+          {editingId !== null ? t("ops.trip.update_delivery") : t("ops.trip.save_delivery")}
         </button>
       </div>
     </div>

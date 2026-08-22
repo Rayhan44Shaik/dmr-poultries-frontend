@@ -25,6 +25,8 @@ import {
 import { QUICK_ACTIONS, resolveRoute } from "../../routes/navigation";
 import { useTheme } from "../../providers/ThemeProvider";
 import { useAuth } from "../../providers/AuthProvider";
+import { useI18n } from "../../i18n";
+import LanguageSwitcher from "./LanguageSwitcher";
 import { collectionService } from "../../modules/operations/collections/services/collectionService";
 import { tripService } from "../../modules/operations/vehicle-trips/services/tripService";
 import { getDocuments } from "../../modules/fleet-operations/services/storage";
@@ -135,6 +137,7 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const { logout } = useAuth();
+  const { language, t } = useI18n();
 
   const route = useMemo(() => resolveRoute(location.pathname + location.search), [location.pathname, location.search]);
 
@@ -142,6 +145,16 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
   const displayName = "Owner";
   const displayRole = "Owner";
   const initials = "O";
+
+  /* ----- Browser/page title from route metadata (translated) ----- */
+  useEffect(() => {
+    const key = route.page?.titleKey ?? `page_title.${route.section?.id ?? ""}`;
+    const fallback = route.page?.label ?? route.section?.label ?? "DMR Poultries";
+    const translated = key && key !== "page_title." ? t(key) : fallback;
+    document.title =
+      translated && translated !== key ? translated : `DMR Poultries - ${fallback}`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, location.search, language]);
 
   /* ----- Data-driven notifications (existing services only) ----- */
   const notifications = useMemo<NotificationItem[]>(() => {
@@ -155,8 +168,10 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
           id: "overdue-collections",
           icon: ShieldAlert,
           tone: "danger",
-          title: `${overdue.length} ${overdue.length === 1 ? "collection is" : "collections are"} overdue`,
-          description: `${formatINR(overdue.reduce((s, p) => s + (p.currentPending || 0), 0))} waiting to be collected`,
+          title: t("header.overdueCollections", { count: overdue.length }),
+          description: t("header.overdueCollectionDesc", {
+            amount: formatINR(overdue.reduce((s, p) => s + (p.currentPending || 0), 0)),
+          }),
           time: formatRelativeTime(new Date()),
           path: "/operations?tab=pending-collections",
         });
@@ -165,8 +180,8 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
           id: "pending-collections",
           icon: Clock3,
           tone: "info",
-          title: `${pending.length} shops with pending collections`,
-          description: `${formatINR(totalPending)} outstanding across shops`,
+          title: t("header.pendingCollectionsTitle", { count: pending.length }),
+          description: t("header.pendingCollectionsDesc", { amount: formatINR(totalPending) }),
           time: formatRelativeTime(new Date()),
           path: "/operations?tab=pending-collections",
         });
@@ -179,7 +194,7 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
           id: "trips-in-progress",
           icon: Truck,
           tone: "info",
-          title: `${inProgress.length} ${inProgress.length === 1 ? "trip is" : "trips are"} in progress`,
+          title: t("header.tripsInProgress", { count: inProgress.length }),
           description: inProgress.slice(0, 2).map((t) => t.vehicleNo).join(", ") + (inProgress.length > 2 ? " …" : ""),
           time: formatRelativeTime(new Date()),
           path: "/operations?tab=trip-list",
@@ -206,8 +221,8 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
           id: "documents-expiring",
           icon: ShieldAlert,
           tone: "warning",
-          title: `${expiring.length} document${expiring.length === 1 ? "" : "s"} expiring within 30 days`,
-          description: expiring.map((d) => (d as { vehicleNo?: string }).vehicleNo || "Vehicle").join(", "),
+          title: t("header.documentsExpiring", { count: expiring.length }),
+          description: expiring.map((d) => (d as { vehicleNo?: string }).vehicleNo || t("common.vehicle")).join(", "),
           time: formatRelativeTime(new Date()),
           path: "/fleet?tab=permits",
         });
@@ -218,10 +233,10 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
     return items;
     // location.key changes on every navigation — recomputes alerts after data entry.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.key]);
+  }, [location.key, language]);
 
-  const title = route.page?.label ?? route.section?.label ?? "";
-  const sectionLabel = route.section?.label;
+  const title = route.page?.labelKey ? t(route.page.labelKey) : (route.page?.label ?? route.section?.label ?? "");
+  const sectionLabel = route.section?.labelKey ? t(route.section.labelKey) : route.section?.label;
 
   const handleSignOut = () => {
     logout();
@@ -235,7 +250,7 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
         type="button"
         onClick={onMenuClick}
         className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 lg:hidden dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-        aria-label="Open navigation menu"
+        aria-label={t("header.openMenu")}
       >
         <Menu size={20} />
       </button>
@@ -266,25 +281,28 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
         className="hidden h-9 items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50/80 pl-3 pr-2 text-sm text-slate-400 transition-all hover:border-slate-300 hover:bg-white hover:text-slate-500 md:flex md:w-56 lg:w-64 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-500 dark:hover:border-slate-600 dark:hover:bg-slate-800"
       >
         <Search size={15} />
-        <span className="flex-1 text-left">Search pages…</span>
+        <span className="flex-1 text-left">{t("header.search")}</span>
         <kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-sans text-[10.5px] font-semibold text-slate-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-400">
           ⌘K
         </kbd>
       </button>
-      <IconButton label="Search" onClick={onOpenCommand} className="md:hidden">
+      <IconButton label={t("header.search_short")} onClick={onOpenCommand} className="md:hidden">
         <Search size={18} />
       </IconButton>
 
       {/* Theme toggle */}
-      <IconButton label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} onClick={toggleTheme}>
+      <IconButton label={theme === "dark" ? t("header.theme_light") : t("header.theme_dark")} onClick={toggleTheme}>
         {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
       </IconButton>
+
+      {/* Language switcher */}
+      <LanguageSwitcher />
 
       {/* Notifications */}
       <Dropdown
         width="w-[360px] max-w-[calc(100vw-2rem)]"
         trigger={(_open, toggle) => (
-          <IconButton label="Notifications" onClick={toggle} badge={notifications.length}>
+          <IconButton label={t("header.notifications")} onClick={toggle} badge={notifications.length}>
             <Bell size={18} />
           </IconButton>
         )}
@@ -292,9 +310,9 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
         {(close) => (
           <div>
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-700">
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Notifications</p>
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t("header.notifications")}</p>
               <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
-                {notifications.length} new
+                {notifications.length} {t("header.new")}
               </span>
             </div>
             <div className="max-h-[320px] overflow-y-auto">
@@ -303,8 +321,8 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-700">
                     <Check size={18} />
                   </div>
-                  <p className="text-sm font-medium text-slate-600 dark:text-slate-300">You're all caught up</p>
-                  <p className="text-xs text-slate-400">No alerts right now.</p>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-300">{t("header.noNotifications")}</p>
+                  <p className="text-xs text-slate-400">{t("header.noNotificationsDesc")}</p>
                 </div>
               ) : (
                 notifications.map((n) => {
@@ -353,7 +371,7 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
             className="hidden h-9 items-center gap-1.5 rounded-lg bg-brand-600 pl-3 pr-2.5 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 sm:flex dark:bg-brand-600 dark:hover:bg-brand-500"
           >
             <Plus size={16} />
-            Quick add
+            {t("header.quickAdd")}
             <ChevronDown size={14} className={`text-brand-200 transition-transform ${open ? "rotate-180" : ""}`} />
           </button>
         )}
@@ -361,7 +379,7 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
         {(close) => (
           <div className="p-1.5">
             <p className="px-2.5 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-              Quick actions
+              {t("header.quickActions")}
             </p>
             {QUICK_ACTIONS.map((action) => (
               <Link
@@ -374,8 +392,12 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
                   <action.icon size={16} />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-[13px] font-semibold text-slate-800 dark:text-slate-100">{action.label}</span>
-                  <span className="block truncate text-xs text-slate-400 dark:text-slate-500">{action.description}</span>
+                  <span className="block text-[13px] font-semibold text-slate-800 dark:text-slate-100">
+                    {action.labelKey ? t(action.labelKey) : action.label}
+                  </span>
+                  <span className="block truncate text-xs text-slate-400 dark:text-slate-500">
+                    {action.descriptionKey ? t(action.descriptionKey) : action.description}
+                  </span>
                 </span>
               </Link>
             ))}
@@ -421,7 +443,7 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
             </div>
             <div className="mx-2.5 my-1.5 flex items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-1.5 dark:bg-slate-700/40">
               <UserRound size={13} className="text-brand-600 dark:text-brand-400" />
-              <span className="text-[11.5px] font-medium text-slate-500 dark:text-slate-300">Role</span>
+              <span className="text-[11.5px] font-medium text-slate-500 dark:text-slate-300">{t("header.role")}</span>
               <span className="ml-auto rounded-full bg-brand-100 px-2 py-px text-[10.5px] font-semibold text-brand-800 dark:bg-brand-500/15 dark:text-brand-300">
                 {displayRole}
               </span>
@@ -432,7 +454,7 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
               onClick={close}
               className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700/50"
             >
-              <Settings size={15} /> Account settings
+              <Settings size={15} /> {t("header.settings")}
             </Link>
             <button
               type="button"
@@ -442,7 +464,7 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
               }}
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
             >
-              <LogOut size={15} /> Sign out
+              <LogOut size={15} /> {t("header.signOut")}
             </button>
           </div>
         )}

@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { X, Download, ExternalLink, FileText } from 'lucide-react';
+import { useI18n } from '../../../../i18n';
 import type { MaintenanceDocument } from '../../types';
 import { maintenanceApi } from '../../services/maintenanceApi';
 
@@ -11,6 +12,7 @@ interface DocumentViewerModalProps {
 }
 
 const DocumentViewerModal = ({ open, maintenanceId, doc, onClose }: DocumentViewerModalProps) => {
+  const { t } = useI18n();
   if (!open || !doc || !maintenanceId) return null;
 
   const url = maintenanceApi.documentUrl(maintenanceId, doc.id);
@@ -38,14 +40,14 @@ const DocumentViewerModal = ({ open, maintenanceId, doc, onClose }: DocumentView
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition"
             >
               <ExternalLink size={14} />
-              Open
+              {t('fleet.document_viewer.open')}
             </a>
             <button
               onClick={() => maintenanceApi.downloadDocument(maintenanceId, doc)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
             >
               <Download size={14} />
-              Download
+              {t('common.download')}
             </button>
             <button
               onClick={onClose}

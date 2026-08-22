@@ -12,6 +12,7 @@ import {
   opsExcelButtonClass,
   opsReactSelectStyles,
 } from "../../../../shared/ui/operationsStyles";
+import { useI18n } from "../../../../i18n";
 
 interface Props {
   fromDate: string;
@@ -70,6 +71,7 @@ function TripFilters({
   hasFilters = false,
   viewButtonRef,
 }: Props) {
+  const { t } = useI18n();
   const vehicleOptions = (vehicles || []).map((v) => ({ value: v, label: v }));
   const supervisorOptions = (supervisors || []).map((v) => ({ value: v, label: v }));
   const farmOptions = (farms || []).map((v) => ({ value: v, label: v }));
@@ -82,12 +84,12 @@ function TripFilters({
         <div>
           <label className={opsFilterLabelClass}>
             <Calendar size={13} className="text-emerald-600 flex-shrink-0" />
-            <span>From Date</span>
+            <span>{t("common.from")}</span>
           </label>
           <DatePicker
             value={fromDate}
             onChange={setFromDate}
-            placeholder="Select date"
+            placeholder={t("placeholder.enter_date")}
             className="w-full text-xs font-medium"
           />
         </div>
@@ -95,12 +97,12 @@ function TripFilters({
         <div>
           <label className={opsFilterLabelClass}>
             <Calendar size={13} className="text-emerald-600 flex-shrink-0" />
-            <span>To Date</span>
+            <span>{t("common.to")}</span>
           </label>
           <DatePicker
             value={toDate}
             onChange={setToDate}
-            placeholder="Select date"
+            placeholder={t("placeholder.enter_date")}
             className="w-full text-xs font-medium"
           />
         </div>
@@ -108,7 +110,7 @@ function TripFilters({
         <div>
           <label className={opsFilterLabelClass}>
             <Truck size={13} className="text-emerald-600 flex-shrink-0" />
-            <span>Vehicle</span>
+            <span>{t("common.vehicle")}</span>
           </label>
           <Select
             options={vehicleOptions}
@@ -116,7 +118,7 @@ function TripFilters({
             onChange={(e) => setVehicle(e?.value || "All Vehicles")}
             isSearchable
             filterOption={containsFilter}
-            placeholder="All Vehicles"
+            placeholder={t("ops.trip.all_vehicles")}
             styles={selectStyles}
           />
         </div>
@@ -124,7 +126,7 @@ function TripFilters({
         <div>
           <label className={opsFilterLabelClass}>
             <UserCog size={13} className="text-emerald-600 flex-shrink-0" />
-            <span>Supervisor</span>
+            <span>{t("common.supervisor")}</span>
           </label>
           <Select
             options={supervisorOptions}
@@ -132,7 +134,7 @@ function TripFilters({
             onChange={(e) => setSupervisor(e?.value || "All Supervisors")}
             isSearchable
             filterOption={containsFilter}
-            placeholder="All Supervisors"
+            placeholder={t("ops.trip.all_supervisors")}
             styles={selectStyles}
           />
         </div>
@@ -140,7 +142,7 @@ function TripFilters({
         <div>
           <label className={opsFilterLabelClass}>
             <Warehouse size={13} className="text-emerald-600 flex-shrink-0" />
-            <span>Source Farm</span>
+            <span>{t("ops.trip.source_farm")}</span>
           </label>
           <Select
             options={farmOptions}
@@ -148,7 +150,7 @@ function TripFilters({
             onChange={(e) => setFarm(e?.value || "All Sources")}
             isSearchable
             filterOption={containsFilter}
-            placeholder="All Sources"
+            placeholder={t("ops.trip.all_sources")}
             styles={selectStyles}
           />
         </div>
@@ -158,14 +160,14 @@ function TripFilters({
         <div className="lg:col-span-5">
           <label className={opsFilterLabelClass}>
             <Search size={13} className="text-slate-400 flex-shrink-0" />
-            <span>Search</span>
+            <span>{t("common.search")}</span>
           </label>
           <div className="relative">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by Trip No, Vehicle, Supervisor, or Farm..."
+              placeholder={t("ops.trip.search_trips_placeholder")}
               className={`${opsInputClass} pl-10`}
             />
           </div>
@@ -179,16 +181,16 @@ function TripFilters({
               className={opsPrimaryButtonClass}
             >
               <Eye size={15} />
-              View Selected
+              {t("ops.trip.view_selected")}
             </button>
           )}
           <button onClick={onSearch} className={opsPrimaryButtonClass}>
             <Search size={15} />
-            Search
+            {t("common.search")}
           </button>
           <button onClick={onReset} className={opsSecondaryButtonClass}>
             <RotateCcw size={14} />
-            Reset
+            {t("common.reset")}
           </button>
           {onExportPDF && (
             <button onClick={onExportPDF} disabled={!hasFilters} className={opsPdfButtonClass}>

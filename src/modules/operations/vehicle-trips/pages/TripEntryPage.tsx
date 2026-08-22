@@ -24,6 +24,7 @@ import { useFarms } from "../../../masters/farms/hooks/useFarms";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useBirdTypes } from "../../../masters/bird-types/hooks/useBirdTypes";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import { useI18n } from "../../../../i18n";
 
 // --- Utils ---
 import { canEditItem } from "../../../../utils/dateUtils";
@@ -50,6 +51,7 @@ const getYesterday = () => {
 type EntryScreen = "prompt" | "form";
 
 function TripEntryPage({ embedded = false }: TripEntryPageProps) {
+  const { t } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
   const { farms } = useFarms();
@@ -118,7 +120,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   // The submitted trip is already in Recent Trips via onTripsChanged.
   useEffect(() => {
     registerStep1SuccessCallback(() => {
-      showNotification(`Step 1 submitted successfully.`, "success");
+      showNotification(t("ops.trip.step1_submitted"), "success");
       clearTrip();
       setRows([]);
       setEntryScreen("prompt");
@@ -132,7 +134,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   useEffect(() => {
     registerStep2SuccessCallback(() => {
-      showNotification("Step 2 submitted successfully.", "success");
+      showNotification(t("ops.trip.step2_submitted"), "success");
       clearTrip();
       setRows([]);
       setEntryScreen("prompt");
@@ -146,7 +148,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   useEffect(() => {
     registerStep3SuccessCallback(() => {
-      showNotification("Step 3 submitted successfully.", "success");
+      showNotification(t("ops.trip.step3_submitted"), "success");
       clearTrip();
       setRows([]);
       setEntryScreen("prompt");
@@ -174,7 +176,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     void loadTripById(selectedTrip.id)
       .then((loaded) => setViewTrip(loaded))
       .catch(() => {
-        showNotification("Could not refresh trip from server. Showing last loaded data.", "info");
+        showNotification(t("ops.trip.refresh_failed_using_cached"), "info");
       });
   };
 
@@ -210,11 +212,11 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       return;
     }
     const targetStep = getNextIncompleteTripStep(selectedTrip);
-    const resumeLabel = getResumeActionLabel(selectedTrip) ?? `Step ${targetStep + 1}`;
+    const resumeLabel = getResumeActionLabel(selectedTrip) ?? t("ops.trip.step_label", { step: targetStep + 1 });
     void openExistingTrip(
       selectedTrip,
       targetStep,
-      `Resuming Trip ${selectedTrip.tripNo} — ${resumeLabel}`,
+      t("ops.trip.resuming", { no: selectedTrip.tripNo, label: resumeLabel }),
       null
     );
   };
@@ -222,18 +224,18 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const handleEdit = (selectedTrip: Trip) => {
     const targetStep = getLastSubmittedTripStep(selectedTrip);
     if (targetStep == null) return;
-    const stepName = TRIP_STEP_LABELS[targetStep] ?? `Step ${targetStep + 1}`;
+    const stepName = TRIP_STEP_LABELS[targetStep] ?? t("ops.trip.step_label", { step: targetStep + 1 });
     void openExistingTrip(
       selectedTrip,
       targetStep,
-      `Edit Mode — Step ${targetStep + 1}: ${stepName}`,
+      t("ops.trip.edit_mode", { step: targetStep + 1, name: stepName }),
       targetStep
     );
   };
 
   const handleRefresh = async () => {
     await refreshTrips();
-    showNotification("Table refreshed", "success");
+    showNotification(t("ops.trip.table_refreshed"), "success");
   };
 
   const isInitialMount = useRef(true);
@@ -503,7 +505,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
     return (
       <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">
-        👈 Select a completed step or the current step to view it here.
+        👈 {t("ops.trip.select_step_hint")}
       </div>
     );
   };
@@ -517,9 +519,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
               <FileText size={36} />
             </div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Trip Entry</h2>
+              <h2 className="text-2xl font-bold text-slate-800 tracking-tight">{t("ops.trip.trip_entry_title")}</h2>
               <p className="text-slate-500 max-w-md mx-auto">
-                No active trip
+                {t("ops.trip.no_active_trip")}
               </p>
             </div>
             <button
@@ -527,7 +529,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
               className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"
             >
               <Plus size={18} />
-              Create New Trip
+              {t("ops.trip.create_new_trip")}
             </button>
           </div>
         ) : (
@@ -545,7 +547,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
                 // submitted (backend state). Redirect to the correct next step.
                 setViewStepIndex(currentStep);
                 showNotification(
-                  `Step ${idx + 1} is locked. Complete Step ${currentStep + 1} (${TRIP_STEP_LABELS[currentStep]}) first.`,
+                  t("ops.trip.step_locked", { locked: idx + 1, current: currentStep + 1, name: TRIP_STEP_LABELS[currentStep] }),
                   "info"
                 );
               }}
@@ -555,7 +557,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
               <WizardStepNotice
                 notice={{
                   type: "info",
-                  message: `Edit Mode — Step ${editingSubmittedStep + 1}: ${TRIP_STEP_LABELS[editingSubmittedStep]}. You are editing the last submitted step.`,
+                  message: t("ops.trip.edit_mode_notice", { step: editingSubmittedStep + 1, name: TRIP_STEP_LABELS[editingSubmittedStep] }),
                 }}
               />
             )}

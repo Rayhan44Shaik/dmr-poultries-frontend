@@ -4,6 +4,7 @@ import type { Collection, CollectionApiEntry } from "../../types/collection";
 import { collectionService } from "../../services/collectionService";
 import { useSafeNotification } from "../../../../../hooks/useSafeNotification";
 import { opsSecondaryButtonClass, opsPrimaryButtonClass } from "../../../../../shared/ui/operationsStyles";
+import { useI18n } from "../../../../../i18n";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -39,6 +40,7 @@ export function ShopCollectionDetailDrawer({
   latestCollection,
   onRefresh,
 }: ShopCollectionDetailDrawerProps) {
+  const { t } = useI18n();
   const { showNotification } = useSafeNotification();
 
   const shopCollections = allCollections
@@ -77,24 +79,24 @@ export function ShopCollectionDetailDrawer({
 
   const handleDeleteCollection = async (collection: CollectionApiEntry) => {
     if (!collection.canDelete) {
-      showNotification("Cannot delete – collection is outside the 7-day deletion window.", "error");
+      showNotification(t("ops.collection.cannot_delete_window"), "error");
       return;
     }
-    if (!window.confirm(`Delete collection ${collection.collectionNo} dated ${formatDate(collection.collectionDate)} for ₹${formatCurrency(Number(collection.amount))}?`)) {
+    if (!window.confirm(t("ops.collection.confirm_delete_collection", { no: collection.collectionNo, date: formatDate(collection.collectionDate), amount: formatCurrency(Number(collection.amount)) }))) {
       return;
     }
     setDeletingId(collection.id);
     try {
       const result = await collectionService.deletePendingCollection(String(collection.id));
       if (result.success) {
-        showNotification("Collection deleted successfully.", "success");
+        showNotification(t("ops.collection.deleted_success"), "success");
         onRefresh();
         onClose();
       } else {
-        showNotification(result.message ?? "Delete failed.", "error");
+        showNotification(result.message ?? t("ops.collection.delete_failed"), "error");
       }
     } catch {
-      showNotification("Delete failed.", "error");
+      showNotification(t("ops.collection.delete_failed"), "error");
     } finally {
       setDeletingId(null);
     }
@@ -117,14 +119,14 @@ export function ShopCollectionDetailDrawer({
               <Eye size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-800">Shop Collection Details</h3>
+              <h3 className="text-lg font-semibold text-slate-800">{t("ops.collection.shop_collection_details")}</h3>
               <p className="text-sm text-slate-600 font-medium">{shopName}</p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-            aria-label="Close"
+            aria-label={t("common.close")}
           >
             <X size={18} />
           </button>
@@ -137,21 +139,21 @@ export function ShopCollectionDetailDrawer({
             <div className="rounded-xl border border-red-200 bg-red-50 p-4">
               <div className="flex items-center gap-2 text-xs font-medium text-red-600 mb-1">
                 <IndianRupee size={14} />
-                Current Outstanding
+                {t("ops.collection.current_outstanding")}
               </div>
               <div className="text-lg font-bold text-red-700">{formatCurrency(currentOutstanding)}</div>
             </div>
             <div className="rounded-xl border border-green-200 bg-green-50 p-4">
               <div className="flex items-center gap-2 text-xs font-medium text-green-600 mb-1">
                 <CreditCard size={14} />
-                Total Collections
+                {t("ops.collection.total_collections")}
               </div>
               <div className="text-lg font-bold text-green-700">{formatCurrency(totalCollections)}</div>
             </div>
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
               <div className="flex items-center gap-2 text-xs font-medium text-blue-600 mb-1">
                 <Calendar size={14} />
-                Last Collection
+                {t("ops.collection.last_collection")}
               </div>
               <div className="text-lg font-bold text-blue-700">{formatDate(lastCollectionDate)}</div>
             </div>
@@ -162,7 +164,7 @@ export function ShopCollectionDetailDrawer({
             <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
               <h4 className="mb-3 text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <Hash size={14} className="text-slate-500" />
-                Latest Collection Details
+                {t("ops.collection.latest_collection_details")}
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="flex items-center gap-2">
@@ -170,7 +172,7 @@ export function ShopCollectionDetailDrawer({
                     <Hash size={14} />
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-slate-500">Collection No.</p>
+                    <p className="text-xs font-medium text-slate-500">{t("ops.collection.collection_no_label")}</p>
                     <p className="text-sm font-medium text-slate-800">{selected.collectionNo || "-"}</p>
                   </div>
                 </div>
@@ -179,7 +181,7 @@ export function ShopCollectionDetailDrawer({
                     <Calendar size={14} />
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-slate-500">Collection Date</p>
+                    <p className="text-xs font-medium text-slate-500">{t("operations.collection_date")}</p>
                     <p className="text-sm font-medium text-slate-800">{formatDate(selected.collectionDate)}</p>
                   </div>
                 </div>
@@ -188,7 +190,7 @@ export function ShopCollectionDetailDrawer({
                     <User size={14} />
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-slate-500">Collector</p>
+                    <p className="text-xs font-medium text-slate-500">{t("common.collector")}</p>
                     <p className="text-sm font-medium text-slate-800">{selected.collectorName || "-"}</p>
                   </div>
                 </div>
@@ -197,7 +199,7 @@ export function ShopCollectionDetailDrawer({
                     <CreditCard size={14} />
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-slate-500">Payment Mode</p>
+                    <p className="text-xs font-medium text-slate-500">{t("operations.payment_mode")}</p>
                     <p className="text-sm font-medium text-slate-800">{selected.paymentModeName || "Cash"}</p>
                   </div>
                 </div>
@@ -206,7 +208,7 @@ export function ShopCollectionDetailDrawer({
                     <Hash size={14} />
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-slate-500">Reference No.</p>
+                    <p className="text-xs font-medium text-slate-500">{t("operations.reference_no")}</p>
                     <p className="text-sm font-medium text-slate-800">{selected.referenceNo || "-"}</p>
                   </div>
                 </div>
@@ -215,7 +217,7 @@ export function ShopCollectionDetailDrawer({
                     <IndianRupee size={14} />
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-slate-500">Amount Received</p>
+                    <p className="text-xs font-medium text-slate-500">{t("operations.amount_received")}</p>
                     <p className="text-sm font-bold text-slate-800">{formatCurrency(selected.amount)}</p>
                   </div>
                 </div>
@@ -225,7 +227,7 @@ export function ShopCollectionDetailDrawer({
                       <FileText size={14} />
                     </div>
                     <div>
-                      <p className="text-xs font-medium text-slate-500">Remarks</p>
+                      <p className="text-xs font-medium text-slate-500">{t("common.remarks")}</p>
                       <p className="text-sm text-slate-700">{selected.remarks}</p>
                     </div>
                   </div>
@@ -239,31 +241,31 @@ export function ShopCollectionDetailDrawer({
             <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
               <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <FileText size={14} className="text-slate-500" />
-                Recent Collection Transactions (Latest 10)
+                {t("ops.collection.recent_transactions")}
               </h4>
               {recentLoading && recentList.length === 0 && (
                 <span className="inline-flex items-center gap-1 text-xs text-slate-400">
                   <Loader2 size={12} className="animate-spin" />
-                  Loading...
+                  {t("common.loading")}
                 </span>
               )}
             </div>
             {recentLoading && recentList.length === 0 ? (
-              <div className="p-8 text-center text-slate-500">Loading recent collections...</div>
+              <div className="p-8 text-center text-slate-500">{t("ops.collection.loading_recent")}</div>
             ) : recentList.length === 0 ? (
-              <div className="p-8 text-center text-slate-500">No collections found for this shop.</div>
+              <div className="p-8 text-center text-slate-500">{t("ops.collection.no_collections_for_shop")}</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-100">
                   <thead className="bg-slate-50">
                     <tr>
-                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Collection ID</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Date</th>
-                      <th className="px-4 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Amount</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Mode</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Collector</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Status</th>
-                      <th className="px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-slate-500">Action</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t("ops.collection.collection_id")}</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t("table.date")}</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-slate-500">{t("table.amount")}</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t("table.mode")}</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t("table.collector")}</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t("table.status")}</th>
+                      <th className="px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-slate-500">{t("table.actions")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
@@ -285,7 +287,11 @@ export function ShopCollectionDetailDrawer({
                             col.status === "Rejected" ? "bg-red-50 text-red-700 border-red-200" :
                             "bg-slate-100 text-slate-600 border-slate-200"
                           }`}>
-                            {col.status || "-"}
+                            {(() => {
+                              const k = "status." + String(col.status).toLowerCase().replace(/\s+/g, "_");
+                              const label = t(k);
+                              return label === k ? col.status || "-" : label;
+                            })()}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -293,7 +299,7 @@ export function ShopCollectionDetailDrawer({
                             <button
                               onClick={() => handleDeleteCollection(col)}
                               disabled={deletingId === col.id}
-                              title="Delete Collection"
+                              title={t("ops.collection.delete_collection")}
                               className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-red-500 hover:bg-red-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {deletingId === col.id ? (
@@ -313,7 +319,7 @@ export function ShopCollectionDetailDrawer({
                 {recentList.length >= 10 && (
                   <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/50">
                     <p className="text-xs text-slate-400 text-center">
-                      Showing latest 10 of {recentList.length}+ collections — full history is available in Shop Ledger.
+                      {t("ops.collection.showing_latest_10", { count: recentList.length })}
                     </p>
                   </div>
                 )}
@@ -329,7 +335,7 @@ export function ShopCollectionDetailDrawer({
             className={opsSecondaryButtonClass}
           >
             <X size={16} className="mr-1" />
-            Close
+            {t("common.close")}
           </button>
         </div>
       </div>

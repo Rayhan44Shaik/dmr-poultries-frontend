@@ -1,4 +1,5 @@
 import { IndianRupee, TrendingUp, ShoppingBag, CreditCard } from "lucide-react";
+import { useI18n } from "../../../../../i18n";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -20,9 +21,10 @@ export function PendingKPICards({
   weeklyCollections,
   weeklyRecovery,
 }: PendingKPICardsProps) {
+  const { t } = useI18n();
   const cards = [
     {
-      label: "Total Outstanding",
+      label: t("ops.collection.total_outstanding"),
       value: formatCurrency(totalPending),
       icon: IndianRupee,
       iconBg: "bg-red-100",
@@ -33,7 +35,7 @@ export function PendingKPICards({
       bgColor: "bg-red-50",
     },
     {
-      label: "This Week Sales",
+      label: t("ops.collection.this_week_sales"),
       value: formatCurrency(weeklySales),
       icon: ShoppingBag,
       iconBg: "bg-blue-100",
@@ -44,7 +46,7 @@ export function PendingKPICards({
       bgColor: "bg-blue-50",
     },
     {
-      label: "This Week Collections",
+      label: t("ops.collection.this_week_collections"),
       value: formatCurrency(weeklyCollections),
       icon: CreditCard,
       iconBg: "bg-green-100",
@@ -55,7 +57,7 @@ export function PendingKPICards({
       bgColor: "bg-green-50",
     },
     {
-      label: "Recovery %",
+      label: t("ops.collection.recovery_pct"),
       value: `${weeklyRecovery.toFixed(2)}%`,
       icon: TrendingUp,
       iconBg: "bg-purple-100",

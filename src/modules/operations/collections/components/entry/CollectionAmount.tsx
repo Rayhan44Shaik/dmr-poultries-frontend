@@ -1,5 +1,6 @@
 import { Calculator, AlertTriangle, CheckCircle, Clock, ArrowRight } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { useI18n } from "../../../../../i18n";
 
 interface CollectionAmountProps {
   amount: number;
@@ -56,6 +57,7 @@ export default function CollectionAmount({
   isSaving,
   disableSave,
 }: CollectionAmountProps) {
+  const { t } = useI18n();
   // Local input state – stores the raw number string (without commas) while editing
   const [inputValue, setInputValue] = useState<string>(
     amount ? amount.toFixed(2) : ""
@@ -117,19 +119,19 @@ export default function CollectionAmount({
   let statusIcon = null;
   
   if (!showSummary || !ledgerLoaded) {
-    statusText = "Select Shop & View Ledger";
+    statusText = t("ops.collection.status.select_shop");
     statusClass = "bg-slate-100 text-slate-600";
     statusIcon = <Clock size={10} />;
   } else if (displayProjected < 0) {
-    statusText = "Overpaid — Exceeds Outstanding";
+    statusText = t("ops.collection.status.overpaid");
     statusClass = "bg-blue-100 text-blue-800 border-blue-200";
     statusIcon = <AlertTriangle size={10} />;
   } else if (displayProjected === 0) {
-    statusText = "Fully Collected — Balance Zero";
+    statusText = t("ops.collection.status.fully_collected");
     statusClass = "bg-green-100 text-green-800 border-green-200";
     statusIcon = <CheckCircle size={10} />;
   } else {
-    statusText = "Pending Approval — Not Yet Deducted";
+    statusText = t("ops.collection.status.pending_approval");
     statusClass = "bg-amber-100 text-amber-800 border-amber-200";
     statusIcon = <Clock size={10} />;
   }
@@ -145,13 +147,13 @@ export default function CollectionAmount({
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
           <Calculator size={16} />
         </div>
-        <h2 className="text-lg font-semibold text-emerald-800">Collection Amount</h2>
+        <h2 className="text-lg font-semibold text-emerald-800">{t("ops.collection.amount_title")}</h2>
       </div>
 
       {/* Amount Input */}
       <div className="flex items-center gap-4">
         <label htmlFor="amount" className="whitespace-nowrap text-sm font-medium text-slate-700">
-          Amount Received <span className="text-red-500">*</span>
+          {t("operations.amount_received")} <span className="text-red-500">*</span>
         </label>
         <div className="relative flex-1">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">₹</span>
@@ -170,19 +172,19 @@ export default function CollectionAmount({
         </div>
       </div>
       {amountError && <p className="mt-1 text-xs text-red-500">{amountError}</p>}
-      <p className="mt-1 text-xs text-slate-400">Enter the amount received from the selected shop.</p>
+      <p className="mt-1 text-xs text-slate-400">{t("ops.collection.enter_amount_hint")}</p>
 
       {/* Remarks */}
       <div className="mt-4 flex items-center gap-4">
         <label htmlFor="remarks" className="whitespace-nowrap text-sm font-medium text-slate-700">
-          Remarks (Optional)
+          {t("ops.collection.remarks_optional")}
         </label>
         <input
           id="remarks"
           type="text"
           value={remarks}
           onChange={(e) => onRemarksChange(e.target.value)}
-          placeholder="Enter remarks..."
+          placeholder={t("placeholder.enter_remarks")}
           className="h-10 flex-1 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
         />
       </div>
@@ -191,17 +193,17 @@ export default function CollectionAmount({
       <div className="mt-5 flex-1 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
         <h3 className="mb-3 text-base font-bold text-emerald-800 flex items-center gap-2">
           <Calculator size={16} />
-          Collection Preview
+          {t("ops.collection.preview")}
         </h3>
         
         {/* BEFORE COLLECTION */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-slate-600">BEFORE COLLECTION</span>
-            <span className="font-bold text-emerald-700">Current Outstanding</span>
+            <span className="font-medium text-slate-600">{t("ops.collection.before_collection")}</span>
+            <span className="font-bold text-emerald-700">{t("ops.collection.current_outstanding")}</span>
           </div>
           <div className="flex items-center justify-between text-base font-bold text-slate-800 bg-white rounded-lg px-3 py-2 border border-slate-200">
-            <span>Current Outstanding</span>
+            <span>{t("ops.collection.current_outstanding")}</span>
             <span>{inr(displayOutstanding)}</span>
           </div>
 
@@ -209,13 +211,13 @@ export default function CollectionAmount({
 
           {/* COLLECTION */}
           <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-slate-600">COLLECTION ENTRY</span>
-            <span className="font-bold text-emerald-700">Pending Approval</span>
+            <span className="font-medium text-slate-600">{t("ops.collection.collection_entry")}</span>
+            <span className="font-bold text-emerald-700">{t("ops.collection.pending_approval")}</span>
           </div>
           <div className="flex items-center justify-between text-base font-bold text-emerald-700 bg-white rounded-lg px-3 py-2 border border-emerald-200">
             <span className="flex items-center gap-1.5">
               <ArrowRight size={14} className="text-emerald-600" />
-              Received Today
+              {t("ops.collection.received_today")}
             </span>
             <span>{inr(displayReceived)}</span>
           </div>
@@ -224,11 +226,11 @@ export default function CollectionAmount({
 
           {/* AFTER APPROVAL */}
           <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-slate-600">AFTER APPROVAL</span>
-            <span className="font-bold text-slate-700">Projected Balance</span>
+            <span className="font-medium text-slate-600">{t("ops.collection.after_approval")}</span>
+            <span className="font-bold text-slate-700">{t("ops.collection.projected_balance")}</span>
           </div>
           <div className="flex items-center justify-between text-base font-extrabold bg-white rounded-lg px-3 py-2 border border-slate-200">
-            <span>Projected Balance After Approval</span>
+            <span>{t("ops.collection.projected_after_approval")}</span>
             <span className={displayProjected < 0 ? "text-blue-600" : displayProjected === 0 ? "text-emerald-700" : "text-rose-600"}>
               {formattedProjected}
             </span>
@@ -242,19 +244,19 @@ export default function CollectionAmount({
             </span>
             {!showSummary || !ledgerLoaded ? (
               <p className="mt-1.5 text-[11px] text-slate-500">
-                Click "View Shop Ledger" to load current outstanding
+                {t("ops.collection.click_view_ledger_hint")}
               </p>
             ) : displayProjected < 0 ? (
               <p className="mt-1.5 text-[11px] text-blue-600">
-                Collection exceeds current outstanding. Verify amount before saving.
+                {t("ops.collection.overpaid_hint")}
               </p>
             ) : displayProjected === 0 ? (
               <p className="mt-1.5 text-[11px] text-emerald-600">
-                This collection will fully settle the outstanding balance.
+                {t("ops.collection.fully_collected_hint")}
               </p>
             ) : (
               <p className="mt-1.5 text-[11px] text-amber-600">
-                This collection will reduce outstanding ONLY after approval.
+                {t("ops.collection.pending_hint")}
               </p>
             )}
           </div>
@@ -268,7 +270,7 @@ export default function CollectionAmount({
           onClick={onCancel}
           className="rounded-md border border-slate-300 px-5 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
         >
-          Cancel
+          {t("common.cancel")}
         </button>
         <button
           type="button"
@@ -280,7 +282,7 @@ export default function CollectionAmount({
               : "bg-emerald-700 hover:bg-emerald-800"
           }`}
         >
-          {isSaving ? "Saving..." : "Save Collection"}
+          {isSaving ? t("common.saving") : t("ops.collection.save_collection")}
         </button>
       </div>
     </div>

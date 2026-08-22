@@ -1,6 +1,7 @@
 import { Check, Box, Users, Scale, Clock, Pencil, FileText, Package, AlertCircle } from "lucide-react";
 import type { ShopDelivery } from "../../types/trip";
 import type { ShopDeliveryWithExtra } from "./useShopDeliveryForm";
+import { useI18n } from "../../../../../i18n";
 
 interface Props {
   row: ShopDeliveryWithExtra;
@@ -19,13 +20,14 @@ export default function ShopDeliveryCard({
   onEdit,
   onPDF,
 }: Props) {
+  const { t } = useI18n();
   const isWeightMode = row.deliveryMode === "weight";
   const selectedBoxes = row.selectedBoxIds || [];
   const perBox = row.perBoxData || [];
   const mortalityCount = row.mortality ?? 0;
   const mortKg = row.mortKg ?? 0;
   const display = (value: string | number | null | undefined) => {
-    if (value == null || value === "" || (typeof value === "number" && Number.isNaN(value))) return "Not entered";
+    if (value == null || value === "" || (typeof value === "number" && Number.isNaN(value))) return t("ops.trip.not_entered");
     return String(value);
   };
 
@@ -39,23 +41,23 @@ export default function ShopDeliveryCard({
 
           <div className="flex items-center gap-1.5 overflow-hidden">
             <span className="font-bold text-slate-800 text-sm truncate" title={row.shopName}>
-              {row.shopName || "Not entered"}
+              {row.shopName || t("ops.trip.not_entered")}
             </span>
 
             <span
-              title={`Delivery Mode: ${isWeightMode ? "Weight" : "Box"}`}
+              title={`${t("ops.trip.delivery_mode")}: ${isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}`}
               className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold shrink-0 border ${
                 isWeightMode
                   ? "bg-purple-50 text-purple-700 border-purple-200/60"
                   : "bg-amber-50 text-amber-700 border-amber-200/60"
               }`}
             >
-              {isWeightMode ? "WEIGHT" : "BOX"}
+              {isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}
             </span>
 
             {mortalityCount > 0 && (
               <span
-                title={`Mortality: ${mortalityCount} birds`}
+                title={`${t("operations.mortality_count")}: ${mortalityCount} ${t("common.birds")}`}
                 className="px-1.5 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-200/60 shrink-0 flex items-center gap-1 text-[10px] font-bold"
               >
                 <AlertCircle size={13} className="text-rose-500 stroke-[2.5]" />
@@ -70,7 +72,7 @@ export default function ShopDeliveryCard({
             <button
               onClick={() => onEdit(row)}
               className="p-1.5 rounded-lg bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 border border-slate-200/60 transition-colors flex items-center justify-center"
-              title="Edit Shop Delivery"
+              title={t("ops.trip.edit_shop_delivery")}
             >
               <Pencil size={14} className="stroke-[2]" />
             </button>
@@ -79,7 +81,7 @@ export default function ShopDeliveryCard({
           <button
             onClick={() => onPDF(row)}
             className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200/60 transition-colors flex items-center justify-center"
-            title="Download PDF"
+            title={t("ops.trip.download_pdf")}
           >
             <FileText size={14} className="stroke-[2]" />
           </button>
@@ -89,33 +91,33 @@ export default function ShopDeliveryCard({
       <div className="grid grid-cols-3 gap-2 bg-slate-50/70 p-2 rounded-xl border border-slate-100">
         <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-lg border border-slate-200/50 shadow-2xs">
           <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-0.5">
-            <Box size={11} className="text-slate-500 stroke-[2]" /> Boxes
+            <Box size={11} className="text-slate-500 stroke-[2]" /> {t("common.boxes")}
           </span>
           <span className="text-xs font-bold text-slate-800">{display(selectedBoxes.length || row.boxNo)}</span>
         </div>
 
         <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-lg border border-slate-200/50 shadow-2xs">
           <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-0.5">
-            <Users size={11} className="text-blue-500 stroke-[2]" /> Birds
+            <Users size={11} className="text-blue-500 stroke-[2]" /> {t("common.birds")}
           </span>
-          <span className="text-xs font-bold text-slate-800">{row.birds ? row.birds : "Not entered"}</span>
+          <span className="text-xs font-bold text-slate-800">{row.birds ? row.birds : t("ops.trip.not_entered")}</span>
         </div>
 
         <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-lg border border-slate-200/50 shadow-2xs">
           <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-0.5">
-            <Scale size={11} className="text-emerald-500 stroke-[2]" /> Weight
+            <Scale size={11} className="text-emerald-500 stroke-[2]" /> {t("common.weight")}
           </span>
           <span className="text-xs font-bold text-slate-800">
-            {row.weight ? `${row.weight.toFixed(2)} kg` : "Not entered"}
+            {row.weight ? `${row.weight.toFixed(2)} kg` : t("ops.trip.not_entered")}
           </span>
         </div>
       </div>
 
       {(mortalityCount > 0 || mortKg > 0) && (
         <div className="flex items-center justify-between px-2 py-1.5 bg-red-50/60 rounded-lg border border-red-100 text-[11px]">
-          <span className="text-red-600 font-semibold">Mortality</span>
+          <span className="text-red-600 font-semibold">{t("operations.mortality_count")}</span>
           <span className="text-red-700 font-bold">
-            {mortalityCount} birds · {mortKg ? mortKg.toFixed(2) : "0.00"} kg
+            {mortalityCount} {t("common.birds")} · {mortKg ? mortKg.toFixed(2) : "0.00"} kg
           </span>
         </div>
       )}
@@ -123,7 +125,7 @@ export default function ShopDeliveryCard({
       {selectedBoxes.length > 0 && (
         <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-100/60 rounded-lg border border-slate-200/40 text-[11px] overflow-x-auto no-scrollbar">
           <span className="text-slate-400 font-semibold flex items-center gap-1 shrink-0 text-[10px] uppercase">
-            <Package size={12} className="text-slate-500" /> Box Nos:
+            <Package size={12} className="text-slate-500" /> {t("ops.trip.box_nos")}:
           </span>
           <div className="flex items-center gap-1 flex-wrap">
             {selectedBoxes.map((id) => (
@@ -140,13 +142,13 @@ export default function ShopDeliveryCard({
 
       {perBox.length > 0 && (
         <div className="rounded-lg border border-slate-200/60 bg-white px-2 py-1.5 text-[11px]">
-          <span className="text-slate-400 font-semibold uppercase text-[10px]">Per-box allocation</span>
+          <span className="text-slate-400 font-semibold uppercase text-[10px]">{t("ops.trip.per_box_allocation")}</span>
           <div className="mt-1 space-y-0.5">
             {perBox.map((pb) => (
               <div key={pb.boxNo} className="flex justify-between text-slate-700">
                 <span className="font-bold">#{pb.boxNo}</span>
                 <span>
-                  {pb.birds} birds · {Number(pb.weight || 0).toFixed(2)} kg
+                  {pb.birds} {t("common.birds")} · {Number(pb.weight || 0).toFixed(2)} kg
                 </span>
               </div>
             ))}
@@ -156,7 +158,7 @@ export default function ShopDeliveryCard({
 
       {row.remarks ? (
         <p className="text-[11px] text-slate-500 px-1">
-          <span className="font-semibold text-slate-400 uppercase text-[10px]">Remarks </span>
+          <span className="font-semibold text-slate-400 uppercase text-[10px]">{t("common.remarks")} </span>
           {row.remarks}
         </p>
       ) : null}
@@ -164,14 +166,14 @@ export default function ShopDeliveryCard({
       <div className="flex items-center justify-between pt-0.5 text-[11px] text-slate-400 font-medium">
         <div className="flex items-center gap-1">
           <Clock size={12} className="text-slate-400 stroke-[2]" />
-          <span>Captured {row.autoCaptureTime || "—"}</span>
+          <span>{t("ops.trip.captured")} {row.autoCaptureTime || "—"}</span>
         </div>
         {row.birdType ? (
           <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded-md text-[10px] border border-blue-100">
             {row.birdType}
           </span>
         ) : (
-          <span className="text-[10px]">Not entered</span>
+          <span className="text-[10px]">{t("ops.trip.not_entered")}</span>
         )}
       </div>
     </div>

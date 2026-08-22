@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, CircleAlert, Clock3 } from "lucide-react";
 import type { PendingCollection } from "../../operations/collections/types/collection";
 import { formatINR } from "../../../utils/format";
+import { useI18n } from "../../../i18n";
 
 interface PendingCollectionsCardProps {
   pending: PendingCollection[];
@@ -12,6 +13,7 @@ interface PendingCollectionsCardProps {
 }
 
 export default function PendingCollectionsCard({ pending, totalAmount }: PendingCollectionsCardProps) {
+  const { t } = useI18n();
   const sorted = [...pending]
     .sort((a, b) => Number(b.currentPending) - Number(a.currentPending))
     .slice(0, 6);
@@ -21,15 +23,15 @@ export default function PendingCollectionsCard({ pending, totalAmount }: Pending
     <section className="flex flex-col rounded-xl border border-slate-200/80 bg-white shadow-card animate-fade-in-up dark:border-slate-800 dark:bg-slate-900">
       <header className="flex items-start justify-between gap-2 px-4 pb-1 pt-4">
         <div>
-          <h3 className="text-[13.5px] font-semibold tracking-tight text-slate-800 dark:text-slate-100">Pending collections</h3>
-          <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Amounts due from shops</p>
+          <h3 className="text-[13.5px] font-semibold tracking-tight text-slate-800 dark:text-slate-100">{t("dashboard.pending_collections")}</h3>
+          <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">{t("common.amount_due_from_shops")}</p>
         </div>
         <div className="text-right">
-          <p className="text-lg font-bold tracking-tight text-slate-900 tabular-nums dark:text-white">{formatINR(totalAmount)}</p>
+          <p className="text-lg font-bold tracking-tight text-slate-900 tabular-nums dark-text-white">{formatINR(totalAmount)}</p>
           {overdueCount > 0 && (
             <p className="flex items-center justify-end gap-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
               <CircleAlert size={11} />
-              {overdueCount} overdue
+              {overdueCount} {t("common.overdue")}
             </p>
           )}
         </div>
@@ -41,8 +43,8 @@ export default function PendingCollectionsCard({ pending, totalAmount }: Pending
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
               <Clock3 size={16} />
             </span>
-            <p className="text-[13px] font-medium text-slate-600 dark:text-slate-300">Nothing pending</p>
-            <p className="max-w-xs text-xs text-slate-400">All shop dues are collected. Great work.</p>
+            <p className="text-[13px] font-medium text-slate-600 dark:text-slate-300">{t("empty.no_pending")}</p>
+            <p className="max-w-xs text-xs text-slate-400">{t("dashboard.all_shop_dues_collected")}</p>
           </div>
         ) : (
           <ul className="divide-y divide-slate-50 dark:divide-slate-800/60">
@@ -76,7 +78,7 @@ export default function PendingCollectionsCard({ pending, totalAmount }: Pending
                       {formatINR(Number(item.currentPending) || 0)}
                     </span>
                     <span className={`block text-[10.5px] font-semibold uppercase tracking-wide ${overdue ? "text-rose-500 dark:text-rose-400" : "text-amber-500 dark:text-amber-400"}`}>
-                      {overdue ? "Overdue" : "Due"}
+                      {overdue ? t("common.overdue") : t("common.due")}
                     </span>
                   </span>
                 </li>
@@ -91,7 +93,7 @@ export default function PendingCollectionsCard({ pending, totalAmount }: Pending
           to="/operations?tab=pending-collections"
           className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
         >
-          View all collections
+          {t("navigation.pendingCollections")}
           <ArrowRight size={13} />
         </Link>
       </footer>

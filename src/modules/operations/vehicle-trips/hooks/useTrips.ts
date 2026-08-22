@@ -5,6 +5,7 @@ import type { Trip } from "../types/trip";
 import { apiPut } from "../../../../api";
 import { listTrips, changeTripStatus, deleteTripFromApi } from "../services/tripHeaderApiService";
 import { sendTripDeliveryEmails } from "../services/deliveryEmailService";
+import { translate } from "../../../../i18n";
 
 type NotificationFn = (message: string, type?: "success" | "error" | "info") => void;
 
@@ -40,7 +41,7 @@ export default function useTrips(
     try {
       setTrips(await listTrips({ includeDeleted }));
     } catch {
-      notifyRef.current?.("Unable to load trips from the server.", "error");
+      notifyRef.current?.(translate("ops.trip.unable_load_trips"), "error");
     }
   }, [includeDeleted]);
 
@@ -65,12 +66,12 @@ export default function useTrips(
   // localStorage. `deleted` trips stay soft-deleted and never resurface.
   const deleteTrip = async (id: number, reason?: string) => {
     try {
-      await deleteTripFromApi(id, reason || "No reason provided");
+      await deleteTripFromApi(id, reason || translate("ops.trip.no_reason"));
       await refreshTrips();
-      notify("Trip deleted successfully!", "success");
+      notify(translate("ops.trip.deleted_success"), "success");
     } catch (err) {
-      const msg = (err as { message?: string })?.message ?? "Failed to delete trip.";
-      notify(`Failed to delete trip: ${msg}`, "error");
+      const msg = (err as { message?: string })?.message ?? translate("ops.trip.failed_delete_trip");
+      notify(translate("ops.trip.failed_delete_trip_msg", { msg }), "error");
     }
   };
 
@@ -84,10 +85,10 @@ export default function useTrips(
         { ...trip, mode: "submit" }
       );
       await refreshTrips();
-      notify("Trip updated successfully!", "success");
+      notify(translate("ops.trip.updated_success"), "success");
       return data;
     } catch {
-      notify("Failed to update trip.", "error");
+      notify(translate("ops.trip.failed_update_trip"), "error");
     }
   };
 
@@ -97,13 +98,13 @@ export default function useTrips(
     try {
       const updated = await changeTripStatus(trip.id, status, approvedBy);
       await refreshTrips();
-      notify(status === "Completed" ? "Trip approved successfully!" : "Trip status updated.", "success");
+      notify(status === "Completed" ? translate("ops.trip.approved_success") : translate("ops.trip.status_updated"), "success");
       if (status === "Completed") {
         void sendTripDeliveryEmails(updated);
       }
     } catch (err) {
-      const msg = (err as { message?: string })?.message ?? "Failed to update trip status.";
-      notify(`Failed to update trip status: ${msg}`, "error");
+      const msg = (err as { message?: string })?.message ?? translate("ops.trip.failed_status_update");
+      notify(translate("ops.trip.failed_status_update_msg", { msg }), "error");
     }
   };
 

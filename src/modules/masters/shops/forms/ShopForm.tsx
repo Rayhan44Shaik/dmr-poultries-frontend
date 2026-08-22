@@ -10,6 +10,7 @@ import {
   IndianRupee,
   MessageSquare,
 } from "lucide-react";
+import { useI18n } from "../../../../i18n";
 
 type ShopFormProps = {
   shop?: Shop | null;
@@ -29,6 +30,7 @@ type ShopFormProps = {
 };
 
 function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
+  const { t } = useI18n();
   const [shopName, setShopName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -96,29 +98,29 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
     };
 
     if (shopName.trim().length < 3) {
-      newErrors.shopName = "Shop Name must contain at least 3 characters.";
+      newErrors.shopName = t("masters.shops.validation.shop_name_min");
     }
     if (ownerName.trim().length < 3) {
-      newErrors.ownerName = "Owner Name must contain at least 3 characters.";
+      newErrors.ownerName = t("masters.shops.validation.owner_name_min");
     }
     if (!/^[0-9]{10}$/.test(phoneNumber)) {
-      newErrors.phoneNumber = "Mobile Number must be exactly 10 digits.";
+      newErrors.phoneNumber = t("masters.shops.validation.mobile_10_digits");
     }
     if (whatsappNumber.trim() !== "" && !/^[0-9]{10}$/.test(whatsappNumber)) {
-      newErrors.whatsappNumber = "WhatsApp Number must be exactly 10 digits.";
+      newErrors.whatsappNumber = t("masters.shops.validation.whatsapp_10_digits");
     }
     if (email.trim() === "") {
-      newErrors.email = "Email ID is required.";
+      newErrors.email = t("masters.shops.validation.email_required");
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      newErrors.email = "Please enter a valid email address.";
+      newErrors.email = t("masters.shops.validation.email_invalid");
     }
     if (village.trim() === "") {
-      newErrors.village = "Village is required.";
+      newErrors.village = t("masters.shops.validation.village_required");
     }
 
     const parsedBalance = parseFloat(openingBalance);
     if (openingBalance.trim() === "" || isNaN(parsedBalance)) {
-      newErrors.openingBalance = "Opening Balance is required and must be a valid number.";
+      newErrors.openingBalance = t("masters.shops.validation.opening_balance_required");
     }
 
     setErrors(newErrors);
@@ -157,9 +159,9 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
     "absolute left-3 top-1/2 -translate-y-1/2 bg-blue-50 p-2 rounded-full text-blue-600";
 
   // ✅ Title changed to "Edit Shop" when editing
-  const title = isEditing ? "Edit Shop" : "Add Shop";
+  const title = isEditing ? t("masters.shops.dialog.edit_title") : t("masters.shops.dialog.add_title");
   // ✅ Subtitle changed to "Update details" when editing
-  const subtitle = isEditing ? "Update details" : "Fill in the information";
+  const subtitle = isEditing ? t("masters.shops.dialog.edit_subtitle") : t("masters.shops.dialog.add_subtitle");
 
   const toggleStatus = () => {
     if (!isSaving) {
@@ -183,7 +185,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
         {/* Status toggle switch */}
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-slate-600">Status</span>
+          <span className="text-sm font-medium text-slate-600">{t("masters.shops.form.status")}</span>
           <button
             type="button"
             onClick={toggleStatus}
@@ -213,7 +215,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="relative">
             <label className="block mb-2 text-sm font-semibold text-slate-700">
-              Shop Name <span className="text-red-500">*</span>
+              {t("masters.shops.form.shop_name")} <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <div className={iconWrapperClass}>
@@ -222,7 +224,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
               <input
                 value={shopName}
                 onChange={(e) => setShopName(e.target.value)}
-                placeholder="Enter Shop Name"
+                placeholder={t("masters.shops.form.shop_name_placeholder")}
                 className={inputClass(!!errors.shopName)}
               />
             </div>
@@ -233,7 +235,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
           <div className="relative">
             <label className="block mb-2 text-sm font-semibold text-slate-700">
-              Owner Name <span className="text-red-500">*</span>
+              {t("masters.shops.form.owner_name")} <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <div className={iconWrapperClass}>
@@ -242,7 +244,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
               <input
                 value={ownerName}
                 onChange={(e) => setOwnerName(e.target.value)}
-                placeholder="Enter Owner Name"
+                placeholder={t("masters.shops.form.owner_name_placeholder")}
                 className={inputClass(!!errors.ownerName)}
               />
             </div>
@@ -253,7 +255,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
           <div className="relative">
             <label className="block mb-2 text-sm font-semibold text-slate-700">
-              Mobile Number <span className="text-red-500">*</span>
+              {t("masters.shops.form.mobile_number")} <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <div className={iconWrapperClass}>
@@ -263,7 +265,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
                 value={phoneNumber}
                 maxLength={10}
                 onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
-                placeholder="Enter Mobile Number"
+                placeholder={t("masters.shops.form.mobile_number_placeholder")}
                 className={inputClass(!!errors.phoneNumber)}
               />
             </div>
@@ -274,7 +276,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
           <div className="relative">
             <label className="block mb-2 text-sm font-semibold text-slate-700">
-              WhatsApp Number
+              {t("masters.shops.form.whatsapp_number")}
             </label>
             <div className="relative">
               <div className={iconWrapperClass}>
@@ -284,7 +286,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
                 value={whatsappNumber}
                 maxLength={10}
                 onChange={(e) => setWhatsAppNumber(e.target.value.replace(/\D/g, ""))}
-                placeholder="Enter WhatsApp Number (optional)"
+                placeholder={t("masters.shops.form.whatsapp_number_placeholder")}
                 className={inputClass(!!errors.whatsappNumber)}
               />
             </div>
@@ -295,7 +297,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
           <div className="relative">
             <label className="block mb-2 text-sm font-semibold text-slate-700">
-              Email ID <span className="text-red-500">*</span>
+              {t("masters.shops.form.email")} <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <div className={iconWrapperClass}>
@@ -305,7 +307,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter Email ID"
+                placeholder={t("masters.shops.form.email_placeholder")}
                 className={inputClass(!!errors.email)}
               />
             </div>
@@ -316,7 +318,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
           <div className="relative">
             <label className="block mb-2 text-sm font-semibold text-slate-700">
-              Village <span className="text-red-500">*</span>
+              {t("masters.shops.form.village")} <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <div className={iconWrapperClass}>
@@ -325,7 +327,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
               <input
                 value={village}
                 onChange={(e) => setVillage(e.target.value)}
-                placeholder="Enter Village"
+                placeholder={t("masters.shops.form.village_placeholder")}
                 className={inputClass(!!errors.village)}
               />
             </div>
@@ -336,7 +338,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
           <div className="relative">
             <label className="block mb-2 text-sm font-semibold text-slate-700">
-              Opening Balance <span className="text-red-500">*</span>
+              {t("masters.shops.form.opening_balance")} <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <div className={iconWrapperClass}>
@@ -347,7 +349,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
                 step="0.01"
                 value={openingBalance}
                 onChange={(e) => setOpeningBalance(e.target.value)}
-                placeholder="0.00"
+                placeholder={t("masters.shops.form.opening_balance_placeholder")}
                 className={inputClass(!!errors.openingBalance)}
               />
             </div>
@@ -358,7 +360,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
           <div className="relative md:col-span-2">
             <label className="block mb-2 text-sm font-semibold text-slate-700">
-              Address
+              {t("masters.shops.form.address")}
             </label>
             <div className="relative">
               <div className="absolute left-3 top-3.5 bg-blue-50 p-2 rounded-full text-blue-600">
@@ -367,7 +369,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
               <textarea
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="Enter Address"
+                placeholder={t("masters.shops.form.address_placeholder")}
                 rows={2}
                 className="w-full pl-12 pr-4 py-3 text-base border-2 rounded-xl focus:ring-4 focus:ring-blue-100/60 focus:border-blue-500 transition-all duration-200 border-slate-200 bg-white/90 hover:shadow-md focus:shadow-lg resize-y"
               />
@@ -383,7 +385,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
             disabled={isSaving}
             className="px-6 py-2.5 border-2 border-slate-300 rounded-xl hover:bg-slate-50/80 font-semibold text-base text-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Cancel
+            {t("masters.shops.dialog.cancel")}
           </button>
           <button
             type="button"
@@ -402,7 +404,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
             )}
-            {isSaving ? "Saving..." : isEditing ? "Update Shop" : "Save Shop"}
+            {isSaving ? t("masters.shops.dialog.saving") : isEditing ? t("masters.shops.dialog.update") : t("masters.shops.dialog.save")}
           </button>
         </div>
       </div>

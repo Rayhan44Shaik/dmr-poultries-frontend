@@ -44,6 +44,10 @@ import {
 
 export interface NavChild {
   label: string;
+  /** i18n key for the label — used for translation when available. */
+  labelKey?: string;
+  /** i18n key for the browser/page title. */
+  titleKey?: string;
   path: string;
   icon?: LucideIcon;
   /** Marks a planned module — rendered with a subtle "Soon" pill. */
@@ -54,6 +58,8 @@ export interface NavChild {
 export interface NavSection {
   id: string;
   label: string;
+  /** i18n key for the label — used for translation when available. */
+  labelKey?: string;
   icon: LucideIcon;
   /** Optional direct path for single-item sections. */
   path?: string;
@@ -64,21 +70,23 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     id: "overview",
     label: "Overview",
+    labelKey: "nav.overview",
     icon: LayoutDashboard,
-    children: [{ label: "Dashboard", path: "/dashboard", icon: LayoutDashboard, keywords: "home kpi charts today overview" }],
+    children: [{ label: "Dashboard", labelKey: "nav.dashboard", titleKey: "page_title.dashboard", path: "/dashboard", icon: LayoutDashboard, keywords: "home kpi charts today overview" }],
   },
   {
     id: "masters",
     label: "Masters",
+    labelKey: "nav.masters",
     icon: Database,
     children: [
-      { label: "Shops", path: "/masters?tab=shops", icon: Store, keywords: "shops master stores" },
-      { label: "Farms / Poultry Farms", path: "/masters?tab=farms", icon: Tractor, keywords: "farms poultry farms" },
-      { label: "Vehicles", path: "/masters?tab=vehicles", icon: Car, keywords: "vehicles master trucks" },
-      { label: "Employees", path: "/masters?tab=employees", icon: Users, keywords: "employees master staff" },
-      { label: "Banks", path: "/masters?tab=banks", icon: Landmark, keywords: "banks master accounts" },
-      { label: "Bird Types", path: "/masters?tab=birdTypes", icon: Bird, keywords: "bird types breed master" },
-      { label: "Market Rates", path: "/accounts?tab=market-rate", icon: TrendingUp, keywords: "market rate weight price" },
+      { label: "Shops", labelKey: "nav.shops", path: "/masters?tab=shops", icon: Store, keywords: "shops master stores" },
+      { label: "Farms / Poultry Farms", labelKey: "nav.farms", path: "/masters?tab=farms", icon: Tractor, keywords: "farms poultry farms" },
+      { label: "Vehicles", labelKey: "nav.vehicles_master", path: "/masters?tab=vehicles", icon: Car, keywords: "vehicles master trucks" },
+      { label: "Employees", labelKey: "nav.employees", path: "/masters?tab=employees", icon: Users, keywords: "employees master staff" },
+      { label: "Banks", labelKey: "nav.banks", path: "/masters?tab=banks", icon: Landmark, keywords: "banks master accounts" },
+      { label: "Bird Types", labelKey: "nav.birdTypes", path: "/masters?tab=birdTypes", icon: Bird, keywords: "bird types breed master" },
+      { label: "Market Rates", labelKey: "nav.marketRates", path: "/accounts?tab=market-rate", icon: TrendingUp, keywords: "market rate weight price" },
 
       //{ label: "Routes", path: "/masters?tab=shops", icon: Package, soon: true, keywords: "routes master" },
     ],
@@ -86,39 +94,41 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     id: "operations",
     label: "Operations",
+    labelKey: "nav.operations",
     icon: PackageOpen,
     children: [
-      { label: "Daily Operation Report", path: "/operations?tab=overview", icon: ClipboardList, keywords: "daily report operations overview" },
+      { label: "Daily Operation Report", labelKey: "nav.dailyOperationReport", path: "/operations?tab=overview", icon: ClipboardList, keywords: "daily report operations overview" },
 
-      { label: "Vehicle Delivery Entry", path: "/operations?tab=trip-entry", icon: PackageCheck, keywords: "delivery trip shop weight" },
-      { label: "Vehicle Trip History", path: "/operations?tab=trip-list", icon: History, keywords: "trips history list completed" },
+      { label: "Vehicle Delivery Entry", labelKey: "nav.vehicleDeliveryEntry", path: "/operations?tab=trip-entry", icon: PackageCheck, keywords: "delivery trip shop weight" },
+      { label: "Vehicle Trip History", labelKey: "nav.vehicleTripHistory", path: "/operations?tab=trip-list", icon: History, keywords: "trips history list completed" },
       
-      { label: "Rate Entry", path: "/operations?tab=rate-entry", icon: DollarSign, keywords: "sales shop invoice rate" },
-      { label: "Shop Sales Entry", path: "/operations?tab=shop-sales", icon: ShoppingBag, keywords: "sales shop invoice rate" },
+      { label: "Rate Entry", labelKey: "nav.rateEntry", path: "/operations?tab=rate-entry", icon: DollarSign, keywords: "sales shop invoice rate" },
+      { label: "Shop Sales Entry", labelKey: "nav.shopSalesEntry", path: "/operations?tab=shop-sales", icon: ShoppingBag, keywords: "sales shop invoice rate" },
       
-      { label: "Collection Entry", path: "/operations?tab=collection", icon: CreditCard, keywords: "collection payment cash" },
-      { label: "Pending Collections", path: "/operations?tab=pending-collections", icon: Clock3, keywords: "pending overdue outstanding collection" },
+      { label: "Collection Entry", labelKey: "nav.collectionEntry", path: "/operations?tab=collection", icon: CreditCard, keywords: "collection payment cash" },
+      { label: "Pending Collections", labelKey: "nav.pendingCollections", path: "/operations?tab=pending-collections", icon: Clock3, keywords: "pending overdue outstanding collection" },
       
-      { label: "Mortality Entry", path: "/operations?tab=mortality", icon: Bird, keywords: "mortality death birds" },
-      { label: "Fuel Expenses", path: "/operations?tab=fuel-expenses", icon: Fuel, keywords: "fuel diesel expenses bills" },
+      { label: "Mortality Entry", labelKey: "nav.mortalityEntry", path: "/operations?tab=mortality", icon: Bird, keywords: "mortality death birds" },
+      { label: "Fuel Expenses", labelKey: "nav.fuelExpenses", path: "/operations?tab=fuel-expenses", icon: Fuel, keywords: "fuel diesel expenses bills" },
     ],
   },
   {
     id: "vehicles",
     label: "Vehicles",
+    labelKey: "nav.vehicles",
     icon: Truck,
     children: [
       // DEFERRED / FUTURE: Fleet Overview (Dashboard) — files preserved, not in active nav
       //{ label: "Fleet Overview", path: "/fleet?tab=dashboard", icon: Gauge, keywords: "fleet vehicles overview status" },
-      { label: "Maintenance Entry", path: "/fleet?tab=entry", icon: Wrench, keywords: "maintenance service garage" },
-      { label: "Maintenance History", path: "/fleet?tab=history", icon: History, keywords: "maintenance history records" },
+      { label: "Maintenance Entry", labelKey: "nav.maintenanceEntry", path: "/fleet?tab=entry", icon: Wrench, keywords: "maintenance service garage" },
+      { label: "Maintenance History", labelKey: "nav.maintenanceHistory", path: "/fleet?tab=history", icon: History, keywords: "maintenance history records" },
 
-      { label: "Permits & Documents", path: "/fleet?tab=permits", icon: FileSpreadsheet, keywords: "permits insurance fitness documents" },
+      { label: "Permits & Documents", labelKey: "nav.permitsDocuments", path: "/fleet?tab=permits", icon: FileSpreadsheet, keywords: "permits insurance fitness documents" },
       
-      { label: "EMI", path: "/fleet?tab=emi", icon: Banknote, keywords: "emi loan installment" },
-      { label: "Analytics", path: "/fleet?tab=analytics", icon: BarChart3, keywords: "analytics vehicle performance" },
+      { label: "EMI", labelKey: "nav.emi", path: "/fleet?tab=emi", icon: Banknote, keywords: "emi loan installment" },
+      { label: "Analytics", labelKey: "nav.analytics", path: "/fleet?tab=analytics", icon: BarChart3, keywords: "analytics vehicle performance" },
       
-      { label: "FASTag", path: "/fleet?tab=fastag", icon: Contact, keywords: "fastag toll balance" },
+      { label: "FASTag", labelKey: "nav.fastag", path: "/fleet?tab=fastag", icon: Contact, keywords: "fastag toll balance" },
       
       //{ label: "Fuel", path: "/operations?tab=fuel-expenses", icon: Fuel, keywords: "fuel diesel expenses" },
       // DEFERRED / FUTURE: Expense Reports + Vehicle Reports — files preserved, not in active nav
@@ -129,14 +139,15 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     id: "staff",
     label: "Staff",
+    labelKey: "nav.staff",
     icon: Users,
     children: [
       //{ label: "Employees", path: "/masters?tab=employees", icon: UserRound, keywords: "employees staff master" },
-      { label: "Duty Planner", path: "/staff?tab=duty-planner", icon: CalendarClock, keywords: "duty planner roster schedule" },
-      { label: "Salary Register", path: "/staff?tab=salary-sheet", icon: Wallet, keywords: "salary register sheet" },
-      { label: "Leaves", path: "/staff?tab=leaves", icon: CalendarDays, keywords: "leave management approval" },
-      { label: "Driver Performance", path: "/staff?tab=driver-performance", icon: Truck, keywords: "driver performance trips cost mileage" },
-      { label: "Supervisor Performance", path: "/staff?tab=supervisor-performance", icon: UserCheck, keywords: "supervisor performance shops birds mortality" },
+      { label: "Duty Planner", labelKey: "nav.dutyPlanner", path: "/staff?tab=duty-planner", icon: CalendarClock, keywords: "duty planner roster schedule" },
+      { label: "Salary Register", labelKey: "nav.salaryRegister", path: "/staff?tab=salary-sheet", icon: Wallet, keywords: "salary register sheet" },
+      { label: "Leaves", labelKey: "nav.leaves", path: "/staff?tab=leaves", icon: CalendarDays, keywords: "leave management approval" },
+      { label: "Driver Performance", labelKey: "nav.driverPerformance", path: "/staff?tab=driver-performance", icon: Truck, keywords: "driver performance trips cost mileage" },
+      { label: "Supervisor Performance", labelKey: "nav.supervisorPerformance", path: "/staff?tab=supervisor-performance", icon: UserCheck, keywords: "supervisor performance shops birds mortality" },
       //{ label: "Attendance", path: "/staff?tab=duty-planner", icon: CalendarCheck, soon: true, keywords: "attendance biometric" },
       //{ label: "Deductions", path: "/staff?tab=salary-sheet", icon: Scale, soon: true, keywords: "deductions advance loan" },
     ],
@@ -144,12 +155,13 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     id: "accounts",
     label: "Accounts",
+    labelKey: "nav.accounts",
     icon: ReceiptIndianRupee,
     children: [
-      { label: "Accounts Dashboard", path: "/accounts?tab=summary", icon: BarChart3, keywords: "accounts summary totals" },
-      { label: "Collection Register", path: "/accounts?tab=paid-payments", icon: BookOpen, keywords: "payments register ledger" },
-      { label: "Farmer Payments", path: "/accounts?tab=farm-payment", icon: Sprout, keywords: "farmer farm payment poultry" },
-      { label: "New Payment Entry", path: "/accounts?tab=new-payments", icon: CreditCard, keywords: "payment entry new" },
+      { label: "Accounts Dashboard", labelKey: "nav.accountsDashboard", path: "/accounts?tab=summary", icon: BarChart3, keywords: "accounts summary totals" },
+      { label: "Collection Register", labelKey: "nav.collectionRegister", path: "/accounts?tab=paid-payments", icon: BookOpen, keywords: "payments register ledger" },
+      { label: "Farmer Payments", labelKey: "nav.farmerPayments", path: "/accounts?tab=farm-payment", icon: Sprout, keywords: "farmer farm payment poultry" },
+      { label: "New Payment Entry", labelKey: "nav.newPaymentEntry", path: "/accounts?tab=new-payments", icon: CreditCard, keywords: "payment entry new" },
     ],
   },
   
@@ -158,24 +170,26 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     id: "reports",
     label: "Reports",
+    labelKey: "nav.reports",
     icon: FileText,
     children: [
       //{ label: "Reports Hub", path: "/reports", icon: BarChart3, keywords: "reports hub" },
-      { label: "Shop Ledger", path: "/reports?tab=shopLedger", icon: BookOpen, keywords: "shop ledger statement" },
-      { label: "Daily / Weekly Reports", path: "/reports?tab=weekly", icon: CalendarDays, keywords: "daily weekly reports" },
-      { label: 'shopSales', path: "/reports?tab=shopSales", icon: ShoppingBag, keywords: "shop sales report" },
-      { label: "Collection Report", path: "/reports?tab=collection", icon: CreditCard, keywords: "collection report register" },
-      { label: "Vehicle Reports", path: "/reports?tab=vehicle", icon: Truck, keywords: "vehicle reports fleet" },
-      { label: "expenses", path: "/reports?tab=expenses", icon: FileText, keywords: "Expenses" },
+      { label: "Shop Ledger", labelKey: "nav.shopLedger", path: "/reports?tab=shopLedger", icon: BookOpen, keywords: "shop ledger statement" },
+      { label: "Daily / Weekly Reports", labelKey: "nav.dailyWeeklyReports", path: "/reports?tab=weekly", icon: CalendarDays, keywords: "daily weekly reports" },
+      { label: "shopSales", labelKey: "nav.shopSalesReport", path: "/reports?tab=shopSales", icon: ShoppingBag, keywords: "shop sales report" },
+      { label: "Collection Report", labelKey: "nav.collectionReport", path: "/reports?tab=collection", icon: CreditCard, keywords: "collection report register" },
+      { label: "Vehicle Reports", labelKey: "nav.vehicleReports", path: "/reports?tab=vehicle", icon: Truck, keywords: "vehicle reports fleet" },
+      { label: "expenses", labelKey: "nav.expensesReport", path: "/reports?tab=expenses", icon: FileText, keywords: "Expenses" },
     ],
   },
   {
     id: "settings",
     label: "Settings",
+    labelKey: "nav.settings",
     icon: Settings,
     children: [
       // Hidden from frontend navigation — underlying modules/routes remain intact.
-       { label: "System Settings", path: "/settings?tab=appearance", icon: Settings, keywords: "settings appearance theme language" },
+       { label: "System Settings", labelKey: "nav.systemSettings", path: "/settings?tab=appearance", icon: Settings, keywords: "settings appearance theme language" },
       // { label: "Users & Roles", path: "/settings?tab=users", icon: UserCog, keywords: "users roles management" },
       // { label: "Permissions", path: "/settings?tab=permissions", icon: KeyRound, keywords: "permissions roles access" },
       // { label: "Profile & Security", path: "/settings?tab=profile", icon: ShieldCheck, keywords: "profile password security" },
@@ -186,7 +200,10 @@ export const NAV_SECTIONS: NavSection[] = [
 /** Flat list of all navigable entries — used by the command palette. */
 export interface FlatNavEntry {
   section: string;
+  sectionKey?: string;
   label: string;
+  labelKey?: string;
+  titleKey?: string;
   path: string;
   icon: LucideIcon;
   soon?: boolean;
@@ -196,7 +213,10 @@ export interface FlatNavEntry {
 export const FLAT_NAV: FlatNavEntry[] = NAV_SECTIONS.flatMap((section) =>
   section.children.map((child) => ({
     section: section.label,
+    sectionKey: section.labelKey,
     label: child.label,
+    labelKey: child.labelKey,
+    titleKey: child.titleKey,
     path: child.path,
     icon: child.icon ?? section.icon,
     soon: child.soon,
@@ -207,16 +227,18 @@ export const FLAT_NAV: FlatNavEntry[] = NAV_SECTIONS.flatMap((section) =>
 /** Quick actions surfaced in the header and command palette. */
 export interface QuickAction {
   label: string;
+  labelKey?: string;
   description: string;
+  descriptionKey?: string;
   path: string;
   icon: LucideIcon;
 }
 
 export const QUICK_ACTIONS: QuickAction[] = [
-  { label: "New Trip Entry", description: "Dispatch a vehicle on a new trip", path: "/operations?tab=trip-entry", icon: PackageOpen },
-  { label: "Record Collection", description: "Enter a shop collection received", path: "/operations?tab=collection", icon: CreditCard },
-  { label: "Enter Shop Sale", description: "Record a delivery against a shop", path: "/operations?tab=shop-sales", icon: ShoppingBag },
-  { label: "Add Fuel Expense", description: "Log diesel / fuel for a vehicle", path: "/operations?tab=fuel-expenses", icon: Fuel },
+  { label: "New Trip Entry", labelKey: "quick.new_trip", description: "Dispatch a vehicle on a new trip", descriptionKey: "quick.new_trip_desc", path: "/operations?tab=trip-entry", icon: PackageOpen },
+  { label: "Record Collection", labelKey: "quick.record_collection", description: "Enter a shop collection received", descriptionKey: "quick.record_collection_desc", path: "/operations?tab=collection", icon: CreditCard },
+  { label: "Enter Shop Sale", labelKey: "quick.enter_shop_sale", description: "Record a delivery against a shop", descriptionKey: "quick.enter_shop_sale_desc", path: "/operations?tab=shop-sales", icon: ShoppingBag },
+  { label: "Add Fuel Expense", labelKey: "quick.add_fuel", description: "Log diesel / fuel for a vehicle", descriptionKey: "quick.add_fuel_desc", path: "/operations?tab=fuel-expenses", icon: Fuel },
 ];
 
 /** Resolve the section + page labels for the current pathname (breadcrumbs). */

@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { Check, Lock, Play, MapPin, Package, Truck, Wallet } from "lucide-react";
 import { TRIP_STEP_KEYS } from "../../../../shared/trip/workflow";
+import { useI18n } from "../../../../i18n";
 
 export type TripWizardCompletedMask = {
   start: boolean;
@@ -49,11 +50,14 @@ export default function TripWizardStepper({
   lockedSteps = [],
   onLockedStepClick,
 }: Props) {
+  const { t } = useI18n();
   const stepStatus = resolveStepperCompletion(completedMask);
 
   return (
     <div className="flex items-center gap-1 md:gap-1.5 overflow-x-auto scrollbar-none py-1.5 px-1 select-none">
       {steps.map((label, index) => {
+        const stepKey = TRIP_STEP_KEYS[index] ?? String(index);
+        const stepLabel = t(`ops.trip.step.${stepKey}`);
         const isCompleted = stepStatus[index];
         const isActive = index === currentStep;
         const isLocked = Boolean(lockedSteps[index]);
@@ -100,14 +104,14 @@ export default function TripWizardStepper({
             ) : (
               <Icon size={13} strokeWidth={2.5} aria-hidden />
             )}
-            <span>{label}</span>
+            <span>{stepLabel}</span>
             {isCompleted && (
               <span
                 className={`hidden md:inline text-[9px] font-semibold ${
                   isActive ? "text-emerald-50/90" : "text-emerald-500"
                 }`}
               >
-                Submitted
+                {t("ops.trip.submitted")}
               </span>
             )}
           </>
@@ -121,7 +125,7 @@ export default function TripWizardStepper({
                 onClick={() => onStepClick(index)}
                 className={pillClasses}
                 aria-current={isActive ? "step" : undefined}
-                aria-label={`Step ${index + 1}: ${label}`}
+                aria-label={t("ops.trip.step_aria", { step: index + 1, label: stepLabel })}
               >
                 {content}
               </button>
@@ -141,8 +145,8 @@ export default function TripWizardStepper({
                 disabled={!isLocked && !onStepClick}
                 className={pillClasses}
                 aria-current={isActive ? "step" : undefined}
-                aria-label={`Step ${index + 1}: ${label}${isLocked ? " (locked)" : ""}`}
-                title={isLocked ? "Complete the previous step first" : undefined}
+                aria-label={t("ops.trip.step_aria", { step: index + 1, label: stepLabel }) + (isLocked ? ` (${t("ops.trip.locked")})` : "")}
+                title={isLocked ? t("ops.trip.complete_previous_first") : undefined}
               >
                 {content}
               </button>

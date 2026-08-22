@@ -60,6 +60,7 @@ export default memo(FastagDashboardPage);
 
 import { memo } from 'react';
 import { Construction } from 'lucide-react';
+import { useI18n } from '../../../i18n';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 
 interface FastagDashboardPageProps {
@@ -68,6 +69,7 @@ interface FastagDashboardPageProps {
 
 /** UNDER CONSTRUCTION — static placeholder. Zero API, cache, storage, or polling. */
 const FastagDashboardPage = ({ embedded = false }: FastagDashboardPageProps) => {
+  const { t } = useI18n();
   return (
     <ErrorBoundary>
       <div
@@ -80,12 +82,12 @@ const FastagDashboardPage = ({ embedded = false }: FastagDashboardPageProps) => 
             <Construction className="w-7 h-7" aria-hidden />
           </div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">FASTAG</p>
-          <h2 className="text-xl font-bold text-slate-800 mb-1">FASTAG Management</h2>
-          <p className="text-sm font-semibold text-amber-700 mb-3">Under Construction</p>
+          <h2 className="text-xl font-bold text-slate-800 mb-1">{t('fleet.fastag.management_title')}</h2>
+          <p className="text-sm font-semibold text-amber-700 mb-3">{t('fleet.fastag.under_construction')}</p>
           <p className="text-sm text-slate-500 leading-relaxed">
-            FASTAG tracking and management will be available in a future release.
+            {t('fleet.fastag.coming_soon_desc')}
           </p>
-          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">Coming Soon</p>
+          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">{t('coming_soon')}</p>
         </div>
       </div>
     </ErrorBoundary>

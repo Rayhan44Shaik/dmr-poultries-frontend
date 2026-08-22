@@ -1,20 +1,22 @@
-const CONFIG_MESSAGE =
-  "WhatsApp service is not configured. Please contact the administrator.";
+import { translate } from "../../../../i18n";
 
-const GENERIC_MESSAGE =
-  "Unable to send the WhatsApp message. Please try again or contact the administrator.";
+const CONFIG_MESSAGE = () =>
+  translate("ops.trip.whatsapp_not_configured");
+
+const GENERIC_MESSAGE = () =>
+  translate("ops.trip.whatsapp_send_failed");
 
 const SECRETISH = /whatsapp[_-]?token|whatsapp[_-]?secret|api[_-]?key|secret|stack/i;
 
 export function userFacingDeliveryWhatsAppError(message?: string | null): string {
   const text = String(message ?? "").trim();
-  if (!text) return GENERIC_MESSAGE;
-  if (/not configured/i.test(text)) return CONFIG_MESSAGE;
-  if (SECRETISH.test(text)) return GENERIC_MESSAGE;
+  if (!text) return GENERIC_MESSAGE();
+  if (/not configured/i.test(text)) return CONFIG_MESSAGE();
+  if (SECRETISH.test(text)) return GENERIC_MESSAGE();
   return text;
 }
 
-export const WHATSAPP_SENT_TOAST = "✓ WhatsApp sent successfully";
+export const WHATSAPP_SENT_TOAST = () => translate("ops.trip.whatsapp_sent_toast");
 
 export type DeliveryWhatsAppAttemptResult = {
   success: boolean;

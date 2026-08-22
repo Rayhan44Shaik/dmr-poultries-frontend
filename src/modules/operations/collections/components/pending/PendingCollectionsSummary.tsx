@@ -1,5 +1,6 @@
 import React from "react";
 import { IndianRupee, ShoppingBag, CreditCard, TrendingUp } from "lucide-react";
+import { useI18n } from "../../../../../i18n";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -29,38 +30,39 @@ function PendingCollectionsSummary({
   shopName,
   isLoading = false,
 }: Props) {
+  const { t } = useI18n();
   if (isLoading) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 text-center text-slate-400">
-        Loading summary...
+        {t("ops.collection.loading_summary")}
       </div>
     );
   }
 
   const cards = [
     {
-      title: "Total Outstanding",
+      title: t("ops.collection.total_outstanding"),
       value: formatCurrency(totalOutstanding),
       icon: <IndianRupee size={18} />,
       bg: "bg-red-50",
       text: "text-red-700",
     },
     {
-      title: "This Week Sales",
+      title: t("ops.collection.this_week_sales"),
       value: formatCurrency(weeklySales),
       icon: <ShoppingBag size={18} />,
       bg: "bg-blue-50",
       text: "text-blue-700",
     },
     {
-      title: "This Week Collections",
+      title: t("ops.collection.this_week_collections"),
       value: formatCurrency(weeklyCollections),
       icon: <CreditCard size={18} />,
       bg: "bg-green-50",
       text: "text-green-700",
     },
     {
-      title: "Recovery %",
+      title: t("ops.collection.recovery_pct"),
       value: `${weeklyRecovery.toFixed(2)}%`,
       icon: <TrendingUp size={18} />,
       bg: "bg-purple-50",

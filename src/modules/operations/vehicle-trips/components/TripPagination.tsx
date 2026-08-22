@@ -4,6 +4,7 @@ import {
   paginationNavBtnClass,
   paginationPageBtnClass,
 } from "../../../../shared/ui/paginationStyles";
+import { useI18n } from "../../../../i18n";
 
 interface Props {
   currentPage: number;
@@ -13,6 +14,7 @@ interface Props {
 }
 
 function TripPagination({ currentPage, totalPages, onPageChange, hidePageInfo = false }: Props) {
+  const { t } = useI18n();
   const hasMultiplePages = totalPages > 1;
 
   const getPageNumbers = () => {
@@ -44,7 +46,7 @@ function TripPagination({ currentPage, totalPages, onPageChange, hidePageInfo = 
         disabled={atFirst}
         className={paginationNavBtnClass}
       >
-        Previous
+        {t("common.previous")}
       </button>
 
       {hasMultiplePages ? (
@@ -96,7 +98,7 @@ function TripPagination({ currentPage, totalPages, onPageChange, hidePageInfo = 
         disabled={atLast}
         className={paginationNavBtnClass}
       >
-        Next
+        {t("common.next")}
       </button>
     </>
   );

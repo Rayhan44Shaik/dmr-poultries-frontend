@@ -18,6 +18,7 @@ import {
   validateDeliveriesStep,
   validateEndStep,
 } from "../../../../shared/trip";
+import { translate } from "../../../../i18n";
 
 type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void;
 
@@ -168,7 +169,7 @@ export function useTripEntry(
   const updateStartStep = async (data: Partial<Trip> = {}): Promise<boolean> => {
     const current = { ...tripRef.current, ...data };
     if (!current.id) {
-      notifyRef.current?.("Trip ID is missing. Submit Start Details first.", "error");
+      notifyRef.current?.(translate("ops.trip.trip_id_missing_start"), "error");
       return false;
     }
 
@@ -196,7 +197,7 @@ export function useTripEntry(
   const submitFarmStep = async (data: Partial<Trip> = {}): Promise<boolean> => {
     const current = tripRef.current;
     if (!current.id) {
-      notifyRef.current?.("Trip ID is missing. Submit Step 1 first.", "error");
+      notifyRef.current?.(translate("ops.trip.trip_id_missing"), "error");
       return false;
     }
 
@@ -238,7 +239,7 @@ export function useTripEntry(
   ): Promise<boolean> => {
     const current = { ...tripRef.current, ...data } as Trip;
     if (!current.id) {
-      notifyRef.current?.("Submit Start Details before saving later progress.", "error");
+      notifyRef.current?.(translate("ops.trip.submit_start_first"), "error");
       return false;
     }
 
@@ -285,7 +286,7 @@ export function useTripEntry(
   const saveDeliveriesProgress = async (rows: ShopDelivery[]): Promise<boolean> => {
     const current = tripRef.current;
     if (!current.id) {
-      notifyRef.current?.("Trip ID is missing. Submit Step 1 first.", "error");
+      notifyRef.current?.(translate("ops.trip.trip_id_missing"), "error");
       return false;
     }
     const withKeys = rows.map((row) => ({
@@ -329,7 +330,7 @@ export function useTripEntry(
   const submitPickupStep = async (data: Partial<Trip> = {}): Promise<boolean> => {
     const current = tripRef.current;
     if (!current.id) {
-      notifyRef.current?.("Trip ID is missing. Submit Step 1 first.", "error");
+      notifyRef.current?.(translate("ops.trip.trip_id_missing"), "error");
       return false;
     }
 
@@ -360,7 +361,7 @@ export function useTripEntry(
   const submitDeliveriesStep = async (): Promise<boolean> => {
     const current = tripRef.current;
     if (!current.id) {
-      notifyRef.current?.("Trip ID is missing. Submit Step 1 first.", "error");
+      notifyRef.current?.(translate("ops.trip.trip_id_missing"), "error");
       return false;
     }
     const wasSubmitted = Boolean(current.deliveryStepSubmitted);
@@ -390,7 +391,7 @@ export function useTripEntry(
       const message = handleApiError(error);
       const apiErr = error as { status?: number; code?: string };
       if (apiErr?.code === "NETWORK_ERROR" || message.toLowerCase().includes("unable to reach")) {
-        notifyRef.current?.("Unable to connect. Please try again.", "error");
+        notifyRef.current?.(translate("ops.trip.unable_to_connect"), "error");
       } else {
         notifyRef.current?.(message, "error");
       }
@@ -423,12 +424,12 @@ export function useTripEntry(
   const submitEndTrip = async (data: Partial<Trip> = {}): Promise<boolean> => {
     const current = { ...tripRef.current, ...data };
     if (!current.id) {
-      notifyRef.current?.("Trip ID is missing. Submit Step 1 first.", "error");
+      notifyRef.current?.(translate("ops.trip.trip_id_missing"), "error");
       return false;
     }
     if (!current.deliveryStepSubmitted) {
       notifyRef.current?.(
-        `❌ You must complete and lock the Deliveries step first.`,
+        translate("ops.trip.lock_deliveries_first"),
         "error"
       );
       return false;

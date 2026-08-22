@@ -13,6 +13,7 @@ import { meterMustBeGreaterThan } from "../../utils/meterValidation";
 import { GpsAddressText } from "../GpsAddressText";
 import { usePendingDelete } from "../../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../../components/common/PendingDeleteNotification";
+import { useI18n } from "../../../../../i18n";
 
 interface DieselExpensesTableProps {
   tripId: number;
@@ -54,6 +55,7 @@ export default function DieselExpensesTable({
   showNotification,
   readOnly = false,
 }: DieselExpensesTableProps) {
+  const { t } = useI18n();
   const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
   const [toastMessage, setToastMessage] = useState<{ message: string; type: "warning" | "error" | "success" } | null>(null);
   const [meterErrors, setMeterErrors] = useState<{ [key: number]: string }>({});
@@ -115,11 +117,11 @@ export default function DieselExpensesTable({
   const handleAddRow = () => {
     const lastRow = rowIndices[rowIndices.length - 1];
     if (!sheetData[`dieselSubmitted${lastRow}`]) {
-      notifyUser("Please submit the current diesel entry before adding a new one.", "warning");
+      notifyUser(t("ops.trip.submit_diesel_first"), "warning");
       return;
     }
     if (lastRow >= 6) {
-      notifyUser("Maximum of 6 diesel entries allowed.", "warning");
+      notifyUser(t("ops.trip.max_6_diesel"), "warning");
       return;
     }
     const nextId = lastRow + 1;
@@ -141,7 +143,7 @@ export default function DieselExpensesTable({
     });
     setDraftClientKey(nextKey);
     setRowIndices((prev) => [...prev, nextId]);
-    notifyUser(`New row added.`, "success");
+    notifyUser(t("ops.trip.new_row_added"), "success");
   };
 
   const handleImageUpload = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -149,12 +151,12 @@ export default function DieselExpensesTable({
     if (!file) return;
     const allowed = ["image/jpeg", "image/jpg", "image/png"];
     if (!allowed.includes(file.type) && !/\.(jpe?g|png)$/i.test(file.name)) {
-      notifyUser("Fuel bill must be a JPEG or PNG image.", "error");
+      notifyUser(t("ops.trip.bill_jpeg_png"), "error");
       e.target.value = "";
       return;
     }
     if (file.size > 1_048_576) {
-      notifyUser("Fuel bill image exceeds the maximum allowed size (1 MB).", "error");
+      notifyUser(t("ops.trip.bill_image_size"), "error");
       e.target.value = "";
       return;
     }
@@ -165,14 +167,14 @@ export default function DieselExpensesTable({
     reader.onloadend = () => {
       const result = String(reader.result || "");
       if (!/^data:image\/(jpeg|jpg|png);base64,/i.test(result)) {
-        notifyUser("Fuel bill must be a JPEG or PNG image.", "error");
+        notifyUser(t("ops.trip.bill_jpeg_png"), "error");
         return;
       }
       applyBatchUpdates({
         [`dieselImageName${index}`]: newFileName,
         [`dieselImage${index}`]: result,
       });
-      notifyUser(`Bill image uploaded for Row ${index}.`, "success");
+      notifyUser(t("ops.trip.bill_uploaded_row", { row: index }), "success");
     };
     reader.readAsDataURL(file);
   };
@@ -199,12 +201,12 @@ export default function DieselExpensesTable({
       return copy;
     });
     if (rowIndices.length > 1) setRowIndices((prev) => prev.filter((id) => id !== num));
-    notifyUser(`Row ${num} cancelled.`, "success");
+    notifyUser(t("ops.trip.row_cancelled", { row: num }), "success");
   };
 
   const handleGetLocation = (index: number) => {
     if (!navigator.geolocation) {
-      notifyUser("Geolocation not supported.", "error");
+      notifyUser(t("ops.trip.geo_unsupported"), "error");
       return;
     }
     setIsFetchingGPS((prev) => ({ ...prev, [index]: true }));
@@ -212,7 +214,7 @@ export default function DieselExpensesTable({
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
         if (latitude === 0 && longitude === 0) {
-          notifyUser("GPS 0,0 is not valid.", "error");
+          notifyUser(t("ops.trip.gps_zero_invalid"), "error");
           setIsFetchingGPS((prev) => ({ ...prev, [index]: false }));
           return;
         }
@@ -223,12 +225,12 @@ export default function DieselExpensesTable({
           [`dieselGpsAccuracy${index}`]: accuracy,
           [`dieselGpsCapturedAt${index}`]: capturedAt,
         });
-        notifyUser(`GPS captured for Row ${index}.`, "success");
+        notifyUser(t("ops.trip.gps_captured_row", { row: index }), "success");
         setIsFetchingGPS((prev) => ({ ...prev, [index]: false }));
       },
       (error) => {
         console.error("Geolocation error:", error);
-        notifyUser("Unable to retrieve location.", "error");
+        notifyUser(t("ops.trip.unable_retrieve_location"), "error");
         setIsFetchingGPS((prev) => ({ ...prev, [index]: false }));
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -238,13 +240,13 @@ export default function DieselExpensesTable({
   const absoluteDestMeter = destMeter || 0;
 
   const getMinAllowedMeter = (num: number) => {
-    const baseLabel = `Farm Meter (${absoluteDestMeter} KM)`;
+    const baseLabel = t("ops.trip.farm_meter_label", { meter: absoluteDestMeter });
     if (num === 1) return { minAllowed: absoluteDestMeter, referenceLabel: baseLabel };
     for (let i = num - 1; i >= 1; i--) {
       if (!sheetData[`dieselSubmitted${i}`] && i !== editingRow) continue;
       const prevVal = sheetData[`dieselMeter${i}`];
       if (prevVal !== undefined && prevVal !== "" && !isNaN(Number(prevVal))) {
-        return { minAllowed: Number(prevVal), referenceLabel: `Row ${i} (${prevVal} KM)` };
+        return { minAllowed: Number(prevVal), referenceLabel: t("ops.trip.row_label", { row: i, meter: prevVal }) };
       }
     }
     return { minAllowed: absoluteDestMeter, referenceLabel: baseLabel };
@@ -299,29 +301,29 @@ export default function DieselExpensesTable({
 
   const rowBlockReason = (num: number): string | null => {
     if (meterErrors[num]) return meterErrors[num];
-    if (!isPositive(sheetData[`dieselLtr${num}`])) return "Diesel (Ltr) is required.";
-    if (!isPositive(sheetData[`dieselRate${num}`])) return "Rate (₹ / Ltr) is required.";
+    if (!isPositive(sheetData[`dieselLtr${num}`])) return t("ops.trip.diesel_ltr_required");
+    if (!isPositive(sheetData[`dieselRate${num}`])) return t("ops.trip.rate_required");
     if (!isPositive(Number(sheetData[`dieselLtr${num}`]) * Number(sheetData[`dieselRate${num}`]))) {
-      return "Amount must be greater than 0.";
+      return t("ops.trip.amount_greater_zero");
     }
-    if (!isPositive(sheetData[`dieselMeter${num}`])) return "Reading is required.";
+    if (!isPositive(sheetData[`dieselMeter${num}`])) return t("ops.trip.reading_required");
     const bunk = String(sheetData[`dieselBunk${num}`] || "").trim();
-    if (!bunk) return "Bunk Address is required.";
-    if (/^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(bunk)) return "Bunk Address is required.";
+    if (!bunk) return t("ops.trip.bunk_required");
+    if (/^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(bunk)) return t("ops.trip.bunk_required");
     if (!isValidGps(sheetData[`dieselGpsLat${num}`], sheetData[`dieselGpsLon${num}`])) {
-      return "GPS must be captured.";
+      return t("ops.trip.gps_must_captured");
     }
-    if (!hasRealBill(sheetData[`dieselImage${num}`])) return "Bill Image / Slip is required.";
+    if (!hasRealBill(sheetData[`dieselImage${num}`])) return t("ops.trip.bill_image_required");
     return null;
   };
 
   const handleRowSubmit = async (num: number) => {
     if (!rowReady(num)) {
-      notifyUser(`Please fill all mandatory diesel fields for Row ${num}.`, "error");
+      notifyUser(t("ops.trip.fill_mandatory_diesel", { row: num }), "error");
       return;
     }
     if (!tripId) {
-      notifyUser("Trip ID is missing. Submit Step 1 first.", "error");
+      notifyUser(t("ops.trip.trip_id_missing"), "error");
       return;
     }
     const clientKey = String(sheetData[`dieselClientKey${num}`] || draftClientKey);
@@ -354,7 +356,7 @@ export default function DieselExpensesTable({
         ),
       });
       setEditingRow(null);
-      notifyUser(`Row ${num} submitted successfully!`, "success");
+      notifyUser(t("ops.trip.row_submitted", { row: num }), "success");
     } catch (err) {
       notifyUser(handleApiError(err), "error");
     } finally {
@@ -391,7 +393,7 @@ export default function DieselExpensesTable({
         });
       }
       applyBatchUpdates(updates);
-      notifyUser(`Row ${num} deleted.`, "success");
+      notifyUser(t("ops.trip.row_deleted", { row: num }), "success");
     } catch (err) {
       notifyUser(handleApiError(err), "error");
     } finally {
@@ -413,7 +415,7 @@ export default function DieselExpensesTable({
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-1 gap-3">
           <div className="flex items-center gap-3">
             <span className="text-xs font-medium text-slate-500">
-              {!isLastRowSubmitted ? "Submit current entry to enable adding more rows" : "Ready to add next entry"}
+              {!isLastRowSubmitted ? t("ops.trip.submit_current_entry") : t("ops.trip.ready_next_entry")}
             </span>
             <div
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold border ${
@@ -421,7 +423,7 @@ export default function DieselExpensesTable({
               }`}
             >
               <Gauge size={12} />
-              <span>Destination Farm meter :- {absoluteDestMeter > 0 ? `${absoluteDestMeter} KM` : "Error: Dest Meter Prop Missing"}</span>
+              <span>{t("ops.trip.dest_farm_meter")} :- {absoluteDestMeter > 0 ? `${absoluteDestMeter} KM` : t("ops.trip.dest_meter_missing")}</span>
             </div>
           </div>
           <button
@@ -435,7 +437,7 @@ export default function DieselExpensesTable({
             }`}
           >
             <Plus size={14} />
-            <span>Add Diesel Entry</span>
+            <span>{t("ops.trip.add_diesel_entry")}</span>
           </button>
         </div>
       )}
@@ -466,21 +468,21 @@ export default function DieselExpensesTable({
           </colgroup>
           <thead>
             <tr className="bg-slate-50 font-normal text-slate-700 text-[11px] tracking-wider border-b border-slate-200">
-              <th className="py-2.5 px-2 text-center">S.No</th>
-              <th className="py-2.5 px-1 text-center">Diesel (Ltr) <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-1 text-center">Rate <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-1 text-center">Amount</th>
-              <th className="py-2.5 px-1 text-center">Reading <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-2 text-left">Bunk Address <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-2 text-center">{t("table.s_no")}</th>
+              <th className="py-2.5 px-1 text-center">{t("ops.trip.diesel_ltr")} <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-1 text-center">{t("common.rate")} <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-1 text-center">{t("table.amount")}</th>
+              <th className="py-2.5 px-1 text-center">{t("ops.trip.reading")} <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-2 text-left">{t("ops.trip.bunk_address")} <span className="text-red-500">*</span></th>
               <th className="py-2.5 px-2 text-center">GPS</th>
-              <th className="py-2.5 px-1 text-center">Bill Image / Slip <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-2 text-center">Status</th>
+              <th className="py-2.5 px-1 text-center">{t("ops.trip.bill_image_slip")} <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-2 text-center">{t("common.status")}</th>
             </tr>
           </thead>
           <tbody>
             {visibleRows.length === 0 && (
               <tr>
-                <td colSpan={9} className="text-center text-xs text-slate-400 py-4">No submitted diesel bills.</td>
+                <td colSpan={9} className="text-center text-xs text-slate-400 py-4">{t("ops.trip.no_submitted_diesel")}</td>
               </tr>
             )}
             {visibleRows.map((num, idx) => {
@@ -527,7 +529,7 @@ export default function DieselExpensesTable({
                     ) : null}
                   </td>
                   <td className="p-1 text-left align-middle px-2 w-36 max-w-[9rem]">
-                    <input type="text" placeholder="Bunk..." disabled={locked || isFetching} value={bunkVal} title={bunkVal}
+                    <input type="text" placeholder={t("ops.trip.bunk_placeholder")} disabled={locked || isFetching} value={bunkVal} title={bunkVal}
                       onChange={(e) => handleFieldChange(`dieselBunk${num}`, num, e.target.value)}
                       className="w-full max-w-[9rem] pl-2 py-1 bg-slate-50/70 border border-slate-200 rounded outline-none text-xs disabled:text-slate-500" />
                   </td>
@@ -543,11 +545,11 @@ export default function DieselExpensesTable({
                         <GpsAddressText
                           lat={sheetData[`dieselGpsLat${num}`]}
                           lon={sheetData[`dieselGpsLon${num}`]}
-                          fallback="Location captured"
+                          fallback={t("ops.trip.location_captured")}
                         />
                       </a>
                     ) : (
-                      <span className="text-[11px] text-slate-400">GPS: Not captured</span>
+                      <span className="text-[11px] text-slate-400">GPS: {t("ops.trip.not_captured")}</span>
                     )}
                     {!locked && (
                       <button type="button" onClick={() => handleGetLocation(num)} disabled={isFetching}
@@ -576,28 +578,28 @@ export default function DieselExpensesTable({
                       !locked && (
                         <button type="button" onClick={() => fileInputRefs.current[num]?.click()}
                           className="px-3 py-1.5 bg-slate-50 text-slate-700 rounded-md text-xs font-semibold border border-slate-200 inline-flex items-center gap-1.5">
-                          <Upload size={13} /> Upload Bill
+                          <Upload size={13} /> {t("ops.trip.upload_bill")}
                         </button>
                       )
                     )}
                   </td>
                   <td className="p-1 text-center align-middle">
                     {readOnly ? (
-                      <span className="text-[11px] font-semibold text-emerald-700">Submitted</span>
+                      <span className="text-[11px] font-semibold text-emerald-700">{t("ops.trip.submitted")}</span>
                     ) : (
                       <div className="flex items-center justify-center gap-2">
                         {isSubmitted && editingRow !== num ? (
                           <>
-                            <span className="text-[10px] font-semibold text-emerald-700 mr-1">Submitted</span>
-                            <button type="button" onClick={() => setEditingRow(num)} className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full" title="Edit Row">
+                            <span className="text-[10px] font-semibold text-emerald-700 mr-1">{t("ops.trip.submitted")}</span>
+                            <button type="button" onClick={() => setEditingRow(num)} className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full" title={t("ops.trip.edit_row")}>
                               <Pencil size={14} />
                             </button>
-                            <button type="button" onClick={() => requestDelete(num, { label: `Deleting diesel row ${num}` })} disabled={busyRow === num} className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full" title="Delete Row">
+                            <button type="button" onClick={() => requestDelete(num, { label: t("ops.trip.deleting_diesel_row", { row: num }) })} disabled={busyRow === num} className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full" title={t("ops.trip.delete_row")}>
                               <Trash2 size={14} />
                             </button>
                           </>
                         ) : (
-                          <span className="text-[10px] font-semibold text-slate-500">Draft</span>
+                          <span className="text-[10px] font-semibold text-slate-500">{t("status.draft")}</span>
                         )}
                       </div>
                     )}
@@ -632,7 +634,7 @@ export default function DieselExpensesTable({
                 }}
                 className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50"
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 type="button"
@@ -644,7 +646,7 @@ export default function DieselExpensesTable({
                     : "bg-slate-300 cursor-not-allowed"
                 }`}
               >
-                {busyRow === actionRow ? "Submitting…" : "Submit Diesel Entry"}
+                {busyRow === actionRow ? `${t("ops.trip.submitting")}…` : t("ops.trip.submit_diesel_entry")}
               </button>
             </div>
           </div>

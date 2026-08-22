@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { X } from "lucide-react";
 import { NAV_SECTIONS, type NavChild } from "../../routes/navigation";
+import { useI18n } from "../../i18n";
 import BrandMark from "../BrandMark";
 
 interface SidebarProps {
@@ -28,6 +29,7 @@ export default function Sidebar({
   const location = useLocation();
   const pathname = location.pathname;
   const search = location.search;
+  const { t } = useI18n();
 
   // Close the mobile drawer on route change.
   useEffect(() => {
@@ -52,24 +54,25 @@ export default function Sidebar({
           <div key={section.id} className="mb-5">
             {/* Section label */}
             <p className="mb-1.5 px-3 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
-              {section.label}
+              {section.labelKey ? t(section.labelKey) : section.label}
             </p>
 
             <ul className="space-y-0.5">
               {section.children.map((child) => {
                 const Icon = child.icon ?? SectionIcon;
                 const active = isChildActive(child, pathname, search);
+                const label = child.labelKey ? t(child.labelKey) : child.label;
 
                 return child.soon ? (
                   <li key={child.label}>
                     <span
                       className="group relative flex w-full cursor-default items-center gap-2.5 rounded-lg px-3 py-2 pr-2 text-sm text-slate-400 dark:text-slate-600"
-                      title={child.soon ? `${child.label} — coming soon` : child.label}
+                      title={child.soon ? `${label} — ${t("sidebar.comingSoon")}` : label}
                     >
                       <Icon size={17} className="shrink-0" />
-                      <span className="flex-1 truncate text-left">{child.label}</span>
+                      <span className="flex-1 truncate text-left">{label}</span>
                       <span className="rounded-full bg-slate-100 px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wide text-slate-400 dark:bg-slate-800 dark:text-slate-500">
-                        Soon
+                        {t("sidebar.comingSoon")}
                       </span>
                     </span>
                   </li>
@@ -95,7 +98,7 @@ export default function Sidebar({
                             : "text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300"
                         }`}
                       />
-                      <span className="flex-1 truncate text-left">{child.label}</span>
+                      <span className="flex-1 truncate text-left">{label}</span>
                     </Link>
                   </li>
                 );
@@ -115,7 +118,7 @@ export default function Sidebar({
           DMR Poultries
         </h1>
         <p className="truncate text-[11px] font-medium text-slate-400 dark:text-slate-500">
-          ERP Management System
+          {t("sidebar.erpSystem")}
         </p>
       </div>
     </div>
@@ -145,7 +148,7 @@ export default function Sidebar({
                     DMR Poultries
                   </h1>
                   <p className="truncate text-[11px] font-medium text-slate-400 dark:text-slate-500">
-                    ERP Management System
+                    {t("sidebar.erpSystem")}
                   </p>
                 </div>
               </div>
@@ -153,7 +156,7 @@ export default function Sidebar({
                 type="button"
                 onClick={onCloseMobile}
                 className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                aria-label="Close menu"
+                aria-label={t("header.closeMenu")}
               >
                 <X size={18} />
               </button>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
+import { useI18n, translateStatus } from '../../../../i18n';
 import type { MaintenanceEvent } from '../../types';
 import MaintenanceDocuments from './MaintenanceDocuments';
 
@@ -11,6 +12,7 @@ interface BillDetailsModalProps {
 }
 
 const BillDetailsModal: React.FC<BillDetailsModalProps> = ({ isOpen, bill, vehicles, onClose }) => {
+  const { t } = useI18n();
   if (!isOpen || !bill) return null;
 
   const vehicle = vehicles.find((v: any) => String(v.id) === String(bill.vehicleId));
@@ -31,7 +33,7 @@ const BillDetailsModal: React.FC<BillDetailsModalProps> = ({ isOpen, bill, vehic
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50 rounded-t-2xl">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Maintenance Record</h3>
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">{t('fleet.maintenance_view.record_title')}</h3>
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg hover:bg-slate-200 transition-colors"
@@ -45,11 +47,11 @@ const BillDetailsModal: React.FC<BillDetailsModalProps> = ({ isOpen, bill, vehic
           {/* Vehicle & Date Row */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Vehicle</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('common.vehicle')}</p>
               <p className="text-sm font-bold text-slate-800">{vehicle?.vehicleNumber || bill.vehicleId}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('common.date')}</p>
               <p className="text-sm font-bold text-slate-800">{formatDate(bill.date)}</p>
             </div>
           </div>
@@ -57,30 +59,30 @@ const BillDetailsModal: React.FC<BillDetailsModalProps> = ({ isOpen, bill, vehic
           {/* Bill Number & Current KM Row */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Bill Number</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('fleet.maintenance_view.bill_number')}</p>
               <p className={`text-sm font-bold ${isApproved ? 'text-green-600' : 'text-orange-500'}`}>
                 {bill.billNumber || '-'}
                 {isApproved && (
                   <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                    Approved
+                    {translateStatus(t, 'Approved')}
                   </span>
                 )}
               </p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Current KM</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('fleet.maintenance_form.current_km')}</p>
               <p className="text-sm font-bold text-slate-800">{bill.currentKM.toLocaleString()}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Driver</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('common.driver')}</p>
               <p className="text-sm text-slate-700">{bill.driverName || '-'}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Next Service KM</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('fleet.maintenance_form.next_service_km')}</p>
               <p className="text-sm font-bold text-slate-800">{bill.nextServiceKM ? bill.nextServiceKM.toLocaleString() : '-'}</p>
             </div>
           </div>
@@ -88,11 +90,11 @@ const BillDetailsModal: React.FC<BillDetailsModalProps> = ({ isOpen, bill, vehic
           {/* Maintenance Type & Service Type Row */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Maintenance Type</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('operations.maintenance_type')}</p>
               <p className="text-sm text-slate-700">{bill.maintenanceType}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Service Type</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('fleet.maintenance_form.service_type')}</p>
               <p className="text-sm text-slate-700">{bill.serviceType}</p>
             </div>
           </div>
@@ -100,11 +102,11 @@ const BillDetailsModal: React.FC<BillDetailsModalProps> = ({ isOpen, bill, vehic
           {/* Garage & Mechanic Row */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Garage</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('operations.maintenance_garage')}</p>
               <p className="text-sm text-slate-700">{bill.garage || '-'}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Mechanic</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('fleet.maintenance_form.mechanic')}</p>
               <p className="text-sm text-slate-700">{bill.mechanic || '-'}</p>
             </div>
           </div>
@@ -112,14 +114,14 @@ const BillDetailsModal: React.FC<BillDetailsModalProps> = ({ isOpen, bill, vehic
           {/* Parts Table */}
           {bill.parts && bill.parts.length > 0 && (
             <div className="border-t border-slate-200 pt-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Parts & Items</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{t('fleet.maintenance_view.parts_title')}</p>
               <div className="overflow-x-auto rounded-lg border border-slate-200">
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Item</th>
-                      <th className="px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">QTY</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('fleet.parts.item_name')}</th>
+                      <th className="px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('fleet.parts.qty')}</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('common.amount')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
@@ -135,7 +137,7 @@ const BillDetailsModal: React.FC<BillDetailsModalProps> = ({ isOpen, bill, vehic
                   </tbody>
                   <tfoot className="bg-slate-50 border-t border-slate-200">
                     <tr>
-                      <td colSpan={2} className="px-4 py-2 text-sm font-bold text-slate-700 text-right">Total</td>
+                      <td colSpan={2} className="px-4 py-2 text-sm font-bold text-slate-700 text-right">{t('common.total')}</td>
                       <td className="px-4 py-2 text-sm font-bold text-blue-600 text-right">
                         ₹{bill.totalCost.toFixed(2)}
                       </td>
@@ -149,7 +151,7 @@ const BillDetailsModal: React.FC<BillDetailsModalProps> = ({ isOpen, bill, vehic
           {/* Total Cost (if no parts) */}
           {(!bill.parts || bill.parts.length === 0) && (
             <div className="border-t border-slate-200 pt-4 flex justify-between items-center">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Cost</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('fleet.parts.total_cost')}</p>
               <p className="text-xl font-bold text-blue-600">₹{bill.totalCost.toFixed(2)}</p>
             </div>
           )}
@@ -158,7 +160,7 @@ const BillDetailsModal: React.FC<BillDetailsModalProps> = ({ isOpen, bill, vehic
           {bill.documents && bill.documents.length > 0 && (
             <div className="border-t border-slate-200 pt-4">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                Documents ({bill.documents.length})
+                {t('fleet.maintenance_view.documents_count', { count: bill.documents.length })}
               </p>
               <MaintenanceDocuments maintenanceId={bill.id || ''} documents={bill.documents} />
             </div>
@@ -167,7 +169,7 @@ const BillDetailsModal: React.FC<BillDetailsModalProps> = ({ isOpen, bill, vehic
           {/* Remarks */}
           {bill.remarks && (
             <div className="border-t border-slate-200 pt-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Remarks</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('common.remarks')}</p>
               <p className="text-sm text-slate-600 italic bg-slate-50 p-2 rounded-lg mt-1">{bill.remarks}</p>
             </div>
           )}
@@ -179,7 +181,7 @@ const BillDetailsModal: React.FC<BillDetailsModalProps> = ({ isOpen, bill, vehic
             onClick={onClose}
             className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-lg transition-colors text-sm"
           >
-            Close
+            {t('common.close')}
           </button>
         </div>
       </div>

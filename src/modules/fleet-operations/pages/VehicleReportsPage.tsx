@@ -82,6 +82,7 @@ const VehicleReportsPage = ({ embedded = false }: VehicleReportsPageProps) => {
 export default memo(VehicleReportsPage);*/
 
 import { memo } from 'react';
+import { useI18n } from '../../../i18n';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 
 interface VehicleReportsPageProps {
@@ -89,6 +90,7 @@ interface VehicleReportsPageProps {
 }
 
 const VehicleReportsPage = ({ embedded = false }: VehicleReportsPageProps) => {
+  const { t } = useI18n();
   return (
     <ErrorBoundary>
       <div className={`w-full flex items-center justify-center animate-in fade-in duration-500 ${
@@ -98,9 +100,9 @@ const VehicleReportsPage = ({ embedded = false }: VehicleReportsPageProps) => {
           <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 border border-blue-100 shadow-sm animate-bounce">
             🚧
           </div>
-          <h2 className="text-xl font-bold text-slate-800 mb-2">Vehicle Reports - Coming Soon</h2>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">{t('fleet.reports.coming_soon_title')}</h2>
           <p className="text-sm text-slate-500 leading-relaxed">
-            This module is currently being enhanced and will be made fully available after the upcoming updates.
+            {t('fleet.reports.coming_soon_desc')}
           </p>
         </div>
       </div>

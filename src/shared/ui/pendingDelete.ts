@@ -1,3 +1,5 @@
+import { translate } from "../../i18n";
+
 export const PENDING_DELETE_SECONDS = 10;
 
 export const PENDING_DELETE_ACTION_CELL_CLASS = "pending-delete-action";
@@ -15,7 +17,7 @@ export function pendingDeleteBarPercent(
 
 export function pendingDeleteCountdownLabel(secondsLeft: number): string {
   const seconds = Math.max(secondsLeft, 1);
-  return seconds === 1 ? "Deleting in 1 second..." : `Deleting in ${seconds} seconds...`;
+  return translate("pendingDelete.countdown", { seconds });
 }
 
 export type PendingDeleteSnapshot<TId extends string | number> = {

@@ -1,6 +1,7 @@
 import React from "react";
 import { Eye, Trash2, Hash, User, CreditCard, Calendar, ShoppingBag, TrendingUp, Phone, Building2 } from "lucide-react";
 import type { PendingReportRow } from "../../types/collection";
+import { useI18n } from "../../../../../i18n";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -49,6 +50,7 @@ function PendingCollectionsTable({
   totalShops,
   isLoading = false,
 }: Props) {
+  const { t } = useI18n();
   const handleRowClick = (shopName: string) => {
     if (selectedShopName === shopName) {
       onSelectShop(null);
@@ -62,7 +64,7 @@ function PendingCollectionsTable({
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center">
         <div className="inline-flex items-center gap-2 text-slate-400 text-sm font-medium">
           <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin" />
-          Loading pending collections...
+          {t("ops.collection.loading_pending")}
         </div>
       </div>
     );
@@ -76,9 +78,9 @@ function PendingCollectionsTable({
     <>
       <div className="px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 flex items-center justify-between flex-wrap gap-3">
         <h3 className="text-sm font-bold text-slate-800 tracking-tight">
-          Pending Collections
+          {t("operations.pending_collections")}
           <span className="ml-2 text-[11px] font-medium text-slate-500">
-            {totalShops} Shops
+            {totalShops} {t("ops.collection.shops")}
           </span>
           {selectedShop && (
             <span className="ml-2 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-full align-middle">
@@ -95,50 +97,50 @@ function PendingCollectionsTable({
               <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <div className="flex items-center justify-center gap-1.5">
                   <Hash size={14} className="text-slate-400" />
-                  S.No
+                  {t("table.s_no")}
                 </div>
               </th>
               <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Shop Name
+                {t("operations.shop_name")}
               </th>
               <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Owner
+                {t("ops.collection.owner")}
               </th>
               <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Mobile
+                {t("ops.collection.mobile")}
               </th>
               <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
                 <div className="flex items-center justify-center gap-1.5">
                   <Calendar size={14} className="text-blue-600" />
-                  Last Collection
+                  {t("ops.collection.last_collection")}
                 </div>
               </th>
               <th className="px-3.5 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Balance
+                {t("common.balance")}
               </th>
               <th className="px-3.5 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-700">
                 <div className="flex items-center justify-center gap-1.5">
                   <ShoppingBag size={14} className="text-blue-600" />
-                  Recent Sales
+                  {t("operations.recent_sales")}
                 </div>
               </th>
               <th className="px-3.5 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-700">
                 <div className="flex items-center justify-center gap-1.5">
                   <CreditCard size={14} className="text-green-600" />
-                  Recent Collections
+                  {t("operations.recent_collections")}
                 </div>
               </th>
               <th className="px-3.5 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-700">
                 <div className="flex items-center justify-center gap-1.5">
                   <TrendingUp size={14} className="text-purple-600" />
-                  Recovery %
+                  {t("ops.collection.recovery_pct")}
                 </div>
               </th>
               <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Overdue
+                {t("ops.collection.overdue")}
               </th>
               <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Actions
+                {t("table.actions")}
               </th>
             </tr>
           </thead>
@@ -146,7 +148,7 @@ function PendingCollectionsTable({
             {data.length === 0 ? (
               <tr>
                 <td colSpan={11} className="py-12 text-center text-slate-400 text-sm font-medium">
-                  No shops found.
+                  {t("empty.no_shops")}
                 </td>
               </tr>
             ) : (
@@ -207,14 +209,14 @@ function PendingCollectionsTable({
                       <div className="inline-flex items-center justify-center gap-1.5">
                         <button
                           onClick={(e) => { e.stopPropagation(); onView(shop.shopName); }}
-                          title="View Details"
+                          title={t("ops.collection.view_details")}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50 transition"
                         >
                           <Eye size={18} />
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); onDelete(shop.shopName); }}
-                          title="Delete Latest Collection"
+                          title={t("ops.collection.delete_latest_collection")}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 hover:bg-red-50 transition"
                         >
                           <Trash2 size={18} />

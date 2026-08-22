@@ -10,6 +10,7 @@ import {
   type DeliveryWhatsAppStatusValue,
 } from "../services/deliveryWhatsAppService";
 import { userFacingDeliveryWhatsAppError } from "../services/deliveryWhatsAppErrors";
+import { translate } from "../../../../i18n";
 
 const WHATSAPP_BACKEND_ENABLED = import.meta.env.VITE_WHATSAPP_BACKEND_ENABLED === "true";
 
@@ -190,7 +191,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
         setLocalErrors((prev) => ({
           ...prev,
           [delivery.id]: userFacingDeliveryWhatsAppError(
-            err instanceof Error ? err.message : "Unable to send WhatsApp."
+            err instanceof Error ? err.message : translate("ops.trip.unable_send_whatsapp")
           ),
         }));
       } finally {
@@ -266,7 +267,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
         setLocalErrors((prev) => ({
           ...prev,
           [delivery.id]: userFacingDeliveryWhatsAppError(
-            err instanceof Error ? err.message : "Unable to send WhatsApp."
+            err instanceof Error ? err.message : translate("ops.trip.unable_send_whatsapp")
           ),
         }));
       } finally {

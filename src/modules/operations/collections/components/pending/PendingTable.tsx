@@ -1,6 +1,7 @@
 import { Eye, Trash2 } from "lucide-react";
 import type { CollectionPendingSummaryRow } from "../../types/collection";
 import { opsTableHeaderBarClass, opsTableThClass, opsTableTdClass, opsTableRowClass, opsTableDivideClass, opsTableCardClass } from "../../../../../shared/ui/operationsStyles";
+import { useI18n } from "../../../../../i18n";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -45,6 +46,7 @@ export function PendingTable({
   grandTotalWeeklySales,
   grandTotalWeeklyCollections,
 }: PendingTableProps) {
+  const { t } = useI18n();
   const handleRowClick = (shopName: string) => {
     if (selectedShopName === shopName) {
       onSelectShop(null);
@@ -58,7 +60,7 @@ export function PendingTable({
   if (data.length === 0) {
     return (
       <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-500">
-        No pending collections found.
+        {t("empty.no_pending")}
       </div>
     );
   }
@@ -72,14 +74,14 @@ export function PendingTable({
           <thead className="bg-slate-50/80">
             <tr>
               <th className={opsTableThClass}>#</th>
-              <th className={opsTableThClass}>Shop Name</th>
-              <th className={opsTableThClass}>Last Collection</th>
-              <th className={`${opsTableThClass} text-right`}>Balance</th>
-              <th className={`${opsTableThClass} text-right`}>Recent Sales</th>
-              <th className={`${opsTableThClass} text-right`}>Recent Collections</th>
-              <th className={`${opsTableThClass} text-right`}>Recovery %</th>
-              <th className={`${opsTableThClass} text-center`}>Overdue (Days)</th>
-              <th className={`${opsTableThClass} text-center`}>Actions</th>
+              <th className={opsTableThClass}>{t("operations.shop_name")}</th>
+              <th className={opsTableThClass}>{t("ops.collection.last_collection")}</th>
+              <th className={`${opsTableThClass} text-right`}>{t("common.balance")}</th>
+              <th className={`${opsTableThClass} text-right`}>{t("operations.recent_sales")}</th>
+              <th className={`${opsTableThClass} text-right`}>{t("operations.recent_collections")}</th>
+              <th className={`${opsTableThClass} text-right`}>{t("ops.collection.recovery_pct")}</th>
+              <th className={`${opsTableThClass} text-center`}>{t("ops.collection.overdue_days")}</th>
+              <th className={`${opsTableThClass} text-center`}>{t("table.actions")}</th>
             </tr>
           </thead>
           <tbody className={`${opsTableDivideClass} bg-white`}>
@@ -124,14 +126,14 @@ export function PendingTable({
                     <div className="inline-flex items-center justify-center gap-1.5">
                       <button
                         onClick={(e) => { e.stopPropagation(); onView(shop.shopName); }}
-                        title="View Details"
+                        title={t("ops.collection.view_details")}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50 transition"
                       >
                         <Eye size={18} />
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); onDelete(shop.shopName); }}
-                        title="Delete Latest Collection"
+                        title={t("ops.collection.delete_latest_collection")}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 hover:bg-red-50 transition"
                       >
                         <Trash2 size={18} />
@@ -144,7 +146,7 @@ export function PendingTable({
           </tbody>
           <tfoot className="bg-slate-50">
             <tr>
-              <td colSpan={3} className={`${opsTableTdClass} font-bold text-slate-700`}>Total (All Pages)</td>
+              <td colSpan={3} className={`${opsTableTdClass} font-bold text-slate-700`}>{t("ops.collection.total_all_pages")}</td>
               <td className={`${opsTableTdClass} text-right font-bold text-slate-800`}>{formattedGrandTotal}</td>
               <td className={`${opsTableTdClass} text-right font-bold text-blue-600`}>{formatCurrency(grandTotalWeeklySales)}</td>
               <td className={`${opsTableTdClass} text-right font-bold text-green-600`}>{formatCurrency(grandTotalWeeklyCollections)}</td>

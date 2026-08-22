@@ -3,6 +3,7 @@
 
 import { Activity } from "lucide-react";
 import type { ActivityItem } from "../utils/dashboardDerive";
+import { useI18n } from "../../../i18n";
 
 const TONE_CLASSES: Record<ActivityItem["tone"], string> = {
   brand: "bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400",
@@ -18,11 +19,12 @@ interface ActivityTimelineProps {
 }
 
 export default function ActivityTimeline({ items }: ActivityTimelineProps) {
+  const { t } = useI18n();
   return (
     <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-card animate-fade-in-up dark:border-slate-800 dark:bg-slate-900">
       <header className="mb-3">
-        <h3 className="text-[13.5px] font-semibold tracking-tight text-slate-800 dark:text-slate-100">Recent activity</h3>
-        <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Latest movements across the business</p>
+        <h3 className="text-[13.5px] font-semibold tracking-tight text-slate-800 dark:text-slate-100">{t("dashboard.activity.title")}</h3>
+        <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">{t("dashboard.activity.subtitle")}</p>
       </header>
 
       {items.length === 0 ? (
@@ -30,8 +32,8 @@ export default function ActivityTimeline({ items }: ActivityTimelineProps) {
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-800">
             <Activity size={16} />
           </span>
-          <p className="text-[13px] font-medium text-slate-600 dark:text-slate-300">No recent activity</p>
-          <p className="max-w-xs text-xs text-slate-400">Trips, collections and expenses will appear here as they happen.</p>
+          <p className="text-[13px] font-medium text-slate-600 dark:text-slate-300">{t("dashboard.activity.no_activity")}</p>
+          <p className="max-w-xs text-xs text-slate-400">{t("dashboard.activity.no_activity_hint")}</p>
         </div>
       ) : (
         <ol className="relative space-y-4 before:absolute before:bottom-2 before:left-[15px] before:top-2 before:w-px before:bg-slate-100 dark:before:bg-slate-800">

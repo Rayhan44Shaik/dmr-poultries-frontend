@@ -1,5 +1,6 @@
 import { memo, useEffect, useState } from 'react';
 import { Download, FileText, Loader2, Paperclip, Trash2 } from 'lucide-react';
+import { useI18n } from '../../../../i18n';
 import type { MaintenanceDocument } from '../../types';
 import { maintenanceApi } from '../../services/maintenanceApi';
 import { handleApiError } from '../../../../api/errors';
@@ -20,6 +21,7 @@ const formatFileSize = (bytes?: number): string => {
 };
 
 const MaintenanceDocuments = ({ maintenanceId, documents, allowRemove = true, onChanged }: MaintenanceDocumentsProps) => {
+  const { t } = useI18n();
   const [viewerDoc, setViewerDoc] = useState<MaintenanceDocument | null>(null);
   const [visibleDocs, setVisibleDocs] = useState<MaintenanceDocument[]>(documents || []);
   const [removingId, setRemovingId] = useState<number | null>(null);
@@ -28,13 +30,13 @@ const MaintenanceDocuments = ({ maintenanceId, documents, allowRemove = true, on
   useEffect(() => setVisibleDocs(Array.isArray(documents) ? documents : []), [documents]);
 
   const remove = async (doc: MaintenanceDocument) => {
-    if (!window.confirm(`Remove “${doc.fileName}” from this maintenance record?`)) return;
+    if (!window.confirm(t('fleet.maintenance_docs.confirm_remove', { file: doc.fileName }))) return;
     setRemovingId(doc.id);
     try {
       await maintenanceApi.removeDocument(maintenanceId, doc.id);
       setVisibleDocs((items) => items.filter((item) => item.id !== doc.id));
       if (viewerDoc?.id === doc.id) setViewerDoc(null);
-      showNotification('Document removed.', 'success');
+      showNotification(t('fleet.maintenance_docs.removed'), 'success');
       onChanged?.();
     } catch (cause) {
       showNotification(handleApiError(cause), 'error');
@@ -43,7 +45,7 @@ const MaintenanceDocuments = ({ maintenanceId, documents, allowRemove = true, on
     }
   };
 
-  if (visibleDocs.length === 0) return <p className="text-sm italic text-slate-400">No documents attached.</p>;
+  if (visibleDocs.length === 0) return <p className="text-sm italic text-slate-400">{t('fleet.maintenance_docs.no_documents')}</p>;
 
   return (
     <>
@@ -61,8 +63,8 @@ const MaintenanceDocuments = ({ maintenanceId, documents, allowRemove = true, on
                 <div className="mt-1 flex items-center justify-between">
                   <span className="text-[10px] text-slate-400">{formatFileSize(doc.fileSize)}</span>
                   <div className="flex items-center gap-1">
-                    <button type="button" onClick={() => maintenanceApi.downloadDocument(maintenanceId, doc).catch((cause) => showNotification(handleApiError(cause), 'error'))} className="rounded p-1 text-slate-400 hover:bg-blue-50 hover:text-blue-600" title="Download"><Download size={13} /></button>
-                    {allowRemove && <button type="button" disabled={removingId === doc.id} onClick={() => void remove(doc)} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50" title="Remove">{removingId === doc.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}</button>}
+                    <button type="button" onClick={() => maintenanceApi.downloadDocument(maintenanceId, doc).catch((cause) => showNotification(handleApiError(cause), 'error'))} className="rounded p-1 text-slate-400 hover:bg-blue-50 hover:text-blue-600" title={t('common.download')}><Download size={13} /></button>
+                    {allowRemove && <button type="button" disabled={removingId === doc.id} onClick={() => void remove(doc)} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50" title={t('common.remove')}>{removingId === doc.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}</button>}
                   </div>
                 </div>
               </div>

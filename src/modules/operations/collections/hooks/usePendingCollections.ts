@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { PendingCollection, Collection } from "../types/collection";
 import { collectionService } from "../services/collectionService";
+import { translate } from "../../../../i18n";
 
 /**
  * Backend-backed pending collections data source.
@@ -21,7 +22,7 @@ export default function usePendingCollections() {
       setPending(collectionService.getPendingCollections());
       setCollections(collectionService.getCollections());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load pending collections.");
+      setError(err instanceof Error ? err.message : translate("ops.collection.failed_load_pending"));
     } finally {
       setLoading(false);
     }

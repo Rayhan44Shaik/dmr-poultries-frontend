@@ -1,6 +1,7 @@
 import { memo, useMemo, useState, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import { Wrench, Battery, Disc, Settings, Droplets, Wind, CircleDot, Milestone, Activity, Hash, Paperclip, Calendar, FilterX, Route, Fuel } from 'lucide-react';
+import { useI18n } from '../../../../i18n';
 import type { MaintenanceEvent } from '../../types';
 import { safeDate } from '../../utils/maintenanceHelpers';
 import BillDetailsModal from './BillDetailsModal';

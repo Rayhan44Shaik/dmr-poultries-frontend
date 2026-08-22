@@ -10,6 +10,7 @@ import ActiveCounts from "../components/ActiveCounts";
 import PendingCollectionsByShop from "../components/PendingCollectionsByShop";
 import { Calendar, ArrowRightLeft } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
+import { useI18n } from "../../../../i18n";
 
 // -------- Helper: get previous Monday–Sunday --------
 const getPreviousWeekRange = () => {
@@ -56,6 +57,7 @@ function RangeDatePicker({
   placement = "bottom",
   className = "",
 }: RangeDatePickerProps) {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -108,7 +110,7 @@ function RangeDatePicker({
           <span>
             {startDate && endDate
               ? `${formatDate(startDate)} – ${formatDate(endDate)}`
-              : "Select Range Window"}
+              : t("ops.dashboard.select_range")}
           </span>
         </button>
       </div>
@@ -121,24 +123,24 @@ function RangeDatePicker({
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  Start Date
+                  {t("ops.dashboard.start_date")}
                 </label>
                 <DatePicker
                   value={startDateStr}
                   onChange={handleStartChange}
-                  placeholder="From"
+                  placeholder={t("common.from")}
                   className="w-full text-xs"
                   icon={slateCalendarIcon}
                 />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  End Date
+                  {t("ops.dashboard.end_date")}
                 </label>
                 <DatePicker
                   value={endDateStr}
                   onChange={handleEndChange}
-                  placeholder="To"
+                  placeholder={t("common.to")}
                   className="w-full text-xs"
                   icon={slateCalendarIcon}
                 />
@@ -156,8 +158,8 @@ function RangeDatePicker({
                   setIsOpen(false);
                 }}
                 className="px-3 py-2 text-xs font-bold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
-              >
-                Last 7 days
+>
+                {t("ops.dashboard.last_7_days")}
               </button>
               <button
                 type="button"
@@ -170,7 +172,7 @@ function RangeDatePicker({
                 }}
                 className="px-3 py-2 text-xs font-bold rounded-lg bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors"
               >
-                Last 30 days
+                {t("ops.dashboard.last_30_days")}
               </button>
             </div>
           </div>
@@ -182,6 +184,7 @@ function RangeDatePicker({
 
 // -------- Main Dashboard View Page --------
 function OperationsDashboardPage() {
+  const { t } = useI18n();
   const initialRange = getPreviousWeekRange();
   const [startDate, setStartDate] = useState<Date | undefined>(initialRange.startDate);
   const [endDate, setEndDate] = useState<Date | undefined>(initialRange.endDate);
@@ -218,9 +221,9 @@ function OperationsDashboardPage() {
             <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 border border-blue-100 shadow-sm animate-bounce">
               📅
             </div>
-            <h3 className="text-lg font-black text-slate-800 tracking-tight">Select Temporal Pipeline</h3>
+            <h3 className="text-lg font-black text-slate-800 tracking-tight">{t("ops.dashboard.select_pipeline")}</h3>
             <p className="text-xs font-semibold text-slate-400 mt-2 leading-relaxed">
-              Click the date range window located above to load real-time analytics indicators.
+              {t("ops.dashboard.select_pipeline_hint")}
             </p>
           </div>
         </div>
@@ -236,7 +239,7 @@ function OperationsDashboardPage() {
           <div className="absolute inset-0 rounded-full border-4 border-t-blue-600 animate-spin" />
         </div>
         <p className="text-xs font-black uppercase tracking-widest text-slate-400 animate-pulse">
-          Synchronizing Analytics Engine...
+          {t("ops.dashboard.syncing")}
         </p>
       </div>
     );
@@ -259,7 +262,7 @@ function OperationsDashboardPage() {
             onClick={() => refetch()}
             className="px-4 py-2 text-sm font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
           >
-            Retry
+            {t("common.retry")}
           </button>
         </div>
       </div>
@@ -284,8 +287,8 @@ function OperationsDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
           <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Time-Series Performance</span>
-            <h3 className="text-sm font-black text-slate-800 mt-0.5">Operational Output Trends</h3>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.time_series")}</span>
+            <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.operational_trends")}</h3>
           </div>
           <div className="w-full overflow-hidden">
             <TrendChart data={data?.trendData || []} />
@@ -294,8 +297,8 @@ function OperationsDashboardPage() {
         
         <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
           <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Credit Allocations</span>
-            <h3 className="text-sm font-black text-slate-800 mt-0.5">Outstanding Shop Balances</h3>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.credit_allocations")}</span>
+            <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.outstanding_balances")}</h3>
           </div>
           <div className="w-full overflow-hidden">
             <PendingCollectionsByShop data={data?.pendingCollectionsByShop || []} />
@@ -306,8 +309,8 @@ function OperationsDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
           <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Payment Breakdown</span>
-            <h3 className="text-sm font-black text-slate-800 mt-0.5">Collection Streams</h3>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.payment_breakdown")}</span>
+            <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.collection_streams")}</h3>
           </div>
           <div className="w-full flex justify-center items-center py-2 overflow-hidden">
             <CollectionsPie data={data?.collectionsByMode || []} />
@@ -317,11 +320,11 @@ function OperationsDashboardPage() {
         <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
           <div className="flex justify-between items-center">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Live Infrastructure Matrix</span>
-              <h3 className="text-sm font-black text-slate-800 mt-0.5">Recent Transit Manifests</h3>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.live_infrastructure")}</span>
+              <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.recent_transit")}</h3>
             </div>
             <div className="px-2.5 py-1 rounded-full bg-slate-50 border border-slate-100 text-[10px] font-bold text-slate-500 flex items-center gap-1.5">
-              <ArrowRightLeft size={10} className="text-slate-400" /> Auto-updates
+              <ArrowRightLeft size={10} className="text-slate-400" /> {t("ops.dashboard.auto_updates")}
             </div>
           </div>
           <div className="w-full overflow-x-auto text-xs rounded-xl border border-slate-100">
@@ -332,8 +335,8 @@ function OperationsDashboardPage() {
 
       <div className="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm w-full min-w-0">
         <div className="mb-4">
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Active Supply Ecosystem Nodes</span>
-          <h3 className="text-sm font-black text-slate-800 mt-0.5">Active Fleet & Asset Infrastructure</h3>
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.active_ecosystem")}</span>
+          <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.active_fleet")}</h3>
         </div>
         <ActiveCounts
           vehicles={data?.activeVehicles || 0}

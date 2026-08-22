@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { Box, ChevronDown, Search } from "lucide-react";
 import type { BoxDetail } from "../../types/trip";
+import { useI18n } from "../../../../../i18n";
 
 interface BoxSelectorProps {
   boxes: BoxDetail[];
@@ -17,6 +18,7 @@ export default function BoxSelector({
   disabled = false,
   usedBoxIds = [],
 }: BoxSelectorProps) {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -81,10 +83,10 @@ export default function BoxSelector({
           <Box size={18} className="text-slate-400 shrink-0" />
           {selectedCount > 0 ? (
             <span className="text-slate-800">
-              {selectedCount} box{selectedCount > 1 ? "es" : ""} selected
+              {t("ops.trip.boxes_selected", { count: selectedCount })}
             </span>
           ) : (
-            <span className="text-slate-400">Select boxes from pickup</span>
+            <span className="text-slate-400">{t("ops.trip.select_boxes_from_pickup")}</span>
           )}
         </span>
         <ChevronDown
@@ -103,7 +105,7 @@ export default function BoxSelector({
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setSearchQuery(e.target.value)
               }
-              placeholder="Search box number..."
+              placeholder={t("ops.trip.search_box_number")}
               className="flex-1 bg-transparent border-none outline-none text-sm font-medium text-slate-700 placeholder-slate-400 py-1"
               autoFocus
             />
@@ -116,16 +118,16 @@ export default function BoxSelector({
                 onChange={toggleAll}
                 className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
               />
-              Select All ({availableBoxes.length})
+              {t("ops.trip.select_all_boxes", { count: availableBoxes.length })}
             </label>
             <span className="text-[10px] text-slate-400">
-              {selectedCount} selected
+              {t("ops.trip.selected_count", { count: selectedCount })}
             </span>
           </div>
           <div className="flex-1 overflow-y-auto max-h-44 p-1 bg-white">
             {filteredBoxes.length === 0 ? (
               <div className="text-center py-3 text-sm text-slate-400">
-                No boxes available.
+                {t("ops.trip.no_boxes_available")}
               </div>
             ) : (
               filteredBoxes.map((box: BoxDetail) => (
@@ -147,7 +149,7 @@ export default function BoxSelector({
                     <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold">
                       #{box.boxNo}
                     </span>
-                    <span className="text-slate-600">{box.birds} birds</span>
+                    <span className="text-slate-600">{box.birds} {t("common.birds")}</span>
                     <span className="text-slate-300">·</span>
                     <span className="text-slate-600">
                       {box.weight.toFixed(2)} kg

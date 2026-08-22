@@ -8,12 +8,14 @@ import CollectionAmount from "../components/entry/CollectionAmount";
 import RecentCollectionsTable from "../components/entry/RecentCollectionsTable";
 import { EditCollectionModal } from "../components/pending/EditCollectionModal";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import { useI18n } from "../../../../i18n";
 
 type Props = {
   embedded?: boolean;
 };
 
 export default function CollectionEntryPage({ embedded: _embedded = false }: Props) {
+  const { t } = useI18n();
   const vm = useCollectionEntry();
   const { showNotification } = useSafeNotification();
 
@@ -35,9 +37,9 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
   const handleSaveCollection = async () => {
     try {
       await vm.saveCollection();
-      showNotification("Collection saved successfully!", "success");
+      showNotification(t("ops.collection.saved_success"), "success");
     } catch (err) {
-      showNotification("Failed to save collection. Please try again.", "error");
+      showNotification(t("ops.collection.failed_save_try_again"), "error");
     }
   };
 

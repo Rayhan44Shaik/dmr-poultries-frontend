@@ -1,4 +1,5 @@
 import { memo, useState, useMemo, useCallback } from 'react';
+import { useI18n } from '../../../i18n';
 import { useEmployees } from '../../masters/employees/hooks/useEmployees';
 import { useMaintenanceData } from '../hooks/useMaintenanceData';
 import { useMaintenanceForm } from '../hooks/useMaintenanceForm';
@@ -15,6 +16,7 @@ import type { MaintenanceEvent } from '../types';
 import { RotateCcw, Save, Wrench, X, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
+  const { t } = useI18n();
   const { employees } = useEmployees();
   const { showNotification } = useSafeNotification();
   const { vehicles, maintenance, approvedMaintenance, deletedRecords, loading: recordsLoading, error: recordsError, refresh: refreshMaintenance } = useMaintenanceData('entry');
@@ -142,7 +144,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
     setSelectKey(prev => prev + 1);
     setCurrentPage(1);
     setSelectedId(null);
-    showNotification('Form has been reset', 'info');
+    showNotification(t('fleet.maintenance_entry.form_reset'), 'info');
   };
 
   const handleView = (record: MaintenanceEvent) => {
@@ -155,7 +157,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
     // lock in fleetMaintenanceLock.ts — "10 days after this maintenance
     // happened", not 10 days after it was typed in).
     if (!isEditable(record.date)) {
-      showNotification('This record is older than 10 days and cannot be edited.', 'error');
+      showNotification(t('fleet.maintenance_entry.older_than_10_days'), 'error');
       return;
     }
 
@@ -183,13 +185,13 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
     setExistingDocuments(record.documents || []);
     setSelectKey(prev => prev + 1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    showNotification('Edit mode – update the details and save.', 'info');
+    showNotification(t('fleet.maintenance_entry.edit_mode_hint'), 'info');
   };
 
   const performDeletion = async (id: string) => {
     try {
       await maintenanceApi.remove(id);
-      showNotification('Record deleted.', 'success');
+      showNotification(t('fleet.maintenance_entry.record_deleted'), 'success');
       refreshMaintenance();
       setSelectedId(null);
       const remaining = displayRecords.length - 1;
@@ -206,28 +208,28 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
 
   const startDeletion = useCallback((record: MaintenanceEvent) => {
     if (!record.id) {
-      showNotification('Invalid record – cannot delete.', 'error');
+      showNotification(t('fleet.maintenance_entry.invalid_record_delete'), 'error');
       return;
     }
     return performDeletion(record.id);
-  }, [showNotification, displayRecords.length, currentPage, pageSize, refreshMaintenance]);
+  }, [showNotification, t, displayRecords.length, currentPage, pageSize, refreshMaintenance]);
 
   // ===== APPROVE: two-step confirmation =====
   const handleApprove = (record: MaintenanceEvent) => {
     if (record.paymentStatus === 'approved') {
-      showNotification('This record is already approved.', 'info');
+      showNotification(t('fleet.maintenance_entry.already_approved'), 'info');
       return;
     }
     if (!record.id) {
-      showNotification('Invalid record – cannot approve.', 'error');
+      showNotification(t('fleet.maintenance_entry.invalid_record_approve'), 'error');
       return;
     }
     const vehicle = vehicles.find((v: any) => String(v.id) === String(record.vehicleId));
-    const vehicleDisplay = vehicle?.vehicleNumber || record.vehicleNo || record.vehicleId || 'Unknown Vehicle';
+    const vehicleDisplay = vehicle?.vehicleNumber || record.vehicleNo || record.vehicleId || t('fleet.maintenance_entry.unknown_vehicle');
     setApproveDialog({
       open: true,
       record,
-      message: `Approve maintenance record "${record.billNumber || '-'}" for vehicle "${vehicleDisplay}"?`,
+      message: t('fleet.maintenance_entry.confirm_approve', { bill: record.billNumber || '-', vehicle: vehicleDisplay }),
     });
   };
 
@@ -236,7 +238,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
     if (!record || !record.id) return;
     try {
       await maintenanceApi.approve(record.id, 'system');
-      showNotification('Maintenance record approved.', 'success');
+      showNotification(t('fleet.maintenance_entry.approved_success'), 'success');
       refreshMaintenance();
       setSelectedId(null);
       setViewMode('approved');
@@ -258,7 +260,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
     
     const { valid, message } = kmGuard.validateKM(km);
     if (!valid) {
-      return message || 'Invalid KM';
+      return message || t('fleet.maintenance_entry.invalid_km');
     }
     return null;
   };
@@ -266,7 +268,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
   // ===== Validate pending fuel before save =====
   const validatePendingFuel = (): string | null => {
     if (pendingWarning && vehicleNumber) {
-      return `Cannot save maintenance: ${pendingWarning}`;
+      return t('fleet.maintenance_entry.cannot_save_pending', { warning: pendingWarning });
     }
     return null;
   };
@@ -305,7 +307,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
               <div className="p-2 bg-blue-50 rounded-xl border border-blue-100 text-blue-600">
                 <Wrench size={18} />
               </div>
-              <h2 className="text-base font-bold text-slate-800">Vehicle Maintenance Entry</h2>
+              <h2 className="text-base font-bold text-slate-800">{t('fleet.maintenance_entry.title')}</h2>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -313,7 +315,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold text-slate-700 border border-slate-300 rounded-xl hover:bg-slate-50 transition shadow-xs"
               >
                 <RotateCcw size={14} />
-                Reset
+                {t('common.reset')}
               </button>
               <button
                 onClick={onSave}
@@ -321,7 +323,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition shadow-sm hover:shadow disabled:opacity-50"
               >
                 <Save size={14} />
-                {loading ? 'Saving...' : (form.id ? 'Update' : 'Save')}
+                {loading ? t('common.saving') : (form.id ? t('fleet.maintenance_entry.update') : t('common.save'))}
               </button>
             </div>
           </div>
@@ -359,14 +361,14 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
         {recordsError && (
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
             <span className="flex items-center gap-2"><AlertCircle size={17} />{recordsError}</span>
-            <button type="button" onClick={refreshMaintenance} className="font-bold underline">Retry</button>
+            <button type="button" onClick={refreshMaintenance} className="font-bold underline">{t('common.retry')}</button>
           </div>
         )}
 
         {/* Latest Records Table */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden p-5">
           {recordsLoading ? (
-            <div className="py-12 text-center text-sm font-semibold text-slate-500">Loading maintenance records…</div>
+            <div className="py-12 text-center text-sm font-semibold text-slate-500">{t('fleet.maintenance_entry.loading_records')}</div>
           ) : (
           <LatestMaintenanceTable
             records={displayRecords}
@@ -401,7 +403,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
               <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
                 <div className="flex items-center gap-3 text-emerald-600">
                   <CheckCircle2 size={20} />
-                  <h3 className="text-sm font-bold text-slate-800">Confirm Approval</h3>
+                  <h3 className="text-sm font-bold text-slate-800">{t('fleet.maintenance_entry.confirm_approval_title')}</h3>
                 </div>
                 <button
                   onClick={() => setApproveDialog({ open: false, record: null })}
@@ -417,13 +419,13 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
                     onClick={() => setApproveDialog({ open: false, record: null })}
                     className="px-4 py-2 text-sm font-semibold border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 transition"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                   <button
                     onClick={confirmApprove}
                     className="px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition shadow-sm"
                   >
-                    Approve
+                    {t('common.approve')}
                   </button>
                 </div>
               </div>

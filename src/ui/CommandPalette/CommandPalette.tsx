@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, CornerDownLeft, Search } from "lucide-react";
 import { FLAT_NAV, QUICK_ACTIONS, type FlatNavEntry } from "../../routes/navigation";
+import { useI18n } from "../../i18n";
 
 interface CommandPaletteProps {
   open: boolean;
@@ -23,6 +24,7 @@ function fuzzyMatch(entry: FlatNavEntry, query: string): number {
 
 export default function CommandPalette({ open, onOpen, onClose }: CommandPaletteProps) {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -34,21 +36,31 @@ export default function CommandPalette({ open, onOpen, onClose }: CommandPalette
       // Top hits: quick actions first, then navigation.
       return [
         ...QUICK_ACTIONS.map((a) => ({
-          section: "Quick actions",
-          label: a.label,
+          section: t("command.quickActions"),
+          label: a.labelKey ? t(a.labelKey) : a.label,
           path: a.path,
           icon: a.icon,
-          keywords: a.description,
+          keywords: a.descriptionKey ? t(a.descriptionKey) : a.description,
         })),
-        ...FLAT_NAV.filter((e) => !e.soon),
+        ...FLAT_NAV.filter((e) => !e.soon).map((e) => ({
+          ...e,
+          section: e.sectionKey ? t(e.sectionKey) : e.section,
+          label: e.labelKey ? t(e.labelKey) : e.label,
+        })),
       ];
     }
     return FLAT_NAV.filter((e) => !e.soon)
       .map((e) => ({ entry: e, score: fuzzyMatch(e, q) }))
       .filter((r) => r.score >= 0)
       .sort((a, b) => a.score - b.score)
-      .map((r) => r.entry);
-  }, [query]);
+      .map((r) => r.entry)
+      .map((e) => ({
+        ...e,
+        section: e.sectionKey ? t(e.sectionKey) : e.section,
+        label: e.labelKey ? t(e.labelKey) : e.label,
+      }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, t]);
 
   // Reset the input whenever the palette is closed, and focus when it opens.
   const close = useCallback(() => {
@@ -120,9 +132,9 @@ export default function CommandPalette({ open, onOpen, onClose }: CommandPalette
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Search pages, actions, modules…"
+            placeholder={t("command.search")}
             className="h-13 w-full bg-transparent py-3.5 text-[15px] text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100"
-            aria-label="Search the application"
+            aria-label={t("command.searchAria")}
           />
           <kbd className="shrink-0 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-sans text-[10.5px] font-semibold text-slate-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-400">
             ESC
@@ -133,8 +145,8 @@ export default function CommandPalette({ open, onOpen, onClose }: CommandPalette
         <div ref={listRef} className="max-h-[46vh] overflow-y-auto p-2">
           {results.length === 0 ? (
             <div className="px-4 py-10 text-center">
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">No results for “{query}”</p>
-              <p className="mt-1 text-xs text-slate-400">Try “collections”, “trips”, “reports”…</p>
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">{t("command.noResults", { query })}</p>
+              <p className="mt-1 text-xs text-slate-400">{t("command.noResultsHint")}</p>
             </div>
           ) : (
             results.map((entry, index) => (
@@ -170,7 +182,7 @@ export default function CommandPalette({ open, onOpen, onClose }: CommandPalette
                 {index === safeIndex && (
                   <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-brand-600 dark:text-brand-300">
                     <span className="hidden items-center gap-1 sm:flex">
-                      Open <CornerDownLeft size={11} />
+                      {t("command.open")} <CornerDownLeft size={11} />
                     </span>
                     <ArrowRight size={13} />
                   </span>
@@ -184,13 +196,13 @@ export default function CommandPalette({ open, onOpen, onClose }: CommandPalette
         <div className="flex items-center gap-4 border-t border-slate-100 bg-slate-50/60 px-4 py-2 text-[11px] font-medium text-slate-400 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-500">
           <span className="flex items-center gap-1.5">
             <kbd className="rounded border border-slate-200 bg-white px-1 py-px font-sans dark:border-slate-600 dark:bg-slate-700">↑↓</kbd>
-            navigate
+            {t("command.navigate")}
           </span>
           <span className="flex items-center gap-1.5">
             <kbd className="rounded border border-slate-200 bg-white px-1 py-px font-sans dark:border-slate-600 dark:bg-slate-700">↵</kbd>
-            open
+            {t("command.open")}
           </span>
-          <span className="ml-auto hidden sm:block">DMR Poultries ERP</span>
+          <span className="ml-auto hidden sm:block">{t("command.footer")}</span>
         </div>
       </div>
     </div>

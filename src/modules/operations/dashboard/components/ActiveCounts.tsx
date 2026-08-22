@@ -1,4 +1,5 @@
 import { Truck, Users, UserCog, Store, Warehouse } from "lucide-react";
+import { useI18n } from "../../../../i18n";
 
 interface ActiveCountsProps {
   vehicles: number;       // total active vehicles
@@ -25,9 +26,10 @@ export default function ActiveCounts({
   usedShops = 0,
   usedFarms = 0,
 }: ActiveCountsProps) {
+  const { t } = useI18n();
   const items = [
     {
-      label: "Active Vehicles",
+      label: t("ops.dashboard.active_vehicles"),
       used: usedVehicles,
       total: vehicles,
       icon: Truck,
@@ -35,7 +37,7 @@ export default function ActiveCounts({
       bg: "bg-blue-50",
     },
     {
-      label: "Active Drivers",
+      label: t("ops.dashboard.active_drivers"),
       used: usedDrivers,
       total: drivers,
       icon: Users,
@@ -43,7 +45,7 @@ export default function ActiveCounts({
       bg: "bg-green-50",
     },
     {
-      label: "Active Helpers",
+      label: t("ops.dashboard.active_helpers"),
       used: usedHelpers,
       total: helpers,
       icon: UserCog,
@@ -51,7 +53,7 @@ export default function ActiveCounts({
       bg: "bg-purple-50",
     },
     {
-      label: "Active Shops",
+      label: t("ops.dashboard.active_shops"),
       used: usedShops,
       total: shops,
       icon: Store,
@@ -59,7 +61,7 @@ export default function ActiveCounts({
       bg: "bg-orange-50",
     },
     {
-      label: "Active Farms",
+      label: t("ops.dashboard.active_farms"),
       used: usedFarms,
       total: farms,
       icon: Warehouse,
@@ -71,7 +73,7 @@ export default function ActiveCounts({
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
       <h3 className="text-sm font-semibold text-slate-700 mb-4 text-center">
-        Active Counts
+        {t("ops.dashboard.active_counts")}
       </h3>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">

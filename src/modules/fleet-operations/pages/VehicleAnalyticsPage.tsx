@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import Select from 'react-select';
+import { useI18n } from '../../../i18n';
 import { useAnalyticsData } from '../hooks/useAnalyticsData';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import ExpenseBreakdownDonut from '../components/analytics/ExpenseBreakdownDonut';
@@ -113,6 +114,7 @@ const SkeletonCharts = () => (
 );
 
 const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) => {
+  const { t } = useI18n();
   const {
     stats,
     weeklyData,
@@ -152,17 +154,17 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
   const kpis = useMemo<KpiDef[]>(() => {
     const costPerKm = stats.costPerKm > 0 ? `₹${stats.costPerKm.toFixed(2)}` : '—';
     return [
-      { label: 'Total Trips', value: formatNumberCompact(stats.totalTrips), icon: Truck, tone: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
-      { label: 'Total Distance', value: `${formatNumberCompact(stats.totalDistance)} km`, icon: TrendingUp, tone: 'bg-blue-50 text-blue-600 border-blue-100' },
-      { label: 'Fuel Used', value: `${formatNumberCompact(stats.totalFuelLitres)} L`, icon: Fuel, tone: 'bg-amber-50 text-amber-600 border-amber-100' },
-      { label: 'Avg Mileage', value: stats.averageMileage > 0 ? `${stats.averageMileage.toFixed(2)} km/l` : '—', icon: Gauge, tone: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
-      { label: 'Vehicle Utilization', value: `${utilization}%`, icon: Activity, tone: 'bg-cyan-50 text-cyan-600 border-cyan-100' },
-      { label: 'Fuel Cost', value: formatCurrencyCompact(stats.fuelCost), icon: Banknote, tone: 'bg-sky-50 text-sky-600 border-sky-100' },
-      { label: 'Maintenance Cost', value: formatCurrencyCompact(stats.maintenanceCost), icon: Wrench, tone: 'bg-violet-50 text-violet-600 border-violet-100' },
-      { label: 'Total Fleet Cost', value: formatCurrencyCompact(stats.totalExpense), icon: IndianRupee, tone: 'bg-rose-50 text-rose-600 border-rose-100' },
-      { label: 'Cost / KM', value: costPerKm, icon: Activity, tone: 'bg-slate-100 text-slate-600 border-slate-200' },
+      { label: t('fleet.analytics.total_trips'), value: formatNumberCompact(stats.totalTrips), icon: Truck, tone: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
+      { label: t('fleet.analytics.total_distance'), value: `${formatNumberCompact(stats.totalDistance)} km`, icon: TrendingUp, tone: 'bg-blue-50 text-blue-600 border-blue-100' },
+      { label: t('fleet.analytics.fuel_used'), value: `${formatNumberCompact(stats.totalFuelLitres)} L`, icon: Fuel, tone: 'bg-amber-50 text-amber-600 border-amber-100' },
+      { label: t('fleet.analytics.avg_mileage'), value: stats.averageMileage > 0 ? `${stats.averageMileage.toFixed(2)} km/l` : '—', icon: Gauge, tone: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+      { label: t('fleet.analytics.vehicle_utilization'), value: `${utilization}%`, icon: Activity, tone: 'bg-cyan-50 text-cyan-600 border-cyan-100' },
+      { label: t('fleet.analytics.fuel_cost'), value: formatCurrencyCompact(stats.fuelCost), icon: Banknote, tone: 'bg-sky-50 text-sky-600 border-sky-100' },
+      { label: t('fleet.analytics.maint_cost'), value: formatCurrencyCompact(stats.maintenanceCost), icon: Wrench, tone: 'bg-violet-50 text-violet-600 border-violet-100' },
+      { label: t('fleet.analytics.total_fleet_cost'), value: formatCurrencyCompact(stats.totalExpense), icon: IndianRupee, tone: 'bg-rose-50 text-rose-600 border-rose-100' },
+      { label: t('fleet.analytics.cost_per_km'), value: costPerKm, icon: Activity, tone: 'bg-slate-100 text-slate-600 border-slate-200' },
     ];
-  }, [stats, utilization]);
+  }, [stats, utilization, t]);
 
   const hasAnyData = stats.totalTrips > 0 || stats.totalDistance > 0 || stats.totalExpense > 0;
 
@@ -181,9 +183,9 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
 
   useEffect(() => {
     if (refreshing === false && lastRefreshed) {
-      setToast({ type: 'success', message: 'Fleet Analytics refreshed' });
+      setToast({ type: 'success', message: t('fleet.analytics.refreshed_success') });
     }
-  }, [refreshing, lastRefreshed]);
+  }, [refreshing, lastRefreshed, t]);
 
   return (
     <ErrorBoundary>
@@ -214,14 +216,14 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
             <div className="flex flex-col gap-1">
               <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 <CalendarDays size={11} className="text-emerald-600" />
-                Date Range
+                {t('fleet.analytics.date_range')}
               </span>
               <div className="flex items-center gap-2">
                 <div className="w-[180px]">
                   <DatePicker
                     value={fromDate}
                     onChange={setFromDate}
-                    placeholder="From date"
+                    placeholder={t('fleet.analytics.from_date')}
                     className="[&_input]:!h-9 [&_input]:!text-xs"
                     hideClear
                   />
@@ -231,7 +233,7 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
                   <DatePicker
                     value={toDate}
                     onChange={setToDate}
-                    placeholder="To date"
+                    placeholder={t('fleet.analytics.to_date')}
                     className="[&_input]:!h-9 [&_input]:!text-xs"
                     hideClear
                   />
@@ -243,7 +245,7 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
             <div className="flex flex-col gap-1 flex-1 min-w-[240px] max-w-md">
               <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 <Truck size={11} className="text-emerald-600" />
-                Vehicle
+                {t('common.vehicle')}
               </span>
               <div className="relative flex items-center gap-2">
                 <div className="flex-1 min-w-0">
@@ -254,7 +256,7 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
                     isSearchable
                     isClearable
                     filterOption={containsFilter}
-                    placeholder={vehiclesLoading ? 'Loading vehicles…' : 'All vehicles'}
+                    placeholder={vehiclesLoading ? t('fleet.analytics.loading_vehicles') : t('fleet.analytics.all_vehicles')}
                     isDisabled={vehiclesLoading}
                     styles={selectStyles}
                     menuPortalTarget={document.body}
@@ -269,26 +271,26 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
                   disabled={vehiclesLoading}
                 >
                   <Search size={13} className="text-slate-400" />
-                  <span className="hidden sm:inline">Search</span>
+                  <span className="hidden sm:inline">{t('common.search')}</span>
                 </button>
               </div>
             </div>
 
             {/* Actions: Search, Reset, Refresh */}
             <div className="flex items-center gap-2 shrink-0">
-              <button type="button" onClick={onReset} className={controlClass} title="Reset filters">
+              <button type="button" onClick={onReset} className={controlClass} title={t('fleet.analytics.reset_filters')}>
                 <RotateCcw size={13} className="text-slate-400" />
-                <span className="hidden sm:inline">Reset</span>
+                <span className="hidden sm:inline">{t('common.reset')}</span>
               </button>
               <button
                 type="button"
                 onClick={refresh}
                 disabled={loading || refreshing}
                 className={controlClass}
-                title="Refresh analytics"
+                title={t('fleet.analytics.refresh_analytics')}
               >
                 <RefreshCw size={13} className={refreshing ? 'animate-spin text-emerald-600' : 'text-slate-400'} />
-                <span className="hidden sm:inline">Refresh</span>
+                <span className="hidden sm:inline">{t('common.refresh')}</span>
               </button>
             </div>
           </div>
@@ -301,14 +303,14 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
               {error}
             </span>
             <button type="button" onClick={refresh} className="font-bold underline">
-              Retry
+              {t('common.retry')}
             </button>
           </div>
         )}
 
         {!hasAnyData && !loading && (
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500">
-            No analytics data available for the selected filters.
+            {t('fleet.analytics.no_data')}
           </div>
         )}
 
@@ -344,7 +346,7 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
               {/* Vehicle Performance */}
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs lg:col-span-2">
                 <div className="mb-3">
-                  <h3 className="text-base font-semibold text-slate-900">Vehicle Performance</h3>
+                  <h3 className="text-base font-semibold text-slate-900">{t('fleet.analytics.vehicle_performance')}</h3>
                 </div>
                 <VehiclePerformanceChart stats={vehicleStats} />
               </div>
@@ -352,7 +354,7 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
               {/* Cost Analysis */}
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
                 <div className="mb-3">
-                  <h3 className="text-base font-semibold text-slate-900">Cost Analysis</h3>
+                  <h3 className="text-base font-semibold text-slate-900">{t('fleet.analytics.cost_analysis')}</h3>
                 </div>
                 <ExpenseBreakdownDonut data={expenseBreakdown} height={280} />
               </div>
@@ -362,7 +364,7 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
               {/* Weekly Activity */}
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs lg:col-span-2">
                 <div className="mb-3">
-                  <h3 className="text-base font-semibold text-slate-900">Weekly Activity</h3>
+                  <h3 className="text-base font-semibold text-slate-900">{t('fleet.analytics.weekly_activity')}</h3>
                 </div>
                 <WeeklyTrendChart data={weeklyData} />
               </div>
@@ -370,7 +372,7 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
               {/* Fleet Insights */}
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
                 <div className="mb-3">
-                  <h3 className="text-base font-semibold text-slate-900">Fleet Insights</h3>
+                  <h3 className="text-base font-semibold text-slate-900">{t('fleet.analytics.fleet_insights')}</h3>
                 </div>
                 <AttentionSection stats={vehicleStats} />
               </div>
@@ -379,7 +381,7 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
             {/* Vehicle performance table */}
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
               <div className="mb-3">
-                <h3 className="text-base font-semibold text-slate-900">Vehicle Details</h3>
+                <h3 className="text-base font-semibold text-slate-900">{t('fleet.analytics.vehicle_details')}</h3>
               </div>
               <VehiclePerformanceTable stats={vehicleStats} statusById={vehicleStatusById} />
             </div>

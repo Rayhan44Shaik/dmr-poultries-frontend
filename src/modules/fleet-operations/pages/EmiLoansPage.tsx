@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshCw, RotateCcw, Search, X } from 'lucide-react';
+import { useI18n, translateStatus } from '../../../i18n';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import Pagination from '../components/common/Pagination';
 import SearchInput from '../components/common/SearchInput';
@@ -62,26 +63,27 @@ const SORT_GETTER: Record<SortKey, (row: EmiOverview) => number | string> = {
 };
 
 const COLUMNS: { key: SortKey; label: string; align: 'left' | 'right' | 'center' }[] = [
-  { key: 'vehicleNo', label: 'VEHICLE NO', align: 'left' },
-  { key: 'purchaseAmount', label: 'PURCHASE AMOUNT', align: 'right' },
-  { key: 'totalEMIs', label: 'TOTAL EMI', align: 'center' },
-  { key: 'completedEMIs', label: 'COMPLETED', align: 'center' },
-  { key: 'pendingEMIs', label: 'PENDING', align: 'center' },
-  { key: 'emiDay', label: 'EMI DATE', align: 'center' },
-  { key: 'status', label: 'STATUS', align: 'center' },
+  { key: 'vehicleNo', label: 'fleet.emi.col_vehicle_no', align: 'left' },
+  { key: 'purchaseAmount', label: 'fleet.emi.col_purchase_amount', align: 'right' },
+  { key: 'totalEMIs', label: 'fleet.emi.col_total_emi', align: 'center' },
+  { key: 'completedEMIs', label: 'fleet.emi.col_completed', align: 'center' },
+  { key: 'pendingEMIs', label: 'fleet.emi.col_pending', align: 'center' },
+  { key: 'emiDay', label: 'fleet.emi.col_emi_date', align: 'center' },
+  { key: 'status', label: 'common.status', align: 'center' },
 ];
 
 const StatusBadge = ({ status }: { status: EmiOverview['status'] }) => {
+  const { t } = useI18n();
   if (status === 'COMPLETED') {
     return (
       <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
-        COMPLETED
+        {translateStatus(t, status)}
       </span>
     );
   }
   return (
     <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-700">
-      PENDING
+      {translateStatus(t, status)}
     </span>
   );
 };
@@ -96,6 +98,7 @@ const CompletedCell = ({ completed, total }: { completed: number; total: number 
 );
 
 const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
+  const { t } = useI18n();
   const {
     allRecords,
     kpis,
@@ -186,13 +189,13 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
 
   useEffect(() => {
     if (refreshStatus === 'success') {
-      setToast({ type: 'success', message: 'EMI data refreshed' });
+      setToast({ type: 'success', message: t('fleet.emi.refreshed_success') });
       clearRefreshStatus();
     } else if (refreshStatus === 'error') {
-      setToast({ type: 'error', message: 'Unable to refresh EMI data. Please try again.' });
+      setToast({ type: 'error', message: t('fleet.emi.refresh_failed') });
       clearRefreshStatus();
     }
-  }, [refreshStatus, clearRefreshStatus]);
+  }, [refreshStatus, clearRefreshStatus, t]);
 
   return (
     <ErrorBoundary>
@@ -221,15 +224,15 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
           {/* KPI Summary Strip - Vehicle Level */}
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm mb-3">
             <div className="flex items-center gap-1.5 text-slate-600">
-              <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">TOTAL VEHICLES</span>
+              <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{t('fleet.emi.total_vehicles')}</span>
               <span className="font-bold text-slate-900 tabular-nums">{kpis.totalVehicles}</span>
             </div>
             <div className="flex items-center gap-1.5 text-emerald-700 border-l border-slate-200 pl-3">
-              <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">COMPLETED EMI VEHICLES</span>
+              <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{t('fleet.emi.completed_emi_vehicles')}</span>
               <span className="font-bold tabular-nums">{kpis.completedEmiVehicles}</span>
             </div>
             <div className="flex items-center gap-1.5 text-amber-700 border-l border-slate-200 pl-3">
-              <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">PENDING EMI VEHICLES</span>
+              <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{t('fleet.emi.pending_emi_vehicles')}</span>
               <span className="font-bold tabular-nums">{kpis.pendingEmiVehicles}</span>
             </div>
           </div>
@@ -241,27 +244,27 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
               <SearchInput
                 value={search}
                 onChange={handleSearchChange}
-                placeholder="Search vehicle no…"
+                placeholder={t('fleet.emi.search_placeholder')}
                 className="pl-9"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('common.status')}</span>
               <select
                 value={statusFilter}
                 onChange={(e) => handleStatusChange(e.target.value as EmiOverview['status'] | 'all')}
                 className={fieldClass}
               >
-                <option value="all">All statuses</option>
-                <option value="PENDING">PENDING</option>
-                <option value="COMPLETED">COMPLETED</option>
+                <option value="all">{t('fleet.emi.all_statuses')}</option>
+                <option value="PENDING">{translateStatus(t, 'PENDING')}</option>
+                <option value="COMPLETED">{translateStatus(t, 'COMPLETED')}</option>
               </select>
             </div>
             <div className="flex items-center gap-2 ml-auto">
               {hasActiveFilters && (
-                <button type="button" onClick={reset} className={controlClass} title="Clear filters">
+                <button type="button" onClick={reset} className={controlClass} title={t('fleet.emi.clear_filters')}>
                   <RotateCcw size={13} className="text-slate-400" />
-                  <span className="hidden sm:inline">Clear</span>
+                  <span className="hidden sm:inline">{t('common.clear')}</span>
                 </button>
               )}
               <button
@@ -269,10 +272,10 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
                 onClick={refresh}
                 disabled={loading || refreshing}
                 className={controlClass}
-                title="Refresh from Master Vehicle"
+                title={t('fleet.emi.refresh_from_master')}
               >
                 <RefreshCw size={13} className={refreshing ? 'animate-spin text-emerald-600' : 'text-slate-400'} />
-                <span className="hidden sm:inline">Refresh</span>
+                <span className="hidden sm:inline">{t('common.refresh')}</span>
               </button>
             </div>
           </div>
@@ -285,7 +288,7 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
               {error}
             </span>
             <button type="button" onClick={refresh} className="font-bold underline">
-              Retry
+              {t('common.retry')}
             </button>
           </div>
         )}
@@ -293,7 +296,7 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
         {/* EMI Schedule Table */}
         <div className="rounded-xl border border-slate-200 bg-white shadow-xs">
           <div className="px-4 py-3 border-b border-slate-200">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">EMI SCHEDULE</h3>
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">{t('fleet.emi.schedule_title')}</h3>
           </div>
 
           <div className="overflow-x-auto">
@@ -312,7 +315,7 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
                           sortKey === column.key ? 'text-emerald-700' : 'text-slate-500 hover:text-slate-700'
                         }`}
                       >
-                        {column.label}
+                        {t(column.label)}
                         {sortKey === column.key && (
                           <span className="text-emerald-600">{sortDir === 'asc' ? '↑' : '↓'}</span>
                         )}
@@ -344,9 +347,9 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
                         <svg className="mx-auto mb-3 text-slate-300" width={42} height={42} viewBox="0 0 24 24" fill="none" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                         </svg>
-                        <p className="font-bold text-slate-700">No EMI records found</p>
+                        <p className="font-bold text-slate-700">{t('fleet.emi.no_records')}</p>
                         <p className="mt-1 text-sm text-slate-400">
-                          Add purchase amount, EMI count and EMI date in Master Vehicle to display the EMI schedule.
+                          {t('fleet.emi.no_records_hint')}
                         </p>
                       </div>
                     </td>
@@ -359,13 +362,13 @@ const EmiLoansPage = ({ embedded = false }: EmiLoansPageProps) => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 18a1 1 0 001-1v-3.586a1 1 0 01.293-.707l6.414-6.414a1 1 0 00.293-.707V5a1 1 0 00-1-1H9a1 1 0 00-1 1v12.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V19a1 1 0 001 1z" />
                         </svg>
-                        <p className="font-bold text-slate-700">No vehicles match the selected filters</p>
+                        <p className="font-bold text-slate-700">{t('fleet.emi.no_vehicles_match')}</p>
                         <button
                           type="button"
                           onClick={reset}
                           className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
                         >
-                          Clear filters
+                          {t('fleet.emi.clear_filters')}
                         </button>
                       </div>
                     </td>

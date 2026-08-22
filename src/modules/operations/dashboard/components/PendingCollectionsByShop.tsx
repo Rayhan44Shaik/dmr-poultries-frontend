@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useI18n } from "../../../../i18n";
 
 interface PendingItem {
   shopName: string;
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function PendingCollectionsByShop({ data }: Props) {
+  const { t } = useI18n();
   const navigate = useNavigate();
 
   const items = useMemo(() => {
@@ -28,7 +30,7 @@ export default function PendingCollectionsByShop({ data }: Props) {
   if (items.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-4 text-center text-slate-400 h-[338px] w-full flex items-center justify-center">
-        No pending collections data available
+        {t("ops.dashboard.no_pending_data")}
       </div>
     );
   }
@@ -42,13 +44,13 @@ export default function PendingCollectionsByShop({ data }: Props) {
       {/* Header with Title + View All link */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <h3 className="text-sm font-semibold text-slate-700">
-          Pending Collections by Shop (Top 10)
+          {t("ops.dashboard.pending_by_shop")}
         </h3>
         <button
           onClick={handleViewAll}
           className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline transition whitespace-nowrap ml-4"
         >
-          View All →
+          {t("ops.dashboard.view_all")} →
         </button>
       </div>
 

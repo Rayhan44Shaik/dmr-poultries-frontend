@@ -20,6 +20,7 @@ import {
   Map,
   Receipt,
 } from "lucide-react";
+import { useI18n } from "../../../../i18n";
 
 interface Props {
   trip: Trip | null;
@@ -46,6 +47,7 @@ function formatKm(value: number | null): string {
 }
 
 export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
+  const { t: translate } = useI18n();
   if (!trip) {
     return null;
   }
@@ -143,44 +145,44 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
 
   const row1Cards = [
     {
-      label: "DC WEIGHT",
+      label: translate("ops.trip.kpi_dc_weight"),
       value: formatKg(dcWeight),
-      sub: "Load from Farm",
+      sub: translate("ops.trip.load_from_farm"),
       bg: "bg-blue-50",
       icon: <Weight size={18} className="text-blue-600" />,
     },
     {
-      label: "TOTAL BIRDS",
+      label: translate("ops.trip.kpi_total_birds"),
       value: formatCount(totalBirds),
-      sub: "Picked up from Farm",
+      sub: translate("ops.trip.picked_from_farm"),
       bg: "bg-green-50",
       icon: <Bird size={18} className="text-green-600" />,
     },
     {
-      label: "DELIVERY WEIGHT",
+      label: translate("ops.trip.kpi_delivery_weight"),
       value: formatKg(deliveryWeight),
-      sub: deliverySubmitted ? `${persistedDeliveries.length} Shop Delivery(s)` : "Not submitted",
+      sub: deliverySubmitted ? translate("ops.trip.shop_deliveries_count", { count: persistedDeliveries.length }) : translate("ops.trip.not_submitted"),
       bg: "bg-slate-50",
       icon: <ShoppingBag size={18} className="text-slate-700" />,
     },
     {
-      label: "DELIVERY BIRDS",
+      label: translate("ops.trip.kpi_delivery_birds"),
       value: formatCount(deliveryBirds),
-      sub: "Total to Shops",
+      sub: translate("ops.trip.total_to_shops"),
       bg: "bg-cyan-50",
       icon: <Bird size={18} className="text-cyan-600" />,
     },
     {
-      label: "MORTALITY",
-      value: mortalityCount == null ? "—" : `${mortalityCount} Birds`,
-      sub: mortalityKg == null ? "Not submitted" : `${mortalityKg.toFixed(2)} Kg Total`,
+      label: translate("operations.total_mortality"),
+      value: mortalityCount == null ? "—" : `${mortalityCount} ${translate("common.birds")}`,
+      sub: mortalityKg == null ? translate("ops.trip.not_submitted") : `${mortalityKg.toFixed(2)} Kg ${translate("ops.trip.total")}`,
       bg: "bg-red-50",
       icon: <HeartPulse size={18} className="text-red-600" />,
     },
     {
-      label: "WEIGHT LOSS",
+      label: translate("ops.trip.kpi_weight_loss"),
       value: formatKg(weightLossValue),
-      sub: "DC - Del - Mort",
+      sub: translate("ops.trip.dc_del_mort"),
       bg: "bg-amber-50",
       icon: <TrendingDown size={18} className="text-amber-600" />,
     },
@@ -188,47 +190,47 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
 
   const row2Cards = [
     {
-      label: "PICKUP DIST",
+      label: translate("ops.trip.kpi_pickup_dist"),
       value: formatKm(pickupDistValue),
-      sub: "Start to Farm",
+      sub: translate("ops.trip.start_to_farm"),
       bg: "bg-indigo-50/50",
       icon: <MapPin size={18} className="text-indigo-600" />,
     },
     {
-      label: "DELIVERY DIST",
+      label: translate("ops.trip.kpi_delivery_dist"),
       value: formatKm(deliveryDistValue),
-      sub: "Farm to Last Drop",
+      sub: translate("ops.trip.farm_to_last_drop"),
       bg: "bg-indigo-50/50",
       icon: <Map size={18} className="text-indigo-600" />,
     },
     {
-      label: "TOTAL DISTANCE",
+      label: translate("ops.trip.kpi_total_distance"),
       value: formatKm(totalDistValue),
-      sub: "Full Trip Total",
+      sub: translate("ops.trip.full_trip_total"),
       bg: "bg-indigo-50",
       icon: <Route size={18} className="text-indigo-700" />,
     },
     {
-      label: "TOLL GATES",
+      label: translate("ops.trip.kpi_toll_gates"),
       value: formatCount(tollsValue),
       sub:
         pickupTollsValue == null && deliveryTollsValue == null
-          ? "Not submitted"
+          ? translate("ops.trip.not_submitted")
           : `P: ${pickupTollsValue ?? 0} • D: ${deliveryTollsValue ?? 0}`,
       bg: "bg-violet-50",
       icon: <Ticket size={18} className="text-violet-600" />,
     },
     {
-      label: "MILEAGE",
+      label: translate("ops.trip.kpi_mileage"),
       value: mileageValue == null ? "—" : mileageValue.toFixed(2),
-      sub: "KM/Ltr Efficiency",
+      sub: translate("ops.trip.km_ltr_efficiency"),
       bg: "bg-purple-50",
       icon: <Fuel size={18} className="text-purple-600" />,
     },
     {
-      label: "EXPENSES",
+      label: translate("ops.trip.kpi_expenses"),
       value: expensesValue == null ? "—" : `₹${expensesValue.toFixed(0)}`,
-      sub: "Total Trip Spends",
+      sub: translate("ops.trip.total_trip_spends"),
       bg: "bg-orange-50",
       icon: <Receipt size={18} className="text-orange-600" />,
     },
@@ -237,7 +239,7 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
   return (
     <div className="mt-8 p-6 md:p-8 w-full bg-slate-50/50 rounded-3xl border border-slate-200/60 shadow-sm overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
       <h3 className="text-sm font-bold text-slate-700 mb-5 uppercase tracking-wider pl-1">
-        Trip Final KPI Summary
+        {translate("ops.trip.final_kpi_summary")}
       </h3>
       
       {/* ─── Row 1: Load, Delivery & Mortality (Forced Wide Layout) ─── */}

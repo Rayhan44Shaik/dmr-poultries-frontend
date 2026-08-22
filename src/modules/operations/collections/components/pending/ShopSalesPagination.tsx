@@ -4,6 +4,7 @@ import {
   paginationNavBtnClass,
   paginationPageBtnClass,
 } from "../../../../../shared/ui/paginationStyles";
+import { useI18n } from "../../../../../i18n";
 
 interface Props {
   currentPage: number;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 function ShopSalesPagination({ currentPage, totalPages, onPageChange }: Props) {
+  const { t } = useI18n();
   const getPageNumbers = () => {
     const pages = [];
     const maxVisible = 10;
@@ -39,7 +41,7 @@ function ShopSalesPagination({ currentPage, totalPages, onPageChange }: Props) {
         onClick={() => onPageChange(currentPage - 1)}
         className={paginationNavBtnClass}
       >
-        Previous
+        {t("common.previous")}
       </button>
 
       {showFirstEllipsis && (
@@ -77,7 +79,7 @@ function ShopSalesPagination({ currentPage, totalPages, onPageChange }: Props) {
         onClick={() => onPageChange(currentPage + 1)}
         className={paginationNavBtnClass}
       >
-        Next
+        {t("common.next")}
       </button>
     </div>
   );

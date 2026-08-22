@@ -2,6 +2,7 @@ import React from "react";
 import { Check, Hash, Calendar, Truck, User, UserCog, Warehouse, Store, ShoppingBag, Bird, Scale, HeartPulse } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { formatTripListDay } from "../utils/formatTripListDay";
+import { useI18n } from "../../../../i18n";
 
 interface Props {
   trips: Trip[];
@@ -11,6 +12,7 @@ interface Props {
 }
 
 function TripMasterTable({ trips, selectedRowId, onRowClick, startIndex = 0 }: Props) {
+  const { t } = useI18n();
   return (
     <div className="w-full overflow-x-auto">
       <table className="min-w-full text-sm text-left border-collapse">
@@ -20,67 +22,67 @@ function TripMasterTable({ trips, selectedRowId, onRowClick, startIndex = 0 }: P
               <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
                 <div className="flex items-center gap-1.5">
                   <Hash size={13} className="text-slate-400 flex-shrink-0" />
-                  <span>Trip No</span>
+                  <span>{t("operations.trip_no")}</span>
                 </div>
               </th>
               <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
                 <div className="flex items-center gap-1.5">
                   <Calendar size={13} className="text-blue-500 flex-shrink-0" />
-                  <span>Day</span>
+                  <span>{t("ops.trip.day")}</span>
                 </div>
               </th>
               <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
                 <div className="flex items-center gap-1.5">
                   <Truck size={13} className="text-indigo-500 flex-shrink-0" />
-                  <span>Vehicle</span>
+                  <span>{t("common.vehicle")}</span>
                 </div>
               </th>
               <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
                 <div className="flex items-center gap-1.5">
                   <User size={13} className="text-emerald-500 flex-shrink-0" />
-                  <span>Driver</span>
+                  <span>{t("common.driver")}</span>
                 </div>
               </th>
               <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
                 <div className="flex items-center gap-1.5">
                   <UserCog size={13} className="text-purple-500 flex-shrink-0" />
-                  <span>Supervisor</span>
+                  <span>{t("common.supervisor")}</span>
                 </div>
               </th>
               <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
                 <div className="flex items-center gap-1.5">
                   <Warehouse size={13} className="text-amber-500 flex-shrink-0" />
-                  <span>Source Farm</span>
+                  <span>{t("ops.trip.source_farm")}</span>
                 </div>
               </th>
               <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
                 <div className="flex items-center gap-1.5">
                   <Store size={13} className="text-orange-500 flex-shrink-0" />
-                  <span>Last Shop</span>
+                  <span>{t("ops.trip.last_shop")}</span>
                 </div>
               </th>
               <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
                 <div className="flex items-center justify-center gap-1.5">
                   <ShoppingBag size={13} className="text-cyan-500 flex-shrink-0" />
-                  <span>Shops</span>
+                  <span>{t("ops.trip.shops")}</span>
                 </div>
               </th>
               <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
                 <div className="flex items-center justify-center gap-1.5">
                   <Bird size={13} className="text-blue-500 flex-shrink-0" />
-                  <span>Birds</span>
+                  <span>{t("common.birds")}</span>
                 </div>
               </th>
               <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
                 <div className="flex items-center justify-center gap-1.5">
                   <Scale size={13} className="text-orange-500 flex-shrink-0" />
-                  <span>Weight (KG)</span>
+                  <span>{t("ops.trip.weight_kg")}</span>
                 </div>
               </th>
               <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
                 <div className="flex items-center justify-center gap-1.5">
                   <HeartPulse size={13} className="text-rose-500 flex-shrink-0" />
-                  <span>Mortality</span>
+                  <span>{t("operations.mortality_count")}</span>
                 </div>
               </th>
             </tr>
@@ -89,7 +91,7 @@ function TripMasterTable({ trips, selectedRowId, onRowClick, startIndex = 0 }: P
             {trips.length === 0 ? (
               <tr>
                 <td colSpan={12} className="py-12 text-center text-slate-400 text-xs font-medium">
-                  No completed trips found matching your criteria.
+                  {t("ops.trip.no_completed_trips")}
                 </td>
               </tr>
             ) : (

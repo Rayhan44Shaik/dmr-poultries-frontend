@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 import type { RecentCollection } from "../../types/collection";
+import { useI18n } from "../../../../../i18n";
 
 interface Props {
   collections: RecentCollection[];
@@ -59,6 +60,7 @@ export default function RecentCollectionsTable({
   onDelete,
   onViewShop,
 }: Props) {
+  const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState("");
 
   // Filter collections by search query (collection no, shop name, collector name)
@@ -122,13 +124,13 @@ export default function RecentCollectionsTable({
   const getEmptyStateMessage = (): string => {
     switch (statusFilter) {
       case "Pending":
-        return "No pending collections found.";
+        return t("empty.no_pending");
       case "Approved":
-        return "No approved collections found.";
+        return t("ops.collection.no_approved");
       case "Deleted":
-        return "No deleted collections found.";
+        return t("ops.collection.no_deleted");
       default:
-        return "No collections found.";
+        return t("empty.no_collections");
     }
   };
 
@@ -157,9 +159,9 @@ export default function RecentCollectionsTable({
           {/* Left: Title + Pending Count */}
           <div className="flex flex-col gap-1 flex-shrink-0 min-w-[220px]">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-slate-800 tracking-tight">Recent Collections</h3>
+              <h3 className="text-sm font-bold text-slate-800 tracking-tight">{t("ops.collection.recent_collections")}</h3>
               <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-semibold text-blue-700">
-                Pending: {pendingApprovalCount}
+                {t("common.pending")}: {pendingApprovalCount}
               </span>
             </div>
           </div>
@@ -171,7 +173,7 @@ export default function RecentCollectionsTable({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search collection no, shop, collector..."
+              placeholder={t("ops.collection.search_collections_placeholder")}
               className="h-8 w-full rounded-lg border border-slate-300 pl-8 pr-8 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
             />
             {searchQuery && (
@@ -206,29 +208,29 @@ export default function RecentCollectionsTable({
             <tr className="text-slate-700 whitespace-nowrap">
               <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <div className="flex items-center justify-center gap-1.5">
-                  S.No
+                  {t("table.s_no")}
                 </div>
               </th>
               <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Collection No
+                {t("table.collection_no")}
               </th>
               <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Date
+                {t("table.date")}
               </th>
               <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Shop
+                {t("table.shop")}
               </th>
               <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Collector
+                {t("table.collector")}
               </th>
               <th className="px-3.5 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Amount
+                {t("table.amount")}
               </th>
               <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Status
+                {t("table.status")}
               </th>
               <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Actions
+                {t("table.actions")}
               </th>
             </tr>
           </thead>
@@ -277,7 +279,11 @@ export default function RecentCollectionsTable({
                       <span
                         className={`inline-block rounded-full px-3 py-1 text-[10px] font-medium border ${getStatusBadgeClass(col.rawStatus || col.status)}`}
                       >
-                        {col.rawStatus || col.status}
+                        {(() => {
+                          const k = "status." + String(col.rawStatus || col.status).toLowerCase().replace(/\s+/g, "_");
+                          const label = t(k);
+                          return label === k ? col.rawStatus || col.status : label;
+                        })()}
                       </span>
                     </td>
                     <td className="px-3.5 py-3 text-center">
@@ -287,34 +293,34 @@ export default function RecentCollectionsTable({
                             <button
                               onClick={() => onApprove(col.id)}
                               className="rounded-lg bg-green-100 px-3 py-1 text-[10px] font-medium text-green-700 transition hover:bg-green-200"
-                              title="Approve"
+                              title={t("common.approve")}
                             >
-                              Approve
+                              {t("common.approve")}
                             </button>
                             <button
                               onClick={() => onEdit(col)}
                               className="rounded-lg bg-blue-100 px-3 py-1 text-[10px] font-medium text-blue-700 transition hover:bg-blue-200"
-                              title="Edit"
+                              title={t("common.edit")}
                             >
-                              Edit
+                              {t("common.edit")}
                             </button>
                             <button
                               onClick={() => onDelete(col.id)}
                               className="rounded-lg bg-red-100 px-3 py-1 text-[10px] font-medium text-red-700 transition hover:bg-red-200"
-                              title="Delete"
+                              title={t("common.delete")}
                             >
-                              Delete
+                              {t("common.delete")}
                             </button>
                           </>
                         ) : isDeleted ? (
-                          <span className="text-xs text-slate-400 font-medium">Deleted</span>
+                          <span className="text-xs text-slate-400 font-medium">{t("status.deleted")}</span>
                         ) : (
                           <button
                             onClick={() => onViewShop(col.shopName)}
                             className="rounded-lg bg-blue-100 px-4 py-1 text-[10px] font-medium text-blue-700 transition hover:bg-blue-200"
-                            title="View"
+                            title={t("common.view")}
                           >
-                            View
+                            {t("common.view")}
                           </button>
                         )}
                       </div>

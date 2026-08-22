@@ -1,6 +1,7 @@
 import { X, Filter } from "lucide-react";
 import { useShopSearch } from "../../../../../core/hooks/useShopSearch";
 import { DatePicker } from "../../../../../components/common/DatePicker"; // adjust if needed
+import { useI18n } from "../../../../../i18n";
 
 interface FilterState {
   shopName: string;
@@ -23,6 +24,7 @@ export function PendingFilters({
   shops,
   onClose,
 }: PendingFiltersProps) {
+  const { t } = useI18n();
   const shopSearch = useShopSearch(shops, filters.shopName, (value) => {
     onFilterChange({ ...filters, shopName: value });
   });
@@ -65,7 +67,7 @@ export function PendingFilters({
           <div className="flex items-center gap-2">
             <Filter size={18} className="text-blue-600" />
             <h2 className="text-base font-semibold text-slate-800">
-              Filters
+              {t("common.filter")}
             </h2>
           </div>
 
@@ -82,7 +84,7 @@ export function PendingFilters({
           {/* Shop Name */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700">
-              Shop Name
+              {t("operations.shop_name")}
             </label>
 
             <div className="relative">
@@ -93,7 +95,7 @@ export function PendingFilters({
                   shopSearch.handleInputChange(e.target.value)
                 }
                 onFocus={() => shopSearch.setIsOpen(true)}
-                placeholder="Search shop..."
+                placeholder={t("ops.collection.search_shop_placeholder")}
                 className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
 
@@ -111,7 +113,7 @@ export function PendingFilters({
                     ))
                   ) : (
                     <li className="px-3 py-2 text-slate-500">
-                      No shops found
+                      {t("empty.no_shops")}
                     </li>
                   )}
                 </ul>
@@ -122,12 +124,12 @@ export function PendingFilters({
           {/* From Date – replaced with DatePicker */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700">
-              From Date
+              {t("common.from")}
             </label>
             <DatePicker
               value={filters.fromDate}
               onChange={(value) => handleDateChange("fromDate", value)}
-              placeholder="Select start"
+              placeholder={t("ops.collection.select_start")}
               className="w-full"
             />
           </div>
@@ -135,12 +137,12 @@ export function PendingFilters({
           {/* To Date – replaced with DatePicker */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700">
-              To Date
+              {t("common.to")}
             </label>
             <DatePicker
               value={filters.toDate}
               onChange={(value) => handleDateChange("toDate", value)}
-              placeholder="Select end"
+              placeholder={t("ops.collection.select_end")}
               className="w-full"
             />
           </div>
@@ -149,7 +151,7 @@ export function PendingFilters({
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="mb-4 flex items-center justify-between">
               <label className="text-sm font-semibold text-slate-700">
-                Recovery %
+                {t("ops.collection.recovery_pct")}
               </label>
 
               <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
@@ -178,7 +180,7 @@ export function PendingFilters({
           {/* Sort By */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700">
-              Sort By
+              {t("ops.collection.sort_by")}
             </label>
 
             <select
@@ -187,13 +189,13 @@ export function PendingFilters({
               className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             >
               <option value="highestBalance">
-                Highest Balance
+                {t("ops.collection.sort_highest_balance")}
               </option>
               <option value="shopName">
-                Shop Name
+                {t("operations.shop_name")}
               </option>
               <option value="overdueDays">
-                Overdue Days
+                {t("ops.collection.sort_overdue_days")}
               </option>
             </select>
           </div>
@@ -205,7 +207,7 @@ export function PendingFilters({
             onClick={handleClearAll}
             className="w-full rounded-lg bg-slate-200 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-300"
           >
-            Clear All
+            {t("ops.collection.clear_all")}
           </button>
         </div>
       </div>

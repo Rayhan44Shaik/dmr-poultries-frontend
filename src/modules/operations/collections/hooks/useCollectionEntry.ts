@@ -15,6 +15,7 @@ import { loadShops, shopService } from "../../../masters/shops/services/shopServ
 import { getEmployees, loadEmployees } from "../../../masters/employees/services/employeeService";
 import { getBanks, loadBanks } from "../../../masters/banks/services/bankService";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import { translate } from "../../../../i18n";
 
 const EMPTY_WEEKLY: CollectionWeeklySummary = {
   shopId: 0,
@@ -101,7 +102,7 @@ export default function useCollectionEntry() {
         setAllCollections(collectionService.getCollections());
       })
       .catch(() => {
-        showNotification("Failed to load master data.", "error");
+        showNotification(translate("ops.collection.failed_load_master"), "error");
       })
       .finally(() => {
         setLoading(false);
@@ -179,21 +180,21 @@ export default function useCollectionEntry() {
 
   async function viewLedger() {
     if (!entry.shopName.trim()) {
-      showNotification("Please select a shop first.", "error");
+      showNotification(translate("ops.collection.select_shop_first"), "error");
       return;
     }
     if (!entry.collectorName.trim()) {
-      showNotification("Please select a collector.", "error");
+      showNotification(translate("validation.select_collector"), "error");
       return;
     }
     if (!entry.paymentModeName.trim()) {
-      showNotification("Please select a payment mode.", "error");
+      showNotification(translate("ops.collection.select_payment_mode"), "error");
       return;
     }
 
     const shopId = collectionService.getShopIdForName(entry.shopName);
     if (!shopId) {
-      showNotification("Invalid shop selection.", "error");
+      showNotification(translate("ops.collection.invalid_shop_selection"), "error");
       return;
     }
 
@@ -204,7 +205,7 @@ export default function useCollectionEntry() {
       setShowSummary(true);
       setLedgerLoaded(true);
     } catch (error) {
-      showNotification("Failed to load shop ledger. Please try again.", "error");
+      showNotification(translate("ops.collection.failed_load_ledger"), "error");
       setWeeklySummary(EMPTY_WEEKLY);
       setShowSummary(false);
       setLedgerLoaded(false);
@@ -372,13 +373,13 @@ export default function useCollectionEntry() {
 
   function validateEntry(): boolean {
     const validation: CollectionErrors = {};
-    if (!entry.shopName.trim()) validation.shopName = "Please select a shop.";
-    if (!entry.collectorName.trim()) validation.collectorName = "Please select a collector.";
-    if (!entry.collectionDate.trim()) validation.collectionDate = "Collection date is required.";
-    if (!entry.paymentModeName.trim()) validation.paymentModeName = "Please select payment mode.";
+    if (!entry.shopName.trim()) validation.shopName = translate("validation.select_shop");
+    if (!entry.collectorName.trim()) validation.collectorName = translate("validation.select_collector");
+    if (!entry.collectionDate.trim()) validation.collectionDate = translate("ops.collection.date_required");
+    if (!entry.paymentModeName.trim()) validation.paymentModeName = translate("ops.collection.select_payment_mode");
 
     if (Number(entry.amount) <= 0) {
-      validation.amount = "Collection amount should be greater than zero.";
+      validation.amount = translate("ops.collection.amount_greater_zero");
     }
 
     setErrors(validation);
@@ -391,10 +392,10 @@ export default function useCollectionEntry() {
       setIsSaving(true);
       const success = await collectionService.saveCollection(entry);
       if (!success) {
-        showNotification("Failed to save collection.", "error");
+        showNotification(translate("ops.collection.failed_save"), "error");
         return;
       }
-      showNotification("Collection saved successfully!", "success");
+      showNotification(translate("ops.collection.saved_success"), "success");
 
       // After save, switch to Pending tab to show the newly created collection
       setStatusFilter("Pending");
@@ -406,7 +407,7 @@ export default function useCollectionEntry() {
       setErrors({});
       setIsEditing(false);
     } catch (error) {
-      showNotification("Failed to save collection.", "error");
+      showNotification(translate("ops.collection.failed_save"), "error");
     } finally {
       setIsSaving(false);
     }
@@ -424,7 +425,7 @@ export default function useCollectionEntry() {
   async function approveCollection(id: string) {
     const result = await collectionService.approveCollection(id, "Admin");
     if (result.success) {
-      showNotification("Collection approved successfully!", "success");
+      showNotification(translate("ops.collection.approved_success"), "success");
       if (result.balance != null) {
         setWeeklySummary((prev) => ({ ...prev, balance: result.balance as number }));
         setPendingShop((prev) =>
@@ -433,29 +434,29 @@ export default function useCollectionEntry() {
       }
       refreshPage();
     } else {
-      showNotification("Failed to approve collection.", "error");
+      showNotification(translate("ops.collection.failed_approve"), "error");
     }
   }
 
   async function deleteCollection(id: string) {
     const success = await collectionService.deleteCollection(id);
     if (success) {
-      showNotification("Collection deleted successfully!", "success");
+      showNotification(translate("ops.collection.deleted_success"), "success");
       refreshPage();
     } else {
-      showNotification("This collection can no longer be deleted.", "error");
+      showNotification(translate("ops.collection.no_longer_deletable"), "error");
     }
   }
 
   async function rejectCollection(id: string) {
-    const confirmed = window.confirm("Reject this collection? The amount will not be adjusted.");
+    const confirmed = window.confirm(translate("ops.collection.confirm_reject"));
     if (!confirmed) return;
     const success = await collectionService.rejectCollection(id, "Admin");
     if (success) {
-      showNotification("Collection rejected successfully!", "success");
+      showNotification(translate("ops.collection.rejected_success"), "success");
       refreshPage();
     } else {
-      showNotification("Failed to reject collection.", "error");
+      showNotification(translate("ops.collection.failed_reject"), "error");
     }
   }
 
@@ -478,7 +479,7 @@ export default function useCollectionEntry() {
 
   function reloadCollections() {
     loadMasterData();
-    showNotification("Collections reloaded.", "info");
+    showNotification(translate("ops.collection.reloaded"), "info");
   }
 
   function editCollection(collection: RecentCollection) {
@@ -533,10 +534,10 @@ export default function useCollectionEntry() {
       remarks: entry.remarks
     });
     if (!success) {
-      showNotification("Edit failed. The collection may be locked.", "error");
+      showNotification(translate("ops.collection.edit_failed_locked"), "error");
       return;
     }
-    showNotification("Collection updated successfully!", "success");
+    showNotification(translate("ops.collection.updated_success"), "success");
     refreshPage();
     resetEntry();
     setIsEditing(false);
@@ -575,15 +576,15 @@ export default function useCollectionEntry() {
   );
 
   const formStatus = useMemo(() => {
-    if (!pendingShop) return { title: "No Shop Selected", message: "Select a pending shop.", status: "empty" };
+    if (!pendingShop) return { title: translate("ops.collection.no_shop_selected"), message: translate("ops.collection.select_pending_shop"), status: "empty" };
     const rem = projectedBalance;
     if (rem < 0) {
-      return { title: "Overpaid", message: "Shop has paid more than outstanding.", status: "overpaid" };
+      return { title: translate("ops.collection.overpaid"), message: translate("ops.collection.overpaid_msg"), status: "overpaid" };
     }
     if (rem === 0) {
-      return { title: "Collection Complete", message: "Outstanding amount fully collected.", status: "completed" };
+      return { title: translate("ops.collection.complete"), message: translate("ops.collection.complete_msg"), status: "completed" };
     }
-    return { title: "Pending Collection", message: "Outstanding balance available.", status: "pending" };
+    return { title: translate("ops.collection.pending"), message: translate("ops.collection.pending_msg"), status: "pending" };
   }, [pendingShop, projectedBalance]);
 
   const footerState = useMemo(

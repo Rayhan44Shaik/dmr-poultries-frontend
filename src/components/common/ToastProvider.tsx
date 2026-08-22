@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { CheckCircle, XCircle, Info, X } from "lucide-react";
+import { useI18n } from "../../i18n";
 
 type ToastType = "success" | "error" | "info";
 
@@ -19,6 +20,7 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const idRef = useRef(0);
+  const { t } = useI18n();
 
   const showToast = useCallback((message: string, type: ToastType = "info", duration: number = 4000) => {
     const id = ++idRef.current;
@@ -70,7 +72,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <button
                 onClick={() => {}}
                 className="flex-shrink-0 -mr-1 p-1 text-white/70 hover:text-white rounded-full hover:bg-white/20 transition-colors"
-                aria-label="Dismiss"
+                aria-label={t("common.close")}
               >
                 <X size={16} />
               </button>

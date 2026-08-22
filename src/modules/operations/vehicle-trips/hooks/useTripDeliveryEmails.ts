@@ -10,6 +10,7 @@ import {
   type DeliveryEmailStatusValue,
 } from "../services/deliveryEmailService";
 import { userFacingDeliveryEmailError } from "../services/deliveryEmailErrors";
+import { translate } from "../../../../i18n";
 
 export type EmailCounts = {
   sent: number;
@@ -179,7 +180,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
         setLocalErrors((prev) => ({
           ...prev,
           [delivery.id]: userFacingDeliveryEmailError(
-            err instanceof Error ? err.message : "Unable to send email."
+            err instanceof Error ? err.message : translate("ops.trip.unable_send_email")
           ),
         }));
       } finally {
@@ -243,7 +244,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
         setLocalErrors((prev) => ({
           ...prev,
           [delivery.id]: userFacingDeliveryEmailError(
-            err instanceof Error ? err.message : "Unable to send email."
+            err instanceof Error ? err.message : translate("ops.trip.unable_send_email")
           ),
         }));
       } finally {

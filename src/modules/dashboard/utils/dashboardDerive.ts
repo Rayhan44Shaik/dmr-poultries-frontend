@@ -17,6 +17,7 @@ import type { DashboardData, VehicleRow } from "../services/dashboardService";
 import type { Trip } from "../../operations/vehicle-trips/types/trip";
 import { getMaintenance } from "../../fleet-operations/services/storage";
 import { formatINR, formatINRCompact, formatNumber, formatWeight } from "../../../utils/format";
+import { translate } from "../../../i18n";
 
 export interface KpiDatum {
   key: string;
@@ -114,7 +115,10 @@ function pctChange(current: number, previous: number): number | null {
 /* ------------------------------------------------------------------ */
 /*  Main derivation                                                    */
 /* ------------------------------------------------------------------ */
-export function deriveDashboard(data: DashboardData): DerivedDashboard {
+const getT = (t?: (key: string, params?: Record<string, string | number>) => string) => t ?? translate;
+
+export function deriveDashboard(data: DashboardData, t?: (key: string, params?: Record<string, string | number>) => string): DerivedDashboard {
+  const tFunc = getT(t);
   const today = todayIso();
   const yesterday = isoDaysAgo(1);
 
@@ -241,9 +245,13 @@ export function deriveDashboard(data: DashboardData): DerivedDashboard {
     .forEach((t) => {
       activity.push({
         id: `trip-${t.tripNo}`,
-        title: `Delivery completed — ${t.tripNo}`,
-        description: `${t.vehicleNo} · ${t.deliveries?.length ?? 0} shop deliveries · ${formatWeight(t.totalDeliveredWeight || 0)}`,
-        time: "Today",
+        title: tFunc("dashboard.activity.delivery_completed", { tripNo: t.tripNo }),
+        description: tFunc("dashboard.activity.delivery_desc", {
+          vehicle: t.vehicleNo,
+          count: t.deliveries?.length ?? 0,
+          weight: formatWeight(t.totalDeliveredWeight || 0),
+        }),
+        time: tFunc("time.today"),
         tone: "brand",
         icon: Truck,
       });
@@ -255,9 +263,12 @@ export function deriveDashboard(data: DashboardData): DerivedDashboard {
     .forEach((c) => {
       activity.push({
         id: `col-${c.collectionNo}`,
-        title: `Collection received — ${c.shopName}`,
-        description: `${formatINR(Number(c.amount) || 0)} via ${c.paymentModeName}`,
-        time: "Today",
+        title: tFunc("dashboard.activity.collection_received", { shopName: c.shopName }),
+        description: tFunc("dashboard.activity.collection_desc", {
+          amount: formatINR(Number(c.amount) || 0),
+          paymentMode: c.paymentModeName,
+        }),
+        time: tFunc("time.today"),
         tone: "sky",
         icon: CreditCard,
       });
@@ -269,9 +280,13 @@ export function deriveDashboard(data: DashboardData): DerivedDashboard {
     .forEach((f) => {
       activity.push({
         id: `fuel-${f.billNo}`,
-        title: `Fuel entry created — ${f.billNo}`,
-        description: `${f.vehicleNo} · ${f.litres} L · ${formatINR(Number(f.amount) || 0)}`,
-        time: "Today",
+        title: tFunc("dashboard.activity.fuel_entry", { billNo: f.billNo }),
+        description: tFunc("dashboard.activity.fuel_desc", {
+          vehicle: f.vehicleNo,
+          litres: f.litres,
+          amount: formatINR(Number(f.amount) || 0),
+        }),
+        time: tFunc("time.today"),
         tone: "amber",
         icon: Bird,
       });
@@ -283,8 +298,8 @@ export function deriveDashboard(data: DashboardData): DerivedDashboard {
     .forEach((m) => {
       activity.push({
         id: `maint-${m.vehicleNo}-${m.date}`,
-        title: `Vehicle maintenance completed — ${m.vehicleNo ?? "Vehicle"}`,
-        description: `${formatINR(Number(m.totalCost) || 0)} service cost`,
+        title: tFunc("dashboard.activity.maintenance_completed", { vehicleNo: m.vehicleNo ?? tFunc("common.vehicle") }),
+        description: tFunc("dashboard.activity.maintenance_desc", { amount: formatINR(Number(m.totalCost) || 0) }),
         time: m.date ?? "",
         tone: "violet",
         icon: Truck,
@@ -297,9 +312,9 @@ export function deriveDashboard(data: DashboardData): DerivedDashboard {
   const kpis: KpiDatum[] = [
     {
       key: "shops",
-      label: "Total Shops",
+      label: tFunc("dashboard.kpi.shops"),
       value: formatNumber(data.shops.length),
-      sub: `${activeShops} active · ${data.shops.length - activeShops} inactive`,
+      sub: tFunc("dashboard.kpi.shops_sub", { active: activeShops, inactive: data.shops.length - activeShops }),
       delta: null,
       trend: "flat",
       icon: Store,
@@ -308,9 +323,9 @@ export function deriveDashboard(data: DashboardData): DerivedDashboard {
     },
     {
       key: "farms",
-      label: "Active Farms",
+      label: tFunc("dashboard.kpi.farms"),
       value: formatNumber(activeFarms),
-      sub: `${data.farms.length} farms on record`,
+      sub: tFunc("dashboard.kpi.farms_sub", { total: data.farms.length }),
       delta: null,
       trend: "flat",
       icon: Sprout,
@@ -319,9 +334,9 @@ export function deriveDashboard(data: DashboardData): DerivedDashboard {
     },
     {
       key: "vehicles",
-      label: "Vehicles",
+      label: tFunc("dashboard.kpi.vehicles"),
       value: formatNumber(data.vehicles.length),
-      sub: `${activeVehicles} in service`,
+      sub: tFunc("dashboard.kpi.vehicles_sub", { active: activeVehicles }),
       delta: null,
       trend: "flat",
       icon: Truck,
@@ -330,9 +345,9 @@ export function deriveDashboard(data: DashboardData): DerivedDashboard {
     },
     {
       key: "employees",
-      label: "Employees",
+      label: tFunc("dashboard.kpi.employees"),
       value: formatNumber(data.employees.length),
-      sub: `${activeEmployees} on duty`,
+      sub: tFunc("dashboard.kpi.employees_sub", { active: activeEmployees }),
       delta: null,
       trend: "flat",
       icon: Users,
@@ -341,9 +356,9 @@ export function deriveDashboard(data: DashboardData): DerivedDashboard {
     },
     {
       key: "todaySales",
-      label: "Today's Sales",
+      label: tFunc("dashboard.kpi.today_sales"),
       value: formatINRCompact(todaySales),
-      sub: `vs ${formatINRCompact(yesterdaySales)} yesterday`,
+      sub: tFunc("dashboard.kpi.today_sales_sub", { yesterday: formatINRCompact(yesterdaySales) }),
       delta: pctChange(todaySales, yesterdaySales),
       trend: todaySales >= yesterdaySales ? "up" : "down",
       icon: IndianRupee,
@@ -352,9 +367,9 @@ export function deriveDashboard(data: DashboardData): DerivedDashboard {
     },
     {
       key: "todayCollections",
-      label: "Today's Collections",
+      label: tFunc("dashboard.kpi.today_collections"),
       value: formatINRCompact(todayCollections),
-      sub: `vs ${formatINRCompact(yesterdayCollections)} yesterday`,
+      sub: tFunc("dashboard.kpi.today_collections_sub", { yesterday: formatINRCompact(yesterdayCollections) }),
       delta: pctChange(todayCollections, yesterdayCollections),
       trend: todayCollections >= yesterdayCollections ? "up" : "down",
       icon: CreditCard,
@@ -363,9 +378,11 @@ export function deriveDashboard(data: DashboardData): DerivedDashboard {
     },
     {
       key: "pending",
-      label: "Pending Collections",
+      label: tFunc("dashboard.kpi.pending"),
       value: formatINRCompact(pendingAmount),
-      sub: overdueCount > 0 ? `${overdueCount} shops overdue` : `${data.pendingCollections.length} shops to collect`,
+      sub: overdueCount > 0
+        ? tFunc("dashboard.kpi.pending_sub_overdue", { count: overdueCount })
+        : tFunc("dashboard.kpi.pending_sub_due", { count: data.pendingCollections.length }),
       delta: null,
       trend: "flat",
       icon: CreditCard,
@@ -374,9 +391,9 @@ export function deriveDashboard(data: DashboardData): DerivedDashboard {
     },
     {
       key: "profit",
-      label: "Today's Profit",
+      label: tFunc("dashboard.kpi.profit"),
       value: formatINRCompact(todayProfit),
-      sub: `vs ${formatINRCompact(yesterdayProfit)} yesterday`,
+      sub: tFunc("dashboard.kpi.profit_sub", { yesterday: formatINRCompact(yesterdayProfit) }),
       delta: pctChange(todayProfit, yesterdayProfit),
       trend: todayProfit >= yesterdayProfit ? "up" : "down",
       icon: TrendingUp,

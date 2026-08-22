@@ -5,6 +5,8 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Gauge, ShieldAlert, Truck } from "lucide-react";
 import type { FleetVehicleView } from "../utils/dashboardDerive";
 import { formatINR, formatNumber } from "../../../utils/format";
+import { useI18n } from "../../../i18n";
+import { translateStatus } from "../../../i18n";
 
 const STATUS_STYLES: Record<FleetVehicleView["status"], string> = {
   "On Trip": "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-400",
@@ -30,22 +32,26 @@ interface FleetStatusCardProps {
 }
 
 export default function FleetStatusCard({ fleet }: FleetStatusCardProps) {
+  const { t } = useI18n();
   const visible = fleet.slice(0, 6);
 
   return (
     <section className="rounded-xl border border-slate-200/80 bg-white shadow-card animate-fade-in-up dark:border-slate-800 dark:bg-slate-900">
       <header className="flex items-center justify-between gap-2 px-4 pb-3 pt-4">
         <div>
-          <h3 className="text-[13.5px] font-semibold tracking-tight text-slate-800 dark:text-slate-100">Vehicle status</h3>
+          <h3 className="text-[13.5px] font-semibold tracking-tight text-slate-800 dark:text-slate-100">{t("dashboard.fleet.title")}</h3>
           <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
-            {fleet.filter((f) => f.status === "On Trip").length} on trip · {fleet.filter((f) => f.status === "Available").length} available
+            {t("dashboard.fleet.on_trip_available", {
+              onTrip: fleet.filter((f) => f.status === "On Trip").length,
+              available: fleet.filter((f) => f.status === "Available").length,
+            })}
           </p>
         </div>
         <Link
           to="/fleet?tab=analytics"
           className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
         >
-          Fleet overview
+          {t("dashboard.fleet.fleet_overview")}
           <ArrowRight size={13} />
         </Link>
       </header>
@@ -56,15 +62,15 @@ export default function FleetStatusCard({ fleet }: FleetStatusCardProps) {
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-800">
               <Truck size={16} />
             </span>
-            <p className="text-[13px] font-medium text-slate-600 dark:text-slate-300">No vehicles on record</p>
+            <p className="text-[13px] font-medium text-slate-600 dark:text-slate-300">{t("dashboard.fleet.no_vehicles")}</p>
             <p className="max-w-xs text-xs text-slate-400">
-              Add vehicles in Masters → Vehicles to start tracking your fleet.
+              {t("dashboard.fleet.add_vehicles_hint")}
             </p>
             <Link
               to="/masters?tab=vehicles"
               className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 dark:bg-brand-600 dark:hover:bg-brand-500"
             >
-              Add vehicle
+              {t("dashboard.fleet.add_vehicle")}
             </Link>
           </div>
         ) : (
@@ -88,16 +94,16 @@ export default function FleetStatusCard({ fleet }: FleetStatusCardProps) {
                           {vehicle.number}
                         </span>
                         {expiringSoon && (
-                          <span title="Document expiring within 30 days" className="shrink-0 text-amber-500">
+                          <span title={t("dashboard.fleet.document_expiring")} className="shrink-0 text-amber-500">
                             <ShieldAlert size={12} />
                           </span>
                         )}
                       </span>
                       <span className="block truncate text-[11px] text-slate-400 dark:text-slate-500">
                         {vehicle.currentTrip
-                          ? `Trip ${vehicle.currentTrip}`
+                          ? t("dashboard.fleet.trip", { tripNo: vehicle.currentTrip })
                           : vehicle.driver !== "—"
-                          ? `Driver · ${vehicle.driver}`
+                          ? t("dashboard.fleet.driver", { driver: vehicle.driver })
                           : vehicle.type}
                       </span>
                     </span>
@@ -105,15 +111,15 @@ export default function FleetStatusCard({ fleet }: FleetStatusCardProps) {
                       className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ring-1 ring-inset ${STATUS_STYLES[vehicle.status]}`}
                     >
                       <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[vehicle.status]}`} />
-                      {vehicle.status}
+                      {translateStatus(t, vehicle.status)}
                     </span>
                   </div>
                   <div className="mt-2 flex items-center gap-3 pl-[42px] text-[11px] text-slate-400 dark:text-slate-500">
                     <span className="flex items-center gap-1">
                       <Gauge size={11} />
-                      {vehicle.km != null ? `${formatNumber(vehicle.km)} km` : "— km"}
+                      {vehicle.km != null ? t("dashboard.fleet.km", { km: formatNumber(vehicle.km) }) : t("dashboard.fleet.km", { km: "—" })}
                     </span>
-                    <span>Fuel {vehicle.fuel > 0 ? formatINR(vehicle.fuel) : "—"}</span>
+                    <span>{t("dashboard.fleet.fuel", { amount: vehicle.fuel > 0 ? formatINR(vehicle.fuel) : "—" })}</span>
                     <span className="hidden truncate lg:inline">{vehicle.maintenanceNote}</span>
                   </div>
                 </li>

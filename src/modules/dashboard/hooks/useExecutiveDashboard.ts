@@ -8,6 +8,7 @@ import {
   type DashboardData,
 } from "../services/dashboardService";
 import { deriveDashboard, type DerivedDashboard } from "../utils/dashboardDerive";
+import { useI18n } from "../../../i18n";
 
 interface ExecutiveDashboardState {
   data: DashboardData | null;
@@ -21,6 +22,7 @@ interface ExecutiveDashboardState {
 }
 
 export function useExecutiveDashboard(): ExecutiveDashboardState {
+  const { t } = useI18n();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export function useExecutiveDashboard(): ExecutiveDashboardState {
     }
   }, []);
 
-  const derived = useMemo(() => (data ? deriveDashboard(data) : null), [data]);
+  const derived = useMemo(() => (data ? deriveDashboard(data, t) : null), [data, t]);
 
   const loadDemo = useCallback(async () => {
     setDemoBusy(true);

@@ -1,5 +1,6 @@
 import React from "react";
 import { Truck, Bird, Scale, HeartPulse, Store } from "lucide-react";
+import { useI18n } from "../../../../i18n";
 
 interface Props {
   totalTrips: number;
@@ -10,9 +11,10 @@ interface Props {
 }
 
 function TripKPICards({ totalTrips, totalBirds, totalWeight, totalMortality, totalShops }: Props) {
+  const { t } = useI18n();
   const cards = [
     {
-      title: "Total Trips",
+      title: t("ops.trip.total_trips"),
       value: totalTrips.toLocaleString(),
       icon: <Truck size={20} />,
       bg: "bg-blue-50",
@@ -20,7 +22,7 @@ function TripKPICards({ totalTrips, totalBirds, totalWeight, totalMortality, tot
       text: "text-blue-700",
     },
     {
-      title: "Total Birds",
+      title: t("ops.trip.total_birds"),
       value: totalBirds.toLocaleString(),
       icon: <Bird size={20} />,
       bg: "bg-green-50",
@@ -28,7 +30,7 @@ function TripKPICards({ totalTrips, totalBirds, totalWeight, totalMortality, tot
       text: "text-green-700",
     },
     {
-      title: "Total Weight (KG)",
+      title: t("ops.trip.total_weight_kg"),
       value: totalWeight.toFixed(2),
       icon: <Scale size={20} />,
       bg: "bg-purple-50",
@@ -36,7 +38,7 @@ function TripKPICards({ totalTrips, totalBirds, totalWeight, totalMortality, tot
       text: "text-purple-700",
     },
     {
-      title: "Total Mortality",
+      title: t("operations.total_mortality"),
       value: totalMortality.toLocaleString(),
       icon: <HeartPulse size={20} />,
       bg: "bg-red-50",
@@ -44,7 +46,7 @@ function TripKPICards({ totalTrips, totalBirds, totalWeight, totalMortality, tot
       text: "text-red-600",
     },
     {
-      title: "Total Shops",
+      title: t("ops.trip.total_shops"),
       value: totalShops.toLocaleString(),
       icon: <Store size={20} />,
       bg: "bg-orange-50",

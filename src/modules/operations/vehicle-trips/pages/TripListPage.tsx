@@ -18,10 +18,12 @@ import { useBirdTypes } from "../../../masters/bird-types/hooks/useBirdTypes";
 
 import type { Trip } from "../types/trip";
 import { listCompletedTrips, loadTripById } from "../services/tripHeaderApiService";
+import { useI18n } from "../../../../i18n";
 
 type TripListPageProps = { embedded?: boolean };
 
 function TripListPage({ embedded = false }: TripListPageProps) {
+  const { t } = useI18n();
   const { showNotification } = useSafeNotification();
 
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -38,9 +40,9 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     try {
       setTrips(await listCompletedTrips());
     } catch {
-      showNotification("Unable to load trips from the server.", "error");
+      showNotification(t("ops.trip.unable_load_trips"), "error");
     }
-  }, [showNotification]);
+  }, [showNotification, t]);
 
   useEffect(() => {
     void refreshTrips();
@@ -149,7 +151,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     void loadTripById(trip.id)
       .then((loaded) => setSelectedTrip(loaded))
       .catch(() => {
-        showNotification("Could not refresh trip from server. Showing last loaded data.", "info");
+        showNotification(t("ops.trip.refresh_failed_using_cached"), "info");
       });
   };
 
@@ -162,26 +164,26 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     if (trip) {
       openView(trip);
     } else {
-      showNotification("No trip selected or trip not found.", "info");
+      showNotification(t("ops.trip.no_trip_selected"), "info");
     }
   };
 
   const handleExportPDF = () => {
     const exportData = filteredTrips && filteredTrips.length > 0 ? filteredTrips : completedTrips;
     if (!exportData || exportData.length === 0) {
-      showNotification("No data to export.", "error");
+      showNotification(t("ops.trip.no_data_export"), "error");
       return;
     }
     const headers = [
-      "Trip No",
-      "Date",
-      "Vehicle",
-      "Driver",
-      "Supervisor",
-      "Source Farm",
-      "Shops",
-      "Birds",
-      "Weight (kg)",
+      t("operations.trip_no"),
+      t("table.date"),
+      t("common.vehicle"),
+      t("common.driver"),
+      t("common.supervisor"),
+      t("ops.trip.source_farm"),
+      t("ops.trip.shops"),
+      t("common.birds"),
+      t("ops.trip.weight_kg"),
     ];
     const rows = exportData.map((t) => [
       t.tripNo,
@@ -195,26 +197,26 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       t.totalWeight.toFixed(2),
     ]);
     const filename = `Trips_${new Date().toISOString().split("T")[0]}`;
-    exportToPDF("Trip List", headers, rows, filename);
-    showNotification("PDF exported successfully!", "success");
+    exportToPDF(t("ops.trip.trip_list"), headers, rows, filename);
+    showNotification(t("notification.export_success"), "success");
   };
 
   const handleExportExcel = () => {
     const exportData = filteredTrips && filteredTrips.length > 0 ? filteredTrips : completedTrips;
     if (!exportData || exportData.length === 0) {
-      showNotification("No data to export.", "error");
+      showNotification(t("ops.trip.no_data_export"), "error");
       return;
     }
     const headers = [
-      "Trip No",
-      "Date",
-      "Vehicle",
-      "Driver",
-      "Supervisor",
-      "Source Farm",
-      "Shops",
-      "Birds",
-      "Weight (kg)",
+      t("operations.trip_no"),
+      t("table.date"),
+      t("common.vehicle"),
+      t("common.driver"),
+      t("common.supervisor"),
+      t("ops.trip.source_farm"),
+      t("ops.trip.shops"),
+      t("common.birds"),
+      t("ops.trip.weight_kg"),
     ];
     const rows = exportData.map((t) => [
       t.tripNo,
@@ -228,13 +230,13 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       t.totalWeight,
     ]);
     const filename = `Trips_${new Date().toISOString().split("T")[0]}`;
-    exportToExcel("Trip List", headers, rows, filename);
-    showNotification("Excel exported successfully!", "success");
+    exportToExcel(t("ops.trip.trip_list"), headers, rows, filename);
+    showNotification(t("notification.export_success"), "success");
   };
 
   const handleResetFilters = () => {
     resetFilters();
-    showNotification("Filters have been reset.", "info");
+    showNotification(t("ops.trip.filters_reset"), "info");
   };
 
   const content = (
@@ -291,7 +293,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
             disabled={currentPage === 1}
             className={paginationNavBtnClass}
           >
-            Previous
+            {t("common.previous")}
           </button>
           {Array.from({ length: totalPagesCompleted }, (_, i) => i + 1).map((page) => (
             <button
@@ -307,7 +309,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
             disabled={currentPage === totalPagesCompleted || totalPagesCompleted === 0}
             className={paginationNavBtnClass}
           >
-            Next
+            {t("common.next")}
           </button>
         </div>
         )}

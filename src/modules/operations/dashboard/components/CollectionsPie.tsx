@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+import { useI18n } from "../../../../i18n";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
@@ -8,6 +9,7 @@ interface CollectionsPieProps {
 }
 
 export default function CollectionsPie({ data }: CollectionsPieProps) {
+  const { t } = useI18n();
   const chartData = data || [];
 
   const enrichedData = useMemo(() => {
@@ -21,7 +23,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
   if (chartData.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-4 text-center text-slate-400 h-[338px] w-full flex items-center justify-center">
-        No data
+        {t("empty.no_data")}
       </div>
     );
   }
@@ -30,7 +32,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
     <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm h-[338px] w-full min-w-0 overflow-hidden flex flex-col mr-2">
       {/* ✅ Heading changed to "Collections Summary", kept centered & semi-bold */}
       <h3 className="text-sm font-semibold text-slate-700 mb-2 flex-shrink-0 text-center">
-        Collections Summary
+        {t("ops.dashboard.collections_summary")}
       </h3>
 
       <div className="flex flex-col items-center flex-1 min-h-0">

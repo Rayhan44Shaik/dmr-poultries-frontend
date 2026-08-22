@@ -1,5 +1,6 @@
 /** DEFERRED / FUTURE WORK — not part of current Fleet Operations production scope. */
 import { memo, useMemo, Suspense } from 'react';
+import { useI18n } from '../../../i18n';
 import { useFleetDashboardData } from '../hooks/useFleetDashboardData';
 import KpiCard from '../components/common/KpiCard';
 import LoadingSkeleton from '../components/common/LoadingSkeleton';
@@ -17,47 +18,48 @@ interface FleetDashboardPageProps {
 }
 
 const FleetDashboardPage = ({ embedded = false }: FleetDashboardPageProps) => {
+  const { t } = useI18n();
   const data = useFleetDashboardData();
 
   // Memoize KPI config array to prevent re-instantiating JSX on every render
   const kpis = useMemo(
     () => [
       {
-        label: 'Total Vehicles',
+        label: t('fleet.dashboard.total_vehicles'),
         value: data?.totalVehicles ?? 0,
         icon: <Truck className="w-5 h-5" />,
       },
       {
-        label: 'Active Vehicles',
+        label: t('fleet.dashboard.active_vehicles'),
         value: data?.activeVehicles ?? 0,
         icon: <Activity className="w-5 h-5" />,
       },
       {
-        label: 'Fuel Cost (This Month)',
+        label: t('fleet.dashboard.fuel_cost_month'),
         value: data?.fuelCostThisMonth ?? 0,
         icon: <Fuel className="w-5 h-5" />,
         format: 'currency' as const,
       },
       {
-        label: 'Total KM (This Month)',
+        label: t('fleet.dashboard.total_km_month'),
         value: data?.totalKMThisMonth ?? 0,
         icon: <MapPin className="w-5 h-5" />,
         format: 'number' as const,
       },
     ],
-    [data]
+    [data, t]
   );
 
   // Memoize alerts array
   const alerts = useMemo(
     () => [
-      { label: 'Service Due', count: data?.serviceDue ?? 0, color: 'bg-amber-100 text-amber-800' },
-      { label: 'Insurance Expiring', count: data?.insuranceExpiring ?? 0, color: 'bg-red-100 text-red-800' },
-      { label: 'Fitness Expiring', count: data?.fitnessExpiring ?? 0, color: 'bg-red-100 text-red-800' },
-      { label: 'Permit Expiring', count: data?.permitExpiring ?? 0, color: 'bg-red-100 text-red-800' },
-      { label: 'FASTag Low Balance', count: data?.fastagLowBalance ?? 0, color: 'bg-amber-100 text-amber-800' },
+      { label: t('fleet.dashboard.service_due'), count: data?.serviceDue ?? 0, color: 'bg-amber-100 text-amber-800' },
+      { label: t('fleet.dashboard.insurance_expiring'), count: data?.insuranceExpiring ?? 0, color: 'bg-red-100 text-red-800' },
+      { label: t('fleet.dashboard.fitness_expiring'), count: data?.fitnessExpiring ?? 0, color: 'bg-red-100 text-red-800' },
+      { label: t('fleet.dashboard.permit_expiring'), count: data?.permitExpiring ?? 0, color: 'bg-red-100 text-red-800' },
+      { label: t('fleet.dashboard.fastag_low_balance'), count: data?.fastagLowBalance ?? 0, color: 'bg-amber-100 text-amber-800' },
     ],
-    [data]
+    [data, t]
   );
 
   return (

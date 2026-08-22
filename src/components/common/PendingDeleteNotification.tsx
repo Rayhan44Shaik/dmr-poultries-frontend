@@ -1,5 +1,6 @@
 import { createPortal } from "react-dom";
 import { Trash2 } from "lucide-react";
+import { useI18n } from "../../i18n";
 import {
   PENDING_DELETE_SECONDS,
   pendingDeleteBarPercent,
@@ -31,6 +32,7 @@ export function PendingDeleteNotification<TId extends string | number>({
   onCancel,
   totalSeconds = PENDING_DELETE_SECONDS,
 }: PendingDeleteNotificationProps<TId>) {
+  const { t } = useI18n();
   if (typeof document === "undefined" || items.length === 0) return null;
 
   return createPortal(
@@ -38,7 +40,7 @@ export function PendingDeleteNotification<TId extends string | number>({
       className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/25 px-4"
       role="dialog"
       aria-modal="true"
-      aria-label="Pending deletion"
+      aria-label={t("pendingDelete.aria")}
     >
       <div className="flex w-full max-w-[480px] flex-col gap-3">
         {items.map((item) => {
@@ -55,10 +57,10 @@ export function PendingDeleteNotification<TId extends string | number>({
                   <Trash2 size={22} />
                 </div>
                 <h3 className="mt-3 text-base font-bold tracking-tight text-slate-800">
-                  {item.label || "Delete Record?"}
+                  {item.label || t("pendingDelete.title")}
                 </h3>
                 <p className="mt-1 max-w-sm text-sm text-slate-500">
-                  This record will be deleted automatically in {totalSeconds} seconds.
+                  {t("pendingDelete.auto", { seconds: totalSeconds })}
                 </p>
               </div>
 
@@ -81,14 +83,14 @@ export function PendingDeleteNotification<TId extends string | number>({
               </div>
 
               {item.committing ? (
-                <p className="mt-4 text-center text-xs font-medium text-slate-400">Deleting…</p>
+                <p className="mt-4 text-center text-xs font-medium text-slate-400">{t("pendingDelete.deleting")}</p>
               ) : (
                 <button
                   type="button"
                   onClick={() => onCancel(item.id)}
                   className="mt-5 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
               )}
             </div>

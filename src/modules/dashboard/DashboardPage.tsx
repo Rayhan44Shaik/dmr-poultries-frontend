@@ -13,8 +13,9 @@ import {
 } from "lucide-react";
 import { useExecutiveDashboard } from "./hooks/useExecutiveDashboard";
 import { useNotification } from "../../context/NotificationContext";
-import { getCurrentUser } from "../settings/services";
+import { useI18n } from "../../i18n";
 import { formatDateLong, greetingForHour } from "../../utils/format";
+import { getCurrentUser } from "../../modules/settings/services";
 import KpiCard from "./components/KpiCard";
 import ChartCard from "./components/ChartCard";
 import TodayTripsTable from "./components/TodayTripsTable";
@@ -32,19 +33,19 @@ import {
 function DashboardPage() {
   const { data, derived, loading, error, refetch, loadDemo, clearDemo, demoBusy } = useExecutiveDashboard();
   const { showNotification } = useNotification();
+  const { t } = useI18n();
 
   const user = getCurrentUser();
-  const firstName = (user.name || "Admin").split(" ")[0];
-  const greeting = `${greetingForHour()}, ${firstName} 👋`;
+  const greeting = `${greetingForHour()}, ${user?.name ?? "Owner"} 👋`;
 
   const handleLoadDemo = async () => {
     await loadDemo();
-    showNotification("Sample data loaded — explore the dashboard. Remove it anytime.", "success");
+    showNotification(t("notification.saved_success"), "success");
   };
 
   const handleClearDemo = async () => {
     await clearDemo();
-    showNotification("Sample data removed.", "info");
+    showNotification(t("notification.data_loaded"), "info");
   };
 
   return (
@@ -59,13 +60,13 @@ function DashboardPage() {
             {data?.demoActive && (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-400">
                 <Sparkles size={11} />
-                Sample data
+                {t("dashboard.sample_data")}
                 <button
                   type="button"
                   onClick={() => void handleClearDemo()}
                   className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-amber-100 dark:hover:bg-amber-500/20"
-                  aria-label="Remove sample data"
-                  title="Remove sample data"
+                  aria-label={t("dashboard.remove_sample_data")}
+                  title={t("dashboard.remove_sample_data")}
                 >
                   <X size={11} />
                 </button>
@@ -73,13 +74,13 @@ function DashboardPage() {
             )}
           </div>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Here's what's happening across DMR Poultries today.
+            {t("dashboard.subtitle")}
           </p>
           <p className="mt-0.5 text-xs font-medium text-slate-400 dark:text-slate-500">{formatDateLong(new Date())}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {derived && !derived.hasAnyData && !data?.demoActive && (
+{derived && !derived.hasAnyData && !data?.demoActive && (
             <button
               type="button"
               onClick={() => void handleLoadDemo()}
@@ -87,7 +88,7 @@ function DashboardPage() {
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
             >
               {demoBusy ? <RefreshCw size={15} className="animate-spin" /> : <DatabaseZap size={15} className="text-amber-500" />}
-              {demoBusy ? "Loading…" : "Load sample data"}
+              {demoBusy ? t("common.loading") : t("common.load")}
             </button>
           )}
           {error && (
@@ -97,22 +98,22 @@ function DashboardPage() {
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
             >
               <RefreshCw size={15} />
-              Retry
+              {t("common.retry")}
             </button>
           )}
           <Link
             to="/operations?tab=collection"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <CreditCard size={15} />
-            Record collection
+            {t("common.record_collection")}
           </Link>
           <Link
             to="/operations?tab=trip-entry"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 dark:bg-brand-600 dark:hover:bg-brand-500"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-600 dark:bg-brand-600 dark:hover:bg-brand-500"
           >
             <PackageOpen size={15} />
-            New trip entry
+            {t("quick.new_trip")}
           </Link>
         </div>
       </div>
@@ -135,23 +136,23 @@ function DashboardPage() {
           {/* ------------------------------------------------------ */}
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
             <ChartCard
-              title="Sales vs Collections"
-              subtitle="Last 7 days · shop deliveries against cash received"
-              action={{ label: "Shop sales", path: "/operations?tab=shop-sales" }}
+              title={t("dashboard.sales_vs_collections")}
+              subtitle={t("dashboard.sales_vs_collections_sub")}
+              action={{ label: t("quick.shop_sales"), path: "/operations?tab=shop-sales" }}
               className="xl:col-span-2"
             >
               <SalesVsCollectionsChart data={derived} />
             </ChartCard>
-            <ChartCard title="Vehicle activity" subtitle="Fleet status right now" action={{ label: "Fleet", path: "/fleet?tab=analytics" }}>
+            <ChartCard title={t("dashboard.vehicle_activity")} subtitle={t("dashboard.vehicle_activity_sub")} action={{ label: t("fleet.fleet_status"), path: "/fleet?tab=analytics" }}>
               <VehicleActivityDonut data={derived} />
             </ChartCard>
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <ChartCard title="Weekly revenue" subtitle="Shop sales by day">
+            <ChartCard title={t("dashboard.weekly_revenue")} subtitle={t("dashboard.weekly_revenue_sub")}>
               <WeeklyRevenueChart data={derived} />
             </ChartCard>
-            <ChartCard title="Delivery volume" subtitle="Birds and weight delivered per day">
+            <ChartCard title={t("dashboard.delivery_volume")} subtitle={t("dashboard.delivery_volume_sub")}>
               <DeliveryVolumeChart data={derived} />
             </ChartCard>
             <PendingCollectionsCard pending={derived.pendingCollections} totalAmount={derived.totals.pendingAmount} />
@@ -172,17 +173,17 @@ function DashboardPage() {
           {/* ------------------------------------------------------ */}
           <FleetStatusCard fleet={derived.fleet} />
         </>
-      ) : (
+) : (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-slate-200 bg-white/60 px-4 py-16 text-center dark:border-slate-800 dark:bg-slate-900/60">
-          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Something went wrong loading the dashboard</p>
-          <p className="text-xs text-slate-400">{error ?? "Please try again."}</p>
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("dashboard.something_wrong")}</p>
+          <p className="text-xs text-slate-400">{t("common.try_again")}</p>
           <button
             type="button"
             onClick={refetch}
-            className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-700"
+            className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-600"
           >
             <RefreshCw size={14} />
-            Retry
+            {t("common.retry")}
           </button>
         </div>
       )}

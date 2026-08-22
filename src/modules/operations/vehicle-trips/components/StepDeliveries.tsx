@@ -10,7 +10,7 @@ import UnLoadingTable from "./Step_4";
 import BoxWeightAnalysis from "./Step_4/BoxWeightAnalysis";
 import type { ShopDelivery, Trip, BoxDetail } from "../types/trip";
 import { getDeliveriesBalanceError } from "../../../../shared/trip/validation";
-import { TRIP_STEP_DEFINITIONS } from "../../../../shared/trip/definitions";
+import { useI18n } from "../../../../i18n";
 
 interface Props {
   rows: ShopDelivery[];
@@ -47,6 +47,7 @@ export default function StepDeliveries({
   boxDetails = [],
   persistedDeliveries,
 }: Props) {
+  const { t } = useI18n();
   // Toggle view mode: 'shops' | 'analysis'
   const [viewMode, setViewMode] = useState<"shops" | "analysis">("shops");
 
@@ -93,10 +94,10 @@ export default function StepDeliveries({
     const balanceError = getDeliveriesBalanceError(trip, rows);
     return {
       valid: balanceError == null,
-      reason: balanceError ? "Delivery balance mismatch." : "",
+      reason: balanceError ? t("ops.trip.balance_mismatch") : "",
       balanceError,
     };
-  }, [rows, trip]);
+  }, [rows, trip, t]);
 
   const canLock = validationResult.valid;
 
@@ -119,7 +120,7 @@ export default function StepDeliveries({
             4
           </span>
           <h2 className="text-base font-bold text-slate-800 tracking-tight">
-            {TRIP_STEP_DEFINITIONS[3].title.toUpperCase()}
+            {t("ops.trip.title.deliveries").toUpperCase()}
           </h2>
         </div>
 
@@ -128,8 +129,8 @@ export default function StepDeliveries({
             type="button"
             onClick={handleCancelWizard}
             className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
-            title="Close Trip"
-            aria-label="Close Trip"
+            title={t("ops.trip.close_trip")}
+            aria-label={t("ops.trip.close_trip")}
           >
             <X size={14} />
           </button>
@@ -144,7 +145,7 @@ export default function StepDeliveries({
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <LayoutGrid size={13} /> Shop View
+              <LayoutGrid size={13} /> {t("ops.trip.shop_view")}
             </button>
             <button
               type="button"
@@ -155,7 +156,7 @@ export default function StepDeliveries({
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <BarChart3 size={13} /> Box Analysis
+              <BarChart3 size={13} /> {t("ops.trip.box_analysis")}
             </button>
           </div>
 
@@ -166,18 +167,18 @@ export default function StepDeliveries({
                   type="button"
                   onClick={() => setIsStepEditing(true)}
                   className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
-                  title="Edit Step"
+                  title={t("ops.trip.edit_step")}
                 >
                   <Pencil size={14} />
                 </button>
               )}
               <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex items-center gap-1.5">
-                <Lock size={12} className="text-slate-500" /> Submitted & Locked
+                <Lock size={12} className="text-slate-500" /> {t("ops.trip.submitted_locked")}
               </span>
             </div>
           ) : (
             <span className="text-xs text-blue-700 font-semibold bg-blue-50 px-3 py-1 rounded-full border border-blue-200 whitespace-nowrap">
-              {editingShopId ? "Editing Shop Details" : isStepEditing ? "Editing Trip " + trip.tripNo : "Step Unlocked"}
+              {editingShopId ? t("ops.trip.editing_shop_details") : isStepEditing ? t("ops.trip.editing_trip", { no: trip.tripNo }) : t("ops.trip.step_unlocked")}
             </span>
           )}
         </div>

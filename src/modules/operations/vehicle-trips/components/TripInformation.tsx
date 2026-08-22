@@ -4,6 +4,7 @@ import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useFuelKMValidator } from "../../../operations/fuel-expenses/hooks/useFuelKMValidator";
+import { useI18n } from "../../../../i18n";
 
 interface Props {
   trip: Trip;
@@ -34,6 +35,7 @@ function TripInformation({
   supervisors,
   farms,
 }: Props) {
+  const { t } = useI18n();
   const [openingKmError, setOpeningKmError] = useState<string | null>(null);
   const [closingKmError, setClosingKmError] = useState<string | null>(null);
 
@@ -264,12 +266,12 @@ function TripInformation({
               <FileText className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-800 tracking-tight">Trip Information</h3>
+              <h3 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.trip_information")}</h3>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full text-xs font-semibold border border-emerald-100/60 shadow-xs">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            Active Log Entry
+            {t("ops.trip.active_log_entry")}
           </div>
         </div>
 
@@ -281,7 +283,7 @@ function TripInformation({
             <div className="group">
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-2">
                 <FileText className="w-3.5 h-3.5 text-slate-400" />
-                Trip No <span className="text-rose-500">*</span>
+                {t("operations.trip_no")} <span className="text-rose-500">*</span>
               </label>
               <input
                 value={trip.tripNo}
@@ -294,12 +296,12 @@ function TripInformation({
             <div className="group">
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-2">
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                Trip Date <span className="text-rose-500">*</span>
+                {t("ops.trip.field.trip_date")} <span className="text-rose-500">*</span>
               </label>
               <DatePicker
                 value={trip.tripDate}
                 onChange={(value) => updateField("tripDate", value)}
-                placeholder="Select date"
+                placeholder={t("placeholder.enter_date")}
                 className="w-full rounded-xl"
               />
             </div>
@@ -308,14 +310,14 @@ function TripInformation({
             <div className="group">
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-2">
                 <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                Source Farm <span className="text-rose-500">*</span>
+                {t("ops.trip.source_farm")} <span className="text-rose-500">*</span>
               </label>
               <select
                 value={trip.sourceFarmId || ""}
                 onChange={handleFarmChange}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm text-slate-700 font-medium focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all cursor-pointer shadow-xs"
               >
-                <option value="">Select Farm</option>
+                <option value="">{t("operations.select_farm")}</option>
                 {farms.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.farmName}
@@ -328,7 +330,7 @@ function TripInformation({
             <div className="group">
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-2">
                 <Truck className="w-3.5 h-3.5 text-slate-400" />
-                Vehicle <span className="text-rose-500">*</span>
+                {t("common.vehicle")} <span className="text-rose-500">*</span>
               </label>
               <Select
                 options={vehicleOptions}
@@ -336,7 +338,7 @@ function TripInformation({
                 onChange={handleVehicleSelect}
                 isSearchable
                 filterOption={containsFilter}
-                placeholder="Search Vehicle..."
+                placeholder={t("ops.trip.search_vehicle")}
                 styles={selectStyles}
               />
             </div>
@@ -345,7 +347,7 @@ function TripInformation({
             <div className="group">
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-2">
                 <User className="w-3.5 h-3.5 text-slate-400" />
-                Supervisor <span className="text-rose-500">*</span>
+                {t("common.supervisor")} <span className="text-rose-500">*</span>
               </label>
               <Select
                 options={supervisorOptions}
@@ -353,7 +355,7 @@ function TripInformation({
                 onChange={handleSupervisorSelect}
                 isSearchable
                 filterOption={startsWithFilter}
-                placeholder="Search Supervisor..."
+                placeholder={t("ops.trip.search_supervisor")}
                 styles={selectStyles}
               />
             </div>
@@ -362,7 +364,7 @@ function TripInformation({
             <div className="group">
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-2">
                 <User className="w-3.5 h-3.5 text-slate-400" />
-                Driver <span className="text-rose-500">*</span>
+                {t("common.driver")} <span className="text-rose-500">*</span>
               </label>
               <Select
                 options={driverOptions}
@@ -370,7 +372,7 @@ function TripInformation({
                 onChange={handleDriverSelect}
                 isSearchable
                 filterOption={startsWithFilter}
-                placeholder="Search Driver..."
+                placeholder={t("ops.trip.search_driver")}
                 styles={selectStyles}
               />
             </div>
@@ -379,7 +381,7 @@ function TripInformation({
             <div className="group">
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-2">
                 <FileText className="w-3.5 h-3.5 text-slate-400" />
-                DC Weight <span className="text-rose-500">*</span>
+                {t("ops.trip.dc_weight")} <span className="text-rose-500">*</span>
               </label>
               <input
                 type="number"
@@ -396,7 +398,7 @@ function TripInformation({
             <div className="group">
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-2">
                 <FileText className="w-3.5 h-3.5 text-slate-400" />
-                Total Birds <span className="text-rose-500">*</span>
+                {t("ops.trip.total_birds")} <span className="text-rose-500">*</span>
               </label>
               <input
                 type="number"
@@ -413,7 +415,7 @@ function TripInformation({
             <div className="group">
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-2">
                 <ShieldAlert className="w-3.5 h-3.5 text-slate-400" />
-                Total Mortality <span className="text-rose-500">*</span>
+                {t("operations.total_mortality")} <span className="text-rose-500">*</span>
               </label>
               <input
                 type="number"
@@ -429,7 +431,7 @@ function TripInformation({
             <div className="group">
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-2">
                 <Gauge className="w-3.5 h-3.5 text-slate-400" />
-                Opening KM
+                {t("ops.trip.opening_km")}
               </label>
               <div>
                 <input
@@ -448,7 +450,7 @@ function TripInformation({
             <div className="group">
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-2">
                 <Gauge className="w-3.5 h-3.5 text-slate-400" />
-                Closing KM
+                {t("ops.trip.closing_km")}
               </label>
               <div>
                 <input
@@ -467,7 +469,7 @@ function TripInformation({
             <div className="group">
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-2">
                 <Gauge className="w-3.5 h-3.5 text-slate-400" />
-                Total KM
+                {t("operations.total_km")}
               </label>
               <input
                 value={trip.totalKm}
@@ -480,7 +482,7 @@ function TripInformation({
             <div className="group">
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-2">
                 <DollarSign className="w-3.5 h-3.5 text-slate-400" />
-                Total Expense
+                {t("ops.trip.total_expense")}
               </label>
               <input
                 type="number"
@@ -495,11 +497,11 @@ function TripInformation({
             <div className="group">
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-2">
                 <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
-                Remarks
+                {t("common.remarks")}
               </label>
               <input
                 value={trip.remarks}
-                placeholder="Optional notes..."
+                placeholder={t("ops.trip.optional_notes")}
                 onChange={(e) => updateField("remarks", e.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-xs"
               />

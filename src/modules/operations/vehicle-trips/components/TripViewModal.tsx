@@ -32,6 +32,7 @@ import { useTripDeliveryEmails } from "../hooks/useTripDeliveryEmails";
 import { useTripDeliveryWhatsApps } from "../hooks/useTripDeliveryWhatsApps";
 import TripViewShopCards from "./TripViewShopCards";
 import { getNextIncompleteTripStep } from "../../../../shared/trip";
+import { useI18n } from "../../../../i18n";
 
 // --- Read-only step presentation (incomplete trips only) ---
 import TripWizardStepper from "./TripWizardStepper";
@@ -51,57 +52,58 @@ interface Props {
 
 /** Read-only Step 1 (Trip Start) details. */
 function Step1View({ trip }: { trip: Trip }) {
+  const { t } = useI18n();
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
       <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
         <Clock size={15} className="text-indigo-600" />
-        Step 1 — Trip Start
+        {t("ops.trip.view_step1")}
       </h3>
       <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Trip Date</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.field.trip_date")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.tripDate || "—"}</dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Start Time</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.field.start_time")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.startTime || "—"}</dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Vehicle</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("common.vehicle")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.vehicleNo || "—"}</dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Supervisor</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("common.supervisor")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.supervisorName || "—"}</dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Driver</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("common.driver")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.driverName || "—"}</dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Opening Meter</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.field.opening_meter")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {trip.openingMeter != null ? `${trip.openingMeter} KM` : "Not entered"}
+            {trip.openingMeter != null ? `${trip.openingMeter} KM` : t("ops.trip.not_entered")}
           </dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Advance / Expenses</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("operations.advance")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {trip.advanceAmount != null ? `₹ ${trip.advanceAmount.toLocaleString()}` : "Not entered"}
+            {trip.advanceAmount != null ? `₹ ${trip.advanceAmount.toLocaleString()}` : t("ops.trip.not_entered")}
           </dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Helpers</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.field.helpers")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.helpers?.join(", ") || "—"}</dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Loaders</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.field.loaders")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.loaders?.join(", ") || "—"}</dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Status</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("common.status")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {trip.startStepSubmitted ? "Submitted" : "Not submitted"}
+            {trip.startStepSubmitted ? t("ops.trip.submitted") : t("ops.trip.not_submitted")}
           </dd>
         </div>
       </dl>
@@ -111,33 +113,35 @@ function Step1View({ trip }: { trip: Trip }) {
 
 /** Read-only Step 2 (Farm / Destination) details — compact, fits the view. */
 function Step2View({ trip }: { trip: Trip }) {
+  const { t } = useI18n();
   const gpsCaptured =
     trip.farmGpsLat != null &&
     trip.farmGpsLon != null &&
     Number.isFinite(Number(trip.farmGpsLat)) &&
     Number.isFinite(Number(trip.farmGpsLon)) &&
     !(Number(trip.farmGpsLat) === 0 && Number(trip.farmGpsLon) === 0);
+  const notEntered = t("ops.trip.not_entered");
   const rows: Array<[string, string]> = [
-    ["Trip Number", trip.tripNo || "Not entered"],
-    ["Step 2 status", trip.farmStepSubmitted ? "Submitted" : "Not submitted"],
-    ["Farm Name", trip.sourceFarm || "Not entered"],
-    ["Farm Address", trip.farmAddress?.trim() ? trip.farmAddress : "Not entered"],
-    ["Farm Meter", trip.destMeter ? `${trip.destMeter} KM` : "Not entered"],
-    ["Reached / Farm Time", trip.reachedTime || "Not entered"],
-    ["Tolls", trip.pickupTolls == null ? "Not entered" : String(trip.pickupTolls)],
-    ["Average Bird Weight", trip.avgBirdWeight ? `${trip.avgBirdWeight} kg` : "Not entered"],
-    ["GPS Latitude", gpsCaptured ? String(trip.farmGpsLat) : "Not entered"],
-    ["GPS Longitude", gpsCaptured ? String(trip.farmGpsLon) : "Not entered"],
-    ["GPS Accuracy", gpsCaptured && trip.farmGpsAccuracy != null ? String(trip.farmGpsAccuracy) : "Not entered"],
-    ["GPS Captured Time", gpsCaptured && trip.farmGpsTime ? String(trip.farmGpsTime) : "Not entered"],
-    ["Remarks", trip.remarks?.trim() ? trip.remarks : "Not entered"],
+    [t("operations.trip_no"), trip.tripNo || notEntered],
+    [t("ops.trip.view_step2_status"), trip.farmStepSubmitted ? t("ops.trip.submitted") : t("ops.trip.not_submitted")],
+    [t("ops.trip.farm_name"), trip.sourceFarm || notEntered],
+    [t("ops.trip.field.farm_address"), trip.farmAddress?.trim() ? trip.farmAddress : notEntered],
+    [t("ops.trip.field.farm_meter"), trip.destMeter ? `${trip.destMeter} KM` : notEntered],
+    [t("ops.trip.field.reached_time"), trip.reachedTime || notEntered],
+    [t("ops.trip.field.pickup_tolls"), trip.pickupTolls == null ? notEntered : String(trip.pickupTolls)],
+    [t("ops.trip.field.avg_bird_weight"), trip.avgBirdWeight ? `${trip.avgBirdWeight} kg` : notEntered],
+    [t("ops.trip.gps_latitude"), gpsCaptured ? String(trip.farmGpsLat) : notEntered],
+    [t("ops.trip.gps_longitude"), gpsCaptured ? String(trip.farmGpsLon) : notEntered],
+    [t("ops.trip.gps_accuracy"), gpsCaptured && trip.farmGpsAccuracy != null ? String(trip.farmGpsAccuracy) : notEntered],
+    [t("ops.trip.gps_captured_time"), gpsCaptured && trip.farmGpsTime ? String(trip.farmGpsTime) : notEntered],
+    [t("common.remarks"), trip.remarks?.trim() ? trip.remarks : notEntered],
   ];
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
           <MapPin size={15} className="text-indigo-600" />
-          Step 2 — Farm / Destination
+          {t("ops.trip.view_step2")}
         </h3>
         <span
           className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${
@@ -146,7 +150,7 @@ function Step2View({ trip }: { trip: Trip }) {
               : "bg-slate-100 text-slate-500 border-slate-200"
           }`}
         >
-          {gpsCaptured ? "GPS captured" : "GPS: Not captured"}
+          {gpsCaptured ? t("ops.trip.gps_captured") : `GPS: ${t("ops.trip.not_captured")}`}
         </span>
       </div>
       <dl className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5">
@@ -165,46 +169,47 @@ function Step2View({ trip }: { trip: Trip }) {
 
 /** Read-only Step 3 (Pickup) details. */
 function Step3View({ trip }: { trip: Trip }) {
+  const { t } = useI18n();
   const pickupBoxes = Array.isArray(trip.boxDetails) ? trip.boxDetails : [];
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
       <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
         <Package size={15} className="text-amber-600" />
-        Step 3 — Pickup Details
+        {t("ops.trip.view_step3")}
       </h3>
       <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">DC Weight</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.dc_weight")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {trip.dcWeight != null ? `${trip.dcWeight} KG` : "Not entered"}
+            {trip.dcWeight != null ? `${trip.dcWeight} KG` : t("ops.trip.not_entered")}
           </dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Total Birds</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.total_birds")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {trip.totalBirds != null ? String(trip.totalBirds) : "Not entered"}
+            {trip.totalBirds != null ? String(trip.totalBirds) : t("ops.trip.not_entered")}
           </dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Boxes</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("common.boxes")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {trip.boxes != null ? String(trip.boxes) : "Not entered"}
+            {trip.boxes != null ? String(trip.boxes) : t("ops.trip.not_entered")}
           </dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Avg Weight</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.avg_weight")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {trip.avgWeight != null ? `${trip.avgWeight} kg` : "Not entered"}
+            {trip.avgWeight != null ? `${trip.avgWeight} kg` : t("ops.trip.not_entered")}
           </dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Pickup Load Time</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.pickupLoadTime || "Not entered"}</dd>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.pickup_load_time")}</dt>
+          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.pickupLoadTime || t("ops.trip.not_entered")}</dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Status</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("common.status")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {trip.pickupStepSubmitted ? "Submitted" : "Not submitted"}
+            {trip.pickupStepSubmitted ? t("ops.trip.submitted") : t("ops.trip.not_submitted")}
           </dd>
         </div>
       </dl>
@@ -213,7 +218,7 @@ function Step3View({ trip }: { trip: Trip }) {
           <table className="w-full text-xs">
             <thead className="bg-slate-50/80">
               <tr>
-                {["S.No", "Box", "Birds", "Weight (KG)", "Avg WT"].map((h) => (
+                {[t("table.s_no"), t("ops.trip.box"), t("common.birds"), t("ops.trip.weight_kg"), t("ops.trip.avg_wt")].map((h) => (
                   <th key={h} className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     {h}
                   </th>
@@ -250,6 +255,7 @@ function Step3View({ trip }: { trip: Trip }) {
 
 /** Read-only Step 5 (End / Expenses / Diesel) details. */
 function Step5View({ trip }: { trip: Trip }) {
+  const { t } = useI18n();
   const totalKm =
     trip.totalKm != null && Number.isFinite(Number(trip.totalKm))
       ? Number(trip.totalKm)
@@ -262,16 +268,16 @@ function Step5View({ trip }: { trip: Trip }) {
   const totalDieselAmount = submittedDiesel.reduce((acc, e) => acc + Number(e.amount || 0), 0);
 
   const expensePairs: Array<[string, number]> = [
-    ["Meals", Number(trip.meals || 0)],
-    ["Loading", Number(trip.loading || 0)],
-    ["Meals / Tiffin", Number(trip.mealsTiffin || 0)],
-    ["Vehicle Maintenance", Number(trip.vehicleMaintenance || 0)],
-    ["Tea", Number(trip.othersRC || 0)],
-    ["Driver", Number(trip.others1Amt || 0)],
-    ["Supervisor", Number(trip.others2Amt || 0)],
-    ["Helper & loader", Number(trip.others3Amt || 0)],
-    ["Others", Number(trip.others4Amt || 0)],
-    ["Others", Number(trip.others5Amt || 0)],
+    [t("ops.trip.exp_meals"), Number(trip.meals || 0)],
+    [t("ops.trip.exp_loading"), Number(trip.loading || 0)],
+    [t("ops.trip.exp_meals_tiffin"), Number(trip.mealsTiffin || 0)],
+    [t("ops.trip.exp_vehicle_maintenance"), Number(trip.vehicleMaintenance || 0)],
+    [t("ops.trip.exp_tea"), Number(trip.othersRC || 0)],
+    [t("ops.trip.exp_driver"), Number(trip.others1Amt || 0)],
+    [t("ops.trip.exp_supervisor"), Number(trip.others2Amt || 0)],
+    [t("ops.trip.exp_helper_loader"), Number(trip.others3Amt || 0)],
+    [t("common.other"), Number(trip.others4Amt || 0)],
+    [t("common.other"), Number(trip.others5Amt || 0)],
   ];
   const positiveExpenses = expensePairs.filter(([, amt]) => amt > 0);
   const totalExpenses = positiveExpenses.reduce((acc, [, amt]) => acc + amt, 0);
@@ -280,54 +286,54 @@ function Step5View({ trip }: { trip: Trip }) {
     <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
       <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
         <Receipt size={15} className="text-orange-600" />
-        Step 5 — End, Expenses & Diesel
+        {t("ops.trip.view_step5")}
       </h3>
       <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">End Meter Reading</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.field.end_meter")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {trip.closingMeter != null ? `${trip.closingMeter} KM` : "Not entered"}
+            {trip.closingMeter != null ? `${trip.closingMeter} KM` : t("ops.trip.not_entered")}
           </dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Delivery Tolls</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.delivery_tolls")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {trip.deliveryTolls != null ? String(trip.deliveryTolls) : "Not entered"}
+            {trip.deliveryTolls != null ? String(trip.deliveryTolls) : t("ops.trip.not_entered")}
           </dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Total Distance</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.total_distance")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{Math.max(0, totalKm)} KM</dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Mileage</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.mileage")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
             {trip.mileageKmL != null && Number.isFinite(Number(trip.mileageKmL))
               ? `${Number(trip.mileageKmL).toFixed(2)} km/L`
-              : "Not available"}
+              : t("ops.trip.not_available")}
           </dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Total Expenses</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("operations.total_expenses")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">₹ {totalExpenses.toFixed(2)}</dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Total Diesel</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.total_diesel")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
             {totalDieselLitres} Ltrs · ₹ {totalDieselAmount.toFixed(2)}
           </dd>
         </div>
         <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">Status</dt>
+          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("common.status")}</dt>
           <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {isTripWizardComplete(trip) ? "Submitted" : "Not submitted"}
+            {isTripWizardComplete(trip) ? t("ops.trip.submitted") : t("ops.trip.not_submitted")}
           </dd>
         </div>
       </dl>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">General Expenses</h4>
+          <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">{t("operations.general_expenses")}</h4>
           {positiveExpenses.length ? (
             <div className="rounded-xl border border-slate-200/70 overflow-hidden">
               <table className="w-full text-xs">
@@ -342,17 +348,17 @@ function Step5View({ trip }: { trip: Trip }) {
               </table>
             </div>
           ) : (
-            <p className="text-xs text-slate-400">No expenses recorded.</p>
+            <p className="text-xs text-slate-400">{t("ops.trip.no_expenses_recorded")}</p>
           )}
         </div>
         <div>
-          <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Diesel / Fuel</h4>
+          <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">{t("ops.trip.diesel_fuel")}</h4>
           {submittedDiesel.length ? (
             <div className="overflow-x-auto rounded-xl border border-slate-200/70">
               <table className="w-full text-xs">
                 <thead className="bg-slate-50/80">
                   <tr>
-                    {["S.No", "Litres", "Rate", "Amount", "Meter", "Bunk"].map((h) => (
+                    {[t("table.s_no"), t("ops.trip.litres"), t("common.rate"), t("table.amount"), t("ops.trip.meter"), t("ops.trip.bunk")].map((h) => (
                       <th key={h} className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
                         {h}
                       </th>
@@ -374,7 +380,7 @@ function Step5View({ trip }: { trip: Trip }) {
               </table>
             </div>
           ) : (
-            <p className="text-xs text-slate-400">No diesel entries recorded.</p>
+            <p className="text-xs text-slate-400">{t("ops.trip.no_diesel_entries")}</p>
           )}
         </div>
       </div>
@@ -390,6 +396,7 @@ function CommunicationSummary({
   emailCounts: { sent: number; pending: number; sending: number; failed: number; total: number };
   whatsappCounts: { sent: number; pending: number; sending: number; failed: number; total: number };
 }) {
+  const { t } = useI18n();
   const emailProcessing = emailCounts.sending + emailCounts.pending;
   const whatsappProcessing = whatsappCounts.sending + whatsappCounts.pending;
 
@@ -397,7 +404,7 @@ function CommunicationSummary({
     <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm">
       <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
         <Package size={15} className="text-emerald-600" />
-        Communication Summary
+        {t("ops.trip.communication_summary")}
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Mail Summary */}
@@ -409,25 +416,25 @@ function CommunicationSummary({
             </div>
             <dl className="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <dt className="text-slate-500">Total Shops</dt>
+                <dt className="text-slate-500">{t("ops.trip.total_shops")}</dt>
                 <dd className="font-semibold text-slate-800">{emailCounts.total}</dd>
               </div>
               <div>
-                <dt className="text-slate-500">Sent</dt>
+                <dt className="text-slate-500">{t("common.sent")}</dt>
                 <dd className="font-semibold text-emerald-700">{emailCounts.sent}</dd>
               </div>
               <div>
-                <dt className="text-slate-500">Failed</dt>
+                <dt className="text-slate-500">{t("common.failed")}</dt>
                 <dd className="font-semibold text-red-700">{emailCounts.failed}</dd>
               </div>
               <div>
-                <dt className="text-slate-500">Pending</dt>
+                <dt className="text-slate-500">{t("common.pending")}</dt>
                 <dd className="font-semibold text-slate-500">{emailCounts.pending}</dd>
               </div>
               {emailProcessing > 0 && (
                 <>
                   <div>
-                    <dt className="text-slate-500">Processing</dt>
+                    <dt className="text-slate-500">{t("ops.trip.processing")}</dt>
                     <dd className="font-semibold text-sky-700">{emailProcessing}</dd>
                   </div>
                 </>
@@ -445,25 +452,25 @@ function CommunicationSummary({
             </div>
             <dl className="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <dt className="text-slate-500">Total Shops</dt>
+                <dt className="text-slate-500">{t("ops.trip.total_shops")}</dt>
                 <dd className="font-semibold text-slate-800">{whatsappCounts.total}</dd>
               </div>
               <div>
-                <dt className="text-slate-500">Sent</dt>
+                <dt className="text-slate-500">{t("common.sent")}</dt>
                 <dd className="font-semibold text-emerald-700">{whatsappCounts.sent}</dd>
               </div>
               <div>
-                <dt className="text-slate-500">Failed</dt>
+                <dt className="text-slate-500">{t("common.failed")}</dt>
                 <dd className="font-semibold text-red-700">{whatsappCounts.failed}</dd>
               </div>
               <div>
-                <dt className="text-slate-500">Pending</dt>
+                <dt className="text-slate-500">{t("common.pending")}</dt>
                 <dd className="font-semibold text-slate-500">{whatsappCounts.pending}</dd>
               </div>
               {whatsappProcessing > 0 && (
                 <>
                   <div>
-                    <dt className="text-slate-500">Processing</dt>
+                    <dt className="text-slate-500">{t("ops.trip.processing")}</dt>
                     <dd className="font-semibold text-sky-700">{whatsappProcessing}</dd>
                   </div>
                 </>
@@ -477,6 +484,7 @@ function CommunicationSummary({
 }
 
 function TripViewModal({ open, trip, onClose, shops }: Props) {
+  const { t } = useI18n();
   // Completed trips open on Step 4 (Shop Deliveries); incomplete on Step 1.
   const [viewStepIndex, setViewStepIndex] = useState(() =>
     trip && trip.status === "Completed" && isTripWizardComplete(trip) ? 3 : 0
@@ -602,7 +610,7 @@ function TripViewModal({ open, trip, onClose, shops }: Props) {
         />
       );
     }
-    return <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">Select a completed step to view its details.</div>;
+    return <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">{t("ops.trip.select_completed_step")}</div>;
   };
 
   /** Completed trips: show ONLY the selected step's own persisted data. */
@@ -661,18 +669,18 @@ function TripViewModal({ open, trip, onClose, shops }: Props) {
             </div>
             <div className="min-w-0">
               <h2 className="text-lg md:text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2 flex-wrap">
-                <span className="truncate">{trip.tripNo || "Trip Details"}</span>
+                <span className="truncate">{trip.tripNo || t("ops.trip.trip_details")}</span>
                 {isCompleted ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 text-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                    <ShieldCheck size={11} /> Submitted · Locked
+                    <ShieldCheck size={11} /> {t("ops.trip.submitted_locked")}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                    {trip.status || "Pending"}
+                    {trip.status || t("status.pending")}
                   </span>
                 )}
               </h2>
-              <p className="text-xs font-medium text-slate-400 mt-1">Read-only trip overview</p>
+              <p className="text-xs font-medium text-slate-400 mt-1">{t("ops.trip.read_only_overview")}</p>
             </div>
           </div>
 
@@ -680,7 +688,7 @@ function TripViewModal({ open, trip, onClose, shops }: Props) {
             {isCompleted && trip.approvedBy && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 border border-slate-200 shadow-sm">
                 <UserCheck size={12} className="text-emerald-600" />
-                Approved By: {trip.approvedBy}
+                {t("table.approved_by")}: {trip.approvedBy}
               </span>
             )}
             {isCompleted && emailCounts.total > 0 && (
@@ -688,13 +696,13 @@ function TripViewModal({ open, trip, onClose, shops }: Props) {
                 <Mail size={12} />
                 {emailState.isBulkSending ? (
                   <>
-                    Sending... {emailState.bulkProgress?.sent ?? emailCounts.sent} / {emailState.bulkProgress?.total ?? emailCounts.total}
+                    {t("ops.trip.sending")}... {emailState.bulkProgress?.sent ?? emailCounts.sent} / {emailState.bulkProgress?.total ?? emailCounts.total}
                   </>
                 ) : (
                   <>
-                    {emailCounts.total} Shops · {emailCounts.sent} Sent
-                    {emailCounts.pending > 0 ? ` · ${emailCounts.pending} Pending` : ""}
-                    {emailCounts.failed > 0 ? ` · ${emailCounts.failed} Failed` : ""}
+                    {emailCounts.total} {t("ops.trip.shops")} · {emailCounts.sent} {t("common.sent")}
+                    {emailCounts.pending > 0 ? ` · ${emailCounts.pending} ${t("common.pending")}` : ""}
+                    {emailCounts.failed > 0 ? ` · ${emailCounts.failed} ${t("common.failed")}` : ""}
                   </>
                 )}
               </span>
@@ -704,13 +712,13 @@ function TripViewModal({ open, trip, onClose, shops }: Props) {
                 <WhatsAppIcon size={12} />
                 {whatsappState.isBulkSending ? (
                   <>
-                    Sending... {whatsappState.bulkProgress?.sent ?? whatsappCounts.sent} / {whatsappState.bulkProgress?.total ?? whatsappCounts.total}
+                    {t("ops.trip.sending")}... {whatsappState.bulkProgress?.sent ?? whatsappCounts.sent} / {whatsappState.bulkProgress?.total ?? whatsappCounts.total}
                   </>
                 ) : (
                   <>
-                    {whatsappCounts.total} Shops · {whatsappCounts.sent} Sent
-                    {whatsappCounts.pending > 0 ? ` · ${whatsappCounts.pending} Pending` : ""}
-                    {whatsappCounts.failed > 0 ? ` · ${whatsappCounts.failed} Failed` : ""}
+                    {whatsappCounts.total} {t("ops.trip.shops")} · {whatsappCounts.sent} {t("common.sent")}
+                    {whatsappCounts.pending > 0 ? ` · ${whatsappCounts.pending} ${t("common.pending")}` : ""}
+                    {whatsappCounts.failed > 0 ? ` · ${whatsappCounts.failed} ${t("common.failed")}` : ""}
                   </>
                 )}
               </span>
@@ -721,14 +729,14 @@ function TripViewModal({ open, trip, onClose, shops }: Props) {
                 onClick={() => void emailState.sendAll()}
                 disabled={emailState.isBulkSending}
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
-                title="Send email to all shops in this trip"
+                title={t("ops.trip.send_email_all")}
               >
                 {emailState.isBulkSending ? (
                   <Loader2 size={14} className="animate-spin" />
                 ) : (
                   <Send size={14} />
                 )}
-                {emailState.isBulkSending ? "Sending..." : "Send All Mail"}
+                {emailState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_mail")}
               </button>
             )}
             {isCompleted && whatsappCounts.total > 0 && (
@@ -737,22 +745,22 @@ function TripViewModal({ open, trip, onClose, shops }: Props) {
                 onClick={() => void whatsappState.sendAll()}
                 disabled={whatsappState.isBulkSending}
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-green-500/20 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
-                title="Send WhatsApp to all shops in this trip"
+                title={t("ops.trip.send_whatsapp_all")}
               >
                 {whatsappState.isBulkSending ? (
                   <Loader2 size={14} className="animate-spin" />
                 ) : (
                   <WhatsAppIcon size={14} />
                 )}
-                {whatsappState.isBulkSending ? "Sending..." : "Send All WhatsApp"}
+                {whatsappState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_whatsapp")}
               </button>
             )}
             <button
               type="button"
               onClick={() => void downloadTripReport()}
               className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 p-2 text-red-700 shadow-sm transition-all active:scale-95"
-              title="Create a professional A4 trip report PDF"
-              aria-label="Create PDF"
+              title={t("ops.trip.create_pdf_title")}
+              aria-label={t("ops.trip.create_pdf")}
             >
               <FileDown size={16} />
             </button>
@@ -789,7 +797,7 @@ function TripViewModal({ open, trip, onClose, shops }: Props) {
         {/* ─── Footer ───────────────────────────────────────────────── */}
         <div className="px-6 md:px-8 py-5 border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 flex items-center justify-end gap-3">
           <button onClick={onClose} className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-all active:scale-95">
-            Close
+            {t("common.close")}
           </button>
         </div>
       </div>
