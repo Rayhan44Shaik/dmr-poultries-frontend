@@ -11,6 +11,8 @@ import {
 } from "../services/deliveryWhatsAppService";
 import { userFacingDeliveryWhatsAppError } from "../services/deliveryWhatsAppErrors";
 
+const WHATSAPP_BACKEND_ENABLED = import.meta.env.VITE_WHATSAPP_BACKEND_ENABLED === "true";
+
 export type WhatsAppCounts = {
   sent: number;
   pending: number;
@@ -34,6 +36,7 @@ type Options = {
 export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], options: Options = {}) {
   const { enabled = true } = options;
   const completed = Boolean(trip && trip.status === "Completed" && enabled);
+  const whatsappEnabled = completed && WHATSAPP_BACKEND_ENABLED;
 
   const [rows, setRows] = useState<DeliveryWhatsAppRow[]>([]);
   const [localStatus, setLocalStatus] = useState<Record<number, DeliveryWhatsAppStatusValue>>({});
@@ -46,7 +49,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
   const tripId = trip?.id ?? 0;
 
   const refresh = useCallback(async () => {
-    if (!completed || !tripId) return;
+    if (!whatsappEnabled || !tripId) return;
     try {
       const next = await fetchDeliveryWhatsAppStatuses(tripId);
       setRows((prev) => {
@@ -56,10 +59,10 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
     } catch {
       /* keep last known rows */
     }
-  }, [completed, tripId]);
+  }, [whatsappEnabled, tripId]);
 
   useEffect(() => {
-    if (!completed) {
+    if (!whatsappEnabled) {
       setRows([]);
       setLocalStatus({});
       setLocalErrors({});
@@ -74,7 +77,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
     return () => {
       cancelled = true;
     };
-  }, [completed, refresh]);
+  }, [whatsappEnabled, refresh]);
 
   const effectiveStatus = useCallback(
     (deliveryId: number): DeliveryWhatsAppStatusValue => {
@@ -149,6 +152,14 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
   const sendOne = useCallback(
     async (delivery: ShopDelivery): Promise<void> => {
       if (!trip || !completed) return;
+      if (!WHATSAPP_BACKEND_ENABLED) {
+        // WhatsApp backend is disabled - show user-friendly message
+        setLocalErrors((prev) => ({
+          ...prev,
+          [delivery.id]: "WhatsApp integration is not configured yet.",
+        }));
+        return;
+      }
       if (busyIds.has(delivery.id) || isBulkSending) return;
       const row = rows.find((r) => r.deliveryId === delivery.id);
       setBusy(delivery.id, true);
@@ -196,6 +207,18 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
    */
   const sendAll = useCallback(async (): Promise<void> => {
     if (!trip || !completed) return;
+    if (!WHATSAPP_BACKEND_ENABLED) {
+      // WhatsApp backend is disabled - show user-friendly message for all eligible deliveries
+      const deliveries = trip.deliveries ?? [];
+      const eligible = deliveries.filter((d) => effectiveStatus(d.id) !== "sent");
+      for (const delivery of eligible) {
+        setLocalErrors((prev) => ({
+          ...prev,
+          [delivery.id]: "WhatsApp integration is not configured yet.",
+        }));
+      }
+      return;
+    }
     if (isBulkSending) return;
     const run = ++bulkRunRef.current;
     const deliveries = trip.deliveries ?? [];

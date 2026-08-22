@@ -2,6 +2,8 @@ import { apiGet, apiPost } from "../../../../api";
 import { generateShopPDFBlob } from "../utils/generateShopPDF";
 import type { ShopDelivery, Trip } from "../types/trip";
 
+const WHATSAPP_BACKEND_ENABLED = import.meta.env.VITE_WHATSAPP_BACKEND_ENABLED === "true";
+
 export type DeliveryWhatsAppStatusValue = "pending" | "sending" | "sent" | "failed";
 
 export type DeliveryWhatsAppRow = {
@@ -45,6 +47,9 @@ export function sanitizeShopNameForFile(shopName: string): string {
 }
 
 export async function fetchDeliveryWhatsAppStatuses(tripId: number): Promise<DeliveryWhatsAppRow[]> {
+  if (!WHATSAPP_BACKEND_ENABLED) {
+    return [];
+  }
   const { data } = await apiGet<DeliveryWhatsAppRow[]>(`/trips/${tripId}/delivery-whatsapp`);
   return Array.isArray(data) ? data : [];
 }
@@ -54,6 +59,13 @@ export async function sendDeliveryWhatsApp(input: {
   delivery: ShopDelivery;
   shopWhatsApp?: string | null;
 }): Promise<{ success: boolean; status: DeliveryWhatsAppStatusValue; message?: string }> {
+  if (!WHATSAPP_BACKEND_ENABLED) {
+    return {
+      success: false,
+      status: "failed",
+      message: "WhatsApp integration is not configured yet.",
+    };
+  }
   const blob = await generateShopPDFBlob(
     {
       ...input.delivery,

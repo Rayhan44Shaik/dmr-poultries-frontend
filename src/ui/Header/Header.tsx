@@ -139,12 +139,9 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
   const route = useMemo(() => resolveRoute(location.pathname + location.search), [location.pathname, location.search]);
 
   const user = getCurrentUser();
-  const initials = (user.name || "U")
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  const displayName = "Owner";
+  const displayRole = "Owner";
+  const initials = "O";
 
   /* ----- Data-driven notifications (existing services only) ----- */
   const notifications = useMemo<NotificationItem[]>(() => {
@@ -400,11 +397,11 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
             </span>
             <span className="hidden text-left xl:block">
               <span className="block max-w-[140px] truncate text-[13px] font-semibold leading-tight text-slate-800 dark:text-slate-100">
-                {user.name}
+                {displayName}
               </span>
               <span className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                {user.role} · {user.department}
+                {displayRole}
               </span>
             </span>
             <ChevronDown size={14} className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -418,7 +415,7 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
                 {initials}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{user.name}</span>
+                <span className="block truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{displayName}</span>
                 <span className="block truncate text-xs text-slate-400">{user.email}</span>
               </span>
             </div>
@@ -426,7 +423,7 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
               <UserRound size={13} className="text-brand-600 dark:text-brand-400" />
               <span className="text-[11.5px] font-medium text-slate-500 dark:text-slate-300">Role</span>
               <span className="ml-auto rounded-full bg-brand-100 px-2 py-px text-[10.5px] font-semibold text-brand-800 dark:bg-brand-500/15 dark:text-brand-300">
-                {user.role} / Admin
+                {displayRole}
               </span>
             </div>
             <div className="my-1.5 h-px bg-slate-100 dark:bg-slate-700" />

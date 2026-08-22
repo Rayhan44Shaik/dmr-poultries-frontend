@@ -8,7 +8,6 @@
 import React, { useState, useCallback } from "react";
 import {
   FileText,
-  Download,
   Mail,
   ShieldCheck,
   Send,
@@ -21,8 +20,6 @@ import {
   FileDown,
 } from "lucide-react";
 import { WhatsAppIcon } from "../../../../ui/WhatsAppIcon";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import type { Trip, ShopDelivery } from "../types/trip";
 import {
   getTripWizardCompletedMask,
@@ -479,7 +476,7 @@ function CommunicationSummary({
   );
 }
 
-function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Props) {
+function TripViewModal({ open, trip, onClose, shops }: Props) {
   // Completed trips open on Step 4 (Shop Deliveries); incomplete on Step 1.
   const [viewStepIndex, setViewStepIndex] = useState(() =>
     trip && trip.status === "Completed" && isTripWizardComplete(trip) ? 3 : 0
@@ -493,7 +490,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
     setViewStepIndex(trip.status === "Completed" && isTripWizardComplete(trip) ? 3 : 0);
   }
 
-  const noopSubscribeSaveStatus = useCallback((_listener: () => void) => () => {}, []);
+  const noopSubscribeSaveStatus = useCallback(() => () => {}, []);
   const getIdleSaveStatus = useCallback(() => "idle" as const, []);
 
   const emailState = useTripDeliveryEmails(trip, shops);
@@ -549,257 +546,6 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
           }
         : null;
     await generateTripReportPDF(trip, emailInfo);
-  };
-
-  // ─── PDF download (existing footer export) ─────────────────────────
-  const downloadPDF = () => {
-    const doc = new jsPDF("p", "mm", "a4");
-    const margin = 16;
-    let y = 20;
-
-    doc.setFontSize(18);
-    doc.setTextColor(5, 150, 105);
-    doc.text("Trip Details", margin, y);
-    y += 8;
-
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    const dateStr = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-    doc.text(`Generated on: ${dateStr}`, margin, y);
-    y += 6;
-
-    const summaryData = [
-      ["Trip No", trip.tripNo, "Vehicle", trip.vehicleNo],
-      ["Trip Date", trip.tripDate, "Driver", trip.driverName],
-      ["Supervisor", trip.supervisorName, "Source Farm", trip.sourceFarm],
-      ["Opening KM", trip.openingMeter == null ? "Not entered" : trip.openingMeter.toString(), "Closing KM", trip.closingMeter.toString()],
-      ["Total KM", totalKmForPdf().toString(), "Fuel (Ltrs)", trip.fuel.toString()],
-      ["Expense", `₹ ${trip.expense}`, "Status", trip.status],
-      ["DC Weight", `${(trip as any).dcWeight || 0} KG`, "Total Birds", `${trip.totalBirds || 0}`],
-      ["Farm", trip.sourceFarm || "Not entered", "Farm Meter", trip.destMeter ? String(trip.destMeter) : "Not entered"],
-      ["Farm Address", trip.farmAddress?.trim() ? trip.farmAddress : "Not entered", "Avg Bird Weight", trip.avgBirdWeight ? `${trip.avgBirdWeight} kg` : "Not entered"],
-      ["Tolls (Farm)", trip.pickupTolls == null ? "Not entered" : String(trip.pickupTolls), "Farm Time", trip.reachedTime || "Not entered"],
-      [
-        "GPS",
-        trip.farmGpsLat != null &&
-        trip.farmGpsLon != null &&
-        Number.isFinite(Number(trip.farmGpsLat)) &&
-        Number.isFinite(Number(trip.farmGpsLon)) &&
-        !(Number(trip.farmGpsLat) === 0 && Number(trip.farmGpsLon) === 0)
-          ? `${trip.farmGpsLat}, ${trip.farmGpsLon}`
-          : "GPS: Not captured",
-        "GPS Time",
-        trip.farmGpsTime || "Not entered",
-      ],
-      ...((trip as any).approvedBy ? [["Approved By", (trip as any).approvedBy, "", ""]] : []),
-    ];
-
-    autoTable(doc, {
-      body: summaryData.map((row) => [row[0], row[1], row[2], row[3]]),
-      startY: y,
-      theme: "plain",
-      styles: { fontSize: 10, cellPadding: 2 },
-      columnStyles: { 0: { cellWidth: 30, fontStyle: "bold", textColor: [80, 80, 80] }, 1: { cellWidth: 45 }, 2: { cellWidth: 30, fontStyle: "bold", textColor: [80, 80, 80] }, 3: { cellWidth: 45 } },
-      margin: { left: margin, right: margin },
-    });
-    y = (doc as any).lastAutoTable.finalY + 6;
-
-    doc.setFontSize(10);
-    doc.setTextColor(0);
-    doc.text("Remarks:", margin, y);
-    y += 5;
-    doc.setFontSize(10);
-    doc.setTextColor(50, 50, 50);
-    doc.text(trip.remarks || "--", margin, y);
-    y += 8;
-
-    const pickupBoxes = Array.isArray(trip.boxDetails) ? trip.boxDetails : [];
-    if (pickupBoxes.length) {
-      doc.setFontSize(12);
-      doc.setTextColor(0);
-      doc.text("Step 3 — Pickup Boxes", margin, y);
-      y += 4;
-      autoTable(doc, {
-        head: [["S.No", "Box", "Birds", "Weight (KG)", "Avg WT"]],
-        body: pickupBoxes.map((b, index) => {
-          const birds = Number(b.birds || 0);
-          const weight = Number(b.weight || 0);
-          const avg =
-            b.avgWeight != null && Number.isFinite(Number(b.avgWeight))
-              ? Number(b.avgWeight)
-              : birds > 0 && weight > 0
-                ? Number((weight / birds).toFixed(3))
-                : null;
-          return [
-            String(index + 1),
-            String(b.boxNo),
-            String(birds),
-            weight.toFixed(2),
-            avg == null ? "--" : avg.toFixed(3),
-          ];
-        }),
-        startY: y,
-        theme: "striped",
-        headStyles: { fillColor: [5, 150, 105], textColor: 255 },
-        styles: { fontSize: 9, cellPadding: 2 },
-        margin: { left: margin, right: margin },
-      });
-      y = (doc as any).lastAutoTable.finalY + 6;
-    }
-
-    const tableHeaders = ["S.No", "Shop", "Mode", "Boxes", "Birds", "Weight (KG)", "Mortality", "Remarks"];
-    const tableRows = (trip.deliveries || []).map((row, index) => [
-      (index + 1).toString(),
-      row.shopName || "--",
-      row.deliveryMode === "weight" ? "Weight" : "Box",
-      Array.isArray(row.selectedBoxIds) && row.selectedBoxIds.length
-        ? row.selectedBoxIds.join(", ")
-        : row.boxNo != null
-          ? String(row.boxNo)
-          : "--",
-      String(row.birds ?? 0),
-      Number(row.weight || 0).toFixed(2),
-      `${row.mortality ?? 0}${row.mortKg ? ` / ${Number(row.mortKg).toFixed(2)} kg` : ""}`,
-      row.remarks || "--",
-    ]);
-
-    autoTable(doc, {
-      head: [tableHeaders],
-      body: tableRows,
-      startY: y,
-      theme: "striped",
-      headStyles: { fillColor: [5, 150, 105], textColor: 255, fontStyle: "bold", halign: "center" },
-      alternateRowStyles: { fillColor: [240, 253, 244] },
-      styles: { fontSize: 9, cellPadding: 2 },
-      columnStyles: { 0: { halign: "center", cellWidth: 12 }, 1: { halign: "center", cellWidth: 15 }, 2: { halign: "left", cellWidth: 63 }, 3: { halign: "center", cellWidth: 20 }, 4: { halign: "center", cellWidth: 25 }, 5: { halign: "center", cellWidth: 25 } },
-      margin: { left: margin, right: margin },
-    });
-    y = (doc as any).lastAutoTable.finalY + 6;
-
-    const expenseRows: string[][] = [];
-    const expensePairs: Array<[string, number]> = [
-      ["Meals", Number(trip.meals || 0)],
-      ["Loading", Number(trip.loading || 0)],
-      ["Meals / Tiffin", Number(trip.mealsTiffin || 0)],
-      ["Vehicle Maintenance", Number(trip.vehicleMaintenance || 0)],
-      ["Tea", Number(trip.othersRC || 0)],
-      ["Driver", Number(trip.others1Amt || 0)],
-      ["Supervisor", Number(trip.others2Amt || 0)],
-      ["Helper & loader", Number(trip.others3Amt || 0)],
-      ["Others", Number(trip.others4Amt || 0)],
-      ["Others", Number(trip.others5Amt || 0)],
-    ];
-    expensePairs.filter(([, amt]) => amt > 0).forEach(([label, amt]) => {
-      expenseRows.push([label, `₹ ${amt.toFixed(2)}`]);
-    });
-    if (expenseRows.length) {
-      doc.setFontSize(12);
-      doc.text("Step 5 — General Expenses", margin, y);
-      y += 4;
-      autoTable(doc, {
-        head: [["Category", "Amount"]],
-        body: expenseRows,
-        startY: y,
-        theme: "striped",
-        headStyles: { fillColor: [5, 150, 105], textColor: 255 },
-        styles: { fontSize: 9, cellPadding: 2 },
-        margin: { left: margin, right: margin },
-      });
-      y = (doc as any).lastAutoTable.finalY + 6;
-    }
-
-    const dieselRows: string[][] = [];
-    const submittedDiesel = Array.isArray(trip.dieselEntries)
-      ? trip.dieselEntries.filter((e) => e.submitted !== false)
-      : [];
-    if (submittedDiesel.length) {
-      submittedDiesel.forEach((e, idx) => {
-        const lat = e.gpsLat;
-        const lon = e.gpsLon;
-        const gps =
-          lat != null && lon != null && Number(lat) !== 0 && Number(lon) !== 0
-            ? `${lat}, ${lon}`
-            : "GPS: Not captured";
-        dieselRows.push([
-          String(idx + 1),
-          String(e.litres ?? ""),
-          String(e.rate ?? ""),
-          `₹ ${Number(e.amount ?? 0).toFixed(2)}`,
-          String(e.meter ?? "--"),
-          String(e.bunkName || "--"),
-          gps,
-          e.submittedAt || "--",
-          e.imageData ? "Persisted" : "--",
-        ]);
-      });
-    } else {
-      for (let i = 1; i <= 6; i++) {
-        const submitted = (trip as any)[`dieselSubmitted${i}`];
-        if (!submitted) continue;
-        const ltr = Number((trip as any)[`dieselLtr${i}`] || 0);
-        const rate = Number((trip as any)[`dieselRate${i}`] || 0);
-        const amount = Number((trip as any)[`dieselAmount${i}`] ?? 0);
-        const meter = (trip as any)[`dieselMeter${i}`] ?? "--";
-        const bunk = (trip as any)[`dieselBunk${i}`] || "--";
-        const lat = (trip as any)[`dieselGpsLat${i}`];
-        const lon = (trip as any)[`dieselGpsLon${i}`];
-        const gps =
-          lat != null && lon != null && Number(lat) !== 0 && Number(lon) !== 0
-            ? `${lat}, ${lon}`
-            : "GPS: Not captured";
-        dieselRows.push([
-          String(dieselRows.length + 1),
-          String(ltr),
-          String(rate),
-          `₹ ${amount.toFixed(2)}`,
-          String(meter),
-          String(bunk),
-          gps,
-          (trip as any)[`dieselSubmittedAt${i}`] || "--",
-          (trip as any)[`dieselImage${i}`] ? "Persisted" : "--",
-        ]);
-      }
-    }
-    if (dieselRows.length) {
-      doc.setFontSize(12);
-      doc.text("Step 5 — Diesel / Fuel", margin, y);
-      y += 4;
-      autoTable(doc, {
-        head: [["S.No", "Litres", "Rate", "Amount", "Meter", "Bunk", "GPS", "Submitted At", "Bill"]],
-        body: dieselRows,
-        startY: y,
-        theme: "striped",
-        headStyles: { fillColor: [5, 150, 105], textColor: 255 },
-        styles: { fontSize: 8, cellPadding: 1.5 },
-        margin: { left: margin, right: margin },
-      });
-      y = (doc as any).lastAutoTable.finalY + 6;
-    }
-
-    const mileage = trip.mileageKmL;
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(
-      `Mileage: ${mileage != null && Number.isFinite(Number(mileage)) ? `${Number(mileage).toFixed(2)} km/L` : "Not available"}`,
-      margin,
-      y
-    );
-    y += 8;
-
-    doc.setFontSize(11);
-    doc.setTextColor(0);
-    doc.setFont("helvetica", "bold");
-    const totalText = `Total Shops: ${trip.totalShops}   Birds: ${trip.totalBirds}   Weight: ${trip.totalWeight.toFixed(2)} KG   Mortality: ${trip.totalMortality}`;
-    doc.text(totalText, margin, y);
-
-    const safeVehicleNo = trip.vehicleNo.replace(/[^a-zA-Z0-9]/g, "_");
-    doc.save(`${trip.tripNo}_${safeVehicleNo}.pdf`);
-  };
-
-  const totalKmForPdf = (): number => {
-    return trip.totalKm != null && Number.isFinite(Number(trip.totalKm))
-      ? Number(trip.totalKm)
-      : Number(trip.closingMeter || 0) - Number(trip.openingMeter || 0);
   };
 
   // ─── Dummy functions for read‑only steps (incomplete trips) ───
@@ -1021,7 +767,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes: _birdTypes }: Pr
             completedMask={completedMask}
             lockedSteps={lockedSteps}
             onStepClick={setViewStepIndex}
-            onLockedStepClick={(idx) => {
+            onLockedStepClick={() => {
               if (!isTripWizardComplete(trip)) {
                 setViewStepIndex(maxAllowedViewStep);
               }

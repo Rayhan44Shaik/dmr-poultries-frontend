@@ -105,99 +105,8 @@ function StatusBadge({
   );
 }
 
-/** Live email progress + persistent result summary for "Send All Mail". */
-function EmailSummaryPanel({
-  counts,
-  isBulkSending,
-}: {
-  counts: { sent: number; pending: number; sending: number; failed: number; total: number };
-  isBulkSending: boolean;
-}) {
-  const { total, sent, failed, pending, sending } = counts;
-  const processing = sending + pending;
-  const remaining = Math.max(0, total - sent);
-
-  if (isBulkSending) {
-    return (
-      <div
-        role="status"
-        aria-live="polite"
-        className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-2 text-xs font-semibold text-sky-800"
-      >
-        <span className="inline-flex items-center gap-1.5">
-          <Loader2 size={13} className="animate-spin" /> Sending shop emails...
-        </span>
-        <span className="text-sky-900">{sent} / {total} completed</span>
-        <span className="text-emerald-700">Sent: {sent}</span>
-        <span className="text-red-700">Failed: {failed}</span>
-        <span className="text-slate-600">Remaining: {remaining}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-700"
-    >
-      <span className="text-slate-900">Total Shops: {total}</span>
-      <span className="text-emerald-700">Sent: {sent}</span>
-      <span className="text-red-700">Failed: {failed}</span>
-      <span className="text-slate-500">Pending: {pending}</span>
-      {processing > 0 && <span className="text-sky-700">Processing: {processing}</span>}
-    </div>
-  );
-}
-
-/** Live WhatsApp progress + persistent result summary for "Send All WhatsApp". */
-function WhatsAppSummaryPanel({
-  counts,
-  isBulkSending,
-}: {
-  counts: { sent: number; pending: number; sending: number; failed: number; total: number };
-  isBulkSending: boolean;
-}) {
-  const { total, sent, failed, pending, sending } = counts;
-  const processing = sending + pending;
-  const remaining = Math.max(0, total - sent);
-
-  if (isBulkSending) {
-    return (
-      <div
-        role="status"
-        aria-live="polite"
-        className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-green-200 bg-green-50 px-3.5 py-2 text-xs font-semibold text-green-800"
-      >
-        <span className="inline-flex items-center gap-1.5">
-          <Loader2 size={13} className="animate-spin" /> Sending shop WhatsApp...
-        </span>
-        <span className="text-green-900">{sent} / {total} completed</span>
-        <span className="text-emerald-700">Sent: {sent}</span>
-        <span className="text-red-700">Failed: {failed}</span>
-        <span className="text-slate-600">Remaining: {remaining}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-700"
-    >
-      <span className="text-slate-900">Total Shops: {total}</span>
-      <span className="text-emerald-700">Sent: {sent}</span>
-      <span className="text-red-700">Failed: {failed}</span>
-      <span className="text-slate-500">Pending: {pending}</span>
-      {processing > 0 && <span className="text-sky-700">Processing: {processing}</span>}
-    </div>
-  );
-}
-
 export function TripViewShopCards({
   trip,
-  shops: _shops,
   effectiveStatus,
   busyIds,
   isBulkSending,
@@ -206,7 +115,6 @@ export function TripViewShopCards({
   sendCountFor,
   onSendOne,
   onDownloadPdf,
-  emailCounts,
   // WhatsApp props
   whatsappEffectiveStatus,
   whatsappBusyIds,
@@ -215,7 +123,6 @@ export function TripViewShopCards({
   whatsappFailureReasonFor,
   whatsappSendCountFor,
   onSendOneWhatsApp,
-  whatsappCounts,
 }: TripViewShopCardsProps) {
   const deliveries = useMemo(
     () => (Array.isArray(trip.deliveries) ? trip.deliveries : []),
