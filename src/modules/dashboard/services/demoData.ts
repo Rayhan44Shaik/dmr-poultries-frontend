@@ -126,6 +126,8 @@ function makeTrip(seed: number, daysAgo: number, status: Trip["status"]): Trip {
     startStepSubmitted: true,
     sourceFarmId: seed,
     sourceFarm: farm,
+    birdTypeId: 1,
+    birdType: "Broiler",
     reachedTime: new Date(new Date().setHours(7, 15)).toLocaleString(),
     destMeter: Math.round(18060 + r(10) * 60000),
     pickupTolls: 120,

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Loader2, Scale, Pencil, X } from "lucide-react";
+import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Loader2, Scale, Pencil, X, Layers } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { WizardActionBar, WizardStepNotice } from "./WizardStepUI";
@@ -19,6 +19,7 @@ interface Props {
   saveFarmProgress?: (data: Partial<Trip>) => Promise<boolean>;
   hasUnsavedChanges?: boolean;
   farms: any[];
+  birdTypes: any[];
   editable?: boolean;
   canEdit?: boolean;
   onCancel?: () => void;
@@ -37,6 +38,7 @@ export default function StepFarm({
   saveFarmProgress,
   hasUnsavedChanges = false,
   farms,
+  birdTypes,
   editable = false,
   canEdit = false,
   onCancel,
@@ -77,6 +79,18 @@ export default function StepFarm({
     .map((farm: any) => ({
       value: farm.id,
       label: farm.farmName,
+    }));
+
+  const birdTypeOptions = birdTypes
+    .filter((bird: any) => {
+      const active = String(bird.status ?? "Active") === "Active";
+      return active || bird.id === trip.birdTypeId;
+    })
+    .slice()
+    .sort((a: any, b: any) => String(a.birdType ?? a.name ?? "").localeCompare(String(b.birdType ?? b.name ?? "")))
+    .map((bird: any) => ({
+      value: bird.id ?? bird.birdTypeId,
+      label: bird.birdType ?? bird.name,
     }));
 
   const selectStyles = {
@@ -166,6 +180,15 @@ export default function StepFarm({
       sourceFarmId: option?.value || 0,
       sourceFarm: option?.label || "",
       farmAddress: farm ? farmMasterAddress(farm) : "",
+    }));
+  };
+
+  const handleBirdSelect = (option: { value: number; label: string } | null) => {
+    const bird = birdTypes.find((b: any) => (b.id ?? b.birdTypeId) === option?.value);
+    setTrip((prev) => ({
+      ...prev,
+      birdTypeId: option?.value || 0,
+      birdType: bird ? (bird.birdType ?? bird.name ?? "") : "",
     }));
   };
 
@@ -281,7 +304,13 @@ export default function StepFarm({
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{trip.sourceFarm || t("ops.trip.not_entered")}</span>
           </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-2">
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Layers size={12} className="text-violet-500" /> {t("operations.bird_type")}
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{trip.birdType || t("ops.trip.not_entered")}</span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <MapPin size={12} className="text-slate-500" /> {t("ops.trip.field.farm_address")}
             </span>
@@ -404,7 +433,29 @@ export default function StepFarm({
             />
           </div>
 
-          <div className="sm:col-span-2">
+          <div>
+            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+              <Layers size={14} className="text-slate-400" /> {t("operations.bird_type")}{" "}
+              {TRIP_FIELD_DEFINITIONS.birdTypeId.required && <span className="text-red-500">*</span>}
+            </label>
+            <Select<{ value: number; label: string }, false>
+              options={birdTypeOptions}
+              getOptionLabel={(e) => e?.label || ""}
+              getOptionValue={(e) => e?.value.toString() || ""}
+              value={birdTypeOptions.find((o) => o.value === trip.birdTypeId) || null}
+              onChange={handleBirdSelect}
+              className="mt-1 text-sm"
+              placeholder={t("ops.trip.search_bird_type")}
+              isSearchable
+              styles={selectStyles}
+              menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+            />
+            {birdTypeOptions.length <= 1 && (
+              <p className="text-[11px] text-slate-400 mt-1">{t("ops.trip.no_active_bird_types")}</p>
+            )}
+          </div>
+
+          <div className="sm:col-span-1">
             <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
               <MapPin size={14} className="text-slate-400" /> {t("ops.trip.field.farm_address")}{" "}
               <span className="text-red-500">*</span>

@@ -62,6 +62,8 @@ export default function DieselExpensesTable({
   const [isFetchingGPS, setIsFetchingGPS] = useState<{ [key: number]: boolean }>({});
   const [busyRow, setBusyRow] = useState<number | null>(null);
   const [editingRow, setEditingRow] = useState<number | null>(null);
+  const [isEditingSubmitted, setIsEditingSubmitted] = useState(false);
+  const [draftData, setDraftData] = useState<Record<string, any>>({});
   const [rowIndices, setRowIndices] = useState<number[]>([1]);
   const [draftClientKey, setDraftClientKey] = useState<string>(() =>
     typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `diesel-${Date.now()}`
@@ -73,7 +75,11 @@ export default function DieselExpensesTable({
   const dd = String(today.getDate()).padStart(2, "0");
   const fallbackDateStr = `${yyyy}${mm}${dd}`;
 
+  const isInitialized = useRef(false);
+
   useEffect(() => {
+    if (isInitialized.current) return;
+    isInitialized.current = true;
     const activeIndices: number[] = [];
     for (let i = 1; i <= 6; i++) {
       const submitted = sheetData[`dieselSubmitted${i}`];
@@ -85,14 +91,8 @@ export default function DieselExpensesTable({
       if (submitted || ltr || rate || meter || bunk || img) activeIndices.push(i);
     }
     if (activeIndices.length === 0) activeIndices.push(1);
-    else if (!readOnly) {
-      const last = activeIndices[activeIndices.length - 1];
-      if (sheetData[`dieselSubmitted${last}`] && last < 6 && !activeIndices.includes(last + 1)) {
-        // keep a draft slot only when user clicked Add
-      }
-    }
     setRowIndices(activeIndices);
-  }, [sheetData, readOnly]);
+  }, []);
 
   useEffect(() => {
     if (toastMessage) {
@@ -110,8 +110,54 @@ export default function DieselExpensesTable({
     if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
   };
 
-  const handleFieldChange = (field: string, _num: number, value: any) => {
-    handleChange(field, value);
+  const getFieldValue = (field: string, num: number) => {
+    if (editingRow === num && draftData[field] !== undefined) {
+      return draftData[field];
+    }
+    return sheetData[field];
+  };
+
+  const setDraftField = (field: string, value: any) => {
+    setDraftData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleFieldChange = (field: string, num: number, value: any) => {
+    if (editingRow === num) {
+      setDraftField(field, value);
+    } else {
+      handleChange(field, value);
+    }
+  };
+
+  const startEdit = (num: number) => {
+    const submitted = !!sheetData[`dieselSubmitted${num}`];
+    const newDraft: Record<string, any> = {};
+    const fields = [
+      "dieselLtr",
+      "dieselRate",
+      "dieselMeter",
+      "dieselBunk",
+      "dieselGpsLat",
+      "dieselGpsLon",
+      "dieselGpsAccuracy",
+      "dieselGpsCapturedAt",
+      "dieselImage",
+      "dieselImageName",
+      "dieselClientKey",
+      "dieselId",
+    ];
+    fields.forEach((f) => {
+      newDraft[`${f}${num}`] = sheetData[`${f}${num}`] ?? "";
+    });
+    setDraftData(newDraft);
+    setIsEditingSubmitted(submitted);
+    setEditingRow(num);
+  };
+
+  const cancelEdit = () => {
+    setDraftData({});
+    setIsEditingSubmitted(false);
+    setEditingRow(null);
   };
 
   const handleAddRow = () => {
@@ -170,10 +216,15 @@ export default function DieselExpensesTable({
         notifyUser(t("ops.trip.bill_jpeg_png"), "error");
         return;
       }
-      applyBatchUpdates({
-        [`dieselImageName${index}`]: newFileName,
-        [`dieselImage${index}`]: result,
-      });
+      if (editingRow === index) {
+        setDraftField(`dieselImageName${index}`, newFileName);
+        setDraftField(`dieselImage${index}`, result);
+      } else {
+        applyBatchUpdates({
+          [`dieselImageName${index}`]: newFileName,
+          [`dieselImage${index}`]: result,
+        });
+      }
       notifyUser(t("ops.trip.bill_uploaded_row", { row: index }), "success");
     };
     reader.readAsDataURL(file);
@@ -243,8 +294,10 @@ export default function DieselExpensesTable({
     const baseLabel = t("ops.trip.farm_meter_label", { meter: absoluteDestMeter });
     if (num === 1) return { minAllowed: absoluteDestMeter, referenceLabel: baseLabel };
     for (let i = num - 1; i >= 1; i--) {
-      if (!sheetData[`dieselSubmitted${i}`] && i !== editingRow) continue;
-      const prevVal = sheetData[`dieselMeter${i}`];
+      const isEditingThisRow = editingRow === i;
+      const submitted = !!sheetData[`dieselSubmitted${i}`];
+      if (!submitted && !isEditingThisRow) continue;
+      const prevVal = isEditingThisRow ? draftData[`dieselMeter${i}`] : sheetData[`dieselMeter${i}`];
       if (prevVal !== undefined && prevVal !== "" && !isNaN(Number(prevVal))) {
         return { minAllowed: Number(prevVal), referenceLabel: t("ops.trip.row_label", { row: i, meter: prevVal }) };
       }
@@ -252,40 +305,15 @@ export default function DieselExpensesTable({
     return { minAllowed: absoluteDestMeter, referenceLabel: baseLabel };
   };
 
-  const handleMeterChange = (num: number, valStr: string) => {
-    const currentMeter = valStr === "" ? "" : Number(valStr);
-    handleChange(`dieselMeter${num}`, currentMeter);
-    if (currentMeter === "" || isNaN(Number(currentMeter))) {
-      setMeterErrors((prev) => {
-        const copy = { ...prev };
-        delete copy[num];
-        return copy;
-      });
-      return;
-    }
-    const { minAllowed } = getMinAllowedMeter(num);
-    if (minAllowed > 0 && Number(currentMeter) <= minAllowed) {
-      setMeterErrors((prev) => ({
-        ...prev,
-        [num]: meterMustBeGreaterThan(minAllowed),
-      }));
-    } else {
-      setMeterErrors((prev) => {
-        const copy = { ...prev };
-        delete copy[num];
-        return copy;
-      });
-    }
-  };
-
-  const rowReady = (num: number) => {
-    const ltr = sheetData[`dieselLtr${num}`];
-    const rate = sheetData[`dieselRate${num}`];
-    const reading = sheetData[`dieselMeter${num}`];
-    const bunk = String(sheetData[`dieselBunk${num}`] || "").trim();
-    const image = sheetData[`dieselImage${num}`];
-    const lat = sheetData[`dieselGpsLat${num}`];
-    const lon = sheetData[`dieselGpsLon${num}`];
+  const rowReady = (num: number, useDraft = false) => {
+    const data = useDraft && editingRow === num ? draftData : sheetData;
+    const ltr = data[`dieselLtr${num}`];
+    const rate = data[`dieselRate${num}`];
+    const reading = data[`dieselMeter${num}`];
+    const bunk = String(data[`dieselBunk${num}`] || "").trim();
+    const image = data[`dieselImage${num}`];
+    const lat = data[`dieselGpsLat${num}`];
+    const lon = data[`dieselGpsLon${num}`];
     return (
       isPositive(ltr) &&
       isPositive(rate) &&
@@ -299,26 +327,28 @@ export default function DieselExpensesTable({
     );
   };
 
-  const rowBlockReason = (num: number): string | null => {
+  const rowBlockReason = (num: number, useDraft = false): string | null => {
     if (meterErrors[num]) return meterErrors[num];
-    if (!isPositive(sheetData[`dieselLtr${num}`])) return t("ops.trip.diesel_ltr_required");
-    if (!isPositive(sheetData[`dieselRate${num}`])) return t("ops.trip.rate_required");
-    if (!isPositive(Number(sheetData[`dieselLtr${num}`]) * Number(sheetData[`dieselRate${num}`]))) {
+    const data = useDraft && editingRow === num ? draftData : sheetData;
+    if (!isPositive(data[`dieselLtr${num}`])) return t("ops.trip.diesel_ltr_required");
+    if (!isPositive(data[`dieselRate${num}`])) return t("ops.trip.rate_required");
+    if (!isPositive(Number(data[`dieselLtr${num}`]) * Number(data[`dieselRate${num}`]))) {
       return t("ops.trip.amount_greater_zero");
     }
-    if (!isPositive(sheetData[`dieselMeter${num}`])) return t("ops.trip.reading_required");
-    const bunk = String(sheetData[`dieselBunk${num}`] || "").trim();
+    if (!isPositive(data[`dieselMeter${num}`])) return t("ops.trip.reading_required");
+    const bunk = String(data[`dieselBunk${num}`] || "").trim();
     if (!bunk) return t("ops.trip.bunk_required");
     if (/^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(bunk)) return t("ops.trip.bunk_required");
-    if (!isValidGps(sheetData[`dieselGpsLat${num}`], sheetData[`dieselGpsLon${num}`])) {
+    if (!isValidGps(data[`dieselGpsLat${num}`], data[`dieselGpsLon${num}`])) {
       return t("ops.trip.gps_must_captured");
     }
-    if (!hasRealBill(sheetData[`dieselImage${num}`])) return t("ops.trip.bill_image_required");
+    if (!hasRealBill(data[`dieselImage${num}`])) return t("ops.trip.bill_image_required");
     return null;
   };
 
   const handleRowSubmit = async (num: number) => {
-    if (!rowReady(num)) {
+    const useDraft = editingRow === num;
+    if (!rowReady(num, useDraft)) {
       notifyUser(t("ops.trip.fill_mandatory_diesel", { row: num }), "error");
       return;
     }
@@ -326,26 +356,31 @@ export default function DieselExpensesTable({
       notifyUser(t("ops.trip.trip_id_missing"), "error");
       return;
     }
-    const clientKey = String(sheetData[`dieselClientKey${num}`] || draftClientKey);
-    if (!sheetData[`dieselClientKey${num}`]) {
-      applyBatchUpdates({ [`dieselClientKey${num}`]: clientKey });
+    const data = useDraft ? draftData : sheetData;
+    const clientKey = String(data[`dieselClientKey${num}`] || draftClientKey);
+    if (!data[`dieselClientKey${num}`]) {
+      if (useDraft) {
+        setDraftField(`dieselClientKey${num}`, clientKey);
+      } else {
+        applyBatchUpdates({ [`dieselClientKey${num}`]: clientKey });
+      }
     }
     const payload = {
       clientKey,
-      litres: Number(sheetData[`dieselLtr${num}`]),
-      rate: Number(sheetData[`dieselRate${num}`]),
-      meter: Number(sheetData[`dieselMeter${num}`]),
-      bunkName: String(sheetData[`dieselBunk${num}`]).trim(),
-      gpsLat: Number(sheetData[`dieselGpsLat${num}`]),
-      gpsLon: Number(sheetData[`dieselGpsLon${num}`]),
-      gpsAccuracy: sheetData[`dieselGpsAccuracy${num}`] === "" ? null : Number(sheetData[`dieselGpsAccuracy${num}`]),
-      gpsCapturedAt: sheetData[`dieselGpsCapturedAt${num}`] || null,
-      imageData: String(sheetData[`dieselImage${num}`]),
-      imageName: sheetData[`dieselImageName${num}`] || null,
+      litres: Number(data[`dieselLtr${num}`]),
+      rate: Number(data[`dieselRate${num}`]),
+      meter: Number(data[`dieselMeter${num}`]),
+      bunkName: String(data[`dieselBunk${num}`]).trim(),
+      gpsLat: Number(data[`dieselGpsLat${num}`]),
+      gpsLon: Number(data[`dieselGpsLon${num}`]),
+      gpsAccuracy: data[`dieselGpsAccuracy${num}`] === "" ? null : Number(data[`dieselGpsAccuracy${num}`]),
+      gpsCapturedAt: data[`dieselGpsCapturedAt${num}`] || null,
+      imageData: String(data[`dieselImage${num}`]),
+      imageName: data[`dieselImageName${num}`] || null,
     };
     setBusyRow(num);
     try {
-      const entryId = Number(sheetData[`dieselId${num}`]);
+      const entryId = Number(data[`dieselId${num}`]);
       const saved =
         entryId > 0
           ? await updateTripDiesel(tripId, entryId, payload)
@@ -355,7 +390,7 @@ export default function DieselExpensesTable({
           Object.keys(saved).filter((k) => k.startsWith("diesel")).map((k) => [k, (saved as any)[k]])
         ),
       });
-      setEditingRow(null);
+      cancelEdit();
       notifyUser(t("ops.trip.row_submitted", { row: num }), "success");
     } catch (err) {
       notifyUser(handleApiError(err), "error");
@@ -486,21 +521,27 @@ export default function DieselExpensesTable({
               </tr>
             )}
             {visibleRows.map((num, idx) => {
-              const ltrVal = sheetData[`dieselLtr${num}`] ?? "";
-              const rateVal = sheetData[`dieselRate${num}`] ?? "";
-              const meterVal = sheetData[`dieselMeter${num}`] ?? "";
-              const bunkVal = sheetData[`dieselBunk${num}`] ?? "";
-              const imageVal = sheetData[`dieselImage${num}`] ?? "";
-              const imageNameVal = sheetData[`dieselImageName${num}`] || `BILL-${fallbackDateStr}-${String(num).padStart(3, "0")}.png`;
-              const amountVal =
-                Number(sheetData[`dieselAmount${num}`]) ||
-                (dieselAmounts[idx] !== undefined ? dieselAmounts[idx] : Number(ltrVal || 0) * Number(rateVal || 0));
+              const isEditingThisRow = editingRow === num;
+              const ltrVal = getFieldValue(`dieselLtr${num}`, num) ?? "";
+              const rateVal = getFieldValue(`dieselRate${num}`, num) ?? "";
+              const meterVal = getFieldValue(`dieselMeter${num}`, num) ?? "";
+              const bunkVal = getFieldValue(`dieselBunk${num}`, num) ?? "";
+              const imageVal = getFieldValue(`dieselImage${num}`, num) ?? "";
+              const imageNameVal = getFieldValue(`dieselImageName${num}`, num) || `BILL-${fallbackDateStr}-${String(num).padStart(3, "0")}.png`;
+              const ltrNum = Number(ltrVal || 0);
+              const rateNum = Number(rateVal || 0);
+              const amountVal = isEditingThisRow
+                ? ltrNum * rateNum
+                : Number(sheetData[`dieselAmount${num}`]) ||
+                  (dieselAmounts[idx] !== undefined ? dieselAmounts[idx] : ltrNum * rateNum);
               const hasError = !!meterErrors[num];
               const isSubmitted = !!sheetData[`dieselSubmitted${num}`];
-              const locked = (isSubmitted && editingRow !== num) || readOnly;
+              const locked = (isSubmitted && !isEditingThisRow) || readOnly;
               const isFetching = !!isFetchingGPS[num];
               const { minAllowed: rowMinAllowed } = getMinAllowedMeter(num);
-              const gpsOk = isValidGps(sheetData[`dieselGpsLat${num}`], sheetData[`dieselGpsLon${num}`]);
+              const gpsLat = getFieldValue(`dieselGpsLat${num}`, num);
+              const gpsLon = getFieldValue(`dieselGpsLon${num}`, num);
+              const gpsOk = isValidGps(gpsLat, gpsLon);
 
               return (
                 <tr key={num} className={`border-b border-slate-100 ${isSubmitted ? "bg-emerald-50/30" : "hover:bg-slate-50/50"}`}>
@@ -536,15 +577,15 @@ export default function DieselExpensesTable({
                   <td className="p-1 text-center align-middle">
                     {gpsOk ? (
                       <a
-                        href={`https://www.google.com/maps?q=${Number(sheetData[`dieselGpsLat${num}`])},${Number(sheetData[`dieselGpsLon${num}`])}`}
+                        href={`https://www.google.com/maps?q=${Number(gpsLat)},${Number(gpsLon)}`}
                         target="_blank"
                         rel="noreferrer"
                         className="text-[11px] text-emerald-700 font-semibold underline break-words"
-                        title={`Open in maps (${Number(sheetData[`dieselGpsLat${num}`]).toFixed(6)}, ${Number(sheetData[`dieselGpsLon${num}`]).toFixed(6)})`}
+                        title={`Open in maps (${Number(gpsLat).toFixed(6)}, ${Number(gpsLon).toFixed(6)})`}
                       >
                         <GpsAddressText
-                          lat={sheetData[`dieselGpsLat${num}`]}
-                          lon={sheetData[`dieselGpsLon${num}`]}
+                          lat={gpsLat}
+                          lon={gpsLon}
                           fallback={t("ops.trip.location_captured")}
                         />
                       </a>
@@ -588,10 +629,10 @@ export default function DieselExpensesTable({
                       <span className="text-[11px] font-semibold text-emerald-700">{t("ops.trip.submitted")}</span>
                     ) : (
                       <div className="flex items-center justify-center gap-2">
-                        {isSubmitted && editingRow !== num ? (
+                        {isSubmitted && !isEditingThisRow ? (
                           <>
                             <span className="text-[10px] font-semibold text-emerald-700 mr-1">{t("ops.trip.submitted")}</span>
-                            <button type="button" onClick={() => setEditingRow(num)} className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full" title={t("ops.trip.edit_row")}>
+                            <button type="button" onClick={() => startEdit(num)} className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full" title={t("ops.trip.edit_row")}>
                               <Pencil size={14} />
                             </button>
                             <button type="button" onClick={() => requestDelete(num, { label: t("ops.trip.deleting_diesel_row", { row: num }) })} disabled={busyRow === num} className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full" title={t("ops.trip.delete_row")}>
@@ -616,8 +657,9 @@ export default function DieselExpensesTable({
           return !readOnly && (!submitted || editingRow === num);
         });
         if (!actionRow) return null;
-        const reason = rowBlockReason(actionRow);
-        const canSubmit = rowReady(actionRow);
+        const isEditingActionRow = editingRow === actionRow;
+        const reason = rowBlockReason(actionRow, isEditingActionRow);
+        const canSubmit = rowReady(actionRow, isEditingActionRow);
         return (
           <div className="space-y-2">
             {reason ? (
@@ -629,7 +671,7 @@ export default function DieselExpensesTable({
               <button
                 type="button"
                 onClick={() => {
-                  if (editingRow === actionRow) setEditingRow(null);
+                  if (isEditingActionRow) cancelEdit();
                   else handleClearRow(actionRow);
                 }}
                 className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50"

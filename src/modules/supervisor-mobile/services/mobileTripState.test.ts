@@ -30,6 +30,8 @@ function trip(overrides: Partial<Trip>): Trip {
     startStepSubmitted: true,
     sourceFarmId: 0,
     sourceFarm: "",
+    birdTypeId: 0,
+    birdType: "",
     reachedTime: "",
     destMeter: 0,
     pickupTolls: 0,

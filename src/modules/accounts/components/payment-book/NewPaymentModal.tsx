@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, CreditCard } from 'lucide-react';
 import type { Payment } from '../../types/payment.types';
-import { PaymentService } from '../../services/PaymentService';
+import { createPayment } from '../../services/paymentApiService';
 import { getBanks } from '../../../masters/banks/services/bankService';
 import { DatePicker } from '../../../../components/common/DatePicker';
 
@@ -118,13 +118,13 @@ export function NewPaymentModal({ isOpen, onClose, onSave }: NewPaymentModalProp
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!validate()) return;
 
-    const finalPaymentMode = form.paymentMode === 'Cash' 
-      ? 'Cash' 
-      : `${form.paymentMode} - ${form.transactionMethod}`;
+    const finalPaymentMode = form.paymentMode === 'Cash'
+      ? 'Cash'
+      : form.transactionMethod === 'UPI' ? 'UPI' : form.transactionMethod === 'NEFT' ? 'NEFT' : form.transactionMethod === 'RTGS' ? 'RTGS' : form.transactionMethod === 'Cheque' ? 'Cheque' : 'Bank Transfer';
 
     const rawAmount = Number(form.amount.replace(/,/g, ''));
 
@@ -141,9 +141,13 @@ export function NewPaymentModal({ isOpen, onClose, onSave }: NewPaymentModalProp
       createdBy: 'admin',
     };
 
-    const saved = PaymentService.createPayment(paymentData);
-    onSave(saved);
-    onClose();
+    try {
+      const saved = await createPayment(paymentData);
+      onSave(saved);
+      onClose();
+    } catch (error) {
+      setErrors({ form: error instanceof Error ? error.message : 'Unable to save payment' });
+    }
   };
 
   if (!isOpen) return null;

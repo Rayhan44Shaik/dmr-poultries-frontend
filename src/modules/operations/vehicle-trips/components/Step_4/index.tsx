@@ -1,6 +1,7 @@
 // src/modules/operations/vehicle-trips/utils/generateShopPDF.ts
 // (Referenced helper or included components as part of UnLoadingTable module)
 
+import { useRef } from "react";
 // src/modules/operations/vehicle-trips/components/Step_4/UnLoadingTable.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import { 
@@ -49,6 +50,8 @@ interface Props {
   persistedRows?: ShopDelivery[];
   balanceError?: DeliveriesBalanceError;
   balanceErrorShown?: boolean;
+  tripBirdTypeId?: number;
+  tripBirdType?: string;
 }
 
 // ─── Confirmation Modal Component ───────────────────────────────────
@@ -185,12 +188,20 @@ export default function UnLoadingTable({
   persistedRows,
   balanceError,
   balanceErrorShown = false,
+  tripBirdTypeId,
+  tripBirdType,
 }: Props) {
   const { t } = useI18n();
   const safeRows = rows ?? [];
   const safeShops = shops ?? [];
   const safeBirdTypes = birdTypes ?? [];
-  const safeBoxDetails = boxDetails ?? [];
+
+  // Cache the last known good boxDetails to prevent stale/empty boxDetails from API responses
+  const boxDetailsRef = useRef<BoxDetail[]>([]);
+  if (boxDetails && boxDetails.length > 0) {
+    boxDetailsRef.current = boxDetails;
+  }
+  const safeBoxDetails = boxDetailsRef.current.length > 0 ? boxDetailsRef.current : (boxDetails ?? []);
 
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage =6;
@@ -533,7 +544,9 @@ export default function UnLoadingTable({
     setEditingId(null);
     setMode("box");
     setAutoCaptureTime(new Date().toLocaleString());
-    setFormData({ ...EMPTY_DELIVERY_FORM });
+    const birdTypeId = tripBirdTypeId || 0;
+    const birdType = tripBirdType || "";
+    setFormData({ ...EMPTY_DELIVERY_FORM, birdTypeId, birdType });
     setShowForm(true);
   };
 
@@ -728,17 +741,27 @@ export default function UnLoadingTable({
   }, [safeShops, safeRows]);
 
   const birdOptions = useMemo(() => {
-    if (!safeBirdTypes || safeBirdTypes.length === 0) {
+    // If tripBirdTypeId is provided (from Step 2), restrict to only that bird type
+    const allowedBirdTypeId = tripBirdTypeId;
+    let filteredBirdTypes = safeBirdTypes;
+    if (allowedBirdTypeId) {
+      filteredBirdTypes = safeBirdTypes.filter((bird: any) => (bird.id ?? bird.birdTypeId) === allowedBirdTypeId);
+    }
+    if (!filteredBirdTypes || filteredBirdTypes.length === 0) {
       return [{ value: 0, label: t("ops.trip.no_bird_types_available"), isDisabled: true }];
     }
-    return safeBirdTypes
+    return filteredBirdTypes
+      .filter((bird: any) => {
+        const active = String(bird.status ?? "Active") === "Active";
+        return active || (bird.id ?? bird.birdTypeId) === allowedBirdTypeId;
+      })
       .map((bird: any) => {
         const value = bird.id ?? bird.birdTypeId ?? 0;
         const label = bird.birdType ?? bird.name ?? `Bird ${value}`;
         return { value, label, isDisabled: false };
       })
       .filter((opt: { value: number; label: string; isDisabled: boolean }) => opt.value > 0);
-  }, [safeBirdTypes]);
+  }, [safeBirdTypes, tripBirdTypeId]);
 
   const isFormValid = useMemo<boolean>(() => {
     if (mode === "box") {

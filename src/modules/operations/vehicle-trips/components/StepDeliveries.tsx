@@ -209,6 +209,8 @@ export default function StepDeliveries({
           onClose={handleCancelWizard}
           persistedRows={persistedDeliveries ?? []}
           balanceError={validationResult.balanceError}
+          tripBirdTypeId={trip.birdTypeId}
+          tripBirdType={trip.birdType}
         />
       ) : (
         <BoxWeightAnalysis

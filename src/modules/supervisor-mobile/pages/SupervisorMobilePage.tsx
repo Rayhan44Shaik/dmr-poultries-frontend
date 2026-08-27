@@ -625,6 +625,7 @@ function SupervisorTripWorkspace({ supervisor }: { supervisor: MobileSupervisorP
           saveFarmProgress={mobileSaveFarm}
           hasUnsavedChanges
           farms={farms}
+          birdTypes={birdTypes}
           editable={isEditable(farmCompleted)}
           canEdit={false}
           onCancel={closeToDrafts}

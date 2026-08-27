@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { X, Clock } from 'lucide-react';
 import type { Payment } from '../../types/payment.types';
-import { PaymentService } from '../../services/PaymentService';
+import { createPayment, updatePayment } from '../../services/paymentApiService';
 import { canEditItem } from '../../../../utils/dateUtils';
 
 interface PaymentEditModalProps {
@@ -95,19 +95,11 @@ export function PaymentEditModal({ isOpen, payment, onClose, onSave }: PaymentEd
     if (!form.paidTo.trim()) newErrors.paidTo = 'Paid To is required';
     if (form.amount <= 0) newErrors.amount = 'Amount must be greater than 0';
     if (!form.referenceNo.trim()) newErrors.referenceNo = 'Reference No is required';
-    else {
-      const existing = PaymentService.getPayments().filter(
-        (p) => p.referenceNo === form.referenceNo && p.id !== payment?.id
-      );
-      if (existing.length > 0) {
-        newErrors.referenceNo = 'Reference No must be unique';
-      }
-    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
 
     const paymentData = {
@@ -116,16 +108,15 @@ export function PaymentEditModal({ isOpen, payment, onClose, onSave }: PaymentEd
       createdBy: 'admin',
     };
 
-    let saved: Payment;
-    if (isEditMode && payment) {
-      const updated = PaymentService.updatePayment(payment.id, paymentData);
-      if (updated) saved = updated;
-      else return;
-    } else {
-      saved = PaymentService.createPayment(paymentData);
+    try {
+      const saved: Payment = isEditMode && payment
+        ? await updatePayment(payment.id, paymentData)
+        : await createPayment(paymentData);
+      onSave(saved);
+      onClose();
+    } catch (error) {
+      setErrors({ form: error instanceof Error ? error.message : 'Unable to save payment' });
     }
-    onSave(saved);
-    onClose();
   };
 
   if (!isOpen) return null;

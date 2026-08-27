@@ -20,6 +20,8 @@ export function createEmptyTrip(overrides: Partial<Trip> = {}): Trip {
     startStepSubmitted: false,
     sourceFarmId: 0,
     sourceFarm: "",
+    birdTypeId: 0,
+    birdType: "",
     reachedTime: "",
     destMeter: 0,
     pickupTolls: 0,

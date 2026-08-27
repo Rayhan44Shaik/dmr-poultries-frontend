@@ -46,6 +46,7 @@ export const TRIP_FIELD_DEFINITIONS = {
 
   reachedTime: { key: "reachedTime", step: "farm", label: "Reached Time", kind: "computed", required: true, readOnly: true },
   sourceFarmId: { key: "sourceFarmId", step: "farm", label: "Farm", kind: "select", required: true, optionSource: "farms" },
+  birdTypeId: { key: "birdTypeId", step: "farm", label: "Bird Type", kind: "select", required: true, optionSource: "birdTypes" },
   farmAddress: { key: "farmAddress", step: "farm", label: "Farm Address", kind: "location", required: true },
   destMeter: { key: "destMeter", step: "farm", label: "Farm / Destination Meter (KM)", kind: "number", required: true, unit: "KM" },
   pickupTolls: { key: "pickupTolls", step: "farm", label: "Tolls", kind: "number", required: false, unit: "count" },
@@ -98,7 +99,7 @@ export const TRIP_STEP_DEFINITIONS = [
     label: "Farm",
     title: "Reached Farm / Destination",
     submittedFlag: "farmStepSubmitted",
-    fields: ["reachedTime", "sourceFarmId", "farmAddress", "destMeter", "pickupTolls", "avgBirdWeight", "remarks"],
+    fields: ["reachedTime", "sourceFarmId", "birdTypeId", "farmAddress", "destMeter", "pickupTolls", "avgBirdWeight", "remarks"],
   },
   {
     key: "pickup",

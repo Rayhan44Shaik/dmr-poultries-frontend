@@ -6,7 +6,7 @@ import { PaymentTable } from '../components/payment-book/PaymentTable';
 import { PaymentViewModal } from '../components/payment-book/PaymentViewModal';
 import { PaymentEditModal } from '../components/payment-book/PaymentEditModal';
 import { NewPaymentModal } from '../components/payment-book/NewPaymentModal';
-import { PaymentService } from '../services/PaymentService';
+import { deletePayment, listPayments } from '../services/paymentApiService';
 import type { Payment } from '../types/payment.types';
 import { DatePicker } from '../../../components/common/DatePicker';
 import { canEditItem, canDeleteItem } from '../../../utils/dateUtils';
@@ -67,17 +67,22 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  const loadPayments = useCallback(() => {
+  const loadPayments = useCallback(async () => {
     const filters: any = { search: searchQuery };
     if (dateFrom) filters.dateFrom = dateFrom;
     if (dateTo) filters.dateTo = dateTo;
     if (paymentType) filters.paymentType = paymentType;
     if (paymentMode) filters.paymentMode = paymentMode;
 
-    const data = PaymentService.getPayments(filters);
-    setPayments(data);
-    setLoading(false);
-  }, [dateFrom, dateTo, paymentType, paymentMode, searchQuery]);
+    try {
+      const data = await listPayments(filters);
+      setPayments(data);
+    } catch {
+      showNotification('Failed to load payments from the server', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [dateFrom, dateTo, paymentType, paymentMode, searchQuery, showNotification]);
 
   // Auto-sync interval / listener setup for background entries
   useEffect(() => {
@@ -167,13 +172,13 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
     }
   };
 
-  const { requestDelete, cancel, pendingItems } = usePendingDelete<string>((id) => {
-    const success = PaymentService.deletePayment(id);
-    if (success) {
+  const { requestDelete, cancel, pendingItems } = usePendingDelete<string>(async (id) => {
+    try {
+      await deletePayment(id);
       showNotification('Payment deleted successfully', 'success');
       setSelectedId(null);
       loadPayments();
-    } else {
+    } catch {
       showNotification('Failed to delete payment', 'error');
     }
   });
@@ -199,12 +204,12 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
   }, []);
 
   const paymentTypes = useMemo(() => {
-    const types = new Set(PaymentService.getPayments().map((p) => p.paymentType));
+    const types = new Set(payments.map((p) => p.paymentType));
     return Array.from(types);
   }, [payments]);
 
   const paymentModes = useMemo(() => {
-    const modes = new Set(PaymentService.getPayments().map((p) => p.paymentMode));
+    const modes = new Set(payments.map((p) => p.paymentMode));
     return Array.from(modes);
   }, [payments]);
 

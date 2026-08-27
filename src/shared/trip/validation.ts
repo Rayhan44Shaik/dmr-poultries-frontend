@@ -62,6 +62,9 @@ export function validateFarmStep(trip: Trip): TripValidationResult {
   if (required("sourceFarmId") && (!trip.sourceFarmId || !trip.sourceFarm)) {
     errors.push("Please select a Farm.");
   }
+  if (required("birdTypeId") && (!trip.birdTypeId || !trip.birdType)) {
+    errors.push("Please select a Bird Type.");
+  }
   if (required("farmAddress") && !String(trip.farmAddress ?? "").trim()) {
     errors.push("Farm address is required.");
   }

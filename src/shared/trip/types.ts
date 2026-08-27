@@ -76,6 +76,8 @@ export interface Trip {
 
   sourceFarmId: number;
   sourceFarm: string;
+  birdTypeId: number;
+  birdType: string;
   reachedTime: string;
   destMeter: number;
   pickupTolls: number;

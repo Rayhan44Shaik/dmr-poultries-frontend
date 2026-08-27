@@ -434,13 +434,16 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
             destMeter: trip.destMeter, pickupTolls: trip.pickupTolls, avgBirdWeight: trip.avgBirdWeight,
             remarks: trip.remarks, farmGpsLat: trip.farmGpsLat, farmGpsLon: trip.farmGpsLon,
             farmGpsAccuracy: trip.farmGpsAccuracy, farmGpsTime: trip.farmGpsTime,
+            birdTypeId: trip.birdTypeId, birdType: trip.birdType,
           }) !== JSON.stringify({
             sourceFarmId: savedTrip.sourceFarmId, sourceFarm: savedTrip.sourceFarm, farmAddress: savedTrip.farmAddress,
             destMeter: savedTrip.destMeter, pickupTolls: savedTrip.pickupTolls, avgBirdWeight: savedTrip.avgBirdWeight,
             remarks: savedTrip.remarks, farmGpsLat: savedTrip.farmGpsLat, farmGpsLon: savedTrip.farmGpsLon,
             farmGpsAccuracy: savedTrip.farmGpsAccuracy, farmGpsTime: savedTrip.farmGpsTime,
+            birdTypeId: savedTrip.birdTypeId, birdType: savedTrip.birdType,
           })}
           farms={farms}
+          birdTypes={birdTypes}
           editable={isEditable(isFarmCompleted)}
           canEdit={canEditTrip}
           onCancel={clearForm}

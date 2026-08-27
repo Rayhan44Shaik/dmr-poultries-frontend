@@ -116,6 +116,8 @@ function mapRowToTrip(row: RateEntryTripDto, withDeliveries: boolean): Trip {
     startStepSubmitted: true,
     sourceFarmId: 0,
     sourceFarm: row.sourceFarm ?? "",
+    birdTypeId: 0,
+    birdType: "",
     reachedTime: "",
     destMeter: 0,
     pickupTolls: 0,
