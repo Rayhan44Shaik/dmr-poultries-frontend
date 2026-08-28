@@ -9,7 +9,7 @@ import TripPagination from "./TripPagination";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
-import { getNextIncompleteTripStep, TRIP_STEP_LABELS } from "../../../../shared/trip";
+import { getNextIncompleteTripStep, TRIP_STEP_LABELS, isValidTripStatusTransition, getValidNextStatuses, type TripStatus } from "../../../../shared/trip";
 import { useI18n } from "../../../../i18n";
 
 interface Props {
@@ -19,8 +19,8 @@ interface Props {
   onEdit: (trip: Trip) => void;
   onResume?: (trip: Trip) => void;
   onDelete?: (trip: Trip, reason: string) => void;
-  // ✅ Updated: accept optional approvedBy parameter
-  onStatusChange?: (trip: Trip, status: "Pending" | "Completed", approvedBy?: string) => void;
+  // ✅ Updated: accept optional approvedBy parameter - now supports all valid status transitions
+  onStatusChange?: (trip: Trip, status: TripStatus, approvedBy?: string) => void;
 }
 
 function TripRecentTable({
@@ -190,14 +190,22 @@ function TripRecentTable({
     };
   };
 
-  // ✅ Handle status change with approver name
-  const handleStatusChange = (trip: Trip, newStatus: "Pending" | "Completed") => {
+  // ✅ Handle status change with approver name - only allows valid transitions per backend state machine
+  const handleStatusChange = (trip: Trip, newStatus: TripStatus) => {
+    if (!isValidTripStatusTransition(trip.status, newStatus)) {
+      return; // Invalid transition - silently ignore (backend will also reject)
+    }
     if (newStatus === "Completed") {
       const approver = getCurrentUser();
       if (onStatusChange) onStatusChange(trip, "Completed", approver);
-    } else {
-      if (onStatusChange) onStatusChange(trip, "Pending");
+    } else if (newStatus === "Pending" || newStatus === "Draft" || newStatus === "Deleted") {
+      if (onStatusChange) onStatusChange(trip, newStatus);
     }
+  };
+
+  // Get valid next statuses for a trip based on current status
+  const getValidStatusOptions = (currentStatus: TripStatus): TripStatus[] => {
+    return getValidNextStatuses(currentStatus);
   };
 
   return (
@@ -281,7 +289,6 @@ function TripRecentTable({
                   const isSelected = trip.id === selectedTripId;
                   const isDeleted = trip.deleted === true;
                   const isApproved = trip.status === "Completed";
-                  const showDropdown = !isDeleted && onStatusChange && trip.status === "Pending" && !isApproved;
 
                   return (
                     <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
@@ -300,28 +307,42 @@ function TripRecentTable({
                       <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                         {isDeleted ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-rose-100 text-rose-700 border border-rose-200/80"><AlertCircle size={12} /> {t("status.deleted")}</span>
-                        ) : showDropdown ? (
-                          <div className="relative inline-block w-32">
-                            <select
-                              value={trip.status}
-                              onChange={(e) => handleStatusChange(trip, e.target.value as "Pending" | "Completed")}
-                              className={`w-full appearance-none rounded-xl px-3 py-1.5 text-xs font-bold border transition-all shadow-sm cursor-pointer pr-8 focus:outline-none focus:ring-2 focus:ring-offset-1 ${
-                                trip.status === "Completed"
-                                  ? "text-emerald-700 border-emerald-300 bg-emerald-50/80 focus:ring-emerald-500"
-                                  : "text-amber-700 border-amber-300 bg-amber-50/80 focus:ring-amber-500"
-                              }`}
-                            >
-                              <option value="Pending" className="text-amber-700 font-semibold bg-white">⏳ {t("status.pending")}</option>
-                              <option value="Completed" className="text-emerald-700 font-semibold bg-white">✅ {t("status.completed")}</option>
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500">
-                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </div>
-                          </div>
-                        ) : (
-                          (() => {
+                        ) : (() => {
+                          const validOptions = getValidStatusOptions(trip.status);
+                          const showDropdown = !isDeleted && onStatusChange && validOptions.length > 0;
+                          if (showDropdown) {
+                            return (
+                              <div className="relative inline-block w-32">
+                                <select
+                                  value={trip.status}
+                                  onChange={(e) => handleStatusChange(trip, e.target.value as TripStatus)}
+                                  className={`w-full appearance-none rounded-xl px-3 py-1.5 text-xs font-bold border transition-all shadow-sm cursor-pointer pr-8 focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+                                    trip.status === "Completed"
+                                      ? "text-emerald-700 border-emerald-300 bg-emerald-50/80 focus:ring-emerald-500"
+                                      : trip.status === "Pending"
+                                      ? "text-amber-700 border-amber-300 bg-amber-50/80 focus:ring-amber-500"
+                                      : "text-blue-700 border-blue-300 bg-blue-50/80 focus:ring-blue-500"
+                                  }`}
+                                >
+                                  {validOptions.map((status) => (
+                                    <option key={status} value={status} className={`font-semibold bg-white ${status === "Completed" ? "text-emerald-700" : status === "Pending" ? "text-amber-700" : status === "Draft" ? "text-blue-700" : "text-rose-700"}`}>
+                                      {status === "Completed" && "✅ "}
+                                      {status === "Pending" && "⏳ "}
+                                      {status === "Draft" && "📝 "}
+                                      {status === "Deleted" && "🗑️ "}
+                                      {t(`status.${status.toLowerCase()}`) || status}
+                                    </option>
+                                  ))}
+                                </select>
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500">
+                                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (() => {
                             const badge = getStepBadge(trip);
                             return (
                               <button
@@ -335,8 +356,8 @@ function TripRecentTable({
                                 {badge.label}
                               </button>
                             );
-                          })()
-                        )}
+                          })();
+                        })()}
                       </td>
                       <td className="text-center px-4 py-3">
                         <button onClick={(e) => { e.stopPropagation(); onView(trip); }} className="h-8 w-8 rounded-xl bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95 group-hover:border-blue-200" title={t("ops.trip.view_trip_details")}><Eye size={14} /></button>

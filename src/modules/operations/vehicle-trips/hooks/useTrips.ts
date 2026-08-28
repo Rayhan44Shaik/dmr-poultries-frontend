@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Trip } from "../types/trip";
+import type { TripStatus } from "../../../../shared/trip";
 import { apiPut } from "../../../../api";
 import { listTrips, changeTripStatus, deleteTripFromApi } from "../services/tripHeaderApiService";
 import { sendTripDeliveryEmails } from "../services/deliveryEmailService";
@@ -92,9 +93,8 @@ export default function useTrips(
     }
   };
 
-  // ✅ Updated: accept approvedBy parameter. Status transitions (Pending ->
-  // Completed) are validated and persisted by the backend API.
-  const changeStatus = async (trip: Trip, status: "Pending" | "Completed", approvedBy?: string) => {
+  // ✅ Updated: accept approvedBy parameter. Status transitions are validated and persisted by the backend API.
+  const changeStatus = async (trip: Trip, status: TripStatus, approvedBy?: string) => {
     try {
       const updated = await changeTripStatus(trip.id, status, approvedBy);
       await refreshTrips();

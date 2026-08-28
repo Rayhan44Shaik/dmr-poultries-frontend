@@ -17,7 +17,7 @@ import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useBirdTypes } from "../../../masters/bird-types/hooks/useBirdTypes";
 
 import type { Trip } from "../types/trip";
-import { listCompletedTrips, loadTripById } from "../services/tripHeaderApiService";
+import { listCompletedTrips, loadTripById, type PaginatedTripListResult } from "../services/tripHeaderApiService";
 import { useI18n } from "../../../../i18n";
 
 type TripListPageProps = { embedded?: boolean };
@@ -28,6 +28,9 @@ function TripListPage({ embedded = false }: TripListPageProps) {
 
   const [trips, setTrips] = useState<Trip[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalTrips, setTotalTrips] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [vehicle, setVehicle] = useState("All Vehicles");
   const [supervisor, setSupervisor] = useState("All Supervisors");
@@ -35,14 +38,30 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const pageSize = 15;
 
   const refreshTrips = useCallback(async () => {
+    setIsLoading(true);
     try {
-      setTrips(await listCompletedTrips());
+      const result: PaginatedTripListResult = await listCompletedTrips({
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
+        vehicleId: vehicle !== "All Vehicles" ? Number(vehicle) : undefined,
+        supervisorId: supervisor !== "All Supervisors" ? Number(supervisor) : undefined,
+        farmId: farm !== "All Sources" ? Number(farm) : undefined,
+        search: search || undefined,
+        page: currentPage,
+        limit: pageSize,
+      });
+      setTrips(result.data);
+      setTotalPages(result.meta.totalPages);
+      setTotalTrips(result.meta.total);
     } catch {
       showNotification(t("ops.trip.unable_load_trips"), "error");
+    } finally {
+      setIsLoading(false);
     }
-  }, [showNotification, t]);
+  }, [showNotification, t, currentPage, pageSize, fromDate, toDate, vehicle, supervisor, farm, search]);
 
   useEffect(() => {
     void refreshTrips();
@@ -108,14 +127,8 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     ...Array.from(new Set(masterVehicles.map((v) => v.vehicleNumber).filter(Boolean))),
   ];
 
-  const safeTrips = Array.isArray(filteredTrips) ? filteredTrips : [];
-
-  const supervisorSet = new Set(safeTrips.map((t) => t.supervisorName).filter(Boolean));
-  const farmSet = new Set(safeTrips.map((t) => t.sourceFarm).filter(Boolean));
-
-  const supervisors = ["All Supervisors", ...Array.from(supervisorSet)];
-  const farms = ["All Sources", ...Array.from(farmSet)];
-
+  // Server-side pagination - trips are already filtered and paginated by the API
+  const safeTrips = Array.isArray(trips) ? trips : [];
   const completedTrips = safeTrips;
 
   const hasFilters =
@@ -126,18 +139,14 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     fromDate !== "" ||
     toDate !== "";
 
-  const totalCompletedTrips = completedTrips.length;
+  const totalCompletedTrips = totalTrips;
   const totalCompletedShops = completedTrips.reduce((sum, t) => sum + t.totalShops, 0);
   const totalCompletedBirds = completedTrips.reduce((sum, t) => sum + t.totalBirds, 0);
   const totalCompletedWeight = completedTrips.reduce((sum, t) => sum + t.totalWeight, 0);
   const totalCompletedMortality = completedTrips.reduce((sum, t) => sum + t.totalMortality, 0);
 
-  const pageSize = 15;
-  const totalPagesCompleted = Math.ceil(completedTrips.length / pageSize);
-  const paginatedTrips = completedTrips.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
+  const totalPagesCompleted = totalPages;
+  const paginatedTrips = completedTrips;
 
   const startEntry = totalCompletedTrips === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endEntry = Math.min(currentPage * pageSize, totalCompletedTrips);
@@ -169,7 +178,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   };
 
   const handleExportPDF = () => {
-    const exportData = filteredTrips && filteredTrips.length > 0 ? filteredTrips : completedTrips;
+    const exportData = completedTrips;
     if (!exportData || exportData.length === 0) {
       showNotification(t("ops.trip.no_data_export"), "error");
       return;
@@ -202,7 +211,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   };
 
   const handleExportExcel = () => {
-    const exportData = filteredTrips && filteredTrips.length > 0 ? filteredTrips : completedTrips;
+    const exportData = completedTrips;
     if (!exportData || exportData.length === 0) {
       showNotification(t("ops.trip.no_data_export"), "error");
       return;
@@ -259,8 +268,8 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         onSearch={() => {}}
         onReset={handleResetFilters}
         vehicles={vehicleOptions}
-        supervisors={supervisors}
-        farms={farms}
+        supervisors={[]}
+        farms={[]}
         onExportPDF={handleExportPDF}
         onExportExcel={handleExportExcel}
         onViewSelected={handleViewSelected}

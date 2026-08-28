@@ -474,16 +474,69 @@ export async function listTrips(options?: { includeDeleted?: boolean }): Promise
 }
 
 /** GET /api/operations/trip-list — completed/approved, non-deleted trips only. */
-export async function listCompletedTrips(): Promise<Trip[]> {
-  const { data } = await apiGet<ApiTripRecord[] | { data: ApiTripRecord[] }>(
-    "/operations/trip-list"
+export interface TripListFilters {
+  fromDate?: string;
+  toDate?: string;
+  vehicleId?: number;
+  supervisorId?: number;
+  driverId?: number;
+  farmId?: number;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedTripListResult {
+  data: Trip[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+/** GET /api/operations/trip-list — completed/approved, non-deleted trips only with pagination. */
+export async function listCompletedTrips(filters: TripListFilters = {}): Promise<PaginatedTripListResult> {
+  const { data } = await apiGet<ApiTripRecord[] | { data: ApiTripRecord[] } | PaginatedTripListResult>(
+    "/operations/trip-list",
+    {
+      params: {
+        fromDate: filters.fromDate,
+        toDate: filters.toDate,
+        vehicleId: filters.vehicleId,
+        supervisorId: filters.supervisorId,
+        driverId: filters.driverId,
+        farmId: filters.farmId,
+        search: filters.search,
+        page: filters.page,
+        limit: filters.limit,
+      },
+    }
   );
-  const rows = Array.isArray(data)
-    ? data
-    : Array.isArray(data?.data)
-      ? data.data
-      : [];
-  return rows.map((trip) => mapApiTripToTrip(trip));
+  
+  // Handle both old format (array) and new paginated format
+  if (Array.isArray(data)) {
+    return {
+      data: data.map((trip) => mapApiTripToTrip(trip)),
+      meta: { total: data.length, page: 1, limit: data.length, totalPages: 1 },
+    };
+  }
+  
+  // Check for paginated format with meta property
+  const hasMeta = data && typeof data === 'object' && 'meta' in data && data.meta;
+  const hasDataArray = data && typeof data === 'object' && 'data' in data && Array.isArray(data.data);
+  
+  if (hasMeta && hasDataArray) {
+    // New paginated format
+    const records = data.data as unknown as ApiTripRecord[];
+    return {
+      data: records.map((trip) => mapApiTripToTrip(trip)),
+      meta: data.meta,
+    };
+  }
+  
+  return { data: [], meta: { total: 0, page: 1, limit: 50, totalPages: 0 } };
 }
 
 /** Single final Step 1 submission. No draft is created or updated before this request. */

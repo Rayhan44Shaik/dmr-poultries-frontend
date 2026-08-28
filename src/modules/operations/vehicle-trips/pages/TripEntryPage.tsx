@@ -38,6 +38,7 @@ import {
   TRIP_STEP_LABELS,
   type Trip,
   type ShopDelivery,
+  type TripStatus,
 } from "../../../../shared/trip";
 
 type TripEntryPageProps = { embedded?: boolean; };
@@ -93,6 +94,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     registerStep2SuccessCallback,
     registerStep3SuccessCallback,
     registerStep4SuccessCallback,
+    registerTripIdCallback,
   } = useTripEntry(showNotification, refreshTrips);
 
   const [rows, setRows] = useState<ShopDelivery[]>([]);
@@ -103,7 +105,15 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const [entryScreen, setEntryScreen] = useState<EntryScreen>("prompt");
   const [editingSubmittedStep, setEditingSubmittedStep] = useState<number | null>(null);
 
-  /** Strip tripId from URL so refresh never resumes an active wizard. */
+  /** Set tripId in URL so refresh can resume the active wizard. */
+  const setTripIdInUrl = useCallback((tripId: number) => {
+    const params = new URLSearchParams(location.search);
+    params.set("tab", "trip-entry");
+    params.set("tripId", String(tripId));
+    navigate(`/operations?${params.toString()}`, { replace: true });
+  }, [location.search, navigate]);
+
+  /** Clear tripId from URL when explicitly creating a new blank trip. */
   const clearTripIdFromUrl = useCallback(() => {
     const params = new URLSearchParams(location.search);
     if (!params.has("tripId")) return;
@@ -112,53 +122,45 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     navigate(`/operations?${params.toString()}`, { replace: true });
   }, [location.search, navigate]);
 
+  /** Register callback to sync tripId to URL when a trip is created/saved. */
   useEffect(() => {
-    clearTripIdFromUrl();
-  }, [clearTripIdFromUrl]);
+    registerTripIdCallback(setTripIdInUrl);
+  }, [registerTripIdCallback, setTripIdInUrl]);
 
-  // After Step 1 success: close the wizard and return to Create Trip Entry.
-  // The submitted trip is already in Recent Trips via onTripsChanged.
+  /** On mount, if tripId is in URL, load that trip. */
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tripId = params.get("tripId");
+    if (tripId && !trip.id) {
+      const id = Number(tripId);
+      if (Number.isFinite(id) && id > 0) {
+        void loadTripFromApi(id);
+      }
+    }
+  }, [location.search, loadTripFromApi, trip.id]);
+
+  // After Step 1 success: stay on the trip and advance to Step 2.
   useEffect(() => {
     registerStep1SuccessCallback(() => {
       showNotification(t("ops.trip.step1_submitted"), "success");
-      clearTrip();
-      setRows([]);
-      setEntryScreen("prompt");
-      setViewStepIndex(0);
-      setIsEditing(false);
-      setEditingSubmittedStep(null);
-      setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
-      clearTripIdFromUrl();
+      // Trip ID is now in URL via registerTripIdCallback.
+      // Stay on the form and let maxAllowedStep advance to Step 2.
     });
-  }, [registerStep1SuccessCallback, clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, showNotification]);
+  }, [registerStep1SuccessCallback, showNotification]);
 
   useEffect(() => {
     registerStep2SuccessCallback(() => {
       showNotification(t("ops.trip.step2_submitted"), "success");
-      clearTrip();
-      setRows([]);
-      setEntryScreen("prompt");
-      setViewStepIndex(0);
-      setIsEditing(false);
-      setEditingSubmittedStep(null);
-      setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
-      clearTripIdFromUrl();
+      // Trip ID is already in URL. Stay on the form; maxAllowedStep advances to Step 3.
     });
-  }, [registerStep2SuccessCallback, clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, showNotification]);
+  }, [registerStep2SuccessCallback, showNotification]);
 
   useEffect(() => {
     registerStep3SuccessCallback(() => {
       showNotification(t("ops.trip.step3_submitted"), "success");
-      clearTrip();
-      setRows([]);
-      setEntryScreen("prompt");
-      setViewStepIndex(0);
-      setIsEditing(false);
-      setEditingSubmittedStep(null);
-      setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
-      clearTripIdFromUrl();
+      // Trip ID is already in URL. Stay on the form; maxAllowedStep advances to Step 4.
     });
-  }, [registerStep3SuccessCallback, clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, showNotification]);
+  }, [registerStep3SuccessCallback, showNotification]);
 
   useEffect(() => {
     registerStep4SuccessCallback(() => {
@@ -166,7 +168,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     });
   }, [registerStep4SuccessCallback]);
 
-  const handleStatusChange = (trip: Trip, status: "Pending" | "Completed") => {
+  const handleStatusChange = (trip: Trip, status: TripStatus) => {
     changeStatus(trip, status);
   };
 

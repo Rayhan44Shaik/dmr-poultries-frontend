@@ -100,3 +100,42 @@ export function isTripStatus(value: unknown): value is TripStatus {
 export function isDraftStatus(status: TripStatus): boolean {
   return status === "Draft";
 }
+
+/**
+ * Frontend mirror of the backend trip status transition state machine.
+ * Backend source: backend/src/validation/trips.ts TRIP_STATUS_TRANSITIONS
+ */
+export const TRIP_STATUS_TRANSITIONS: Record<TripStatus, TripStatus[]> = {
+  Draft: ["Pending", "Deleted"],
+  Pending: ["Completed", "Draft", "Deleted"],
+  Completed: ["Deleted"],
+  Deleted: [],
+};
+
+/**
+ * Check if a status transition is valid according to the backend state machine.
+ */
+export function isValidTripStatusTransition(from: TripStatus, to: TripStatus): boolean {
+  const allowed = TRIP_STATUS_TRANSITIONS[from] ?? [];
+  return allowed.includes(to);
+}
+
+/**
+ * Get the list of valid next statuses for a given current status.
+ */
+export function getValidNextStatuses(status: TripStatus): TripStatus[] {
+  return TRIP_STATUS_TRANSITIONS[status] ?? [];
+}
+
+/**
+ * Get user-friendly label for a trip status.
+ */
+export function getTripStatusLabel(status: TripStatus): string {
+  const labels: Record<TripStatus, string> = {
+    Draft: "Draft",
+    Pending: "Pending",
+    Completed: "Completed",
+    Deleted: "Deleted",
+  };
+  return labels[status] ?? status;
+}
