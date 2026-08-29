@@ -13,6 +13,7 @@ import PendingCollectionsPage from "../collections/pages/PendingCollectionsPage"
 import CollectionReportPage from "../collections/pages/CollectionReportPage";
 import FuelExpensesPage from "../fuel-expenses/pages/FuelExpensesPage";
 import MortalityEntryPage from "../mortality/pages/MortalityEntryPage";
+import OrdersPage from "../orders/pages/OrdersPage";
 
 // Map tab keys (resolved from ?tab= sidebar deep-links / path aliases)
 // to their child page components.
@@ -27,6 +28,7 @@ const tabComponents: Record<string, React.ComponentType<{ embedded?: boolean }>>
   "collection-report": CollectionReportPage,
   mortality: MortalityEntryPage,
   "fuel-expenses": FuelExpensesPage,
+  orders: OrdersPage,
 };
 
 function OperationsPages() {
@@ -50,6 +52,7 @@ function OperationsPages() {
     if (pathname.includes("collections/report")) return "collection-report";
     if (pathname.includes("mortality")) return "mortality";
     if (pathname.includes("fuel-expenses")) return "fuel-expenses";
+    if (pathname.includes("orders")) return "orders";
 
     return "overview"; // Default tab
   }, [location.pathname, searchParams]);
