@@ -220,6 +220,8 @@ export function computeOrdersProgress(
   let totalWeight = 0;
   let totalBirds = 0;
   let deliveredBoxes = 0;
+  let deliveredBirds = 0;
+  let deliveredWeight = 0;
 
   const planByShop = new Map<number, ShopDelivery>();
   for (const row of rows) {
@@ -239,7 +241,12 @@ export function computeOrdersProgress(
     totalBirds += ordered ? ordered.birds : num(row.farmBirds ?? row.birds);
   }
   for (const row of rows) {
-    if (isOrderPlanRow(row) && isCapturedRow(row)) deliveredBoxes += deliveredRowBoxes(row);
+    if (isOrderPlanRow(row) && isCapturedRow(row)) {
+      deliveredBoxes += deliveredRowBoxes(row);
+      // Step 4 rewrites the row in place: birds/weight = delivered values.
+      deliveredBirds += num(row.birds);
+      deliveredWeight += num(row.weight);
+    }
   }
 
   // Fallback when the marker was lost (e.g. remarks edited in Step 4):
@@ -292,6 +299,8 @@ export function computeOrdersProgress(
     deliveredShops,
     pendingShops,
     deliveredBoxes,
+    deliveredBirds,
+    deliveredWeight: Number(deliveredWeight.toFixed(2)),
     additionalShopCount,
     status,
   };

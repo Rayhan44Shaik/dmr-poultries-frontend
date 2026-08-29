@@ -454,8 +454,8 @@ function CollectionEntries({
   const statusLabelOf = useCallback(
     (shopId: number, hasEntry: boolean): string => {
       const assignment = collection?.shops.get(shopId) ?? null;
-      if (!hasEntry) return "";
-      if (!assignment) return to("orders.not_assigned");
+      if (!hasEntry) return to("orders.status_not_collected");
+      if (!assignment) return to("orders.status_collected");
       return assignment.delivered ? to("orders.status_delivered") : to("orders.status_assigned");
     },
     [collection, to]
@@ -616,6 +616,8 @@ function CollectionEntries({
                 <th className={`${opsTableThClass} w-28`}>{to("orders.col_birds")}</th>
                 <th className={`${opsTableThClass} w-28`}>{to("orders.col_boxes")} *</th>
                 <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_weight")}</th>
+                <th className={`${opsTableThClass} w-36`}>{to("orders.col_trip_no")}</th>
+                <th className={`${opsTableThClass} w-28`}>{to("orders.col_vehicle_no")}</th>
                 <th className={`${opsTableThClass} w-32`}>{to("orders.col_status")}</th>
                 <th className={`${opsTableThClass} w-20`}>{to("orders.col_action")}</th>
               </tr>
@@ -630,15 +632,13 @@ function CollectionEntries({
                 const assignment = collection?.shops.get(shop.id) ?? null;
 
                 let statusNode: React.ReactNode = (
-                  <span className="text-slate-300 text-xs">—</span>
+                  <OrdersStatusBadge status="Not Collected" label={to("orders.status_not_collected")} />
                 );
                 if (hasEntry) {
                   if (!assignment) {
+                    // Order collected but not yet on any vehicle.
                     statusNode = (
-                      <OrdersStatusBadge
-                        status="Not Assigned"
-                        label={to("orders.not_assigned")}
-                      />
+                      <OrdersStatusBadge status="Collected" label={to("orders.status_collected")} />
                     );
                   } else if (assignment.delivered) {
                     // Step 4 confirmed this shop was delivered → GREEN.
@@ -650,8 +650,8 @@ function CollectionEntries({
                       </span>
                     );
                   } else {
-                    // Compact indicator only — trip / vehicle / sequence
-                    // live on hover; details belong to Tab 2 / Tab 3.
+                    // Compact indicator only — sequence lives on hover;
+                    // details belong to Tab 2 / Tab 3.
                     statusNode = (
                       <span
                         title={`${assignment.tripNo} · ${assignment.vehicleNo} · ${to("orders.seq_n", { n: assignment.sequence })}`}
@@ -719,6 +719,21 @@ function CollectionEntries({
                         </span>
                       )}
                     </td>
+                    <td className={opsTableTdClass}>
+                      {assignment ? (
+                        <span
+                          className={`font-bold ${assignment.delivered ? "text-emerald-600" : "text-slate-700"}`}
+                          title={assignment.delivered ? to("orders.status_delivered") : to("orders.status_assigned")}
+                        >
+                          {assignment.tripNo}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300">—</span>
+                      )}
+                    </td>
+                    <td className={`${opsTableTdClass} text-slate-500`}>
+                      {assignment?.vehicleNo || <span className="text-slate-300">—</span>}
+                    </td>
                     <td className={opsTableTdClass}>{statusNode}</td>
                     <td className={opsTableTdClass}>
                       {isEditable ? (
@@ -741,7 +756,7 @@ function CollectionEntries({
               })}
               {pageShops.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12">
+                  <td colSpan={10} className="px-4 py-12">
                     <OrdersEmptyState
                       title={
                         q

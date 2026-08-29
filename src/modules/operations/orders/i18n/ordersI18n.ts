@@ -229,7 +229,7 @@ const EN: Record<string, string> = {
   // Table-level refresh (soft notification)
   "orders.refresh": "Refresh",
   "orders.refresh_collection": "Orders refreshed",
-  "orders.refresh_assignment": "Assignments refreshed",
+  "orders.refresh_assignment": "Assignment data refreshed",
   "orders.refresh_tracking": "Delivery tracking refreshed",
 
   // Collection table sort
@@ -237,6 +237,23 @@ const EN: Record<string, string> = {
   "orders.sort_collected_first": "Collected First",
   "orders.sort_name_az": "Shop Name A → Z",
   "orders.sort_name_za": "Shop Name Z → A",
+
+  // Collection statuses + assignment/tracking additions (polish round 2)
+  "orders.status_not_collected": "Not Collected",
+  "orders.status_collected": "Collected",
+  "orders.available": "Available",
+  "orders.available_collected_shops": "AVAILABLE COLLECTED SHOPS",
+  "orders.selected_shops": "Selected Shops",
+  "orders.selected_count": "{n} selected",
+  "orders.total_birds": "Total Birds",
+  "orders.total_boxes": "Total Boxes",
+  "orders.total_weight": "Total Weight (KG)",
+  "orders.delivery_time": "Delivery Time",
+  "orders.weight": "Weight",
+  "orders.requested": "Requested",
+  "orders.already_assigned": "Already Assigned",
+  "orders.capacity_exceeded_line": "Capacity exceeded. Please reduce the assigned boxes.",
+  "orders.not_listed_note": "This shop was delivered during Step 4 but was not present in the original collected order.",
 };
 
 const TE: Record<string, string> = {
@@ -459,7 +476,7 @@ const TE: Record<string, string> = {
   // Table-level refresh (soft notification)
   "orders.refresh": "రిఫ్రెష్",
   "orders.refresh_collection": "ఆర్డర్లు రిఫ్రెష్ అయ్యాయి",
-  "orders.refresh_assignment": "అసైన్‌మెంట్లు రిఫ్రెష్ అయ్యాయి",
+  "orders.refresh_assignment": "అసైన్‌మెంట్ డేటా రిఫ్రెష్ అయ్యంది",
   "orders.refresh_tracking": "డెలివరీ ట్రాకింగ్ రిఫ్రెష్ అయింది",
 
   // Collection table sort
@@ -467,6 +484,23 @@ const TE: Record<string, string> = {
   "orders.sort_collected_first": "సేకరించినవి ముందు",
   "orders.sort_name_az": "షాప్ పేరు A → Z",
   "orders.sort_name_za": "షాప్ పేరు Z → A",
+
+  // Collection statuses + assignment/tracking additions (polish round 2)
+  "orders.status_not_collected": "సేకరించలేదు",
+  "orders.status_collected": "సేకరించబడింది",
+  "orders.available": "అందుబాటులో",
+  "orders.available_collected_shops": "అందుబాటులో ఉన్న సేకరించిన షాప్‌లు",
+  "orders.selected_shops": "ఎంచుకున్న షాప్‌లు",
+  "orders.selected_count": "{n} ఎంచుకోబడ్డాయి",
+  "orders.total_birds": "మొత్తం పక్షులు",
+  "orders.total_boxes": "మొత్తం బాక్స్‌లు",
+  "orders.total_weight": "మొత్తం బరువు (కేజీ)",
+  "orders.delivery_time": "డెలివరీ సమయం",
+  "orders.weight": "బరువు",
+  "orders.requested": "రిక్వెస్టెడ్",
+  "orders.already_assigned": "ఇప్పటికే అసైన్ చేసినవి",
+  "orders.capacity_exceeded_line": "కెపాసిటీ మించింది. అసైన్ చేసిన బాక్స్‌లను తగ్గించండి.",
+  "orders.not_listed_note": "ఈ షాప్ స్టెప్ 4 సమయంలో డెలివర్ అయింది కానీ అసలు సేకరించిన ఆర్డర్‌లో లేదు.",
 };
 
 export type OrdersT = (key: string, params?: Record<string, string | number>) => string;

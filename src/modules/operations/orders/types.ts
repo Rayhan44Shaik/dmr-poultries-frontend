@@ -80,6 +80,10 @@ export type OrdersProgress = {
   pendingShops: number;
   /** Original boxes with a Step 4 capture. */
   deliveredBoxes: number;
+  /** Birds actually delivered for the original shops (Step 4 rows). */
+  deliveredBirds: number;
+  /** Weight (KG) actually delivered for the original shops (Step 4 rows). */
+  deliveredWeight: number;
   /** Shops present in Step 4 data but NOT part of the original order. */
   additionalShopCount: number;
   /** Assigned = 0 delivered · In Progress = partial · Completed = all or trip ended. */

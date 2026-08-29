@@ -328,6 +328,9 @@ const OrdersPage: React.FC = () => {
             <OrdersDeliveryTrackingTab
               trips={data.tracking}
               loading={false}
+              day={day}
+              today={today}
+              onDaySelect={setSelectedDay}
               shopDirectory={shopDirectory}
               pdfBusyId={pdfBusyId}
               whatsappBusyId={whatsappBusyId}

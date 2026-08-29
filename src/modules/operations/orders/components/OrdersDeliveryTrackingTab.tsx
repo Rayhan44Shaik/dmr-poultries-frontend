@@ -21,7 +21,7 @@
 // are derived from the persisted Step 4 rows (no UI-only state).
 
 import React, { useMemo, useState } from "react";
-import { Eye, FileText, MessageCircle, RefreshCw } from "lucide-react";
+import { Eye, FileText, RefreshCw } from "lucide-react";
 import {
   opsTableDivideClass,
   opsTableHeadRowClass,
@@ -34,24 +34,38 @@ import {
   shouldShowPagination,
 } from "../../../../shared/ui/paginationStyles";
 import TripPagination from "../../vehicle-trips/components/TripPagination";
-import { formatCount, formatDeliveredAtLabel } from "../ordersUtils";
+import { formatCount } from "../ordersUtils";
 import { paginate, villageOf, type ShopDirectory } from "../ordersService";
 import { useOrdersI18n } from "../i18n/ordersI18n";
 import type { OrdersTrip } from "../types";
 import {
+  OrdersDateControl,
   OrdersEmptyState,
   OrdersFilterSelect,
   OrdersIconButton,
   OrdersSearchInput,
   OrdersStatusBadge,
   OrdersTableSkeleton,
+  WhatsAppIcon,
 } from "./OrdersCommon";
 
 const PAGE_SIZE = 10;
 
+/** Compact YYYY-MM-DD → DD/MM/YYYY (tracking table Date column). */
+function formatDayShort(iso: string): string {
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-");
+  return d && m && y ? `${d}/${m}/${y}` : iso;
+}
+
 type Props = {
   trips: OrdersTrip[];
   loading: boolean;
+  /** Selected operational day — tracking is shown day-by-day. */
+  day: string;
+  /** Operational today (drives the shared date selector). */
+  today: string;
+  onDaySelect: (day: string) => void;
   shopDirectory: ShopDirectory;
   pdfBusyId: number | null;
   whatsappBusyId: number | null;
@@ -90,14 +104,7 @@ function usePaged<T>(
 
 // ─── Compact filters (status + difference) ──────────────────────────────────
 
-type StatusFilter =
-  | "all"
-  | "assigned"
-  | "pending"
-  | "in_progress"
-  | "completed"
-  | "not_listed"
-  | "with_diff";
+type StatusFilter = "all" | "assigned" | "in_progress" | "completed";
 type DifferenceFilter = "all" | "none" | "short" | "extra" | "not_listed";
 
 function statusMatches(ot: OrdersTrip, f: StatusFilter): boolean {
@@ -107,17 +114,12 @@ function statusMatches(ot: OrdersTrip, f: StatusFilter): boolean {
     case "all":
       return true;
     case "assigned":
-    case "pending":
       // Waiting for the first Step 4 capture (delivery not started yet).
       return p.status === "Assigned";
     case "in_progress":
       return p.status === "In Progress";
     case "completed":
       return p.status === "Completed";
-    case "not_listed":
-      return p.additionalShopCount > 0;
-    case "with_diff":
-      return p.deliveredShops > 0 && p.deliveredBoxes !== p.totalBoxes;
   }
 }
 
@@ -140,13 +142,6 @@ function differenceMatches(ot: OrdersTrip, f: DifferenceFilter): boolean {
       // Step-4-only: shops delivered that were never in the order.
       return p.additionalShopCount > 0;
   }
-}
-
-/** Signed box difference for the Difference column (null = no delivery yet). */
-function boxDiff(ot: OrdersTrip): number | null {
-  const p = ot.progress;
-  if (!p || p.deliveredShops === 0) return null;
-  return p.deliveredBoxes - p.totalBoxes;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -189,8 +184,9 @@ function ActionButtons({
         label={to("orders.whatsapp")}
         onClick={() => onWhatsApp(ot)}
         busy={whatsappBusyId === trip.id}
+        tone="emerald"
       >
-        <MessageCircle size={14} />
+        <WhatsAppIcon size={14} />
       </OrdersIconButton>
     </div>
   );
@@ -252,20 +248,22 @@ function TrackingTable({
   const { to } = useOrdersI18n();
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1160px] text-xs md:text-sm">
+      <table className="w-full min-w-[1480px] text-xs md:text-sm">
         <thead>
           <tr className={opsTableHeadRowClass}>
             <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
             <th className={opsTableThClass}>{to("orders.col_trip_no")}</th>
+            <th className={`${opsTableThClass} w-24`}>{to("orders.col_date")}</th>
             <th className={opsTableThClass}>{to("orders.col_vehicle_no")}</th>
             <th className={opsTableThClass}>{to("orders.supervisor")}</th>
-            <th className={`${opsTableThClass} w-20 text-right`}>{to("orders.col_total_shops")}</th>
-            <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_boxes")}</th>
-            <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.col_delivered_boxes")}</th>
-            <th className={`${opsTableThClass} w-20 text-right`}>{to("orders.col_difference")}</th>
-            <th className={`${opsTableThClass} w-32`}>{to("orders.col_progress")}</th>
+            <th className={opsTableThClass}>{to("orders.driver")}</th>
+            <th className={`${opsTableThClass} w-32`}>{to("orders.col_total_shops")}</th>
+            <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.total_boxes")}</th>
+            <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_delivered_boxes")}</th>
+            <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_birds")}</th>
+            <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.delivered_weight")}</th>
+            <th className={`${opsTableThClass} w-20 text-right`}>{to("orders.status_pending")}</th>
             <th className={`${opsTableThClass} w-28`}>{to("orders.col_status")}</th>
-            <th className={`${opsTableThClass} w-36`}>{to("orders.col_completed_at")}</th>
             <th className={`${opsTableThClass} w-28`}>{to("orders.col_action")}</th>
           </tr>
         </thead>
@@ -273,7 +271,6 @@ function TrackingTable({
           {pageSlice.map((ot, index) => {
             const { trip, progress } = ot;
             const status = progress?.status ?? "Assigned";
-            const diff = boxDiff(ot);
             return (
               <tr key={trip.id} className={`${opsTableRowClass} align-middle`}>
                 <td className={opsTableTdClass}>
@@ -282,10 +279,12 @@ function TrackingTable({
                   </span>
                 </td>
                 <td className={`${opsTableTdClass} font-bold text-emerald-700`}>{trip.tripNo}</td>
+                <td className={`${opsTableTdClass} text-slate-500 whitespace-nowrap`}>{formatDayShort(trip.tripDate)}</td>
                 <td className={opsTableTdClass}>{trip.vehicleNo || "—"}</td>
                 <td className={opsTableTdClass}>{trip.supervisorName || "—"}</td>
-                <td className={`${opsTableTdClass} text-right font-semibold`}>
-                  {progress ? formatCount(progress.totalShops) : "—"}
+                <td className={opsTableTdClass}>{trip.driverName || "—"}</td>
+                <td className={opsTableTdClass}>
+                  <ProgressBar ot={ot} />
                 </td>
                 <td className={`${opsTableTdClass} text-right font-bold text-emerald-800`}>
                   {progress ? formatCount(progress.totalBoxes) : "—"}
@@ -293,19 +292,22 @@ function TrackingTable({
                 <td className={`${opsTableTdClass} text-right font-semibold`}>
                   {progress ? formatCount(progress.deliveredBoxes) : "—"}
                 </td>
-                <td className={opsTableTdClass}>
-                  {diff === null ? (
-                    <span className="text-slate-300">—</span>
-                  ) : diff < 0 ? (
-                    <span className="font-bold text-rose-600">−{Math.abs(diff)}</span>
-                  ) : diff > 0 ? (
-                    <span className="font-bold text-sky-600">+{diff}</span>
-                  ) : (
-                    <span className="font-semibold text-slate-400">0</span>
-                  )}
+                <td className={`${opsTableTdClass} text-right font-semibold`}>
+                  {progress && progress.deliveredBirds > 0 ? formatCount(progress.deliveredBirds) : <span className="text-slate-300">—</span>}
                 </td>
-                <td className={opsTableTdClass}>
-                  <ProgressBar ot={ot} />
+                <td className={`${opsTableTdClass} text-right font-semibold`}>
+                  {progress && progress.deliveredWeight > 0 ? progress.deliveredWeight.toFixed(2) : <span className="text-slate-300">—</span>}
+                </td>
+                <td className={`${opsTableTdClass} text-right`}>
+                  {progress ? (
+                    progress.pendingShops > 0 ? (
+                      <b className="text-amber-600">{progress.pendingShops}</b>
+                    ) : (
+                      <span className="text-slate-300">0</span>
+                    )
+                  ) : (
+                    <span className="text-slate-300">—</span>
+                  )}
                 </td>
                 <td className={opsTableTdClass}>
                   <StatusBadge status={status} />
@@ -316,11 +318,6 @@ function TrackingTable({
                     >
                       +{progress.additionalShopCount}
                     </span>
-                  )}
-                </td>
-                <td className={`${opsTableTdClass} text-slate-500 whitespace-nowrap`}>
-                  {formatDeliveredAtLabel(trip.submittedAtTimestamp ?? null) || (
-                    <span className="text-slate-300">—</span>
                   )}
                 </td>
                 <td className={opsTableTdClass}>
@@ -347,6 +344,9 @@ function TrackingTable({
 function OrdersDeliveryTrackingTab({
   trips,
   loading,
+  day,
+  today,
+  onDaySelect,
   shopDirectory,
   pdfBusyId,
   whatsappBusyId,
@@ -358,13 +358,19 @@ function OrdersDeliveryTrackingTab({
 }: Props) {
   const { to } = useOrdersI18n();
 
+  // Tracking is day-scoped: the single global date selector drives which
+  // trips are shown (no Previous/Next day buttons).
+  const dayTrips = useMemo(
+    () => trips.filter((t) => t.trip.tripDate === day),
+    [trips, day]
+  );
   const active = useMemo(
-    () => trips.filter((t) => t.progress?.status !== "Completed"),
-    [trips]
+    () => dayTrips.filter((t) => t.progress?.status !== "Completed"),
+    [dayTrips]
   );
   const completed = useMemo(
-    () => trips.filter((t) => t.progress?.status === "Completed"),
-    [trips]
+    () => dayTrips.filter((t) => t.progress?.status === "Completed"),
+    [dayTrips]
   );
 
   // ── One compact search + status filter + difference filter ───────────────
@@ -377,11 +383,8 @@ function OrdersDeliveryTrackingTab({
     () => [
       { value: "all", label: to("orders.all") },
       { value: "assigned", label: to("orders.status_assigned") },
-      { value: "pending", label: to("orders.status_pending") },
       { value: "in_progress", label: to("orders.status_in_progress") },
       { value: "completed", label: to("orders.status_completed") },
-      { value: "not_listed", label: to("orders.status_not_listed") },
-      { value: "with_diff", label: to("orders.delivered_with_difference") },
     ],
     [to]
   );
@@ -442,7 +445,32 @@ function OrdersDeliveryTrackingTab({
     [completed, statusFilter, differenceFilter, q, to, shopDirectory]
   );
 
-  const filterKey = `${q}|${statusFilter}|${differenceFilter}`;
+  // ── Compact scope summary over the VISIBLE (filtered) rows ───────────────
+  const scope = useMemo(() => {
+    const t = {
+      totalBirds: 0,
+      totalBoxes: 0,
+      totalWeight: 0,
+      deliveredBirds: 0,
+      deliveredBoxes: 0,
+      deliveredWeight: 0,
+    };
+    for (const ot of [...activeFiltered, ...completedFiltered]) {
+      const p = ot.progress;
+      if (!p) continue;
+      t.totalBirds += p.totalBirds;
+      t.totalBoxes += p.totalBoxes;
+      t.totalWeight += p.totalWeight;
+      t.deliveredBirds += p.deliveredBirds;
+      t.deliveredBoxes += p.deliveredBoxes;
+      t.deliveredWeight += p.deliveredWeight;
+    }
+    t.totalWeight = Number(t.totalWeight.toFixed(2));
+    t.deliveredWeight = Number(t.deliveredWeight.toFixed(2));
+    return t;
+  }, [activeFiltered, completedFiltered]);
+
+  const filterKey = `${q}|${statusFilter}|${differenceFilter}|${day}`;
   const [activePage, safeActivePage, activeTotalPages, setActivePage] = usePaged(
     activeFiltered,
     PAGE_SIZE,
@@ -469,6 +497,16 @@ function OrdersDeliveryTrackingTab({
           ariaLabel={to("orders.search_tracking")}
           className="w-full sm:w-64"
         />
+        {day && today && (
+          <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} />
+        )}
+        <OrdersIconButton
+          label={`${to("orders.refresh")} — ${to("orders.refresh_tracking")}`}
+          onClick={onRefresh}
+          busy={refreshing}
+        >
+          <RefreshCw size={14} />
+        </OrdersIconButton>
         <OrdersFilterSelect
           value={statusFilter}
           onChange={(v) => setStatusFilter(v as StatusFilter)}
@@ -538,6 +576,24 @@ function OrdersDeliveryTrackingTab({
           />
         )}
       </div>
+
+      {/* ── Compact scope summary (currently visible / filtered rows) ────── */}
+      {activeFiltered.length + completedFiltered.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-4 py-2.5 flex items-center gap-x-5 gap-y-1 flex-wrap text-xs font-semibold text-slate-600">
+          {([
+            [to("orders.total_birds"), formatCount(scope.totalBirds)],
+            [to("orders.total_boxes"), formatCount(scope.totalBoxes)],
+            [to("orders.total_weight"), scope.totalWeight.toFixed(2)],
+            [to("orders.delivered_birds"), formatCount(scope.deliveredBirds)],
+            [to("orders.delivered_boxes"), formatCount(scope.deliveredBoxes)],
+            [to("orders.delivered_weight"), scope.deliveredWeight.toFixed(2)],
+          ] as Array<[string, string]>).map(([label, value]) => (
+            <span key={label} className="whitespace-nowrap">
+              {label}: <b className="text-slate-800">{value}</b>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

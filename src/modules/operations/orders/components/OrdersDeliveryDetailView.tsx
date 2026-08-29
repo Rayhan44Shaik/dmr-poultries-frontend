@@ -20,7 +20,7 @@
 //   the VISIBLE rows and never mix ordered vs delivered quantities).
 
 import React, { useMemo, useState } from "react";
-import { FileText, MessageCircle, X } from "lucide-react";
+import { FileText, X } from "lucide-react";
 import {
   opsTableCardClass,
   opsTableDivideClass,
@@ -45,6 +45,7 @@ import {
   OrdersIconButton,
   OrdersSearchInput,
   OrdersStatusBadge,
+  WhatsAppIcon,
 } from "./OrdersCommon";
 
 const PAGE_SIZE = 10;
@@ -287,8 +288,9 @@ function OrdersDeliveryDetailView({
                 label={to("orders.whatsapp")}
                 onClick={onWhatsApp}
                 busy={whatsappBusy}
+                tone="emerald"
               >
-                <MessageCircle size={15} />
+                <WhatsAppIcon size={15} />
               </OrdersIconButton>
               <button
                 type="button"
@@ -352,29 +354,26 @@ function OrdersDeliveryDetailView({
                 </div>
               </div>
               <div className={`${opsTableCardClass} overflow-x-auto`}>
-                <table className="w-full min-w-[1560px] text-xs md:text-sm">
+                <table className="w-full min-w-[1280px] text-xs md:text-sm">
                   <thead>
                     <tr className={opsTableHeadRowClass}>
-                      <th className={`${opsTableThClass} w-14`}>{to("orders.col_sequence")}</th>
+                      <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
                       <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
                       <th className={opsTableThClass}>{to("orders.col_village")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_birds")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_birds")}</th>
-                      <th className={`${opsTableThClass} w-16 text-right`}>{to("orders.col_difference")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_boxes")}</th>
+                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_birds")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_boxes")}</th>
-                      <th className={`${opsTableThClass} w-16 text-right`}>{to("orders.col_difference")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_weight")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_weight")}</th>
+                      <th className={`${opsTableThClass} w-40`}>{to("orders.delivery_time")}</th>
                       <th className={`${opsTableThClass} w-20 text-right`}>{to("orders.col_difference")}</th>
-                      <th className={`${opsTableThClass} w-44`}>{to("orders.col_delivery_status")}</th>
-                      <th className={`${opsTableThClass} w-44`}>{to("orders.col_delivered_at")}</th>
+                      <th className={`${opsTableThClass} w-40`}>{to("orders.col_delivery_status")}</th>
                     </tr>
                   </thead>
                   <tbody className={opsTableDivideClass}>
                     {pageRows.length === 0 && (
                       <tr>
-                        <td className={opsTableTdClass} colSpan={14}>
+                        <td className={opsTableTdClass} colSpan={11}>
                           <span className="text-slate-400 text-sm py-4 block text-center">
                             {query || statusFilter !== "all"
                               ? to("orders.no_results")
@@ -384,11 +383,11 @@ function OrdersDeliveryDetailView({
                       </tr>
                     )}
                     {pageRows.map((row, index) => {
+                      // Difference is only meaningful once a Step 4 capture
+                      // exists (delivered / delivered-with-diff rows).
                       const showDiff =
                         row.status === "delivered" ||
-                        row.status === "delivered_with_diff" ||
-                        row.status === "not_delivered";
-                      const weightDiff = row.deliveredWeight - row.orderedWeight;
+                        row.status === "delivered_with_diff";
                       return (
                         <tr key={row.shopId} className="align-middle transition-colors">
                           <td className={opsTableTdClass}>
@@ -403,35 +402,26 @@ function OrdersDeliveryDetailView({
                           <td className={`${opsTableTdClass} text-right font-semibold`}>
                             {row.orderedBirds > 0 ? formatCount(row.orderedBirds) : "—"}
                           </td>
-                          <td className={`${opsTableTdClass} text-right font-semibold`}>
-                            {row.deliveredBirds > 0 ? formatCount(row.deliveredBirds) : "—"}
-                          </td>
-                          <td className={`${opsTableTdClass} text-right`}>
-                            <DiffCell value={row.birdDifference} show={showDiff} />
-                          </td>
                           <td className={`${opsTableTdClass} text-right font-bold text-emerald-800`}>
                             {row.orderedBoxes > 0 ? formatCount(row.orderedBoxes) : "—"}
                           </td>
                           <td className={`${opsTableTdClass} text-right font-semibold`}>
-                            {row.deliveredBoxes > 0 ? formatCount(row.deliveredBoxes) : "—"}
-                          </td>
-                          <td className={`${opsTableTdClass} text-right`}>
-                            <DiffCell value={row.boxDifference} show={showDiff} />
+                            {row.deliveredBirds > 0 ? formatCount(row.deliveredBirds) : "—"}
                           </td>
                           <td className={`${opsTableTdClass} text-right font-semibold`}>
-                            {row.orderedWeight > 0 ? row.orderedWeight.toFixed(2) : "—"}
+                            {row.deliveredBoxes > 0 ? formatCount(row.deliveredBoxes) : "—"}
                           </td>
                           <td className={`${opsTableTdClass} text-right font-semibold`}>
                             {row.deliveredWeight > 0 ? row.deliveredWeight.toFixed(2) : "—"}
                           </td>
+                          <td className={`${opsTableTdClass} text-slate-500 whitespace-nowrap`}>
+                            {formatDeliveredAtLabel(row.deliveredAt)}
+                          </td>
                           <td className={`${opsTableTdClass} text-right`}>
-                            <WeightDiffCell value={weightDiff} show={showDiff} />
+                            <DiffCell value={row.boxDifference} show={showDiff} />
                           </td>
                           <td className={opsTableTdClass}>
                             <DeliveryStatusCell row={row} to={to} />
-                          </td>
-                          <td className={`${opsTableTdClass} text-slate-500`}>
-                            {formatDeliveredAtLabel(row.deliveredAt)}
                           </td>
                         </tr>
                       );
@@ -507,13 +497,14 @@ function OrdersDeliveryDetailView({
                     {to("orders.not_listed_deliveries")}
                   </h3>
                   <span className="text-[11px] font-semibold text-amber-700/80">
-                    {to("orders.additional_legend")}
+                    {to("orders.not_listed_note")}
                   </span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs md:text-sm">
                     <thead>
                       <tr className={opsTableHeadRowClass}>
+                        <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
                         <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
                         <th className={opsTableThClass}>{to("orders.col_village")}</th>
                         <th className={`${opsTableThClass} w-32 text-right`}>{to("orders.delivered_birds")}</th>
@@ -523,8 +514,13 @@ function OrdersDeliveryDetailView({
                       </tr>
                     </thead>
                     <tbody className={opsTableDivideClass}>
-                      {unlistedRows.map((row) => (
+                      {unlistedRows.map((row, uIndex) => (
                         <tr key={row.shopId} className="align-middle bg-amber-50/40">
+                          <td className={opsTableTdClass}>
+                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-[12px] font-bold text-amber-700">
+                              {uIndex + 1}
+                            </span>
+                          </td>
                           <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
                             <span className="inline-flex items-center gap-2 flex-wrap">
                               {row.shopName || "—"}
