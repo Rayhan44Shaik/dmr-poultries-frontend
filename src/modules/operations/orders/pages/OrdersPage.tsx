@@ -40,11 +40,13 @@ import {
   loadShopDirectory,
   loadSupervisorDirectory,
   sendOrdersWhatsApp,
+  shopMobileOf,
   supervisorMobileOf,
   villageOf,
   type ShopDirectory,
   type SupervisorDirectory,
 } from "../ordersService";
+import { useToast } from "../../../../components/common/ToastProvider";
 import { buildShopBreakdown, rowsInSequence } from "../ordersUtils";
 import { generateOrdersPdf } from "../pdf/generateOrdersPdf";
 import type { OrdersFetch, OrdersTrip } from "../types";
@@ -166,9 +168,12 @@ const OrdersPage: React.FC = () => {
   // ── Table-level Refresh (all three tabs) ─────────────────────────────────
   // Refetches only the Orders data for the current tab: no app reload, no
   // unrelated modules, no main skeleton swap (the visible table stays), and
-  // the selected day / tab / search text are preserved (only `data` is
-  // replaced — the tab components keep their local state). A soft
-  // auto-dismiss toast confirms it; a guard blocks duplicate calls.
+  // the selected day / tab / search text / sort / filters are preserved
+  // (only `data` is replaced — the tab components keep their local state).
+  // Confirmed with the EXISTING global compact toast (auto-dismiss ~5s,
+  // non-blocking — never a modal, never covering the table); a guard
+  // blocks duplicate calls while a refresh is in flight.
+  const { success: toastSuccess, error: toastError } = useToast();
   const handleRefresh = useCallback(
     async (tab: TabKey) => {
       if (refreshing) return;
@@ -177,14 +182,14 @@ const OrdersPage: React.FC = () => {
         const next = await fetchOrdersData();
         setData(next);
         setError(null);
-        showNotification(to(`orders.refresh_${tab}`), "success");
+        toastSuccess(to(`orders.refresh_${tab}`), 5000);
       } catch {
-        showNotification(to("orders.refresh_failed"), "error");
+        toastError(to("orders.refresh_failed"), 5000);
       } finally {
         setRefreshing(null);
       }
     },
-    [refreshing, showNotification, to]
+    [refreshing, toastSuccess, toastError, to]
   );
 
   // ── Row-level operations (PDF / WhatsApp) ──────────────────────────────
@@ -201,7 +206,8 @@ const OrdersPage: React.FC = () => {
             rowsInSequence(ot.trip),
             ot.originalShopIds,
             (shopId, shopName) => villageOf(shopId, shopName, shopDirectory),
-            ot.originalQuantities
+            ot.originalQuantities,
+            (shopId) => shopMobileOf(shopId, shopDirectory)
           ),
           language,
         });

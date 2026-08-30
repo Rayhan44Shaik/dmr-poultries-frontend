@@ -7,8 +7,11 @@
 //   Delivered Boxes · Difference · Progress · Status · Completed At ·
 //   Actions
 //   1. PENDING & IN PROGRESS — assigned / partially delivered trips
-//   2. COMPLETED — completed trips, latest 7 operational days only
-//      (window applied by the service; no old-history search, no deletion)
+//      (day-scoped by the single global date selector)
+//   2. COMPLETED — lifecycle-completed trips inside a controlled
+//      [From → To] range (default: last 7 operational days). The
+//      backend keeps ALL history; the range picker reaches back to the
+//      oldest completed trip. Future dates disabled.
 //
 // ONE compact table-level search (shop / village / trip / vehicle /
 // supervisor / status) + ONE compact status filter + ONE compact
@@ -21,7 +24,7 @@
 // are derived from the persisted Step 4 rows (no UI-only state).
 
 import React, { useMemo, useState } from "react";
-import { Eye, FileText, RefreshCw } from "lucide-react";
+import { CalendarRange, Eye, FileText, RefreshCw } from "lucide-react";
 import {
   opsTableDivideClass,
   opsTableHeadRowClass,
@@ -35,13 +38,15 @@ import {
 } from "../../../../shared/ui/paginationStyles";
 import TripPagination from "../../vehicle-trips/components/TripPagination";
 import { formatCount } from "../ordersUtils";
+import { addLocalDays } from "../ordersUtils";
 import { paginate, villageOf, type ShopDirectory } from "../ordersService";
 import { useOrdersI18n } from "../i18n/ordersI18n";
 import type { OrdersTrip } from "../types";
+import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   OrdersDateControl,
+  OrdersDropdown,
   OrdersEmptyState,
-  OrdersFilterSelect,
   OrdersIconButton,
   OrdersSearchInput,
   OrdersStatusBadge,
@@ -358,8 +363,8 @@ function OrdersDeliveryTrackingTab({
 }: Props) {
   const { to } = useOrdersI18n();
 
-  // Tracking is day-scoped: the single global date selector drives which
-  // trips are shown (no Previous/Next day buttons).
+  // The PENDING table is day-scoped: the single global date selector
+  // drives which trips are shown (no Previous/Next day buttons).
   const dayTrips = useMemo(
     () => trips.filter((t) => t.trip.tripDate === day),
     [trips, day]
@@ -368,9 +373,37 @@ function OrdersDeliveryTrackingTab({
     () => dayTrips.filter((t) => t.progress?.status !== "Completed"),
     [dayTrips]
   );
+
+  // ── COMPLETED range: [From → To] (default = last 7 operational days).
+  //     Frontend window only — the backend keeps ALL history, and the
+  //     range picker can reach back to the oldest completed trip.
+  //     Future dates are disabled; From ≤ To (pickers constrain each other).
+  const [completedFrom, setCompletedFrom] = useState(() =>
+    today ? addLocalDays(today, -6) : ""
+  );
+  const [completedTo, setCompletedTo] = useState(() => today);
+  const completedAll = useMemo(
+    () => trips.filter((t) => t.progress?.status === "Completed"),
+    [trips]
+  );
+  const oldestCompleted = useMemo(() => {
+    let min = "";
+    for (const t of completedAll) {
+      if (t.trip.tripDate && (!min || t.trip.tripDate < min)) min = t.trip.tripDate;
+    }
+    return min || undefined;
+  }, [completedAll]);
   const completed = useMemo(
-    () => dayTrips.filter((t) => t.progress?.status === "Completed"),
-    [dayTrips]
+    () =>
+      !today
+        ? completedAll
+        : completedAll.filter(
+            (t) =>
+              t.trip.tripDate >=
+                (completedFrom || addLocalDays(today, -6)) &&
+              t.trip.tripDate <= (completedTo || today)
+          ),
+    [completedAll, completedFrom, completedTo, today]
   );
 
   // ── One compact search + status filter + difference filter ───────────────
@@ -448,6 +481,7 @@ function OrdersDeliveryTrackingTab({
   // ── Compact scope summary over the VISIBLE (filtered) rows ───────────────
   const scope = useMemo(() => {
     const t = {
+      totalShops: 0,
       totalBirds: 0,
       totalBoxes: 0,
       totalWeight: 0,
@@ -458,6 +492,7 @@ function OrdersDeliveryTrackingTab({
     for (const ot of [...activeFiltered, ...completedFiltered]) {
       const p = ot.progress;
       if (!p) continue;
+      t.totalShops += p.totalShops;
       t.totalBirds += p.totalBirds;
       t.totalBoxes += p.totalBoxes;
       t.totalWeight += p.totalWeight;
@@ -470,7 +505,7 @@ function OrdersDeliveryTrackingTab({
     return t;
   }, [activeFiltered, completedFiltered]);
 
-  const filterKey = `${q}|${statusFilter}|${differenceFilter}|${day}`;
+  const filterKey = `${q}|${statusFilter}|${differenceFilter}|${day}|${completedFrom}|${completedTo}`;
   const [activePage, safeActivePage, activeTotalPages, setActivePage] = usePaged(
     activeFiltered,
     PAGE_SIZE,
@@ -500,26 +535,22 @@ function OrdersDeliveryTrackingTab({
         {day && today && (
           <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} />
         )}
-        <OrdersIconButton
-          label={`${to("orders.refresh")} — ${to("orders.refresh_tracking")}`}
-          onClick={onRefresh}
-          busy={refreshing}
-        >
-          <RefreshCw size={14} />
-        </OrdersIconButton>
-        <OrdersFilterSelect
+        <OrdersDropdown
           value={statusFilter}
           onChange={(v) => setStatusFilter(v as StatusFilter)}
           options={statusOptions}
           ariaLabel={to("orders.filter_status")}
+          widthClass="w-40"
         />
-        <OrdersFilterSelect
+        <OrdersDropdown
           value={differenceFilter}
           onChange={(v) => setDifferenceFilter(v as DifferenceFilter)}
           options={differenceOptions}
           ariaLabel={to("orders.filter_difference")}
+          widthClass="w-40"
         />
         <OrdersIconButton
+          className="ml-auto"
           label={`${to("orders.refresh")} — ${to("orders.refresh_tracking")}`}
           onClick={onRefresh}
           busy={refreshing}
@@ -551,12 +582,59 @@ function OrdersDeliveryTrackingTab({
         )}
       </div>
 
-      {/* ── TABLE 2 — COMPLETED (latest 7 operational days) ─────────────── */}
+      {/* ── TABLE 2 — COMPLETED (lifecycle-completed trips) ────────────────
+          Controlled [From → To] history range: default = the last 7
+          operational days; the backend keeps ALL history, so the range
+          can reach back to the oldest completed trip. Future disabled. */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <SectionTitle
-          label={to("orders.tracking_completed_title")}
-          note={to("orders.week_window_note")}
-        />
+        <div className="px-5 py-3 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between flex-wrap gap-2">
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+            {to("orders.tracking_completed_title")}
+          </h3>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400">
+              <CalendarRange size={12} aria-hidden />
+              {to("orders.from_date")}
+            </span>
+            <DatePicker
+              value={completedFrom}
+              onChange={(v) => {
+                if (v && v <= (completedTo || today)) setCompletedFrom(v);
+              }}
+              minDate={oldestCompleted}
+              maxDate={completedTo || today}
+              placeholder="DD/MM/YYYY"
+              hideThisWeek
+              hideClear
+              hideToday
+              className="w-36"
+              data-testid="orders-completed-from"
+            />
+            <span className="text-[11px] font-semibold text-slate-400" aria-hidden>
+              →
+            </span>
+            <span className="text-[11px] font-semibold text-slate-400">
+              {to("orders.to_date")}
+            </span>
+            <DatePicker
+              value={completedTo}
+              onChange={(v) => {
+                if (v && v >= (completedFrom || addLocalDays(today, -6))) setCompletedTo(v);
+              }}
+              minDate={completedFrom || addLocalDays(today, -6)}
+              maxDate={today}
+              placeholder="DD/MM/YYYY"
+              hideThisWeek
+              hideClear
+              hideToday
+              className="w-36"
+              data-testid="orders-completed-to"
+            />
+            <span className="text-[11px] font-semibold text-slate-400">
+              {to("orders.trips_count", { x: completed.length })}
+            </span>
+          </div>
+        </div>
         {completedFiltered.length === 0 ? (
           <OrdersEmptyState
             title={
@@ -581,6 +659,7 @@ function OrdersDeliveryTrackingTab({
       {activeFiltered.length + completedFiltered.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-4 py-2.5 flex items-center gap-x-5 gap-y-1 flex-wrap text-xs font-semibold text-slate-600">
           {([
+            [to("orders.col_total_shops"), formatCount(scope.totalShops)],
             [to("orders.total_birds"), formatCount(scope.totalBirds)],
             [to("orders.total_boxes"), formatCount(scope.totalBoxes)],
             [to("orders.total_weight"), scope.totalWeight.toFixed(2)],

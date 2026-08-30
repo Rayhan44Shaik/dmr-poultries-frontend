@@ -40,7 +40,6 @@ import {
   isOrderContainer,
   isOrderPlanRow,
   isTrackingTrip,
-  isWithinOneWeek,
   localToday,
   nextOrderTripNo,
   rowBoxes,
@@ -248,15 +247,13 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
     .map((trip) => toEligibleVehicle(trip, vehicleList))
     .sort((a, b) => a.trip.vehicleNo.localeCompare(b.trip.vehicleNo) || a.trip.id - b.trip.id);
 
-  // ── Tab 3 — order-assigned trips; completed records stay visible only
-  //    for the current 7-day operational window (frontend filter, no deletion).
+  // ── Tab 3 — ALL order-assigned trips (active on any day + the FULL
+  //    completed history). The backend keeps every record; the tracking
+  //    tab shows completed trips inside its controlled [From → To] range
+  //    (default: the last 7 operational days) — a frontend window only.
   const tracking: OrdersTrip[] = trips
     .filter(isTrackingTrip)
     .map((trip) => buildOrdersTrip(trip, quantitiesForTrip(trip)))
-    .filter((ot) => {
-      const status = ot.progress?.status;
-      return status !== "Completed" || isWithinOneWeek(ot.trip.tripDate);
-    })
     .sort(
       (a, b) =>
         a.trip.tripDate.localeCompare(b.trip.tripDate) * -1 || b.trip.id - a.trip.id
@@ -456,14 +453,26 @@ export async function findDayShopConflicts(
 
 // ─── Reference data (shop villages, vehicle capacity, supervisor mobiles) ───
 
-export type ShopDirectory = Map<number, { shopName: string; village: string }>;
+/**
+ * Shop Master reference data per shop id. `mobile` is the Shop Master's
+ * registered phone number — the ONLY source for the "Shop Mobile" column.
+ * Never invented, never defaulted; empty when the master has none.
+ */
+export type ShopDirectory = Map<
+  number,
+  { shopName: string; village: string; mobile: string }
+>;
 export type SupervisorDirectory = Map<string, string>; // name (lower) -> mobile
 
 export async function loadShopDirectory(): Promise<ShopDirectory> {
   const shops = await loadShops().catch(() => []);
   const dir: ShopDirectory = new Map();
   for (const shop of shops) {
-    dir.set(shop.id, { shopName: shop.shopName, village: shop.village });
+    dir.set(shop.id, {
+      shopName: shop.shopName,
+      village: shop.village,
+      mobile: (shop.phoneNumber ?? "").trim(),
+    });
   }
   return dir;
 }
@@ -490,6 +499,14 @@ export function villageOf(
   directory: ShopDirectory
 ): string {
   return directory.get(shopId)?.village ?? shopName ?? "";
+}
+
+/** Shop Mobile from the Shop Master only ("" when the master has none). */
+export function shopMobileOf(
+  shopId: number,
+  directory: ShopDirectory
+): string {
+  return directory.get(shopId)?.mobile ?? "";
 }
 
 // ─── WhatsApp — existing per-delivery mechanism, order-level usage ──────────

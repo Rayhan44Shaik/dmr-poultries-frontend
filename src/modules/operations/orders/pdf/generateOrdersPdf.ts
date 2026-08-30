@@ -58,8 +58,8 @@ export async function generateOrdersPdf({
 }: OrdersPdfInput): Promise<void> {
   const doc = createDmrPoultryPdf("portrait");
   doc.setProperties({
-    title: `${trip.tripNo || "Trip"} — Order Collection`,
-    subject: "DMR POULTRIES order collection",
+    title: `${trip.tripNo || "Trip"} — Shop Delivery Report`,
+    subject: "DMR POULTRIES shop delivery report",
     author: "DMR POULTRIES",
     creator: "DMR POULTRIES",
   });
@@ -229,7 +229,7 @@ export async function generateOrdersPdf({
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   doc.setTextColor(255, 255, 255);
-  doc.text("ORDER COLLECTION", margin + 4, y + 7.2);
+  doc.text(ordersTranslate("orders.pdf_report_title", language), margin + 4, y + 7.2);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.text(trip.tripNo || "—", pageWidth - margin - 4, y + 7.2, { align: "right" });
@@ -282,6 +282,7 @@ export async function generateOrdersPdf({
     b.serialNo || index + 1,
     b.shopName,
     b.village || "—",
+    b.mobile || "—",
     b.orderedBirds > 0 ? count(b.orderedBirds) : "—",
     b.deliveredBirds > 0 ? count(b.deliveredBirds) : "—",
     diffStr(b.birdDifference),
@@ -304,6 +305,7 @@ export async function generateOrdersPdf({
       "—",
       "—",
       "—",
+      "—",
     ]);
   }
 
@@ -313,6 +315,7 @@ export async function generateOrdersPdf({
       "Seq",
       ordersTranslate("orders.col_shop_name", language),
       ordersTranslate("orders.col_village", language),
+      ordersTranslate("orders.shop_mobile", language),
       ordersTranslate("orders.ordered_birds", language),
       ordersTranslate("orders.delivered_birds", language),
       `${ordersTranslate("orders.col_difference", language)} (${ordersTranslate("orders.word_birds", language)})`,
@@ -324,7 +327,7 @@ export async function generateOrdersPdf({
     ],
     seqBody,
     {
-      widths: [9, 34, 20, 12, 12, 12, 12, 12, 12, 24, 23],
+      widths: [8, 30, 17, 20, 11, 11, 11, 11, 11, 11, 22, null],
     }
   );
 
@@ -340,8 +343,10 @@ export async function generateOrdersPdf({
       index + 1,
       b.shopName,
       b.village || "—",
-      count(b.deliveredBoxes),
+      b.mobile || "—",
       count(b.deliveredBirds),
+      count(b.deliveredBoxes),
+      kg(b.deliveredWeight),
       formatDeliveredAtLabel(b.deliveredAt),
     ]);
     simpleTable(
@@ -349,16 +354,51 @@ export async function generateOrdersPdf({
         "Seq",
         ordersTranslate("orders.col_shop_name", language),
         ordersTranslate("orders.col_village", language),
-        ordersTranslate("orders.delivered_boxes", language),
+        ordersTranslate("orders.shop_mobile", language),
         ordersTranslate("orders.delivered_birds", language),
+        ordersTranslate("orders.delivered_boxes", language),
+        ordersTranslate("orders.delivered_weight", language),
         ordersTranslate("orders.col_delivered_at", language),
       ],
       notListedBody,
       {
-        widths: [10, 60, 34, 26, 26, 26],
+        widths: [8, 42, 24, 26, 16, 16, 16, null],
         additionalRows: new Set(notListedRows.map((_, i) => i)),
       }
     );
+  }
+
+  // ─── FINAL TOTALS (shop-level, ordered vs delivered) ─────────────────────
+  // Aggregated over the shop delivery breakdown: Total Shops, Listed,
+  // Not Listed, ordered/delivered birds & boxes, box difference, and
+  // total/delivered weight. Shown even when there is no delivery yet
+  // (delivered figures read 0).
+  {
+    const orderedRows = breakdown.filter((b) => b.ordered);
+    const notListedCount = breakdown.filter((b) => b.status === "not_listed").length;
+    const sum = (rows: ShopDeliveryBreakdown[], key: (b: ShopDeliveryBreakdown) => number): number =>
+      rows.reduce((s, b) => s + key(b), 0);
+    const orderedBirds = sum(orderedRows, (b) => b.orderedBirds);
+    const deliveredBirds = sum(breakdown, (b) => b.deliveredBirds);
+    const orderedBoxes = sum(orderedRows, (b) => b.orderedBoxes);
+    const deliveredBoxes = sum(breakdown, (b) => b.deliveredBoxes);
+    const totalWeight = sum(orderedRows, (b) => b.orderedWeight);
+    const deliveredWeight = sum(breakdown, (b) => b.deliveredWeight);
+
+    ensureSpace(30);
+    drawSectionBand(ordersTranslate("orders.pdf_totals", language));
+    kvGrid([
+      [ordersTranslate("orders.col_total_shops", language), count(orderedRows.length)],
+      [ordersTranslate("orders.listed_shops", language), count(orderedRows.length)],
+      [ordersTranslate("orders.not_listed_shops", language), count(notListedCount)],
+      [ordersTranslate("orders.ordered_birds", language), count(orderedBirds)],
+      [ordersTranslate("orders.delivered_birds", language), count(deliveredBirds)],
+      [ordersTranslate("orders.ordered_boxes", language), count(orderedBoxes)],
+      [ordersTranslate("orders.delivered_boxes", language), count(deliveredBoxes)],
+      [ordersTranslate("orders.box_difference", language), diffStr(deliveredBoxes - orderedBoxes)],
+      [ordersTranslate("orders.total_weight", language), kg(totalWeight)],
+      [ordersTranslate("orders.delivered_weight", language), kg(deliveredWeight)],
+    ]);
   }
 
   // ─── FOOTER / PAGE CHROME (same pattern as the Trip Report PDF) ─────
@@ -373,7 +413,7 @@ export async function generateOrdersPdf({
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8);
       doc.setTextColor(255, 255, 255);
-      doc.text("DMR POULTRIES — ORDER COLLECTION", margin, 5);
+      doc.text(`DMR POULTRIES — ${ordersTranslate("orders.pdf_report_title", language)}`, margin, 5);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
       doc.text(trip.tripNo || "", w - margin, 5, { align: "right" });
@@ -389,5 +429,5 @@ export async function generateOrdersPdf({
   }
 
   const safeTripNo = String(trip.tripNo || "Trip").replace(/[^a-zA-Z0-9_-]+/g, "_");
-  doc.save(`${safeTripNo}_OrderCollection.pdf`);
+  doc.save(`${safeTripNo}_ShopDeliveryReport.pdf`);
 }

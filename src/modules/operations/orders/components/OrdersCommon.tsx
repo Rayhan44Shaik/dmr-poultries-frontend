@@ -5,9 +5,10 @@
 // Deliberately NO dashboard-style KPI cards: this is an operational
 // table page, and summaries live in compact bars inside each workflow.
 
-import React from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import {
   AlertTriangle,
+  Check,
   ChevronDown,
   CloudOff,
   Inbox,
@@ -142,6 +143,7 @@ export function OrdersIconButton({
   busy,
   children,
   tone = "slate",
+  className = "",
 }: {
   label: string;
   onClick: () => void;
@@ -149,6 +151,7 @@ export function OrdersIconButton({
   busy?: boolean;
   children: React.ReactNode;
   tone?: "slate" | "emerald" | "rose" | "sky";
+  className?: string;
 }) {
   const tones: Record<string, string> = {
     slate: "border-slate-200/80 text-slate-500 hover:bg-slate-50 hover:text-slate-800",
@@ -163,7 +166,7 @@ export function OrdersIconButton({
       aria-label={label}
       onClick={onClick}
       disabled={disabled || busy}
-      className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border bg-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${tones[tone]}`}
+      className={`inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border bg-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${tones[tone]} ${className}`}
     >
       {busy ? <RefreshCw size={14} className="animate-spin" /> : children}
     </button>
@@ -294,44 +297,155 @@ export function WhatsAppIcon({ size = 16 }: { size?: number }) {
 
 // ─── Compact table-level filter (single select) ─────────────────────────────
 
-export function OrdersFilterSelect({
+/**
+ * REAL dropdown (popover listbox) — replaces native <select>:
+ *  - trigger shows the CURRENT selection,
+ *  - opens a visible option list,
+ *  - selecting an option closes the list,
+ *  - click outside / Escape closes it,
+ *  - keyboard accessible (Arrow keys, Home/End, Enter/Space, Escape),
+ *  - the parent applies the new value, so the table reorders visibly.
+ */
+export function OrdersDropdown({
   value,
   onChange,
   options,
   ariaLabel,
   className = "",
+  widthClass = "w-44",
 }: {
   value: string;
   onChange: (v: string) => void;
   options: Array<{ value: string; label: string }>;
   ariaLabel: string;
   className?: string;
+  widthClass?: string;
 }) {
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const listboxId = useId();
+  const selected = options.find((o) => o.value === value);
+
+  // Close on outside click.
+  useEffect(() => {
+    if (!open) return;
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [open]);
+
+  // Keep the highlighted option scrolled into view.
+  useEffect(() => {
+    if (!open || !listRef.current) return;
+    const el = listRef.current.children[activeIndex] as HTMLElement | undefined;
+    el?.scrollIntoView({ block: "nearest" });
+  }, [open, activeIndex]);
+
+  const openList = (focusList: boolean) => {
+    setActiveIndex(Math.max(0, options.findIndex((o) => o.value === value)));
+    setOpen(true);
+    if (focusList) {
+      requestAnimationFrame(() => listRef.current?.focus());
+    }
+  };
+
+  const select = (v: string) => {
+    setOpen(false);
+    if (v !== value) onChange(v);
+  };
+
+  const onTriggerKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openList(true);
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  };
+
+  const onListKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.min(options.length - 1, i + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(0, i - 1));
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      setActiveIndex(0);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      setActiveIndex(options.length - 1);
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      const opt = options[activeIndex];
+      if (opt) select(opt.value);
+    } else if (e.key === "Tab") {
+      setOpen(false);
+    }
+  };
+
   return (
-    <label className={`relative inline-block ${className}`}>
+    <div ref={rootRef} className={`relative inline-block ${className}`}>
       <span className="sr-only">{ariaLabel}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listboxId : undefined}
         aria-label={ariaLabel}
-        className={`h-9 appearance-none rounded-lg border bg-white pl-3 pr-8 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${
-          value
-            ? "border-emerald-300 text-emerald-800 bg-emerald-50/50"
-            : "border-slate-200 text-slate-600"
+        onClick={() => (open ? setOpen(false) : openList(false))}
+        onKeyDown={onTriggerKeyDown}
+        className={`h-9 ${widthClass} inline-flex items-center justify-between gap-2 rounded-lg border bg-white pl-3 pr-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${
+          value ? "border-emerald-300 text-emerald-800 bg-emerald-50/50" : "border-slate-200 text-slate-600"
         }`}
       >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown
-        size={13}
-        className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
-        aria-hidden
-      />
-    </label>
+        <span className="truncate text-left">{selected?.label ?? "—"}</span>
+        <ChevronDown
+          size={13}
+          className={`flex-shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+          aria-hidden
+        />
+      </button>
+      {open && (
+        <ul
+          ref={listRef}
+          id={listboxId}
+          role="listbox"
+          aria-label={ariaLabel}
+          tabIndex={-1}
+          onKeyDown={onListKeyDown}
+          className={`absolute right-0 z-30 mt-1 max-h-64 min-w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 ${widthClass}`}
+        >
+          {options.map((o, i) => (
+            <li key={o.value} role="option" aria-selected={o.value === value}>
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => select(o.value)}
+                onMouseDown={(e) => e.preventDefault()}
+                onMouseEnter={() => setActiveIndex(i)}
+                className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-semibold transition-colors ${
+                  i === activeIndex ? "bg-emerald-50 text-emerald-800" : "text-slate-600"
+                } ${o.value === value ? "font-bold" : ""}`}
+              >
+                <span className="truncate">{o.label}</span>
+                {o.value === value && <Check size={13} className="flex-shrink-0 text-emerald-600" aria-hidden />}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

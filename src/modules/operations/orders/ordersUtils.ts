@@ -457,6 +457,8 @@ export type ShopDeliveryBreakdown = {
   shopId: number;
   shopName: string;
   village: string;
+  /** Shop Mobile — Shop Master only ("" when the master has none). */
+  mobile: string;
   /** Sequence of the first row for this shop. */
   serialNo: number;
   /** Was this shop in the original Order Collection / Assignment? */
@@ -490,7 +492,8 @@ export function buildShopBreakdown(
   rows: ShopDelivery[],
   originalShopIds: Set<number>,
   villageOf: (shopId: number, shopName: string) => string,
-  originalQuantities?: ShopOrderQuantities
+  originalQuantities?: ShopOrderQuantities,
+  mobileOf?: (shopId: number) => string
 ): ShopDeliveryBreakdown[] {
   type Acc = {
     first: ShopDelivery;
@@ -552,6 +555,7 @@ export function buildShopBreakdown(
       shopId,
       shopName: acc.first.shopName || "—",
       village: villageOf(shopId, acc.first.shopName || ""),
+      mobile: mobileOf ? mobileOf(shopId) : "",
       serialNo: num(acc.first.serialNo ?? acc.first.id),
       ordered: !additional,
       orderedBoxes,

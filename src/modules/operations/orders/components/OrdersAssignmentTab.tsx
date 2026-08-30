@@ -72,7 +72,7 @@ import type {
 import {
   OrdersDateControl,
   OrdersEmptyState,
-  OrdersFilterSelect,
+  OrdersDropdown,
   OrdersIconButton,
   OrdersSearchInput,
   OrdersStatusBadge,
@@ -188,13 +188,15 @@ function OrdersAssignmentTab({
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
 
-  // ── Compact table-level sort (same control as Order Collection) ─────────
-  const [sortMode, setSortMode] = useState<"collected" | "az" | "za">("collected");
+  // ── Compact table-level sort (real dropdown; same visual control as
+  //     Order Collection) ──────────────────────────────────────────────────
+  const [sortMode, setSortMode] = useState<"pending" | "az" | "za" | "vehicle_trip">("pending");
   const sortOptions = useMemo(
     () => [
-      { value: "collected", label: to("orders.sort_collected_first") },
+      { value: "pending", label: to("orders.sort_pending_first") },
       { value: "az", label: to("orders.sort_name_az") },
       { value: "za", label: to("orders.sort_name_za") },
+      { value: "vehicle_trip", label: to("orders.sort_vehicle_trip") },
     ],
     [to]
   );
@@ -203,7 +205,8 @@ function OrdersAssignmentTab({
   const isPast = day < today;
 
   // ONE card with the SAME toolbar / table visual language as Order
-  // Collection: [ Search ][ Date + TODAY ][ Refresh ][ Sort ] + summary.
+  // Collection: [ Search ][ Date + TODAY ][ Sort ] … [↻ Refresh].
+  // Refresh is ALWAYS the last control, far right.
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
       <div className="px-5 py-2.5 border-b border-slate-200 bg-slate-50/60 flex items-center gap-3 flex-wrap">
@@ -214,6 +217,29 @@ function OrdersAssignmentTab({
           className="w-full sm:w-64"
         />
         <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} />
+        <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+          {to("orders.sort")}
+        </span>
+        <OrdersDropdown
+          value={sortMode}
+          onChange={(v) => setSortMode(v as "pending" | "az" | "za" | "vehicle_trip")}
+          options={sortOptions}
+          ariaLabel={to("orders.sort")}
+          widthClass="w-44"
+        />
+        {isPast ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+            <Lock size={11} />
+            {to("orders.closed_day")}
+          </span>
+        ) : null}
+        <span className="ml-auto text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+          {to("orders.pool_summary", {
+            collected: collection?.totalShops ?? 0,
+            assigned: collection?.assignedShops ?? 0,
+            available: (collection?.totalShops ?? 0) - (collection?.assignedShops ?? 0),
+          })}
+        </span>
         <OrdersIconButton
           label={`${to("orders.refresh")} — ${to("orders.refresh_assignment")}`}
           onClick={onRefresh}
@@ -221,30 +247,6 @@ function OrdersAssignmentTab({
         >
           <RefreshCw size={14} />
         </OrdersIconButton>
-        <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
-          {to("orders.sort")}
-        </span>
-        <OrdersFilterSelect
-          value={sortMode}
-          onChange={(v) => setSortMode(v as "collected" | "az" | "za")}
-          options={sortOptions}
-          ariaLabel={to("orders.sort")}
-          className="w-44"
-        />
-        {isPast ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-            <Lock size={11} />
-            {to("orders.closed_day")}
-          </span>
-        ) : (
-          <span className="ml-auto text-[11px] font-semibold text-slate-400 whitespace-nowrap">
-            {to("orders.pool_summary", {
-              collected: collection?.totalShops ?? 0,
-              assigned: collection?.assignedShops ?? 0,
-              available: (collection?.totalShops ?? 0) - (collection?.assignedShops ?? 0),
-            })}
-          </span>
-        )}
       </div>
 
       {isPast ? (
@@ -377,10 +379,10 @@ function AssignmentEditor({
   eligibleVehicles: OrdersEligibleVehicle[];
   shopDirectory: ShopDirectory;
   supervisorDirectory: SupervisorDirectory;
-  /** Lower-cased search (shop / village). */
+  /** Lower-cased search (shop / village / vehicle / trip). */
   q: string;
-  /** Table-level sort (same options as Order Collection). */
-  sortMode: "collected" | "az" | "za";
+  /** Table-level sort (Pending First / A→Z / Z→A / Vehicle · Trip). */
+  sortMode: "pending" | "az" | "za" | "vehicle_trip";
   onChanged: () => void;
   onFinished: (vehicleTrip: Trip) => void;
 }) {
@@ -664,27 +666,65 @@ function AssignmentEditor({
       ]
     : [];
 
-  // ── Available shops: table-level search over the FULL pool, then
-  //     pagination (existing global component; 10 rows per page) ───────────
-  const filteredAvailable = useMemo(() => {
-    const list = q
-      ? pool.available.filter((row) =>
-          `${row.shopName} ${villageOf(row.shopId, row.shopName, shopDirectory)}`
-            .toLowerCase()
-            .includes(q)
-        )
-      : [...pool.available];
-    // "collected" = the day's collection order (stable default).
+  // ── Day pool table: PENDING (unassigned) + ASSIGNED shops together ───────
+  //     Only pending rows are assignable — the same-shop/same-day rule stays
+  //     visible at a glance. Table-level search over the FULL pool (shop /
+  //     village / vehicle / trip), sorted by the selected mode, then
+  //     paginated (existing global component; 10 rows per page).
+  type PoolRow = OrderShopRow & {
+    poolIndex: number;
+    kind: "pending" | "assigned";
+    assignedVehicleNo: string;
+    assignedTripNo: string;
+    delivered: boolean;
+  };
+  const filteredPool = useMemo(() => {
+    const list: PoolRow[] = [];
+    collection.rows.forEach((row, i) => {
+      const a = collection.shops.get(row.shopId);
+      const item: PoolRow = {
+        ...row,
+        poolIndex: i,
+        kind: a ? "assigned" : "pending",
+        assignedVehicleNo: a?.vehicleNo ?? "",
+        assignedTripNo: a?.tripNo ?? "",
+        delivered: a?.delivered ?? false,
+      };
+      if (q) {
+        const hay =
+          `${row.shopName} ${villageOf(row.shopId, row.shopName, shopDirectory)} ${item.assignedVehicleNo} ${item.assignedTripNo}`.toLowerCase();
+        if (!hay.includes(q)) return;
+      }
+      list.push(item);
+    });
     if (sortMode === "az") {
-      list.sort((a, b) => (a.shopName || "").localeCompare(b.shopName || ""));
+      list.sort(
+        (a, b) => (a.shopName || "").localeCompare(b.shopName || "") || a.poolIndex - b.poolIndex
+      );
     } else if (sortMode === "za") {
-      list.sort((a, b) => (b.shopName || "").localeCompare(a.shopName || ""));
+      list.sort(
+        (a, b) => (b.shopName || "").localeCompare(a.shopName || "") || a.poolIndex - b.poolIndex
+      );
+    } else if (sortMode === "vehicle_trip") {
+      // Pending (no vehicle) first, then grouped by Vehicle No → Trip No.
+      list.sort(
+        (a, b) =>
+          a.assignedVehicleNo.localeCompare(b.assignedVehicleNo) ||
+          a.assignedTripNo.localeCompare(b.assignedTripNo) ||
+          a.poolIndex - b.poolIndex
+      );
+    } else {
+      // Pending First: unassigned shops up top (collection order), then
+      // assigned (collection order).
+      list.sort((a, b) =>
+        a.kind === b.kind ? a.poolIndex - b.poolIndex : a.kind === "pending" ? -1 : 1
+      );
     }
     return list;
-  }, [pool.available, q, shopDirectory, sortMode]);
+  }, [collection, q, shopDirectory, sortMode]);
 
   const [availablePage, setAvailablePage] = useState(1);
-  const availableKey = `${q}|${sortMode}|${filteredAvailable.length}`;
+  const availableKey = `${q}|${sortMode}|${filteredPool.length}`;
   const [lastAvailableKey, setLastAvailableKey] = useState(availableKey);
   if (lastAvailableKey !== availableKey) {
     setLastAvailableKey(availableKey);
@@ -692,12 +732,12 @@ function AssignmentEditor({
   }
   const availableTotalPages = Math.max(
     1,
-    Math.ceil(filteredAvailable.length / AVAILABLE_PAGE_SIZE)
+    Math.ceil(filteredPool.length / AVAILABLE_PAGE_SIZE)
   );
   const safeAvailablePage = Math.min(availablePage, availableTotalPages);
   const availableStartIndex =
-    filteredAvailable.length === 0 ? 0 : (safeAvailablePage - 1) * AVAILABLE_PAGE_SIZE;
-  const pageAvailable = filteredAvailable.slice(
+    filteredPool.length === 0 ? 0 : (safeAvailablePage - 1) * AVAILABLE_PAGE_SIZE;
+  const pageAvailable = filteredPool.slice(
     (safeAvailablePage - 1) * AVAILABLE_PAGE_SIZE,
     safeAvailablePage * AVAILABLE_PAGE_SIZE
   );
@@ -714,16 +754,17 @@ function AssignmentEditor({
   //     Order Collection; vehicle comes AFTER the shop selection) ─────────
   return (
     <div>
-      {/* 1 — Available collected shops (always visible; select one by one) */}
+      {/* 1 — Day pool: pending + assigned collected shops (select
+          pending shops one by one; assigned rows are visible, locked) */}
       <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between gap-2 flex-wrap">
         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-          {to("orders.available_collected_shops")}
+          {to("orders.collected_shops")}
         </span>
         <span className="text-[11px] font-semibold text-slate-400">
-          {filteredAvailable.length} / {collection.totalShops}
+          {filteredPool.length} / {collection.totalShops}
         </span>
       </div>
-      {filteredAvailable.length === 0 ? (
+      {filteredPool.length === 0 ? (
         <div className="px-4 py-5">
           <OrdersEmptyState
             title={
@@ -740,7 +781,7 @@ function AssignmentEditor({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] text-xs md:text-sm">
+            <table className="w-full min-w-[980px] text-xs md:text-sm">
               <thead>
                 <tr className={opsTableHeadRowClass}>
                   <th className={`${opsTableThClass} w-14`}>{to("orders.select_col")}</th>
@@ -750,25 +791,36 @@ function AssignmentEditor({
                   <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_birds")}</th>
                   <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.ordered_boxes")}</th>
                   <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.weight")}</th>
+                  <th className={`${opsTableThClass} w-40`}>{to("orders.vehicle_trip")}</th>
                   <th className={`${opsTableThClass} w-28`}>{to("orders.col_status")}</th>
                 </tr>
               </thead>
               <tbody className={opsTableDivideClass}>
                 {pageAvailable.map((row, index) => {
                   const checked = selectedIds.has(row.shopId);
+                  const isAssignedRow = row.kind === "assigned";
                   return (
                     <tr
                       key={row.shopId}
-                      className={`${opsTableRowClass} cursor-pointer ${checked ? "bg-emerald-50/50" : ""}`}
-                      onClick={() => toggleShop(row, !checked)}
+                      className={`${opsTableRowClass} ${
+                        isAssignedRow
+                          ? "cursor-default opacity-60"
+                          : `cursor-pointer ${checked ? "bg-emerald-50/50" : ""}`
+                      }`}
+                      onClick={() => {
+                        if (!isAssignedRow) toggleShop(row, !checked);
+                      }}
                     >
                       <td className={opsTableTdClass} onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={checked}
+                          disabled={isAssignedRow}
                           onChange={(e) => toggleShop(row, e.target.checked)}
                           aria-label={`${to("orders.select_col")} — ${row.shopName}`}
-                          className="h-4 w-4 accent-emerald-600 cursor-pointer"
+                          className={`h-4 w-4 accent-emerald-600 ${
+                            isAssignedRow ? "cursor-not-allowed opacity-40" : "cursor-pointer"
+                          }`}
                         />
                       </td>
                       <td className={opsTableTdClass}>
@@ -793,8 +845,24 @@ function AssignmentEditor({
                           ? `${weightForBirds(Number(row.birds) || 0, avgBirdWeight).toFixed(2)} kg`
                           : "—"}
                       </td>
+                      <td className={`${opsTableTdClass} whitespace-nowrap`}>
+                        {isAssignedRow ? (
+                          <span className="text-slate-600">
+                            {row.assignedVehicleNo || "—"}
+                            {row.assignedTripNo ? ` · ${row.assignedTripNo}` : ""}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
                       <td className={opsTableTdClass}>
-                        {checked ? (
+                        {isAssignedRow ? (
+                          row.delivered ? (
+                            <OrdersStatusBadge status="Delivered" label={to("orders.status_delivered")} />
+                          ) : (
+                            <OrdersStatusBadge status="Assigned" label={to("orders.col_assigned")} />
+                          )
+                        ) : checked ? (
                           <OrdersStatusBadge status="Assigned" label={to("orders.col_assigned")} />
                         ) : (
                           <span className="text-[11px] font-semibold text-emerald-600">
@@ -808,7 +876,7 @@ function AssignmentEditor({
               </tbody>
             </table>
           </div>
-          {filteredAvailable.length > AVAILABLE_PAGE_SIZE && (
+          {filteredPool.length > AVAILABLE_PAGE_SIZE && (
             <div className="px-4 py-2.5 border-t border-slate-100">
               <TripPagination
                 currentPage={safeAvailablePage}

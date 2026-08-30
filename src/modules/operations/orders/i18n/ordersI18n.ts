@@ -202,7 +202,7 @@ const EN: Record<string, string> = {
     "orders.col_completed_at": "Completed At",
     "orders.status_complete": "COMPLETE",
     "orders.no_pending_deliveries": "No pending deliveries",
-    "orders.no_completed_window": "No completed trips in the last 7 days",
+    "orders.no_completed_window": "No completed trips in the selected range",
     "orders.no_search_results": "No shops match your search",
     "orders.search_collection": "Search shop, village, trip, vehicle, status…",
     "orders.search_assignment": "Search shop, village, trip, vehicle, supervisor…",
@@ -254,6 +254,19 @@ const EN: Record<string, string> = {
   "orders.already_assigned": "Already Assigned",
   "orders.capacity_exceeded_line": "Capacity exceeded. Please reduce the assigned boxes.",
   "orders.not_listed_note": "This shop was delivered during Step 4 but was not present in the original collected order.",
+  "orders.shop_mobile": "Shop Mobile",
+  "orders.from_date": "From",
+  "orders.to_date": "To",
+  "orders.trips_count": "{x} trips",
+  "orders.collected_shops": "Collected Shops",
+  "orders.vehicle_trip": "Vehicle / Trip",
+  "orders.sort_pending_first": "Pending First",
+  "orders.sort_vehicle_trip": "Vehicle / Trip",
+  "orders.listed_shops": "Listed Shops",
+  "orders.not_listed_shops": "Not Listed Shops",
+  "orders.box_difference": "Box Difference",
+  "orders.pdf_report_title": "SHOP DELIVERY REPORT",
+  "orders.pdf_totals": "TOTALS",
 };
 
 const TE: Record<string, string> = {
@@ -501,6 +514,19 @@ const TE: Record<string, string> = {
   "orders.already_assigned": "ఇప్పటికే అసైన్ చేసినవి",
   "orders.capacity_exceeded_line": "కెపాసిటీ మించింది. అసైన్ చేసిన బాక్స్‌లను తగ్గించండి.",
   "orders.not_listed_note": "ఈ షాప్ స్టెప్ 4 సమయంలో డెలివర్ అయింది కానీ అసలు సేకరించిన ఆర్డర్‌లో లేదు.",
+  "orders.shop_mobile": "షాప్ మొబైల్",
+  "orders.from_date": "మొదలు",
+  "orders.to_date": "వరకు",
+  "orders.trips_count": "{x} ట్రిప్‌లు",
+  "orders.collected_shops": "సేకరించిన షాప్‌లు",
+  "orders.vehicle_trip": "వాహనం / ట్రిప్",
+  "orders.sort_pending_first": "పెండింగ్ ముందు",
+  "orders.sort_vehicle_trip": "వాహనం / ట్రిప్",
+  "orders.listed_shops": "లిస్టెడ్ షాప్‌లు",
+  "orders.not_listed_shops": "పట్టికలో లేని షాప్‌లు",
+  "orders.box_difference": "బాక్స్ తేడా",
+  "orders.pdf_report_title": "షాప్ డెలివరీ రిపోర్ట్",
+  "orders.pdf_totals": "మొత్తాలు",
 };
 
 export type OrdersT = (key: string, params?: Record<string, string | number>) => string;

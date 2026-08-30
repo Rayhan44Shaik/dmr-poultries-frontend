@@ -59,7 +59,7 @@ import type { OrderShopRow, OrdersDayCollection } from "../types";
 import {
   OrdersDateControl,
   OrdersEmptyState,
-  OrdersFilterSelect,
+  OrdersDropdown,
   OrdersIconButton,
   OrdersSearchInput,
   OrdersStatusBadge,
@@ -563,9 +563,10 @@ function CollectionEntries({
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        {/* Table-level controls: [Search][Date][Refresh][Sort] + compact
-            status. No section heading — the active tab says it. No
-            Previous/Next day buttons, no scroller. */}
+        {/* Table-level controls: [Search][Date][Sort] … [↻ Refresh] —
+            Refresh is ALWAYS the last control, far right. No section
+            heading — the active tab says it. No Previous/Next day
+            buttons, no scroller. */}
         <div className="px-5 py-2.5 border-b border-slate-200 bg-slate-50/60 flex items-center gap-3 flex-wrap">
           <OrdersSearchInput
             value={query}
@@ -574,22 +575,15 @@ function CollectionEntries({
             className="w-full sm:w-64"
           />
           <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} />
-          <OrdersIconButton
-            label={`${to("orders.refresh")} — ${to("orders.refresh_collection")}`}
-            onClick={onRefresh}
-            busy={refreshing}
-          >
-            <RefreshCw size={14} />
-          </OrdersIconButton>
           <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
             {to("orders.sort")}
           </span>
-          <OrdersFilterSelect
+          <OrdersDropdown
             value={sortMode}
             onChange={(v) => setSortMode(v as "collected" | "az" | "za")}
             options={sortOptions}
             ariaLabel={to("orders.sort")}
-            className="w-44"
+            widthClass="w-44"
           />
           {isLocked && !isPast && (
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2 py-0.5 text-[11px] font-bold text-slate-600">
@@ -604,10 +598,17 @@ function CollectionEntries({
               birds: totals.totalBirds,
             })}
           </span>
+          <OrdersIconButton
+            label={`${to("orders.refresh")} — ${to("orders.refresh_collection")}`}
+            onClick={onRefresh}
+            busy={refreshing}
+          >
+            <RefreshCw size={14} />
+          </OrdersIconButton>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-xs md:text-sm">
+          <table className="w-full min-w-[1060px] text-xs md:text-sm">
             <thead>
               <tr className={opsTableHeadRowClass}>
                 <th className={`${opsTableThClass} w-16`}>{to("orders.col_sno")}</th>

@@ -37,11 +37,11 @@ import {
   rowsInSequence,
   type ShopDeliveryBreakdown,
 } from "../ordersUtils";
-import { villageOf, type ShopDirectory } from "../ordersService";
+import { shopMobileOf, villageOf, type ShopDirectory } from "../ordersService";
 import { useOrdersI18n } from "../i18n/ordersI18n";
 import type { OrdersTrip } from "../types";
 import {
-  OrdersFilterSelect,
+  OrdersDropdown,
   OrdersIconButton,
   OrdersSearchInput,
   OrdersStatusBadge,
@@ -132,7 +132,8 @@ function OrdersDeliveryDetailView({
         rowsInSequence(trip),
         originalShopIds,
         (shopId, shopName) => villageOf(shopId, shopName, shopDirectory),
-        orderTrip.originalQuantities
+        orderTrip.originalQuantities,
+        (shopId) => shopMobileOf(shopId, shopDirectory)
       ),
     [trip, originalShopIds, shopDirectory, orderTrip.originalQuantities]
   );
@@ -345,21 +346,23 @@ function OrdersDeliveryDetailView({
                     ariaLabel={to("orders.search_report")}
                     className="w-full sm:w-56"
                   />
-                  <OrdersFilterSelect
+                  <OrdersDropdown
                     value={statusFilter}
                     onChange={(v) => setStatusFilter(v as ReportStatusFilter)}
                     options={statusOptions}
                     ariaLabel={to("orders.filter_status")}
+                    widthClass="w-40"
                   />
                 </div>
               </div>
               <div className={`${opsTableCardClass} overflow-x-auto`}>
-                <table className="w-full min-w-[1280px] text-xs md:text-sm">
+                <table className="w-full min-w-[1400px] text-xs md:text-sm">
                   <thead>
                     <tr className={opsTableHeadRowClass}>
                       <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
                       <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
                       <th className={opsTableThClass}>{to("orders.col_village")}</th>
+                      <th className={`${opsTableThClass} w-32`}>{to("orders.shop_mobile")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_birds")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_boxes")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_birds")}</th>
@@ -373,7 +376,7 @@ function OrdersDeliveryDetailView({
                   <tbody className={opsTableDivideClass}>
                     {pageRows.length === 0 && (
                       <tr>
-                        <td className={opsTableTdClass} colSpan={11}>
+                        <td className={opsTableTdClass} colSpan={12}>
                           <span className="text-slate-400 text-sm py-4 block text-center">
                             {query || statusFilter !== "all"
                               ? to("orders.no_results")
@@ -399,6 +402,9 @@ function OrdersDeliveryDetailView({
                             {row.shopName || "—"}
                           </td>
                           <td className={opsTableTdClass}>{row.village || "—"}</td>
+                          <td className={`${opsTableTdClass} text-slate-600 whitespace-nowrap`}>
+                            {row.mobile || "—"}
+                          </td>
                           <td className={`${opsTableTdClass} text-right font-semibold`}>
                             {row.orderedBirds > 0 ? formatCount(row.orderedBirds) : "—"}
                           </td>
@@ -507,6 +513,7 @@ function OrdersDeliveryDetailView({
                         <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
                         <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
                         <th className={opsTableThClass}>{to("orders.col_village")}</th>
+                        <th className={`${opsTableThClass} w-32`}>{to("orders.shop_mobile")}</th>
                         <th className={`${opsTableThClass} w-32 text-right`}>{to("orders.delivered_birds")}</th>
                         <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_boxes")}</th>
                         <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.delivered_weight")}</th>
@@ -530,6 +537,9 @@ function OrdersDeliveryDetailView({
                             </span>
                           </td>
                           <td className={opsTableTdClass}>{row.village || "—"}</td>
+                          <td className={`${opsTableTdClass} text-slate-600 whitespace-nowrap`}>
+                            {row.mobile || "—"}
+                          </td>
                           <td className={`${opsTableTdClass} text-right font-semibold`}>
                             {row.deliveredBirds > 0 ? formatCount(row.deliveredBirds) : "—"}
                           </td>
