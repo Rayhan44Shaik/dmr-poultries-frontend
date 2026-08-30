@@ -1,0 +1,83 @@
+name: Backend Orders E2E
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-orders-e2e.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-orders-e2e.yml"
+
+jobs:
+  orders-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: dmr_poultries
+          POSTGRES_USER: dmr
+          POSTGRES_PASSWORD: dmr_local_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U dmr -d dmr_poultries"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      DATABASE_URL: postgresql://dmr:dmr_local_dev@127.0.0.1:5432/dmr_poultries
+      PORT: 4000
+      NODE_ENV: test
+      CORS_ORIGIN: http://localhost:5173
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend
+        working-directory: backend
+        run: npm ci
+
+      - name: Typecheck backend
+        working-directory: backend
+        run: npm run typecheck
+
+      - name: Apply migrations
+        working-directory: backend
+        run: npm run db:migrate
+
+      - name: Seed masters
+        working-directory: backend
+        run: npm run db:seed
+
+      - name: Start backend
+        working-directory: backend
+        run: |
+          npm start > /tmp/dmr-backend.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4000/api/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/dmr-backend.log
+          exit 1
+
+      - name: Orders API E2E
+        working-directory: backend
+        env:
+          E2E_BASE_URL: http://127.0.0.1:4000/api
+        run: npm run test:e2e:orders
