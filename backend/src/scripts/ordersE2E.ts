@@ -67,8 +67,6 @@ async function main() {
   assert.equal(shopsResult.response.status, 200);
 
   const employees = employeesResult.body as Array<Record<string, unknown>>;
-  const vehicles = employeesResult.body as unknown;
-  void vehicles;
   const vehicleList = vehiclesResult.body as Array<Record<string, unknown>>;
   const farmList = farmsResult.body as Array<Record<string, unknown>>;
   const shopList = shopsResult.body as Array<Record<string, unknown>>;
@@ -165,7 +163,7 @@ async function main() {
       mode: "save",
       deliveries: [orderRow],
     });
-    assert.equal(blockedBeforeStep2.response.status, 500 === blockedBeforeStep2.response.status ? 500 : 500);
+    assert.equal(blockedBeforeStep2.response.status, 400);
     assert.match(String((blockedBeforeStep2.body as Record<string, unknown>)?.error ?? ""), /Step 2/i);
 
     // 3) Submit Step 2; the same assignment must now succeed.
@@ -246,17 +244,23 @@ async function main() {
       mode: "save",
       deliveries: [orderRow],
     });
-    assert.equal(duplicate.response.status, 500 === duplicate.response.status ? 500 : 500);
+    assert.equal(duplicate.response.status, 409);
     assert.match(String((duplicate.body as Record<string, unknown>)?.error ?? ""), /already assigned/i);
 
     // 5) The existing trip endpoint remains the source of truth and returns
     // the persisted collection + assignment data together.
-    const listed = (await expectStatus(`/trips?fromDate=${testDate}&toDate=${testDate}`, {}, 200)) as Array<Record<string, unknown>>;
+    const listed = (await expectStatus(
+      `/trips?fromDate=${testDate}&toDate=${testDate}`,
+      {},
+      200
+    )) as Array<Record<string, unknown>>;
     assert(listed.some((t) => t.tripNo === collectionTripNo));
     assert(listed.some((t) => t.tripNo === tripOneNo));
 
     console.log("Orders backend E2E: PASS");
-    console.log("  collection -> submitted -> Step 2 gate -> assignment -> duplicate-shop guard -> readback");
+    console.log(
+      "  collection -> submitted -> Step 2 gate -> assignment -> duplicate-shop guard -> readback"
+    );
   } finally {
     for (const id of createdTrips.reverse()) {
       await deleteTrip(id).catch(() => undefined);
