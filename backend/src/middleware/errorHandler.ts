@@ -15,6 +15,10 @@ export function notFound(_req: Request, res: Response) {
   res.status(404).json({ error: "Not found" });
 }
 
+function isPgError(err: unknown): err is { code?: string; detail?: string; hint?: string } {
+  return typeof err === "object" && err !== null && "code" in err;
+}
+
 export function errorHandler(
   err: unknown,
   _req: Request,
@@ -26,6 +30,29 @@ export function errorHandler(
       error: err.message,
       details: err.details,
     });
+  }
+
+  if (isPgError(err)) {
+    const code = err.code;
+    const message =
+      typeof (err as { message?: unknown }).message === "string"
+        ? (err as { message: string }).message
+        : "Database error";
+
+    if (code === "23505") {
+      return res.status(409).json({
+        error: message,
+        details: err.detail,
+      });
+    }
+
+    if (code === "23503" || code === "23514" || code === "22P02") {
+      return res.status(400).json({
+        error: message,
+        details: err.detail,
+        hint: err.hint,
+      });
+    }
   }
 
   console.error(err);
