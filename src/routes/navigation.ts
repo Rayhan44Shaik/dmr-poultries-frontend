@@ -110,6 +110,7 @@ export const NAV_SECTIONS: NavSection[] = [
       
       { label: "Mortality Entry", labelKey: "nav.mortalityEntry", path: "/operations?tab=mortality", icon: Bird, keywords: "mortality death birds" },
       { label: "Fuel Expenses", labelKey: "nav.fuelExpenses", path: "/operations?tab=fuel-expenses", icon: Fuel, keywords: "fuel diesel expenses bills" },
+      { label: "Orders", path: "/operations?tab=orders", icon: ClipboardList, keywords: "orders shop order collection delivery sequence pending completed" },
     ],
   },
   {
