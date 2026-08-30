@@ -15,7 +15,7 @@ export function notFound(_req: Request, res: Response) {
   res.status(404).json({ error: "Not found" });
 }
 
-function isPgError(err: unknown): err is { code?: string; detail?: string; hint?: string } {
+function isPgError(err: unknown): err is { code?: string; detail?: string; hint?: string; message?: string } {
   return typeof err === "object" && err !== null && "code" in err;
 }
 
@@ -34,10 +34,7 @@ export function errorHandler(
 
   if (isPgError(err)) {
     const code = err.code;
-    const message =
-      typeof (err as { message?: unknown }).message === "string"
-        ? (err as { message: string }).message
-        : "Database error";
+    const message = err.message ?? "Database error";
 
     if (code === "23505") {
       return res.status(409).json({
@@ -46,7 +43,7 @@ export function errorHandler(
       });
     }
 
-    if (code === "23503" || code === "23514" || code === "22P02") {
+    if (code === "23503" || code === "23514" || code === "22P02" || code === "P0001") {
       return res.status(400).json({
         error: message,
         details: err.detail,
