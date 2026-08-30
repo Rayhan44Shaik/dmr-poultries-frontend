@@ -744,4 +744,86 @@
   'ops.trip.emi_due_date': 'గడువు తేదీ',
   'ops.trip.emi_paid_date': 'చెల్లించిన తేదీ',
   'ops.trip.emi_status': 'EMI స్థితి',
+
+  /* ── Mortality & Weight Loss Analysis ───────────────────────────── */
+  // Filters
+  'ops.mortality.filter.all_farms': 'అన్ని ఫారాలు',
+  'ops.mortality.filter.all_supervisors': 'అన్ని సూపర్వైజర్లు',
+  'ops.mortality.filter.search_placeholder': 'ట్రిప్, ఫారం, సూపర్వైజర్...',
+
+  // Section heading
+  'ops.mortality.section.completed_trips': 'పూర్తయిన ట్రిప్పులు',
+
+  // KPI cards
+  'ops.mortality.kpi.completed_trips': 'పూర్తయిన ట్రిప్పులు',
+  'ops.mortality.kpi.farm_birds': 'ఫారం పక్షులు',
+  'ops.mortality.kpi.farm_weight': 'ఫారం బరువు',
+  'ops.mortality.kpi.delivery_shops': 'డెలివరీ షాపులు',
+  'ops.mortality.kpi.delivered_birds': 'డెలివరీ చేసిన పక్షులు',
+  'ops.mortality.kpi.delivery_weight': 'డెలివరీ బరువు',
+  'ops.mortality.kpi.mortality_birds': 'మరణించిన పక్షులు',
+  'ops.mortality.kpi.mortality_weight': 'మరణాల బరువు',
+  'ops.mortality.kpi.mortality_pct': 'మరణాలు %',
+  'ops.mortality.kpi.weight_loss': 'బరువు నష్టం',
+  'ops.mortality.kpi.weight_loss_pct': 'బరువు నష్టం %',
+  'ops.mortality.kpi.filtered_summary': 'వర్తింపజేసిన ఫిల్టర్ కోసం సారాంశం',
+
+  // Table columns
+  'ops.mortality.col.source_farm': 'ఫారం',
+  'ops.mortality.col.farm_birds': 'ఫారం పక్షులు',
+  'ops.mortality.col.farm_weight': 'ఫారం బరు',
+  'ops.mortality.col.delivery_shops': 'డెలి షాపులు',
+  'ops.mortality.col.delivered_birds': 'డెలి పక్షులు',
+  'ops.mortality.col.delivery_weight': 'డెలి బరు',
+  'ops.mortality.col.mortality': 'మరణాలు',
+  'ops.mortality.col.mortality_weight': 'మరణాల బరు',
+  'ops.mortality.col.weight_loss': 'బరు నష్టం',
+  'ops.mortality.col.loss_pct': 'నష్టం %',
+
+  // Empty states
+  'ops.mortality.empty.title': 'పూర్తయిన ట్రిప్పులు కనుగొనబడలేదు',
+  'ops.mortality.empty.hint': 'తేదీ పరిధి లేదా ఫిల్టర్లను మార్చి చూడండి.',
+  'ops.mortality.empty.filtered_title': 'మీ శోధన ప్రమాణాలకు సరిపోలే పూర్తయిన ట్రిప్పులు లేవు.',
+
+  // Pagination
+  'ops.mortality.pagination.showing': '{total} పూర్తయిన ట్రిప్పులలో {start}–{end} చూపుతోంది',
+  'ops.mortality.pagination.rows_per_page': 'ఒక పేజీకి వరుసలు',
+
+  // Expanded detail
+  'ops.mortality.detail.trip_overview': 'ట్రిప్ అవలోకనం',
+  'ops.mortality.detail.farm_input': 'ఫారం ఇన్‌పుట్',
+  'ops.mortality.detail.delivery_output': 'డెలివరీ అవుట్‌పుట్',
+  'ops.mortality.detail.total_delivery': 'మొత్తం డెలివరీ',
+  'ops.mortality.detail.mortality': 'మరణాలు',
+  'ops.mortality.detail.weight_loss': 'బరువు నష్టం',
+  'ops.mortality.detail.delivery_reconciliation': 'డెలివరీ సరిపోలిక',
+  'ops.mortality.detail.no_deliveries': 'డెలివరీ రికార్డులు లేవు.',
+  'ops.mortality.detail.shop_count': '({count} షాపులు)',
+  'ops.mortality.detail.shop_count_one': '({count} షాపు)',
+  'ops.mortality.field.trip_no': 'ట్రిప్ నంబర్',
+  'ops.mortality.field.vehicle': 'వాహనం',
+  'ops.mortality.field.source_farm': 'మూల ఫారం',
+  'ops.mortality.field.farm_birds': 'ఫారం పక్షులు',
+  'ops.mortality.field.farm_weight': 'ఫారం బరువు',
+  'ops.mortality.field.shops': 'షాపుల సంఖ్య',
+  'ops.mortality.field.delivered_birds': 'డెలివరీ చేసిన పక్షులు',
+  'ops.mortality.field.delivery_weight': 'డెలివరీ బరువు',
+  'ops.mortality.field.mortality_birds': 'మరణించిన పక్షులు',
+  'ops.mortality.field.mortality_weight': 'మరణాల బరువు',
+  'ops.mortality.field.mortality_pct': 'మరణాలు %',
+  'ops.mortality.field.survival_rate': 'జీవన రేటు',
+  'ops.mortality.field.weight_loss': 'బరువు నష్టం',
+  'ops.mortality.field.weight_loss_pct': 'నష్టం %',
+
+  // Toasts & states
+  'ops.mortality.toast.refreshed': 'మరణాల డేటా రిఫ్రెష్ చేయబడింది',
+  'ops.mortality.toast.refresh_failed': 'మరణాల డేటాను రిఫ్రెష్ చేయలేకపోయింది',
+  'ops.mortality.toast.search_applied': 'శోధన వర్తించబడింది',
+  'ops.mortality.toast.search_result': 'శోధన వర్తించబడింది — {count} పూర్తయిన ట్రిప్పులు',
+  'ops.mortality.toast.search_result_one': 'శోధన వర్తించబడింది — {count} పూర్తయిన ట్రిప్పు',
+  'ops.mortality.toast.reset': 'ఫిల్టర్లు ప్రస్తుత వారానికి రీసెట్ చేయబడ్డాయి.',
+  'ops.mortality.error.title': 'పూర్తయిన ట్రిప్పులను లోడ్ చేయలేకపోయింది',
+  'ops.mortality.loading': 'పూర్తయిన ట్రిప్పులు లోడ్ అవుతున్నాయి…',
+  'ops.mortality.aria.expand': 'ట్రిప్‌ను విస్తరించండి',
+  'ops.mortality.aria.collapse': 'ట్రిప్‌ను కుదించండి',
 };

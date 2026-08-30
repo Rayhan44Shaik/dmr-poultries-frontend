@@ -24,7 +24,7 @@ const LEGACY_STORAGE_KEYS = [
 /** Cache filled exclusively by GET /api/masters/shops. */
 let shopsCache: Shop[] = [];
 
-export type ShopInput = Omit<Shop, "id" | "shopNo"> & {
+export type ShopInput = Omit<Shop, "id" | "shopNo" | "currentBalance"> & {
   shopNo?: number;
 };
 
@@ -46,13 +46,18 @@ function mapShop(raw: Record<string, unknown>): Shop {
   return {
     id: Number(raw.id),
     shopNo: Number(raw.shopNo ?? raw.shop_no ?? 0),
+    shopNumber: String(raw.shopNumber ?? raw.shop_number ?? ""),
     shopName: String(raw.shopName ?? raw.shop_name ?? ""),
     ownerName: String(raw.ownerName ?? raw.owner_name ?? ""),
     phoneNumber: String(raw.phoneNumber ?? raw.phone_number ?? ""),
-    whatsappNumber: String(raw.whatsappNumber ?? raw.whatsapp_number ?? ""),
+    secondaryPhoneNumber: String(raw.secondaryPhoneNumber ?? raw.secondary_phone_number ?? ""),
     email: String(raw.email ?? "").trim(),
-    village: String(raw.village ?? ""),
+    city: String(raw.city ?? ""),
     address: String(raw.address ?? ""),
+    latitude: raw.latitude != null ? Number(raw.latitude) : undefined,
+    longitude: raw.longitude != null ? Number(raw.longitude) : undefined,
+    paperRate: Number(raw.paperRate ?? raw.paper_rate ?? 0),
+    associationType: String(raw.associationType ?? raw.association_type ?? ""),
     status: normalizeStatus(raw.status),
     openingBalance: Number(raw.openingBalance ?? raw.opening_balance ?? 0),
     currentBalance:
@@ -67,13 +72,18 @@ function mapShop(raw: Record<string, unknown>): Shop {
 function toPayload(input: ShopInput | Partial<Shop>): Record<string, unknown> {
   return {
     shopNo: input.shopNo,
+    shopNumber: input.shopNumber?.trim(),
     shopName: input.shopName?.trim(),
     ownerName: input.ownerName?.trim() ?? "",
     phoneNumber: input.phoneNumber?.trim() ?? "",
-    whatsappNumber: input.whatsappNumber?.trim() ?? "",
+    secondaryPhoneNumber: input.secondaryPhoneNumber?.trim() ?? "",
     email: input.email?.trim() ?? "",
-    village: input.village?.trim() ?? "",
+    city: input.city?.trim() ?? "",
     address: input.address?.trim() ?? "",
+    latitude: input.latitude != null ? Number(input.latitude) : null,
+    longitude: input.longitude != null ? Number(input.longitude) : null,
+    paperRate: Number(input.paperRate ?? 0),
+    associationType: input.associationType?.trim() ?? "",
     status: input.status ?? "Active",
     openingBalance: Number(input.openingBalance ?? 0),
   };

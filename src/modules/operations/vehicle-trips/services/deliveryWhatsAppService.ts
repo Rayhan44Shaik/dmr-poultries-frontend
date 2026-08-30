@@ -58,7 +58,7 @@ export async function sendDeliveryWhatsApp(input: {
   trip: Trip;
   delivery: ShopDelivery;
   shopWhatsApp?: string | null;
-}): Promise<{ success: boolean; status: DeliveryWhatsAppStatusValue; message?: string }> {
+}): Promise<{ success: boolean; status: DeliveryWhatsAppStatusValue; message?: string; sendCount?: number; attemptCount?: number }> {
   if (!WHATSAPP_BACKEND_ENABLED) {
     return {
       success: false,
@@ -90,6 +90,8 @@ export async function sendDeliveryWhatsApp(input: {
     success: boolean;
     status: DeliveryWhatsAppStatusValue;
     message?: string;
+    sendCount?: number;
+    attemptCount?: number;
   }>(
     `/trips/${input.trip.id}/deliveries/${input.delivery.id}/whatsapp`,
     { pdfBase64, fileName },

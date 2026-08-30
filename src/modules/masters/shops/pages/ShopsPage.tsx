@@ -25,7 +25,7 @@ import { useI18n } from "../../../../i18n";
 
 type ShopsPageProps = { embedded?: boolean };
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 5;
 
 function ShopsPage({ embedded = false }: ShopsPageProps) {
   const { t } = useI18n();
@@ -34,7 +34,6 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const { showNotification } = useSafeNotification();
   const {
@@ -46,7 +45,6 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     addShop,
     addShopsBulk,
     editShop,
-    removeShop,
   } = useShops();
 
   const shopBulkImportConfig = useMemo(
@@ -66,9 +64,9 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       (shop) =>
         shop.shopName.toLowerCase().includes(keyword) ||
         shop.ownerName.toLowerCase().includes(keyword) ||
-        shop.village.toLowerCase().includes(keyword) ||
+        shop.city.toLowerCase().includes(keyword) ||
         shop.phoneNumber.includes(keyword) ||
-        (shop.whatsappNumber ?? "").includes(keyword)
+        shop.shopNumber.toLowerCase().includes(keyword)
     );
   }, [shops, search]);
 
@@ -85,34 +83,33 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       return;
     }
 
-    // Initialize jsPDF in Landscape ('l') orientation with exact dimensions
     const doc = new jsPDF("l", "mm", "a4");
-    const pageWidth = doc.internal.pageSize.getWidth(); // 297mm for A4 Landscape
+    const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 14;
     const usableWidth = pageWidth - (margin * 2);
 
-    // Adjusted weights to ensure total sum maps precisely to usableWidth without clipping right borders
-    const relativeWeights = [0.10, 0.26, 0.20, 0.22, 0.12, 0.10];
+    const relativeWeights = [0.06, 0.22, 0.16, 0.14, 0.12, 0.10, 0.08, 0.12];
     const columnStylesConfig: { [key: number]: { cellWidth: number; halign?: "center" | "left" | "right" } } = {};
 
     const headers = [
-      t("masters.shops.table.shop_no"),
+      t("masters.shops.table.s_no"),
       t("masters.shops.table.shop_name"),
       t("masters.shops.table.owner"),
-      t("masters.shops.table.village"),
-      t("masters.shops.table.phone"),
-      t("masters.shops.table.status"),
+      t("masters.shops.table.mobile_no"),
+      t("masters.shops.table.city"),
+      t("masters.shops.table.association_type"),
+      t("masters.shops.table.paper_rate"),
+      t("masters.shops.table.opening_balance"),
     ];
     headers.forEach((_, index) => {
       const computedWidth = usableWidth * relativeWeights[index];
-      const isCentered = index === 0 || index === headers.length - 1;
+      const isCentered = index === 0 || index === 6 || index === 7;
       columnStylesConfig[index] = {
         cellWidth: computedWidth,
         halign: isCentered ? "center" : "left",
       };
     });
 
-    // Document Header Block
     doc.setFontSize(16);
     doc.setTextColor(30, 41, 59);
     doc.text(t("masters.shops.title") + " - " + t("common.master_list"), margin, 15);
@@ -121,16 +118,17 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     doc.setTextColor(100, 116, 139);
     doc.text(`${t("common.generated_on")}: ${new Date().toLocaleDateString()}`, margin, 21);
 
-    const rows = filteredShops.map((shop) => [
-      shop.shopNo.toString(),
+    const rows = filteredShops.map((shop, index) => [
+      (index + 1).toString(),
       shop.shopName,
       shop.ownerName,
-      shop.village,
       shop.phoneNumber,
-      shop.status,
+      shop.city,
+      shop.associationType || "—",
+      shop.paperRate.toString(),
+      `₹${Number(shop.openingBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     ]);
 
-    // Render AutoTable with precise explicit table width bounds to prevent right-side clipping
     autoTable(doc, {
       startY: 26,
       head: [headers],
@@ -181,20 +179,24 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       return;
     }
     const headers = [
-      t("masters.shops.table.shop_no"),
+      t("masters.shops.table.s_no"),
       t("masters.shops.table.shop_name"),
       t("masters.shops.table.owner"),
-      t("masters.shops.table.village"),
-      t("masters.shops.table.phone"),
-      t("masters.shops.table.status"),
+      t("masters.shops.table.mobile_no"),
+      t("masters.shops.table.city"),
+      t("masters.shops.table.association_type"),
+      t("masters.shops.table.paper_rate"),
+      t("masters.shops.table.opening_balance"),
     ];
-    const rows = filteredShops.map((shop) => [
-      shop.shopNo.toString(),
+    const rows = filteredShops.map((shop, index) => [
+      (index + 1).toString(),
       shop.shopName,
       shop.ownerName,
-      shop.village,
       shop.phoneNumber,
-      shop.status,
+      shop.city,
+      shop.associationType || "—",
+      shop.paperRate.toString(),
+      `₹${Number(shop.openingBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     ]);
     const filename = `${t("masters.shops.title")}_${new Date().toISOString().split("T")[0]}`;
 
@@ -207,11 +209,11 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     const shopName = shop.shopName?.trim() ?? "";
     const ownerName = shop.ownerName?.trim() ?? "";
     const phoneNumber = shop.phoneNumber?.trim() ?? "";
-    const whatsappNumber = shop.whatsappNumber?.trim() ?? "";
+    const secondaryPhoneNumber = shop.secondaryPhoneNumber?.trim() ?? "";
     const email = shop.email?.trim() ?? "";
-    const village = shop.village?.trim() ?? "";
+    const city = shop.city?.trim() ?? "";
 
-    if (!shopName || !ownerName || !phoneNumber || !email || !village) {
+    if (!shopName || !ownerName || !phoneNumber || !city) {
       return t("masters.shops.validation.fill_required");
     }
     if (shopName.length < 3) {
@@ -223,10 +225,10 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     if (!/^[0-9]{10}$/.test(phoneNumber)) {
       return t("masters.shops.validation.mobile_10_digits");
     }
-    if (whatsappNumber !== "" && !/^[0-9]{10}$/.test(whatsappNumber)) {
-      return t("masters.shops.validation.whatsapp_10_digits");
+    if (secondaryPhoneNumber !== "" && !/^[0-9]{10}$/.test(secondaryPhoneNumber)) {
+      return t("masters.shops.validation.secondary_mobile_10_digits");
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (email !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return t("masters.shops.validation.email_invalid");
     }
 
@@ -237,13 +239,6 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     );
     if (duplicateShop) {
       return t("masters.shops.validation.duplicate_shop");
-    }
-
-    const duplicatePhone = shops.some(
-      (s) => s.phoneNumber === phoneNumber && s.id !== editingShop?.id
-    );
-    if (duplicatePhone) {
-      return t("masters.shops.validation.duplicate_phone");
     }
 
     return null;
@@ -257,13 +252,18 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     }
 
     const payload = {
+      shopNumber: shop.shopNumber?.trim() ?? "",
       shopName: shop.shopName!.trim(),
       ownerName: shop.ownerName!.trim(),
       phoneNumber: shop.phoneNumber!.trim(),
-      whatsappNumber: shop.whatsappNumber?.trim() ?? "",
-      email: shop.email!.trim(),
-      village: shop.village!.trim(),
+      secondaryPhoneNumber: shop.secondaryPhoneNumber?.trim() ?? "",
+      email: shop.email?.trim() ?? "",
+      city: shop.city!.trim(),
       address: shop.address?.trim() ?? "",
+      latitude: shop.latitude != null ? Number(shop.latitude) : 0,
+      longitude: shop.longitude != null ? Number(shop.longitude) : 0,
+      paperRate: shop.paperRate ?? 1,
+      associationType: shop.associationType?.trim() ?? "",
       status: shop.status ?? "Active",
       openingBalance: shop.openingBalance ?? 0,
     };
@@ -295,19 +295,6 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   const handleEditShop = (shop: Shop) => {
     setEditingShop(shop);
     setShowDialog(true);
-  };
-
-  const handleDeleteShop = async (id: number) => {
-    setDeletingId(id);
-    try {
-      await removeShop(id);
-      logAuditEvent("DELETE_SHOP", "Shops", id);
-      showNotification(t("masters.shops.toast.deleted"), "success");
-    } catch (err) {
-      showNotification(handleApiError(err), "error");
-    } finally {
-      setDeletingId(null);
-    }
   };
 
   const content = (
@@ -432,7 +419,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
             <span className="px-2 py-0.5 font-semibold text-blue-700 bg-blue-50 border border-blue-200/60 rounded-full">
               {t("masters.shops.records", { count: filteredShops.length })}
             </span>
-            {(loading || saving || deletingId !== null) && (
+            {(loading || saving) && (
               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 font-medium text-slate-600 bg-slate-100 border border-slate-200 rounded-full">
                 <svg className="animate-spin h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -481,7 +468,6 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
             <ShopTable
               shops={paginatedShops}
               onEdit={handleEditShop}
-              onDelete={handleDeleteShop}
             />
           )}
         </div>

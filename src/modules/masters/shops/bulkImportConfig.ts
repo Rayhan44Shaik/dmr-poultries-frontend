@@ -9,35 +9,53 @@ import type { Shop } from "./types/shop";
 import type { ShopInput } from "./services/shopService";
 
 export type ShopBulkRow = {
+  shopNumber: string;
   shopName: string;
   ownerName: string;
   phoneNumber: string;
+  secondaryPhoneNumber: string;
   email: string;
-  village: string;
+  city: string;
   address: string;
+  latitude: string;
+  longitude: string;
+  paperRate: number;
+  associationType: string;
   status: "Active" | "Inactive";
+  openingBalance: number;
 };
 
 function toShopPayload(row: ShopBulkRow): ShopInput {
   return {
+    shopNumber: row.shopNumber.trim(),
     shopName: row.shopName.trim(),
     ownerName: row.ownerName.trim(),
     phoneNumber: row.phoneNumber.trim(),
+    secondaryPhoneNumber: row.secondaryPhoneNumber.trim(),
     email: row.email.trim(),
-    village: row.village.trim(),
+    city: row.city.trim(),
     address: row.address.trim(),
+    latitude: row.latitude.trim() ? parseFloat(row.latitude.trim()) : 0,
+    longitude: row.longitude.trim() ? parseFloat(row.longitude.trim()) : 0,
+    paperRate: row.paperRate,
+    associationType: row.associationType.trim(),
     status: row.status,
-    openingBalance: 0,
+    openingBalance: row.openingBalance,
   };
 }
 
 function validateShopRow(row: ShopBulkRow, existing: Shop[]): string[] {
   const errors: string[] = [];
+  const shopNumber = row.shopNumber.trim();
   const shopName = row.shopName.trim();
   const ownerName = row.ownerName.trim();
   const phoneNumber = row.phoneNumber.trim();
+  const secondaryPhoneNumber = row.secondaryPhoneNumber.trim();
   const email = row.email.trim();
-  const village = row.village.trim();
+  const city = row.city.trim();
+  const latitude = row.latitude.trim();
+  const longitude = row.longitude.trim();
+  const paperRate = row.paperRate;
 
   if (!shopName) errors.push("Shop Name is required.");
   else if (shopName.length < 3) errors.push("Shop Name must contain at least 3 characters.");
@@ -48,10 +66,37 @@ function validateShopRow(row: ShopBulkRow, existing: Shop[]): string[] {
   if (!phoneNumber) errors.push("Mobile Number is required.");
   else if (!/^[0-9]{10}$/.test(phoneNumber)) errors.push("Mobile Number must be exactly 10 digits.");
 
-  if (!email) errors.push("Email ID is required.");
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push("Please enter a valid email address.");
+  if (secondaryPhoneNumber !== "" && !/^[0-9]{10}$/.test(secondaryPhoneNumber)) {
+    errors.push("Secondary Mobile Number must be exactly 10 digits.");
+  }
 
-  if (!village) errors.push("Village is required.");
+  if (email !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.push("Please enter a valid email address.");
+  }
+
+  if (!city) errors.push("City is required.");
+
+  if (latitude !== "") {
+    const lat = parseFloat(latitude);
+    if (isNaN(lat) || lat < -90 || lat > 90) {
+      errors.push("Latitude must be between -90 and 90.");
+    }
+  }
+
+  if (longitude !== "") {
+    const lng = parseFloat(longitude);
+    if (isNaN(lng) || lng < -180 || lng > 180) {
+      errors.push("Longitude must be between -180 and 180.");
+    }
+  }
+
+  if (paperRate < 1 || paperRate > 30 || !Number.isInteger(paperRate)) {
+    errors.push("Paper Rate must be an integer between 1 and 30.");
+  }
+
+  if (!row.associationType.trim()) {
+    errors.push("Association Type is required.");
+  }
 
   const duplicate = existing.some(
     (s) => s.shopName.trim().toLowerCase() === shopName.toLowerCase()
@@ -80,23 +125,37 @@ export function buildShopBulkImportConfig({
     nounPlural: "Shops",
     filenamePrefix: "Shops",
     columns: [
+      { key: "Shop Number", sample: "SHOP-000001" },
       { key: "Shop Name", required: true, sample: "Ramesh Chicken Shop" },
       { key: "Owner Name", required: true, sample: "Ramesh Kumar" },
       { key: "Phone", aliases: ["Mobile Number", "Phone Number"], required: true, sample: "9876543210" },
-      { key: "Email", aliases: ["Email ID", "email"], required: true, sample: "shop@example.com" },
-      { key: "Village", required: true, sample: "Bhimavaram" },
-      { key: "Address", sample: "Main Road, 2nd Lane" },
+      { key: "Secondary Phone", aliases: ["Secondary Mobile", "Secondary Mobile Number"], sample: "9876543211" },
+      { key: "Email", aliases: ["Email ID", "email"], sample: "shop@example.com" },
+      { key: "City", required: true, sample: "Bhimavaram" },
+      { key: "Address", sample: "Main Road, 2nd Lane, Bhimavaram, West Godavari, Andhra Pradesh" },
+      { key: "Latitude", sample: "16.544123" },
+      { key: "Longitude", sample: "81.523456" },
+      { key: "Paper Rate", required: true, sample: "5" },
+      { key: "Association Type", required: true, sample: "Association A" },
+      { key: "Opening Balance", sample: "12000" },
       { key: "Status", sample: "Active" },
     ],
-    parseRow: (record) => {
+    parseRow: (record): ShopBulkRow => {
       const status = String(record["Status"] ?? "Active").trim();
       return {
+        shopNumber: String(record["Shop Number"] ?? "").trim(),
         shopName: String(record["Shop Name"] ?? "").trim(),
         ownerName: String(record["Owner Name"] ?? "").trim(),
         phoneNumber: String(record["Phone"] ?? "").trim(),
+        secondaryPhoneNumber: String(record["Secondary Phone"] ?? "").trim(),
         email: String(record["Email"] ?? "").trim(),
-        village: String(record["Village"] ?? "").trim(),
+        city: String(record["City"] ?? "").trim(),
         address: String(record["Address"] ?? "").trim(),
+        latitude: String(record["Latitude"] ?? "").trim(),
+        longitude: String(record["Longitude"] ?? "").trim(),
+        paperRate: parseInt(String(record["Paper Rate"] ?? "1"), 10) || 1,
+        associationType: String(record["Association Type"] ?? "").trim(),
+        openingBalance: parseFloat(String(record["Opening Balance"] ?? "0")) || 0,
         status: status === "Inactive" ? "Inactive" : "Active",
       };
     },

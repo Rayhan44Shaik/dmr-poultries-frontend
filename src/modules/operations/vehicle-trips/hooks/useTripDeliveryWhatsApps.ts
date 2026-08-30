@@ -53,10 +53,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
     if (!whatsappEnabled || !tripId) return;
     try {
       const next = await fetchDeliveryWhatsAppStatuses(tripId);
-      setRows((prev) => {
-        if (next.length === 0) return prev;
-        return next;
-      });
+      setRows(next);
     } catch {
       /* keep last known rows */
     }
@@ -176,11 +173,11 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
           delivery,
           shopWhatsApp: row?.shopWhatsApp ?? null,
         });
-        setLocalStatus((prev) => ({
-          ...prev,
-          [delivery.id]: result.status === "sent" ? ("sent" as const) : ("failed" as const),
-        }));
-        if (result.status !== "sent") {
+        if (result.status === "sent") {
+          setLocalStatus((prev) => ({ ...prev, [delivery.id]: "sent" as const }));
+          // Backend returns authoritative sendCount; refresh will sync it
+        } else {
+          setLocalStatus((prev) => ({ ...prev, [delivery.id]: "failed" as const }));
           setLocalErrors((prev) => ({
             ...prev,
             [delivery.id]: userFacingDeliveryWhatsAppError(result.message),
@@ -255,6 +252,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
         if (result.status === "sent") {
           succeeded = true;
           setLocalStatus((prev) => ({ ...prev, [delivery.id]: "sent" as const }));
+          // Backend returns authoritative sendCount; refresh will sync it
         } else {
           setLocalStatus((prev) => ({ ...prev, [delivery.id]: "failed" as const }));
           setLocalErrors((prev) => ({

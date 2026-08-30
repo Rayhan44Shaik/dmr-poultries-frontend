@@ -53,7 +53,7 @@ export async function sendDeliveryEmail(input: {
   trip: Trip;
   delivery: ShopDelivery;
   shopEmail?: string | null;
-}): Promise<{ success: boolean; status: DeliveryEmailStatusValue; message?: string }> {
+}): Promise<{ success: boolean; status: DeliveryEmailStatusValue; message?: string; sendCount?: number; attemptCount?: number }> {
   const blob = await generateShopPDFBlob(
     {
       ...input.delivery,
@@ -78,6 +78,8 @@ export async function sendDeliveryEmail(input: {
     success: boolean;
     status: DeliveryEmailStatusValue;
     message?: string;
+    sendCount?: number;
+    attemptCount?: number;
   }>(
     `/trips/${input.trip.id}/deliveries/${input.delivery.id}/email`,
     { pdfBase64, fileName },

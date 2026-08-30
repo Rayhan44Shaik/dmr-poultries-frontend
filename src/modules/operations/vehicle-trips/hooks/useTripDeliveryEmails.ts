@@ -50,10 +50,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
     if (!completed || !tripId) return;
     try {
       const next = await fetchDeliveryEmailStatuses(tripId);
-      setRows((prev) => {
-        if (next.length === 0) return prev;
-        return next;
-      });
+      setRows(next);
     } catch {
       /* keep last known rows */
     }
@@ -165,11 +162,11 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
           delivery,
           shopEmail: row?.shopEmail ?? null,
         });
-        setLocalStatus((prev) => ({
-          ...prev,
-          [delivery.id]: result.status === "sent" ? ("sent" as const) : ("failed" as const),
-        }));
-        if (result.status !== "sent") {
+        if (result.status === "sent") {
+          setLocalStatus((prev) => ({ ...prev, [delivery.id]: "sent" as const }));
+          // Backend returns authoritative sendCount; refresh will sync it
+        } else {
+          setLocalStatus((prev) => ({ ...prev, [delivery.id]: "failed" as const }));
           setLocalErrors((prev) => ({
             ...prev,
             [delivery.id]: userFacingDeliveryEmailError(result.message),
@@ -232,6 +229,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
         if (result.status === "sent") {
           succeeded = true;
           setLocalStatus((prev) => ({ ...prev, [delivery.id]: "sent" as const }));
+          // Backend returns authoritative sendCount; refresh will sync it
         } else {
           setLocalStatus((prev) => ({ ...prev, [delivery.id]: "failed" as const }));
           setLocalErrors((prev) => ({

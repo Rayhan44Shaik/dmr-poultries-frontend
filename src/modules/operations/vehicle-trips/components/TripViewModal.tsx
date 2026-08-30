@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { WhatsAppIcon } from "../../../../ui/WhatsAppIcon";
 import type { Trip, ShopDelivery } from "../types/trip";
+import { Shop } from "../../../masters/shops/types/shop";
+import { BirdType } from "../../../masters/bird-types/types/birdType";
 import {
   getTripWizardCompletedMask,
   isTripWizardComplete,
@@ -46,8 +48,8 @@ interface Props {
   open: boolean;
   trip: Trip | null;
   onClose: () => void;
-  shops: any[];
-  birdTypes: any[];
+  shops: Shop[];
+  birdTypes: BirdType[];
 }
 
 /** Read-only Step 1 (Trip Start) details. */
@@ -388,100 +390,7 @@ function Step5View({ trip }: { trip: Trip }) {
   );
 }
 
-/** Communication Summary panel showing Mail and WhatsApp stats side by side. */
-function CommunicationSummary({
-  emailCounts,
-  whatsappCounts,
-}: {
-  emailCounts: { sent: number; pending: number; sending: number; failed: number; total: number };
-  whatsappCounts: { sent: number; pending: number; sending: number; failed: number; total: number };
-}) {
-  const { t } = useI18n();
-  const emailProcessing = emailCounts.sending + emailCounts.pending;
-  const whatsappProcessing = whatsappCounts.sending + whatsappCounts.pending;
 
-  return (
-    <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm">
-      <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-        <Package size={15} className="text-emerald-600" />
-        {t("ops.trip.communication_summary")}
-      </h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Mail Summary */}
-        {emailCounts.total > 0 && (
-          <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Mail size={18} className="text-sky-600" />
-              <span className="text-sm font-bold text-sky-800">Mail</span>
-            </div>
-            <dl className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <dt className="text-slate-500">{t("ops.trip.total_shops")}</dt>
-                <dd className="font-semibold text-slate-800">{emailCounts.total}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">{t("common.sent")}</dt>
-                <dd className="font-semibold text-emerald-700">{emailCounts.sent}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">{t("common.failed")}</dt>
-                <dd className="font-semibold text-red-700">{emailCounts.failed}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">{t("common.pending")}</dt>
-                <dd className="font-semibold text-slate-500">{emailCounts.pending}</dd>
-              </div>
-              {emailProcessing > 0 && (
-                <>
-                  <div>
-                    <dt className="text-slate-500">{t("ops.trip.processing")}</dt>
-                    <dd className="font-semibold text-sky-700">{emailProcessing}</dd>
-                  </div>
-                </>
-              )}
-            </dl>
-          </div>
-        )}
-
-        {/* WhatsApp Summary */}
-        {whatsappCounts.total > 0 && (
-          <div className="rounded-xl border border-green-200 bg-green-50 p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <WhatsAppIcon size={18} className="text-green-600" />
-              <span className="text-sm font-bold text-green-800">WhatsApp</span>
-            </div>
-            <dl className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <dt className="text-slate-500">{t("ops.trip.total_shops")}</dt>
-                <dd className="font-semibold text-slate-800">{whatsappCounts.total}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">{t("common.sent")}</dt>
-                <dd className="font-semibold text-emerald-700">{whatsappCounts.sent}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">{t("common.failed")}</dt>
-                <dd className="font-semibold text-red-700">{whatsappCounts.failed}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">{t("common.pending")}</dt>
-                <dd className="font-semibold text-slate-500">{whatsappCounts.pending}</dd>
-              </div>
-              {whatsappProcessing > 0 && (
-                <>
-                  <div>
-                    <dt className="text-slate-500">{t("ops.trip.processing")}</dt>
-                    <dd className="font-semibold text-sky-700">{whatsappProcessing}</dd>
-                  </div>
-                </>
-              )}
-            </dl>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
 
 function TripViewModal({ open, trip, onClose, shops }: Props) {
   const { t } = useI18n();
@@ -632,7 +541,6 @@ function TripViewModal({ open, trip, onClose, shops }: Props) {
             isBulkSending={emailState.isBulkSending}
             bulkProgress={emailState.bulkProgress}
             shopEmailFor={emailState.shopEmailFor}
-            failureReasonFor={emailState.failureReasonFor}
             sendCountFor={emailState.sendCountFor}
             onSendOne={(delivery) => void emailState.sendOne(delivery)}
             onDownloadPdf={(delivery) => void downloadShopPDF(delivery)}
@@ -642,7 +550,6 @@ function TripViewModal({ open, trip, onClose, shops }: Props) {
             whatsappBusyIds={whatsappState.busyIds}
             whatsappIsBulkSending={whatsappState.isBulkSending}
             shopWhatsAppFor={whatsappState.shopWhatsAppFor}
-            whatsappFailureReasonFor={whatsappState.failureReasonFor}
             whatsappSendCountFor={whatsappState.sendCountFor}
             onSendOneWhatsApp={(delivery) => void whatsappState.sendOne(delivery)}
             whatsappCounts={whatsappCounts}
@@ -662,109 +569,125 @@ function TripViewModal({ open, trip, onClose, shops }: Props) {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto animate-fade-in">
       <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-7xl max-h-[92vh] overflow-hidden flex flex-col">
         {/* ─── Header ─────────────────────────────────────────────── */}
-        <div className="flex items-start justify-between gap-4 px-6 md:px-8 py-5 border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80">
-          <div className="flex items-center gap-4 min-w-0">
-            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white shrink-0">
-              <FileText className="w-7 h-7" />
+        <div className="border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80">
+          {/* Top row: Trip identity + status */}
+          <div className="px-6 md:px-8 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-4 min-w-0 flex-1 sm:flex-none">
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white shrink-0">
+                <FileText className="w-6 h-6" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight truncate">
+                  {trip.tripNo || t("ops.trip.trip_details")}
+                </h2>
+                <div className="flex items-center gap-2 flex-wrap mt-1.5">
+                  {isCompleted ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 text-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0">
+                      <ShieldCheck size={11} /> {t("ops.trip.submitted_locked")}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0">
+                      {trip.status || t("status.pending")}
+                    </span>
+                  )}
+                  <span className="text-xs font-medium text-slate-400">{t("ops.trip.read_only_overview")}</span>
+                </div>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h2 className="text-lg md:text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2 flex-wrap">
-                <span className="truncate">{trip.tripNo || t("ops.trip.trip_details")}</span>
-                {isCompleted ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 text-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                    <ShieldCheck size={11} /> {t("ops.trip.submitted_locked")}
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                    {trip.status || t("status.pending")}
-                  </span>
-                )}
-              </h2>
-              <p className="text-xs font-medium text-slate-400 mt-1">{t("ops.trip.read_only_overview")}</p>
+
+            <div className="flex items-center gap-2 flex-wrap justify-end shrink-0 w-full sm:w-auto">
+              {isCompleted && trip.approvedBy && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 border border-slate-200 shadow-sm shrink-0">
+                  <UserCheck size={12} className="text-emerald-600" />
+                  {t("ops.trip.approved_by")}: {trip.approvedBy}
+                </span>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
-            {isCompleted && trip.approvedBy && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 border border-slate-200 shadow-sm">
-                <UserCheck size={12} className="text-emerald-600" />
-                {t("table.approved_by")}: {trip.approvedBy}
-              </span>
-            )}
-            {isCompleted && emailCounts.total > 0 && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 border border-sky-200 shadow-sm" role="status" aria-live="polite">
-                <Mail size={12} />
-                {emailState.isBulkSending ? (
-                  <>
-                    {t("ops.trip.sending")}... {emailState.bulkProgress?.sent ?? emailCounts.sent} / {emailState.bulkProgress?.total ?? emailCounts.total}
-                  </>
-                ) : (
-                  <>
-                    {emailCounts.total} {t("ops.trip.shops")} · {emailCounts.sent} {t("common.sent")}
-                    {emailCounts.pending > 0 ? ` · ${emailCounts.pending} ${t("common.pending")}` : ""}
-                    {emailCounts.failed > 0 ? ` · ${emailCounts.failed} ${t("common.failed")}` : ""}
-                  </>
+          {/* Bottom row: Email/WhatsApp counts + Actions */}
+          {isCompleted && (emailCounts.total > 0 || whatsappCounts.total > 0) && (
+            <div className="px-6 md:px-8 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-100/50">
+              <div className="flex items-center gap-3 flex-wrap">
+                {emailCounts.total > 0 && (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-sky-700" role="status" aria-live="polite">
+                    <Mail size={12} className="text-sky-600" />
+                    {emailState.isBulkSending ? (
+                      <>
+                        {t("ops.trip.sending")}... {emailState.bulkProgress?.sent ?? emailCounts.sent} / {emailState.bulkProgress?.total ?? emailCounts.total}
+                      </>
+                    ) : (
+                      <>
+                        {emailCounts.total} {t("ops.trip.shops").toLowerCase()} · {emailCounts.sent} {t("common.sent").toLowerCase()}
+                        {emailCounts.pending > 0 ? ` · ${emailCounts.pending} ${t("common.pending").toLowerCase()}` : ""}
+                        {emailCounts.failed > 0 ? ` · ${emailCounts.failed} ${t("common.failed").toLowerCase()}` : ""}
+                      </>
+                    )}
+                  </span>
                 )}
-              </span>
-            )}
-            {isCompleted && whatsappCounts.total > 0 && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 border border-green-200 shadow-sm" role="status" aria-live="polite">
-                <WhatsAppIcon size={12} />
-                {whatsappState.isBulkSending ? (
-                  <>
-                    {t("ops.trip.sending")}... {whatsappState.bulkProgress?.sent ?? whatsappCounts.sent} / {whatsappState.bulkProgress?.total ?? whatsappCounts.total}
-                  </>
-                ) : (
-                  <>
-                    {whatsappCounts.total} {t("ops.trip.shops")} · {whatsappCounts.sent} {t("common.sent")}
-                    {whatsappCounts.pending > 0 ? ` · ${whatsappCounts.pending} ${t("common.pending")}` : ""}
-                    {whatsappCounts.failed > 0 ? ` · ${whatsappCounts.failed} ${t("common.failed")}` : ""}
-                  </>
+                {whatsappCounts.total > 0 && (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700" role="status" aria-live="polite">
+                    <WhatsAppIcon size={12} className="text-green-600" />
+                    {whatsappState.isBulkSending ? (
+                      <>
+                        {t("ops.trip.sending")}... {whatsappState.bulkProgress?.sent ?? whatsappCounts.sent} / {whatsappState.bulkProgress?.total ?? whatsappCounts.total}
+                      </>
+                    ) : (
+                      <>
+                        {whatsappCounts.total} {t("ops.trip.shops").toLowerCase()} · {whatsappCounts.sent} {t("common.sent").toLowerCase()}
+                        {whatsappCounts.pending > 0 ? ` · ${whatsappCounts.pending} ${t("common.pending").toLowerCase()}` : ""}
+                        {whatsappCounts.failed > 0 ? ` · ${whatsappCounts.failed} ${t("common.failed").toLowerCase()}` : ""}
+                      </>
+                    )}
+                  </span>
                 )}
-              </span>
-            )}
-            {isCompleted && emailCounts.total > 0 && (
-              <button
-                type="button"
-                onClick={() => void emailState.sendAll()}
-                disabled={emailState.isBulkSending}
-                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
-                title={t("ops.trip.send_email_all")}
-              >
-                {emailState.isBulkSending ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Send size={14} />
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
+                {emailCounts.total > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void emailState.sendAll()}
+                    disabled={emailState.isBulkSending}
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    title={t("ops.trip.send_email_all")}
+                  >
+                    {emailState.isBulkSending ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Send size={14} />
+                    )}
+                    {emailState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_email")}
+                  </button>
                 )}
-                {emailState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_mail")}
-              </button>
-            )}
-            {isCompleted && whatsappCounts.total > 0 && (
-              <button
-                type="button"
-                onClick={() => void whatsappState.sendAll()}
-                disabled={whatsappState.isBulkSending}
-                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-green-500/20 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
-                title={t("ops.trip.send_whatsapp_all")}
-              >
-                {whatsappState.isBulkSending ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <WhatsAppIcon size={14} />
+                {whatsappCounts.total > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void whatsappState.sendAll()}
+                    disabled={whatsappState.isBulkSending}
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-green-500/20 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    title={t("ops.trip.send_whatsapp_all")}
+                  >
+                    {whatsappState.isBulkSending ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <WhatsAppIcon size={14} />
+                    )}
+                    {whatsappState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_whatsapp")}
+                  </button>
                 )}
-                {whatsappState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_whatsapp")}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => void downloadTripReport()}
-              className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 p-2 text-red-700 shadow-sm transition-all active:scale-95"
-              title={t("ops.trip.create_pdf_title")}
-              aria-label={t("ops.trip.create_pdf")}
-            >
-              <FileDown size={16} />
-            </button>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => void downloadTripReport()}
+                  className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 p-2 text-red-700 shadow-sm transition-all active:scale-95"
+                  title={t("ops.trip.create_pdf_title")}
+                  aria-label={t("ops.trip.create_pdf")}
+                >
+                  <FileDown size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ─── Body ─────────────────────────────────────────────────── */}
@@ -784,13 +707,6 @@ function TripViewModal({ open, trip, onClose, shops }: Props) {
           <div key={`${trip.id}-step-${safeViewStepIndex}`} className="animate-fade-in-up">
             {isCompleted ? renderCompletedStep() : renderViewStep()}
           </div>
-          {/* Communication Summary - only on Shop Deliveries step for completed trips */}
-          {isCompleted && safeViewStepIndex === 3 && (emailCounts.total > 0 || whatsappCounts.total > 0) && (
-            <CommunicationSummary
-              emailCounts={emailCounts}
-              whatsappCounts={whatsappCounts}
-            />
-          )}
           <TripFinalKPI trip={trip} deliveries={trip.deliveries} />
         </div>
 
