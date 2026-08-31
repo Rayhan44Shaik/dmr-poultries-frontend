@@ -25,7 +25,8 @@ import { useI18n } from "../../../../i18n";
 
 type ShopsPageProps = { embedded?: boolean };
 
-const ITEMS_PER_PAGE = 5;
+const PAGE_SIZE_OPTIONS = [10, 15, 20, 25] as const;
+const DEFAULT_PAGE_SIZE = 10;
 
 function ShopsPage({ embedded = false }: ShopsPageProps) {
   const { t } = useI18n();
@@ -35,6 +36,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
 
   const { showNotification } = useSafeNotification();
   const {
@@ -71,6 +73,12 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     setCurrentPage(1);
   };
 
+  // Reset to page 1 whenever the rows-per-page value changes
+  const handlePageSizeChange = (value: number) => {
+    setPageSize(value);
+    setCurrentPage(1);
+  };
+
   // City dropdown options are derived live from the full loaded shop dataset —
   // never hardcoded. Empty values are ignored; case/whitespace variants collapse
   // to a single option (first spelling seen wins for display).
@@ -104,16 +112,17 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   }, [shops, search, cityFilter]);
 
   // Pagination Calculations
-  const totalPages = Math.ceil(filteredShops.length / ITEMS_PER_PAGE) || 1;
+  const totalPages = Math.ceil(filteredShops.length / pageSize) || 1;
 
   // Clamp at render time so a shrinking dataset (filter change, data refresh,
-  // edit that moves a shop's city, delete) never leaves us on an empty page.
+  // edit that moves a shop's city, delete, or a larger page size) never leaves
+  // us on an empty page.
   const safePage = Math.min(currentPage, totalPages);
-  const pageStartIndex = (safePage - 1) * ITEMS_PER_PAGE;
+  const pageStartIndex = (safePage - 1) * pageSize;
   const paginatedShops = useMemo(() => {
-    const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
-    return filteredShops.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredShops, safePage]);
+    const startIndex = (safePage - 1) * pageSize;
+    return filteredShops.slice(startIndex, startIndex + pageSize);
+  }, [filteredShops, safePage, pageSize]);
 
   const handleExportPDF = () => {
     if (filteredShops.length === 0) {
@@ -562,6 +571,25 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
 
         {shouldShowPagination(filteredShops.length) && (
         <div className={paginationBarClass}>
+          <div className="mr-auto flex items-center gap-2">
+            <label htmlFor="shops-page-size" className="text-xs font-semibold text-slate-600">
+              {t("common.per_page")}
+            </label>
+            <select
+              id="shops-page-size"
+              value={pageSize}
+              onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+              disabled={loading}
+              className="h-8 px-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-600"
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button
             onClick={() => setCurrentPage(Math.max(safePage - 1, 1))}
             disabled={safePage === 1 || loading}
