@@ -25,7 +25,7 @@ import { useI18n } from "../../../../i18n";
 
 type ShopsPageProps = { embedded?: boolean };
 
-const ITEMS_PER_PAGE = 5;
+const PAGE_SIZE_OPTIONS = [10, 15, 20, 25] as const;
 
 function ShopsPage({ embedded = false }: ShopsPageProps) {
   const { t } = useI18n();
@@ -35,6 +35,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(10);
 
   const { showNotification } = useSafeNotification();
   const {
@@ -71,6 +72,11 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     setCurrentPage(1);
   };
 
+  const handleItemsPerPageChange = (value: number) => {
+    setItemsPerPage(value);
+    setCurrentPage(1);
+  };
+
   // City dropdown options are derived live from the full loaded shop dataset —
   // never hardcoded. Empty values are ignored; case/whitespace variants collapse
   // to a single option (first spelling seen wins for display).
@@ -104,16 +110,16 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   }, [shops, search, cityFilter]);
 
   // Pagination Calculations
-  const totalPages = Math.ceil(filteredShops.length / ITEMS_PER_PAGE) || 1;
+  const totalPages = Math.ceil(filteredShops.length / itemsPerPage) || 1;
 
   // Clamp at render time so a shrinking dataset (filter change, data refresh,
   // edit that moves a shop's city, delete) never leaves us on an empty page.
   const safePage = Math.min(currentPage, totalPages);
-  const pageStartIndex = (safePage - 1) * ITEMS_PER_PAGE;
+  const pageStartIndex = (safePage - 1) * itemsPerPage;
   const paginatedShops = useMemo(() => {
-    const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
-    return filteredShops.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredShops, safePage]);
+    const startIndex = (safePage - 1) * itemsPerPage;
+    return filteredShops.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredShops, safePage, itemsPerPage]);
 
   const handleExportPDF = () => {
     if (filteredShops.length === 0) {
@@ -460,7 +466,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-green-600 hover:bg-green-50 transition-colors border-t border-slate-100"
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M2 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V4zm6 0a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1H9a1 1 0 01-1-1V4zm6 0a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                      <path d="M2 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V4zm6 0a1 1 0 011-1h2a1 1 1 0 011 1v12a1 1 0 01-1 1H9a1 1 0 01-1-1V4zm6 0a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                     </svg>
                     {t("masters.shops.export_excel")}
                   </button>
@@ -542,7 +548,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
             <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
               <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 0 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
               <p className="text-sm font-medium">{t("masters.shops.loading")}</p>
             </div>
@@ -561,36 +567,56 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
         </div>
 
         {shouldShowPagination(filteredShops.length) && (
-        <div className={paginationBarClass}>
-          <button
-            onClick={() => setCurrentPage(Math.max(safePage - 1, 1))}
-            disabled={safePage === 1 || loading}
-            className={paginationNavBtnClass}
-          >
-            {t("masters.shops.pagination.previous")}
-          </button>
-
-          <div className="flex items-center gap-1.5">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-              <button
-                key={pageNum}
-                onClick={() => setCurrentPage(pageNum)}
+          <div className={paginationBarClass}>
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <label htmlFor="shops-page-size" className="whitespace-nowrap font-medium">
+                Rows per page
+              </label>
+              <select
+                id="shops-page-size"
+                aria-label="Rows per page"
+                value={itemsPerPage}
+                onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
                 disabled={loading}
-                className={paginationPageBtnClass(safePage === pageNum)}
+                className="px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50"
               >
-                {pageNum}
-              </button>
-            ))}
-          </div>
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <button
-            onClick={() => setCurrentPage(Math.min(safePage + 1, totalPages))}
-            disabled={safePage === totalPages || loading}
-            className={paginationNavBtnClass}
-          >
-            {t("masters.shops.pagination.next")}
-          </button>
-        </div>
+            <button
+              onClick={() => setCurrentPage(Math.max(safePage - 1, 1))}
+              disabled={safePage === 1 || loading}
+              className={paginationNavBtnClass}
+            >
+              {t("masters.shops.pagination.previous")}
+            </button>
+
+            <div className="flex items-center gap-1.5">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  disabled={loading}
+                  className={paginationPageBtnClass(safePage === pageNum)}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(Math.min(safePage + 1, totalPages))}
+              disabled={safePage === totalPages || loading}
+              className={paginationNavBtnClass}
+            >
+              {t("masters.shops.pagination.next")}
+            </button>
+          </div>
         )}
       </div>
 
