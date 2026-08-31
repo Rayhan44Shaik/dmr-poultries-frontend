@@ -33,24 +33,24 @@ function ShopTable({ shops, onEdit, startIndex = 0 }: ShopTableProps) {
 
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-      <table className="w-full min-w-[1180px] border-collapse">
+      <table className="w-full min-w-[900px] table-fixed border-collapse">
+        {/* table-fixed + proportional widths so columns stay balanced and the
+            Shop Name column never absorbs all the slack space. */}
         <colgroup>
-          <col style={{ width: "56px" }} />
-          <col style={{ width: "132px" }} />
-          <col style={{ width: "auto" }} />
-          <col style={{ width: "180px" }} />
-          <col style={{ width: "196px" }} />
-          <col style={{ width: "144px" }} />
-          <col style={{ width: "130px" }} />
-          <col style={{ width: "92px" }} />
-          <col style={{ width: "152px" }} />
-          <col style={{ width: "112px" }} />
-          <col style={{ width: "72px" }} />
+          <col style={{ width: "5%" }} />
+          <col style={{ width: "21%" }} />
+          <col style={{ width: "16%" }} />
+          <col style={{ width: "11%" }} />
+          <col style={{ width: "10%" }} />
+          <col style={{ width: "10%" }} />
+          <col style={{ width: "7%" }} />
+          <col style={{ width: "10%" }} />
+          <col style={{ width: "6%" }} />
+          <col style={{ width: "4%" }} />
         </colgroup>
         <thead className="bg-slate-50">
           <tr className="border-b border-slate-200">
             <th className={`${thBase} text-center`}>{t("masters.shops.table.s_no")}</th>
-            <th className={thBase}>{t("masters.shops.table.shop_number")}</th>
             <th className={thBase}>{t("masters.shops.table.shop_name")}</th>
             <th className={thBase}>{t("masters.shops.table.owner")}</th>
             <th className={thBase}>{t("masters.shops.table.mobile")}</th>
@@ -66,23 +66,15 @@ function ShopTable({ shops, onEdit, startIndex = 0 }: ShopTableProps) {
           {orderedShops.map((shop, index) => {
             const isActive = shop.status === "Active";
             const hasAssociation = Boolean(shop.associationType?.trim());
-            const hasSecondary = Boolean(shop.secondaryPhoneNumber?.trim());
-            const hasEmail = Boolean(shop.email?.trim());
             return (
               <tr key={shop.id} className="h-[60px] transition-colors hover:bg-slate-50/70">
                 <td className={`${tdBase} text-center tabular-nums text-slate-400`}>
                   {startIndex + index + 1}
                 </td>
 
-                <td className={`${tdBase} whitespace-nowrap`}>
-                  <span className="font-mono text-[13px] font-semibold text-slate-700">
-                    {shop.shopNumber || "—"}
-                  </span>
-                </td>
-
                 <td className={tdBase}>
                   <span
-                    className="block max-w-[280px] truncate font-semibold text-slate-800"
+                    className="block truncate font-semibold text-slate-800"
                     title={shop.shopName}
                   >
                     {shop.shopName}
@@ -90,7 +82,7 @@ function ShopTable({ shops, onEdit, startIndex = 0 }: ShopTableProps) {
                 </td>
 
                 <td className={tdBase}>
-                  <span className="block max-w-[170px] truncate" title={shop.ownerName}>
+                  <span className="block truncate" title={shop.ownerName}>
                     {shop.ownerName || "—"}
                   </span>
                 </td>
@@ -99,24 +91,10 @@ function ShopTable({ shops, onEdit, startIndex = 0 }: ShopTableProps) {
                   <span className="block whitespace-nowrap font-mono text-[13px] text-slate-700">
                     {shop.phoneNumber || "—"}
                   </span>
-                  {(hasSecondary || hasEmail) && (
-                    <span className="mt-0.5 flex flex-col gap-0.5 text-[11px] leading-tight text-slate-400">
-                      {hasSecondary && (
-                        <span className="whitespace-nowrap font-mono">
-                          {t("masters.shops.table.secondary_mobile")}: {shop.secondaryPhoneNumber}
-                        </span>
-                      )}
-                      {hasEmail && (
-                        <span className="block max-w-[184px] truncate" title={shop.email}>
-                          {shop.email}
-                        </span>
-                      )}
-                    </span>
-                  )}
                 </td>
 
                 <td className={tdBase}>
-                  <span className="block max-w-[132px] truncate" title={shop.city}>
+                  <span className="block truncate" title={shop.city}>
                     {shop.city || "—"}
                   </span>
                 </td>
@@ -180,7 +158,7 @@ function ShopTable({ shops, onEdit, startIndex = 0 }: ShopTableProps) {
           })}
           {orderedShops.length === 0 && (
             <tr>
-              <td colSpan={11} className="px-4 py-6 text-center text-sm text-slate-500">
+              <td colSpan={10} className="px-4 py-6 text-center text-sm text-slate-500">
                 {t("masters.shops.no_shops_found")}
               </td>
             </tr>
