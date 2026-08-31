@@ -815,14 +815,14 @@
   'ops.mortality.field.weight_loss': 'బరువు నష్టం',
   'ops.mortality.field.weight_loss_pct': 'నష్టం %',
 
-  // Toasts & states
+// Toasts & states
   'ops.mortality.toast.refreshed': 'మరణాల డేటా రిఫ్రెష్ చేయబడింది',
   'ops.mortality.toast.refresh_failed': 'మరణాల డేటాను రిఫ్రెష్ చేయలేకపోయింది',
   'ops.mortality.toast.search_applied': 'శోధన వర్తించబడింది',
   'ops.mortality.toast.search_result': 'శోధన వర్తించబడింది — {count} పూర్తయిన ట్రిప్పులు',
   'ops.mortality.toast.search_result_one': 'శోధన వర్తించబడింది — {count} పూర్తయిన ట్రిప్పు',
-  'ops.mortality.toast.reset': 'ఫిల్టర్లు ప్రస్తుత వారానికి రీసెట్ చేయబడ్డాయి.',
-  'ops.mortality.error.title': 'పూర్తయిన ట్రిప్పులను లోడ్ చేయలేకపోయింది',
+  'ops.mortality.toast.reset': 'ఫిల్టర్లు రీసెట్ చేయబడ్డాయి.',
+  'ops.mortality.error.title': 'పూర్తయిన ట్రిప్పులను లోడ్ చేయలేకపోయいました',
   'ops.mortality.loading': 'పూర్తయిన ట్రిప్పులు లోడ్ అవుతున్నాయి…',
   'ops.mortality.aria.expand': 'ట్రిప్‌ను విస్తరించండి',
   'ops.mortality.aria.collapse': 'ట్రిప్‌ను కుదించండి',

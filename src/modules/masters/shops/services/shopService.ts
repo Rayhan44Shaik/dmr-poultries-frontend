@@ -162,6 +162,17 @@ export async function refreshShops(): Promise<Shop[]> {
   return loadShops();
 }
 
+/** POST /api/masters/resolve-location — resolve URL/address to coordinates. */
+export async function resolveLocation(
+  input: string
+): Promise<{ latitude: number; longitude: number; address: string | null }> {
+  const { data } = await apiPost<{ latitude: number; longitude: number; address: string | null }>(
+    "/masters/resolve-location",
+    { input }
+  );
+  return data;
+}
+
 /** Compatibility object for modules that import `shopService.getAll()`. */
 export const shopService = {
   getAll,

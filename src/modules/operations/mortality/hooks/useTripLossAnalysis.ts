@@ -12,13 +12,36 @@
 // N+1 (one detail request per trip, each inlining base64 DC photos) and means
 // the page cost is one small request regardless of how many trips exist.
 //
-// LIVE FILTERING
-// --------------
-//   The table of completed trips is shown immediately on load and ALWAYS shows
-//   the current filtered set. Every control (FROM/TO/FARM/SUPERVISOR/SEARCH)
-//   updates the dataset live — there is no separate "Apply" step. KPIs are
-//   always visible alongside the table. RESET clears the controls to the
-//   current week; REFRESH re-fetches from the server.
+// FILTER MODEL
+// ------------
+//   DRAFT FILTERS (bound to controls): fromDate, toDate, sourceFarm, supervisor, search
+//   APPLIED FILTERS (set only when user clicks Search): copy of draft filters at that moment
+//
+//   DEFAULT STATE (page load):
+//     - Draft filters: all empty (no date, no farm, no supervisor, no search)
+//     - Applied filters: all empty
+//     - Table: shows ALL completed trips (no filter)
+//     - KPI cards: HIDDEN
+//     - Applied filters indicator: HIDDEN
+//
+//   AFTER SEARCH (user clicks Search):
+//     - Applied filters := draft filters
+//     - Table: shows trips matching applied filters (or all if no real filter)
+//     - KPI cards: VISIBLE only if applied filters contain a real filter
+//     - Applied filters indicator: VISIBLE only if applied filters contain a real filter
+//     - Pagination: reset to page 1
+//
+//   RESET:
+//     - Draft filters := empty defaults
+//     - Applied filters := empty defaults
+//     - KPI cards: HIDDEN
+//     - Applied filters indicator: HIDDEN
+//     - Table: shows ALL completed trips
+//     - Pagination: reset to page 1
+//     - Sort: reset to default
+//
+//   REFRESH:
+//     - Re-fetches data preserving current applied filters and page
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DatePickerUtils } from "../../../../components/common/DatePicker";
@@ -64,11 +87,11 @@ export function currentWeekRange(): { fromDate: string; toDate: string } {
   };
 }
 
+/** Empty defaults — no automatic date filter, no farm, no supervisor, no search. */
 export function defaultFilters(): LossFilters {
-  const week = currentWeekRange();
   return {
-    fromDate: week.fromDate,
-    toDate: week.toDate,
+    fromDate: "",
+    toDate: "",
     sourceFarm: "",
     supervisor: "",
     search: "",
@@ -81,16 +104,12 @@ export const DEFAULT_PAGE_SIZE = 10;
 const EMPTY_OPTIONS: MortalityFilterOptions = { farms: [], supervisors: [] };
 
 /**
- * A filter "counts" only when the user has narrowed beyond the defaults: an
- * explicit FROM/TO range (not the default current week), or a chosen farm,
- * supervisor, or non-empty search. Empty strings / "All" selections do NOT make
- * the KPI summary appear — only a genuine filter does.
+ * A filter "counts" only when the user has set any non-empty filter value.
+ * Empty strings / "All" selections do NOT make the KPI summary appear —
+ * only a genuine filter does.
  */
 function isRealFilter(f: LossFilters): boolean {
-  const week = currentWeekRange();
-  const dateChanged =
-    (f.fromDate && f.fromDate !== week.fromDate) ||
-    (f.toDate && f.toDate !== week.toDate);
+  const dateChanged = !!f.fromDate.trim() || !!f.toDate.trim();
   const farmChanged = !!f.sourceFarm.trim();
   const supervisorChanged = !!f.supervisor.trim();
   const searchChanged = !!f.search.trim();
@@ -158,15 +177,16 @@ export function useTripLossAnalysis() {
   const requestIdRef = useRef(0);
   const kpiRequestIdRef = useRef(0);
 
-  // ── TABLE query — ALWAYS shows every completed trip (no filter/search) ─────
-  // This is the full loss ledger: it ignores FROM/TO/FARM/SUPERVISOR/SEARCH
-  // entirely. Sorting and pagination still apply to the full set.
+  // ── TABLE query — shows all trips by default; filtered trips when a real
+  // filter has been applied via Search. Uses appliedFilters (not draft filters).
   useEffect(() => {
     const controller = new AbortController();
     const requestId = ++requestIdRef.current;
 
     setLoading(true);
     setError(null);
+
+    const tableFilterActive = isRealFilter(appliedFilters);
 
     // Debounce fast control changes; AbortController cancels any in-flight
     // request so only the final state ever lands (no out-of-order updates).
@@ -177,6 +197,15 @@ export function useTripLossAnalysis() {
           sortDir: sort.dir,
           page,
           limit: pageSize,
+          ...(tableFilterActive
+            ? {
+                fromDate: appliedFilters.fromDate || undefined,
+                toDate: appliedFilters.toDate || undefined,
+                farm: appliedFilters.sourceFarm || undefined,
+                supervisor: appliedFilters.supervisor || undefined,
+                search: appliedFilters.search.trim() || undefined,
+              }
+            : {}),
         },
         controller.signal
       )
@@ -204,7 +233,7 @@ export function useTripLossAnalysis() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [sort, page, pageSize, reloadToken]);
+  }, [sort, page, pageSize, reloadToken, appliedFilters]);
 
   // ── KPI query — runs ONLY when a real filter is applied ───────────────────
   // Reflects the *applied* subset (date range and/or farm and/or supervisor and/or
@@ -271,15 +300,17 @@ export function useTripLossAnalysis() {
     setPage((p) => Math.min(Math.max(1, p), totalPages));
   }, [totalPages]);
 
-  /** APPLY — commits the current controls to the KPI summary and reveals the
-   *  cards. The TABLE itself is unaffected (it always shows all trips). If no real
-   *  filter is active the cards simply stay hidden. */
+  /** APPLY — commits the current controls to the KPI summary, filters the table,
+   *  reveals the cards, and resets pagination to page 1. If no real filter is
+   *  active the cards simply stay hidden and the table shows all trips. */
   const applyFilters = useCallback(() => {
     setAppliedFilters(filters);
     setKpisVisible(isRealFilter(filters));
+    setPage(1);
   }, [filters]);
 
-  /** RESET — clears the controls to the default week, hides the KPI summary. */
+  /** RESET — clears all controls to empty defaults, hides the KPI summary,
+   *  resets sort and pagination. */
   const resetFilters = useCallback(() => {
     const defaults = defaultFilters();
     setFilters(defaults);

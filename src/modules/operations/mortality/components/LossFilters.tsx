@@ -1,12 +1,15 @@
 // src/modules/operations/mortality/components/LossFilters.tsx
-// Global filter bar — FROM · TO · SOURCE FARM · SUPERVISOR  /  SEARCH FIELD · Apply · Reset · Refresh.
+// Global filter bar — FROM · TO · SOURCE FARM · SUPERVISOR  /  SEARCH FIELD · Search · Reset · Refresh.
 //
 // Reuses the project's global DatePicker (Monday-start week convention) and the
 // shared Operations filter/button styling. No duplicate calendar implementation.
 //
-// The completed-trips TABLE always shows every trip, so these controls never
-// filter it. APPLY commits the current controls to the KPI summary (which appears
-// only once a real filter is set); Reset / Refresh behave as labelled.
+// These controls modify DRAFT filters only. Changing them does NOT affect the table.
+// Clicking SEARCH copies draft → applied filters, which then:
+//   - Filters the completed-trips table
+//   - Shows KPI cards (if a real filter was set)
+//   - Shows Applied Filters indicator
+// Reset clears draft + applied filters, hides KPI/indicator, restores table to ALL trips.
 
 import { RotateCcw, RefreshCw, Search, UserCheck, Warehouse } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";

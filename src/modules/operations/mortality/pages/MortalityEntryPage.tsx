@@ -7,16 +7,19 @@
 // There is no manual mortality entry form and no mortality register on this
 // page — mortality figures come from the Trip model itself.
 //
-// LAYOUT ORDER (fixed): FILTER BAR -> KPI CARDS -> COMPLETED TRIPS TABLE.
-// The table of completed trips is ALWAYS visible (every trip, regardless of the
-// filter controls). The KPI cards appear only when a real filter is Applied, and
-// they summarise that applied subset (e.g. a date range, or a single supervisor).
+// LAYOUT ORDER (fixed): FILTER BAR -> APPLIED FILTERS INDICATOR -> KPI CARDS -> COMPLETED TRIPS TABLE.
+// The table of completed trips is ALWAYS visible. By default it shows ALL completed trips.
+// When a real filter is Applied via Search, the table shows ONLY filtered trips,
+// the KPI cards appear (summarising the filtered subset), and an Applied Filters
+// indicator is shown. Changing filter controls does NOT affect the table until Search is clicked.
+// Reset clears all filters, hides KPIs/indicator, and restores the table to ALL trips.
 
 import { useCallback, useState } from "react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import LossFilters from "../components/LossFilters";
 import LossKpiCards from "../components/LossKpiCards";
 import TripLossTable from "../components/TripLossTable";
+import AppliedFiltersIndicator from "../components/AppliedFiltersIndicator";
 import { useTripLossAnalysis } from "../hooks/useTripLossAnalysis";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { opsPageClass } from "../../../../shared/ui/operationsStyles";
@@ -28,8 +31,8 @@ export default function MortalityEntryPage() {
   const { t } = useI18n();
   const [refreshing, setRefreshing] = useState(false);
 
-  // APPLY — commit the current controls to the KPI summary. The table is
-  // unaffected; it keeps showing every completed trip.
+  // APPLY — commit the current controls to the KPI summary, filter the table,
+  // show applied filters indicator, and reset pagination to page 1.
   const handleApply = useCallback(() => {
     analysis.applyFilters();
     showNotification(
@@ -78,8 +81,16 @@ export default function MortalityEntryPage() {
         refreshing={refreshing}
       />
 
-      {/* ── 2. KPIs — only when a real filter is Applied ────────── */}
-      {analysis.kpisVisible && !analysis.error && (
+      {/* ── Applied filters indicator (only after Search with real filter) ────────── */}
+      {analysis.kpisVisible && (
+        <AppliedFiltersIndicator
+          appliedFilters={analysis.appliedFilters}
+          onClear={handleReset}
+        />
+      )}
+
+      {/* ── 2. KPIs — only when a real filter is Applied AND has results ────────── */}
+      {analysis.kpisVisible && !analysis.error && analysis.totalRecords > 0 && (
         <section className="space-y-2">
           <p className="text-[12px] font-medium text-slate-500">
             {t("ops.mortality.kpi.filtered_summary")}
@@ -127,6 +138,7 @@ export default function MortalityEntryPage() {
             onPageSizeChange={analysis.setPageSize}
             loading={analysis.loading}
             emptyAll={showEmptyAll}
+            filtersApplied={analysis.kpisVisible}
             onReset={handleReset}
           />
         )}

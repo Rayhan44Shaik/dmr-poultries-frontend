@@ -48,6 +48,8 @@ interface TripLossTableProps {
   loading?: boolean;
   /** No completed trips exist at all (regardless of current filters). */
   emptyAll?: boolean;
+  /** A real filter has been applied via Search (shows "no results for filter" state). */
+  filtersApplied?: boolean;
   onReset?: () => void;
 }
 
@@ -216,6 +218,7 @@ export default function TripLossTable({
   onPageSizeChange,
   loading = false,
   emptyAll = false,
+  filtersApplied = false,
   onReset,
 }: TripLossTableProps) {
   const { t } = useI18n();
@@ -240,7 +243,8 @@ export default function TripLossTable({
 
   const rangeStart = totalRecords === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = Math.min(page * pageSize, totalRecords);
-  const showEmpty = !loading && emptyAll;
+  const showEmptyAll = !loading && emptyAll;
+  const showEmptyFiltered = !loading && filtersApplied && records.length === 0;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
@@ -308,7 +312,7 @@ export default function TripLossTable({
                   </td>
                 </tr>
               </>
-            ) : showEmpty ? (
+            ) : showEmptyAll ? (
               <tr>
                 <td colSpan={COLUMNS.length} className="px-4 py-12">
                   <div className="flex flex-col items-center gap-2 text-center">
@@ -317,6 +321,22 @@ export default function TripLossTable({
                     </span>
                     <p className="text-[13px] font-semibold text-slate-700">
                       {t("ops.mortality.empty.title")}
+                    </p>
+                    <p className="max-w-md text-xs text-slate-400">
+                      {t("ops.mortality.empty.hint")}
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            ) : showEmptyFiltered ? (
+              <tr>
+                <td colSpan={COLUMNS.length} className="px-4 py-12">
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-500">
+                      <SearchX size={18} />
+                    </span>
+                    <p className="text-[13px] font-semibold text-slate-700">
+                      {t("ops.mortality.empty.filtered_title")}
                     </p>
                     <p className="max-w-md text-xs text-slate-400">
                       {t("ops.mortality.empty.hint")}

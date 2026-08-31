@@ -12,10 +12,13 @@ function ShopTable({ shops, onEdit }: ShopTableProps) {
   return (
     <div className="overflow-x-auto rounded-xl bg-white shadow-sm border border-slate-200">
       <table className="min-w-full divide-y divide-slate-200">
-        <thead className="bg-slate-50">
+        <thead className="bg-slate-50 sticky top-0">
           <tr>
-            <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-slate-500 w-12">
+            <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-slate-500 w-10">
               {t("masters.shops.table.s_no")}
+            </th>
+            <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-slate-500 w-28">
+              {t("masters.shops.table.shop_number")}
             </th>
             <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
               {t("masters.shops.table.shop_name")}
@@ -27,6 +30,12 @@ function ShopTable({ shops, onEdit }: ShopTableProps) {
               {t("masters.shops.table.mobile_no")}
             </th>
             <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-slate-500 hidden md:table-cell">
+              {t("masters.shops.table.secondary_mobile")}
+            </th>
+            <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-slate-500 hidden md:table-cell">
+              {t("masters.shops.table.email")}
+            </th>
+            <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-slate-500 hidden lg:table-cell">
               {t("masters.shops.table.city")}
             </th>
             <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-slate-500 hidden lg:table-cell">
@@ -52,10 +61,13 @@ function ShopTable({ shops, onEdit }: ShopTableProps) {
             .map((shop, index) => (
             <tr key={shop.id} className="hover:bg-slate-50 transition-colors">
               <td className="px-3 py-2.5 text-sm text-slate-500">{index + 1}</td>
+              <td className="px-3 py-2.5 text-sm font-mono text-slate-700">{shop.shopNumber}</td>
               <td className="px-3 py-2.5 text-sm font-medium text-slate-800">{shop.shopName}</td>
               <td className="px-3 py-2.5 text-sm text-slate-600">{shop.ownerName}</td>
               <td className="px-3 py-2.5 text-sm text-slate-600 font-mono">{shop.phoneNumber}</td>
-              <td className="px-3 py-2.5 text-sm text-slate-600 hidden md:table-cell">{shop.city}</td>
+              <td className="px-3 py-2.5 text-sm text-slate-600 hidden md:table-cell">{shop.secondaryPhoneNumber || "—"}</td>
+              <td className="px-3 py-2.5 text-sm text-slate-600 hidden md:table-cell">{shop.email || "—"}</td>
+              <td className="px-3 py-2.5 text-sm text-slate-600 hidden lg:table-cell">{shop.city}</td>
               <td className="px-3 py-2.5 text-sm text-slate-600 hidden lg:table-cell">{shop.associationType || "—"}</td>
               <td className="px-3 py-2.5 text-center text-sm font-medium text-slate-700">{shop.paperRate}</td>
               <td className="px-3 py-2.5 text-right text-sm font-medium text-slate-700">
@@ -85,7 +97,7 @@ function ShopTable({ shops, onEdit }: ShopTableProps) {
           ))}
           {shops.length === 0 && (
             <tr>
-              <td colSpan={10} className="px-4 py-6 text-center text-sm text-slate-500">
+              <td colSpan={12} className="px-4 py-6 text-center text-sm text-slate-500">
                 {t("masters.shops.no_shops_found")}
               </td>
             </tr>

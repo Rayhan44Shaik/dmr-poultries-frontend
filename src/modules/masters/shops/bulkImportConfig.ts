@@ -8,6 +8,8 @@ import type { BulkImportConfig } from "../components/bulk-import/bulkImportTypes
 import type { Shop } from "./types/shop";
 import type { ShopInput } from "./services/shopService";
 
+const ASSOCIATION_TYPES = ["Vencob Vij", "Vencob Gun", "Ass Vij", "Ass Gun"] as const;
+
 export type ShopBulkRow = {
   shopNumber: string;
   shopName: string;
@@ -94,14 +96,23 @@ function validateShopRow(row: ShopBulkRow, existing: Shop[]): string[] {
     errors.push("Paper Rate must be an integer between 1 and 30.");
   }
 
-  if (!row.associationType.trim()) {
-    errors.push("Association Type is required.");
+  if (!row.associationType.trim() || !ASSOCIATION_TYPES.includes(row.associationType as typeof ASSOCIATION_TYPES[number])) {
+    errors.push(`Association Type must be one of: ${ASSOCIATION_TYPES.join(", ")}`);
   }
 
+  // Check for duplicate shop name in existing data
   const duplicate = existing.some(
     (s) => s.shopName.trim().toLowerCase() === shopName.toLowerCase()
   );
   if (duplicate) errors.push("Shop Name already exists.");
+
+  // Check for duplicate shop number in existing data
+  if (shopNumber) {
+    const duplicateNumber = existing.some(
+      (s) => s.shopNumber.trim().toLowerCase() === shopNumber.toLowerCase()
+    );
+    if (duplicateNumber) errors.push("Shop Number already exists.");
+  }
 
   return errors;
 }
@@ -136,7 +147,7 @@ export function buildShopBulkImportConfig({
       { key: "Latitude", sample: "16.544123" },
       { key: "Longitude", sample: "81.523456" },
       { key: "Paper Rate", required: true, sample: "5" },
-      { key: "Association Type", required: true, sample: "Association A" },
+      { key: "Association Type", required: true, sample: "Vencob Vij" },
       { key: "Opening Balance", sample: "12000" },
       { key: "Status", sample: "Active" },
     ],
@@ -160,7 +171,7 @@ export function buildShopBulkImportConfig({
       };
     },
     validateRow: validateShopRow,
-    duplicateKey: (row) => row.shopName,
+    duplicateKey: (row) => `${row.shopName}|${row.shopNumber}`,
     toPayload: toShopPayload,
     createMany: async (rows, onProgress) => {
       const total = rows.length;

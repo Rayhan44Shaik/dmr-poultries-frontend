@@ -879,6 +879,28 @@ export default {
   'page_title.farmer_payments': 'DMR Poultries - రైతు చెల్లింపులు',
   'page_title.market_rates': 'DMR Poultries - మార్కెట్ రేట్లు',
 
+  // Market Rates page — table section labels (frontend-only refinements)
+  'marketRates.section.companyRates': 'కంపెనీ & అసోసియేషన్ రేట్లు',
+  'marketRates.section.additionalMetrics': 'అదనపు మెట్రిక్‌ల ఎంట్రీ',
+  'marketRates.section.sizeCategoryBreakdown': 'లెస్ రేట్ల బ్రేక్‌డౌన్',
+  'marketRates.subtitle.companyRates': 'రోజువారీ కంపెనీ, విక్రేత మరియు అసోసియేషన్ రేట్ మాతృక',
+  'marketRates.subtitle.additionalMetrics': 'రోజువారీ సారాంశ మెట్రిక్‌లు (Vij, Gun, R.P)',
+  'marketRates.subtitle.sizeCategoryBreakdown': 'రోజువారీ సైజ్ / కేటగిరీ రేట్ బ్రేక్‌డౌన్',
+  'marketRates.col.date': 'తేదీ',
+  'marketRates.col.snehaFarmer': 'Sneha / Farmer',
+  'marketRates.col.venVij': 'Ven Vij',
+  'marketRates.col.venGun': 'Ven Gun',
+  'marketRates.col.assVij': 'Ass Vij',
+  'marketRates.col.assGun': 'Ass Gun',
+  'marketRates.col.vij': 'Vij',
+  'marketRates.col.gun': 'Gun',
+  'marketRates.col.rp': 'R.P',
+  'marketRates.col.c17': '17',
+  'marketRates.col.c15': '15',
+  'marketRates.col.c13': '13',
+  'marketRates.col.c12': '12',
+  'marketRates.col.c10': '10',
+
   // Coming soon
   'coming_soon': 'త్వరలో',
   'coming_soon_desc': 'ఈ ఫీచర్ అభివృద్ధిలో ఉంది.',

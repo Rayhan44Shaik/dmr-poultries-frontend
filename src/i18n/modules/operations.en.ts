@@ -682,9 +682,17 @@
   'ops.mortality.toast.search_applied': 'Search applied',
   'ops.mortality.toast.search_result': 'Search applied — {count} completed trips',
   'ops.mortality.toast.search_result_one': 'Search applied — {count} completed trip',
-  'ops.mortality.toast.reset': 'Filters reset to the current week.',
+  'ops.mortality.toast.reset': 'Filters reset.',
   'ops.mortality.error.title': 'Unable to load completed trips',
   'ops.mortality.loading': 'Loading completed trips…',
   'ops.mortality.aria.expand': 'Expand trip',
   'ops.mortality.aria.collapse': 'Collapse trip',
+
+  // Applied filters indicator
+  'ops.mortality.applied_filters.label': 'Applied filters',
+  'ops.mortality.applied_filters.from': 'From',
+  'ops.mortality.applied_filters.to': 'To',
+  'ops.mortality.applied_filters.farm': 'Farm',
+  'ops.mortality.applied_filters.supervisor': 'Supervisor',
+  'ops.mortality.applied_filters.search': 'Search',
 };

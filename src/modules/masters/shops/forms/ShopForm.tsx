@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import type { Shop } from "../types/shop";
 import {
   Store,
@@ -6,12 +6,13 @@ import {
   Phone,
   Mail,
   MapPin,
-  Home,
   IndianRupee,
-  Globe,
   Settings,
+  Search,
+  ChevronDown,
 } from "lucide-react";
 import { useI18n } from "../../../../i18n";
+import { formatINR } from "../../../../utils/format";
 import LocationPicker from "../components/LocationPicker";
 
 type ShopFormProps = {
@@ -37,15 +38,145 @@ type ShopFormProps = {
 };
 
 const PAPER_RATE_OPTIONS = Array.from({ length: 30 }, (_, i) => i + 1);
+const ASSOCIATION_TYPES = ["Vencob Vij", "Vencob Gun", "Ass Vij", "Ass Gun"];
 
-const ASSOCIATION_TYPES = [
-  "Association A",
-  "Association B",
-  "Association C",
-  "Association D",
-  "Independent",
-  "Other",
-];
+function PaperRateSelect({
+  value,
+  onChange,
+  hasError,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  hasError?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return PAPER_RATE_OPTIONS;
+    const q = query.trim().toLowerCase();
+    return PAPER_RATE_OPTIONS.filter((o) => String(o).includes(q));
+  }, [query]);
+
+  const openUpward = useMemo(() => {
+    if (!rootRef.current) return false;
+    const rect = rootRef.current.getBoundingClientRect();
+    return window.innerHeight - rect.bottom < 220;
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      setHighlightedIndex(0);
+      setQuery("");
+      requestAnimationFrame(() => searchRef.current?.focus());
+    }
+  }, [open]);
+
+  useEffect(() => { setHighlightedIndex(0); }, [query]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setOpen(false); return; }
+      if (e.key === "ArrowDown") { e.preventDefault(); setHighlightedIndex((i) => Math.min(i + 1, filtered.length - 1)); }
+      if (e.key === "ArrowUp") { e.preventDefault(); setHighlightedIndex((i) => Math.max(i - 1, 0)); }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (filtered[highlightedIndex] !== undefined) {
+          onChange(String(filtered[highlightedIndex]));
+          setOpen(false);
+        }
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, highlightedIndex, filtered, onChange]);
+
+  useEffect(() => {
+    if (!open || !listRef.current) return;
+    const el = listRef.current.children[highlightedIndex] as HTMLElement | undefined;
+    el?.scrollIntoView({ block: "nearest" });
+  }, [highlightedIndex, open]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`w-full flex items-center pl-10 pr-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150 ${
+          hasError ? "border-red-500" : "border-slate-200"
+        } bg-white hover:shadow-sm focus:shadow-md appearance-none cursor-pointer text-left`}
+      >
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+          <IndianRupee size={15} />
+        </span>
+        <span className={`flex-1 truncate ${!value ? "text-slate-400" : ""}`}>
+          {value || "Select Paper Rate"}
+        </span>
+      </button>
+      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+        <ChevronDown size={14} />
+      </div>
+      {open && (
+        <div
+          className={`absolute z-[60] w-full bg-white border border-slate-200 rounded-lg shadow-md overflow-hidden ${
+            openUpward ? "bottom-full mb-1" : "top-full mt-1"
+          }`}
+        >
+          <div className="px-1.5 pt-1.5 pb-1">
+            <div className="relative">
+              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                ref={searchRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+                placeholder="Search rate..."
+                className="w-full pl-6 pr-2 py-[5px] text-[13px] border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400/30 focus:border-blue-400"
+              />
+            </div>
+          </div>
+          <div ref={listRef} className="overflow-y-auto max-h-[160px] px-1 pb-1">
+            {filtered.map((rate, idx) => (
+              <button
+                key={rate}
+                type="button"
+                onMouseEnter={() => setHighlightedIndex(idx)}
+                onClick={() => { onChange(String(rate)); setOpen(false); }}
+                className={`w-full px-2.5 py-[7px] text-[14px] text-left rounded transition-colors ${
+                  String(rate) === value
+                    ? "bg-emerald-50 text-emerald-700 font-medium"
+                    : idx === highlightedIndex
+                    ? "bg-slate-100 text-slate-800"
+                    : "text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {rate}
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <p className="px-2 py-1.5 text-[12px] text-slate-400 text-center">No rates found</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
   const { t } = useI18n();
@@ -61,22 +192,15 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
   const [longitude, setLongitude] = useState("");
   const [paperRate, setPaperRate] = useState("1");
   const [associationType, setAssociationType] = useState("");
-  const [openingBalance, setOpeningBalance] = useState("0.00");
+  const [openingBalance, setOpeningBalance] = useState("0");
+  const [isBalanceFocused, setIsBalanceFocused] = useState(false);
+  const balanceInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
 
   const [errors, setErrors] = useState({
-    shopNumber: "",
-    shopName: "",
-    ownerName: "",
-    phoneNumber: "",
-    secondaryPhoneNumber: "",
-    email: "",
-    city: "",
-    latitude: "",
-    longitude: "",
-    paperRate: "",
-    associationType: "",
-    openingBalance: "",
+    shopNumber: "", shopName: "", ownerName: "", phoneNumber: "",
+    secondaryPhoneNumber: "", email: "", city: "", latitude: "", longitude: "",
+    paperRate: "", associationType: "", openingBalance: "",
   });
 
   const isEditing = !!shop;
@@ -95,252 +219,196 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       setLongitude(shop.longitude !== undefined ? String(shop.longitude) : "");
       setPaperRate(shop.paperRate !== undefined ? String(shop.paperRate) : "1");
       setAssociationType(shop.associationType ?? "");
-      setOpeningBalance(shop.openingBalance !== undefined ? String(shop.openingBalance) : "0.00");
+      setOpeningBalance(shop.openingBalance !== undefined ? String(shop.openingBalance) : "0");
       setStatus(shop.status);
     } else {
-      setShopNumber("");
-      setShopName("");
-      setOwnerName("");
-      setPhoneNumber("");
-      setSecondaryPhoneNumber("");
-      setEmail("");
-      setCity("");
-      setAddress("");
-      setLatitude("");
-      setLongitude("");
-      setPaperRate("1");
-      setAssociationType("");
-      setOpeningBalance("0.00");
-      setStatus("Active");
+      setShopNumber(""); setShopName(""); setOwnerName(""); setPhoneNumber("");
+      setSecondaryPhoneNumber(""); setEmail(""); setCity(""); setAddress("");
+      setLatitude(""); setLongitude(""); setPaperRate("1"); setAssociationType("");
+      setOpeningBalance("0"); setStatus("Active");
     }
-    setErrors({
-      shopNumber: "",
-      shopName: "",
-      ownerName: "",
-      phoneNumber: "",
-      secondaryPhoneNumber: "",
-      email: "",
-      city: "",
-      latitude: "",
-      longitude: "",
-      paperRate: "",
-      associationType: "",
-      openingBalance: "",
-    });
+    setErrors({ shopNumber: "", shopName: "", ownerName: "", phoneNumber: "",
+      secondaryPhoneNumber: "", email: "", city: "", latitude: "", longitude: "",
+      paperRate: "", associationType: "", openingBalance: "" });
   }, [shop]);
 
-  const handleSubmit = () => {
-    const newErrors = {
-      shopNumber: "",
-      shopName: "",
-      ownerName: "",
-      phoneNumber: "",
-      secondaryPhoneNumber: "",
-      email: "",
-      city: "",
-      latitude: "",
-      longitude: "",
-      paperRate: "",
-      associationType: "",
-      openingBalance: "",
-    };
+  const formatDisplayBalance = useCallback((raw: string): string => {
+    const num = parseFloat(raw);
+    if (isNaN(num) || raw === "") return "₹0.00";
+    return formatINR(num);
+  }, []);
 
-    if (shopName.trim().length < 3) {
-      newErrors.shopName = t("masters.shops.validation.shop_name_min");
+  const parseBalanceInput = useCallback((input: string): string => {
+    const cleaned = input.replace(/[₹,\s]/g, "");
+    const valid = cleaned.replace(/[^0-9.\-]/g, "");
+    const dotIndex = valid.indexOf(".");
+    if (dotIndex !== -1) {
+      return valid.substring(0, dotIndex + 1) + valid.substring(dotIndex + 1).replace(/\./g, "");
     }
-    if (ownerName.trim().length < 3) {
-      newErrors.ownerName = t("masters.shops.validation.owner_name_min");
-    }
-    if (!/^[0-9]{10}$/.test(phoneNumber)) {
-      newErrors.phoneNumber = t("masters.shops.validation.mobile_10_digits");
-    }
-    if (secondaryPhoneNumber.trim() !== "" && !/^[0-9]{10}$/.test(secondaryPhoneNumber)) {
+    return valid;
+  }, []);
+
+  const handleBalanceChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setOpeningBalance(parseBalanceInput(e.target.value));
+  }, [parseBalanceInput]);
+
+  const handleBalanceFocus = useCallback(() => {
+    setIsBalanceFocused(true);
+    setTimeout(() => {
+      if (balanceInputRef.current) {
+        const len = balanceInputRef.current.value.length;
+        balanceInputRef.current.setSelectionRange(len, len);
+      }
+    }, 0);
+  }, []);
+
+  const handleBalanceBlur = useCallback(() => setIsBalanceFocused(false), []);
+
+  const handleLocationChange = useCallback((lat: string, lng: string, addr?: string) => {
+    setLatitude(lat);
+    setLongitude(lng);
+    if (addr !== undefined) setAddress(addr);
+  }, []);
+
+  const handleSubmit = useCallback(() => {
+    const newErrors = { shopNumber: "", shopName: "", ownerName: "", phoneNumber: "",
+      secondaryPhoneNumber: "", email: "", city: "", latitude: "", longitude: "",
+      paperRate: "", associationType: "", openingBalance: "" };
+
+    if (shopName.trim().length < 3) newErrors.shopName = t("masters.shops.validation.shop_name_min");
+    if (ownerName.trim().length < 3) newErrors.ownerName = t("masters.shops.validation.owner_name_min");
+    if (!/^[0-9]{10}$/.test(phoneNumber)) newErrors.phoneNumber = t("masters.shops.validation.mobile_10_digits");
+    if (secondaryPhoneNumber.trim() !== "" && !/^[0-9]{10}$/.test(secondaryPhoneNumber))
       newErrors.secondaryPhoneNumber = t("masters.shops.validation.secondary_mobile_10_digits");
-    }
-    if (email.trim() !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    if (email.trim() !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
       newErrors.email = t("masters.shops.validation.email_invalid");
-    }
-    if (city.trim() === "") {
-      newErrors.city = t("masters.shops.validation.city_required");
-    }
+    if (city.trim() === "") newErrors.city = t("masters.shops.validation.city_required");
 
     const lat = parseFloat(latitude);
-    if (latitude.trim() !== "" && (isNaN(lat) || lat < -90 || lat > 90)) {
+    if (latitude.trim() !== "" && (isNaN(lat) || lat < -90 || lat > 90))
       newErrors.latitude = t("masters.shops.validation.latitude_invalid");
-    }
-
     const lng = parseFloat(longitude);
-    if (longitude.trim() !== "" && (isNaN(lng) || lng < -180 || lng > 180)) {
+    if (longitude.trim() !== "" && (isNaN(lng) || lng < -180 || lng > 180))
       newErrors.longitude = t("masters.shops.validation.longitude_invalid");
-    }
 
     const rate = parseInt(paperRate, 10);
-    if (paperRate.trim() === "" || isNaN(rate) || rate < 1 || rate > 30) {
+    if (paperRate.trim() === "" || isNaN(rate) || rate < 1 || rate > 30)
       newErrors.paperRate = t("masters.shops.validation.paper_rate_invalid");
-    }
-
-    if (associationType.trim() === "") {
+    if (associationType.trim() === "")
       newErrors.associationType = t("masters.shops.validation.association_type_required");
-    }
 
     const parsedBalance = parseFloat(openingBalance);
-    if (openingBalance.trim() === "" || isNaN(parsedBalance)) {
+    if (openingBalance.trim() === "" || isNaN(parsedBalance))
       newErrors.openingBalance = t("masters.shops.validation.opening_balance_required");
-    }
 
     setErrors(newErrors);
-
-    if (
-      newErrors.shopName ||
-      newErrors.ownerName ||
-      newErrors.phoneNumber ||
-      newErrors.secondaryPhoneNumber ||
-      newErrors.email ||
-      newErrors.city ||
-      newErrors.latitude ||
-      newErrors.longitude ||
-      newErrors.paperRate ||
-      newErrors.associationType ||
-      newErrors.openingBalance
-    ) {
-      return;
-    }
+    if (Object.values(newErrors).some(Boolean)) return;
 
     onSave({
       shopNumber: isEditing ? shopNumber : shopNumber || `SHOP-${String(Date.now()).slice(-6)}`,
-      shopName,
-      ownerName,
-      phoneNumber,
+      shopName, ownerName, phoneNumber,
       secondaryPhoneNumber: secondaryPhoneNumber.trim(),
-      email,
-      city,
-      address,
+      email, city, address,
       latitude: latitude.trim() || "0",
       longitude: longitude.trim() || "0",
-      paperRate: rate,
-      associationType,
-      status,
+      paperRate: rate, associationType, status,
       openingBalance: parsedBalance,
     });
-  };
+  }, [shop, shopNumber, shopName, ownerName, phoneNumber, secondaryPhoneNumber, email,
+    city, address, latitude, longitude, paperRate, associationType, openingBalance, status,
+    isEditing, onSave, t]);
 
   const inputClass = (hasError = false) =>
-    `w-full pl-10 pr-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150 ${
+    `w-full pl-10 pr-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150 ${
       hasError ? "border-red-500" : "border-slate-200"
     } bg-white hover:shadow-sm focus:shadow-md appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`;
 
   const selectClass = (hasError = false) =>
-    `w-full pl-10 pr-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150 ${
+    `w-full pl-10 pr-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150 ${
       hasError ? "border-red-500" : "border-slate-200"
     } bg-white hover:shadow-sm focus:shadow-md appearance-none cursor-pointer`;
-
-  const textareaClass = (hasError = false) =>
-    `w-full pl-10 pr-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150 ${
-      hasError ? "border-red-500" : "border-slate-200"
-    } bg-white hover:shadow-sm focus:shadow-md resize-y`;
 
   const iconWrapperClass = "absolute left-3 top-1/2 -translate-y-1/2 text-slate-400";
 
   const title = isEditing ? t("masters.shops.dialog.edit_title") : t("masters.shops.dialog.add_title");
   const subtitle = isEditing ? t("masters.shops.dialog.edit_subtitle") : t("masters.shops.dialog.add_subtitle");
 
-  const toggleStatus = () => {
-    if (!isSaving) {
-      setStatus(status === "Active" ? "Inactive" : "Active");
-    }
-  };
-
-  const sectionStyle = "mb-5";
-  const sectionTitleStyle = "flex items-center gap-1.5 text-sm font-semibold text-slate-700 mb-3 pb-1.5 border-b border-slate-100";
-  const labelStyle = "block text-xs font-medium text-slate-600 mb-1";
-  const requiredStar = <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>;
+  const toggleStatus = useCallback(() => {
+    if (!isSaving) setStatus(status === "Active" ? "Inactive" : "Active");
+  }, [status, isSaving]);
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl border border-slate-200/60 overflow-hidden max-h-[90vh] flex flex-col">
+    <div className="bg-white rounded-xl shadow-xl border border-slate-200/60 overflow-hidden max-h-[90vh] flex flex-col">
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-50 to-slate-100/50 px-5 py-3.5 flex items-center justify-between border-b border-slate-200/60 shrink-0 gap-4">
+      <div className="bg-gradient-to-r from-slate-50 to-slate-100/50 px-5 py-2.5 flex items-center justify-between border-b border-slate-200/60 shrink-0 gap-4">
         <div className="flex items-center gap-2.5">
-          <div className="bg-blue-100 p-2 rounded-lg">
-            <Store className="h-4.5 w-4.5 text-blue-600" />
+          <div className="bg-blue-100 p-1.5 rounded-lg">
+            <Store className="h-4 w-4 text-blue-600" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-800 tracking-tight">{title}</h2>
+            <h2 className="text-base font-bold text-slate-800 tracking-tight">{title}</h2>
             <p className="text-[11px] text-slate-500 font-medium">{subtitle}</p>
           </div>
         </div>
-
-        {/* Status toggle switch in header */}
         <div className="flex items-center gap-2 ml-auto shrink-0">
-          <span className="text-xs font-medium text-slate-600 hidden sm:inline">{t("masters.shops.form.status")}</span>
+          <span className="text-xs font-medium text-slate-500 hidden sm:inline">{t("masters.shops.form.status")}</span>
           <button
-            type="button"
-            onClick={toggleStatus}
-            disabled={isSaving}
+            type="button" onClick={toggleStatus} disabled={isSaving}
             className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-200 ${
               status === "Active" ? "bg-emerald-500" : "bg-slate-300"
             } ${isSaving ? "opacity-60 cursor-not-allowed" : ""}`}
             aria-label={t("masters.shops.form.status")}
           >
-            <span
-              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                status === "Active" ? "translate-x-5" : "translate-x-0.5"
-              }`}
-            />
+            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm ${
+              status === "Active" ? "translate-x-5" : "translate-x-0.5"
+            }`} />
           </button>
-          <span
-            className={`text-xs font-medium hidden sm:inline ${
-              status === "Active" ? "text-emerald-600" : "text-slate-500"
-            }`}
-          >
-            {status}
-          </span>
+          <span className={`text-xs font-medium hidden sm:inline ${
+            status === "Active" ? "text-emerald-600" : "text-slate-400"
+          }`}>{status}</span>
         </div>
       </div>
 
-      {/* Form body - scrollable */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-5">
+      {/* Form body */}
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
         {/* SHOP DETAILS */}
-        <section className={sectionStyle}>
-          <h3 className={sectionTitleStyle}>
-            <Store className="h-4 w-4 text-blue-600" />
+        <section>
+          <h3 className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5">
+            <Store className="h-3.5 w-3.5" />
             {t("masters.shops.form.sections.shop_details")}
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {/* Shop Number */}
-            <div className="relative">
-              <label className={labelStyle}>
-                {t("masters.shops.form.shop_number")} {requiredStar}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-3 gap-y-3">
+            {/* Shop Number — with helper text inside the same grid cell */}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                {t("masters.shops.form.shop_number")} <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
               </label>
               <div className="relative">
-                <div className={iconWrapperClass}>
-                  <Store size={15} />
-                </div>
+                <div className={iconWrapperClass}><Store size={15} /></div>
                 <input
                   value={shopNumber}
                   onChange={(e) => setShopNumber(e.target.value.toUpperCase())}
                   placeholder={t("masters.shops.form.shop_number_placeholder")}
-                  className={inputClass(!!errors.shopNumber)}
+                  className={`w-full pl-10 pr-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150 bg-white hover:shadow-sm focus:shadow-md appearance-none ${
+                    errors.shopNumber ? "border-red-500" : isEditing ? "bg-slate-50 border-slate-200 text-slate-600" : "border-slate-200"
+                  }`}
                   disabled={isEditing}
                   readOnly={isEditing}
                 />
               </div>
-              {errors.shopNumber && (
-                <p className="text-red-600 text-xs mt-1">{errors.shopNumber}</p>
-              )}
+              {errors.shopNumber && <p className="text-red-600 text-[11px] mt-0.5">{errors.shopNumber}</p>}
               {isEditing && (
-                <p className="text-[10px] text-slate-400 mt-1">{t("masters.shops.form.shop_number_readonly_hint")}</p>
+                <p className="text-[11px] text-slate-400 mt-1">Cannot be changed after creation</p>
               )}
             </div>
 
             {/* Shop Name */}
-            <div className="relative">
-              <label className={labelStyle}>
-                {t("masters.shops.form.shop_name")} {requiredStar}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                {t("masters.shops.form.shop_name")} <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
               </label>
               <div className="relative">
-                <div className={iconWrapperClass}>
-                  <Store size={15} />
-                </div>
+                <div className={iconWrapperClass}><Store size={15} /></div>
                 <input
                   value={shopName}
                   onChange={(e) => setShopName(e.target.value)}
@@ -348,20 +416,16 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
                   className={inputClass(!!errors.shopName)}
                 />
               </div>
-              {errors.shopName && (
-                <p className="text-red-600 text-xs mt-1">{errors.shopName}</p>
-              )}
+              {errors.shopName && <p className="text-red-600 text-[11px] mt-0.5">{errors.shopName}</p>}
             </div>
 
             {/* Owner Name */}
-            <div className="relative">
-              <label className={labelStyle}>
-                {t("masters.shops.form.owner_name")} {requiredStar}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                {t("masters.shops.form.owner_name")} <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
               </label>
               <div className="relative">
-                <div className={iconWrapperClass}>
-                  <User size={15} />
-                </div>
+                <div className={iconWrapperClass}><User size={15} /></div>
                 <input
                   value={ownerName}
                   onChange={(e) => setOwnerName(e.target.value)}
@@ -369,20 +433,16 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
                   className={inputClass(!!errors.ownerName)}
                 />
               </div>
-              {errors.ownerName && (
-                <p className="text-red-600 text-xs mt-1">{errors.ownerName}</p>
-              )}
+              {errors.ownerName && <p className="text-red-600 text-[11px] mt-0.5">{errors.ownerName}</p>}
             </div>
 
             {/* Mobile Number */}
-            <div className="relative">
-              <label className={labelStyle}>
-                {t("masters.shops.form.mobile_number")} {requiredStar}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                {t("masters.shops.form.mobile_number")} <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
               </label>
               <div className="relative">
-                <div className={iconWrapperClass}>
-                  <Phone size={15} />
-                </div>
+                <div className={iconWrapperClass}><Phone size={15} /></div>
                 <input
                   value={phoneNumber}
                   maxLength={10}
@@ -391,20 +451,16 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
                   className={inputClass(!!errors.phoneNumber)}
                 />
               </div>
-              {errors.phoneNumber && (
-                <p className="text-red-600 text-xs mt-1">{errors.phoneNumber}</p>
-              )}
+              {errors.phoneNumber && <p className="text-red-600 text-[11px] mt-0.5">{errors.phoneNumber}</p>}
             </div>
 
             {/* Secondary Mobile */}
-            <div className="relative">
-              <label className={labelStyle}>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
                 {t("masters.shops.form.secondary_mobile_number")}
               </label>
               <div className="relative">
-                <div className={iconWrapperClass}>
-                  <Phone size={15} />
-                </div>
+                <div className={iconWrapperClass}><Phone size={15} /></div>
                 <input
                   value={secondaryPhoneNumber}
                   maxLength={10}
@@ -413,20 +469,16 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
                   className={inputClass(!!errors.secondaryPhoneNumber)}
                 />
               </div>
-              {errors.secondaryPhoneNumber && (
-                <p className="text-red-600 text-xs mt-1">{errors.secondaryPhoneNumber}</p>
-              )}
+              {errors.secondaryPhoneNumber && <p className="text-red-600 text-[11px] mt-0.5">{errors.secondaryPhoneNumber}</p>}
             </div>
 
             {/* Email */}
-            <div className="relative">
-              <label className={labelStyle}>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
                 {t("masters.shops.form.email")}
               </label>
               <div className="relative">
-                <div className={iconWrapperClass}>
-                  <Mail size={15} />
-                </div>
+                <div className={iconWrapperClass}><Mail size={15} /></div>
                 <input
                   type="email"
                   value={email}
@@ -435,179 +487,116 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
                   className={inputClass(!!errors.email)}
                 />
               </div>
-              {errors.email && (
-                <p className="text-red-600 text-xs mt-1">{errors.email}</p>
-              )}
+              {errors.email && <p className="text-red-600 text-[11px] mt-0.5">{errors.email}</p>}
             </div>
           </div>
         </section>
 
-        {/* ADDRESS */}
-        <section className={sectionStyle}>
-          <h3 className={sectionTitleStyle}>
-            <MapPin className="h-4 w-4 text-blue-600" />
+        {/* ADDRESS & BUSINESS DETAILS */}
+        <section>
+          <h3 className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5">
+            <MapPin className="h-3.5 w-3.5" />
             {t("masters.shops.form.sections.address")}
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {/* City */}
-            <div className="relative">
-              <label className={labelStyle}>
-                {t("masters.shops.form.city")} {requiredStar}
-              </label>
-              <div className="relative">
-                <div className={iconWrapperClass}>
-                  <MapPin size={15} />
+          <div className="space-y-3">
+            {/* Row 1: City | Association Type | Paper Rate */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-3 gap-y-3">
+              {/* City */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  {t("masters.shops.form.city")} <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
+                </label>
+                <div className="relative">
+                  <div className={iconWrapperClass}><MapPin size={15} /></div>
+                  <input
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder={t("masters.shops.form.city_placeholder")}
+                    className={inputClass(!!errors.city)}
+                  />
                 </div>
-                <input
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder={t("masters.shops.form.city_placeholder")}
-                  className={inputClass(!!errors.city)}
-                />
+                {errors.city && <p className="text-red-600 text-[11px] mt-0.5">{errors.city}</p>}
               </div>
-              {errors.city && (
-                <p className="text-red-600 text-xs mt-1">{errors.city}</p>
-              )}
+
+              {/* Association Type */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  {t("masters.shops.form.association_type")} <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
+                </label>
+                <div className="relative">
+                  <div className={iconWrapperClass}><Settings size={15} /></div>
+                  <select
+                    value={associationType}
+                    onChange={(e) => setAssociationType(e.target.value)}
+                    className={selectClass(!!errors.associationType)}
+                  >
+                    <option value="">{t("masters.shops.form.association_type_placeholder")}</option>
+                    {ASSOCIATION_TYPES.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+                {errors.associationType && <p className="text-red-600 text-[11px] mt-0.5">{errors.associationType}</p>}
+              </div>
+
+              {/* Paper Rate — searchable */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  {t("masters.shops.form.paper_rate")} <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
+                </label>
+                <PaperRateSelect
+                  value={paperRate}
+                  onChange={setPaperRate}
+                  hasError={!!errors.paperRate}
+                />
+                {errors.paperRate && <p className="text-red-600 text-[11px] mt-0.5">{errors.paperRate}</p>}
+              </div>
             </div>
 
-            {/* Full Address */}
-            <div className="relative sm:col-span-2">
-              <label className={labelStyle}>
+            {/* Row 2: Full Address + Get GPS */}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
                 {t("masters.shops.form.full_address")}
               </label>
-              <div className="relative">
-                <div className="absolute left-3 top-2.5 text-slate-400">
-                  <Home size={15} />
-                </div>
-                <textarea
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder={t("masters.shops.form.full_address_placeholder")}
-                  rows={2}
-                  className={textareaClass()}
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* LOCATION */}
-        <section className={sectionStyle}>
-          <h3 className={sectionTitleStyle}>
-            <Globe className="h-4 w-4 text-blue-600" />
-            {t("masters.shops.form.sections.location")}
-          </h3>
-
-          <LocationPicker
-            latitude={latitude}
-            longitude={longitude}
-            onChange={(lat, lng) => {
-              setLatitude(lat);
-              setLongitude(lng);
-            }}
-            onLocationCaptured={() => {}}
-            disabled={isSaving}
-          />
-        </section>
-
-        {/* BUSINESS DETAILS */}
-        <section className={sectionStyle}>
-          <h3 className={sectionTitleStyle}>
-            <Settings className="h-4 w-4 text-blue-600" />
-            {t("masters.shops.form.sections.business_details")}
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {/* Association Type */}
-            <div className="relative">
-              <label className={labelStyle}>
-                {t("masters.shops.form.association_type")} {requiredStar}
-              </label>
-              <div className="relative">
-                <div className={iconWrapperClass}>
-                  <Settings size={15} />
-                </div>
-                <select
-                  value={associationType}
-                  onChange={(e) => setAssociationType(e.target.value)}
-                  className={selectClass(!!errors.associationType)}
-                >
-                  <option value="">{t("masters.shops.form.association_type_placeholder")}</option>
-                  {ASSOCIATION_TYPES.map((type) => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </div>
-              {errors.associationType && (
-                <p className="text-red-600 text-xs mt-1">{errors.associationType}</p>
-              )}
+              <LocationPicker
+                latitude={latitude}
+                longitude={longitude}
+                address={address}
+                onChange={handleLocationChange}
+                disabled={isSaving}
+              />
             </div>
 
-            {/* Paper Rate */}
-            <div className="relative">
-              <label className={labelStyle}>
-                {t("masters.shops.form.paper_rate")} {requiredStar}
+            {/* Row 3: Opening Balance */}
+            <div className="max-w-xs">
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                {t("masters.shops.form.opening_balance")} <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
               </label>
               <div className="relative">
-                <div className={iconWrapperClass}>
-                  <IndianRupee size={15} />
-                </div>
-                <select
-                  value={paperRate}
-                  onChange={(e) => setPaperRate(e.target.value)}
-                  className={selectClass(!!errors.paperRate)}
-                >
-                  {PAPER_RATE_OPTIONS.map((rate) => (
-                    <option key={rate} value={String(rate)}>{rate}</option>
-                  ))}
-                </select>
-              </div>
-              {errors.paperRate && (
-                <p className="text-red-600 text-xs mt-1">{errors.paperRate}</p>
-              )}
-            </div>
-
-            {/* Opening Balance */}
-            <div className="relative sm:col-span-2">
-              <label className={labelStyle}>
-                {t("masters.shops.form.opening_balance")} {requiredStar}
-              </label>
-              <div className="relative">
-                <div className={iconWrapperClass}>
-                  <IndianRupee size={15} />
-                </div>
+                <div className={iconWrapperClass}><IndianRupee size={15} /></div>
                 <input
-                  type="number"
-                  step="0.01"
-                  value={openingBalance}
-                  onChange={(e) => setOpeningBalance(e.target.value)}
-                  placeholder={t("masters.shops.form.opening_balance_placeholder")}
+                  ref={balanceInputRef} type="text" inputMode="decimal"
+                  value={isBalanceFocused ? openingBalance : formatDisplayBalance(openingBalance)}
+                  onChange={handleBalanceChange}
+                  onFocus={handleBalanceFocus} onBlur={handleBalanceBlur}
+                  placeholder="₹0.00"
                   className={inputClass(!!errors.openingBalance)}
                 />
               </div>
-              {errors.openingBalance && (
-                <p className="text-red-600 text-xs mt-1">{errors.openingBalance}</p>
-              )}
+              {errors.openingBalance && <p className="text-red-600 text-[11px] mt-0.5">{errors.openingBalance}</p>}
             </div>
           </div>
         </section>
       </div>
 
-      {/* Footer - sticky */}
-      <div className="flex justify-end gap-3 px-5 py-3.5 border-t border-slate-200/60 bg-slate-50/50 shrink-0">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={isSaving}
-          className="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
+      {/* Footer */}
+      <div className="flex justify-end gap-3 px-5 py-3 border-t border-slate-200/60 bg-slate-50/50 shrink-0">
+        <button type="button" onClick={onCancel} disabled={isSaving}
+          className="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
           {t("masters.shops.dialog.cancel")}
         </button>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={isSaving}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        >
+        <button type="button" onClick={handleSubmit} disabled={isSaving}
+          className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2">
           {isSaving && (
             <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
