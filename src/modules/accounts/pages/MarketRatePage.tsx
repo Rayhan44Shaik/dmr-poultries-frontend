@@ -595,7 +595,8 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
           <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col h-full">
             {renderSectionHeader(
               t('marketRates.section.additionalMetrics'),
-              Sigma
+              Sigma,
+              { chip: 'bg-sky-50', icon: 'text-sky-600' }
             )}
             <div className={`overflow-auto ${TABLE_MAX_H}`}>
               <table className="w-full table-fixed text-center border-collapse sm:text-xs">
@@ -634,12 +635,13 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
           {/* end of side-by-side grid (Company Rates + Additional Metrics) */}
 
           {/* ============================================================ */}
-          {/* SECTION 3 — SIZE & CATEGORY BREAKDOWN ENTRY (full width)      */}
+          {/* SECTION 3 — SHOP RATES LESS BREAKDOWN ENTRY (full width)         */}
           {/* ============================================================ */}
           <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
             {renderSectionHeader(
               t('marketRates.section.sizeCategoryBreakdown'),
-              Layers
+              Layers,
+              { chip: 'bg-violet-50', icon: 'text-violet-600' }
             )}
             <div className={`overflow-auto ${TABLE_MAX_H}`}>
               <table className="w-full table-fixed text-center border-collapse sm:text-xs">

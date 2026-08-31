@@ -882,7 +882,7 @@ export default {
   // Market Rates page — table section labels (frontend-only refinements)
   'marketRates.section.companyRates': 'Company & Association Rates',
   'marketRates.section.additionalMetrics': 'Additional Metrics Entry',
-  'marketRates.section.sizeCategoryBreakdown': 'Less Rates Breakdown',
+  'marketRates.section.sizeCategoryBreakdown': 'Shop Rates Less Breakdown',
   'marketRates.subtitle.companyRates': 'Daily company, vendor and associate rate matrix',
   'marketRates.subtitle.additionalMetrics': 'Daily summary metrics (Vij, Gun, R.P)',
   'marketRates.subtitle.sizeCategoryBreakdown': 'Daily size / category rate breakdown',

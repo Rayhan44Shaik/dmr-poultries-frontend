@@ -882,7 +882,7 @@ export default {
   // Market Rates page — table section labels (frontend-only refinements)
   'marketRates.section.companyRates': 'కంపెనీ & అసోసియేషన్ రేట్లు',
   'marketRates.section.additionalMetrics': 'అదనపు మెట్రిక్‌ల ఎంట్రీ',
-  'marketRates.section.sizeCategoryBreakdown': 'లెస్ రేట్ల బ్రేక్‌డౌన్',
+  'marketRates.section.sizeCategoryBreakdown': 'షాప్ రేట్ల లెస్ బ్రేక్‌డౌన్',
   'marketRates.subtitle.companyRates': 'రోజువారీ కంపెనీ, విక్రేత మరియు అసోసియేషన్ రేట్ మాతృక',
   'marketRates.subtitle.additionalMetrics': 'రోజువారీ సారాంశ మెట్రిక్‌లు (Vij, Gun, R.P)',
   'marketRates.subtitle.sizeCategoryBreakdown': 'రోజువారీ సైజ్ / కేటగిరీ రేట్ బ్రేక్‌డౌన్',
