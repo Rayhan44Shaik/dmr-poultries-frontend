@@ -26,6 +26,10 @@ import { useI18n } from "../../../../i18n";
 type ShopsPageProps = { embedded?: boolean };
 
 const PAGE_SIZE_OPTIONS = [10, 15, 20, 25] as const;
+<<<<<<< HEAD
+=======
+const DEFAULT_PAGE_SIZE = 10;
+>>>>>>> 8e1dac4 (Shops Pagination)
 
 function ShopsPage({ embedded = false }: ShopsPageProps) {
   const { t } = useI18n();
@@ -35,7 +39,11 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+<<<<<<< HEAD
   const [itemsPerPage, setItemsPerPage] = useState<number>(10);
+=======
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
+>>>>>>> 8e1dac4 (Shops Pagination)
 
   const { showNotification } = useSafeNotification();
   const {
@@ -72,8 +80,14 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     setCurrentPage(1);
   };
 
+<<<<<<< HEAD
   const handleItemsPerPageChange = (value: number) => {
     setItemsPerPage(value);
+=======
+  // Reset to page 1 whenever the rows-per-page value changes
+  const handlePageSizeChange = (value: number) => {
+    setPageSize(value);
+>>>>>>> 8e1dac4 (Shops Pagination)
     setCurrentPage(1);
   };
 
@@ -110,16 +124,29 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   }, [shops, search, cityFilter]);
 
   // Pagination Calculations
+<<<<<<< HEAD
   const totalPages = Math.ceil(filteredShops.length / itemsPerPage) || 1;
+=======
+  const totalPages = Math.ceil(filteredShops.length / pageSize) || 1;
+>>>>>>> 8e1dac4 (Shops Pagination)
 
   // Clamp at render time so a shrinking dataset (filter change, data refresh,
-  // edit that moves a shop's city, delete) never leaves us on an empty page.
+  // edit that moves a shop's city, delete, or a larger page size) never leaves
+  // us on an empty page.
   const safePage = Math.min(currentPage, totalPages);
+<<<<<<< HEAD
   const pageStartIndex = (safePage - 1) * itemsPerPage;
   const paginatedShops = useMemo(() => {
     const startIndex = (safePage - 1) * itemsPerPage;
     return filteredShops.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredShops, safePage, itemsPerPage]);
+=======
+  const pageStartIndex = (safePage - 1) * pageSize;
+  const paginatedShops = useMemo(() => {
+    const startIndex = (safePage - 1) * pageSize;
+    return filteredShops.slice(startIndex, startIndex + pageSize);
+  }, [filteredShops, safePage, pageSize]);
+>>>>>>> 8e1dac4 (Shops Pagination)
 
   const handleExportPDF = () => {
     if (filteredShops.length === 0) {
@@ -567,6 +594,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
         </div>
 
         {shouldShowPagination(filteredShops.length) && (
+<<<<<<< HEAD
           <div className={paginationBarClass}>
             <div className="flex items-center gap-2 text-xs text-slate-600">
               <label htmlFor="shops-page-size" className="whitespace-nowrap font-medium">
@@ -577,6 +605,41 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
                 aria-label="Rows per page"
                 value={itemsPerPage}
                 onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+=======
+        <div className={paginationBarClass}>
+          <div className="mr-auto flex items-center gap-2">
+            <label htmlFor="shops-page-size" className="text-xs font-semibold text-slate-600">
+              {t("common.per_page")}
+            </label>
+            <select
+              id="shops-page-size"
+              value={pageSize}
+              onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+              disabled={loading}
+              className="h-8 px-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-600"
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={() => setCurrentPage(Math.max(safePage - 1, 1))}
+            disabled={safePage === 1 || loading}
+            className={paginationNavBtnClass}
+          >
+            {t("masters.shops.pagination.previous")}
+          </button>
+
+          <div className="flex items-center gap-1.5">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+              <button
+                key={pageNum}
+                onClick={() => setCurrentPage(pageNum)}
+>>>>>>> 8e1dac4 (Shops Pagination)
                 disabled={loading}
                 className="px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50"
               >
