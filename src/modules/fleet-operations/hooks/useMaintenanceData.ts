@@ -86,7 +86,10 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
     let cancelled = false;
     (async () => {
       try {
-        const approvedData = await maintenanceApi.list({ status: 'Approved', latestApproved: true, limit: 500 });
+        // Full list of approved records (not just latestApproved per vehicle) so the
+        // Approved Maintenance Timeline can show every approved maintenance event all
+        // the time, not only the most recent one per vehicle.
+        const approvedData = await maintenanceApi.list({ status: 'Approved', limit: 500 });
         if (!cancelled) setApprovedMaintenance(rowsOf(approvedData).map(mapMaintenanceToEvent));
       } catch {
         if (!cancelled) setApprovedMaintenance([]);

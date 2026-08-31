@@ -71,7 +71,16 @@ const getTimelineNode = (event: MaintenanceEvent): TimelineNode => {
 
 type TimelineRow =
   | { kind: 'maintenance'; time: number; data: MaintenanceEvent }
+  | { kind: 'trip'; time: number; data: TripGroup }
   | { kind: 'meter'; time: number; data: VehicleMeterEvent };
+
+interface TripGroup {
+  ref: string;
+  vehicleId: number;
+  startEvent?: VehicleMeterEvent;
+  endEvent?: VehicleMeterEvent;
+  fuels: VehicleMeterEvent[];
+}
 
 const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilters = false, onClearFilters }: MaintenanceTimelineProps) => {
   const [selectedBill, setSelectedBill] = useState<MaintenanceEvent | null>(null);
@@ -85,21 +94,65 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
       .sort((a, b) => safeDate(b.date).getTime() - safeDate(a.date).getTime());
   }, [events]);
 
-  // Merge Trip/Fuel meter events (when a single vehicle is selected — see
-  // MaintenanceHistoryPage.tsx) into the same chronological timeline, most
-  // recent first. Maintenance-sourced rows are excluded from `meterEvents`
-  // by the caller since they're already covered by `timelineEvents` above.
+  // Consolidate Trip Start + Trip End (same `ref`/trip_no) into ONE card, and
+  // attribute each Fuel bill to the trip whose time window contains it. Fuels
+  // that fall outside any trip window remain as standalone rows so no data is
+  // lost. Mileage shown is the distance covered (end − start) in KM — fuel
+  // litres are not exposed by the read-only meter view, so km/litre is N/A here.
+  const { tripRows, orphanFuelRows } = useMemo(() => {
+    const starts = new Map<string, VehicleMeterEvent>();
+    const ends = new Map<string, VehicleMeterEvent>();
+    const fuels: VehicleMeterEvent[] = [];
+    (meterEvents || [])
+      .filter((m) => m.sourceType !== 'MAINTENANCE')
+      .forEach((m) => {
+        if (m.sourceType === 'TRIP_START') starts.set(m.ref, m);
+        else if (m.sourceType === 'TRIP_END') ends.set(m.ref, m);
+        else if (m.sourceType === 'FUEL') fuels.push(m);
+      });
+
+    const refs = new Set<string>([...starts.keys(), ...ends.keys()]);
+    const consumed = new Set<string>();
+    const tripGroups: TripGroup[] = [];
+
+    refs.forEach((ref) => {
+      const s = starts.get(ref);
+      const e = ends.get(ref);
+      const startT = s ? safeDate(s.eventInstant || s.eventDate).getTime() : -Infinity;
+      const endT = e ? safeDate(e.eventInstant || e.eventDate).getTime() : Infinity;
+      const tripFuels = fuels.filter((f) => {
+        const t = safeDate(f.eventInstant || f.eventDate).getTime();
+        const inside = t >= startT && t <= endT;
+        if (inside) consumed.add(f.recordId);
+        return inside;
+      });
+      tripGroups.push({ ref, vehicleId: (s || e)!.vehicleId, startEvent: s, endEvent: e, fuels: tripFuels });
+    });
+
+    const orphanFuels = fuels.filter((f) => !consumed.has(f.recordId));
+    return { tripRows: tripGroups, orphanFuelRows: orphanFuels };
+  }, [meterEvents]);
+
+  // Merge approved maintenance, consolidated trips, and orphan fuel rows into one
+  // chronological feed (newest first).
   const mergedTimeline = useMemo<TimelineRow[]>(() => {
     const maintRows: TimelineRow[] = timelineEvents.map((data) => ({
       kind: 'maintenance',
       time: safeDate(data.date).getTime(),
       data,
     }));
-    const meterRows: TimelineRow[] = (meterEvents || [])
-      .filter((m) => m.sourceType !== 'MAINTENANCE')
-      .map((data) => ({ kind: 'meter', time: safeDate(data.eventDate).getTime(), data }));
-    return [...maintRows, ...meterRows].sort((a, b) => b.time - a.time);
-  }, [timelineEvents, meterEvents]);
+    const tripRowItems: TimelineRow[] = tripRows.map((group) => ({
+      kind: 'trip',
+      time: safeDate((group.startEvent || group.endEvent)!.eventInstant || (group.startEvent || group.endEvent)!.eventDate).getTime(),
+      data: group,
+    }));
+    const orphanRows: TimelineRow[] = orphanFuelRows.map((data) => ({
+      kind: 'meter',
+      time: safeDate(data.eventDate).getTime(),
+      data,
+    }));
+    return [...maintRows, ...tripRowItems, ...orphanRows].sort((a, b) => b.time - a.time);
+  }, [timelineEvents, tripRows, orphanFuelRows]);
 
   const handleBillClick = (event: MaintenanceEvent) => {
     setSelectedBill(event);
@@ -152,6 +205,63 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
         {visibleTimeline.map((row, index) => {
           const isLast = index === visibleTimeline.length - 1;
 
+          if (row.kind === 'trip') {
+            const trip = row.data;
+            const startMeter = trip.startEvent?.meter ?? null;
+            const endMeter = trip.endEvent?.meter ?? null;
+            const distance = startMeter != null && endMeter != null ? Math.max(0, endMeter - startMeter) : null;
+            const tripVehicle = vehicles.find((v) => String(v.id) === String(trip.vehicleId));
+            const tripVehicleNo = tripVehicle?.vehicleNumber || '';
+            const tripDate = trip.startEvent?.eventDate || trip.endEvent?.eventDate || '';
+            return (
+              <div key={`trip-${trip.ref}`} className={`relative pl-14 ${isLast ? 'pb-1' : 'pb-6'}`}>
+                <div className={`absolute left-5 -translate-x-1/2 top-1 z-10 w-8 h-8 rounded-full border flex items-center justify-center shadow-sm border-sky-200 bg-sky-50 text-sky-600`}>
+                  <Route className="w-3.5 h-3.5" />
+                </div>
+                <div className="bg-white hover:bg-slate-50/50 border border-slate-200/70 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-bold text-gray-900 text-sm tracking-wide">Trip</h4>
+                      <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                        {trip.ref}
+                      </span>
+                      {tripVehicleNo && (
+                        <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                          {tripVehicleNo}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="inline-flex items-center gap-0.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 shadow-sm">
+                        {distance != null ? `${distance.toLocaleString('en-IN')} KM` : '—'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-2.5 flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+                    <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                    {tripDate ? format(safeDate(tripDate), 'dd MMM yyyy') : '—'}
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
+                    <span className="inline-flex items-center gap-1 font-semibold text-gray-600">
+                      <Milestone className="w-3.5 h-3.5 text-gray-400" />
+                      Start → End:{' '}
+                      <span className="font-bold text-gray-700">
+                        {startMeter != null ? startMeter.toLocaleString('en-IN') : '—'} →{' '}
+                        {endMeter != null ? endMeter.toLocaleString('en-IN') : '—'} KM
+                      </span>
+                    </span>
+                    <span className="inline-flex items-center gap-1 font-semibold text-gray-600">
+                      <Fuel className="w-3.5 h-3.5 text-gray-400" />
+                      Fuels: <span className="font-bold text-gray-700">{trip.fuels.length}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
           if (row.kind === 'meter') {
             const m = row.data;
             const isFuel = m.sourceType === 'FUEL';
@@ -159,6 +269,8 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
             const classes = isFuel
               ? 'border-orange-200 bg-orange-50 text-orange-600'
               : 'border-sky-200 bg-sky-50 text-sky-600';
+            const meterVehicle = vehicles.find((v) => String(v.id) === String(m.vehicleId));
+            const meterVehicleNo = meterVehicle?.vehicleNumber || '';
             return (
               <div key={`meter-${m.sourceType}-${m.recordId}`} className={`relative pl-14 ${isLast ? 'pb-1' : 'pb-6'}`}>
                 <div className={`absolute left-5 -translate-x-1/2 top-1 z-10 w-8 h-8 rounded-full border flex items-center justify-center shadow-sm ${classes}`}>
@@ -171,6 +283,11 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
                       <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
                         {m.ref}
                       </span>
+                      {meterVehicleNo && (
+                        <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                          {meterVehicleNo}
+                        </span>
+                      )}
                     </div>
                     <div className="text-right shrink-0">
                       <span className="inline-flex items-center gap-0.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 shadow-sm">

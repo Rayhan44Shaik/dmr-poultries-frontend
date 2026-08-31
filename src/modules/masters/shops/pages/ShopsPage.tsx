@@ -33,6 +33,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
   const [search, setSearch] = useState("");
+  const [cityFilter, setCityFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
   const { showNotification } = useSafeNotification();
@@ -58,24 +59,61 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     setCurrentPage(1);
   };
 
+  // Reset to page 1 whenever the city filter changes
+  const handleCityChange = (value: string) => {
+    setCityFilter(value);
+    setCurrentPage(1);
+  };
+
+  const handleResetFilters = () => {
+    setSearch("");
+    setCityFilter("");
+    setCurrentPage(1);
+  };
+
+  // City dropdown options are derived live from the full loaded shop dataset —
+  // never hardcoded. Empty values are ignored; case/whitespace variants collapse
+  // to a single option (first spelling seen wins for display).
+  const cityOptions = useMemo(() => {
+    const byKey = new Map<string, string>();
+    for (const shop of shops) {
+      const label = (shop.city ?? "").trim();
+      if (!label) continue;
+      const key = label.toLowerCase();
+      if (!byKey.has(key)) byKey.set(key, label);
+    }
+    return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b));
+  }, [shops]);
+
   const filteredShops = useMemo(() => {
-    const keyword = search.toLowerCase();
-    return shops.filter(
-      (shop) =>
-        shop.shopName.toLowerCase().includes(keyword) ||
-        shop.ownerName.toLowerCase().includes(keyword) ||
-        shop.city.toLowerCase().includes(keyword) ||
-        shop.phoneNumber.includes(keyword) ||
-        shop.shopNumber.toLowerCase().includes(keyword)
-    );
-  }, [shops, search]);
+    const keyword = search.trim().toLowerCase();
+    const city = cityFilter.trim().toLowerCase();
+    return shops
+      .filter((shop) => {
+        const matchesSearch =
+          keyword === "" ||
+          shop.shopName.toLowerCase().includes(keyword) ||
+          shop.ownerName.toLowerCase().includes(keyword) ||
+          shop.city.toLowerCase().includes(keyword) ||
+          shop.phoneNumber.includes(keyword) ||
+          shop.shopNumber.toLowerCase().includes(keyword);
+        const matchesCity = city === "" || (shop.city ?? "").trim().toLowerCase() === city;
+        return matchesSearch && matchesCity;
+      })
+      .sort((a, b) => a.shopNo - b.shopNo);
+  }, [shops, search, cityFilter]);
 
   // Pagination Calculations
   const totalPages = Math.ceil(filteredShops.length / ITEMS_PER_PAGE) || 1;
+
+  // Clamp at render time so a shrinking dataset (filter change, data refresh,
+  // edit that moves a shop's city, delete) never leaves us on an empty page.
+  const safePage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (safePage - 1) * ITEMS_PER_PAGE;
   const paginatedShops = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
     return filteredShops.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredShops, currentPage]);
+  }, [filteredShops, safePage]);
 
   const handleExportPDF = () => {
     if (filteredShops.length === 0) {
@@ -315,9 +353,9 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
         {/* Toolbar - Search on LEFT, Buttons on RIGHT in same line */}
         <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/40 rounded-t-xl">
           <div className="flex items-center justify-between gap-4">
-            {/* Search Bar - Left Side */}
-            <div className="flex-1 max-w-md">
-              <div className="relative">
+            {/* Search + City filter - Left Side */}
+            <div className="flex flex-1 flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[180px] max-w-md">
                 <input
                   type="text"
                   placeholder={t("masters.shops.search_placeholder")}
@@ -340,6 +378,55 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
                   />
                 </svg>
               </div>
+
+              <div className="relative">
+                <svg
+                  className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"
+                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <select
+                  aria-label={t("masters.shops.filter.city")}
+                  value={cityFilter}
+                  onChange={(e) => handleCityChange(e.target.value)}
+                  disabled={loading}
+                  className="appearance-none pl-8 pr-8 py-1.5 text-sm border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:opacity-50"
+                >
+                  <option value="">{t("masters.shops.filter.all_cities")}</option>
+                  {cityOptions.map((city) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
+                  ))}
+                </select>
+                <svg
+                  className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+
+              {(search !== "" || cityFilter !== "") && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="px-2.5 py-1.5 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 hover:text-slate-800 transition-all"
+                >
+                  {t("masters.shops.filter.reset")}
+                </button>
+              )}
             </div>
 
             {/* Action Buttons - Right Side */}
@@ -430,7 +517,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
             )}
           </div>
           <p className="text-slate-500 font-medium">
-            {t("masters.shops.showing", { shown: paginatedShops.length, total: filteredShops.length, current: currentPage, pages: totalPages })}
+            {t("masters.shops.showing", { shown: paginatedShops.length, total: filteredShops.length, current: safePage, pages: totalPages })}
           </p>
         </div>
 
@@ -468,6 +555,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
             <ShopTable
               shops={paginatedShops}
               onEdit={handleEditShop}
+              startIndex={pageStartIndex}
             />
           )}
         </div>
@@ -475,8 +563,8 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
         {shouldShowPagination(filteredShops.length) && (
         <div className={paginationBarClass}>
           <button
-            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1 || loading}
+            onClick={() => setCurrentPage(Math.max(safePage - 1, 1))}
+            disabled={safePage === 1 || loading}
             className={paginationNavBtnClass}
           >
             {t("masters.shops.pagination.previous")}
@@ -488,7 +576,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
                 disabled={loading}
-                className={paginationPageBtnClass(currentPage === pageNum)}
+                className={paginationPageBtnClass(safePage === pageNum)}
               >
                 {pageNum}
               </button>
@@ -496,8 +584,8 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
           </div>
 
           <button
-            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages || loading}
+            onClick={() => setCurrentPage(Math.min(safePage + 1, totalPages))}
+            disabled={safePage === totalPages || loading}
             className={paginationNavBtnClass}
           >
             {t("masters.shops.pagination.next")}
