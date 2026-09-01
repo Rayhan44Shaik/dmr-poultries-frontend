@@ -470,7 +470,7 @@ export async function loadShopDirectory(): Promise<ShopDirectory> {
   for (const shop of shops) {
     dir.set(shop.id, {
       shopName: shop.shopName,
-      village: shop.village,
+      village: shop.city,
       mobile: (shop.phoneNumber ?? "").trim(),
     });
   }

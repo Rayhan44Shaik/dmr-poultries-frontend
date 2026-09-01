@@ -6,12 +6,11 @@ export type Shop = {
   ownerName: string;
   phoneNumber: string;
   secondaryPhoneNumber?: string;
-  /** Dedicated WhatsApp number from the shop master redesign; falls back to phone. */
+  /** Optional dedicated WhatsApp number; delivery WhatsApp falls back to phoneNumber. */
   whatsappNumber?: string;
   email: string;
+  /** Shop locality. `city` is the shop-master-redesign name for the old `village`. */
   city: string;
-  /** Optional village / locality from the shop master redesign. */
-  village?: string;
   address: string;
   latitude?: number;
   longitude?: number;

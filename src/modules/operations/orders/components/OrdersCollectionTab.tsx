@@ -111,7 +111,7 @@ function buildInitial(
       id: 0,
       shopId: shop.id,
       shopName: shop.shopName,
-      village: shop.village,
+      village: shop.city,
       birds: 0,
       boxes: 0,
     });
