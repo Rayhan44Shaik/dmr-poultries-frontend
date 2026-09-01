@@ -127,14 +127,24 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     registerTripIdCallback(setTripIdInUrl);
   }, [registerTripIdCallback, setTripIdInUrl]);
 
-  /** On mount, if tripId is in URL, load that trip. */
+  /**
+   * On mount / refresh: if a tripId is in the URL, load that trip AND reopen the
+   * wizard on it (so a browser refresh mid-wizard resumes exactly where the user
+   * was — required for Part K Step 5 draft restoration, and for resume-by-URL).
+   */
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const tripId = params.get("tripId");
-    if (tripId && !trip.id) {
-      const id = Number(tripId);
+    const urlTripId = params.get("tripId");
+    if (urlTripId && !trip.id) {
+      const id = Number(urlTripId);
       if (Number.isFinite(id) && id > 0) {
-        void loadTripFromApi(id);
+        void loadTripFromApi(id).then((loaded) => {
+          if (!loaded) return;
+          setRows(loaded.deliveries || []);
+          setEntryScreen("form");
+          setEditingSubmittedStep(null);
+          setViewStepIndex(getNextIncompleteTripStep(loaded));
+        });
       }
     }
   }, [location.search, loadTripFromApi, trip.id]);

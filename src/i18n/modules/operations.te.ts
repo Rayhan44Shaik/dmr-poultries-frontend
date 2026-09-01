@@ -278,7 +278,7 @@
   'ops.trip.delete_trip': 'ట్రిప్ తొలగించండి',
   'ops.trip.deleted_success': 'విజయవంతంగా తొలగించబడింది.',
   'ops.trip.deleting_diesel_row': 'డీజిల్ ఎంట్రీ తొలగించబడుతోంది…',
-  'ops.trip.deleting_trip': 'ట్రిప్ తొలగించబడుతోంది…',
+  'ops.trip.deleting_trip': 'ట్రిప్ {no}',
   'ops.trip.delivered': 'డెలివరీ చేయబడింది',
   'ops.trip.delivered_birds': 'డెలివరీ చేసిన పక్షులు',
   'ops.trip.delivered_weight_kg': 'డెలివరీ చేసిన బరువు (KG)',
