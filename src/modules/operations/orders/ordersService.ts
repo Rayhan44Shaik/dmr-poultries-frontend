@@ -77,7 +77,9 @@ const num = (v: unknown): number => {
  */
 export async function fetchOrdersData(): Promise<OrdersFetch> {
   const [trips, vehicles] = await Promise.all([
-    listTrips(),
+    // `full` — Orders classifies containers / assignment / tracking from the
+    // persisted delivery rows, which the summary payload omits.
+    listTrips({ full: true }),
     loadVehicles().catch(() => [] as Vehicle[]),
   ]);
   const vehicleList = vehicles.map((v) => ({ id: v.id, noOfBoxes: v.noOfBoxes }));
@@ -380,10 +382,20 @@ function normalizeBirdType(deliveries: ShopDelivery[]): ShopDelivery[] {
 }
 
 function buildAssignmentDeliveries(vehicleTrip: Trip, groups: AssignmentGroup[]): ShopDelivery[] {
+  // The vehicle trip's Step 2 is already complete (it is only assignable when
+  // farmStepSubmitted), so its bird type IS known — carry it onto the plan
+  // rows. Step 4 then opens each shop pre-filled instead of blank, and the
+  // Orders tracking data stays consistent with the trip. The trip's Step 2
+  // bird type is exposed as `farmBirdTypeId` by the API.
+  const t = vehicleTrip as Trip & { farmBirdTypeId?: number; farmBirdType?: string };
+  const tripBirdTypeId = Number(t.farmBirdTypeId ?? t.birdTypeId) || 0;
+  const tripBirdType = t.farmBirdType || t.birdType || "";
   let deliveries = rowsInSequence(vehicleTrip);
   for (const group of groups) {
     const withRef = group.rows.map((row) => ({
       ...row,
+      birdTypeId: Number(row.birdTypeId) > 0 ? row.birdTypeId : tripBirdTypeId,
+      birdType: Number(row.birdTypeId) > 0 ? row.birdType : tripBirdType,
       remarks: orderRowRemarks(group.orderTripNo),
     }));
     deliveries = mergeOrderRowsInto(deliveries, group.orderTripNo, withRef);
@@ -405,25 +417,29 @@ export async function saveAssignment(
 }
 
 /**
- * Finish Assignment (Tab 2) — validated by the caller; marks
- * deliveryStepSubmitted (existing contract) and links order → vehicle in
- * the trip remarks. The collection container is kept — it remains the day's
- * collection record (Trip No / Vehicle / Sequence / Status stay visible in
- * Order Collection), and the same-shop/same-day rule now reads "assigned".
+ * Finish Assignment (Tab 2) — validated by the caller (≥ 1 shop, boxes in
+ * range, capacity, fresh conflict re-check).
+ *
+ * This PERSISTS the order's plan rows onto the vehicle trip; it does NOT
+ * submit Step 4. Assignment is a plan — the box-less, weight-0 plan rows
+ * cannot (and must not) pass the Step 4 submit contract (bird type +
+ * delivered birds/weight per shop). The supervisor still performs the real
+ * Step 4 Delivery in Trip Entry, shop by shop, and each capture flows back
+ * to Orders Tracking through the persisted rows. The collection container is
+ * kept as the day's collection record; the same-shop/same-day rule now
+ * reads "assigned" for every persisted plan row.
+ *
+ * Same persistence as {@link saveAssignment} — the only difference is the
+ * caller's validation and that the page then moves to Delivery Tracking.
  */
 export async function finishAssignment(
   vehicleTrip: Trip,
   groups: AssignmentGroup[]
 ): Promise<Trip> {
   const deliveries = buildAssignmentDeliveries(vehicleTrip, groups);
-  let remarks = String(vehicleTrip.remarks ?? "").trim();
-  for (const group of groups) {
-    const tag = `order:${group.orderTripNo}`;
-    if (!remarks.includes(tag)) remarks = remarks ? `${remarks} | ${tag}` : tag;
-  }
   const { data } = await apiPost<RawTrip>(
     `/trips/${vehicleTrip.id}/steps/deliveries`,
-    { ...toStep4Payload({ deliveries } as unknown as Partial<Trip>), mode: "submit", remarks }
+    { ...toStep4Payload({ deliveries } as unknown as Partial<Trip>), mode: "save" }
   );
   return mapApiTripToTrip(data, vehicleTrip);
 }

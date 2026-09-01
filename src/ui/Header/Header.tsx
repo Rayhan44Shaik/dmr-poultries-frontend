@@ -2,6 +2,10 @@
 // Premium top header: breadcrumbs, global search (command palette),
 // notifications, quick actions, theme toggle and user profile.
 
+// src/ui/Header/Header.tsx
+// Premium top header: breadcrumbs, global search (command palette),
+// notifications, quick actions, theme toggle and user profile.
+
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -149,10 +153,10 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
   /* ----- Browser/page title from route metadata (translated) ----- */
   useEffect(() => {
     const key = route.page?.titleKey ?? `page_title.${route.section?.id ?? ""}`;
-    const fallback = route.page?.label ?? route.section?.label ?? "DMR Poultries";
+    const fallback = route.page?.label ?? route.section?.label ?? "DMR Poultry";
     const translated = key && key !== "page_title." ? t(key) : fallback;
     document.title =
-      translated && translated !== key ? translated : `DMR Poultries - ${fallback}`;
+      translated && translated !== key ? translated : `DMR Poultry - ${fallback}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, location.search, language]);
 
@@ -255,22 +259,21 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
         <Menu size={20} />
       </button>
 
-      {/* Breadcrumb + title */}
-      <div className="min-w-0 flex-1">
+      {/* Neat Single-Line Breadcrumb & Page Title */}
+      <div className="min-w-0 flex-1 flex items-center">
         {sectionLabel && route.page && (
-          <div className="hidden items-center gap-1.5 text-xs font-medium text-slate-400 sm:flex dark:text-slate-500">
+          <>
             <Link
               to={route.section?.children[0]?.path ?? "/dashboard"}
-              className="transition-colors hover:text-slate-600 dark:hover:text-slate-300"
+              className="hidden truncate text-[15px] font-medium text-slate-500 transition-colors hover:text-slate-800 sm:block dark:text-slate-400 dark:hover:text-slate-200"
             >
               {sectionLabel}
             </Link>
-            <ChevronRight size={12} />
-            <span className="truncate text-slate-500 dark:text-slate-400">{title}</span>
-          </div>
+            <ChevronRight size={16} className="hidden mx-2 shrink-0 text-slate-400 sm:block dark:text-slate-600" />
+          </>
         )}
         <h1 className="truncate text-[16px] font-semibold tracking-tight text-slate-900 sm:text-[17px] dark:text-white">
-          {title || "DMR Poultries"}
+          {title || "DMR Poultry"}
         </h1>
       </div>
 

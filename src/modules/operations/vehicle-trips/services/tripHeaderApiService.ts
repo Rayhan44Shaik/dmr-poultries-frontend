@@ -467,9 +467,19 @@ export async function loadTripById(id: number): Promise<Trip> {
  * is the single source of truth — never fall back to stale localStorage
  * data that could override PostgreSQL (Trip List must reflect the same
  * updated trip deliveries/summaries as Shop Sales). */
-export async function listTrips(options?: { includeDeleted?: boolean }): Promise<Trip[]> {
+export async function listTrips(options?: {
+  includeDeleted?: boolean;
+  /** Hydrate every trip with its full deliveries / boxes / diesel rows
+   *  (GET /trips?full=true). The Orders module needs the persisted delivery
+   *  rows to classify collection containers and assignment rows; the plain
+   *  Recent Trips list does not and stays on the lighter summary payload. */
+  full?: boolean;
+}): Promise<Trip[]> {
+  const params: Record<string, string> = {};
+  if (options?.includeDeleted) params.includeDeleted = "true";
+  if (options?.full) params.full = "true";
   const { data } = await apiGet<ApiTripRecord[]>(TRIPS_PATH, {
-    params: options?.includeDeleted ? { includeDeleted: "true" } : undefined,
+    params: Object.keys(params).length ? params : undefined,
   });
   return data.map((trip) => mapApiTripToTrip(trip));
 }

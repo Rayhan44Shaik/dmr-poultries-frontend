@@ -10,16 +10,46 @@ import { test, expect, type Page, type APIRequestContext } from '@playwright/tes
 
 const API = 'http://127.0.0.1:4100/api';
 
+// Deterministic browser context for the full real-UI flow: GPS is granted and
+// pinned to a fixed coordinate so Step 2's "Get GPS" never touches a real
+// device; the DC photo is a generated PNG uploaded through the real file input.
+test.use({
+  permissions: ['geolocation'],
+  geolocation: { latitude: 17.385044, longitude: 78.486671 },
+  // Pin the browser clock's zone to UTC so "today" is one value shared by the
+  // browser (createEmptyTrip / Orders localToday) and the UTC-pinned harness
+  // (PGlite CURRENT_DATE). Keeps the date-driven Orders flow deterministic.
+  timezoneId: 'UTC',
+});
+
 const SEED = {
   vehicle: 'E2E-TRUCK-01',
+  /** Dedicated vehicle + crew for the full real-UI Step 1→5 flow spec. */
+  fullVehicle: 'E2E-TRUCK-03',
+  fullDriver: 'E2E Driver Two',
+  fullSupervisor: 'E2E Supervisor Two',
+  fullHelper: 'E2E Helper Two',
+  fullLoader: 'E2E Loader Two',
   driver: 'E2E Driver One',
   supervisor: 'E2E Supervisor One',
   helper: 'E2E Helper One',
   loader: 'E2E Loader One',
   farm: 'E2E Source Farm',
   birdType: 'E2E Broiler',
-  shops: ['E2E Shop Alpha', 'E2E Shop Bravo', 'E2E Shop Charlie'],
+  shops: [
+    'E2E Shop Alpha',
+    'E2E Shop Bravo',
+    'E2E Shop Charlie',
+    'E2E Shop Delta',
+    'E2E Shop Echo',
+  ],
 };
+
+/** Smallest valid PNG (1×1, transparent) — the deterministic DC photo fixture. */
+const PNG_1PX = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFhAJ/wlseKgAAAABJRU5ErkJggg==',
+  'base64'
+);
 
 // Shared across the serial suite.
 let tripId = 0;
@@ -121,7 +151,14 @@ test('16: new trip — only Step 1 before submit, then all five steps open; Step
 
   // Permanent Trip No generated; same authoritative trip.
   const trips = await apiTrips(request, '?includeDeleted=true');
-  const mine = trips.find((t) => String(t.tripNo).startsWith('TR-') && t.startStepSubmitted === true && t.status === 'Draft');
+  const mine = trips.find(
+    (t) =>
+      String(t.tripNo).startsWith('TR-') &&
+      t.startStepSubmitted === true &&
+      t.status === 'Draft' &&
+      t.vehicleNo === SEED.vehicle &&
+      !t.farmStepSubmitted // the pre-seeded assign trip is already past Step 2
+  );
   expect(mine, 'a Draft trip with a TR- number and startStepSubmitted').toBeTruthy();
   tripId = Number(mine!.id);
   tripNo = String(mine!.tripNo);
@@ -419,5 +456,523 @@ test('26: EN + TE -- wizard step names, Recent Table + Orders, no raw i18n keys 
     await page.goto('/operations?tab=orders');
     await page.waitForLoadState('networkidle');
     await assertNoRawKeys(page);
+  }
+});
+
+// ── Orders — the CRITICAL Collection → container flow, driven through the
+//    real Order Collection UI (not the API). Proves POST /trips/0/steps/
+//    deliveries creates / locates ONE vehicle-less ORD-YYYYMMDD-NN container,
+//    never a real TR- trip, and that the collected shop count is derived from
+//    the persisted [ORDER] rows and survives a full page reload.
+
+async function ordContainer(request: APIRequestContext) {
+  const res = await request.get(`${API}/trips?full=true`);
+  expect(res.ok(), `GET /trips?full=true → ${res.status()}`).toBeTruthy();
+  const all = (await res.json()) as Array<Record<string, unknown>>;
+  return all.filter((t) => String(t.tripNo).startsWith('ORD-'));
+}
+
+const boxInput = (page: Page, shop: string) =>
+  page.getByRole('spinbutton', { name: new RegExp(`Boxes.*${shop}`, 'i') });
+
+test('27: Order Collection UI — one ORD container, no TR- trip, shop count from persisted [ORDER] rows, survives reload', async ({ page, request }) => {
+  await setLanguage(page, 'en');
+  await page.goto('/operations?tab=orders');
+  await page.waitForLoadState('networkidle');
+
+  const trCountBefore = (await apiTrips(request, '?includeDeleted=true')).filter((t) =>
+    String(t.tripNo).startsWith('TR-')
+  ).length;
+
+  // Collection is the default tab; the seed shops render as editable rows.
+  await expect(boxInput(page, SEED.shops[0])).toBeVisible();
+
+  // Collect ALL 5 seed shops — test 28 assigns this same finished collection.
+  const plan: Array<[string, string]> = [
+    [SEED.shops[0], '3'],
+    [SEED.shops[1], '2'],
+    [SEED.shops[2], '4'],
+    [SEED.shops[3], '2'],
+    [SEED.shops[4], '2'],
+  ];
+  for (const [shop, boxes] of plan) await boxInput(page, shop).fill(boxes);
+
+  const [saveRes] = await Promise.all([
+    page.waitForResponse((r) => /\/trips\/\d+\/steps\/deliveries$/.test(r.url()) && r.request().method() === 'POST'),
+    page.getByRole('button', { name: /save progress/i }).click(),
+  ]);
+  expect(saveRes.ok(), `collection save → ${saveRes.status()} ${await saveRes.text()}`).toBeTruthy();
+
+  // Exactly ONE container, vehicle-less, ORD-numbered, 3 [ORDER] plan rows,
+  // not finished. And NOT a real numbered trip.
+  let containers = await ordContainer(request);
+  expect(containers.length, 'exactly one ORD collection container').toBe(1);
+  const container = containers[0];
+  expect(String(container.tripNo)).toMatch(/^ORD-\d{8}-\d+$/);
+  expect(container.vehicleNo || '', 'container has no vehicle').toBeFalsy();
+  expect(Number(container.vehicleId) || 0).toBe(0);
+  expect(container.startStepSubmitted).not.toBe(true);
+  expect(container.deliveries.length, 'one persisted [ORDER] row per collected shop').toBe(5);
+  for (const d of container.deliveries) {
+    expect(String(d.remarks).startsWith('[ORDER]'), `row remarks: ${d.remarks}`).toBe(true);
+  }
+  const trCountAfter = (await apiTrips(request, '?includeDeleted=true')).filter((t) =>
+    String(t.tripNo).startsWith('TR-')
+  ).length;
+  expect(trCountAfter, 'no new TR- trip minted for id 0').toBe(trCountBefore);
+
+  // Reload: the collected quantities come back from the persisted rows.
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  await expect(boxInput(page, SEED.shops[0])).toHaveValue('3');
+  await expect(boxInput(page, SEED.shops[1])).toHaveValue('2');
+  await expect(boxInput(page, SEED.shops[2])).toHaveValue('4');
+  await assertNoRawKeys(page);
+
+  // Finish Collection latches the container (still no second trip, still no TR-).
+  const [finishRes] = await Promise.all([
+    page.waitForResponse((r) => /\/trips\/\d+\/steps\/deliveries$/.test(r.url()) && r.request().method() === 'POST'),
+    page.getByRole('button', { name: /finish collection/i }).click(),
+  ]);
+  expect(finishRes.ok(), `finish collection → ${finishRes.status()} ${await finishRes.text()}`).toBeTruthy();
+
+  containers = await ordContainer(request);
+  expect(containers.length, 'still exactly one container after Finish').toBe(1);
+  expect(containers[0].id, 'same container row').toBe(container.id);
+  expect(containers[0].startStepSubmitted, 'Finish Collection latched start_step_submitted').toBe(true);
+});
+
+// ════════════════════════════════════════════════════════════════════════
+//  28: complete real UI Trip Entry workflow Step 1 through Step 5
+//  ────────────────────────────────────────────────────────────────────────
+//  The BROWSER performs every step: Step 1 → Step 2 → (Orders sees the same
+//  trip) → Step 3 → Order Assignment UI (5 shops) → Step 4 UI (deliver 5,
+//  count 5→4→3→2→1→0) → Step 4 submit → Step 5 Save → reload → Step 5 submit
+//  → Pending → Recent Table → Completed. No step-submit API is ever called
+//  by the test; deterministic fixtures only for GPS (pinned geolocation) and
+//  the DC photo (a generated PNG through the real file input).
+// ════════════════════════════════════════════════════════════════════════
+
+const FULL_RE = /TR-\d{8}-\d{3}/;
+
+/** Locate the full-flow trip in GET /trips?full=true by its known id. */
+async function fullTrip(request: APIRequestContext, id: number) {
+  const all = (await request.get(`${API}/trips?full=true`).then((r) => r.json())) as Array<
+    Record<string, unknown>
+  >;
+  const t = all.find((x) => Number(x.id) === id);
+  expect(t, `trip ${id} present in /trips?full=true`).toBeTruthy();
+  return t as Record<string, unknown>;
+}
+
+/** Open Delivery Tracking and return the given trip's row. */
+async function trackingRowFor(page: Page, tripNo: string) {
+  await page.goto('/operations?tab=orders');
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: /delivery tracking/i }).click();
+  const row = page.getByRole('row', { name: new RegExp(tripNo.replace(/-/g, '\\-')) });
+  await expect(row).toBeVisible();
+  return row;
+}
+
+/** Deliver one already-listed shop through the real Step 4 form (1 pickup box). */
+async function deliverShopInStep4(page: Page, tripId: number, shop: string, boxNo: number) {
+  await page.goto(`/operations?tab=trip-entry&tripId=${tripId}`);
+  await page.waitForLoadState('networkidle');
+  await stepBtn(page, 4).click();
+
+  const card = page
+    .locator('div.rounded-2xl', { hasText: shop })
+    .filter({ has: page.getByRole('button', { name: /edit shop delivery/i }) })
+    .last();
+  await card.getByRole('button', { name: /edit shop delivery/i }).click();
+
+  await page.getByText(/select available boxes/i).waitFor();
+  await pickReactSelect(page, /bird type/i, SEED.birdType);
+  await page.getByText(/select boxes from pickup|boxes selected/i).click();
+  await page.getByRole('checkbox', { name: new RegExp(`#${boxNo}\\b`) }).check();
+  await page.getByText(/select boxes from pickup|boxes selected/i).click(); // close the dropdown
+  await page.getByRole('button', { name: /update delivery/i }).click();
+
+  const [saveRes] = await Promise.all([
+    page.waitForResponse(
+      (r) => new RegExp(`/trips/${tripId}/deliveries$`).test(r.url()) && r.request().method() === 'PUT'
+    ),
+    page.getByRole('button', { name: /save progress/i }).click(),
+  ]);
+  expect(saveRes.ok(), `Step 4 Save Progress (${shop}) → ${saveRes.status()}`).toBeTruthy();
+}
+
+const labelInput = (page: Page, label: RegExp) =>
+  page.locator('label', { hasText: label }).first().locator('xpath=following::input[1]');
+
+test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ page, request }) => {
+  test.setTimeout(600_000);
+  await setLanguage(page, 'en');
+
+  const OPENING = 200000;
+  const DEST = 200150;
+  const END = 200400;
+
+  // ─────────────────────────────  STEP 1 (real UI)  ─────────────────────
+  await gotoTripEntry(page);
+  await page.getByRole('button', { name: /create new trip/i }).click();
+
+  // Only Step 1 before submit.
+  for (const n of [2, 3, 4, 5]) {
+    await expect(stepBtn(page, n)).toHaveAttribute('aria-label', /Locked/i);
+  }
+
+  await pickReactSelect(page, /vehicle/i, SEED.fullVehicle);
+  await pickReactSelect(page, /supervisor/i, SEED.fullSupervisor);
+  await pickReactSelect(page, /driver/i, SEED.fullDriver);
+  await pickReactSelect(page, /helpers/i, SEED.fullHelper);
+  await pickReactSelect(page, /loaders/i, SEED.fullLoader);
+  await page
+    .locator('main label', { hasText: /opening meter/i })
+    .locator('xpath=following::input[1]')
+    .fill(String(OPENING));
+
+  const [startRes] = await Promise.all([
+    page.waitForResponse((r) => /\/trips\/steps\/start$/.test(r.url()) && r.request().method() === 'POST'),
+    page.getByRole('button', { name: /submit trip details/i }).click(),
+  ]);
+  expect(startRes.ok(), `Step 1 submit → ${startRes.status()} ${await startRes.text()}`).toBeTruthy();
+
+  const mineList = (await apiTrips(request, '?includeDeleted=true')).filter(
+    (t) =>
+      FULL_RE.test(String(t.tripNo)) &&
+      t.vehicleNo === SEED.fullVehicle &&
+      t.startStepSubmitted === true
+  );
+  expect(mineList.length, 'exactly one trip created for the full-flow vehicle').toBe(1);
+  const tripId = Number(mineList[0].id);
+  const tripNo = String(mineList[0].tripNo);
+  const TRIP_RE = new RegExp(tripNo.replace(/-/g, '\\-'));
+  expect(tripNo).toMatch(/^TR-\d{8}-\d{3}$/);
+
+  // Permanent Trip No shown in the UI; official Step 1 timestamp persisted.
+  {
+    const s1 = await fullTrip(request, tripId);
+    expect(s1.startStepSubmitted).toBe(true);
+    expect(s1.startStepSubmittedAt ?? null, 'Step 1 server timestamp').toBeTruthy();
+  }
+
+  // Reload → all five steps become openable; Trip No visible.
+  await page.goto(`/operations?tab=trip-entry&tripId=${tripId}`);
+  await page.waitForLoadState('networkidle');
+  for (const n of [1, 2, 3, 4, 5]) {
+    await expect(stepBtn(page, n)).not.toHaveAttribute('aria-label', /Locked/i);
+  }
+  await expect(page.getByText(tripNo, { exact: true }).first()).toBeVisible();
+
+  // ─────────────────────────────  STEP 2 (real UI)  ─────────────────────
+  await stepBtn(page, 2).click();
+  await expect(page.getByRole('heading', { name: /farm/i }).first()).toBeVisible();
+  await assertNoRawKeys(page);
+
+  await pickReactSelect(page, /farm/i, SEED.farm);
+  await pickReactSelect(page, /bird type/i, SEED.birdType);
+  await labelInput(page, /farm address/i).fill('E2E Farm Gate Road');
+  // Deterministic GPS: permission granted + coordinate pinned via test.use().
+  await page.getByRole('button', { name: /get gps/i }).click();
+  await expect(page.getByText(/captured at/i)).toBeVisible({ timeout: 15_000 });
+  await labelInput(page, /destination meter/i).fill(String(DEST));
+  await labelInput(page, /avg bird weight/i).fill('2');
+
+  const [farmRes] = await Promise.all([
+    page.waitForResponse(
+      (r) => new RegExp(`/trips/${tripId}/steps/farm$`).test(r.url()) && r.request().method() === 'POST'
+    ),
+    page.getByRole('button', { name: /submit farm details/i }).click(),
+  ]);
+  expect(farmRes.ok(), `Step 2 submit → ${farmRes.status()} ${await farmRes.text()}`).toBeTruthy();
+
+  {
+    const s2 = await fullTrip(request, tripId);
+    expect(s2.farmStepSubmitted).toBe(true);
+    expect(s2.id).toBe(tripId);
+    expect(s2.tripNo).toBe(tripNo);
+    expect(s2.vehicleNo).toBe(SEED.fullVehicle);
+    expect(Number(s2.sourceFarmId), 'farm persisted').toBeGreaterThan(0);
+    expect(Number(s2.destMeter)).toBe(DEST);
+    expect(Number(s2.avgBirdWeight)).toBe(2);
+    expect(s2.farmGpsLat ?? null, 'GPS captured through the UI').toBeTruthy();
+  }
+
+  // Reload → Step 2 still shows the submitted values.
+  await page.goto(`/operations?tab=trip-entry&tripId=${tripId}`);
+  await page.waitForLoadState('networkidle');
+  await stepBtn(page, 2).click();
+  await expect(page.getByText(SEED.farm).first()).toBeVisible();
+  await expect(page.getByText(new RegExp(`${DEST}`))).toBeVisible();
+
+  // ── STEP 2 → ORDERS: the SAME operational trip is visible in Orders ───
+  await page.goto('/operations?tab=orders');
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: /order assignment/i }).click();
+  await page.getByRole('checkbox', { name: new RegExp(`Select.*${SEED.shops[0]}`, 'i') }).check();
+  {
+    const combo = page.locator('input[role="combobox"]').first();
+    await combo.click();
+    await combo.pressSequentially(SEED.fullVehicle, { delay: 20 });
+    await expect(
+      page.getByRole('option', { name: new RegExp(SEED.fullVehicle) }),
+      'the Step-2-complete trip appears as an assignable vehicle in Orders'
+    ).toBeVisible();
+    await page.keyboard.press('Escape');
+  }
+  const ordersTrip = await fullTrip(request, tripId);
+  expect(ordersTrip.tripNo).toBe(tripNo);
+  expect(ordersTrip.vehicleNo).toBe(SEED.fullVehicle);
+  expect(ordersTrip.tripDate).toBe((await fullTrip(request, tripId)).tripDate);
+
+  // ─────────────────────────────  STEP 3 (real UI)  ─────────────────────
+  await page.goto(`/operations?tab=trip-entry&tripId=${tripId}`);
+  await page.waitForLoadState('networkidle');
+  await stepBtn(page, 3).click();
+  await expect(page.getByText(/DC Photo/i).first()).toBeVisible();
+  await assertNoRawKeys(page);
+
+  // DC photo — a generated PNG through the real hidden file input.
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'dc-photo.png',
+    mimeType: 'image/png',
+    buffer: PNG_1PX,
+  });
+  await expect(page.getByRole('img', { name: /pickup/i }).first()).toBeVisible({ timeout: 10_000 });
+
+  // Exactly 5 pickup boxes @ 30 birds / 60 kg — balances the 5 Step-4 deliveries.
+  const boxCell = (idx: number) => page.locator('input.mini-input').nth(idx);
+  for (let b = 0; b < 5; b += 1) {
+    await boxCell(b * 2).fill('30'); // birds
+    await boxCell(b * 2 + 1).fill('60'); // weight
+    if (b < 4) await page.getByRole('button', { name: /add box/i }).click();
+  }
+
+  await page.getByRole('button', { name: /create pickup/i }).click();
+  const [pickupRes] = await Promise.all([
+    page.waitForResponse(
+      (r) => new RegExp(`/trips/${tripId}/steps/pickup$`).test(r.url()) && r.request().method() === 'POST'
+    ),
+    page.getByRole('button', { name: /yes,?\s*create/i }).click(),
+  ]);
+  expect(pickupRes.ok(), `Step 3 submit → ${pickupRes.status()} ${await pickupRes.text()}`).toBeTruthy();
+
+  {
+    const s3 = await fullTrip(request, tripId);
+    expect(s3.pickupStepSubmitted).toBe(true);
+    expect(s3.id).toBe(tripId);
+    expect(s3.tripNo).toBe(tripNo);
+    expect((s3.boxDetails as unknown[]).length, '5 pickup boxes persisted').toBe(5);
+    expect(Number(s3.totalBirds)).toBe(150);
+    expect(s3.dcPhotoKey ?? null, 'DC photo satisfied through the real UI').toBeTruthy();
+  }
+
+  // Reload → Step 3 persisted values remain.
+  await page.goto(`/operations?tab=trip-entry&tripId=${tripId}`);
+  await page.waitForLoadState('networkidle');
+  await stepBtn(page, 3).click();
+  await expect(page.getByText(/150/).first()).toBeVisible();
+
+  // ── STEP 3 → ORDERS ASSIGNMENT (real UI): assign 5 shops to THIS trip ──
+  await page.goto('/operations?tab=orders');
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: /order assignment/i }).click();
+  for (const shop of SEED.shops) {
+    await page.getByRole('checkbox', { name: new RegExp(`Select.*${shop}`, 'i') }).check();
+  }
+  {
+    const combo = page.locator('input[role="combobox"]').first();
+    await combo.click();
+    await combo.pressSequentially(SEED.fullVehicle, { delay: 20 });
+    await page.getByRole('option', { name: new RegExp(SEED.fullVehicle) }).click();
+  }
+  const tripCountBeforeAssign = (await apiTrips(request, '?includeDeleted=true')).length;
+  const [assignRes] = await Promise.all([
+    page.waitForResponse(
+      (r) => new RegExp(`/trips/${tripId}/steps/deliveries$`).test(r.url()) && r.request().method() === 'POST'
+    ),
+    page.getByRole('button', { name: /finish assignment/i }).click(),
+  ]);
+  expect(assignRes.ok(), `finish assignment → ${assignRes.status()} ${await assignRes.text()}`).toBeTruthy();
+
+  {
+    const a = await fullTrip(request, tripId);
+    expect(a.id).toBe(tripId);
+    expect(a.tripNo).toBe(tripNo);
+    expect(a.vehicleNo).toBe(SEED.fullVehicle);
+    expect(a.deliveryStepSubmitted, 'assignment must NOT submit Step 4').not.toBe(true);
+    expect((a.deliveries as unknown[]).length, '5 assigned shops').toBe(5);
+    expect(
+      new Set((a.deliveries as Array<Record<string, unknown>>).map((d) => d.shopId)).size,
+      'no duplicate shop rows'
+    ).toBe(5);
+    for (const d of a.deliveries as Array<Record<string, unknown>>) {
+      expect(String(d.remarks).startsWith('[ORDER]'), `row remarks: ${d.remarks}`).toBe(true);
+    }
+  }
+  expect(
+    (await apiTrips(request, '?includeDeleted=true')).length,
+    'no extra vehicle trip created by assignment'
+  ).toBe(tripCountBeforeAssign);
+
+  // Reload Orders → 5 shops remain assigned (persisted, not UI-only).
+  await expect(await trackingRowFor(page, tripNo)).toContainText('0 / 5 Delivered');
+
+  // ─────────────────────────────  STEP 4 (real UI)  ─────────────────────
+  await page.goto(`/operations?tab=trip-entry&tripId=${tripId}`);
+  await page.waitForLoadState('networkidle');
+  await stepBtn(page, 4).click();
+  for (const shop of SEED.shops) {
+    await expect(page.getByText(shop, { exact: true }).first()).toBeVisible();
+  }
+
+  for (let i = 0; i < SEED.shops.length; i += 1) {
+    await deliverShopInStep4(page, tripId, SEED.shops[i], i + 1);
+    await expect(await trackingRowFor(page, tripNo)).toContainText(`${i + 1} / 5 Delivered`);
+    if (i === 0) {
+      // Reload checkpoint after the first delivery.
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      await page.getByRole('button', { name: /delivery tracking/i }).click();
+      await expect(page.getByRole('row', { name: TRIP_RE })).toContainText('1 / 5 Delivered');
+    }
+  }
+
+  // ── STEP 4 FINAL SUBMIT (real UI) ────────────────────────────────────
+  await page.goto(`/operations?tab=trip-entry&tripId=${tripId}`);
+  await page.waitForLoadState('networkidle');
+  await stepBtn(page, 4).click();
+  await page.getByRole('button', { name: 'Submit Deliveries', exact: true }).click();
+  const [step4SubmitRes] = await Promise.all([
+    page.waitForResponse(
+      (r) => new RegExp(`/trips/${tripId}/steps/deliveries$`).test(r.url()) && r.request().method() === 'POST'
+    ),
+    page.getByRole('button', { name: /yes,?\s*submit/i }).click(),
+  ]);
+  expect(step4SubmitRes.ok(), `Step 4 submit → ${step4SubmitRes.status()} ${await step4SubmitRes.text()}`).toBeTruthy();
+
+  {
+    const s4 = await fullTrip(request, tripId);
+    expect(s4.deliveryStepSubmitted, 'Step 4 submitted through the UI').toBe(true);
+    expect((s4.deliveries as unknown[]).length, 'still exactly 5 delivery rows').toBe(5);
+  }
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  await stepBtn(page, 4).click();
+  await expect(page.getByText(/submitted/i).first()).toBeVisible();
+  await expect(await trackingRowFor(page, tripNo)).toContainText('5 / 5 Delivered');
+
+  // ─────────────────────────────  STEP 5 (real UI)  ─────────────────────
+  await page.goto(`/operations?tab=trip-entry&tripId=${tripId}`);
+  await page.waitForLoadState('networkidle');
+  await stepBtn(page, 5).click();
+  await expect(page.getByRole('heading', { name: /expenses|end details/i })).toBeVisible();
+
+  await expenseInput(page, /^Meals/).fill('500');
+  await expenseInput(page, /Loading/).fill('0'); // explicit zero
+  await expenseInput(page, /Delivery Tolls/).fill('0');
+  await expenseInput(page, /End Meter/).fill(String(END));
+  await page.waitForTimeout(800);
+
+  await page.getByRole('button', { name: /save progress/i }).click();
+  await expect
+    .poll(async () => Number((await fullTrip(request, tripId)).closingMeter ?? (await fullTrip(request, tripId)).endMeter), {
+      timeout: 20_000,
+    })
+    .toBe(END);
+  {
+    const s5save = await fullTrip(request, tripId);
+    expect(s5save.status, 'Save Progress must not move the trip to Pending').toBe('Draft');
+    expect(Boolean(s5save.expensesStepSubmitted), 'not submitted after Save Progress').toBe(false);
+    expect(s5save.expensesStepSubmittedAt ?? null, 'no completion timestamp on Save Progress').toBeNull();
+    expect(Number(s5save.meals)).toBe(500);
+    expect(Number(s5save.loading), 'explicit zero persisted').toBe(0);
+  }
+
+  // Reload → the Step 5 values are still there.
+  await page.goto(`/operations?tab=trip-entry&tripId=${tripId}`);
+  await page.waitForLoadState('networkidle');
+  await stepBtn(page, 5).click();
+  await expect(expenseInput(page, /^Meals/)).toHaveValue('500');
+  await expect(expenseInput(page, /End Meter/)).toHaveValue(String(END));
+
+  // ── STEP 5 FINAL SUBMIT (real UI) ────────────────────────────────────
+  await page.getByRole('button', { name: /submit end details/i }).click();
+  const [step5SubmitRes] = await Promise.all([
+    page.waitForResponse(
+      (r) => new RegExp(`/trips/${tripId}/steps/expenses$`).test(r.url()) && r.request().method() === 'POST'
+    ),
+    page.getByRole('button', { name: /yes,?\s*submit/i }).click(),
+  ]);
+  expect(step5SubmitRes.ok(), `Step 5 submit → ${step5SubmitRes.status()} ${await step5SubmitRes.text()}`).toBeTruthy();
+
+  // ── COMPLETE FLOW ASSERTION ─────────────────────────────────────────
+  const done = await fullTrip(request, tripId);
+  for (const f of ['startStepSubmitted', 'farmStepSubmitted', 'pickupStepSubmitted', 'deliveryStepSubmitted', 'endStepSubmitted', 'expensesStepSubmitted']) {
+    expect(Boolean(done[f]), `${f} must be true`).toBe(true);
+  }
+  expect(done.status, 'trip is Pending after Step 5 submit').toBe('Pending');
+  expect((done.expensesStepSubmittedAt ?? done.submittedAt) ?? null, 'server completion timestamp').toBeTruthy();
+  expect(done.id).toBe(tripId);
+  expect(done.tripNo).toBe(tripNo);
+  expect(done.vehicleNo).toBe(SEED.fullVehicle);
+  const onVehicle = (await apiTrips(request, '?includeDeleted=true')).filter(
+    (t) => t.vehicleNo === SEED.fullVehicle && !String(t.tripNo).startsWith('ORD-')
+  );
+  expect(onVehicle.length, 'exactly one operational vehicle trip exists').toBe(1);
+
+  // Reload → still Pending.
+  await page.goto(`/operations?tab=trip-entry&tripId=${tripId}`);
+  await page.waitForLoadState('networkidle');
+  expect((await fullTrip(request, tripId)).status).toBe('Pending');
+
+  // ── RECENT TABLE ───────────────────────────────────────────────────
+  await gotoTripEntry(page);
+  await page.getByRole('button', { name: /^pending\b/i }).click();
+  await expect(page.getByRole('row', { name: TRIP_RE })).toBeVisible();
+  await page.getByRole('button', { name: /^draft\b/i }).click();
+  await expect(page.getByRole('row', { name: TRIP_RE })).toHaveCount(0);
+
+  await page.getByRole('button', { name: /^all\b/i }).click();
+  await page.getByRole('row', { name: TRIP_RE }).click();
+  await page.getByRole('button', { name: /^edit\b/i }).click();
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByText(tripNo, { exact: true }).first()).toBeVisible();
+  {
+    const afterEdit = await fullTrip(request, tripId);
+    expect(afterEdit.status, 'editing a Pending trip keeps it Pending').toBe('Pending');
+    for (const f of ['startStepSubmitted', 'farmStepSubmitted', 'pickupStepSubmitted', 'deliveryStepSubmitted', 'endStepSubmitted', 'expensesStepSubmitted']) {
+      expect(Boolean(afterEdit[f]), `${f} stays true`).toBe(true);
+    }
+  }
+
+  // ── COMPLETED (through the Recent-table status control) ─────────────
+  await gotoTripEntry(page);
+  await page.getByRole('button', { name: /^pending\b/i }).click();
+  const row = page.getByRole('row', { name: TRIP_RE });
+  const [statusRes] = await Promise.all([
+    page.waitForResponse(
+      (r) => new RegExp(`/trips/${tripId}/status$`).test(r.url()) && r.request().method() === 'PATCH'
+    ),
+    row.getByRole('combobox').selectOption('Completed'),
+  ]);
+  expect(statusRes.ok(), `Pending → Completed → ${statusRes.status()} ${await statusRes.text()}`).toBeTruthy();
+  expect((await fullTrip(request, tripId)).status).toBe('Completed');
+
+  await page.getByRole('button', { name: /^all\b/i }).click();
+  await page.getByRole('row', { name: TRIP_RE }).click();
+  await page.getByRole('button', { name: /^edit\b/i }).click();
+  await page.waitForLoadState('networkidle');
+  for (const n of [1, 2, 3, 4, 5]) {
+    await expect(stepBtn(page, n)).not.toHaveAttribute('aria-label', /Locked/i);
+  }
+  {
+    const c = await fullTrip(request, tripId);
+    expect(c.status, 'editing a Completed trip keeps it Completed').toBe('Completed');
+    for (const f of ['startStepSubmitted', 'farmStepSubmitted', 'pickupStepSubmitted', 'deliveryStepSubmitted', 'endStepSubmitted', 'expensesStepSubmitted']) {
+      expect(Boolean(c[f]), `${f} stays true on Completed`).toBe(true);
+    }
   }
 });

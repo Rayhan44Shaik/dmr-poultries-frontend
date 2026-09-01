@@ -30,8 +30,23 @@ export function isOrderPlanRow(row: ShopDelivery): boolean {
   return isOrderPlanRemarks(row.remarks);
 }
 
-/** True when Step 4 actually captured this delivery (real delivery data). */
+/**
+ * True when Step 4 actually DELIVERED this shop (real delivery data), not
+ * merely when a row exists.
+ *
+ * The backend stamps `auto_capture_time` on every `trip_deliveries` INSERT —
+ * including the box-less, weight-0 plan rows the Orders Assignment step
+ * writes onto the vehicle trip — so a capture timestamp alone cannot tell a
+ * planned stop from a delivered one. A real Step 4 capture always carries
+ * actual delivered quantities: delivered weight > 0, or one or more selected
+ * pickup boxes. An Orders plan row has neither until the supervisor delivers
+ * it in Step 4.
+ */
 export function isCapturedRow(row: ShopDelivery): boolean {
+  const hasDeliveredActuals =
+    (Number(row.weight) || 0) > 0 ||
+    (Array.isArray(row.selectedBoxIds) && row.selectedBoxIds.length > 0);
+  if (!hasDeliveredActuals) return false;
   return Boolean(
     row.autoCaptureTime ||
       (row as { deliveredAt?: string }).deliveredAt ||
@@ -120,11 +135,23 @@ export function isEligibleVehicleTrip(trip: Trip): boolean {
   );
 }
 
-/** A trip with an assigned order whose delivery progress is tracked (Tab 3). */
+/**
+ * A vehicle trip with an assigned order whose delivery progress is tracked
+ * (Tab 3).
+ *
+ * As soon as Order Assignment writes the order's plan rows onto the vehicle
+ * trip it becomes trackable — "Assigned" (0 delivered) → "In Progress"
+ * (some Step 4 captures) → "Completed" (trip lifecycle-completed). It does
+ * NOT wait for `deliveryStepSubmitted`: the supervisor delivers shops one by
+ * one in Trip Entry Step 4, and each capture must be reflected here
+ * immediately — long before Step 4 is finally submitted. The vehicle-less
+ * collection container is excluded (it never carries a vehicle).
+ */
 export function isTrackingTrip(trip: Trip): boolean {
   return (
     trip.deleted !== true &&
-    trip.deliveryStepSubmitted === true &&
+    trip.vehicleId != null &&
+    trip.vehicleId > 0 &&
     hasOrderRows(trip)
   );
 }

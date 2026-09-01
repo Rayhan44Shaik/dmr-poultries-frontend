@@ -43,10 +43,21 @@ import {
 
 type TripEntryPageProps = { embedded?: boolean; };
 
-const getYesterday = () => {
-  const date = new Date();
-  date.setDate(date.getDate() - 1);
-  return date.toISOString().split("T")[0];
+/**
+ * Default operational date for a NEW trip: the current LOCAL calendar day.
+ *
+ * Trip Entry, the Orders module (`localToday()`), and the server
+ * (`CURRENT_DATE`) must agree on "today" — otherwise a freshly-created trip
+ * lands on a different operational day than the Orders collection/assignment
+ * for the same session, and the Orders ↔ Trip Entry flow cannot connect.
+ * Uses local date components (never `toISOString()`, which is UTC and rolls
+ * a day early for zones ahead of UTC).
+ */
+const getTripEntryDate = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
 };
 
 type EntryScreen = "prompt" | "form";
@@ -270,8 +281,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   useEffect(() => {
     if (isInitialMount.current) {
       if (!trip.tripDate) {
-        const yesterday = getYesterday();
-        setTrip((prev) => ({ ...prev, tripDate: yesterday }));
+        const initialDate = getTripEntryDate();
+        setTrip((prev) => ({ ...prev, tripDate: initialDate }));
       }
       isInitialMount.current = false;
     }
@@ -304,7 +315,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setViewStepIndex(0);
     setIsEditing(false);
     setEditingSubmittedStep(null);
-    setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
+    setTrip((prev) => ({ ...prev, tripDate: getTripEntryDate() }));
     clearTripIdFromUrl();
   }, [clearTrip, clearTripIdFromUrl, setIsEditing, setTrip]);
 
@@ -312,7 +323,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     clearTrip();
     setRows([]);
     setViewStepIndex(0);
-    setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
+    setTrip((prev) => ({ ...prev, tripDate: getTripEntryDate() }));
     clearTripIdFromUrl();
     setIsEditing(true);
     setEditingSubmittedStep(null);
