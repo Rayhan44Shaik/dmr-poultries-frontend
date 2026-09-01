@@ -612,12 +612,13 @@
   'ops.trip.yes_submit': 'అవును, సమర్పించండి',
   'ops.trip.yes_update': 'అవును, నవీకరించండి',
 
-  // Trip step labels (used in TripWizardStepper)
-  'ops.trip.step.start': 'ప్రారంభం',
-  'ops.trip.step.farm': 'ఫారం',
-  'ops.trip.step.pickup': 'పికప్',
-  'ops.trip.step.deliveries': 'డెలివరీలు',
-  'ops.trip.step.expenses': 'ఖర్చులు',
+  // Trip step labels (used in TripWizardStepper) — kept in sync with ops.trip.step{n}_label
+  'ops.trip.step.start': 'ట్రిప్ వివరాలు',
+  'ops.trip.step.farm': 'ఫారమ్ వివరాలు',
+  'ops.trip.step.pickup': 'పికప్ వివరాలు',
+  'ops.trip.step.deliveries': 'డెలివరీ వివరాలు',
+  'ops.trip.step.expenses': 'ఖర్చులు / చివరి వివరాలు',
+  'ops.trip.locked': 'లాక్ చేయబడింది',
 
   // StepFarm
   'ops.trip.submit_farm_details': 'ఫారం వివరాలను సమర్పించండి',

@@ -3,9 +3,7 @@ import {
   Lock,
   LayoutGrid,
   BarChart3,
-  Pencil,
-  X,
-} from "lucide-react";
+  Pencil } from "lucide-react";
 import UnLoadingTable from "./Step_4";
 import BoxWeightAnalysis from "./Step_4/BoxWeightAnalysis";
 import type { ShopDelivery, Trip, BoxDetail } from "../types/trip";
@@ -125,15 +123,8 @@ export default function StepDeliveries({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <button
-            type="button"
-            onClick={handleCancelWizard}
-            className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
-            title={t("ops.trip.close_trip")}
-            aria-label={t("ops.trip.close_trip")}
-          >
-            <X size={14} />
-          </button>
+          {/* Part E: no top-right X — the bottom action bar Cancel is the only
+              cancel affordance in first-submit / Edit mode. */}
           {/* VIEW MODE TOGGLE BUTTONS */}
           <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200/60">
             <button

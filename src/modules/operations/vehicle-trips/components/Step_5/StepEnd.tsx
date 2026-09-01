@@ -3,9 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   Pencil,
-  AlertTriangle,
-  X,
-} from "lucide-react";
+  AlertTriangle } from "lucide-react";
 import type { Trip } from "../../types/trip";
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 import GeneralExpensesTable from "./GeneralExpensesTable";
@@ -468,15 +466,7 @@ export default function StepEnd({
               <h2 className="text-sm font-bold text-slate-800 tracking-tight">{t("ops.trip.title.expenses").toUpperCase()} ({t("ops.trip.submitted").toUpperCase()})</h2>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={handleCloseView}
-                className="bg-white hover:bg-slate-50 p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
-                title={t("ops.trip.close_trip")}
-                aria-label={t("ops.trip.close_trip")}
-              >
-                <X size={14} />
-              </button>
+
               {canEdit && (
                 <button
                   onClick={() => setIsLocalEditing(true)}
@@ -552,15 +542,7 @@ export default function StepEnd({
               <h2 className="text-sm font-bold text-slate-800 tracking-tight">{t("ops.trip.title.expenses").toUpperCase()}</h2>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleCloseView}
-                className="bg-white hover:bg-slate-50 p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
-                title={t("ops.trip.close_trip")}
-                aria-label={t("ops.trip.close_trip")}
-              >
-                <X size={14} />
-              </button>
+
               <span className="text-[11px] text-slate-700 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 whitespace-nowrap">{t("ops.trip.editable_view")}</span>
             </div>
           </div>
