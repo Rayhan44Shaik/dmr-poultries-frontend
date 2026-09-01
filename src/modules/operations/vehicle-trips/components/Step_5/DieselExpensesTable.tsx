@@ -561,7 +561,7 @@ export default function DieselExpensesTable({
                   </td>
                   <td className="p-1 text-center relative">
                     <input type="number" min={rowMinAllowed > 0 ? rowMinAllowed + 1 : 0} disabled={locked} value={meterVal} onKeyDown={blockInvalidChar}
-                      onChange={(e) => handleMeterChange(num, e.target.value)}
+                      onChange={(e) => handleFieldChange(`dieselMeter${num}`, num, e.target.value === "" ? "" : Number(e.target.value))}
                       className={`w-24 text-center p-1 border ${hasError ? "border-red-500 bg-red-50" : "border-slate-200 bg-slate-50/70"} rounded text-xs mx-auto block outline-none disabled:bg-slate-100`} />
                     {hasError ? (
                       <div className="mt-1 mx-auto max-w-[9rem] rounded border border-red-300 bg-red-50 px-1.5 py-1 text-[10px] font-semibold text-red-700">

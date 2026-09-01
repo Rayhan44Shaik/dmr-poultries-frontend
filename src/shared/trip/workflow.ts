@@ -38,17 +38,19 @@ export function getNextIncompleteTripStep(trip: TripStepFlags): number {
 }
 
 /**
- * Highest step a user may legitimately open right now (0-based).
- * Completed steps below it stay reopenable; the returned index is the
- * working step; anything above it is LOCKED until the previous step is
- * actually submitted. All five steps become viewable once the trip is complete.
+ * Highest step a user may legitimately OPEN right now (0-based).
+ *
+ * Part G business rule: before Step 1 is submitted (and the permanent Trip No
+ * generated) only Step 1 is available. The moment Step 1 is submitted ALL FIVE
+ * steps become openable — expenses (Step 5) can be filled while the trip is
+ * still in progress. Opening a step is NOT submitting it; per-step submit
+ * validation and step-order gating are enforced separately (backend-authoritative).
  */
 export function getMaxAllowedTripStep(trip: TripStepFlags): number {
-  if (isTripWizardComplete(trip)) return 4;
-  return getNextIncompleteTripStep(trip);
+  return trip.startStepSubmitted ? 4 : 0;
 }
 
-/** True when the given step index is locked until an earlier step is submitted. */
+/** True when the given step index cannot be opened yet (Step 1 not submitted). */
 export function isTripStepLocked(trip: TripStepFlags, index: number): boolean {
   return index > getMaxAllowedTripStep(trip);
 }

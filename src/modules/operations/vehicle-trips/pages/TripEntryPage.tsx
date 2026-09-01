@@ -30,6 +30,7 @@ import { useI18n } from "../../../../i18n";
 import { canEditItem } from "../../../../utils/dateUtils";
 import {
   getLastSubmittedTripStep,
+  getMaxAllowedTripStep,
   getNextIncompleteTripStep,
   getTripWizardCompletedMask,
   isTripEnded as hasTripEnded,
@@ -215,7 +216,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       // Resume: reopen at the first incomplete step per authoritative state.
       resolvedStep = getNextIncompleteTripStep(authoritative);
     }
-    const maxAllowed = isTripWizardComplete(authoritative) ? 4 : getNextIncompleteTripStep(authoritative);
+    // Part G: once Step 1 is submitted every step is openable.
+    const maxAllowed = getMaxAllowedTripStep(authoritative);
     setViewStepIndex(Math.min(Math.max(0, resolvedStep), maxAllowed));
   };
 
@@ -317,10 +319,10 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   // Shared Desktop + Mobile workflow definition.
   const currentStep = getNextIncompleteTripStep(trip);
-  // The maximum step a user may view/edit right now. Completed steps (0..max-1)
-  // stay reopenable; the currentStep is the working step; everything after it is
-  // LOCKED until the previous step is submitted (backend-submitted state only).
-  const maxAllowedStep = trip.startStepSubmitted ? 4 : currentStep;
+  // Part G: only Step 1 is openable until it is submitted; afterwards every
+  // step opens (expenses can be entered mid-trip). Opening != submitting —
+  // per-step submit validation and order gating are enforced on submit.
+  const maxAllowedStep = getMaxAllowedTripStep(trip);
   const lockedSteps = TRIP_STEP_LABELS.map((_, index) => index > maxAllowedStep);
   // Render-safe view index — the UI must never trust a requested index that
   // bypasses the sequence (direct state/URL manipulation included).
