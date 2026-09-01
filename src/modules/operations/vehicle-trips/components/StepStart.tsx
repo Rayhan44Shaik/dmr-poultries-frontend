@@ -7,7 +7,7 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { Clock, User, Truck, Gauge, Wallet, Pencil, X } from "lucide-react";
+import { Clock, User, Truck, Gauge, Wallet, Pencil } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { validateStartStep } from "../../../../shared/trip/validation";
@@ -609,19 +609,23 @@ function StepStart({
     }
     let cancelled = false;
     setLatestMeter(null);
-    fetchLastClosingMeter(form.vehicleId)
+    // Part L: when editing, the backend excludes this trip's own start/end
+    // meter from the lookup. The client-side guard below stays as defence in
+    // depth (same rule, both sides) in case a stale row slips through.
+    fetchLastClosingMeter(form.vehicleId, tripId > 0 ? tripId : undefined)
       .then((data) => {
         if (cancelled) return;
         if (!data || data.closingMeter == null) {
           setLatestMeter(null);
           return;
         }
-        // Self-exclusion when editing: the latest event may be THIS trip's own
-        // start/end meter, which must never constrain its own opening reading.
-        const isSelf =
+        const isCurrentTripMeter =
           tripId > 0 &&
-          (data.source === "TRIP_START" || data.source === "TRIP_END") &&
-          String(data.ref) === String(tripId);
+          data.ref != null &&
+          (String(data.ref) === String(tripId) || data.tripNo === tripNo);
+        const isSelf =
+          isCurrentTripMeter &&
+          (data.source === "TRIP_START" || data.source === "TRIP_END");
         setLatestMeter(
           isSelf
             ? null
@@ -634,7 +638,7 @@ function StepStart({
     return () => {
       cancelled = true;
     };
-  }, [form.vehicleId, tripId]);
+  }, [form.vehicleId, tripId, tripNo]);
 
   const driverOptions = useMemo(
     () => employeeOptions.filter((employee) => employee.department === "Driver"),
@@ -782,16 +786,6 @@ function StepStart({
     }
   }, [startStepSubmitted, clearForm, editable, onCancel]);
 
-  const handleCloseStep = useCallback(() => {
-    if (clearForm) {
-      clearForm();
-    } else if (onCancel) {
-      onCancel();
-    } else {
-      setIsLocalEditing(false);
-    }
-  }, [clearForm, onCancel]);
-
   const inputsLocked = headerLoading || isSubmitting;
   const submitLabel = startStepSubmitted
     ? "ops.trip.update_start_details"
@@ -844,15 +838,6 @@ function StepStart({
             <h2 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.title.start").toUpperCase()}</h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={handleCloseStep}
-              className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
-              title={t("ops.trip.close_trip")}
-              aria-label={t("ops.trip.close_trip")}
-            >
-              <X size={14} />
-            </button>
             {canEdit && (
               <button
                 type="button"
@@ -963,15 +948,8 @@ function StepStart({
             <h2 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.title.start").toUpperCase()}</h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={handleCloseStep}
-              className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
-              title={t("ops.trip.close_trip")}
-              aria-label={t("ops.trip.close_trip")}
-            >
-              <X size={14} />
-            </button>
+            {/* Part E: no top-right X in first-submit / Edit mode — the bottom
+                action bar Cancel is the only cancel affordance. */}
             {((editable && startStepSubmitted) || isLocalEditing) && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
                 {tripNo ? t("ops.trip.editing_trip", { no: tripNo }) : t("ops.trip.editable_view")}

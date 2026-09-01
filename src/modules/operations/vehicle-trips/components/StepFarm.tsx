@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Loader2, Scale, Pencil, X, Layers } from "lucide-react";
+import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Loader2, Scale, Pencil, Layers } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { WizardActionBar, WizardStepNotice } from "./WizardStepUI";
@@ -266,15 +266,7 @@ export default function StepFarm({
             </h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => onCancel?.()}
-              className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
-              title={t("ops.trip.close_trip")}
-              aria-label={t("ops.trip.close_trip")}
-            >
-              <X size={14} />
-            </button>
+
             {canEdit && (
               <button
                 type="button"
@@ -386,15 +378,7 @@ export default function StepFarm({
             </h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => onCancel?.()}
-              className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
-              title={t("ops.trip.close_trip")}
-              aria-label={t("ops.trip.close_trip")}
-            >
-              <X size={14} />
-            </button>
+
             {editable && trip.farmStepSubmitted && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
                 {t("ops.trip.editable_view")}

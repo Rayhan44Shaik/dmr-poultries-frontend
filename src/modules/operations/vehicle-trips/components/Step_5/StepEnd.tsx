@@ -1,16 +1,17 @@
 // src/modules/operations/vehicle-trips/components/Step_5/StepEnd.tsx
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Pencil,
-  AlertTriangle,
-  X,
-} from "lucide-react";
+  AlertTriangle } from "lucide-react";
 import type { Trip } from "../../types/trip";
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 import GeneralExpensesTable from "./GeneralExpensesTable";
 import DieselExpensesTable from "./DieselExpensesTable";
 import { useI18n } from "../../../../../i18n";
+import { useStep5DurableDraft } from "../../hooks/useStep5DurableDraft";
+import { performStep5Save } from "../../services/tripHeaderApiService";
+import type { Step5DraftFields } from "../../../../../shared/trip/step5DraftStore";
 
 // ─── ConfirmationModal ────────────────────────────────────────────
 function ConfirmationModal({ isOpen, title, message, confirmLabel = "ops.trip.yes_proceed", cancelLabel = "common.cancel", onConfirm, onCancel, type = "warning" }: {
@@ -171,6 +172,40 @@ export default function StepEnd({
     }
   }, [trip.id, trip]);
 
+  // ─── Part K: durable local Step 5 draft + offline Save Progress queue ──
+  const userTouchedRef = useRef(false);
+  const restoredNotifiedRef = useRef(false);
+  const step5Draft = useStep5DurableDraft({
+    tripId: trip.id,
+    tripNo: trip.tripNo,
+    serverUpdatedAt: (trip as unknown as { updatedAt?: string | null }).updatedAt ?? null,
+    enabled: trip.id > 0 && Boolean(trip.startStepSubmitted),
+    performSave: useCallback(
+      async (fields: Step5DraftFields) => {
+        const r = await performStep5Save(trip.id, fields as Record<string, unknown>);
+        return { ok: r.ok, serverUpdatedAt: r.serverUpdatedAt, retryable: r.retryable, error: r.error };
+      },
+      [trip.id]
+    ),
+  });
+  const { restoredFields, recordEdit, saveProgress, discardDraft, isOffline } = step5Draft;
+
+  // Restore unsaved local Step 5 edits (refresh / remount / tab return).
+  useEffect(() => {
+    if (!restoredFields) return;
+    setSheetData((prev) => ({ ...prev, ...(restoredFields as Partial<SheetData>) }));
+    userTouchedRef.current = true;
+    if (!restoredNotifiedRef.current) {
+      restoredNotifiedRef.current = true;
+      setToast({ message: t("ops.trip.draft_restored"), type: "info" });
+    }
+  }, [restoredFields, t]);
+
+  // Persist every edit to the durable draft (debounced inside the hook).
+  useEffect(() => {
+    if (userTouchedRef.current) recordEdit(sheetData as Step5DraftFields);
+  }, [sheetData, recordEdit]);
+
   // ─── Compute Distance & Average ──────────────────────────────────
   const openingMeter = trip.openingMeter || 0;
   const destMeter = trip.destMeter || 0;
@@ -215,14 +250,16 @@ export default function StepEnd({
   const savedSheetRef = useRef(JSON.stringify(buildSheetDataFromTrip(trip)));
   const hasUnsavedChanges = JSON.stringify(sheetData) !== savedSheetRef.current;
 
-  // ─── Handle field changes in React state only ──────────────────
+  // ─── Handle field changes in React state (mirrored to the durable draft) ──
   const handleChange = (field: string, value: any) => {
     setErrorMsg("");
+    userTouchedRef.current = true;
     setSheetData((prev) => ({ ...prev, [field]: value }));
   };
 
   const applyBatchUpdates = (updates: Record<string, any>) => {
     setErrorMsg("");
+    userTouchedRef.current = true;
     setSheetData((prev) => ({ ...prev, ...updates }));
   };
 
@@ -270,17 +307,18 @@ export default function StepEnd({
     "others5Amt",
   ] as const;
 
-  const positiveExpense = (value: unknown): number | undefined => {
+  // Part I: an expense that is cleared or set to 0 must persist as 0 — never
+  // be dropped from the payload (which would leave the previous value in place).
+  const expenseValue = (value: unknown): number => {
+    if (value === "" || value == null) return 0;
     const n = Number(value);
-    if (!Number.isFinite(n) || n <= 0) return undefined;
-    return n;
+    return Number.isFinite(n) ? n : 0;
   };
 
   const prepareFinalPayload = (stepSubmitted = false) => {
     const expenses: Record<string, number> = {};
     for (const key of EXPENSE_KEYS) {
-      const n = positiveExpense(sheetData[key]);
-      if (n != null) expenses[key] = n;
+      expenses[key] = expenseValue(sheetData[key]);
     }
 
     return {
@@ -300,22 +338,54 @@ export default function StepEnd({
   };
 
   // ─── Save progress (manual) ──────────────────────────────────────
+  // Part K: routed through the durable draft. Online -> real Save Progress,
+  // reconcile, clear dirty on confirmed success. Offline / retryable failure
+  // -> durable queued op + "Saved locally" (never claims the server save
+  // succeeded). Never submits, never sets a completion timestamp, never moves
+  // the trip to Pending. Works before Step 4 (Part H unchanged).
+  const canDurable = trip.id > 0 && Boolean(trip.startStepSubmitted);
   const handleSaveProgress = async () => {
-    if (!saveEndProgress) return;
     setIsSubmitting(true);
-    const payload = prepareFinalPayload(false);
-    const success = await saveEndProgress(payload as Partial<Trip>);
-    if (success) {
-      savedSheetRef.current = JSON.stringify(sheetData);
-      setToast({ message: t("ops.trip.end_saved_ok"), type: "success" });
-    } else {
-      setToast({ message: t("ops.trip.failed_save_end"), type: "error" });
+    try {
+      const canonical = prepareFinalPayload(false);
+      if (canDurable) {
+        // Persist EVERY editable Step 5 field (incl. diesel rows, zeros, cleared)
+        // to the durable draft, then save the canonical payload.
+        const fullFields = { ...sheetData, ...canonical } as Step5DraftFields;
+        const res = await saveProgress(fullFields);
+        if (res.mode === "queued") {
+          savedSheetRef.current = JSON.stringify(sheetData);
+          setToast({ message: t("ops.trip.saved_locally"), type: "info" });
+        } else if (res.ok) {
+          savedSheetRef.current = JSON.stringify(sheetData);
+          setToast({ message: t("ops.trip.end_saved_ok"), type: "success" });
+        } else {
+          setToast({ message: res.error || t("ops.trip.failed_save_end"), type: "error" });
+        }
+      } else if (saveEndProgress) {
+        const success = await saveEndProgress(canonical as Partial<Trip>);
+        setToast(
+          success
+            ? { message: t("ops.trip.end_saved_ok"), type: "success" }
+            : { message: t("ops.trip.failed_save_end"), type: "error" }
+        );
+        if (success) savedSheetRef.current = JSON.stringify(sheetData);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
   // ─── Initiate submit ──────────────────────────────────────────────
   const handleInitiateSubmit = () => {
+    // Part K: final Submit needs the server. Offline, keep every entered value
+    // locally, keep the trip's existing authoritative status, and do NOT set
+    // Pending / endStepSubmitted / expensesStepSubmitted / submittedAt.
+    if (canDurable && isOffline) {
+      void step5Draft.saveProgress({ ...sheetData, ...prepareFinalPayload(false) } as Step5DraftFields);
+      setErrorMsg(t("ops.trip.submit_offline"));
+      return;
+    }
     const endMeterNum = Number(sheetData.endMeter);
     if (sheetData.endMeter === "" || sheetData.endMeter === null || isNaN(endMeterNum)) {
       setErrorMsg(t("ops.trip.end_meter_required"));
@@ -419,6 +489,9 @@ export default function StepEnd({
       if (success) {
         setIsLocalEditing(false);
         setIsSubmittedLocal(true);
+        // Part K: the authoritative submission succeeded — the durable draft
+        // and any queued Save op for this trip are now obsolete.
+        void discardDraft();
         setToast({ message: t("ops.trip.step5_submitted"), type: "success" });
       } else {
         // Single inline presentation — the inline error box below shows the
@@ -427,6 +500,8 @@ export default function StepEnd({
       }
     } catch (err: any) {
       console.error("Submit error:", err);
+      // Server-authoritative failure: keep every entered value in the durable
+      // draft, keep the trip's existing status, show a retryable message.
       setErrorMsg(err?.message || t("ops.trip.failed_save_step"));
     } finally {
       setIsSubmitting(false);
@@ -468,15 +543,7 @@ export default function StepEnd({
               <h2 className="text-sm font-bold text-slate-800 tracking-tight">{t("ops.trip.title.expenses").toUpperCase()} ({t("ops.trip.submitted").toUpperCase()})</h2>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={handleCloseView}
-                className="bg-white hover:bg-slate-50 p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
-                title={t("ops.trip.close_trip")}
-                aria-label={t("ops.trip.close_trip")}
-              >
-                <X size={14} />
-              </button>
+
               {canEdit && (
                 <button
                   onClick={() => setIsLocalEditing(true)}
@@ -552,15 +619,7 @@ export default function StepEnd({
               <h2 className="text-sm font-bold text-slate-800 tracking-tight">{t("ops.trip.title.expenses").toUpperCase()}</h2>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleCloseView}
-                className="bg-white hover:bg-slate-50 p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
-                title={t("ops.trip.close_trip")}
-                aria-label={t("ops.trip.close_trip")}
-              >
-                <X size={14} />
-              </button>
+
               <span className="text-[11px] text-slate-700 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 whitespace-nowrap">{t("ops.trip.editable_view")}</span>
             </div>
           </div>

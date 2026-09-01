@@ -802,7 +802,18 @@ export default function UnLoadingTable({
 
   // ─── Filtered Search & Pagination ──────────────────────────────
   const displayRows = useMemo<ShopDelivery[]>(() => {
-    const saved = safeRows.filter((r: ShopDelivery) => r.shopId > 0 && r.birds > 0 && r.weight > 0);
+    // Show fully-entered deliveries, plus Orders assignment plan rows that are
+    // still awaiting their Step 4 delivery. Those carry the `[ORDER]` marker
+    // and land here with weight 0 / no box selection until the supervisor
+    // delivers them — they must be visible so the assigned route can be
+    // fulfilled shop by shop (they persist regardless; this filter is only
+    // what the card list renders).
+    const saved = safeRows.filter(
+      (r: ShopDelivery) =>
+        r.shopId > 0 &&
+        ((r.birds > 0 && r.weight > 0) ||
+          String(r.remarks ?? "").trim().startsWith("[ORDER]"))
+    );
 
     const filtered = saved.filter((r: ShopDelivery) => {
       if (!searchTerm.trim()) return true;

@@ -9,7 +9,7 @@ import TripPagination from "./TripPagination";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
-import { getNextIncompleteTripStep, TRIP_STEP_LABELS, isValidTripStatusTransition, getValidNextStatuses, type TripStatus } from "../../../../shared/trip";
+import { getNextIncompleteTripStep, isTripWizardComplete, TRIP_STEP_LABELS, isValidTripStatusTransition, getValidNextStatuses, type TripStatus } from "../../../../shared/trip";
 import { useI18n } from "../../../../i18n";
 
 interface Props {
@@ -34,6 +34,12 @@ function TripRecentTable({
 }: Props) {
   const { t } = useI18n();
   const safeTrips = Array.isArray(trips) ? trips : [];
+
+  /** Translate, but never surface a raw i18n key: returns "" when the key is missing. */
+  const tSafe = (key: string, params?: Record<string, string | number>) => {
+    const value = t(key, params);
+    return value === key ? "" : value;
+  };
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTripId, setSelectedTripId] = useState<number | null>(null);
@@ -178,10 +184,18 @@ function TripRecentTable({
     if (trip.status === "Pending") {
       return { label: t("status.pending"), color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, resume: false };
     }
+    // Defensive: a Draft whose wizard is actually complete (inconsistent
+    // legacy data) must not advertise a "pending" step to resume.
+    if (isTripWizardComplete(trip)) {
+      return { label: t("status.completed"), color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={12} />, resume: false };
+    }
     // A Draft trip always has Step 1 submitted (trips are created on Step 1
     // submit), so it is always mid-workflow: show which step is pending next.
     const nextStep = getNextIncompleteTripStep(trip);
-    const stepLabel = TRIP_STEP_LABELS[nextStep] ?? t("ops.trip.step_label", { step: nextStep + 1 });
+    const stepLabel =
+      tSafe(`ops.trip.step${nextStep + 1}_label`) ||
+      TRIP_STEP_LABELS[nextStep] ||
+      t("ops.trip.step_label", { step: nextStep + 1 });
     return {
       label: t("ops.trip.in_progress_step", { step: nextStep + 1, name: stepLabel }),
       color: "bg-blue-50 text-blue-700 border-blue-200",
@@ -190,7 +204,10 @@ function TripRecentTable({
     };
   };
 
-  // ✅ Handle status change with approver name - only allows valid transitions per backend state machine
+  // Status control — only forward lifecycle transitions (Draft→Pending,
+  // Pending→Completed). `Pending → Draft` never exists. Deletion is NOT a
+  // status change: it goes exclusively through the Delete action + 10s undo,
+  // so "Deleted" is never a value this handler receives.
   const handleStatusChange = (trip: Trip, newStatus: TripStatus) => {
     if (!isValidTripStatusTransition(trip.status, newStatus)) {
       return; // Invalid transition - silently ignore (backend will also reject)
@@ -198,7 +215,7 @@ function TripRecentTable({
     if (newStatus === "Completed") {
       const approver = getCurrentUser();
       if (onStatusChange) onStatusChange(trip, "Completed", approver);
-    } else if (newStatus === "Pending" || newStatus === "Draft" || newStatus === "Deleted") {
+    } else if (newStatus === "Pending") {
       if (onStatusChange) onStatusChange(trip, newStatus);
     }
   };
@@ -308,8 +325,20 @@ function TripRecentTable({
                         {isDeleted ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-rose-100 text-rose-700 border border-rose-200/80"><AlertCircle size={12} /> {t("status.deleted")}</span>
                         ) : (() => {
-                          const validOptions = getValidStatusOptions(trip.status);
-                          const showDropdown = !isDeleted && onStatusChange && validOptions.length > 0;
+                          // Part B: a Draft (in-progress) trip shows its first
+                          // unsubmitted step as a clickable resume badge — never a
+                          // status dropdown. Part N: only Pending offers a manual
+                          // forward transition (→ Completed); deletion always goes
+                          // through the Delete button + 10s undo (Part O), so it is
+                          // never offered here. Completed stays Completed.
+                          const validOptions = getValidStatusOptions(trip.status).filter(
+                            (s) => s !== "Deleted"
+                          );
+                          const showDropdown =
+                            !isDeleted &&
+                            onStatusChange &&
+                            trip.status === "Pending" &&
+                            validOptions.length > 0;
                           if (showDropdown) {
                             return (
                               <div className="relative inline-block w-32">
@@ -324,13 +353,13 @@ function TripRecentTable({
                                       : "text-blue-700 border-blue-300 bg-blue-50/80 focus:ring-blue-500"
                                   }`}
                                 >
-                                  {validOptions.map((status) => (
+                                  {[trip.status, ...validOptions].map((status) => (
                                     <option key={status} value={status} className={`font-semibold bg-white ${status === "Completed" ? "text-emerald-700" : status === "Pending" ? "text-amber-700" : status === "Draft" ? "text-blue-700" : "text-rose-700"}`}>
                                       {status === "Completed" && "✅ "}
                                       {status === "Pending" && "⏳ "}
                                       {status === "Draft" && "📝 "}
                                       {status === "Deleted" && "🗑️ "}
-                                      {t(`status.${status.toLowerCase()}`) || status}
+                                      {tSafe(`status.${status.toLowerCase()}`) || status}
                                     </option>
                                   ))}
                                 </select>

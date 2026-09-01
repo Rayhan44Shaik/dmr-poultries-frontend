@@ -428,8 +428,10 @@ export function useTripEntry(
       return false;
     }
     if (!current.deliveryStepSubmitted) {
+      // Part H: Step 5 stays openable and Save Progress works before Step 4,
+      // but the FINAL submit is gated on Step 4 with a specific message.
       notifyRef.current?.(
-        translate("ops.trip.lock_deliveries_first"),
+        translate("ops.trip.step4_not_submitted"),
         "error"
       );
       return false;

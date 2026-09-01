@@ -51,9 +51,9 @@ export default function Sidebar({
       {NAV_SECTIONS.map((section) => {
         const SectionIcon = section.icon;
         return (
-          <div key={section.id} className="mb-5">
+          <div key={section.id} className="mb-6">
             {/* Section label */}
-            <p className="mb-1.5 px-3 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
+            <p className="mb-2 px-3 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-slate-400/90 dark:text-slate-500">
               {section.labelKey ? t(section.labelKey) : section.label}
             </p>
 
@@ -66,10 +66,10 @@ export default function Sidebar({
                 return child.soon ? (
                   <li key={child.label}>
                     <span
-                      className="group relative flex w-full cursor-default items-center gap-2.5 rounded-lg px-3 py-2 pr-2 text-sm text-slate-400 dark:text-slate-600"
+                      className="group relative flex w-full cursor-default items-center gap-2.5 rounded-lg py-2 pl-3.5 pr-3 text-[13.5px] text-slate-400 dark:text-slate-600"
                       title={child.soon ? `${label} — ${t("sidebar.comingSoon")}` : label}
                     >
-                      <Icon size={17} className="shrink-0" />
+                      <Icon size={17} strokeWidth={2} className="shrink-0" />
                       <span className="flex-1 truncate text-left">{label}</span>
                       <span className="rounded-full bg-slate-100 px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wide text-slate-400 dark:bg-slate-800 dark:text-slate-500">
                         {t("sidebar.comingSoon")}
@@ -80,7 +80,8 @@ export default function Sidebar({
                   <li key={child.label}>
                     <Link
                       to={child.path}
-                      className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] transition-colors duration-150 ${
+                      aria-current={active ? "page" : undefined}
+                      className={`group relative flex items-center gap-2.5 rounded-lg py-2 pl-3.5 pr-3 text-[13.5px] transition-colors duration-150 ${
                         active
                           ? "bg-brand-50 font-semibold text-brand-800 dark:bg-brand-500/10 dark:text-brand-300"
                           : "font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/70 dark:hover:text-slate-200"
@@ -92,6 +93,7 @@ export default function Sidebar({
                       )}
                       <Icon
                         size={17}
+                        strokeWidth={2}
                         className={`shrink-0 ${
                           active
                             ? "text-brand-700 dark:text-brand-300"

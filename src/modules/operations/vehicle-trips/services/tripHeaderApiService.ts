@@ -12,6 +12,7 @@ import {
   apiPatch,
   apiDelete,
   handleApiError,
+  toApiError,
 } from "../../../../api";
 import {
   createEmptyTrip,
@@ -336,7 +337,7 @@ export function toStep5Payload(trip: Partial<Trip> & Record<string, unknown>): R
   };
   for (const key of EXPENSE_KEYS) {
     const x = n(trip[key]);
-    if (x > 0) payload[key] = x;
+    payload[key] = x;
   }
   const raw = trip as Record<string, unknown>;
   const endRaw = raw.endMeter ?? trip.closingMeter;
@@ -466,9 +467,19 @@ export async function loadTripById(id: number): Promise<Trip> {
  * is the single source of truth — never fall back to stale localStorage
  * data that could override PostgreSQL (Trip List must reflect the same
  * updated trip deliveries/summaries as Shop Sales). */
-export async function listTrips(options?: { includeDeleted?: boolean }): Promise<Trip[]> {
+export async function listTrips(options?: {
+  includeDeleted?: boolean;
+  /** Hydrate every trip with its full deliveries / boxes / diesel rows
+   *  (GET /trips?full=true). The Orders module needs the persisted delivery
+   *  rows to classify collection containers and assignment rows; the plain
+   *  Recent Trips list does not and stays on the lighter summary payload. */
+  full?: boolean;
+}): Promise<Trip[]> {
+  const params: Record<string, string> = {};
+  if (options?.includeDeleted) params.includeDeleted = "true";
+  if (options?.full) params.full = "true";
   const { data } = await apiGet<ApiTripRecord[]>(TRIPS_PATH, {
-    params: options?.includeDeleted ? { includeDeleted: "true" } : undefined,
+    params: Object.keys(params).length ? params : undefined,
   });
   return data.map((trip) => mapApiTripToTrip(trip));
 }
@@ -602,6 +613,50 @@ export async function submitTripStep(
   return mapApiTripToTrip(data, trip as Trip);
 }
 
+export type Step5SaveOutcome = {
+  ok: boolean;
+  /** Server `updatedAt` on success — the draft's rebase point. */
+  serverUpdatedAt: string | null;
+  /** true = transient (offline / timeout / 5xx / 429): safe to retry. */
+  retryable: boolean;
+  error?: string;
+  trip?: Trip;
+};
+
+/**
+ * Part K — perform ONE Step 5 (Expenses/End) Save Progress call and classify
+ * the outcome for the durable draft/queue. Idempotent: the backend Step 5 save
+ * is a COALESCE upsert, so retrying the same payload is harmless. Never submits.
+ */
+export async function performStep5Save(
+  tripId: number,
+  fields: Record<string, unknown>
+): Promise<Step5SaveOutcome> {
+  try {
+    const body = {
+      ...toStep5Payload(fields as Partial<Trip> & Record<string, unknown>),
+      mode: "save" as const,
+    };
+    const { data } = await apiPost<ApiTripRecord>(`${TRIPS_PATH}/${tripId}/steps/expenses`, body);
+    const trip = mapApiTripToTrip(data, {} as Trip);
+    return {
+      ok: true,
+      serverUpdatedAt: (data as Record<string, unknown>).updatedAt as string ?? trip.updatedAt ?? null,
+      retryable: false,
+      trip,
+    };
+  } catch (error) {
+    const apiErr = toApiError(error);
+    const status = apiErr.status;
+    const retryable =
+      apiErr.code === "NETWORK_ERROR" ||
+      apiErr.code === "TIMEOUT" ||
+      status === 429 ||
+      (typeof status === "number" && status >= 500);
+    return { ok: false, serverUpdatedAt: null, retryable, error: apiErr.message };
+  }
+}
+
 /** Explicitly persist a valid step without submitting/locking it. */
 export async function saveTripStepProgress(
   tripId: number,
@@ -639,10 +694,19 @@ export async function fetchAvailableResources(tripId?: number | null): Promise<A
   return data;
 }
 
-/** GET /api/trips/vehicle/:vehicleId/last-meter — opening KM validation. */
-export async function fetchLastClosingMeter(vehicleId: number): Promise<LastClosingMeter | null> {
+/**
+ * GET /api/trips/vehicle/:vehicleId/last-meter — opening KM validation hint.
+ * Part L: pass the trip id when EDITING so the backend excludes this trip's own
+ * start/end meter and never reports it as the "previous" reading.
+ */
+export async function fetchLastClosingMeter(
+  vehicleId: number,
+  excludeTripId?: number
+): Promise<LastClosingMeter | null> {
+  const suffix =
+    excludeTripId && excludeTripId > 0 ? `?excludeTripId=${excludeTripId}` : "";
   const { data } = await apiGet<LastClosingMeter | null>(
-    `${TRIPS_PATH}/vehicle/${vehicleId}/last-meter`
+    `${TRIPS_PATH}/vehicle/${vehicleId}/last-meter${suffix}`
   );
   if (!data || data.closingMeter == null) return null;
   return data;

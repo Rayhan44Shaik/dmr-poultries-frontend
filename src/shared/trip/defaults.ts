@@ -1,11 +1,19 @@
 import type { Trip } from "./types";
 
 export function createEmptyTrip(overrides: Partial<Trip> = {}): Trip {
-  const now = new Date().toISOString();
+  // Local calendar date (YYYY-MM-DD) — the operator's day. `toISOString()` is
+  // UTC and rolls a day early for timezones ahead of UTC, which would put a
+  // freshly-created trip on a different day than the rest of the app
+  // (Orders' localToday(), the server's CURRENT_DATE).
+  const d = new Date();
+  const now = d.toISOString();
+  const tripDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
   return {
     id: 0,
     tripNo: "",
-    tripDate: now.slice(0, 10),
+    tripDate,
     startTime: "",
     vehicleId: 0,
     vehicleNo: "",

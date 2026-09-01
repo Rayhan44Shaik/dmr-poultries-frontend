@@ -37,3 +37,9 @@ backend/dist
 *.tsbuildinfo
 vite.config.js
 vite.config.d.ts
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

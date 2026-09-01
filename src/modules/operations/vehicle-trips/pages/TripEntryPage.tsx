@@ -30,8 +30,8 @@ import { useI18n } from "../../../../i18n";
 import { canEditItem } from "../../../../utils/dateUtils";
 import {
   getLastSubmittedTripStep,
+  getMaxAllowedTripStep,
   getNextIncompleteTripStep,
-  getResumeActionLabel,
   getTripWizardCompletedMask,
   isTripEnded as hasTripEnded,
   isTripWizardComplete,
@@ -43,10 +43,21 @@ import {
 
 type TripEntryPageProps = { embedded?: boolean; };
 
-const getYesterday = () => {
-  const date = new Date();
-  date.setDate(date.getDate() - 1);
-  return date.toISOString().split("T")[0];
+/**
+ * Default operational date for a NEW trip: the current LOCAL calendar day.
+ *
+ * Trip Entry, the Orders module (`localToday()`), and the server
+ * (`CURRENT_DATE`) must agree on "today" — otherwise a freshly-created trip
+ * lands on a different operational day than the Orders collection/assignment
+ * for the same session, and the Orders ↔ Trip Entry flow cannot connect.
+ * Uses local date components (never `toISOString()`, which is UTC and rolls
+ * a day early for zones ahead of UTC).
+ */
+const getTripEntryDate = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
 };
 
 type EntryScreen = "prompt" | "form";
@@ -127,14 +138,24 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     registerTripIdCallback(setTripIdInUrl);
   }, [registerTripIdCallback, setTripIdInUrl]);
 
-  /** On mount, if tripId is in URL, load that trip. */
+  /**
+   * On mount / refresh: if a tripId is in the URL, load that trip AND reopen the
+   * wizard on it (so a browser refresh mid-wizard resumes exactly where the user
+   * was — required for Part K Step 5 draft restoration, and for resume-by-URL).
+   */
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const tripId = params.get("tripId");
-    if (tripId && !trip.id) {
-      const id = Number(tripId);
+    const urlTripId = params.get("tripId");
+    if (urlTripId && !trip.id) {
+      const id = Number(urlTripId);
       if (Number.isFinite(id) && id > 0) {
-        void loadTripFromApi(id);
+        void loadTripFromApi(id).then((loaded) => {
+          if (!loaded) return;
+          setRows(loaded.deliveries || []);
+          setEntryScreen("form");
+          setEditingSubmittedStep(null);
+          setViewStepIndex(getNextIncompleteTripStep(loaded));
+        });
       }
     }
   }, [location.search, loadTripFromApi, trip.id]);
@@ -172,6 +193,17 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     changeStatus(trip, status);
   };
 
+  /** Bilingual, human-readable name for a step index (never a raw i18n key). */
+  const stepDisplayName = useCallback(
+    (index: number) => {
+      const key = `ops.trip.step${index + 1}_label`;
+      const translated = t(key);
+      if (translated !== key) return translated;
+      return TRIP_STEP_LABELS[index] ?? t("ops.trip.step_label", { step: index + 1 });
+    },
+    [t]
+  );
+
   const handleView = (selectedTrip: Trip) => {
     setViewTrip(selectedTrip);
     setViewOpen(true);
@@ -205,7 +237,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       // Resume: reopen at the first incomplete step per authoritative state.
       resolvedStep = getNextIncompleteTripStep(authoritative);
     }
-    const maxAllowed = isTripWizardComplete(authoritative) ? 4 : getNextIncompleteTripStep(authoritative);
+    // Part G: once Step 1 is submitted every step is openable.
+    const maxAllowed = getMaxAllowedTripStep(authoritative);
     setViewStepIndex(Math.min(Math.max(0, resolvedStep), maxAllowed));
   };
 
@@ -214,7 +247,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       return;
     }
     const targetStep = getNextIncompleteTripStep(selectedTrip);
-    const resumeLabel = getResumeActionLabel(selectedTrip) ?? t("ops.trip.step_label", { step: targetStep + 1 });
+    const resumeLabel = `${t("ops.trip.step_label", { step: targetStep + 1 })}: ${stepDisplayName(targetStep)}`;
     void openExistingTrip(
       selectedTrip,
       targetStep,
@@ -226,11 +259,14 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const handleEdit = (selectedTrip: Trip) => {
     const targetStep = getLastSubmittedTripStep(selectedTrip);
     if (targetStep == null) return;
-    const stepName = TRIP_STEP_LABELS[targetStep] ?? t("ops.trip.step_label", { step: targetStep + 1 });
     void openExistingTrip(
       selectedTrip,
       targetStep,
-      t("ops.trip.edit_mode", { step: targetStep + 1, name: stepName }),
+      t("ops.trip.edit_mode", {
+        no: selectedTrip.tripNo,
+        step: targetStep + 1,
+        name: stepDisplayName(targetStep),
+      }),
       targetStep
     );
   };
@@ -245,8 +281,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   useEffect(() => {
     if (isInitialMount.current) {
       if (!trip.tripDate) {
-        const yesterday = getYesterday();
-        setTrip((prev) => ({ ...prev, tripDate: yesterday }));
+        const initialDate = getTripEntryDate();
+        setTrip((prev) => ({ ...prev, tripDate: initialDate }));
       }
       isInitialMount.current = false;
     }
@@ -279,7 +315,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setViewStepIndex(0);
     setIsEditing(false);
     setEditingSubmittedStep(null);
-    setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
+    setTrip((prev) => ({ ...prev, tripDate: getTripEntryDate() }));
     clearTripIdFromUrl();
   }, [clearTrip, clearTripIdFromUrl, setIsEditing, setTrip]);
 
@@ -287,7 +323,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     clearTrip();
     setRows([]);
     setViewStepIndex(0);
-    setTrip((prev) => ({ ...prev, tripDate: getYesterday() }));
+    setTrip((prev) => ({ ...prev, tripDate: getTripEntryDate() }));
     clearTripIdFromUrl();
     setIsEditing(true);
     setEditingSubmittedStep(null);
@@ -304,10 +340,10 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   // Shared Desktop + Mobile workflow definition.
   const currentStep = getNextIncompleteTripStep(trip);
-  // The maximum step a user may view/edit right now. Completed steps (0..max-1)
-  // stay reopenable; the currentStep is the working step; everything after it is
-  // LOCKED until the previous step is submitted (backend-submitted state only).
-  const maxAllowedStep = isTripEnded ? 4 : currentStep;
+  // Part G: only Step 1 is openable until it is submitted; afterwards every
+  // step opens (expenses can be entered mid-trip). Opening != submitting —
+  // per-step submit validation and order gating are enforced on submit.
+  const maxAllowedStep = getMaxAllowedTripStep(trip);
   const lockedSteps = TRIP_STEP_LABELS.map((_, index) => index > maxAllowedStep);
   // Render-safe view index — the UI must never trust a requested index that
   // bypasses the sequence (direct state/URL manipulation included).
@@ -552,7 +588,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
                 // submitted (backend state). Redirect to the correct next step.
                 setViewStepIndex(currentStep);
                 showNotification(
-                  t("ops.trip.step_locked", { locked: idx + 1, current: currentStep + 1, name: TRIP_STEP_LABELS[currentStep] }),
+                  t("ops.trip.step_locked", { locked: idx + 1, current: currentStep + 1, name: stepDisplayName(currentStep) }),
                   "info"
                 );
               }}
@@ -562,7 +598,11 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
               <WizardStepNotice
                 notice={{
                   type: "info",
-                  message: t("ops.trip.edit_mode_notice", { step: editingSubmittedStep + 1, name: TRIP_STEP_LABELS[editingSubmittedStep] }),
+                  message: t("ops.trip.edit_mode_notice", {
+                    no: trip.tripNo,
+                    step: editingSubmittedStep + 1,
+                    name: stepDisplayName(editingSubmittedStep),
+                  }),
                 }}
               />
             )}

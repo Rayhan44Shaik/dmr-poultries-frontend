@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Scale, Bird, Box, Gauge, Clock, Pencil,
-  Plus, Trash2, FileText, AlertTriangle, Camera, Download, X
+  Plus, Trash2, FileText, AlertTriangle, Camera, Download
 } from "lucide-react";
 import type { Trip, BoxDetail } from "../types/trip";
 import { getVehicles } from "../../../masters/vehicles/services/vehicleService";
@@ -594,15 +594,7 @@ export default function StepPickup({
             </h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
-              title={t("ops.trip.close_trip")}
-              aria-label={t("ops.trip.close_trip")}
-            >
-              <X size={14} />
-            </button>
+
             {canEdit && (
               <button
                 onClick={() => setIsLocalEditing(true)}
@@ -833,15 +825,7 @@ export default function StepPickup({
             </h2>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
-              title={t("ops.trip.close_trip")}
-              aria-label={t("ops.trip.close_trip")}
-            >
-              <X size={14} />
-            </button>
+
             {(isEditMode || isLocalEditing) && trip.pickupStepSubmitted && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
                 {t("ops.trip.editing_trip", { no: trip.tripNo })}

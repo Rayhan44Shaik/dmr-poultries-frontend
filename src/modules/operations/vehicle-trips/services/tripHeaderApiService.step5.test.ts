@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { formatStartTimeForDisplay, mapApiTripToTrip, toStep5Payload } from "./tripHeaderApiService";
 
-test("toStep5Payload sends expenses only — no vehicle, advance, diesel, or timestamps", () => {
+test("toStep5Payload sends expenses only — no vehicle, advance, diesel, or timestamps; zero expenses are kept (Part I)", () => {
   const payload = toStep5Payload({
     vehicleNo: "AP16",
     advanceAmount: 2000,
@@ -22,8 +22,10 @@ test("toStep5Payload sends expenses only — no vehicle, advance, diesel, or tim
   assert.equal("submittedAtTimestamp" in payload, false);
   assert.equal("endTime" in payload, false);
   assert.equal(payload.meals, 500);
-  assert.equal("loading" in payload, false);
-  assert.equal("othersRC" in payload, false);
+  // Part I: a cleared / zero expense must be sent so the backend persists 0
+  // (was previously dropped by an `if (x > 0)` guard).
+  assert.equal(payload.loading, 0);
+  assert.equal(payload.othersRC, 0);
   assert.equal(payload.endMeter, 50400);
   assert.equal(payload.destinationTolls, 0);
 });
