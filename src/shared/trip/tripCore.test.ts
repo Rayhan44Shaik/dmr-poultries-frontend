@@ -30,7 +30,13 @@ test("Desktop compatibility facade resolves to the shared validators and calcula
 });
 
 test("one shared definition describes the five-step Trip workflow", () => {
-  assert.deepEqual(TRIP_STEP_LABELS, ["Start", "Farm", "Pickup", "Deliveries", "End"]);
+  assert.deepEqual(TRIP_STEP_LABELS, [
+    "Trip Details",
+    "Farm Details",
+    "Pickup Details",
+    "Delivery Details",
+    "Expenses / End Details",
+  ]);
   assert.equal(TRIP_STEP_DEFINITIONS.length, 5);
   assert.equal(TRIP_STEP_DEFINITIONS[0].fields.includes("vehicleId"), true);
   assert.equal(TRIP_FIELD_DEFINITIONS.vehicleId.required, true);

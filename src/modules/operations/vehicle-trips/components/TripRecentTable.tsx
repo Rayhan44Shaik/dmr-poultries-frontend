@@ -9,7 +9,7 @@ import TripPagination from "./TripPagination";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
-import { getNextIncompleteTripStep, TRIP_STEP_LABELS, isValidTripStatusTransition, getValidNextStatuses, type TripStatus, type TripStepKey } from "../../../../shared/trip";
+import { getNextIncompleteTripStep, TRIP_STEP_LABELS, isValidTripStatusTransition, getValidNextStatuses, type TripStatus } from "../../../../shared/trip";
 import { useI18n } from "../../../../i18n";
 
 interface Props {
@@ -34,6 +34,12 @@ function TripRecentTable({
 }: Props) {
   const { t } = useI18n();
   const safeTrips = Array.isArray(trips) ? trips : [];
+
+  /** Translate, but never surface a raw i18n key: returns "" when the key is missing. */
+  const tSafe = (key: string, params?: Record<string, string | number>) => {
+    const value = t(key, params);
+    return value === key ? "" : value;
+  };
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTripId, setSelectedTripId] = useState<number | null>(null);
@@ -181,8 +187,10 @@ function TripRecentTable({
     // A Draft trip always has Step 1 submitted (trips are created on Step 1
     // submit), so it is always mid-workflow: show which step is pending next.
     const nextStep = getNextIncompleteTripStep(trip);
-    const stepKey: TripStepKey = TRIP_STEP_DEFINITIONS[nextStep]?.key ?? "start";
-    const stepLabel = t(`ops.trip.${stepKey}_label`) ?? TRIP_STEP_LABELS[nextStep] ?? t("ops.trip.step_label", { step: nextStep + 1 });
+    const stepLabel =
+      tSafe(`ops.trip.step${nextStep + 1}_label`) ||
+      TRIP_STEP_LABELS[nextStep] ||
+      t("ops.trip.step_label", { step: nextStep + 1 });
     return {
       label: t("ops.trip.in_progress_step", { step: nextStep + 1, name: stepLabel }),
       color: "bg-blue-50 text-blue-700 border-blue-200",
@@ -199,7 +207,9 @@ function TripRecentTable({
     if (newStatus === "Completed") {
       const approver = getCurrentUser();
       if (onStatusChange) onStatusChange(trip, "Completed", approver);
-    } else if (newStatus === "Pending" || newStatus === "Draft" || newStatus === "Deleted") {
+    } else if (newStatus === "Pending" || newStatus === "Deleted") {
+      // Pending → Draft is not a valid lifecycle transition and is intentionally
+      // absent here, in the transition map, and in the backend state machine.
       if (onStatusChange) onStatusChange(trip, newStatus);
     }
   };

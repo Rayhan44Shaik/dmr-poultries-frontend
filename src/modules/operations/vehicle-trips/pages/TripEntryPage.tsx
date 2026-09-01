@@ -31,7 +31,6 @@ import { canEditItem } from "../../../../utils/dateUtils";
 import {
   getLastSubmittedTripStep,
   getNextIncompleteTripStep,
-  getResumeActionLabel,
   getTripWizardCompletedMask,
   isTripEnded as hasTripEnded,
   isTripWizardComplete,
@@ -172,6 +171,17 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     changeStatus(trip, status);
   };
 
+  /** Bilingual, human-readable name for a step index (never a raw i18n key). */
+  const stepDisplayName = useCallback(
+    (index: number) => {
+      const key = `ops.trip.step${index + 1}_label`;
+      const translated = t(key);
+      if (translated !== key) return translated;
+      return TRIP_STEP_LABELS[index] ?? t("ops.trip.step_label", { step: index + 1 });
+    },
+    [t]
+  );
+
   const handleView = (selectedTrip: Trip) => {
     setViewTrip(selectedTrip);
     setViewOpen(true);
@@ -214,7 +224,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       return;
     }
     const targetStep = getNextIncompleteTripStep(selectedTrip);
-    const resumeLabel = getResumeActionLabel(selectedTrip) ?? t("ops.trip.step_label", { step: targetStep + 1 });
+    const resumeLabel = `${t("ops.trip.step_label", { step: targetStep + 1 })}: ${stepDisplayName(targetStep)}`;
     void openExistingTrip(
       selectedTrip,
       targetStep,
@@ -226,11 +236,14 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const handleEdit = (selectedTrip: Trip) => {
     const targetStep = getLastSubmittedTripStep(selectedTrip);
     if (targetStep == null) return;
-    const stepName = TRIP_STEP_LABELS[targetStep] ?? t("ops.trip.step_label", { step: targetStep + 1 });
     void openExistingTrip(
       selectedTrip,
       targetStep,
-      t("ops.trip.edit_mode", { step: targetStep + 1, name: stepName }),
+      t("ops.trip.edit_mode", {
+        no: selectedTrip.tripNo,
+        step: targetStep + 1,
+        name: stepDisplayName(targetStep),
+      }),
       targetStep
     );
   };
@@ -552,7 +565,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
                 // submitted (backend state). Redirect to the correct next step.
                 setViewStepIndex(currentStep);
                 showNotification(
-                  t("ops.trip.step_locked", { locked: idx + 1, current: currentStep + 1, name: TRIP_STEP_LABELS[currentStep] }),
+                  t("ops.trip.step_locked", { locked: idx + 1, current: currentStep + 1, name: stepDisplayName(currentStep) }),
                   "info"
                 );
               }}
@@ -562,7 +575,11 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
               <WizardStepNotice
                 notice={{
                   type: "info",
-                  message: t("ops.trip.edit_mode_notice", { step: editingSubmittedStep + 1, name: TRIP_STEP_LABELS[editingSubmittedStep] }),
+                  message: t("ops.trip.edit_mode_notice", {
+                    no: trip.tripNo,
+                    step: editingSubmittedStep + 1,
+                    name: stepDisplayName(editingSubmittedStep),
+                  }),
                 }}
               />
             )}
