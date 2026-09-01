@@ -107,7 +107,7 @@ export function isDraftStatus(status: TripStatus): boolean {
  */
 export const TRIP_STATUS_TRANSITIONS: Record<TripStatus, TripStatus[]> = {
   Draft: ["Pending", "Deleted"],
-  Pending: ["Completed", "Draft", "Deleted"],
+  Pending: ["Completed", "Deleted"],
   Completed: ["Deleted"],
   Deleted: [],
 };

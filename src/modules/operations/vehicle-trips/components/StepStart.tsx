@@ -618,10 +618,13 @@ function StepStart({
         }
         // Self-exclusion when editing: the latest event may be THIS trip's own
         // start/end meter, which must never constrain its own opening reading.
-        const isSelf =
+        const isCurrentTripMeter =
           tripId > 0 &&
-          (data.source === "TRIP_START" || data.source === "TRIP_END") &&
-          String(data.ref) === String(tripId);
+          data.ref != null &&
+          (String(data.ref) === String(tripId) || data.tripNo === tripNo);
+        const isSelf =
+          isCurrentTripMeter &&
+          (data.source === "TRIP_START" || data.source === "TRIP_END");
         setLatestMeter(
           isSelf
             ? null
@@ -634,7 +637,7 @@ function StepStart({
     return () => {
       cancelled = true;
     };
-  }, [form.vehicleId, tripId]);
+  }, [form.vehicleId, tripId, tripNo]);
 
   const driverOptions = useMemo(
     () => employeeOptions.filter((employee) => employee.department === "Driver"),

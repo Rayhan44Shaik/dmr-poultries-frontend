@@ -88,7 +88,7 @@ export const TRIP_STEP_DEFINITIONS = [
   {
     key: "start",
     index: 0,
-    label: "Start",
+    label: "Trip Details",
     title: "Trip Start (At Office)",
     submittedFlag: "startStepSubmitted",
     fields: ["tripDate", "startTime", "vehicleId", "supervisorId", "driverId", "openingMeter", "advanceAmount", "helpers", "loaders"],
@@ -96,7 +96,7 @@ export const TRIP_STEP_DEFINITIONS = [
   {
     key: "farm",
     index: 1,
-    label: "Farm",
+    label: "Farm Details",
     title: "Reached Farm / Destination",
     submittedFlag: "farmStepSubmitted",
     fields: ["reachedTime", "sourceFarmId", "birdTypeId", "farmAddress", "destMeter", "pickupTolls", "avgBirdWeight", "remarks"],
@@ -104,7 +104,7 @@ export const TRIP_STEP_DEFINITIONS = [
   {
     key: "pickup",
     index: 2,
-    label: "Pickup",
+    label: "Pickup Details",
     title: "Pickup KPI",
     submittedFlag: "pickupStepSubmitted",
     fields: ["dcPhotoKey", "boxDetails", "totalBirds", "dcWeight", "boxes", "avgWeight"],
@@ -112,7 +112,7 @@ export const TRIP_STEP_DEFINITIONS = [
   {
     key: "deliveries",
     index: 3,
-    label: "Deliveries",
+    label: "Delivery Details",
     title: "Shop Deliveries",
     submittedFlag: "deliveryStepSubmitted",
     fields: ["deliveries"],
@@ -120,7 +120,7 @@ export const TRIP_STEP_DEFINITIONS = [
   {
     key: "expenses",
     index: 4,
-    label: "End",
+    label: "Expenses / End Details",
     title: "Expenses Sheet",
     submittedFlag: "endStepSubmitted",
     fields: ["closingMeter", "deliveryTolls", "generalExpenses", "dieselEntries", "remarks"],

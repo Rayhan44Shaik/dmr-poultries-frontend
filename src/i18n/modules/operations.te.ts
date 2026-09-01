@@ -407,6 +407,7 @@
   'ops.trip.locating': 'స్థానం కనుగొనబడుతోంది…',
   'ops.trip.location_captured': 'స్థానం సంగ్రహించబడింది',
   'ops.trip.lock_deliveries_first': 'ముందుగా డెలివరీలు సమర్పించండి.',
+  'ops.trip.step4_not_submitted': 'దశ 4 — డెలివరీ వివరాలు Sava
   'ops.trip.locked_from_step1': 'దశ 1 సమర్పించే వరకు లాక్ చేయబడింది.',
   'ops.trip.loss': 'నష్టం',
   'ops.trip.max_2_photos': 'గరిష్టంగా 2 ఫోటోలు',
@@ -515,7 +516,13 @@
   'ops.trip.start_to_farm': 'ప్రారంభం → ఫారం',
   'ops.trip.step_aria': 'దశ {step}',
   'ops.trip.step_label': 'దశ {step}',
-  'ops.trip.step_locked': 'దశ {current} ({name}) సమర్పించే వరకు దశ {locked} లాక్ చేయబడింది.',
+  'ops.trip.step_locked': 'దశ {current} ({name}) సమర్పించే వరకు దశ {locked} లాక్ చేయboden',
+  'ops.trip.step1_label': 'ట్రిప్ వివరాలు',
+  'ops.trip.step2_label': 'ఫారమ్ వివరాలు',
+  'ops.trip.step3_label': 'పికప్ వివరాలు',
+  'ops.trip.step4_label': 'డెలివరీ వివరాలు',
+  'ops.trip.step5_label': 'ఖర్చులు / చివరి వివరాలు',
+  'ops.trip.step1_submitted': 'దశ 1 Sava
   'ops.trip.step1_submitted': 'దశ 1 సేవ్ చేయబడింది. ఫారం వివరాలతో కొనసాగవచ్చు.',
   'ops.trip.step2_submitted': 'దశ 2 సేవ్ చేయబడింది. పికప్‌తో కొనసాగవచ్చు.',
   'ops.trip.step3_submitted': 'దశ 3 సేవ్ చేయబడింది. డెలివరీలతో కొనసాగవచ్చు.',

@@ -307,7 +307,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   // The maximum step a user may view/edit right now. Completed steps (0..max-1)
   // stay reopenable; the currentStep is the working step; everything after it is
   // LOCKED until the previous step is submitted (backend-submitted state only).
-  const maxAllowedStep = isTripEnded ? 4 : currentStep;
+  const maxAllowedStep = trip.startStepSubmitted ? 4 : currentStep;
   const lockedSteps = TRIP_STEP_LABELS.map((_, index) => index > maxAllowedStep);
   // Render-safe view index — the UI must never trust a requested index that
   // bypasses the sequence (direct state/URL manipulation included).

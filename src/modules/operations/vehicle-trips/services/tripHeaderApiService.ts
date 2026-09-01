@@ -336,7 +336,7 @@ export function toStep5Payload(trip: Partial<Trip> & Record<string, unknown>): R
   };
   for (const key of EXPENSE_KEYS) {
     const x = n(trip[key]);
-    if (x > 0) payload[key] = x;
+    payload[key] = x;
   }
   const raw = trip as Record<string, unknown>;
   const endRaw = raw.endMeter ?? trip.closingMeter;

@@ -9,7 +9,7 @@ import TripPagination from "./TripPagination";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
-import { getNextIncompleteTripStep, TRIP_STEP_LABELS, isValidTripStatusTransition, getValidNextStatuses, type TripStatus } from "../../../../shared/trip";
+import { getNextIncompleteTripStep, TRIP_STEP_LABELS, isValidTripStatusTransition, getValidNextStatuses, type TripStatus, type TripStepKey } from "../../../../shared/trip";
 import { useI18n } from "../../../../i18n";
 
 interface Props {
@@ -181,7 +181,8 @@ function TripRecentTable({
     // A Draft trip always has Step 1 submitted (trips are created on Step 1
     // submit), so it is always mid-workflow: show which step is pending next.
     const nextStep = getNextIncompleteTripStep(trip);
-    const stepLabel = TRIP_STEP_LABELS[nextStep] ?? t("ops.trip.step_label", { step: nextStep + 1 });
+    const stepKey: TripStepKey = TRIP_STEP_DEFINITIONS[nextStep]?.key ?? "start";
+    const stepLabel = t(`ops.trip.${stepKey}_label`) ?? TRIP_STEP_LABELS[nextStep] ?? t("ops.trip.step_label", { step: nextStep + 1 });
     return {
       label: t("ops.trip.in_progress_step", { step: nextStep + 1, name: stepLabel }),
       color: "bg-blue-50 text-blue-700 border-blue-200",
