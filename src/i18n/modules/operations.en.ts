@@ -522,6 +522,7 @@
   'ops.trip.step_aria': 'Step {step}',
   'ops.trip.step_label': 'Step {step}',
   'ops.trip.step_locked': 'Step {locked} is locked until Step {current} ({name}) is submitted.',
+  'ops.trip.step_unlocked': 'Step unlocked',
   'ops.trip.step1_label': 'Trip Details',
   'ops.trip.step2_label': 'Farm Details',
   'ops.trip.step3_label': 'Pickup Details',
