@@ -285,6 +285,8 @@
   'ops.trip.delivery_mode': 'Delivery Mode',
   'ops.trip.delivery_tolls': 'Delivery Tolls',
   'ops.trip.dest_farm_meter': 'Destination Farm Meter',
+  'ops.trip.dest_meter_missing': 'Not recorded',
+  'ops.trip.submit_diesel_entry': 'Submit Diesel Entry',
   'ops.trip.dest_meter_label': 'Destination Meter',
   'ops.trip.diesel_draft_message_many': '{count} diesel entries are still draft. Submit the sheet before closing.',
   'ops.trip.diesel_draft_message_one': '1 diesel entry is still draft. Submit the sheet before closing.',

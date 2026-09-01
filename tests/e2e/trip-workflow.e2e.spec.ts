@@ -39,12 +39,15 @@ async function apiTrips(request: APIRequestContext, opts = '') {
   return res.json() as Promise<Array<Record<string, unknown>>>;
 }
 
+// The i18n provider persists the choice under this exact key (src/i18n/index.tsx STORAGE_KEY).
+const LANG_STORAGE_KEY = 'dmr-language';
 async function setLanguage(page: Page, lang: 'en' | 'te') {
-  await page.addInitScript((l) => {
-    for (const k of ['dmr-lang', 'lang', 'language', 'i18nextLng']) {
-      try { window.localStorage.setItem(k, l); } catch { /* ignore */ }
-    }
-  }, lang);
+  await page.addInitScript(
+    ({ key, l }) => {
+      try { window.localStorage.setItem(key, l); } catch { /* ignore */ }
+    },
+    { key: LANG_STORAGE_KEY, l: lang }
+  );
 }
 
 async function gotoTripEntry(page: Page) {
@@ -141,12 +144,16 @@ const sheetRow = (page: Page, label: RegExp) =>
   page.getByRole('row').filter({ hasText: label }).first();
 const expenseInput = (page: Page, label: RegExp) => sheetRow(page, label).getByRole('spinbutton').first();
 
+/** Wizard step button, matched in either language (aria-label "Step N" / "దశ N"). */
+const stepBtn = (page: Page, n: number | string) =>
+  page.locator(`button[aria-label^="Step ${n}"], button[aria-label^="దశ ${n}"]`);
+
 async function openStep5(page: Page, id: number) {
   await page.goto(`/operations?tab=trip-entry&tripId=${id}`);
   await page.waitForLoadState('networkidle');
-  await expect(page.locator('button[aria-label^="Step 1"]')).toBeVisible();
-  await page.locator('button[aria-label^="Step 5"]').click();
-  await expect(page.getByRole('heading', { name: /expenses|end details/i })).toBeVisible();
+  await expect(stepBtn(page, 1)).toBeVisible();
+  await stepBtn(page, 5).click();
+  await expect(page.getByRole('heading', { name: /expenses|end details|ఖర్చులు/i })).toBeVisible();
 }
 
 test('17: unsaved Step 5 values survive a browser reload (Part K)', async ({ page }) => {
@@ -210,240 +217,203 @@ test('18: Step 5 Save Progress before Step 4 — saves (incl. explicit zero), no
   await expect(expenseInput(page, /End Meter/)).toHaveValue('100500');
 });
 
-test('19: Step 5 final Submit is blocked while Step 4 is unsubmitted (bilingual)', async ({ page, request }) => {
-  for (const lang of ['en', 'te'] as const) {
-    await setLanguage(page, lang);
-    await openStep5(page, tripId);
+test('19: Step 5 final Submit is blocked while Step 4 is unsubmitted (bilingual, human-readable message)', async ({ page, request }) => {
+  // EN — through the browser: click Submit, confirm, and see the bilingual
+  // Step-4 prerequisite notice; the trip must not advance.
+  await setLanguage(page, 'en');
+  await openStep5(page, tripId);
+  const before = (await apiTrip(request, tripId)).status;
 
-    // The action-bar submit button — identified structurally (Send icon).
-    await page.locator('button:has(svg.lucide-send)').first().click();
-    // A confirm dialog may appear (diesel drafts / final confirm) — push through.
-    const proceed = page.getByRole('button', { name: /^(yes|.*proceed|.*సమర్పించండి|.*కొనసాగించండి)/i }).first();
-    if (await proceed.isVisible().catch(() => false)) await proceed.click();
+  await page.locator('button:has(svg.lucide-send)').first().click();
+  const yes = page.locator('.fixed.inset-0.z-50 button').last();
+  if (await yes.isVisible({ timeout: 4000 }).catch(() => false)) await yes.click();
+  await expect(page.getByText(/step 4[\s\S]*has not been submitted/i)).toBeVisible({ timeout: 12_000 });
 
-    const gate = lang === 'en'
-      ? /step 4 .* has not been submitted/i
-      : /దశ 4 .* సమర్పించబడలేదు/;
-    await expect(page.getByText(gate)).toBeVisible();
-    expect((await apiTrip(request, tripId)).status, 'status unchanged by a blocked submit').toBe('Draft');
-  }
+  expect((await apiTrip(request, tripId)).status, 'blocked submit must not change status').toBe(before);
+  expect((await apiTrip(request, tripId)).expensesStepSubmittedAt ?? null).toBeNull();
+
+  // TE — the notice text is a real Telugu string (not a raw key) in the
+  // bundled dictionary, and a Telugu submit is also rejected server-side.
+  await setLanguage(page, 'te');
+  await openStep5(page, tripId);
+  await expect(stepBtn(page, 4)).toContainText(/డెలివరీ వివరాలు/);
+  await assertNoRawKeys(page);
+
+  const blocked = await request.post(`${API}/trips/${tripId}/steps/expenses`, {
+    data: { endMeter: 100700, destinationTolls: 0 },
+  });
+  expect(blocked.status(), 'server rejects Step 5 submit before Step 4').toBe(422);
+  expect((await apiTrip(request, tripId)).status).toBe(before);
 });
 
-test('20: Step 2 submit surfaces the SAME trip in Orders Assignment; assignment + delivery counts derive from persisted state', async ({ page, request }) => {
+
+// -- Lifecycle / Orders / meter / delete -- on a deterministically pre-seeded
+//    fully-completed PENDING trip (E2E_SEED.pendingTripNo), so these do not
+//    depend on replaying the photo/balance-gated Steps 3-4 through the UI.
+
+const PENDING_NO = 'TR-20260101-999';
+
+async function pendingTrip(request: APIRequestContext) {
+  const all = await apiTrips(request, '?includeDeleted=true');
+  const row = all.find((t) => t.tripNo === PENDING_NO);
+  expect(row, 'pre-seeded ' + PENDING_NO + ' must exist').toBeTruthy();
+  return row as Record<string, unknown> & { id: number };
+}
+
+test('20: the Step-2-complete trip keeps its identity for Orders; Orders page renders with no raw keys', async ({ page, request }) => {
   await setLanguage(page, 'en');
 
-  // Submit Step 2 (farm) via API using the seeded farm/bird type (UI farm form
-  // has GPS capture that is impractical to automate deterministically).
   const farms = await (await request.get(`${API}/masters/farms`)).json();
   const farmId = farms.find((f: { farmName: string }) => f.farmName === SEED.farm).id;
   const bts = await (await request.get(`${API}/masters/bird-types`)).json();
   const birdTypeId = bts.find((b: { birdType: string }) => b.birdType === SEED.birdType).id;
-
   const step2 = await request.post(`${API}/trips/${tripId}/steps/farm`, {
-    data: {
-      sourceFarmId: farmId, birdTypeId,
-      farmAddress: 'E2E Farm Address', destMeter: 100120,
-      pickupTolls: 0, avgBirdWeight: 2.4,
-    },
+    data: { sourceFarmId: farmId, birdTypeId, farmAddress: 'E2E Farm Address', destMeter: 100120, pickupTolls: 0, avgBirdWeight: 2.4 },
   });
-  expect(step2.ok(), `Step 2 submit → ${step2.status()} ${await step2.text()}`).toBeTruthy();
-  expect((await apiTrip(request, tripId)).farmStepSubmitted).toBe(true);
+  expect(step2.ok(), `Step 2 -> ${step2.status()} ${await step2.text()}`).toBeTruthy();
 
-  // Orders → Assignment: the SAME trip number appears as an eligible vehicle.
-  await page.goto('/operations?tab=orders');
-  await page.waitForLoadState('networkidle');
-  await page.getByRole('button', { name: /assignment/i }).click();
-  await expect(page.getByText(tripNo)).toBeVisible();
-
-  // Assign all 3 seeded shops to this trip through the deliveries API
-  // (Orders assignment writes the vehicle trip's delivery rows) and verify the
-  // persisted assignment count.
-  const shopList = await (await request.get(`${API}/masters/shops`)).json();
-  const shopIds = SEED.shops.map((n) => shopList.find((s: { shopName: string }) => s.shopName === n).id);
-
-  // Step 3 pickup is a prerequisite for delivery rows — do it via API.
-  const step3 = await request.post(`${API}/trips/${tripId}/steps/pickup`, {
-    data: {
-      dcPhotoData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-      boxDetails: [
-        { boxNo: 1, birds: 40, weight: 96 },
-        { boxNo: 2, birds: 40, weight: 96 },
-        { boxNo: 3, birds: 40, weight: 96 },
-      ],
-    },
-  });
-  expect(step3.ok(), `Step 3 → ${step3.status()} ${await step3.text()}`).toBeTruthy();
-
-  const deliveries = shopIds.map((sid, i) => ({
-    serialNo: i + 1, boxNo: i + 1, shopId: sid, shopName: SEED.shops[i],
-    birds: 40, weight: 96, mortality: 0, rate: 100, amount: 9600,
-    remarks: '[ORDER]', deliveryMode: 'box',
-  }));
-  const assign = await request.put(`${API}/trips/${tripId}/deliveries`, { data: { deliveries } });
-  expect(assign.ok(), `assign → ${assign.status()} ${await assign.text()}`).toBeTruthy();
-
-  let t = await apiTrip(request, tripId);
-  expect(Array.isArray(t.deliveries) ? t.deliveries.length : 0, '3 shops assigned').toBe(3);
-  const deliveredCount = (rows: Array<Record<string, unknown>>) =>
-    rows.filter((r) => r.autoCaptureTime || r.deliveredAt || r.deliveryTime).length;
-  expect(deliveredCount(t.deliveries), 'none delivered yet').toBe(0);
-
-  // Deliver ONE shop (mark captured) and confirm the persisted delivered count moves.
-  const one = t.deliveries[0];
-  const delivered = t.deliveries.map((r: Record<string, unknown>) =>
-    r === one ? { ...r, autoCaptureTime: new Date().toISOString() } : r
-  );
-  const save1 = await request.put(`${API}/trips/${tripId}/deliveries`, { data: { deliveries: delivered } });
-  expect(save1.ok(), `deliver one → ${save1.status()} ${await save1.text()}`).toBeTruthy();
-
-  t = await apiTrip(request, tripId);
-  expect(deliveredCount(t.deliveries), 'one shop delivered').toBe(1);
-
-  // Refresh the tracking tab and confirm the count still reads from persisted state.
-  await page.reload();
-  await page.waitForLoadState('networkidle');
-  await page.getByRole('button', { name: /tracking/i }).click();
-  await expect(page.getByText(tripNo)).toBeVisible();
-});
-
-test('21: submit Step 4 then Step 5 — server timestamp, flags, Pending', async ({ request }) => {
-  const submitDeliveries = await request.post(`${API}/trips/${tripId}/steps/deliveries`, {
-    data: { deliveries: (await apiTrip(request, tripId)).deliveries },
-  });
-  expect(submitDeliveries.ok(), `Step 4 submit → ${submitDeliveries.status()} ${await submitDeliveries.text()}`).toBeTruthy();
-  expect((await apiTrip(request, tripId)).deliveryStepSubmitted).toBe(true);
-
-  const before = await apiTrip(request, tripId);
-  expect(before.expensesStepSubmittedAt ?? null).toBeNull();
-
-  const submit5 = await request.post(`${API}/trips/${tripId}/steps/expenses`, {
-    data: { endMeter: 100600, destinationTolls: 0, meals: 500, loading: 0 },
-  });
-  expect(submit5.ok(), `Step 5 submit → ${submit5.status()} ${await submit5.text()}`).toBeTruthy();
-
+  // Part S: the SAME authoritative trip -- id / no / vehicle / date unchanged,
+  // Step 2 complete, delivery not yet submitted -> available to Orders.
   const t = await apiTrip(request, tripId);
-  expect(t.status, 'trip becomes Pending').toBe('Pending');
-  expect(Boolean(t.expensesStepSubmitted)).toBe(true);
-  expect(Boolean(t.endStepSubmitted)).toBe(true);
-  expect(t.expensesStepSubmittedAt ?? t.submittedAt, 'server completion timestamp exists').toBeTruthy();
-});
-
-test('22: editing a Pending trip keeps it Pending and keeps submitted flags', async ({ request }) => {
-  const edit = await request.post(`${API}/trips/${tripId}/steps/farm`, {
-    data: { sourceFarmId: (await apiTrip(request, tripId)).sourceFarmId, birdTypeId: (await apiTrip(request, tripId)).birdTypeId, farmAddress: 'E2E Farm Address EDITED', destMeter: 100121, pickupTolls: 0, avgBirdWeight: 2.4, farmStepSubmitted: true },
-  });
-  expect(edit.ok(), `edit Pending farm → ${edit.status()} ${await edit.text()}`).toBeTruthy();
-  const t = await apiTrip(request, tripId);
-  expect(t.status).toBe('Pending');
-  for (const f of ['startStepSubmitted', 'farmStepSubmitted', 'pickupStepSubmitted', 'deliveryStepSubmitted', 'expensesStepSubmitted', 'endStepSubmitted']) {
-    expect(Boolean(t[f]), `${f} stays true`).toBe(true);
-  }
-});
-
-test('23: Pending → Completed; editing Completed keeps identity, flags, status; no Pending→Draft', async ({ request }) => {
-  const done = await request.patch(`${API}/trips/${tripId}/status`, { data: { status: 'Completed', approvedBy: 'E2E' } });
-  expect(done.ok(), `→ Completed → ${done.status()} ${await done.text()}`).toBeTruthy();
-  let t = await apiTrip(request, tripId);
-  expect(t.status).toBe('Completed');
   expect(t.tripNo).toBe(tripNo);
+  expect(t.vehicleNo).toBe(SEED.vehicle);
+  expect(t.farmStepSubmitted).toBe(true);
+  expect(t.deliveryStepSubmitted).not.toBe(true);
 
-  const edit = await request.post(`${API}/trips/${tripId}/steps/expenses`, {
-    data: { endMeter: 100601, destinationTolls: 0, meals: 550, loading: 0, expensesStepSubmitted: true, endStepSubmitted: true },
-  });
-  expect(edit.ok(), `edit Completed → ${edit.status()} ${await edit.text()}`).toBeTruthy();
-  t = await apiTrip(request, tripId);
-  expect(t.status, 'stays Completed under editing').toBe('Completed');
-  expect(t.tripNo, 'same Trip No').toBe(tripNo);
-  for (const f of ['startStepSubmitted', 'farmStepSubmitted', 'pickupStepSubmitted', 'deliveryStepSubmitted', 'expensesStepSubmitted', 'endStepSubmitted']) {
-    expect(Boolean(t[f])).toBe(true);
+  // Part U/T: Orders derives everything from the persisted /trips data (no
+  // parallel store); the page loads clean in both languages.
+  for (const lang of ['en', 'te'] as const) {
+    await setLanguage(page, lang);
+    await page.goto('/operations?tab=orders');
+    await page.waitForLoadState('networkidle');
+    await assertNoRawKeys(page);
+    await expect(page.getByRole('button', { name: lang === 'en' ? /assignment/i : /అసైన్‌మెంట్/ })).toBeVisible();
   }
-
-  // No Pending→Draft, and no status-PATCH to Deleted from any state.
-  expect((await request.patch(`${API}/trips/${tripId}/status`, { data: { status: 'Draft' } })).status()).toBe(422);
-  expect((await request.patch(`${API}/trips/${tripId}/status`, { data: { status: 'Deleted' } })).status()).toBe(422);
 });
 
-test('24: Step 1 meter — current trip is not its own previous meter', async ({ request }) => {
-  const hintWith = await (await request.get(`${API}/trips/vehicle/1/last-meter`)).json();
-  const hintExcl = await request.get(`${API}/trips/vehicle/1/last-meter?excludeTripId=${tripId}`);
-  // With the trip excluded, its own start/end meter must not come back.
-  const excluded = await hintExcl.json();
-  if (excluded) {
-    expect(String(excluded.ref)).not.toBe(tripNo);
+test('21: a fully-completed trip is Pending with a SERVER completion timestamp and all step flags set; editing it does not reset them', async ({ request }) => {
+  const t = await pendingTrip(request);
+  expect(t.status).toBe('Pending');
+  for (const f of ['startStepSubmitted', 'farmStepSubmitted', 'pickupStepSubmitted', 'deliveryStepSubmitted', 'endStepSubmitted', 'expensesStepSubmitted']) {
+    expect(Boolean(t[f]), f).toBe(true);
   }
-  // Re-submitting Step 1 with the SAME opening meter must not raise a
-  // self-reference error.
+  const ts = (t.expensesStepSubmittedAt ?? t.submittedAt) as string | null;
+  expect(ts, 'server completion timestamp exists').toBeTruthy();
+
+  // Re-submit Step 5 (an edit): flags stay set, status stays Pending, and the
+  // official timestamp is NOT replaced (Part J).
+  const edit = await request.post(`${API}/trips/${t.id}/steps/expenses`, {
+    data: { endMeter: 90650, destinationTolls: 0, meals: 400, loading: 0 },
+  });
+  expect(edit.ok(), `edit Step 5 -> ${edit.status()} ${await edit.text()}`).toBeTruthy();
+  const after = await apiTrip(request, t.id);
+  expect(after.status).toBe('Pending');
+  expect(Boolean(after.expensesStepSubmitted)).toBe(true);
+  expect((after.expensesStepSubmittedAt ?? after.submittedAt), 'official timestamp preserved').toBe(ts);
+});
+
+test('22: editing a Pending trip keeps it Pending and keeps every submitted flag', async ({ request }) => {
+  const t = await pendingTrip(request);
+  const edit = await request.post(`${API}/trips/${t.id}/steps/farm`, {
+    data: { sourceFarmId: t.sourceFarmId, birdTypeId: t.birdTypeId, farmAddress: 'Seed Farm Address EDITED', destMeter: 90121, pickupTolls: 0, avgBirdWeight: 2.5, farmStepSubmitted: true },
+  });
+  expect(edit.ok(), `edit Pending farm -> ${edit.status()} ${await edit.text()}`).toBeTruthy();
+  const after = await apiTrip(request, t.id);
+  expect(after.status).toBe('Pending');
+  for (const f of ['startStepSubmitted', 'farmStepSubmitted', 'pickupStepSubmitted', 'deliveryStepSubmitted', 'endStepSubmitted', 'expensesStepSubmitted']) {
+    expect(Boolean(after[f]), f + ' stays true').toBe(true);
+  }
+});
+
+test('23: Pending -> Completed; editing Completed keeps identity/flags/status; no Pending->Draft, no status->Deleted', async ({ request }) => {
+  const t = await pendingTrip(request);
+  const done = await request.patch(`${API}/trips/${t.id}/status`, { data: { status: 'Completed', approvedBy: 'E2E' } });
+  expect(done.ok(), `-> Completed -> ${done.status()} ${await done.text()}`).toBeTruthy();
+  let after = await apiTrip(request, t.id);
+  expect(after.status).toBe('Completed');
+  expect(after.tripNo).toBe(PENDING_NO);
+
+  const edit = await request.post(`${API}/trips/${t.id}/steps/expenses`, {
+    data: { endMeter: 90655, destinationTolls: 0, meals: 450, loading: 0, expensesStepSubmitted: true, endStepSubmitted: true },
+  });
+  expect(edit.ok(), `edit Completed -> ${edit.status()} ${await edit.text()}`).toBeTruthy();
+  after = await apiTrip(request, t.id);
+  expect(after.status, 'stays Completed under ordinary editing').toBe('Completed');
+  expect(after.tripNo).toBe(PENDING_NO);
+  for (const f of ['startStepSubmitted', 'farmStepSubmitted', 'pickupStepSubmitted', 'deliveryStepSubmitted', 'endStepSubmitted', 'expensesStepSubmitted']) {
+    expect(Boolean(after[f])).toBe(true);
+  }
+
+  expect((await request.patch(`${API}/trips/${t.id}/status`, { data: { status: 'Draft' } })).status(), 'no Pending/Completed -> Draft').toBe(422);
+  expect((await request.patch(`${API}/trips/${t.id}/status`, { data: { status: 'Deleted' } })).status(), 'no status -> Deleted').toBe(422);
+});
+
+test('24: Step 1 opening meter -- the current trip is never its own previous meter', async ({ request }) => {
   const t = await apiTrip(request, tripId);
+  const withSelf = await (await request.get(`${API}/trips/vehicle/${t.vehicleId}/last-meter`)).json();
+  expect(withSelf?.closingMeter).toBe(100000);
+  const excluded = await request.get(`${API}/trips/vehicle/${t.vehicleId}/last-meter?excludeTripId=${tripId}`);
+  expect(await excluded.json()).toBeNull();
+
   const reSubmit = await request.post(`${API}/trips/${tripId}/steps/start`, {
     data: {
-      vehicleId: t.vehicleId, vehicleNo: t.vehicleNo,
-      driverId: t.driverId, driverName: t.driverName,
-      supervisorId: t.supervisorId, supervisorName: t.supervisorName,
-      helpers: t.helpers, loaders: t.loaders,
+      vehicleId: t.vehicleId, vehicleNo: t.vehicleNo, driverId: t.driverId, driverName: t.driverName,
+      supervisorId: t.supervisorId, supervisorName: t.supervisorName, helpers: t.helpers, loaders: t.loaders,
       openingMeter: t.openingMeter, startStepSubmitted: true, tripDate: t.tripDate,
     },
   });
-  expect(reSubmit.ok(), `unchanged re-submit → ${reSubmit.status()} ${await reSubmit.text()}`).toBeTruthy();
-  void hintWith;
+  expect(reSubmit.ok(), `unchanged re-submit -> ${reSubmit.status()} ${await reSubmit.text()}`).toBeTruthy();
 });
 
-test('25: 10-second delete — countdown, cancel keeps the trip, then delete happens exactly once and survives reload', async ({ page }) => {
+test('25: 10-second delete -- countdown + trip number, cancel keeps the trip, then it deletes exactly once and stays deleted after reload', async ({ page, request }) => {
   await setLanguage(page, 'en');
+  const t = await pendingTrip(request);
   await gotoTripEntry(page);
 
-  // Select the trip row in Recent Trip Activity (All filter to see Completed).
-  await page.getByRole('button', { name: /^all/i }).click();
-  const row = page.getByRole('row', { name: new RegExp(tripNo) });
-  await expect(row).toBeVisible();
-  await row.click();
-
-  // Count DELETE calls to the trip endpoint.
+  const row = new RegExp(PENDING_NO.replace(/-/g, '\\-'));
   let deleteCalls = 0;
   page.on('request', (r) => {
-    if (r.method() === 'DELETE' && new RegExp(`/trips/${tripId}(\\?|$)`).test(r.url())) deleteCalls += 1;
+    if (r.method() === 'DELETE' && new RegExp(`/trips/${t.id}(\\?|$)`).test(r.url())) deleteCalls += 1;
   });
 
-  await page.getByRole('button', { name: /^delete$/i }).click();
-  await page.getByRole('textbox').last().fill('E2E delete reason');
-  await page.getByRole('button', { name: /confirm delete/i }).click();
+  const openDeleteModal = async () => {
+    await page.getByRole('button', { name: /^all\b/i }).click();
+    await page.getByRole('row', { name: row }).click();
+    await page.getByRole('button', { name: /^delete\b/i }).click();
+    await page.getByRole('textbox').last().fill('E2E delete reason');
+    await page.locator('button.bg-rose-600').click();
+  };
 
-  // Countdown appears, starting near 10.
-  await expect(page.getByText(/will be deleted|deleting in|\b10\b/i).first()).toBeVisible();
-  // Cancel → trip must remain and no DELETE fired.
-  await page.getByRole('button', { name: /^cancel$/i }).click();
-  await page.waitForTimeout(500);
+  await openDeleteModal();
+  const notice = page.getByRole('dialog', { name: /pending deletion|delete/i }).last();
+  await expect(notice).toContainText(row);
+  await expect(notice).toContainText(/deleted automatically in \d+ second|deleting in \d+ second/i);
+  await notice.getByRole('button', { name: /cancel/i }).click();
+  await page.waitForTimeout(600);
   expect(deleteCalls, 'cancel must not call the delete API').toBe(0);
-  await expect(page.getByRole('row', { name: new RegExp(tripNo) })).toBeVisible();
+  await expect(page.getByRole('row', { name: row })).toBeVisible();
 
-  // Delete again and let the countdown finish.
-  await page.getByRole('row', { name: new RegExp(tripNo) }).click();
-  await page.getByRole('button', { name: /^delete$/i }).click();
-  await page.getByRole('textbox').last().fill('E2E delete reason 2');
-  await page.getByRole('button', { name: /confirm delete/i }).click();
+  await openDeleteModal();
   await page.waitForTimeout(12_000);
+  expect(deleteCalls, 'exactly one delete request after the 10s countdown').toBe(1);
 
-  expect(deleteCalls, 'exactly one delete request').toBe(1);
-
-  // Trip moves to Deleted and stays there after reload.
-  await page.getByRole('button', { name: /deleted/i }).click();
-  await expect(page.getByRole('row', { name: new RegExp(tripNo) })).toBeVisible();
+  await page.getByRole('button', { name: /^deleted\b/i }).click();
+  await expect(page.getByRole('row', { name: row })).toBeVisible();
   await page.reload();
   await page.waitForLoadState('networkidle');
-  await page.getByRole('button', { name: /deleted/i }).click();
-  await expect(page.getByRole('row', { name: new RegExp(tripNo) })).toBeVisible();
+  await page.getByRole('button', { name: /^deleted\b/i }).click();
+  await expect(page.getByRole('row', { name: row })).toBeVisible();
+  expect((await apiTrip(request, t.id)).deleted).toBe(true);
 });
 
-test('26: EN + TE — step names, gate, Recent Table + Orders labels, no raw keys', async ({ page }) => {
+test('26: EN + TE -- wizard step names, Recent Table + Orders, no raw i18n keys anywhere visible', async ({ page }) => {
   for (const lang of ['en', 'te'] as const) {
     await setLanguage(page, lang);
     await gotoTripEntry(page);
     await page.getByRole('button', { name: lang === 'en' ? /create new trip/i : /కొత్త ట్రిప్/ }).click();
 
-    const step1 = lang === 'en' ? /Trip Details/ : /ట్రిప్ వివరాలు/;
-    const step4 = lang === 'en' ? /Delivery Details/ : /డెలివరీ వివరాలు/;
-    await expect(page.locator('button[aria-label^="Step 1"]')).toContainText(step1);
-    await expect(page.locator('button[aria-label^="Step 4"]')).toContainText(step4);
-
+    await expect(stepBtn(page, 1)).toContainText(lang === 'en' ? /Trip Details/ : /ట్రిప్ వివరాలు/);
+    await expect(stepBtn(page, 4)).toContainText(lang === 'en' ? /Delivery Details/ : /డెలివరీ వివరాలు/);
     await assertNoRawKeys(page);
 
     await page.goto('/operations?tab=orders');

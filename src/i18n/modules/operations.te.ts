@@ -285,6 +285,8 @@
   'ops.trip.delivery_mode': 'డెలివరీ విధానం',
   'ops.trip.delivery_tolls': 'డెలివరీ టోల్లు',
   'ops.trip.dest_farm_meter': 'గమ్య ఫారం మీటర్',
+  'ops.trip.dest_meter_missing': 'నమోదు చేయబడలేదు',
+  'ops.trip.submit_diesel_entry': 'డీజిల్ ఎంట్రీ సమర్పించండి',
   'ops.trip.dest_meter_label': 'గమ్య మీటర్',
   'ops.trip.diesel_draft_message_many': '{count} డీజిల్ ఎంట్రీలు ఇంకా డ్రాఫ్ట్‌లో ఉన్నాయి. మూసివేయడానికి ముందు షీట్ సమర్పించండి.',
   'ops.trip.diesel_draft_message_one': '1 డీజిల్ ఎంట్రీ ఇంకా డ్రాఫ్ట్‌లో ఉంది. మూసివేయడానికి ముందు షీట్ సమర్పించండి.',
