@@ -12,6 +12,7 @@ import {
   apiPatch,
   apiDelete,
   handleApiError,
+  toApiError,
 } from "../../../../api";
 import {
   createEmptyTrip,
@@ -600,6 +601,50 @@ export async function submitTripStep(
     body
   );
   return mapApiTripToTrip(data, trip as Trip);
+}
+
+export type Step5SaveOutcome = {
+  ok: boolean;
+  /** Server `updatedAt` on success — the draft's rebase point. */
+  serverUpdatedAt: string | null;
+  /** true = transient (offline / timeout / 5xx / 429): safe to retry. */
+  retryable: boolean;
+  error?: string;
+  trip?: Trip;
+};
+
+/**
+ * Part K — perform ONE Step 5 (Expenses/End) Save Progress call and classify
+ * the outcome for the durable draft/queue. Idempotent: the backend Step 5 save
+ * is a COALESCE upsert, so retrying the same payload is harmless. Never submits.
+ */
+export async function performStep5Save(
+  tripId: number,
+  fields: Record<string, unknown>
+): Promise<Step5SaveOutcome> {
+  try {
+    const body = {
+      ...toStep5Payload(fields as Partial<Trip> & Record<string, unknown>),
+      mode: "save" as const,
+    };
+    const { data } = await apiPost<ApiTripRecord>(`${TRIPS_PATH}/${tripId}/steps/expenses`, body);
+    const trip = mapApiTripToTrip(data, {} as Trip);
+    return {
+      ok: true,
+      serverUpdatedAt: (data as Record<string, unknown>).updatedAt as string ?? trip.updatedAt ?? null,
+      retryable: false,
+      trip,
+    };
+  } catch (error) {
+    const apiErr = toApiError(error);
+    const status = apiErr.status;
+    const retryable =
+      apiErr.code === "NETWORK_ERROR" ||
+      apiErr.code === "TIMEOUT" ||
+      status === 429 ||
+      (typeof status === "number" && status >= 500);
+    return { ok: false, serverUpdatedAt: null, retryable, error: apiErr.message };
+  }
 }
 
 /** Explicitly persist a valid step without submitting/locking it. */

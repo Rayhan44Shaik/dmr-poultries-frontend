@@ -57,25 +57,32 @@ test("Part B: first incomplete step is reported (0-based)", () => {
   );
 });
 
-test("Part M: lifecycle transition map has no Pending -> Draft", () => {
-  assert.deepEqual(TRIP_STATUS_TRANSITIONS.Draft, ["Pending", "Deleted"]);
-  assert.deepEqual(TRIP_STATUS_TRANSITIONS.Pending, ["Completed", "Deleted"]);
-  assert.deepEqual(TRIP_STATUS_TRANSITIONS.Completed, ["Deleted"]);
+test("Part M: status control map — forward only, no Pending -> Draft, deletion is not a transition", () => {
+  assert.deepEqual(TRIP_STATUS_TRANSITIONS.Draft, ["Pending"]);
+  assert.deepEqual(TRIP_STATUS_TRANSITIONS.Pending, ["Completed"]);
+  assert.deepEqual(TRIP_STATUS_TRANSITIONS.Completed, []);
   assert.deepEqual(TRIP_STATUS_TRANSITIONS.Deleted, []);
+  // "Deleted" is never a status-control target on any state — it is only
+  // reachable through the dedicated Delete action + 10s undo.
+  for (const from of ["Draft", "Pending", "Completed", "Deleted"] as const) {
+    assert.equal(TRIP_STATUS_TRANSITIONS[from].includes("Deleted"), false);
+  }
 });
 
 test("Part N: valid / invalid transitions", () => {
   assert.equal(isValidTripStatusTransition("Draft", "Pending"), true);
-  assert.equal(isValidTripStatusTransition("Draft", "Deleted"), true);
   assert.equal(isValidTripStatusTransition("Pending", "Completed"), true);
-  assert.equal(isValidTripStatusTransition("Pending", "Deleted"), true);
 
   assert.equal(isValidTripStatusTransition("Pending", "Draft"), false);
   assert.equal(isValidTripStatusTransition("Completed", "Draft"), false);
   assert.equal(isValidTripStatusTransition("Completed", "Pending"), false);
+  assert.equal(isValidTripStatusTransition("Completed", "Deleted"), false);
+  assert.equal(isValidTripStatusTransition("Draft", "Deleted"), false);
+  assert.equal(isValidTripStatusTransition("Pending", "Deleted"), false);
   assert.equal(isValidTripStatusTransition("Deleted", "Draft"), false);
   assert.equal(isValidTripStatusTransition("Deleted", "Pending"), false);
 
   assert.equal(getValidNextStatuses("Pending").includes("Draft"), false);
   assert.equal(getValidNextStatuses("Completed").includes("Draft"), false);
+  assert.equal(getValidNextStatuses("Completed").length, 0);
 });

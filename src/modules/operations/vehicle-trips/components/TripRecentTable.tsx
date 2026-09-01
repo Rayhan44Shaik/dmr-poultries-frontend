@@ -204,7 +204,10 @@ function TripRecentTable({
     };
   };
 
-  // ✅ Handle status change with approver name - only allows valid transitions per backend state machine
+  // Status control — only forward lifecycle transitions (Draft→Pending,
+  // Pending→Completed). `Pending → Draft` never exists. Deletion is NOT a
+  // status change: it goes exclusively through the Delete action + 10s undo,
+  // so "Deleted" is never a value this handler receives.
   const handleStatusChange = (trip: Trip, newStatus: TripStatus) => {
     if (!isValidTripStatusTransition(trip.status, newStatus)) {
       return; // Invalid transition - silently ignore (backend will also reject)
@@ -212,9 +215,7 @@ function TripRecentTable({
     if (newStatus === "Completed") {
       const approver = getCurrentUser();
       if (onStatusChange) onStatusChange(trip, "Completed", approver);
-    } else if (newStatus === "Pending" || newStatus === "Deleted") {
-      // Pending → Draft is not a valid lifecycle transition and is intentionally
-      // absent here, in the transition map, and in the backend state machine.
+    } else if (newStatus === "Pending") {
       if (onStatusChange) onStatusChange(trip, newStatus);
     }
   };

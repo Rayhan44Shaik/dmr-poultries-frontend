@@ -5,6 +5,7 @@ import type { Trip } from "../types/trip";
 import type { TripStatus } from "../../../../shared/trip";
 import { apiPut } from "../../../../api";
 import { listTrips, changeTripStatus, deleteTripFromApi } from "../services/tripHeaderApiService";
+import { clearStep5Draft } from "../../../../shared/trip/step5DraftStore";
 import { sendTripDeliveryEmails } from "../services/deliveryEmailService";
 import { translate } from "../../../../i18n";
 
@@ -68,6 +69,9 @@ export default function useTrips(
   const deleteTrip = async (id: number, reason?: string) => {
     try {
       await deleteTripFromApi(id, reason || translate("ops.trip.no_reason"));
+      // Part K: a deleted trip's local Step 5 draft/queue is obsolete. Only this
+      // trip's keys are removed — other trips' drafts are untouched.
+      await clearStep5Draft(id).catch(() => {});
       await refreshTrips();
       notify(translate("ops.trip.deleted_success"), "success");
     } catch (err) {
