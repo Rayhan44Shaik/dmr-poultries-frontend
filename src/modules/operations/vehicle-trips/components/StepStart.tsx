@@ -609,15 +609,16 @@ function StepStart({
     }
     let cancelled = false;
     setLatestMeter(null);
-    fetchLastClosingMeter(form.vehicleId)
+    // Part L: when editing, the backend excludes this trip's own start/end
+    // meter from the lookup. The client-side guard below stays as defence in
+    // depth (same rule, both sides) in case a stale row slips through.
+    fetchLastClosingMeter(form.vehicleId, tripId > 0 ? tripId : undefined)
       .then((data) => {
         if (cancelled) return;
         if (!data || data.closingMeter == null) {
           setLatestMeter(null);
           return;
         }
-        // Self-exclusion when editing: the latest event may be THIS trip's own
-        // start/end meter, which must never constrain its own opening reading.
         const isCurrentTripMeter =
           tripId > 0 &&
           data.ref != null &&

@@ -639,10 +639,19 @@ export async function fetchAvailableResources(tripId?: number | null): Promise<A
   return data;
 }
 
-/** GET /api/trips/vehicle/:vehicleId/last-meter — opening KM validation. */
-export async function fetchLastClosingMeter(vehicleId: number): Promise<LastClosingMeter | null> {
+/**
+ * GET /api/trips/vehicle/:vehicleId/last-meter — opening KM validation hint.
+ * Part L: pass the trip id when EDITING so the backend excludes this trip's own
+ * start/end meter and never reports it as the "previous" reading.
+ */
+export async function fetchLastClosingMeter(
+  vehicleId: number,
+  excludeTripId?: number
+): Promise<LastClosingMeter | null> {
+  const suffix =
+    excludeTripId && excludeTripId > 0 ? `?excludeTripId=${excludeTripId}` : "";
   const { data } = await apiGet<LastClosingMeter | null>(
-    `${TRIPS_PATH}/vehicle/${vehicleId}/last-meter`
+    `${TRIPS_PATH}/vehicle/${vehicleId}/last-meter${suffix}`
   );
   if (!data || data.closingMeter == null) return null;
   return data;
