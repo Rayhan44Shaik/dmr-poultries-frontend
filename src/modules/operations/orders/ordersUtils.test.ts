@@ -2,9 +2,10 @@
 // "Shops (5) → (4) → … → (0)" in Delivery Tracking.
 //
 // The count is DERIVED from persisted rows only:
-//   - Order Assignment writes box-less, weight-0 `[ORDER]` plan rows onto the
-//     vehicle trip (the backend still stamps auto_capture_time on every
-//     INSERT — that alone must NOT count as "delivered").
+//   - Order Assignment (POST /api/orders/assignments) projects box-less,
+//     weight-0 `[ORDER]` plan rows onto the vehicle trip inside the same
+//     transaction (the backend stamps auto_capture_time on every INSERT —
+//     that alone must NOT count as "delivered").
 //   - Trip Entry Step 4 later rewrites a row with real delivered quantities
 //     (weight > 0 and/or selected pickup boxes) — THAT is a capture.
 //   - pendingShops = original order shops with no capture yet.
@@ -18,9 +19,7 @@ import {
   isCapturedRow,
   isTrackingTrip,
 } from "./ordersUtils";
-import { orderRowRemarks, type ShopOrderQuantities } from "./types";
-
-const CONTAINER_NO = "ORD-20260901-01";
+import { ORDER_PLAN_REMARKS, type ShopOrderQuantities } from "./types";
 
 function planRow(shopId: number, over: Partial<ShopDelivery> = {}): ShopDelivery {
   return {
@@ -38,7 +37,7 @@ function planRow(shopId: number, over: Partial<ShopDelivery> = {}): ShopDelivery
     mortKg: 0,
     rate: null,
     amount: 0,
-    remarks: orderRowRemarks(CONTAINER_NO),
+    remarks: ORDER_PLAN_REMARKS,
     deliveryMode: "box",
     selectedBoxIds: [],
     // The backend stamps this on every trip_deliveries INSERT, plan rows included.
@@ -92,7 +91,7 @@ test("isTrackingTrip: a vehicle trip carrying [ORDER] rows is tracked before Ste
   const trip = vehicleTrip([planRow(1), planRow(2)]);
   assert.equal(hasOrderRows(trip), true);
   assert.equal(isTrackingTrip(trip), true);
-  // the vehicle-less collection container is never a tracking trip
+  // a row with no vehicle is never a tracking trip
   assert.equal(
     isTrackingTrip(vehicleTrip([planRow(1)], { vehicleId: 0, vehicleNo: "" })),
     false

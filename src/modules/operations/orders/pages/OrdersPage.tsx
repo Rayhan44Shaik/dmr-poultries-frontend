@@ -1,127 +1,166 @@
 // src/modules/operations/orders/pages/OrdersPage.tsx
-// DMR POULTRIES — Orders (3-tab operational flow, day-based).
+// DMR POULTRIES — Orders.
 //
-// Exactly three tabs, no search/filter panel, no KPI cards, and NO
-// in-page header — the global header already renders the single
-// "Operations / Orders" breadcrumb + title:
+//   Order Collection | Order Assignment | Delivery Tracking
 //
-//   1. ORDER COLLECTION — day-based collection. One collection per
-//      operational day, chosen with the SINGLE global date selector
-//      (compact DatePicker — default TODAY, previous days allowed,
-//      FUTURE DATES NEVER SELECTABLE). Today is editable (Save Progress /
-//      Finish Collection); PAST AND FINISHED DAYS ARE READ-ONLY (locked).
-//      The table collects the order: shop, village, birds (optional),
-//      boxes (mandatory), weight and a compact status — assignment facts
-//      (trip / vehicle / sequence) show as a tooltip, not as columns.
-//   2. ORDER ASSIGNMENT — day-scoped, vehicle-first: select a vehicle →
-//      select the day's available shops ONE BY ONE (compact checkbox
-//      table) → sequence (↑/↓) → assigned boxes (1…ordered) → Save
-//      Progress / Finish. The vehicle's box capacity is a HARD LIMIT
-//      (exact figures, invalid values blocked). The same shop can NOT be
-//      assigned to two vehicles on the same day (enforced from persisted
-//      data; re-checked before every save). Past days read-only.
-//   3. DELIVERY TRACKING — order-assigned trips with their ACTUAL
-//      delivery progress (Step 4 records are the source of truth; Orders
-//      never writes delivery data). Completed trips stay visible only for
-//      the current 7-day operational window.
-//
-// Data is read through the existing /api/trips contract — the same
-// vehicle-trip endpoint Step 1–5 uses, so Step 4 delivery records, PDF
-// and WhatsApp work unchanged.
+// All three tabs read the SAME backend Orders module (/api/orders), which
+// owns the quantities, the locks and the statuses. The page holds only view
+// state (active tab, selected day/range, search text, page, rows per page)
+// and refetches from the server whenever that view state changes — so a
+// refresh, a cache clear, a navigation away and back, or a change made by
+// another user always reproduces the correct state.
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardList, PackageCheck, Route } from "lucide-react";
 import { useI18n } from "../../../../i18n";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
-import type { Trip } from "../../../../shared/trip";
+import { useToast } from "../../../../components/common/ToastProvider";
 import {
-  fetchOrdersData,
+  cityOf,
+  loadOrdersTrip,
   loadShopDirectory,
   loadSupervisorDirectory,
   sendOrdersWhatsApp,
   shopMobileOf,
   supervisorMobileOf,
-  villageOf,
   type ShopDirectory,
   type SupervisorDirectory,
 } from "../ordersService";
-import { useToast } from "../../../../components/common/ToastProvider";
-import { buildShopBreakdown, rowsInSequence } from "../ordersUtils";
+import {
+  emptyOrdersPage,
+  listEligibleVehicles,
+  listOrders,
+  type EligibleVehicle,
+  type OrdersPage as OrdersPageData,
+} from "../services/ordersApi";
+import { addLocalDays, buildShopBreakdown, localToday, rowsInSequence } from "../ordersUtils";
 import { generateOrdersPdf } from "../pdf/generateOrdersPdf";
-import type { OrdersFetch, OrdersTrip } from "../types";
+import type { OrdersTrip } from "../types";
 import { useOrdersI18n } from "../i18n/ordersI18n";
 import OrdersAssignmentTab from "../components/OrdersAssignmentTab";
 import OrdersCollectionTab from "../components/OrdersCollectionTab";
 import OrdersDeliveryTrackingTab from "../components/OrdersDeliveryTrackingTab";
 import OrdersDeliveryDetailView from "../components/OrdersDeliveryDetailView";
-import { OrdersErrorState, OrdersTableSkeleton } from "../components/OrdersCommon";
+import { OrdersErrorState, OrdersTabHeader } from "../components/OrdersCommon";
+import { ORDERS_DEFAULT_PAGE_SIZE } from "../components/ordersUiConstants";
 
 type TabKey = "collection" | "assignment" | "tracking";
-
-const TAB_DEFS: Array<{ key: TabKey; labelKey: string; icon: React.ReactNode }> = [
-  { key: "collection", labelKey: "orders.tab_collection", icon: <ClipboardList size={13} /> },
-  { key: "assignment", labelKey: "orders.tab_assignment", icon: <PackageCheck size={13} /> },
-  { key: "tracking", labelKey: "orders.tab_tracking", icon: <Route size={13} /> },
-];
 
 const OrdersPage: React.FC = () => {
   const { language } = useI18n();
   const { to } = useOrdersI18n();
   const { showNotification } = useSafeNotification();
+  const { success: toastSuccess, error: toastError } = useToast();
   const { shops, loading: shopsLoading } = useShops();
 
-  const [data, setData] = useState<OrdersFetch | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const today = useMemo(() => localToday(), []);
+
   const [activeTab, setActiveTab] = useState<TabKey>("collection");
-  const [viewingId, setViewingId] = useState<number | null>(null);
-  const [pdfBusyId, setPdfBusyId] = useState<number | null>(null);
-  const [whatsappBusyId, setWhatsappBusyId] = useState<number | null>(null);
-  /** Which tab's table-level refresh is in flight (null = idle). */
-  const [refreshing, setRefreshing] = useState<TabKey | null>(null);
+
+  // ── View state (per tab) ────────────────────────────────────────────────
+  const [day, setDay] = useState<string>(today);
+  const [trackingFrom, setTrackingFrom] = useState<string>(addLocalDays(today, -6));
+  const [trackingTo, setTrackingTo] = useState<string>(today);
+  const [search, setSearch] = useState<Record<TabKey, string>>({
+    collection: "",
+    assignment: "",
+    tracking: "",
+  });
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [pageNumber, setPageNumber] = useState<Record<TabKey, number>>({
+    collection: 1,
+    assignment: 1,
+    tracking: 1,
+  });
+  const [pageSize, setPageSize] = useState<Record<TabKey, number>>({
+    collection: ORDERS_DEFAULT_PAGE_SIZE,
+    assignment: ORDERS_DEFAULT_PAGE_SIZE,
+    tracking: ORDERS_DEFAULT_PAGE_SIZE,
+  });
+  const [selectedTripId, setSelectedTripId] = useState<number | null>(null);
+
+  // ── Server data ─────────────────────────────────────────────────────────
+  const [data, setData] = useState<OrdersPageData>(() => emptyOrdersPage());
+  const [vehicles, setVehicles] = useState<EligibleVehicle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [shopDirectory, setShopDirectory] = useState<ShopDirectory>(new Map());
   const [supervisorDirectory, setSupervisorDirectory] = useState<SupervisorDirectory>(new Map());
 
-  // ── Selected operational day (drives Tabs 1 + 2; today by default) ──────
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const today = data?.today ?? "";
-  // Clamp: never future, always inside the 7-day window.
-  const day = selectedDay && today && selectedDay <= today && data?.days.includes(selectedDay)
-    ? selectedDay
-    : today;
+  // Debounce the search box so typing does not fire a query per keystroke,
+  // and always reset to page 1 when the query changes.
+  const activeSearch = search[activeTab];
+  useEffect(() => {
+    const handle = window.setTimeout(() => setDebouncedSearch(activeSearch.trim()), 300);
+    return () => window.clearTimeout(handle);
+  }, [activeSearch]);
 
-  const load = useCallback(async () => {
-    try {
-      const next = await fetchOrdersData();
-      setData(next);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load orders");
-    } finally {
-      setLoading(false);
+  const currentQuery = useMemo(() => {
+    if (activeTab === "tracking") {
+      return {
+        fromDate: trackingFrom,
+        toDate: trackingTo,
+        search: debouncedSearch,
+        page: pageNumber.tracking,
+        pageSize: pageSize.tracking,
+      };
     }
-  }, []);
+    return {
+      date: day,
+      search: debouncedSearch,
+      page: pageNumber[activeTab],
+      pageSize: pageSize[activeTab],
+    };
+  }, [activeTab, day, trackingFrom, trackingTo, debouncedSearch, pageNumber, pageSize]);
 
-  // Initial load. The retry button and post-mutation refreshes use `load`;
-  // the first fetch is inlined here so the effect only sets state from
-  // async callbacks (no synchronous setState in the effect body).
+  // A monotonically increasing token: only the newest response is applied,
+  // so a slow earlier request can never overwrite fresher data.
+  const requestToken = useRef(0);
+
+  /**
+   * Reloads the current tab from the server. State is only ever written from
+   * the async callbacks, so the effect below never sets state synchronously
+   * (no cascading renders).
+   */
+  const fetchPage = useCallback(
+    (): Promise<boolean> => {
+      const token = (requestToken.current += 1);
+      return Promise.all([
+        listOrders(currentQuery),
+        activeTab === "assignment"
+          ? listEligibleVehicles(day)
+          : Promise.resolve<EligibleVehicle[]>([]),
+      ]).then(
+        ([next, eligible]) => {
+          if (token !== requestToken.current) return false;
+          setData(next);
+          if (activeTab === "assignment") setVehicles(eligible);
+          setError(null);
+          setLoading(false);
+          setRefreshing(false);
+          return true;
+        },
+        (e: unknown) => {
+          if (token !== requestToken.current) return false;
+          setError(e instanceof Error ? e.message : "Failed to load orders");
+          setLoading(false);
+          setRefreshing(false);
+          return false;
+        }
+      );
+    },
+    [currentQuery, activeTab, day]
+  );
+
+  useEffect(() => {
+    void fetchPage();
+  }, [fetchPage]);
+
   useEffect(() => {
     let cancelled = false;
-    void fetchOrdersData().then(
-      (next) => {
-        if (cancelled) return;
-        setData(next);
-        setError(null);
-      },
-      (e: unknown) => {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Failed to load orders");
-      }
-    ).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
     void (async () => {
       try {
         const [shopDir, supDir] = await Promise.all([
@@ -133,7 +172,7 @@ const OrdersPage: React.FC = () => {
           setSupervisorDirectory(supDir);
         }
       } catch {
-        // Non-fatal: village / supervisor-mobile columns fall back to "—".
+        // Non-fatal: city / supervisor-mobile decorations fall back to "—".
       }
     })();
     return () => {
@@ -141,71 +180,86 @@ const OrdersPage: React.FC = () => {
     };
   }, []);
 
-  const mobileOf = useCallback(
-    (trip: Trip) => supervisorMobileOf(trip, supervisorDirectory),
-    [supervisorDirectory]
+  // A vehicle that is no longer eligible (completed, rate-locked, another
+  // day) must never linger as a stale selection — derived, not stored.
+  const effectiveTripId = useMemo(
+    () => (selectedTripId && vehicles.some((v) => v.tripId === selectedTripId) ? selectedTripId : null),
+    [selectedTripId, vehicles]
   );
 
-  // ── Tab 1 / Tab 2 completion flows ─────────────────────────────────────
-  const handleCollectionSaved = useCallback(async () => {
-    await load();
-  }, [load]);
+  // ── View-state setters (filters always reset pagination) ────────────────
+  const setTabSearch = useCallback(
+    (value: string) => {
+      setSearch((prev) => ({ ...prev, [activeTab]: value }));
+      setPageNumber((prev) => ({ ...prev, [activeTab]: 1 }));
+    },
+    [activeTab]
+  );
 
-  const handleCollectionFinished = useCallback(async () => {
-    await load();
-    setActiveTab("assignment");
-  }, [load]);
+  const setTabPage = useCallback(
+    (value: number) => setPageNumber((prev) => ({ ...prev, [activeTab]: Math.max(1, value) })),
+    [activeTab]
+  );
 
-  const handleAssignmentChanged = useCallback(async () => {
-    await load();
-  }, [load]);
+  const setTabPageSize = useCallback(
+    (value: number) => {
+      setPageSize((prev) => ({ ...prev, [activeTab]: value }));
+      setPageNumber((prev) => ({ ...prev, [activeTab]: 1 }));
+    },
+    [activeTab]
+  );
 
-  const handleAssignmentFinished = useCallback(async () => {
-    await load();
-    setActiveTab("tracking");
-  }, [load]);
+  const handleDaySelect = useCallback((next: string) => {
+    setDay(next);
+    setPageNumber({ collection: 1, assignment: 1, tracking: 1 });
+  }, []);
 
-  // ── Table-level Refresh (all three tabs) ─────────────────────────────────
-  // Refetches only the Orders data for the current tab: no app reload, no
-  // unrelated modules, no main skeleton swap (the visible table stays), and
-  // the selected day / tab / search text / sort / filters are preserved
-  // (only `data` is replaced — the tab components keep their local state).
-  // Confirmed with the EXISTING global compact toast (auto-dismiss ~5s,
-  // non-blocking — never a modal, never covering the table); a guard
-  // blocks duplicate calls while a refresh is in flight.
-  const { success: toastSuccess, error: toastError } = useToast();
-  const handleRefresh = useCallback(
-    async (tab: TabKey) => {
-      if (refreshing) return;
-      setRefreshing(tab);
+  const handleRangeChange = useCallback((from: string, toDay: string) => {
+    setTrackingFrom(from);
+    setTrackingTo(toDay);
+    setPageNumber((prev) => ({ ...prev, tracking: 1 }));
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    // The refresh NEVER throws: it reports the real outcome instead.
+    const ok = await fetchPage();
+    if (ok) toastSuccess(to(`orders.refresh_${activeTab}`), 5000);
+    else toastError(to("orders.refresh_failed"), 5000);
+  }, [refreshing, fetchPage, toastSuccess, toastError, to, activeTab]);
+
+  // ── Row actions on Delivery Tracking (existing trip services) ───────────
+  const [viewing, setViewing] = useState<OrdersTrip | null>(null);
+  const [pdfBusyTripId, setPdfBusyTripId] = useState<number | null>(null);
+  const [whatsappBusyTripId, setWhatsappBusyTripId] = useState<number | null>(null);
+
+  const openTrip = useCallback(
+    async (tripId: number) => {
+      if (!tripId) return;
       try {
-        const next = await fetchOrdersData();
-        setData(next);
-        setError(null);
-        toastSuccess(to(`orders.refresh_${tab}`), 5000);
-      } catch {
-        toastError(to("orders.refresh_failed"), 5000);
-      } finally {
-        setRefreshing(null);
+        setViewing(await loadOrdersTrip(tripId, data.rows));
+      } catch (e) {
+        showNotification(e instanceof Error ? e.message : to("orders.load_failed"), "error");
       }
     },
-    [refreshing, toastSuccess, toastError, to]
+    [data.rows, showNotification, to]
   );
 
-  // ── Row-level operations (PDF / WhatsApp) ──────────────────────────────
   const handlePdf = useCallback(
-    async (ot: OrdersTrip) => {
-      if (pdfBusyId != null) return;
-      setPdfBusyId(ot.trip.id);
+    async (tripId: number) => {
+      if (!tripId || pdfBusyTripId != null) return;
+      setPdfBusyTripId(tripId);
       try {
+        const ot = await loadOrdersTrip(tripId, data.rows);
         await generateOrdersPdf({
           trip: ot.trip,
-          supervisorMobile: mobileOf(ot.trip),
+          supervisorMobile: supervisorMobileOf(ot.trip, supervisorDirectory),
           progress: ot.progress,
           breakdown: buildShopBreakdown(
             rowsInSequence(ot.trip),
             ot.originalShopIds,
-            (shopId, shopName) => villageOf(shopId, shopName, shopDirectory),
+            (shopId, shopName) => cityOf(shopId, shopName, shopDirectory),
             ot.originalQuantities,
             (shopId) => shopMobileOf(shopId, shopDirectory)
           ),
@@ -214,20 +268,27 @@ const OrdersPage: React.FC = () => {
       } catch (e) {
         showNotification(e instanceof Error ? e.message : to("orders.pdf_failed"), "error");
       } finally {
-        setPdfBusyId(null);
+        setPdfBusyTripId(null);
       }
     },
-    [pdfBusyId, mobileOf, shopDirectory, language, to, showNotification]
+    [pdfBusyTripId, data.rows, supervisorDirectory, shopDirectory, language, showNotification, to]
   );
 
   const handleWhatsApp = useCallback(
-    async (ot: OrdersTrip) => {
-      if (whatsappBusyId != null) return;
-      setWhatsappBusyId(ot.trip.id);
+    async (tripId: number) => {
+      if (!tripId || whatsappBusyTripId != null) return;
+      setWhatsappBusyTripId(tripId);
       try {
-        const result = await sendOrdersWhatsApp(ot.trip, mobileOf(ot.trip));
+        const ot = await loadOrdersTrip(tripId, data.rows);
+        const result = await sendOrdersWhatsApp(
+          ot.trip,
+          supervisorMobileOf(ot.trip, supervisorDirectory)
+        );
         if (result.sent > 0 && result.failed === 0) {
-          showNotification(to("orders.whatsapp_done", { sent: result.sent, total: result.sent }), "success");
+          showNotification(
+            to("orders.whatsapp_done", { sent: result.sent, total: result.sent }),
+            "success"
+          );
         } else if (result.sent > 0) {
           showNotification(
             to("orders.whatsapp_partial", { sent: result.sent, failed: result.failed }),
@@ -238,7 +299,10 @@ const OrdersPage: React.FC = () => {
         } else if (result.message === "no_rows") {
           showNotification(to("orders.whatsapp_no_rows"), "info");
         } else {
-          showNotification(to("orders.whatsapp_failed", { message: result.message ?? "—" }), "error");
+          showNotification(
+            to("orders.whatsapp_failed", { message: result.message ?? "—" }),
+            "error"
+          );
         }
       } catch (e) {
         showNotification(
@@ -246,125 +310,121 @@ const OrdersPage: React.FC = () => {
           "error"
         );
       } finally {
-        setWhatsappBusyId(null);
+        setWhatsappBusyTripId(null);
       }
     },
-    [whatsappBusyId, mobileOf, to, showNotification]
+    [whatsappBusyTripId, data.rows, supervisorDirectory, showNotification, to]
   );
 
-  // ── Detail view (opened from Tab 3) — rendered as a modal over the tab ─
-  const viewing: OrdersTrip | null =
-    (viewingId != null && data?.tracking.find((t) => t.trip.id === viewingId)) || null;
-
-  const dayCollection = data && day ? data.collectionsByDay[day] ?? null : null;
+  const tabs = useMemo(
+    () => [
+      {
+        key: "collection",
+        label: to("orders.tab_collection"),
+        icon: <ClipboardList size={14} />,
+      },
+      {
+        key: "assignment",
+        label: to("orders.tab_assignment"),
+        icon: <PackageCheck size={14} />,
+      },
+      { key: "tracking", label: to("orders.tab_tracking"), icon: <Route size={14} /> },
+    ],
+    [to]
+  );
 
   return (
     <div className="space-y-4">
-      {/* Tab switcher — clean labels only (no numeric counters). The ONE
-          global date selector lives in the table-level controls of Tabs 1
-          and 2; the selected day is preserved across tab switches. */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {TAB_DEFS.map((tab) => {
-          const active = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] md:text-xs font-bold transition-colors ${
-                active
-                  ? "bg-white shadow-sm text-emerald-700 border border-slate-200"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              <span className={active ? "text-emerald-500" : "text-slate-400"}>{tab.icon}</span>
-              {to(tab.labelKey)}
-            </button>
-          );
-        })}
-      </div>
+      <OrdersTabHeader
+        tabs={tabs}
+        activeKey={activeTab}
+        onSelect={(key) => setActiveTab(key as TabKey)}
+        ariaLabel={to("orders.tabs_aria")}
+      />
 
-      {loading ? (
-        <OrdersTableSkeleton rows={5} />
-      ) : error ? (
+      {error ? (
         <OrdersErrorState
           title={to("orders.error_title")}
           message={error}
-          onRetry={() => void load()}
+          onRetry={() => void fetchPage()}
           retryLabel={to("orders.retry")}
         />
-      ) : data ? (
-        <>
-          {activeTab === "collection" && (
-            <OrdersCollectionTab
-              key={`collection|${day}`}
-              shops={shops}
-              shopsLoading={shopsLoading}
-              shopDirectory={shopDirectory}
-              day={day}
-              today={today}
-              onDaySelect={setSelectedDay}
-              collection={dayCollection}
-              nextTripNo={data.nextTripNo}
-              onSaved={() => void handleCollectionSaved()}
-              onFinished={() => void handleCollectionFinished()}
-              onRefresh={() => void handleRefresh("collection")}
-              refreshing={refreshing === "collection"}
-            />
-          )}
-          {activeTab === "assignment" && (
-            <OrdersAssignmentTab
-              key={`assignment|${day}`}
-              loading={false}
-              day={day}
-              today={today}
-              onDaySelect={setSelectedDay}
-              collection={dayCollection}
-              eligibleVehicles={data.eligibleVehicles}
-              dayVehicleViews={day ? data.dayVehicleViews[day] ?? [] : []}
-              shopDirectory={shopDirectory}
-              supervisorDirectory={supervisorDirectory}
-              onChanged={() => void handleAssignmentChanged()}
-              onFinished={() => void handleAssignmentFinished()}
-              onRefresh={() => void handleRefresh("assignment")}
-              refreshing={refreshing === "assignment"}
-            />
-          )}
-          {activeTab === "tracking" && (
-            <OrdersDeliveryTrackingTab
-              trips={data.tracking}
-              loading={false}
-              day={day}
-              today={today}
-              onDaySelect={setSelectedDay}
-              shopDirectory={shopDirectory}
-              pdfBusyId={pdfBusyId}
-              whatsappBusyId={whatsappBusyId}
-              onPdf={(ot) => void handlePdf(ot)}
-              onWhatsApp={(ot) => void handleWhatsApp(ot)}
-              onView={(ot) => setViewingId(ot.trip.id)}
-              onRefresh={() => void handleRefresh("tracking")}
-              refreshing={refreshing === "tracking"}
-            />
-          )}
-        </>
-      ) : null}
+      ) : activeTab === "collection" ? (
+        <OrdersCollectionTab
+          shops={shops}
+          shopsLoading={shopsLoading}
+          page={data}
+          loading={loading}
+          day={day}
+          today={today}
+          onDaySelect={handleDaySelect}
+          search={search.collection}
+          onSearchChange={setTabSearch}
+          pageSize={pageSize.collection}
+          onPageChange={setTabPage}
+          onPageSizeChange={setTabPageSize}
+          onReload={() => fetchPage()}
+          onRefresh={() => void handleRefresh()}
+          refreshing={refreshing}
+        />
+      ) : activeTab === "assignment" ? (
+        <OrdersAssignmentTab
+          page={data}
+          loading={loading}
+          day={day}
+          today={today}
+          onDaySelect={handleDaySelect}
+          vehicles={vehicles}
+          selectedTripId={effectiveTripId}
+          onSelectTrip={setSelectedTripId}
+          search={search.assignment}
+          onSearchChange={setTabSearch}
+          pageSize={pageSize.assignment}
+          onPageChange={setTabPage}
+          onPageSizeChange={setTabPageSize}
+          onReload={() => fetchPage()}
+          onRefresh={() => void handleRefresh()}
+          onFinished={() => setActiveTab("tracking")}
+          refreshing={refreshing}
+        />
+      ) : (
+        <OrdersDeliveryTrackingTab
+          page={data}
+          loading={loading}
+          fromDate={trackingFrom}
+          toDate={trackingTo}
+          today={today}
+          onRangeChange={handleRangeChange}
+          search={search.tracking}
+          onSearchChange={setTabSearch}
+          pageSize={pageSize.tracking}
+          onPageChange={setTabPage}
+          onPageSizeChange={setTabPageSize}
+          onRefresh={() => void handleRefresh()}
+          refreshing={refreshing}
+          onView={(tripId) => void openTrip(tripId)}
+          onPdf={(tripId) => void handlePdf(tripId)}
+          onWhatsApp={(tripId) => void handleWhatsApp(tripId)}
+          pdfBusyTripId={pdfBusyTripId}
+          whatsappBusyTripId={whatsappBusyTripId}
+        />
+      )}
 
       {/* Delivery detail modal (one clean sheet; no duplicate page header) */}
       {viewing && (
         <OrdersDeliveryDetailView
           orderTrip={viewing}
           shopDirectory={shopDirectory}
-          supervisorMobile={mobileOf(viewing.trip)}
-          pdfBusy={pdfBusyId === viewing.trip.id}
-          whatsappBusy={whatsappBusyId === viewing.trip.id}
-          onClose={() => setViewingId(null)}
-          onPdf={() => void handlePdf(viewing)}
-          onWhatsApp={() => void handleWhatsApp(viewing)}
+          supervisorMobile={supervisorMobileOf(viewing.trip, supervisorDirectory)}
+          pdfBusy={pdfBusyTripId === viewing.trip.id}
+          whatsappBusy={whatsappBusyTripId === viewing.trip.id}
+          onClose={() => setViewing(null)}
+          onPdf={() => void handlePdf(viewing.trip.id)}
+          onWhatsApp={() => void handleWhatsApp(viewing.trip.id)}
         />
       )}
     </div>
   );
-}
+};
 
 export default OrdersPage;

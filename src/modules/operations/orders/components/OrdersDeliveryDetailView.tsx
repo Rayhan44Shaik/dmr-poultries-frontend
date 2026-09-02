@@ -37,7 +37,7 @@ import {
   rowsInSequence,
   type ShopDeliveryBreakdown,
 } from "../ordersUtils";
-import { shopMobileOf, villageOf, type ShopDirectory } from "../ordersService";
+import { cityOf, shopMobileOf, type ShopDirectory } from "../ordersService";
 import { useOrdersI18n } from "../i18n/ordersI18n";
 import type { OrdersTrip } from "../types";
 import {
@@ -131,7 +131,7 @@ function OrdersDeliveryDetailView({
       buildShopBreakdown(
         rowsInSequence(trip),
         originalShopIds,
-        (shopId, shopName) => villageOf(shopId, shopName, shopDirectory),
+        (shopId, shopName) => cityOf(shopId, shopName, shopDirectory),
         orderTrip.originalQuantities,
         (shopId) => shopMobileOf(shopId, shopDirectory)
       ),
@@ -361,7 +361,7 @@ function OrdersDeliveryDetailView({
                     <tr className={opsTableHeadRowClass}>
                       <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
                       <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
-                      <th className={opsTableThClass}>{to("orders.col_village")}</th>
+                      <th className={opsTableThClass}>{to("orders.col_city")}</th>
                       <th className={`${opsTableThClass} w-32`}>{to("orders.shop_mobile")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_birds")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_boxes")}</th>
@@ -401,7 +401,7 @@ function OrdersDeliveryDetailView({
                           <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
                             {row.shopName || "—"}
                           </td>
-                          <td className={opsTableTdClass}>{row.village || "—"}</td>
+                          <td className={opsTableTdClass}>{row.city || "—"}</td>
                           <td className={`${opsTableTdClass} text-slate-600 whitespace-nowrap`}>
                             {row.mobile || "—"}
                           </td>
@@ -512,7 +512,7 @@ function OrdersDeliveryDetailView({
                       <tr className={opsTableHeadRowClass}>
                         <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
                         <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
-                        <th className={opsTableThClass}>{to("orders.col_village")}</th>
+                        <th className={opsTableThClass}>{to("orders.col_city")}</th>
                         <th className={`${opsTableThClass} w-32`}>{to("orders.shop_mobile")}</th>
                         <th className={`${opsTableThClass} w-32 text-right`}>{to("orders.delivered_birds")}</th>
                         <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_boxes")}</th>
@@ -536,7 +536,7 @@ function OrdersDeliveryDetailView({
                               </span>
                             </span>
                           </td>
-                          <td className={opsTableTdClass}>{row.village || "—"}</td>
+                          <td className={opsTableTdClass}>{row.city || "—"}</td>
                           <td className={`${opsTableTdClass} text-slate-600 whitespace-nowrap`}>
                             {row.mobile || "—"}
                           </td>

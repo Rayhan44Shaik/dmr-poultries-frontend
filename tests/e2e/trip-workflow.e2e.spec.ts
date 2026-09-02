@@ -335,7 +335,7 @@ test('20: the Step-2-complete trip keeps its identity for Orders; Orders page re
     await page.goto('/operations?tab=orders');
     await page.waitForLoadState('networkidle');
     await assertNoRawKeys(page);
-    await expect(page.getByRole('button', { name: lang === 'en' ? /assignment/i : /అసైన్‌మెంట్/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: lang === 'en' ? /assignment/i : /అసైన్‌మెంట్/ })).toBeVisible();
   }
 });
 
@@ -470,94 +470,119 @@ test('26: EN + TE -- wizard step names, Recent Table + Orders, no raw i18n keys 
   }
 });
 
-// ── Orders — the CRITICAL Collection → container flow, driven through the
-//    real Order Collection UI (not the API). Proves POST /trips/0/steps/
-//    deliveries creates / locates ONE vehicle-less ORD-YYYYMMDD-NN container,
-//    never a real TR- trip, and that the collected shop count is derived from
-//    the persisted [ORDER] rows and survives a full page reload.
+// ── Orders — the CRITICAL Order Collection flow, driven through the real
+//    Order Collection UI (not the API). Proves POST /api/orders/collection
+//    persists ONE `orders` row per shop per day (ORD-YYYYMMDD-NNN), that the
+//    collected quantities survive a full page reload, and that Finish
+//    Collection latches the day.
 
-async function ordContainer(request: APIRequestContext) {
-  const res = await request.get(`${API}/trips?full=true`);
-  expect(res.ok(), `GET /trips?full=true → ${res.status()}`).toBeTruthy();
-  const all = (await res.json()) as Array<Record<string, unknown>>;
-  return all.filter((t) => String(t.tripNo).startsWith('ORD-'));
+async function apiOrders(request: APIRequestContext, query = '') {
+  const res = await request.get(`${API}/orders${query}`);
+  expect(res.ok(), `GET /orders${query} → ${res.status()}`).toBeTruthy();
+  return (await res.json()) as {
+    rows: Array<Record<string, unknown>>;
+    total: number;
+    summary: Record<string, number>;
+  };
 }
 
-const boxInput = (page: Page, shop: string) =>
-  page.getByRole('spinbutton', { name: new RegExp(`Boxes.*${shop}`, 'i') });
+/** The operational day the browser uses (UTC-pinned in this spec). */
+function todayIso(): string {
+  const d = new Date();
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(
+    d.getUTCDate()
+  ).padStart(2, '0')}`;
+}
 
-test('27: Order Collection UI — one ORD container, no TR- trip, shop count from persisted [ORDER] rows, survives reload', async ({ page, request }) => {
+const requiredInput = (page: Page, shop: string) =>
+  page.getByRole('spinbutton', { name: new RegExp(`Required Boxes.*${shop}`, 'i') });
+
+/** Add one shop to today's collection through the real picker. */
+async function addShopToCollection(page: Page, shop: string, boxes: number) {
+  const picker = page.locator('#orders-add-shop');
+  await picker.click();
+  await picker.pressSequentially(shop, { delay: 20 });
+  await page.getByRole('option', { name: new RegExp(shop, 'i') }).first().click();
+  await requiredInput(page, shop).fill(String(boxes));
+}
+
+/** Collected plan for the day — reused by the assignment spec below. */
+const COLLECTION_PLAN: Array<[string, number]> = [
+  [SEED.shops[0], 3],
+  [SEED.shops[1], 2],
+  [SEED.shops[2], 4],
+  [SEED.shops[3], 2],
+  [SEED.shops[4], 2],
+];
+
+test('27: Order Collection UI — one `orders` row per shop, real quantities, survives reload, Finish latches the day', async ({
+  page,
+  request,
+}) => {
   await setLanguage(page, 'en');
   await page.goto('/operations?tab=orders');
   await page.waitForLoadState('networkidle');
 
-  const trCountBefore = (await apiTrips(request, '?includeDeleted=true')).filter((t) =>
-    String(t.tripNo).startsWith('TR-')
-  ).length;
+  const day = todayIso();
+  const trCountBefore = (await apiTrips(request, '?includeDeleted=true')).length;
 
-  // Collection is the default tab; the seed shops render as editable rows.
-  await expect(boxInput(page, SEED.shops[0])).toBeVisible();
-
-  // Collect ALL 5 seed shops — test 28 assigns this same finished collection.
-  const plan: Array<[string, string]> = [
-    [SEED.shops[0], '3'],
-    [SEED.shops[1], '2'],
-    [SEED.shops[2], '4'],
-    [SEED.shops[3], '2'],
-    [SEED.shops[4], '2'],
-  ];
-  for (const [shop, boxes] of plan) await boxInput(page, shop).fill(boxes);
+  for (const [shop, boxes] of COLLECTION_PLAN) {
+    await addShopToCollection(page, shop, boxes);
+  }
 
   const [saveRes] = await Promise.all([
-    page.waitForResponse((r) => /\/trips\/\d+\/steps\/deliveries$/.test(r.url()) && r.request().method() === 'POST'),
+    page.waitForResponse(
+      (r) => /\/orders\/collection$/.test(r.url()) && r.request().method() === 'POST'
+    ),
     page.getByRole('button', { name: /save progress/i }).click(),
   ]);
   expect(saveRes.ok(), `collection save → ${saveRes.status()} ${await saveRes.text()}`).toBeTruthy();
 
-  // Exactly ONE container, vehicle-less, ORD-numbered, 3 [ORDER] plan rows,
-  // not finished. And NOT a real numbered trip.
-  let containers = await ordContainer(request);
-  expect(containers.length, 'exactly one ORD collection container').toBe(1);
-  const container = containers[0];
-  expect(String(container.tripNo)).toMatch(/^ORD-\d{8}-\d+$/);
-  expect(container.vehicleNo || '', 'container has no vehicle').toBeFalsy();
-  expect(Number(container.vehicleId) || 0).toBe(0);
-  expect(container.startStepSubmitted).not.toBe(true);
-  expect(container.deliveries.length, 'one persisted [ORDER] row per collected shop').toBe(5);
-  for (const d of container.deliveries) {
-    expect(String(d.remarks).startsWith('[ORDER]'), `row remarks: ${d.remarks}`).toBe(true);
+  // Exactly one persisted order per shop, with the entered quantity.
+  const persisted = await apiOrders(request, `?date=${day}&pageSize=200`);
+  expect(persisted.total, 'one order row per collected shop').toBe(COLLECTION_PLAN.length);
+  for (const [shop, boxes] of COLLECTION_PLAN) {
+    const row = persisted.rows.find((r) => r.shopName === shop);
+    expect(row, `order row for ${shop}`).toBeTruthy();
+    expect(Number(row!.requiredBoxes)).toBe(boxes);
+    expect(String(row!.orderNo)).toMatch(/^ORD-\d{8}-\d{3}$/);
+    expect(row!.collected).toBe(false);
+    expect(Number(row!.assignedBoxes)).toBe(0);
+    expect(Number(row!.deliveredBoxes)).toBe(0);
   }
-  const trCountAfter = (await apiTrips(request, '?includeDeleted=true')).filter((t) =>
-    String(t.tripNo).startsWith('TR-')
-  ).length;
-  expect(trCountAfter, 'no new TR- trip minted for id 0').toBe(trCountBefore);
+  // Collecting an order never mints a trip.
+  expect(
+    (await apiTrips(request, '?includeDeleted=true')).length,
+    'no trip created by Order Collection'
+  ).toBe(trCountBefore);
 
-  // Reload: the collected quantities come back from the persisted rows.
+  // Reload: the quantities come back from the backend, not from local state.
   await page.reload();
   await page.waitForLoadState('networkidle');
-  await expect(boxInput(page, SEED.shops[0])).toHaveValue('3');
-  await expect(boxInput(page, SEED.shops[1])).toHaveValue('2');
-  await expect(boxInput(page, SEED.shops[2])).toHaveValue('4');
+  for (const [shop, boxes] of COLLECTION_PLAN) {
+    await expect(requiredInput(page, shop)).toHaveValue(String(boxes));
+  }
   await assertNoRawKeys(page);
 
-  // Finish Collection latches the container (still no second trip, still no TR-).
+  // Finish Collection latches the day (statuses become "Collected").
   const [finishRes] = await Promise.all([
-    page.waitForResponse((r) => /\/trips\/\d+\/steps\/deliveries$/.test(r.url()) && r.request().method() === 'POST'),
+    page.waitForResponse(
+      (r) => /\/orders\/collection$/.test(r.url()) && r.request().method() === 'POST'
+    ),
     page.getByRole('button', { name: /finish collection/i }).click(),
   ]);
   expect(finishRes.ok(), `finish collection → ${finishRes.status()} ${await finishRes.text()}`).toBeTruthy();
 
-  containers = await ordContainer(request);
-  expect(containers.length, 'still exactly one container after Finish').toBe(1);
-  expect(containers[0].id, 'same container row').toBe(container.id);
-  expect(containers[0].startStepSubmitted, 'Finish Collection latched start_step_submitted').toBe(true);
+  const finished = await apiOrders(request, `?date=${day}&pageSize=200`);
+  expect(finished.total).toBe(COLLECTION_PLAN.length);
+  for (const row of finished.rows) expect(row.collected).toBe(true);
 });
 
 test('27b: Orders Assignment calendar — opens unclipped, month nav works, does not self-close, and the picked date drives the selected day', async ({ page }) => {
   await setLanguage(page, 'en');
   await page.goto('/operations?tab=orders');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('button', { name: /order assignment/i }).click();
+  await page.getByRole('tab', { name: /order assignment/i }).click();
 
   const dateInput = page.getByTestId('orders-date-picker').locator('input');
   const todayStr = await dateInput.inputValue(); // DD/MM/YYYY == operational today
@@ -639,14 +664,23 @@ async function fullTrip(request: APIRequestContext, id: number) {
   return t as Record<string, unknown>;
 }
 
-/** Open Delivery Tracking and return the given trip's row. */
-async function trackingRowFor(page: Page, tripNo: string) {
+/**
+ * Open Delivery Tracking, filter it to ONE trip through the real table-level
+ * search (server-side), and return that trip's per-shop rows.
+ */
+async function trackingRowsFor(page: Page, tripNo: string) {
   await page.goto('/operations?tab=orders');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('button', { name: /delivery tracking/i }).click();
-  const row = page.getByRole('row', { name: new RegExp(tripNo.replace(/-/g, '\\-')) });
-  await expect(row).toBeVisible();
-  return row;
+  await page.getByRole('tab', { name: /delivery tracking/i }).click();
+  await page.getByRole('textbox', { name: /search shop, city/i }).fill(tripNo);
+  await expect(page.getByRole('row').filter({ hasText: tripNo }).first()).toBeVisible();
+  return page.getByRole('row').filter({ hasText: tripNo });
+}
+
+/** How many of a trip's tracked shops already show a delivery. */
+async function trackingDeliveredCount(page: Page, tripNo: string): Promise<number> {
+  const rows = await trackingRowsFor(page, tripNo);
+  return rows.filter({ hasText: /Delivered/ }).count();
 }
 
 /** Deliver one already-listed shop through the real Step 4 form (1 pickup box). */
@@ -799,10 +833,9 @@ test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ 
   // ── STEP 2 → ORDERS: the SAME operational trip is visible in Orders ───
   await page.goto('/operations?tab=orders');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('button', { name: /order assignment/i }).click();
-  await page.getByRole('checkbox', { name: new RegExp(`Select.*${SEED.shops[0]}`, 'i') }).check();
+  await page.getByRole('tab', { name: /order assignment/i }).click();
   {
-    const combo = page.locator('input[role="combobox"]').first();
+    const combo = page.locator('#orders-vehicle-select');
     await combo.click();
     await combo.pressSequentially(SEED.fullVehicle, { delay: 20 });
     await expect(
@@ -870,26 +903,53 @@ test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ 
   // ── STEP 3 → ORDERS ASSIGNMENT (real UI): assign 5 shops to THIS trip ──
   await page.goto('/operations?tab=orders');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('button', { name: /order assignment/i }).click();
-  for (const shop of SEED.shops) {
-    await page.getByRole('checkbox', { name: new RegExp(`Select.*${shop}`, 'i') }).check();
-  }
+  await page.getByRole('tab', { name: /order assignment/i }).click();
   {
-    const combo = page.locator('input[role="combobox"]').first();
+    const combo = page.locator('#orders-vehicle-select');
     await combo.click();
     await combo.pressSequentially(SEED.fullVehicle, { delay: 20 });
     await page.getByRole('option', { name: new RegExp(SEED.fullVehicle) }).click();
   }
+  // ONE pickup box per shop — well inside every collected order quantity.
+  for (const shop of SEED.shops) {
+    await page
+      .getByRole('spinbutton', { name: new RegExp(`Pickup Boxes.*${shop}`, 'i') })
+      .fill('1');
+  }
   const tripCountBeforeAssign = (await apiTrips(request, '?includeDeleted=true')).length;
   const [assignRes] = await Promise.all([
     page.waitForResponse(
-      (r) => new RegExp(`/trips/${tripId}/steps/deliveries$`).test(r.url()) && r.request().method() === 'POST'
+      (r) => /\/orders\/assignments$/.test(r.url()) && r.request().method() === 'POST'
     ),
     page.getByRole('button', { name: /finish assignment/i }).click(),
   ]);
   expect(assignRes.ok(), `finish assignment → ${assignRes.status()} ${await assignRes.text()}`).toBeTruthy();
 
+  // The supervisor notification is fired by the BACKEND inside the same
+  // request — the response carries the REAL per-channel outcome.
   {
+    const payload = (await assignRes.json()) as {
+      notifications: Array<{ channel: string; status: string }>;
+    };
+    expect(
+      payload.notifications.map((n) => n.channel).sort(),
+      'backend fired both supervisor channels'
+    ).toEqual(['email', 'whatsapp']);
+  }
+
+  {
+    const assigned = await apiOrders(request, `?date=${todayIso()}&tripId=${tripId}&pageSize=200`);
+    expect(assigned.total, '5 shops assigned to this trip').toBe(5);
+    for (const row of assigned.rows) {
+      const mine = (row.assignments as Array<Record<string, unknown>>).find(
+        (a) => Number(a.tripId) === tripId
+      );
+      expect(mine, `assignment for ${row.shopName}`).toBeTruthy();
+      expect(Number(mine!.pickupBoxes)).toBe(1);
+      expect(Number(mine!.deliveredBoxes)).toBe(0);
+    }
+
+    // The assignment PROJECTED the plan onto the trip's Step 4 rows.
     const a = await fullTrip(request, tripId);
     expect(a.id).toBe(tripId);
     expect(a.tripNo).toBe(tripNo);
@@ -910,7 +970,8 @@ test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ 
   ).toBe(tripCountBeforeAssign);
 
   // Reload Orders → 5 shops remain assigned (persisted, not UI-only).
-  await expect(await trackingRowFor(page, tripNo)).toContainText('0 / 5 Delivered');
+  expect(await (await trackingRowsFor(page, tripNo)).count(), '5 tracked shops').toBe(5);
+  expect(await trackingDeliveredCount(page, tripNo), 'nothing delivered yet').toBe(0);
 
   // ─────────────────────────────  STEP 4 (real UI)  ─────────────────────
   await page.goto(`/operations?tab=trip-entry&tripId=${tripId}`);
@@ -922,13 +983,16 @@ test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ 
 
   for (let i = 0; i < SEED.shops.length; i += 1) {
     await deliverShopInStep4(page, tripId, SEED.shops[i], i + 1);
-    await expect(await trackingRowFor(page, tripNo)).toContainText(`${i + 1} / 5 Delivered`);
+    expect(
+      await trackingDeliveredCount(page, tripNo),
+      `Delivery Tracking after ${i + 1} deliveries`
+    ).toBe(i + 1);
     if (i === 0) {
-      // Reload checkpoint after the first delivery.
+      // Reload checkpoint after the first delivery — the count is rebuilt
+      // from the backend, never from cached React state.
       await page.reload();
       await page.waitForLoadState('networkidle');
-      await page.getByRole('button', { name: /delivery tracking/i }).click();
-      await expect(page.getByRole('row', { name: TRIP_RE })).toContainText('1 / 5 Delivered');
+      expect(await trackingDeliveredCount(page, tripNo)).toBe(1);
     }
   }
 
@@ -954,7 +1018,7 @@ test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ 
   await page.waitForLoadState('networkidle');
   await stepBtn(page, 4).click();
   await expect(page.getByText(/submitted/i).first()).toBeVisible();
-  await expect(await trackingRowFor(page, tripNo)).toContainText('5 / 5 Delivered');
+  expect(await trackingDeliveredCount(page, tripNo), 'all 5 shops delivered').toBe(5);
 
   // ─────────────────────────────  STEP 5 (real UI)  ─────────────────────
   await page.goto(`/operations?tab=trip-entry&tripId=${tripId}`);

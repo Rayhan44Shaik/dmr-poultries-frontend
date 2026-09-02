@@ -22,8 +22,10 @@ import {
   opsPrimaryButtonClass,
 } from "../../../../shared/ui/operationsStyles";
 import { DatePicker } from "../../../../components/common/DatePicker";
+import TripPagination from "../../vehicle-trips/components/TripPagination";
 import { addLocalDays } from "../ordersUtils";
 import type { OrdersT } from "../i18n/ordersI18n";
+import { ORDERS_DEFAULT_PAGE_SIZE, ORDERS_PAGE_SIZES } from "./ordersUiConstants";
 
 // ─── Status badge ────────────────────────────────────────────────────────────
 
@@ -232,15 +234,18 @@ export function OrdersDateControl({
   onDaySelect,
   t,
   className = "",
+  daysBack = 6,
 }: {
   day: string;
   today: string;
   onDaySelect: (day: string) => void;
   t: (key: string) => string;
   className?: string;
+  /** How far back the calendar may go (Delivery Tracking looks further). */
+  daysBack?: number;
 }) {
   if (!day || !today) return null;
-  const minDate = addLocalDays(today, -6);
+  const minDate = addLocalDays(today, -Math.max(0, daysBack));
   return (
     <div className={`inline-flex items-center gap-2 ${className}`}>
       <DatePicker
@@ -450,3 +455,149 @@ export function OrdersDropdown({
 }
 
 export type { OrdersT };
+
+// ─── Table-level pagination bar (10 rows default + rows-per-page) ──────────
+
+/**
+ * ONE pagination bar for every Orders table: total count, rows-per-page and
+ * the shared Previous / page-numbers / Next control. The numbers come from
+ * the SERVER-side page envelope (`total`, `page`, `totalPages`), so a page
+ * change never re-slices a partially loaded dataset.
+ */
+export function OrdersPagination({
+  page,
+  totalPages,
+  total,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
+  t,
+}: {
+  page: number;
+  totalPages: number;
+  total: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = Math.min(total, page * pageSize);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-2.5">
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap">
+          {t("orders.pagination_range", { from, to, total })}
+        </span>
+        <OrdersDropdown
+          value={String(pageSize)}
+          onChange={(v) => onPageSizeChange(Number(v) || ORDERS_DEFAULT_PAGE_SIZE)}
+          options={ORDERS_PAGE_SIZES.map((size) => ({
+            value: String(size),
+            label: t("orders.rows_per_page", { size }),
+          }))}
+          ariaLabel={t("orders.rows_per_page_label")}
+          widthClass="w-36"
+        />
+      </div>
+      <TripPagination
+        currentPage={page}
+        totalPages={Math.max(1, totalPages)}
+        onPageChange={onPageChange}
+        hidePageInfo
+      />
+    </div>
+  );
+}
+
+// ─── Quantity summary strip (real backend figures, never hard-coded) ───────
+
+export type OrdersSummaryMetric = {
+  key: string;
+  label: string;
+  value: number | string;
+  tone?: "slate" | "emerald" | "amber" | "sky" | "rose";
+};
+
+/**
+ * Compact metric strip above the table. Values come straight from the
+ * server-side `summary` envelope (the FILTERED dataset, not the page), so
+ * "how many boxes are required / loaded / pending / delivered" is always the
+ * real persisted figure.
+ */
+export function OrdersSummaryStrip({ metrics }: { metrics: OrdersSummaryMetric[] }) {
+  const tones: Record<string, string> = {
+    slate: "text-slate-700",
+    emerald: "text-emerald-700",
+    amber: "text-amber-700",
+    sky: "text-sky-700",
+    rose: "text-rose-700",
+  };
+  return (
+    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-3 lg:grid-cols-6">
+      {metrics.map((metric) => (
+        <div key={metric.key} className="bg-white px-3 py-2">
+          <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+            {metric.label}
+          </div>
+          <div className={`text-base font-extrabold tabular-nums ${tones[metric.tone ?? "slate"]}`}>
+            {metric.value}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Professional tab header ───────────────────────────────────────────────
+
+export type OrdersTabDef = {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+};
+
+/**
+ * ERP-style segmented tab header: one clearly active tab, quiet inactive
+ * tabs, consistent 36px height, icons aligned with the label, and a single
+ * rule under the whole strip so the table below reads as its content.
+ * Horizontally scrollable (never wrapped) on narrow screens.
+ */
+export function OrdersTabHeader({
+  tabs,
+  activeKey,
+  onSelect,
+  ariaLabel,
+}: {
+  tabs: OrdersTabDef[];
+  activeKey: string;
+  onSelect: (key: string) => void;
+  ariaLabel: string;
+}) {
+  return (
+    <div className="border-b border-slate-200" role="tablist" aria-label={ariaLabel}>
+      <div className="-mb-px flex items-stretch gap-1 overflow-x-auto">
+        {tabs.map((tab) => {
+          const active = tab.key === activeKey;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onSelect(tab.key)}
+              className={`inline-flex h-10 flex-shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-[12px] font-bold tracking-tight transition-colors md:px-4 md:text-[13px] ${
+                active
+                  ? "border-emerald-600 text-emerald-700"
+                  : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
+              }`}
+            >
+              <span className={active ? "text-emerald-600" : "text-slate-400"}>{tab.icon}</span>
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
