@@ -7,7 +7,7 @@ import type { Trip, BoxDetail } from "../types/trip";
 import { getVehicles } from "../../../masters/vehicles/services/vehicleService";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { WizardActionBar, WizardStepNotice } from "./WizardStepUI";
+import { StepCloseButton, WizardActionBar, WizardStepNotice } from "./WizardStepUI";
 import { calculatePickupTotals, calculateBoxAvgWeight } from "../../../../shared/trip/calculations";
 import {
   TRIP_FIELD_DEFINITIONS,
@@ -604,6 +604,7 @@ export default function StepPickup({
                 <Pencil size={14} />
               </button>
             )}
+            <StepCloseButton onClose={clearForm} />
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
               {t("ops.trip.submitted_locked")}
             </span>

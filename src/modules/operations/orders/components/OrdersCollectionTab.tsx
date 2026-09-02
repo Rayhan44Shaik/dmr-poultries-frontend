@@ -186,7 +186,10 @@ function OrdersCollectionTab(props: Props) {
   // Shops load asynchronously. The stateful editor mounts only once they are
   // ready (and re-mounts per day via key={day} from the page), so it can seed
   // its entries in a useState initializer — no effect-based state sync.
-  if (shopsLoading) {
+  // Only block with the skeleton on the FIRST shop load (nothing to show yet).
+  // On a day switch / refresh the shops are already cached, so keep the table
+  // visible instead of flashing the skeleton on every interaction.
+  if (shopsLoading && shops.length === 0) {
     return <OrdersTableSkeleton rows={6} />;
   }
   if (shops.length === 0) {
@@ -541,7 +544,7 @@ function CollectionEntries({
   // Past day with nothing collected: clean empty state (read-only by nature).
   if (isPast && !collection) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-visible">
         {/* Controls only — the active tab already identifies the section. */}
         <div className="px-5 py-2.5 border-b border-slate-200 bg-slate-50/60 flex items-center gap-3 flex-wrap">
           <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} />
@@ -562,8 +565,9 @@ function CollectionEntries({
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        {/* Table-level controls: [Search][Date][Sort] … [↻ Refresh] —
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-visible">
+        {/* overflow-visible: the date-picker calendar popup must not be clipped.
+            Table-level controls: [Search][Date][Sort] … [↻ Refresh] —
             Refresh is ALWAYS the last control, far right. No section
             heading — the active tab says it. No Previous/Next day
             buttons, no scroller. */}

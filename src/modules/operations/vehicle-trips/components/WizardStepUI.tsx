@@ -1,6 +1,31 @@
 import { Check, CircleAlert, CircleX, Save, Send, X } from "lucide-react";
 import { useI18n } from "../../../../i18n";
 
+/**
+ * Header "Close" control for a submitted / locked step.
+ *
+ * CLOSES the Trip Entry editor and returns to the landing state. It does NOT
+ * delete the trip, change submitted flags, change status, or clear any backend
+ * data — reopening the trip reloads everything from the API. Deliberately
+ * distinct from the bottom action-bar "Cancel", which only discards unsaved
+ * edits to the step currently being edited.
+ */
+export function StepCloseButton({ onClose }: { onClose?: () => void }) {
+  const { t } = useI18n();
+  if (!onClose) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClose}
+      aria-label={t("common.close")}
+      title={t("common.close")}
+      className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
+    >
+      <X size={14} />
+    </button>
+  );
+}
+
 export type WizardNoticeState = {
   type: "success" | "error" | "info";
   message: string;

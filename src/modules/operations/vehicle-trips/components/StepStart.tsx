@@ -12,7 +12,7 @@ import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { validateStartStep } from "../../../../shared/trip/validation";
 import { fetchLastClosingMeter } from "../services/tripHeaderApiService";
-import { WizardActionBar, WizardStepNotice, type WizardNoticeState } from "./WizardStepUI";
+import { StepCloseButton, WizardActionBar, WizardStepNotice, type WizardNoticeState } from "./WizardStepUI";
 import {
   TRIP_FIELD_DEFINITIONS,
 } from "../../../../shared/trip/definitions";
@@ -778,13 +778,16 @@ function StepStart({
 
   const handleCancelEdit = useCallback(() => {
     if (!startStepSubmitted && clearForm) {
+      // Brand-new trip, nothing persisted → close the editor.
       clearForm();
-    } else if (editable && onCancel) {
-      onCancel();
-    } else {
-      setIsLocalEditing(false);
+      return;
     }
-  }, [startStepSubmitted, clearForm, editable, onCancel]);
+    // Editing a submitted Step 1: discard unsaved edits. The parent reverts the
+    // working copy to the last saved trip and remounts this step (the local
+    // `form` re-hydrates from the restored snapshot).
+    setIsLocalEditing(false);
+    onCancel?.();
+  }, [startStepSubmitted, clearForm, onCancel]);
 
   const inputsLocked = headerLoading || isSubmitting;
   const submitLabel = startStepSubmitted
@@ -848,6 +851,7 @@ function StepStart({
                 <Pencil size={14} />
               </button>
             )}
+            <StepCloseButton onClose={clearForm} />
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
               {t("ops.trip.submitted_locked")}
             </span>

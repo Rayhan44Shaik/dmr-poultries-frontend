@@ -80,3 +80,30 @@ test("empty destMeter and avgBirdWeight map to null in the Step 2 payload", () =
   assert.equal(payload.avgBirdWeight, null);
   assert.equal(payload.pickupTolls, 0);
 });
+
+test("Bird Type survives the full Step 2 round-trip (payload uses farmBirdType* keys, mapper reads them back)", () => {
+  // Submit / Save payload carries the backend canonical keys.
+  const payload = toStep2Payload({
+    sourceFarmId: 1,
+    destMeter: 10,
+    pickupTolls: 0,
+    birdTypeId: 7,
+    birdType: "Broiler",
+  } as any);
+  assert.equal(payload.farmBirdTypeId, 7);
+  assert.equal(payload.farmBirdType, "Broiler");
+
+  // A null / unset id is NOT sent (the strict farm-submit schema rejects it).
+  const noBird = toStep2Payload({ sourceFarmId: 1, destMeter: 10, pickupTolls: 0 } as any);
+  assert.equal("farmBirdTypeId" in noBird, false);
+
+  // GET / Edit / Resume / post-submit reload rehydrates the Trip model's
+  // birdTypeId / birdType from farmBirdTypeId / farmBirdType (or snake_case).
+  const mappedCamel = mapApiTripToTrip({ id: 3, farmBirdTypeId: 7, farmBirdType: "Broiler" });
+  assert.equal(mappedCamel.birdTypeId, 7);
+  assert.equal(mappedCamel.birdType, "Broiler");
+
+  const mappedSnake = mapApiTripToTrip({ id: 4, farm_bird_type_id: 9, farm_bird_type: "Layer" });
+  assert.equal(mappedSnake.birdTypeId, 9);
+  assert.equal(mappedSnake.birdType, "Layer");
+});

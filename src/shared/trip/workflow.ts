@@ -38,21 +38,67 @@ export function getNextIncompleteTripStep(trip: TripStepFlags): number {
 }
 
 /**
- * Highest step a user may legitimately OPEN right now (0-based).
+ * Step-enablement dependency model (0-based step indexes).
  *
- * Part G business rule: before Step 1 is submitted (and the permanent Trip No
- * generated) only Step 1 is available. The moment Step 1 is submitted ALL FIVE
- * steps become openable — expenses (Step 5) can be filled while the trip is
- * still in progress. Opening a step is NOT submitting it; per-step submit
- * validation and step-order gating are enforced separately (backend-authoritative).
+ * Each step opens only once its immediate predecessor has been SUBMITTED —
+ * authoritative state comes from the persisted `*StepSubmitted` flags, never
+ * from "a trip exists" or temporary React state:
+ *
+ *   Step 1 (start, idx 0)      : always open.
+ *   Step 2 (farm, idx 1)       : open once Step 1 submitted.
+ *   Step 3 (pickup, idx 2)     : open once Step 2 submitted.
+ *   Step 4 (deliveries, idx 3) : open once Step 3 submitted.
+ *   Step 5 (expenses, idx 4)   : open once Step 1 submitted — expenses/end
+ *                                details can be entered mid-trip. Its FINAL
+ *                                submit is still gated on Steps 1–4 (enforced
+ *                                in useTripEntry.submitEndTrip + backend
+ *                                assertStepOrder); opening ≠ submitting.
  */
-export function getMaxAllowedTripStep(trip: TripStepFlags): number {
-  return trip.startStepSubmitted ? 4 : 0;
+export function isTripStepLocked(trip: TripStepFlags, index: number): boolean {
+  switch (index) {
+    case 0:
+      return false;
+    case 1:
+      return !trip.startStepSubmitted;
+    case 2:
+      return !trip.farmStepSubmitted;
+    case 3:
+      return !trip.pickupStepSubmitted;
+    case 4:
+      return !trip.startStepSubmitted;
+    default:
+      return true;
+  }
 }
 
-/** True when the given step index cannot be opened yet (Step 1 not submitted). */
-export function isTripStepLocked(trip: TripStepFlags, index: number): boolean {
-  return index > getMaxAllowedTripStep(trip);
+/** Per-step lock mask for the wizard stepper (index → locked?). */
+export function getTripStepLockMask(trip: TripStepFlags): boolean[] {
+  return TRIP_STEP_DEFINITIONS.map((_, index) => isTripStepLocked(trip, index));
+}
+
+/**
+ * Clamp a requested step index to one the user may actually open right now.
+ * If the requested step is locked (stale click, direct URL/state manipulation)
+ * fall back to the first incomplete step, which is always unlocked.
+ */
+export function clampTripStepIndex(trip: TripStepFlags, requested: number): number {
+  const safe = Number.isFinite(requested) ? Math.max(0, Math.trunc(requested)) : 0;
+  if (!isTripStepLocked(trip, safe)) return safe;
+  return getNextIncompleteTripStep(trip);
+}
+
+/**
+ * Highest step reachable through the normal linear chain (0-based). Kept for
+ * callers that only need the contiguous ceiling; note Step 5 (idx 4) can be
+ * open even when this returns a lower value — use {@link isTripStepLocked} /
+ * {@link getTripStepLockMask} for authoritative per-step gating.
+ */
+export function getMaxAllowedTripStep(trip: TripStepFlags): number {
+  if (!trip.startStepSubmitted) return 0;
+  if (!trip.farmStepSubmitted) return 1;
+  if (!trip.pickupStepSubmitted) return 2;
+  if (!trip.deliveryStepSubmitted) return 3;
+  return 4;
 }
 
 export function getLastSubmittedTripStep(trip: TripStepFlags): number | null {

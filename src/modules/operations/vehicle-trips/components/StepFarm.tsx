@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Loader2, Scale, Pencil, Layers } from "lucide-react";
 import Select from "react-select";
 import type { Trip } from "../types/trip";
-import { WizardActionBar, WizardStepNotice } from "./WizardStepUI";
+import { StepCloseButton, WizardActionBar, WizardStepNotice } from "./WizardStepUI";
 import { GpsAddressText } from "./GpsAddressText";
 import {
   TRIP_FIELD_DEFINITIONS,
@@ -23,6 +23,8 @@ interface Props {
   editable?: boolean;
   canEdit?: boolean;
   onCancel?: () => void;
+  /** Close the whole Trip Entry editor (no data change). */
+  clearForm?: () => void;
   showNotification?: (message: string, type?: "info" | "success" | "error" | "warning") => void;
 }
 
@@ -42,6 +44,7 @@ export default function StepFarm({
   editable = false,
   canEdit = false,
   onCancel,
+  clearForm,
   showNotification,
 }: Props) {
   const { t } = useI18n();
@@ -277,6 +280,7 @@ export default function StepFarm({
                 <Pencil size={14} />
               </button>
             )}
+            <StepCloseButton onClose={clearForm} />
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
               {t("ops.trip.submitted_locked")}
             </span>
@@ -572,10 +576,12 @@ export default function StepFarm({
         />
         <WizardActionBar
           onCancel={() => {
-            if (isLocalEditing) {
-              setIsLocalEditing(false);
-              return;
-            }
+            // Cancel = discard unsaved edits. The parent reverts the working
+            // copy to the last saved trip and remounts this step, so exiting
+            // local-edit mode here is enough; we must still call onCancel so a
+            // pencil-edit of a SUBMITTED step drops the in-progress changes
+            // (e.g. a re-picked Bird Type) instead of leaving them in state.
+            setIsLocalEditing(false);
             onCancel?.();
           }}
           onSave={saveFarmProgress ? handleSaveProgress : undefined}

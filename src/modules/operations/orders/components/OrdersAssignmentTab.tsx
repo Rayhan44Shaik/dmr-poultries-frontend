@@ -204,11 +204,20 @@ function OrdersAssignmentTab({
   if (loading) return <OrdersTableSkeleton rows={4} />;
   const isPast = day < today;
 
+  // Day-scope the assignable vehicles: an operational vehicle trip can only be
+  // assigned the collection for its OWN operational day. The backend does not
+  // day-filter `eligibleVehicles` (day is a UI selection), so we do it here —
+  // the selected date, not "any Step-2 trip", controls what is offered.
+  const dayEligibleVehicles = eligibleVehicles.filter((v) => v.trip.tripDate === day);
+
   // ONE card with the SAME toolbar / table visual language as Order
   // Collection: [ Search ][ Date + TODAY ][ Sort ] … [↻ Refresh].
   // Refresh is ALWAYS the last control, far right.
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+    // overflow-visible (not -hidden): the toolbar's date-picker calendar popup
+    // is absolutely positioned and must not be clipped by this card. The inner
+    // tables keep their own `overflow-x-auto` wrappers for horizontal scroll.
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-visible">
       <div className="px-5 py-2.5 border-b border-slate-200 bg-slate-50/60 flex items-center gap-3 flex-wrap">
         <OrdersSearchInput
           value={query}
@@ -268,7 +277,7 @@ function OrdersAssignmentTab({
           key={`${day}|${collection.trip.id}`}
           day={day}
           collection={collection}
-          eligibleVehicles={eligibleVehicles}
+          eligibleVehicles={dayEligibleVehicles}
           shopDirectory={shopDirectory}
           supervisorDirectory={supervisorDirectory}
           q={q}
@@ -639,18 +648,27 @@ function AssignmentEditor({
     () =>
       eligibleVehicles.map((v) => ({
         value: v.trip.id,
-        label: `${v.trip.vehicleNo} · ${v.trip.sourceFarm || "—"} · ${v.capacity} ${to("orders.col_boxes").toLowerCase()}`,
+        // The operational Trip No + date are the identity the operator matches
+        // against Trip Entry — show them first, never just the vehicle number.
+        label: `${v.trip.tripNo || "—"} · ${v.trip.vehicleNo || "—"} · ${formatDayFull(v.trip.tripDate)} · ${v.capacity} ${to("orders.col_boxes").toLowerCase()}`,
       })),
     [eligibleVehicles, to]
   );
   const vehicleValue =
     vehicleOptions.find((o) => o.value === vehicleTripId) ??
-    (vehicle ? { value: vehicle.trip.id, label: vehicle.trip.vehicleNo || String(vehicle.trip.id) } : null);
+    (vehicle
+      ? {
+          value: vehicle.trip.id,
+          label: `${vehicle.trip.tripNo || "—"} · ${vehicle.trip.vehicleNo || String(vehicle.trip.id)}`,
+        }
+      : null);
 
   // Compact vehicle information strip — the useful fact set, rendered
   // small (never as a hero panel).
   const summary: Array<[string, string]> = vehicle
     ? [
+        [to("orders.col_trip_no"), vehicle.trip.tripNo || "—"],
+        [to("orders.col_date"), formatDayFull(vehicle.trip.tripDate)],
         [to("orders.vehicle_no"), vehicle.trip.vehicleNo || "—"],
         [
           to("orders.farm_address"),

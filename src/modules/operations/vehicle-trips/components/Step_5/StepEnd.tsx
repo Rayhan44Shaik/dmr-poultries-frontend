@@ -5,7 +5,7 @@ import {
   Pencil,
   AlertTriangle } from "lucide-react";
 import type { Trip } from "../../types/trip";
-import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
+import { StepCloseButton, WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 import GeneralExpensesTable from "./GeneralExpensesTable";
 import DieselExpensesTable from "./DieselExpensesTable";
 import { useI18n } from "../../../../../i18n";
@@ -512,6 +512,9 @@ export default function StepEnd({
     if (isLocalEditing) {
       setIsLocalEditing(false);
       setToast({ message: t("ops.trip.edit_cancelled"), type: "info" });
+      // Discard the in-progress edits of this SUBMITTED step: the parent
+      // reverts the working copy to the last saved trip and remounts Step 5.
+      onCancel?.();
       return;
     }
     // Cancel active wizard — discard unsaved Step 5 only.
@@ -553,6 +556,7 @@ export default function StepEnd({
                   <Pencil size={14} />
                 </button>
               )}
+              <StepCloseButton onClose={clearForm} />
               <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap">
                 {t("ops.trip.submitted_locked")}
               </span>

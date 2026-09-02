@@ -7,11 +7,13 @@ import {
   TRIP_STEP_LABELS,
   applyDeliveryMetrics,
   calculatePickupTotals,
+  clampTripStepIndex,
   createEmptyTrip,
   getLastSubmittedTripStep,
   getMaxAllowedTripStep,
   getNextIncompleteTripStep,
   getResumeActionLabel,
+  getTripStepLockMask,
   getTripWizardCompletedMask,
   isTripEnded,
   isTripStepLocked,
@@ -194,36 +196,56 @@ test("View stepper mask marks Step 5 submitted only from Step 5 flags", () => {
   });
 });
 
-test("Part G step access: only Step 1 before it is submitted, then all five steps open", () => {
-  // New trip: only Step 1 is available; Steps 2-5 cannot be opened yet.
+test("Step-enablement dependency matrix: each step opens only after its predecessor is submitted; Step 5 opens after Step 1", () => {
+  const mask = (trip: Parameters<typeof getTripStepLockMask>[0]) => getTripStepLockMask(trip);
+
+  // NEW TRIP — only Step 1 (idx 0) enabled.
   const fresh = createEmptyTrip({});
+  assert.deepEqual(mask(fresh), [false, true, true, true, true]);
   assert.equal(getMaxAllowedTripStep(fresh), 0);
-  assert.deepEqual(
-    [0, 1, 2, 3, 4].map((i) => isTripStepLocked(fresh, i)),
-    [false, true, true, true, true]
-  );
 
-  // The moment Step 1 is submitted (permanent Trip No exists) every step opens
-  // so expenses can be entered while the trip is still in progress.
+  // AFTER STEP 1 — Step 2 (idx 1) and Step 5 (idx 4) enabled; Steps 3-4 locked.
   const after1 = { ...fresh, startStepSubmitted: true };
-  assert.equal(getMaxAllowedTripStep(after1), 4);
-  assert.deepEqual(
-    [0, 1, 2, 3, 4].map((i) => isTripStepLocked(after1, i)),
-    [false, false, false, false, false]
-  );
+  assert.deepEqual(mask(after1), [false, false, true, true, false]);
+  assert.equal(getMaxAllowedTripStep(after1), 1);
 
-  // Subsequent submissions never re-lock anything.
+  // AFTER STEP 2 — Step 3 (idx 2) + Step 5 enabled; Step 4 (idx 3) still locked.
   const after2 = { ...after1, farmStepSubmitted: true };
+  assert.deepEqual(mask(after2), [false, false, false, true, false]);
+  assert.equal(getMaxAllowedTripStep(after2), 2);
+
+  // AFTER STEP 3 — Step 4 (idx 3) + Step 5 enabled.
   const after3 = { ...after2, pickupStepSubmitted: true };
+  assert.deepEqual(mask(after3), [false, false, false, false, false]);
+  assert.equal(getMaxAllowedTripStep(after3), 3);
+
+  // AFTER STEP 4 — all five open.
   const after4 = { ...after3, deliveryStepSubmitted: true };
-  const complete = { ...after4, endStepSubmitted: true, expensesStepSubmitted: true };
-  for (const trip of [after2, after3, after4, complete]) {
-    assert.equal(getMaxAllowedTripStep(trip), 4);
-    assert.deepEqual(
-      [0, 1, 2, 3, 4].map((i) => isTripStepLocked(trip, i)),
-      [false, false, false, false, false]
-    );
-  }
+  assert.deepEqual(mask(after4), [false, false, false, false, false]);
+  assert.equal(getMaxAllowedTripStep(after4), 4);
+
+  // AFTER STEP 5 — everything submitted, nothing re-locks.
+  const complete = { ...after4, endStepSubmitted: true, expensesStepSubmitted: true, status: "Pending" as const };
+  assert.deepEqual(mask(complete), [false, false, false, false, false]);
+});
+
+test("clampTripStepIndex redirects a locked requested step to the first incomplete step", () => {
+  const fresh = createEmptyTrip({});
+  // Direct click / stale URL asking for Step 3 on a brand-new trip → Step 1.
+  assert.equal(clampTripStepIndex(fresh, 2), 0);
+  assert.equal(clampTripStepIndex(fresh, 4), 0);
+  assert.equal(clampTripStepIndex(fresh, 0), 0);
+
+  const after1 = { ...fresh, startStepSubmitted: true };
+  // Step 2 and Step 5 are reachable; Step 3/4 fall back to the next step (Step 2).
+  assert.equal(clampTripStepIndex(after1, 1), 1);
+  assert.equal(clampTripStepIndex(after1, 4), 4);
+  assert.equal(clampTripStepIndex(after1, 2), 1);
+  assert.equal(clampTripStepIndex(after1, 3), 1);
+
+  const after2 = { ...after1, farmStepSubmitted: true };
+  assert.equal(clampTripStepIndex(after2, 3), 2);
+  assert.equal(clampTripStepIndex(after2, 2), 2);
 });
 
 test("Resume always opens the first incomplete step; completed steps stay reopenable", () => {

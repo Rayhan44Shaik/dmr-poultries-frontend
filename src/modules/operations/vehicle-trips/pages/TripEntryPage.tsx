@@ -29,9 +29,10 @@ import { useI18n } from "../../../../i18n";
 // --- Utils ---
 import { canEditItem } from "../../../../utils/dateUtils";
 import {
+  clampTripStepIndex,
   getLastSubmittedTripStep,
-  getMaxAllowedTripStep,
   getNextIncompleteTripStep,
+  getTripStepLockMask,
   getTripWizardCompletedMask,
   isTripEnded as hasTripEnded,
   isTripWizardComplete,
@@ -115,6 +116,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   const [entryScreen, setEntryScreen] = useState<EntryScreen>("prompt");
   const [editingSubmittedStep, setEditingSubmittedStep] = useState<number | null>(null);
+  /** Bumped by "Cancel" (discard changes) to force the open step to remount
+   *  and re-hydrate every field from the last saved trip state. */
+  const [stepRemountNonce, setStepRemountNonce] = useState(0);
 
   /** Set tripId in URL so refresh can resume the active wizard. */
   const setTripIdInUrl = useCallback((tripId: number) => {
@@ -237,9 +241,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       // Resume: reopen at the first incomplete step per authoritative state.
       resolvedStep = getNextIncompleteTripStep(authoritative);
     }
-    // Part G: once Step 1 is submitted every step is openable.
-    const maxAllowed = getMaxAllowedTripStep(authoritative);
-    setViewStepIndex(Math.min(Math.max(0, resolvedStep), maxAllowed));
+    // Authoritative per-step gating: a locked target falls back to the first
+    // incomplete step (never "trip exists = every step open").
+    setViewStepIndex(clampTripStepIndex(authoritative, resolvedStep));
   };
 
   const handleResume = (selectedTrip: Trip) => {
@@ -319,6 +323,31 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     clearTripIdFromUrl();
   }, [clearTrip, clearTripIdFromUrl, setIsEditing, setTrip]);
 
+  /**
+   * Bottom "Cancel" on any step = DISCARD unsaved local edits only.
+   *
+   *  - A brand-new trip that was never created has nothing persisted → close
+   *    the editor back to the landing screen (handled by each step calling
+   *    `clearForm` while its own step is not submitted).
+   *  - Otherwise revert the working copy to the last server-confirmed state
+   *    (`savedTrip`, updated by every successful Save Progress / Submit) and
+   *    force the step to remount so any component-local form mirror
+   *    (StepStart's `form`, box tables, delivery rows…) re-hydrates from it.
+   *
+   * It NEVER deletes the trip or a step, and NEVER touches submitted flags or
+   * status — a successful Save survives Cancel + reopen (CASE B / D).
+   */
+  const discardStepChanges = useCallback(() => {
+    if (!trip.id) {
+      clearForm();
+      return;
+    }
+    setTrip(savedTrip);
+    setRows(savedTrip.deliveries || []);
+    setEditingSubmittedStep(null);
+    setStepRemountNonce((n) => n + 1);
+  }, [trip.id, savedTrip, setTrip, clearForm]);
+
   const createNewTrip = useCallback(() => {
     clearTrip();
     setRows([]);
@@ -340,14 +369,14 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   // Shared Desktop + Mobile workflow definition.
   const currentStep = getNextIncompleteTripStep(trip);
-  // Part G: only Step 1 is openable until it is submitted; afterwards every
-  // step opens (expenses can be entered mid-trip). Opening != submitting —
-  // per-step submit validation and order gating are enforced on submit.
-  const maxAllowedStep = getMaxAllowedTripStep(trip);
-  const lockedSteps = TRIP_STEP_LABELS.map((_, index) => index > maxAllowedStep);
+  // Step-enablement dependency model: each step opens only when its predecessor
+  // is SUBMITTED (Step 5 opens after Step 1 so expenses can be entered mid-trip;
+  // its final submit stays gated on Steps 1–4). Opening != submitting — per-step
+  // submit validation and order gating are enforced on submit (frontend + backend).
+  const lockedSteps = getTripStepLockMask(trip);
   // Render-safe view index — the UI must never trust a requested index that
   // bypasses the sequence (direct state/URL manipulation included).
-  const effectiveViewStepIndex = Math.min(Math.max(0, viewStepIndex), maxAllowedStep);
+  const effectiveViewStepIndex = clampTripStepIndex(trip, viewStepIndex);
 
   const [vehicleOpts, setVehicleOpts] = useState<Array<{ id: number; vehicleNumber: string }>>([]);
   const [employeeOpts, setEmployeeOpts] = useState<Array<{ id: number; employeeName: string; department: string }>>([]);
@@ -400,11 +429,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   // available. This runs regardless of how the step was requested (click,
   // programmatic navigation, state restoration) and never relies on the
   // frontend-only flag being "next".
-  useEffect(() => {
-    if (viewStepIndex > maxAllowedStep) {
-      setViewStepIndex(maxAllowedStep);
-    }
-  }, [viewStepIndex, maxAllowedStep]);
+  // No reconciling effect is needed: `effectiveViewStepIndex` re-derives a
+  // safe, unlocked index from authoritative trip state on every render, so a
+  // stale/locked `viewStepIndex` can never reach the rendered wizard.
 
   const isNewTrip = trip.id === 0 || !trip.tripNo;
 
@@ -427,6 +454,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     if (effectiveViewStepIndex === 0) {
       return (
         <StepStart
+          key={`step0-${stepRemountNonce}`}
           tripId={trip.id}
           tripNo={trip.tripNo}
           startTime={trip.startTime}
@@ -450,7 +478,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           employeeOptions={employeeOpts}
           editable={isEditable(isStartCompleted)}
           canEdit={canEditTrip}
-          onCancel={clearForm}
+          onCancel={discardStepChanges}
           clearForm={clearForm}
           headerLoading={headerLoading}
           subscribeHeaderSaveStatus={subscribeHeaderSaveStatus}
@@ -462,6 +490,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     if (effectiveViewStepIndex === 1) {
       return (
         <StepFarm
+          key={`step1-${stepRemountNonce}`}
           trip={trip}
           setTrip={setTrip}
           updateTrip={updateTrip}
@@ -484,7 +513,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           birdTypes={birdTypes}
           editable={isEditable(isFarmCompleted)}
           canEdit={canEditTrip}
-          onCancel={clearForm}
+          onCancel={discardStepChanges}
+          clearForm={clearForm}
         />
       );
     }
@@ -492,6 +522,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     if (effectiveViewStepIndex === 2) {
       return (
         <StepPickup
+          key={`step2-${stepRemountNonce}`}
           trip={trip}
           setTrip={setTrip}
           updateTrip={updateTrip}
@@ -500,7 +531,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           updateBoxDetails={updateBoxDetails}
           editable={isEditable(isPickupCompleted)}
           canEdit={canEditTrip}
-          onCancel={clearForm}
+          onCancel={discardStepChanges}
           clearForm={clearForm}
         />
       );
@@ -509,6 +540,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     if (effectiveViewStepIndex === 3) {
       return (
         <StepDeliveries
+          key={`step3-${stepRemountNonce}`}
           rows={rows}
           setRows={setRows}
           shops={shops}
@@ -521,7 +553,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           readOnly={!isEditable(isDeliveryCompleted)}
           editable={isEditable(isDeliveryCompleted)}
           canEdit={canEditTrip}
-          onCancel={clearForm}
+          onCancel={discardStepChanges}
           clearForm={clearForm}
           persistedDeliveries={savedTrip.deliveries || []}
         />
@@ -531,12 +563,13 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     if (effectiveViewStepIndex === 4) {
       return (
         <StepEnd
+          key={`step4-${stepRemountNonce}`}
           trip={trip}
           setTrip={setTrip}
           updateTrip={updateTrip}
           editable={isEditable(isTripEnded)}
           canEdit={canEditTrip}
-          onCancel={clearForm}
+          onCancel={discardStepChanges}
           clearForm={clearForm}
           submitExpensesStep={submitEndTrip}
           saveEndProgress={saveEndProgress}

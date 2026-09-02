@@ -8,6 +8,7 @@ import UnLoadingTable from "./Step_4";
 import BoxWeightAnalysis from "./Step_4/BoxWeightAnalysis";
 import type { ShopDelivery, Trip, BoxDetail } from "../types/trip";
 import { getDeliveriesBalanceError } from "../../../../shared/trip/validation";
+import { StepCloseButton } from "./WizardStepUI";
 import { useI18n } from "../../../../i18n";
 
 interface Props {
@@ -79,6 +80,12 @@ export default function StepDeliveries({
   };
 
   const handleCancelStepEdit = () => {
+    // Lightweight: exit step-edit / shop-edit mode only. This runs as part of
+    // the normal per-shop save flow (Step_4 index.closeForm() calls
+    // onCancelEdit after every successful shop save), so it MUST NOT discard
+    // `rows` — a per-shop save writes straight to the parent working copy and
+    // is persisted by "Save Progress" / Submit. Unsaved shop-form input is
+    // discarded by the shop form's own Cancel (form-local state).
     setIsStepEditing(false);
     setEditingShopId(null);
   };
@@ -163,6 +170,7 @@ export default function StepDeliveries({
                   <Pencil size={14} />
                 </button>
               )}
+              <StepCloseButton onClose={handleCancelWizard} />
               <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex items-center gap-1.5">
                 <Lock size={12} className="text-slate-500" /> {t("ops.trip.submitted_locked")}
               </span>

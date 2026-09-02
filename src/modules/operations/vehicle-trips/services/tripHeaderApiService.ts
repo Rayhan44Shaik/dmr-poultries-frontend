@@ -198,6 +198,12 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     updatedAt: str(raw.updatedAt ?? raw.updated_at, defaults.updatedAt ?? new Date().toISOString()),
     sourceFarmId: numOrZero(raw.sourceFarmId ?? raw.source_farm_id ?? defaults.sourceFarmId),
     sourceFarm: str(raw.sourceFarm ?? raw.source_farm, defaults.sourceFarm),
+    // Farm (Step 2) bird type — backend canonical fields are farm_bird_type_id /
+    // farm_bird_type (API: farmBirdTypeId / farmBirdType). The Trip model keeps
+    // the shorter birdTypeId / birdType names; map both casings so an Edit /
+    // Resume / post-submit reload rehydrates the value instead of blanking it.
+    birdTypeId: numOrZero(raw.farmBirdTypeId ?? raw.farm_bird_type_id ?? defaults.birdTypeId),
+    birdType: str(raw.farmBirdType ?? raw.farm_bird_type, defaults.birdType),
     reachedTime: formatStartTimeForDisplay(raw.reachedTime ?? raw.reached_time) || defaults.reachedTime,
     destMeter: numOrZero(raw.destMeter ?? raw.dest_meter ?? defaults.destMeter),
     pickupTolls: num(raw.pickupTolls ?? raw.pickup_tolls, defaults.pickupTolls),
@@ -272,6 +278,14 @@ export function toStep2Payload(trip: Partial<Trip>): Record<string, unknown> {
     remarks: trip.remarks ?? "",
     farmStepSubmitted: trip.farmStepSubmitted ?? false,
   };
+  // Farm bird type — backend canonical body keys are farmBirdTypeId /
+  // farmBirdType (columns farm_bird_type_id / farm_bird_type). Send only when a
+  // real id is selected: the strict farm-submit schema rejects a null id, and a
+  // COALESCE update means "omitted" safely keeps the stored value.
+  if (trip.birdTypeId) {
+    payload.farmBirdTypeId = trip.birdTypeId;
+    payload.farmBirdType = trip.birdType || null;
+  }
   const lat = numOrNull(trip.farmGpsLat);
   const lon = numOrNull(trip.farmGpsLon);
   if (

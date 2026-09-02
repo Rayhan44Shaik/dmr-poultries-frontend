@@ -118,7 +118,7 @@ test('harness is up and seeded', async ({ request }) => {
   expect(body.vehicles.map((v: { vehicleNumber: string }) => v.vehicleNumber)).toContain(SEED.vehicle);
 });
 
-test('16: new trip — only Step 1 before submit, then all five steps open; Step 5 opens before Step 4', async ({ page, request }) => {
+test('16: step-enablement dependency — new trip only Step 1; after Step 1 only Steps 2 + 5; Step 3/4 stay locked until their predecessor is submitted', async ({ page, request }) => {
   await setLanguage(page, 'en');
   await gotoTripEntry(page);
 
@@ -164,17 +164,28 @@ test('16: new trip — only Step 1 before submit, then all five steps open; Step
   tripNo = String(mine!.tripNo);
   expect(tripNo).toMatch(/^TR-\d{8}-\d{3}$/);
 
-  // All five steps now openable (no "Locked") — verified after a fresh load.
+  // After Step 1 (fresh load): Step 2 and Step 5 open; Step 3 and Step 4 stay
+  // LOCKED until their immediate predecessor is submitted. Step 5 is the
+  // deliberate exception — expenses can be entered mid-trip.
   await page.goto(`/operations?tab=trip-entry&tripId=${tripId}`);
   await page.waitForLoadState('networkidle');
   await expect(page.locator('button[aria-label^="Step 1"]')).toBeVisible();
-  for (const n of [1, 2, 3, 4, 5]) {
+  for (const n of [1, 2, 5]) {
     await expect(page.locator(`button[aria-label^="Step ${n}"]`)).not.toHaveAttribute('aria-label', /Locked/i);
   }
+  for (const n of [3, 4]) {
+    await expect(page.locator(`button[aria-label^="Step ${n}"]`)).toHaveAttribute('aria-label', /Locked/i);
+  }
 
-  // Open Step 5 BEFORE Step 4.
+  // Open Step 5 BEFORE Step 4 (allowed after Step 1).
   await page.locator('button[aria-label^="Step 5"]').click();
   await expect(page.getByRole('heading', { name: /expenses|end details/i })).toBeVisible();
+
+  // A locked step must not open: clicking Step 3 redirects to the first
+  // incomplete step (Step 2) instead of showing Step 3.
+  await page.locator('button[aria-label^="Step 3"]').click();
+  await expect(page.getByRole('heading', { name: /farm/i }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: /pickup/i })).toHaveCount(0);
 });
 
 const sheetRow = (page: Page, label: RegExp) =>
@@ -542,6 +553,69 @@ test('27: Order Collection UI — one ORD container, no TR- trip, shop count fro
   expect(containers[0].startStepSubmitted, 'Finish Collection latched start_step_submitted').toBe(true);
 });
 
+test('27b: Orders Assignment calendar — opens unclipped, month nav works, does not self-close, and the picked date drives the selected day', async ({ page }) => {
+  await setLanguage(page, 'en');
+  await page.goto('/operations?tab=orders');
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: /order assignment/i }).click();
+
+  const dateInput = page.getByTestId('orders-date-picker').locator('input');
+  const todayStr = await dateInput.inputValue(); // DD/MM/YYYY == operational today
+  expect(todayStr).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
+
+  // Open the calendar.
+  await dateInput.click();
+  const dialog = page.getByRole('dialog', { name: /choose date/i });
+  await expect(dialog).toBeVisible();
+
+  // NOT clipped: the popup is fully inside the viewport (no overflow:hidden
+  // ancestor cutting it off, no off-screen x/y).
+  const box = await dialog.boundingBox();
+  const vp = page.viewportSize()!;
+  expect(box, 'calendar popup has a bounding box').toBeTruthy();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(vp.width + 1);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(vp.height + 1);
+
+  // Month navigation works (the Month control's label changes, then returns).
+  const monthCtl = dialog.getByRole('button', { name: 'Month', exact: true });
+  const m0 = (await monthCtl.innerText()).trim();
+  await dialog.getByRole('button', { name: 'Previous month' }).click();
+  await expect(monthCtl).not.toHaveText(m0);
+  await dialog.getByRole('button', { name: 'Next month' }).click();
+  await expect(monthCtl).toHaveText(m0);
+
+  // Year control is present and interactive.
+  await expect(dialog.getByRole('button', { name: 'Year', exact: true })).toBeVisible();
+
+  // No immediate-close bug: still open after interacting inside it.
+  await expect(dialog).toBeVisible();
+
+  // Escape closes it (outside-interaction close works, not a stuck overlay).
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+
+  // The picked date drives the selected day: choose a past day inside the
+  // 7-day window → the day becomes read-only ("CLOSED"); then back to today.
+  const [dd, mm, yyyy] = todayStr.split('/').map(Number);
+  const past = new Date(Date.UTC(yyyy, mm - 1, dd - 2));
+  const pastStr =
+    `${String(past.getUTCDate()).padStart(2, '0')}/` +
+    `${String(past.getUTCMonth() + 1).padStart(2, '0')}/` +
+    `${past.getUTCFullYear()}`;
+
+  await dateInput.fill(pastStr);
+  await dateInput.blur();
+  await expect(dateInput).toHaveValue(pastStr);
+  await expect(page.getByText(/^CLOSED$/).first()).toBeVisible();
+
+  await dateInput.fill(todayStr);
+  await dateInput.blur();
+  await expect(dateInput).toHaveValue(todayStr);
+  await expect(page.getByText(/^TODAY$/).first()).toBeVisible();
+});
+
 // ════════════════════════════════════════════════════════════════════════
 //  28: complete real UI Trip Entry workflow Step 1 through Step 5
 //  ────────────────────────────────────────────────────────────────────────
@@ -658,11 +732,15 @@ test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ 
     expect(s1.startStepSubmittedAt ?? null, 'Step 1 server timestamp').toBeTruthy();
   }
 
-  // Reload → all five steps become openable; Trip No visible.
+  // Reload → after Step 1 only Steps 2 + 5 open; Steps 3 + 4 stay locked;
+  // Trip No visible.
   await page.goto(`/operations?tab=trip-entry&tripId=${tripId}`);
   await page.waitForLoadState('networkidle');
-  for (const n of [1, 2, 3, 4, 5]) {
+  for (const n of [1, 2, 5]) {
     await expect(stepBtn(page, n)).not.toHaveAttribute('aria-label', /Locked/i);
+  }
+  for (const n of [3, 4]) {
+    await expect(stepBtn(page, n)).toHaveAttribute('aria-label', /Locked/i);
   }
   await expect(page.getByText(tripNo, { exact: true }).first()).toBeVisible();
 
@@ -700,12 +778,23 @@ test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ 
     expect(s2.farmGpsLat ?? null, 'GPS captured through the UI').toBeTruthy();
   }
 
-  // Reload → Step 2 still shows the submitted values.
+  // Reload → Step 2 still shows the submitted values, including Bird Type
+  // (persisted frontend → backend farm_bird_type_id → GET → reopen).
   await page.goto(`/operations?tab=trip-entry&tripId=${tripId}`);
   await page.waitForLoadState('networkidle');
   await stepBtn(page, 2).click();
   await expect(page.getByText(SEED.farm).first()).toBeVisible();
   await expect(page.getByText(new RegExp(`${DEST}`))).toBeVisible();
+  await expect(page.getByText(SEED.birdType).first()).toBeVisible();
+  {
+    const s2b = await fullTrip(request, tripId);
+    expect(Number(s2b.farmBirdTypeId), 'farm bird type persisted to the trip row').toBeGreaterThan(0);
+    expect(String(s2b.farmBirdType)).toBe(SEED.birdType);
+  }
+
+  // After Step 2: Step 3 opens, Step 4 stays locked.
+  await expect(stepBtn(page, 3)).not.toHaveAttribute('aria-label', /Locked/i);
+  await expect(stepBtn(page, 4)).toHaveAttribute('aria-label', /Locked/i);
 
   // ── STEP 2 → ORDERS: the SAME operational trip is visible in Orders ───
   await page.goto('/operations?tab=orders');
@@ -774,6 +863,9 @@ test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ 
   await page.waitForLoadState('networkidle');
   await stepBtn(page, 3).click();
   await expect(page.getByText(/150/).first()).toBeVisible();
+
+  // After Step 3: Step 4 opens.
+  await expect(stepBtn(page, 4)).not.toHaveAttribute('aria-label', /Locked/i);
 
   // ── STEP 3 → ORDERS ASSIGNMENT (real UI): assign 5 shops to THIS trip ──
   await page.goto('/operations?tab=orders');
