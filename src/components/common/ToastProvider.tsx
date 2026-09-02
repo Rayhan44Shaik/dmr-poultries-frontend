@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import { createContext, useContext, useState, useCallback, useRef } from "react";
 import { CheckCircle, XCircle, Info, X } from "lucide-react";
 import { useI18n } from "../../i18n";
 
@@ -22,7 +22,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const idRef = useRef(0);
   const { t } = useI18n();
 
-  const showToast = useCallback((message: string, type: ToastType = "info", duration: number = 4000) => {
+  const showToast = useCallback((message: string, type: ToastType = "info", duration: number = 5000) => {
     const id = ++idRef.current;
     setToasts((prev) => [...prev, { id, message, type }]);
     
@@ -38,11 +38,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`pointer-events-auto animate-in slide-in-from-right duration-300 max-w-xs ${
+            className={`pointer-events-auto animate-in slide-in-from-top duration-300 max-w-xs ${
               toast.type === "success"
                 ? "bg-green-600 text-white"
                 : toast.type === "error"
@@ -70,7 +70,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 {toast.message}
               </p>
               <button
-                onClick={() => {}}
+                onClick={() => removeToast(toast.id)}
                 className="flex-shrink-0 -mr-1 p-1 text-white/70 hover:text-white rounded-full hover:bg-white/20 transition-colors"
                 aria-label={t("common.close")}
               >

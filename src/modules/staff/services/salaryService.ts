@@ -4,6 +4,7 @@
 // synthetic records, no client-side totals.
 
 import {
+  apiClient,
   apiDelete,
   apiGet,
   apiPatch,
@@ -11,7 +12,11 @@ import {
   apiPut,
   handleApiError,
 } from "../../../api";
-import type { SalaryRecord } from "../types/staffDashboard";
+import type {
+  SalaryMonthSummary,
+  SalaryRecord,
+  SubmitMonthResult,
+} from "../types/staffDashboard";
 
 const SALARY_PATH = "/staff/salaries";
 
@@ -83,6 +88,63 @@ function mapSalary(raw: Record<string, unknown>): SalaryRecord {
 // ---------------------------------------------------------------------------
 // API
 // ---------------------------------------------------------------------------
+
+/** POST /api/staff/salaries/submit-month — transactional month submission,
+ *  then payslip email queue. Backend-authoritative. */
+export async function submitSalaryMonth(
+  month: string,
+  submittedBy = "user"
+): Promise<SubmitMonthResult> {
+  const { data } = await apiPost<Record<string, unknown>>(
+    `${SALARY_PATH}/submit-month`,
+    { month, submittedBy }
+  );
+  return {
+    month: str(data.month),
+    submittedCount: num(data.submittedCount ?? data.submitted_count),
+    alreadySubmittedCount: num(data.alreadySubmittedCount ?? data.already_submitted_count),
+    paidCount: num(data.paidCount ?? data.paid_count),
+    emailQueuedCount: num(data.emailQueuedCount ?? data.email_queued_count),
+    emailSentCount: num(data.emailSentCount ?? data.email_sent_count),
+    emailFailedCount: num(data.emailFailedCount ?? data.email_failed_count),
+    emailSkippedCount: num(data.emailSkippedCount ?? data.email_skipped_count),
+  };
+}
+
+/** GET /api/staff/salaries/month-summary — backend-derived month lifecycle. */
+export async function getSalaryMonthSummary(month: string): Promise<SalaryMonthSummary> {
+  const { data } = await apiGet<Record<string, unknown>>(
+    `${SALARY_PATH}/month-summary`,
+    { params: { month } }
+  );
+  return {
+    month: str(data.month),
+    employees: num(data.employees),
+    pending: num(data.pending),
+    submitted: num(data.submitted),
+    paid: num(data.paid),
+    closed: Boolean(data.closed),
+  };
+}
+
+/** GET /api/staff/salaries/:id/payslip.pdf — canonical downloadable payslip. */
+export async function downloadPayslipPdf(id: string): Promise<void> {
+  const response = await apiClient.get<Blob>(`${SALARY_PATH}/${id}/payslip.pdf`, {
+    responseType: "blob",
+  });
+  const disposition = String(response.headers?.["content-disposition"] ?? "");
+  const match = /filename="?([^";]+)"?/i.exec(disposition);
+  const fileName = match?.[1] ?? `DMR-Poultries-Payslip-${id}.pdf`;
+  const blob = response.data;
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
 
 /** GET /api/staff/salaries?month=YYYY-MM&department= */
 export async function listSalaries(

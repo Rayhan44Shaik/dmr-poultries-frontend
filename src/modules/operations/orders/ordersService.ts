@@ -26,7 +26,7 @@ import type { OrderView } from "./services/ordersApi";
  */
 export type ShopDirectory = Map<
   number,
-  { shopName: string; city: string; mobile: string }
+  { shopName: string; city: string; mobile: string; ownerName: string }
 >;
 export type SupervisorDirectory = Map<string, string>; // name (lower) -> mobile
 
@@ -38,6 +38,7 @@ export async function loadShopDirectory(): Promise<ShopDirectory> {
       shopName: shop.shopName,
       city: shop.city,
       mobile: (shop.phoneNumber ?? "").trim(),
+      ownerName: (shop.ownerName ?? "").trim(),
     });
   }
   return dir;
@@ -71,6 +72,11 @@ export function cityOf(
 /** Shop Mobile from the Shop Master only ("" when the master has none). */
 export function shopMobileOf(shopId: number, directory: ShopDirectory): string {
   return directory.get(shopId)?.mobile ?? "";
+}
+
+/** Shop owner name from the Shop Master only ("" when the master has none). */
+export function shopOwnerOf(shopId: number, directory: ShopDirectory): string {
+  return directory.get(shopId)?.ownerName ?? "";
 }
 
 // ─── Trip-level detail (Delivery Tracking "View" / PDF / WhatsApp) ──────────

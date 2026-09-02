@@ -109,7 +109,7 @@ export default function OrdersDeliveryTrackingTab({
     const out: TrackingLine[] = [];
     for (const order of page.rows) {
       if (order.assignments.length === 0) {
-        out.push({ key: `o-${order.id}`, order, assignment: null });
+        out.push({ key: order.id > 0 ? `o-${order.id}` : `s-${order.shopId}`, order, assignment: null });
         continue;
       }
       for (const assignment of order.assignments) {
@@ -215,15 +215,17 @@ export default function OrdersDeliveryTrackingTab({
           <OrdersEmptyState title={to("orders.tracking_empty")} />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1180px]">
+            <table className="w-full min-w-[1420px]">
               <thead className={opsTableHeadRowClass}>
                 <tr>
                   <th className={opsTableThClass}>{to("orders.col_sno")}</th>
                   <th className={opsTableThClass}>{to("orders.col_date")}</th>
+                  <th className={opsTableThClass}>{to("orders.col_order_no")}</th>
                   <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
                   <th className={opsTableThClass}>{to("orders.col_city")}</th>
                   <th className={opsTableThClass}>{to("orders.col_trip")}</th>
                   <th className={opsTableThClass}>{to("orders.col_vehicle")}</th>
+                  <th className={opsTableThClass}>{to("orders.col_sequence")}</th>
                   <th className={opsTableThClass}>{to("orders.col_required_boxes")}</th>
                   <th className={opsTableThClass}>{to("orders.col_pickup_boxes")}</th>
                   <th className={opsTableThClass}>{to("orders.col_pending_boxes")}</th>
@@ -238,16 +240,24 @@ export default function OrdersDeliveryTrackingTab({
                 {lines.map((line, index) => {
                   const { order, assignment } = line;
                   const tripId = assignment?.tripId ?? 0;
+                  // The per-delivery email/WhatsApp services accept COMPLETED
+                  // trips only (they reject anything else with 422), so the
+                  // action must not be offered before the trip is completed.
+                  const tripCompleted = assignment?.tripStatus === "Completed";
                   return (
                     <tr key={line.key} className={opsTableRowClass}>
                       <td className={opsTableTdClass}>{startIndex + index + 1}</td>
                       <td className={opsTableTdClass}>{order.orderDate}</td>
+                      <td className={`${opsTableTdClass} font-mono text-xs text-slate-500`}>
+                        {order.orderNo}
+                      </td>
                       <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
                         {order.shopName}
                       </td>
                       <td className={opsTableTdClass}>{order.city || "—"}</td>
                       <td className={`${opsTableTdClass} text-xs`}>{assignment?.tripNo ?? "—"}</td>
                       <td className={`${opsTableTdClass} text-xs`}>{assignment?.vehicleNo || "—"}</td>
+                      <td className={`${opsTableTdClass} tabular-nums`}>{assignment?.sequence ?? "—"}</td>
                       <td className={`${opsTableTdClass} font-semibold tabular-nums`}>
                         {order.requiredBoxes}
                       </td>
@@ -289,9 +299,13 @@ export default function OrdersDeliveryTrackingTab({
                             <FileText size={14} />
                           </OrdersIconButton>
                           <OrdersIconButton
-                            label={to("orders.send_whatsapp")}
+                            label={
+                              tripCompleted
+                                ? to("orders.send_whatsapp")
+                                : to("orders.whatsapp_completed_only")
+                            }
                             tone="emerald"
-                            disabled={!tripId}
+                            disabled={!tripId || !tripCompleted}
                             busy={whatsappBusyTripId === tripId && tripId > 0}
                             onClick={() => onWhatsApp(tripId)}
                           >

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSalaryRegister } from "../hooks/useSalaryRegister";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { loadEmployees } from "../../masters/employees/services/employeeService";
+import { getSalaryMonthSummary, downloadPayslipPdf, submitSalaryMonth } from "../services/salaryService";
 import {
   Calendar,
   ChevronLeft,
@@ -11,7 +12,6 @@ import {
   Clock,
   LayoutGrid,
   RefreshCw,
-  Sparkles,
   Users,
   Wallet,
   TrendingUp,
@@ -23,11 +23,13 @@ import {
   X,
   CheckCheck,
   Undo2,
+  Lock,
 } from "lucide-react";
 import { SalaryTable } from "../components/salary/salaryTable";
 import { SalaryView } from "../components/salary/SalaryView";
 import { BulkPayModal } from "../components/salary/BulkPayModal";
-import type { SalaryRecord } from "../types/staffDashboard";
+import { SubmitMonthModal } from "../components/salary/SubmitMonthModal";
+import type { SalaryMonthSummary, SalaryRecord } from "../types/staffDashboard";
 
 function formatMonthName(monthStr: string): string {
   if (!monthStr) return "";
@@ -57,13 +59,13 @@ function Kpi({
   tone: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-start justify-between shadow-sm">
-      <div>
+    <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-start justify-between">
+      <div className="min-w-0">
         <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">{label}</div>
-        <div className="text-xl font-extrabold text-slate-800 mt-1">{value}</div>
+        <div className="text-lg font-extrabold text-slate-800 mt-1 leading-tight">{value}</div>
         {sub && <div className="text-[11px] text-slate-400 mt-0.5">{sub}</div>}
       </div>
-      <div className={`p-2 rounded-lg ${tone}`}>{icon}</div>
+      <div className={`p-2 rounded-lg shrink-0 ${tone}`}>{icon}</div>
     </div>
   );
 }
@@ -99,11 +101,13 @@ function SalaryRegisterPage() {
   const [masterEmployees, setMasterEmployees] = useState<Array<{ department?: string; employeeName?: string }>>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkPayOpen, setBulkPayOpen] = useState(false);
+  const [submitMonthOpen, setSubmitMonthOpen] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{
     title: string;
     message: string;
     onConfirm: () => void;
   } | null>(null);
+  const [monthSummary, setMonthSummary] = useState<SalaryMonthSummary | null>(null);
 
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState<number>(() => Number(getCurrentYearMonth().split("-")[0]));
@@ -117,6 +121,7 @@ function SalaryRegisterPage() {
     filter,
     setFilter,
     loading,
+    refreshing,
     saving,
     error,
     refresh,
@@ -126,28 +131,29 @@ function SalaryRegisterPage() {
     hasRecords,
   } = useSalaryRegister(month, department);
 
-  useEffect(() => {
-    // Reset to the first page whenever the dataset or filters change.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  const handleMonthChange = useCallback((value: string) => {
+    setMonth(value);
     setCurrentPage(1);
-  }, [month, department, filter, searchQuery]);
-
-  // A different month/department/status tab invalidates the selection.
-  useEffect(() => {
     setSelectedIds(new Set());
-  }, [month, department, filter]);
+  }, []);
 
-  // Drop ids that no longer exist in the loaded register.
-  useEffect(() => {
-    setSelectedIds((current) => {
-      if (current.size === 0) return current;
-      const present = new Set(allRecords.map((r) => r.id));
-      const next = new Set([...current].filter((id) => present.has(id)));
-      return next.size === current.size ? current : next;
-    });
-  }, [allRecords]);
+  const handleDepartmentChange = useCallback((value: string) => {
+    setDepartment(value);
+    setCurrentPage(1);
+    setSelectedIds(new Set());
+  }, []);
 
-  // Close dropdowns on outside click
+  const handleFilterChange = useCallback((value: 'All' | 'Pending' | 'Submitted' | 'Paid') => {
+    setFilter(value);
+    setCurrentPage(1);
+    setSelectedIds(new Set());
+  }, [setFilter]);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  }, []);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (monthPickerRef.current && !monthPickerRef.current.contains(e.target as Node)) {
@@ -158,7 +164,6 @@ function SalaryRegisterPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Department options come from the Employees master (not fabricated rows).
   useEffect(() => {
     let mounted = true;
     loadEmployees()
@@ -172,6 +177,21 @@ function SalaryRegisterPage() {
       mounted = false;
     };
   }, []);
+
+  // Month-level lifecycle status comes only from the backend.
+  useEffect(() => {
+    let cancelled = false;
+    getSalaryMonthSummary(month)
+      .then((summary) => {
+        if (!cancelled) setMonthSummary(summary);
+      })
+      .catch(() => {
+        if (!cancelled) setMonthSummary(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [month, records]);
 
   const departments = useMemo(() => {
     const set = new Set<string>();
@@ -188,8 +208,8 @@ function SalaryRegisterPage() {
   }, [records, searchQuery]);
 
   const handleRefresh = useCallback(() => {
-    void refresh().then(() => showNotification("Salary register refreshed.", "info"));
-  }, [refresh, showNotification]);
+    void refresh();
+  }, [refresh]);
 
   // ---- Bulk selection -----------------------------------------------------
   const selectedRows = useMemo(
@@ -224,6 +244,7 @@ function SalaryRegisterPage() {
 
   // ---- Actions -----------------------------------------------------------
   const [viewTarget, setViewTarget] = useState<SalaryRecord | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const confirm = useCallback((title: string, message: string, onConfirm: () => void) => {
     setConfirmConfig({ title, message, onConfirm });
@@ -248,6 +269,25 @@ function SalaryRegisterPage() {
     );
   }, [confirm, generate, month, runConfirm]);
 
+  const handleSubmitMonth = useCallback(async () => {
+    setSubmitMonthOpen(false);
+    try {
+      const result = await submitSalaryMonth(month);
+      await refresh();
+      let message = `${formatMonthName(month)} salary submitted successfully.`;
+      if (result.emailQueuedCount > 0 && result.emailFailedCount === 0) {
+        message = `${formatMonthName(month)} salary submitted. Payslip emails queued for ${result.emailQueuedCount} employees.`;
+      } else if (result.emailQueuedCount > 0) {
+        message = `${formatMonthName(month)} salary submitted. ${result.emailSentCount} payslips sent, ${result.emailFailedCount} email deliveries need attention.`;
+      } else if (result.submittedCount === 0) {
+        message = `${formatMonthName(month)} salary already submitted. No duplicate emails queued.`;
+      }
+      showNotification(message, "success");
+    } catch (error) {
+      showNotification((error as Error)?.message || "Unable to submit month.", "error");
+    }
+  }, [showNotification, month, refresh]);
+
   const handleBulkPay = useCallback(
     (input: { paymentDate: string; paymentMode: string }) => {
       const ids = [...selectedIds];
@@ -269,11 +309,36 @@ function SalaryRegisterPage() {
     );
   }, [confirm, selectedIds, markUnpaidBulk, runConfirm, clearSelection]);
 
+  const handleDownload = useCallback(
+    async (record: SalaryRecord) => {
+      setDownloadingId(record.id);
+      try {
+        await downloadPayslipPdf(record.id);
+      } catch {
+        showNotification("Unable to download payslip.", "error");
+      } finally {
+        setDownloadingId(null);
+      }
+    },
+    [showNotification]
+  );
+
+  const monthStatus = useMemo(() => {
+    if (!monthSummary) return null;
+    if (monthSummary.closed) return { label: "Closed", tone: "bg-slate-100 text-slate-600 border-slate-200" };
+    if (monthSummary.employees === 0) return { label: "Draft", tone: "bg-slate-50 text-slate-500 border-slate-200" };
+    if (monthSummary.paid === monthSummary.employees) return { label: "Paid", tone: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+    if (monthSummary.paid > 0) return { label: "Partially Paid", tone: "bg-indigo-50 text-indigo-700 border-indigo-200" };
+    if (monthSummary.submitted > 0 && monthSummary.pending === 0) return { label: "Submitted", tone: "bg-blue-50 text-blue-700 border-blue-200" };
+    if (monthSummary.submitted > 0) return { label: "Partially Submitted", tone: "bg-blue-50 text-blue-700 border-blue-200" };
+    return { label: "Pending", tone: "bg-amber-50 text-amber-700 border-amber-200" };
+  }, [monthSummary]);
+
   const statusTab = (key: 'All' | 'Pending' | 'Submitted' | 'Paid', label: string, icon: React.ReactNode) => (
     <button
       type="button"
-      onClick={() => setFilter(key)}
-      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all transform active:scale-95 duration-150 ${
+      onClick={() => handleFilterChange(key)}
+      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
         filter === key ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-900"
       }`}
     >
@@ -286,9 +351,17 @@ function SalaryRegisterPage() {
     <div className="space-y-4 w-full">
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">Salary Register</h1>
-          <p className="text-xs text-slate-500">Monthly payroll and employee salary status</p>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl font-bold text-slate-900">Salary Register</h1>
+            {monthStatus && (
+              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${monthStatus.tone}`}>
+                {monthStatus.label === "Closed" || monthStatus.label === "Paid" ? <Lock size={11} /> : null}
+                {monthStatus.label}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">Monthly payroll, attendance and payment status</p>
         </div>
         <div className="flex items-center gap-2">
           {!hasRecords && !loading && (
@@ -303,17 +376,25 @@ function SalaryRegisterPage() {
           )}
           <button
             type="button"
+            onClick={() => setSubmitMonthOpen(true)}
+            disabled={saving || refreshing || totals.pendingCount === 0}
+            className="h-9 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+          >
+            <Send size={14} /> Submit Month
+          </button>
+          <button
+            type="button"
             onClick={handleRefresh}
-            disabled={loading || saving}
+            disabled={refreshing || saving}
             className="h-9 px-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition flex items-center gap-1.5 disabled:opacity-50"
           >
-            <RefreshCw size={14} /> Refresh
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Refresh
           </button>
         </div>
       </div>
 
       {/* Filter bar */}
-      <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
         <div className="flex flex-wrap items-end gap-3">
           <div className="relative" ref={monthPickerRef}>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Month</label>
@@ -324,14 +405,14 @@ function SalaryRegisterPage() {
                 if (y) setPickerYear(Number(y));
                 setIsMonthPickerOpen((o) => !o);
               }}
-              className="h-9 px-3 w-44 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white text-slate-700 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-all font-medium"
+              className="h-9 px-3 w-44 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white text-slate-700 flex items-center justify-between hover:border-slate-300 transition font-medium"
             >
               <span>{formatMonthName(month)}</span>
               <Calendar size={14} className="text-blue-500" />
             </button>
 
             {isMonthPickerOpen && (
-              <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200/80 p-4 z-50 animate-in fade-in zoom-in-95 duration-150 space-y-4">
+              <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-lg border border-slate-200 p-4 z-50 space-y-4">
                 <div className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/60">
                   <button type="button" onClick={() => setPickerYear((p) => p - 1)} className="p-1.5 hover:bg-white rounded-lg text-slate-600 transition">
                     <ChevronLeft size={16} />
@@ -349,12 +430,12 @@ function SalaryRegisterPage() {
                         key={m.value}
                         type="button"
                         onClick={() => {
-                          setMonth(`${pickerYear}-${m.value}`);
+                          handleMonthChange(`${pickerYear}-${m.value}`);
                           setIsMonthPickerOpen(false);
                         }}
-                        className={`py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                        className={`py-2.5 rounded-xl text-xs font-semibold transition ${
                           isSelected
-                            ? "bg-blue-600 text-white shadow-md shadow-blue-500/25"
+                            ? "bg-blue-600 text-white shadow-sm"
                             : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-100"
                         }`}
                       >
@@ -368,7 +449,7 @@ function SalaryRegisterPage() {
                     type="button"
                     onClick={() => {
                       const cur = getCurrentYearMonth();
-                      setMonth(cur);
+                      handleMonthChange(cur);
                       setPickerYear(Number(cur.split("-")[0]));
                       setIsMonthPickerOpen(false);
                     }}
@@ -388,8 +469,8 @@ function SalaryRegisterPage() {
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Department</label>
             <select
               value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              className="h-9 px-3 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white text-slate-700 shadow-2xs hover:border-slate-300 transition-all font-medium"
+              onChange={(e) => handleDepartmentChange(e.target.value)}
+              className="h-9 px-3 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white text-slate-700 hover:border-slate-300 transition font-medium"
             >
               <option value="">All Departments</option>
               {departments.map((d) => (
@@ -403,15 +484,15 @@ function SalaryRegisterPage() {
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search by employee name..."
-              className="h-9 w-full px-3 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white text-slate-700 shadow-2xs"
+              className="h-9 w-full px-3 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white text-slate-700"
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Status</label>
-            <div className="inline-flex bg-slate-100/80 p-0.5 rounded-xl border border-slate-200/80 shadow-2xs h-9 items-center">
+            <div className="inline-flex bg-slate-100/80 p-0.5 rounded-xl border border-slate-200 h-9 items-center">
               {statusTab("All", "All", <LayoutGrid size={12} className="text-slate-400" />)}
               {statusTab("Pending", "Pending", <Clock size={12} className="text-slate-400" />)}
               {statusTab("Submitted", "Submitted", <Send size={12} className="text-slate-400" />)}
@@ -419,42 +500,28 @@ function SalaryRegisterPage() {
             </div>
           </div>
         </div>
-
-        <div className="flex items-center justify-between bg-gradient-to-r from-slate-50 via-blue-50/20 to-slate-50 py-2 px-4 rounded-xl border border-slate-200/60">
-          <div className="flex items-center gap-2">
-            <div className="p-1 bg-blue-100/70 rounded-md text-blue-600">
-              <Sparkles size={14} />
-            </div>
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Net Payroll for {formatMonthName(month)}:
-            </span>
-            <span className="text-xs font-extrabold text-emerald-600">{formatCurrency(totals.netPayroll)}</span>
-          </div>
-          <span className="text-[11px] text-slate-400">
-            {totals.totalEmployees} employee(s) · {hasRecords ? allRecords.length : 0} records
-          </span>
-        </div>
       </div>
 
-      {/* Payroll summary */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        <Kpi label="Total Employees" value={String(totals.totalEmployees)} icon={<Users size={16} />} tone="bg-blue-50 text-blue-600" />
-        <Kpi label="Total Gross" value={formatCurrency(totals.totalGross)} icon={<TrendingUp size={16} />} tone="bg-emerald-50 text-emerald-600" />
-        <Kpi label="Total Deductions" value={formatCurrency(totals.totalDeductions)} icon={<TrendingDown size={16} />} tone="bg-rose-50 text-rose-600" />
-        <Kpi label="Net Payroll" value={formatCurrency(totals.netPayroll)} icon={<Wallet size={16} />} tone="bg-indigo-50 text-indigo-600" />
-        <Kpi label="Paid" value={String(totals.paidCount)} icon={<CheckCircle size={16} />} tone="bg-emerald-50 text-emerald-600" />
-        <Kpi label="Pending" value={String(totals.pendingCount)} icon={<Clock size={16} />} tone="bg-amber-50 text-amber-600" />
+      {/* Payroll summary — 7 compact cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2.5">
+        <Kpi label="Employees" value={String(totals.totalEmployees)} sub="Monthly staff" icon={<Users size={15} />} tone="bg-slate-100 text-slate-600" />
+        <Kpi label="Gross Payroll" value={formatCurrency(totals.totalGross)} icon={<TrendingUp size={15} />} tone="bg-emerald-50 text-emerald-600" />
+        <Kpi label="Deductions" value={formatCurrency(totals.totalDeductions)} icon={<TrendingDown size={15} />} tone="bg-rose-50 text-rose-600" />
+        <Kpi label="Net Payroll" value={formatCurrency(totals.netPayroll)} icon={<Wallet size={15} />} tone="bg-indigo-50 text-indigo-600" />
+        <Kpi label="Pending" value={String(totals.pendingCount)} icon={<Clock size={15} />} tone="bg-amber-50 text-amber-600" />
+        <Kpi label="Submitted" value={String(totals.submittedCount)} icon={<Send size={15} />} tone="bg-blue-50 text-blue-600" />
+        <Kpi label="Paid" value={String(totals.paidCount)} icon={<CheckCircle size={15} />} tone="bg-emerald-50 text-emerald-600" />
       </div>
 
       {error && (
-        <div className="bg-rose-50/80 border border-rose-200/80 rounded-xl p-3 text-xs text-rose-700">
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-700">
           {error}
         </div>
       )}
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 bg-blue-50/80 border border-blue-200 rounded-xl px-4 py-3 shadow-sm animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="flex flex-wrap items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
           <div className="flex items-center gap-2 text-xs font-semibold text-blue-800">
             <CheckCheck size={15} className="text-blue-600" />
             {selectedIds.size} selected · Total {formatCurrency(selectedTotalNet)}
@@ -489,14 +556,14 @@ function SalaryRegisterPage() {
         </div>
       )}
 
-      {/* Table / states */}
+      {/* Table / states — data remains visible during refresh */}
       {loading ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 shadow-sm flex flex-col items-center justify-center space-y-2">
+        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 flex flex-col items-center justify-center space-y-2">
           <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
           <span className="text-xs font-medium">Loading salary register for {formatMonthName(month)}...</span>
         </div>
       ) : !hasRecords ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-sm shadow-sm space-y-3">
+        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-sm space-y-3">
           <div className="mx-auto w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
             <FileText size={18} />
           </div>
@@ -511,7 +578,7 @@ function SalaryRegisterPage() {
           </button>
         </div>
       ) : visibleRecords.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-sm shadow-sm">
+        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-sm">
           No records match the current filters.
         </div>
       ) : (
@@ -530,7 +597,15 @@ function SalaryRegisterPage() {
       )}
 
       {/* Modals */}
-      {viewTarget && <SalaryView record={viewTarget} onClose={() => setViewTarget(null)} formatCurrency={formatCurrency} />}
+      {viewTarget && (
+        <SalaryView
+          record={viewTarget}
+          onClose={() => setViewTarget(null)}
+          formatCurrency={formatCurrency}
+          onDownload={() => void handleDownload(viewTarget)}
+          downloading={downloadingId === viewTarget.id}
+        />
+      )}
 
       {bulkPayOpen && (
         <BulkPayModal
@@ -544,9 +619,19 @@ function SalaryRegisterPage() {
         />
       )}
 
+      {submitMonthOpen && (
+        <SubmitMonthModal
+          monthLabel={formatMonthName(month)}
+          pendingCount={totals.pendingCount}
+          saving={saving}
+          onCancel={() => setSubmitMonthOpen(false)}
+          onConfirm={() => void handleSubmitMonth()}
+        />
+      )}
+
       {confirmConfig && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl border border-slate-200 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl border border-slate-200 space-y-4">
             <h3 className="text-base font-bold text-slate-900">{confirmConfig.title}</h3>
             <p className="text-xs text-slate-600">{confirmConfig.message}</p>
             <div className="flex justify-end gap-2 pt-2">

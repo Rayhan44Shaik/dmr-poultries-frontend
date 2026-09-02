@@ -13,7 +13,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardList, PackageCheck, Route } from "lucide-react";
 import { useI18n } from "../../../../i18n";
-import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { useToast } from "../../../../components/common/ToastProvider";
 import {
@@ -52,7 +51,6 @@ const OrdersPage: React.FC = () => {
   const { to } = useOrdersI18n();
   const { showNotification } = useSafeNotification();
   const { success: toastSuccess, error: toastError } = useToast();
-  const { shops, loading: shopsLoading } = useShops();
 
   const today = useMemo(() => localToday(), []);
 
@@ -79,6 +77,9 @@ const OrdersPage: React.FC = () => {
     tracking: ORDERS_DEFAULT_PAGE_SIZE,
   });
   const [selectedTripId, setSelectedTripId] = useState<number | null>(null);
+  // Collection working-sheet view state (server-driven sort + filled-only).
+  const [collectionSort, setCollectionSort] = useState<string>("shopNameAsc");
+  const [filledOnly, setFilledOnly] = useState<boolean>(false);
 
   // ── Server data ─────────────────────────────────────────────────────────
   const [data, setData] = useState<OrdersPageData>(() => emptyOrdersPage());
@@ -113,8 +114,23 @@ const OrdersPage: React.FC = () => {
       search: debouncedSearch,
       page: pageNumber[activeTab],
       pageSize: pageSize[activeTab],
+      // Collection is the all-shops working sheet; Assignment only needs
+      // the shops whose collection is FINISHED (collected = true).
+      sort: activeTab === "collection" ? collectionSort : undefined,
+      filledOnly: activeTab === "assignment" ? true : activeTab === "collection" ? filledOnly : undefined,
+      collectedOnly: activeTab === "assignment" ? true : undefined,
     };
-  }, [activeTab, day, trackingFrom, trackingTo, debouncedSearch, pageNumber, pageSize]);
+  }, [
+    activeTab,
+    day,
+    trackingFrom,
+    trackingTo,
+    debouncedSearch,
+    pageNumber,
+    pageSize,
+    collectionSort,
+    filledOnly,
+  ]);
 
   // A monotonically increasing token: only the newest response is applied,
   // so a slow earlier request can never overwrite fresher data.
@@ -218,6 +234,16 @@ const OrdersPage: React.FC = () => {
     setTrackingFrom(from);
     setTrackingTo(toDay);
     setPageNumber((prev) => ({ ...prev, tracking: 1 }));
+  }, []);
+
+  const handleSortChange = useCallback((next: string) => {
+    setCollectionSort(next);
+    setPageNumber((prev) => ({ ...prev, collection: 1 }));
+  }, []);
+
+  const handleFilledOnlyChange = useCallback((next: boolean) => {
+    setFilledOnly(next);
+    setPageNumber((prev) => ({ ...prev, collection: 1 }));
   }, []);
 
   const handleRefresh = useCallback(async () => {
@@ -351,15 +377,18 @@ const OrdersPage: React.FC = () => {
         />
       ) : activeTab === "collection" ? (
         <OrdersCollectionTab
-          shops={shops}
-          shopsLoading={shopsLoading}
           page={data}
           loading={loading}
           day={day}
           today={today}
+          shopDirectory={shopDirectory}
           onDaySelect={handleDaySelect}
           search={search.collection}
           onSearchChange={setTabSearch}
+          sort={collectionSort}
+          onSortChange={handleSortChange}
+          filledOnly={filledOnly}
+          onFilledOnlyChange={handleFilledOnlyChange}
           pageSize={pageSize.collection}
           onPageChange={setTabPage}
           onPageSizeChange={setTabPageSize}

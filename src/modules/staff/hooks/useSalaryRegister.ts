@@ -1,10 +1,10 @@
 // src/modules/staff/hooks/useSalaryRegister.ts
 // Backend-authoritative salary register hook. Records are loaded from
 // GET /api/staff/salaries?month=YYYY-MM and every mutation (bulk mark
-// paid / mark unpaid / generate) is a backend call followed by a reload.
-// No localStorage, no synthetic rows, no frontend salary calculation.
+// paid / mark unpaid / generate / submit month) is a backend call followed by
+// a reload. No localStorage, no synthetic rows, no frontend salary calculation.
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   bulkUpdateSalaryStatus,
   generateSalaries,
@@ -26,23 +26,15 @@ export interface SalaryRegisterTotals {
 export function useSalaryRegister(month: string, department: string = "") {
   const [records, setRecords] = useState<SalaryRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'All' | 'Pending' | 'Submitted' | 'Paid'>('All');
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await listSalaries(month, department || undefined);
-      setRecords(data);
-    } catch (err) {
-      setError(handleApiError(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [month, department]);
+  const requestSeq = useRef(0);
+  const initialLoaded = useRef(false);
 
+  // Initial load only (full spinner is acceptable on first paint).
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -52,12 +44,30 @@ export function useSalaryRegister(month: string, department: string = "") {
       } catch (err) {
         if (!cancelled) setError(handleApiError(err));
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          initialLoaded.current = true;
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
+  }, [month, department]);
+
+  /** Refresh preserves existing rows — no blanking, no full-page spinner. */
+  const refresh = useCallback(async () => {
+    const seq = ++requestSeq.current;
+    setRefreshing(true);
+    setError(null);
+    try {
+      const data = await listSalaries(month, department || undefined);
+      if (seq === requestSeq.current) setRecords(data);
+    } catch (err) {
+      if (seq === requestSeq.current) setError(handleApiError(err));
+    } finally {
+      if (seq === requestSeq.current) setRefreshing(false);
+    }
   }, [month, department]);
 
   const filteredRecords = useMemo(() => {
@@ -77,18 +87,13 @@ export function useSalaryRegister(month: string, department: string = "") {
     };
   }, [records]);
 
-  /** After any successful mutation, reload the authoritative list. */
-  const refresh = useCallback(async () => {
-    await loadData();
-  }, [loadData]);
-
   const runMutation = useCallback(
     async (action: () => Promise<unknown>, successMessage: string) => {
       setSaving(true);
       setError(null);
       try {
         await action();
-        await loadData();
+        await refresh();
         return { ok: true as const, message: successMessage };
       } catch (err) {
         const message = handleApiError(err);
@@ -98,7 +103,7 @@ export function useSalaryRegister(month: string, department: string = "") {
         setSaving(false);
       }
     },
-    [loadData]
+    [refresh]
   );
 
   /** Bulk Mark as Paid — one transaction for the whole selection. */
@@ -143,6 +148,7 @@ export function useSalaryRegister(month: string, department: string = "") {
     filter,
     setFilter,
     loading,
+    refreshing,
     saving,
     error,
     refresh,

@@ -278,3 +278,17 @@
 .react-datepicker__day--selected:hover {
   background-color: #047857 !important;
 }
+
+/* ============================================================
+   NUMBER INPUTS — hide native up/down spinners
+   ============================================================ */
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.no-spinner[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

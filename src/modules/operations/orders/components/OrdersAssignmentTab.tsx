@@ -29,7 +29,7 @@ import {
   opsTableThClass,
   opsTableRowClass,
 } from "../../../../shared/ui/operationsStyles";
-import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import { useToast } from "../../../../components/common/ToastProvider";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 import { formatDayFull } from "../ordersUtils";
@@ -115,7 +115,7 @@ export default function OrdersAssignmentTab({
   refreshing,
 }: Props) {
   const { to } = useOrdersI18n();
-  const { showNotification } = useSafeNotification();
+  const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
 
   const [draft, setDraft] = useState<Draft>(new Map());
   const [saving, setSaving] = useState(false);
@@ -212,7 +212,7 @@ export default function OrdersAssignmentTab({
       }
 
       if (items.length === 0 && !finish) {
-        showNotification(to("orders.nothing_to_save"), "info");
+        toastInfo(to("orders.nothing_to_save"), 5000);
         return;
       }
       if (finish && items.length === 0) {
@@ -231,7 +231,7 @@ export default function OrdersAssignmentTab({
           }
         }
         if (items.length === 0) {
-          showNotification(to("orders.assign_at_least_one_shop"), "info");
+          toastInfo(to("orders.assign_at_least_one_shop"), 5000);
           return;
         }
       }
@@ -249,17 +249,17 @@ export default function OrdersAssignmentTab({
         setNotifications(finish ? result.notifications : []);
         await onReload();
         if (finish) {
-          showNotification(to("orders.assignment_finished"), "success");
+          toastSuccess(to("orders.assignment_finished"), 5000);
           onFinished();
         } else {
-          showNotification(to("orders.assignment_saved"), "success");
+          toastSuccess(to("orders.assignment_saved"), 5000);
         }
       } catch (error) {
         // The backend's own validation message (box limit, delivered lock,
         // completed trip, stale version) is what the user sees.
-        showNotification(
+        toastError(
           error instanceof Error ? error.message : to("orders.save_failed"),
-          "error"
+          5000
         );
         await onReload();
       } finally {
@@ -276,7 +276,9 @@ export default function OrdersAssignmentTab({
       day,
       onReload,
       onFinished,
-      showNotification,
+      toastSuccess,
+      toastError,
+      toastInfo,
       to,
     ]
   );
@@ -287,16 +289,16 @@ export default function OrdersAssignmentTab({
       try {
         await deleteOrderAssignment(assignmentId);
         await onReload();
-        showNotification(to("orders.assignment_removed"), "success");
+        toastSuccess(to("orders.assignment_removed"), 5000);
       } catch (error) {
-        showNotification(
+        toastError(
           error instanceof Error ? error.message : to("orders.delete_failed"),
-          "error"
+          5000
         );
         await onReload();
       }
     },
-    [onReload, showNotification, to]
+    [onReload, toastSuccess, toastError, to]
   );
 
   const { requestDelete, cancel: cancelDelete, pendingItems } = usePendingDelete<number>(
@@ -443,10 +445,11 @@ export default function OrdersAssignmentTab({
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1080px]">
+            <table className="w-full min-w-[1240px]">
               <thead className={opsTableHeadRowClass}>
                 <tr>
                   <th className={opsTableThClass}>{to("orders.col_sno")}</th>
+                  <th className={opsTableThClass}>{to("orders.col_order_no")}</th>
                   <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
                   <th className={opsTableThClass}>{to("orders.col_city")}</th>
                   <th className={opsTableThClass}>{to("orders.col_sequence")}</th>
@@ -454,6 +457,7 @@ export default function OrdersAssignmentTab({
                   <th className={opsTableThClass}>{to("orders.col_pickup_boxes")}</th>
                   <th className={opsTableThClass}>{to("orders.col_pending_boxes")}</th>
                   <th className={opsTableThClass}>{to("orders.col_delivered_boxes")}</th>
+                  <th className={opsTableThClass}>{to("orders.col_remaining_boxes")}</th>
                   <th className={opsTableThClass}>{to("orders.col_trip")}</th>
                   <th className={opsTableThClass}>{to("orders.col_vehicle")}</th>
                   <th className={opsTableThClass}>{to("orders.col_status")}</th>
@@ -484,6 +488,9 @@ export default function OrdersAssignmentTab({
                       }`}
                     >
                       <td className={opsTableTdClass}>{startIndex + index + 1}</td>
+                      <td className={`${opsTableTdClass} font-mono text-xs text-slate-500`}>
+                        {row.orderNo}
+                      </td>
                       <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
                         <span className="inline-flex items-center gap-1.5">
                           {locked && <Lock size={11} className="text-slate-400" aria-hidden />}
@@ -499,7 +506,7 @@ export default function OrdersAssignmentTab({
                             value={sequenceOf(row, index)}
                             aria-label={`${to("orders.col_sequence")} — ${row.shopName}`}
                             onChange={(e) => updateDraft(row, index, "sequence", e.target.value)}
-                            className="h-8 w-16 rounded-lg border border-slate-200 px-2 text-xs"
+                            className="no-spinner h-8 w-16 rounded-lg border border-slate-200 px-2 text-xs"
                           />
                         ) : (
                           <span className="tabular-nums">{assignment?.sequence ?? "—"}</span>
@@ -520,7 +527,7 @@ export default function OrdersAssignmentTab({
                               onChange={(e) =>
                                 updateDraft(row, index, "pickupBoxes", e.target.value)
                               }
-                              className={`h-8 w-24 rounded-lg border px-2 text-xs font-semibold ${
+                              className={`no-spinner h-8 w-24 rounded-lg border px-2 text-xs font-semibold ${
                                 overLimit || underDelivered
                                   ? "border-rose-400 text-rose-700"
                                   : "border-emerald-300"
@@ -544,6 +551,7 @@ export default function OrdersAssignmentTab({
                       <td className={`${opsTableTdClass} tabular-nums font-semibold text-emerald-700`}>
                         {row.deliveredBoxes}
                       </td>
+                      <td className={`${opsTableTdClass} tabular-nums`}>{row.remainingBoxes}</td>
                       <td className={`${opsTableTdClass} text-xs text-slate-500`}>
                         {row.assignments.map((a) => a.tripNo).join(", ") || "—"}
                       </td>

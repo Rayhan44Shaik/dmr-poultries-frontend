@@ -53,6 +53,29 @@ async function post(request: APIRequestContext, path: string, data: unknown) {
   return res.json();
 }
 
+/**
+ * Idempotent master seeding. The harness DB is normally fresh, but this suite
+ * must not depend on that: if a previous run (or a retry) already created the
+ * record, reuse it instead of failing on the unique-name constraint.
+ */
+async function ensureMaster<T extends Record<string, unknown>>(
+  request: APIRequestContext,
+  collection: string,
+  matchKey: string,
+  matchValue: string,
+  body: unknown
+): Promise<T> {
+  const existing = (await (await request.get(`${API}/masters/${collection}`)).json()) as T[];
+  const found = existing.find((r) => String(r[matchKey]) === matchValue);
+  if (found) return found;
+  const res = await request.post(`${API}/masters/${collection}`, { data: body });
+  expect(
+    res.ok(),
+    `POST /masters/${collection} (${matchValue}) → ${res.status()} ${await res.text()}`
+  ).toBeTruthy();
+  return (await res.json()) as T;
+}
+
 async function apiOrders(request: APIRequestContext, query = '') {
   const res = await request.get(`${API}/orders${query}`);
   expect(res.ok(), `GET /orders${query} → ${res.status()}`).toBeTruthy();
@@ -67,6 +90,7 @@ async function apiOrders(request: APIRequestContext, query = '') {
       remainingBoxes: number;
       status: string;
       locked: boolean;
+      version: number;
       assignments: Array<{ id: number; tripId: number; pickupBoxes: number; deliveredBoxes: number }>;
     }>;
     total: number;
@@ -105,14 +129,6 @@ async function selectVehicle(page: Page) {
   await page.getByRole('option', { name: new RegExp(vehicleNo) }).first().click();
 }
 
-async function addShopToCollection(page: Page, shop: string, boxes: number) {
-  const picker = page.locator('#orders-add-shop');
-  await picker.click();
-  await picker.pressSequentially(shop, { delay: 15 });
-  await page.getByRole('option', { name: new RegExp(shop, 'i') }).first().click();
-  await requiredInput(page, shop).fill(String(boxes));
-}
-
 async function saveCollection(page: Page) {
   const [res] = await Promise.all([
     page.waitForResponse((r) => /\/orders\/collection$/.test(r.url()) && r.request().method() === 'POST'),
@@ -125,7 +141,7 @@ async function saveCollection(page: Page) {
 
 test('orders-00: seed dedicated shops and a Step-3-complete trip', async ({ request }) => {
   for (const shopName of SHOPS) {
-    await post(request, '/masters/shops', {
+    await ensureMaster(request, 'shops', 'shopName', shopName, {
       shopName,
       ownerName: 'ORDX Owner',
       phoneNumber: `98${String(SHOPS.indexOf(shopName) + 10).padStart(8, '0')}`,
@@ -137,7 +153,7 @@ test('orders-00: seed dedicated shops and a Step-3-complete trip', async ({ requ
     });
   }
 
-  const vehicle = (await post(request, '/masters/vehicles', {
+  const vehicle = (await ensureMaster(request, 'vehicles', 'vehicleNumber', `${P}-TRUCK-01`, {
     vehicleNumber: `${P}-TRUCK-01`,
     vehicleType: 'Lorry',
     noOfBoxes: 80,
@@ -149,7 +165,7 @@ test('orders-00: seed dedicated shops and a Step-3-complete trip', async ({ requ
   })) as { id: number; vehicleNumber: string };
   vehicleNo = vehicle.vehicleNumber;
 
-  const driver = (await post(request, '/masters/employees', {
+  const driver = (await ensureMaster(request, 'employees', 'employeeName', `${P} Driver`, {
     employeeName: `${P} Driver`,
     department: 'Driver',
     role: 'Driver',
@@ -158,7 +174,7 @@ test('orders-00: seed dedicated shops and a Step-3-complete trip', async ({ requ
     salary: 18000,
     status: 'Active',
   })) as { id: number; employeeName: string };
-  const supervisor = (await post(request, '/masters/employees', {
+  const supervisor = (await ensureMaster(request, 'employees', 'employeeName', `${P} Supervisor`, {
     employeeName: `${P} Supervisor`,
     department: 'Supervisor',
     role: 'Supervisor',
@@ -167,7 +183,7 @@ test('orders-00: seed dedicated shops and a Step-3-complete trip', async ({ requ
     salary: 24000,
     status: 'Active',
   })) as { id: number; employeeName: string };
-  const farm = (await post(request, '/masters/farms', {
+  const farm = (await ensureMaster(request, 'farms', 'farmName', `${P} Farm`, {
     farmName: `${P} Farm`,
     ownerName: 'Owner',
     supervisorName: 'Farm Sup',
@@ -177,11 +193,29 @@ test('orders-00: seed dedicated shops and a Step-3-complete trip', async ({ requ
     capacity: 30000,
     status: 'Active',
   })) as { id: number; farmName: string };
-  const birdType = (await post(request, '/masters/bird-types', {
+  const birdType = (await ensureMaster(request, 'bird-types', 'birdType', `${P} Broiler`, {
     birdType: `${P} Broiler`,
     averageWeight: 2,
     status: 'Active',
   })) as { id: number; birdType: string };
+
+  // Reuse an open ORDX trip if one already exists for the day.
+  const openTrips = (await (await request.get(`${API}/trips`)).json()) as Array<{
+    id: number;
+    tripNo: string;
+    vehicleNo?: string;
+    tripDate?: string;
+    status?: string;
+  }>;
+  const existingTrip = openTrips.find(
+    (t) => t.vehicleNo === vehicle.vehicleNumber && String(t.tripDate).slice(0, 10) === DAY
+  );
+  if (existingTrip) {
+    tripId = existingTrip.id;
+    tripNo = existingTrip.tripNo;
+    expect(tripId).toBeGreaterThan(0);
+    return;
+  }
 
   const trip = (await post(request, '/trips', {
     tripNo: 'IGNORED',
@@ -211,25 +245,71 @@ test('orders-00: seed dedicated shops and a Step-3-complete trip', async ({ requ
 
 // ── Collection: enter the day's orders through the real UI ────────────────
 
-test('orders-01: Order Collection persists the entered quantities and survives a reload (Test I)', async ({
+test('orders-01: working sheet shows ALL shops; Save Progress stays on Collection (Test I)', async ({
   page,
   request,
 }) => {
   await gotoOrders(page, 'collection');
 
-  // 12 shops so pagination has something real to page through (Test K).
-  await addShopToCollection(page, SHOPS[0], 20);
-  await addShopToCollection(page, SHOPS[1], 10);
+  // No separate page-level "Orders" heading inside the Orders module — the
+  // module header is the three attached tabs (the app's global breadcrumb may
+  // still show "Orders" in the top banner, which is expected).
+  await expect(page.getByRole('main').getByRole('heading', { name: /^orders$/i })).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: /order collection/i })).toBeVisible();
+  await expect(page.getByRole('tab', { name: /order assignment/i })).toBeVisible();
+  await expect(page.getByRole('tab', { name: /delivery tracking/i })).toBeVisible();
+
+  // The collection sheet is a day-wise working sheet: every active shop is
+  // shown even before any entry exists (no "no orders collected" screen).
+  await searchBox(page).fill(P);
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByText(/1–10 of 12/)).toBeVisible();
+
+  // Expand the page so all 12 ORDX shops are visible for entry.
+  await page.getByRole('button', { name: /rows per page/i }).click();
+  await page.getByRole('option', { name: /25 \/ page/i }).click();
+  await page.waitForLoadState('networkidle');
+
+  // Enter birds/boxes directly on the sheet (no add-shop picker anymore).
+  await requiredInput(page, SHOPS[0]).fill('20');
+  await requiredInput(page, SHOPS[1]).fill('10');
   for (let i = 2; i < SHOPS.length; i += 1) {
-    await addShopToCollection(page, SHOPS[i], 5);
+    await requiredInput(page, SHOPS[i]).fill('5');
   }
+
+  // Save Progress must SAVE and STAY on Collection (never navigate away).
   const res = await saveCollection(page);
   expect(res.ok(), `collection save → ${res.status()} ${await res.text()}`).toBeTruthy();
+  await expect(page.getByRole('tab', { name: /order collection/i })).toHaveAttribute(
+    'aria-selected',
+    'true'
+  );
+  await expect(page.getByRole('button', { name: /save progress/i })).toBeVisible();
 
   const persisted = await apiOrders(request, `?date=${DAY}&search=${encodeURIComponent(P)}&pageSize=200`);
   expect(persisted.total).toBe(SHOPS.length);
   expect(orderRow(persisted, SHOPS[0]).requiredBoxes).toBe(20);
   expect(orderRow(persisted, SHOPS[1]).requiredBoxes).toBe(10);
+
+  // KPI includes Total Shops and Shops With Orders.
+  await expect(page.getByText(/shops with orders/i)).toBeVisible();
+  expect(persisted.summary.shopsWithOrders).toBe(SHOPS.length);
+
+  // Finish Collection → the day becomes assignment-eligible.
+  const [finishRes] = await Promise.all([
+    page.waitForResponse((r) => /\/orders\/collection$/.test(r.url()) && r.request().method() === 'POST'),
+    page.getByRole('button', { name: /finish collection/i }).click(),
+  ]);
+  expect(finishRes.ok(), `finish collection → ${finishRes.status()} ${await finishRes.text()}`).toBeTruthy();
+
+  // Success toast appears top-right and its X dismisses it immediately.
+  const toast = page.getByRole('alert').first();
+  await expect(toast).toBeVisible();
+  const box = await toast.boundingBox();
+  expect(box).toBeTruthy();
+  expect(box!.x + box!.width).toBeGreaterThan(700);
+  await toast.getByRole('button', { name: /close/i }).click();
+  await expect(toast).toBeHidden();
 
   // Test I — a full reload rebuilds the table from the backend.
   await page.reload();
@@ -267,6 +347,12 @@ test('orders-02: pagination — 10 rows by default, Next/Previous, rows-per-page
   await page.waitForLoadState('networkidle');
   await expect(rows).toHaveCount(12);
   await expect(page.getByText(/1–12 of 12/)).toBeVisible();
+
+  // The full page-size set (10 / 15 / 20 / 25 / 30) is offered.
+  await page.getByRole('button', { name: /rows per page/i }).click();
+  for (const size of ['10', '15', '20', '25', '30']) {
+    await expect(page.getByRole('option', { name: new RegExp(`${size} / page`) })).toBeVisible();
+  }
 });
 
 // ── Test L — server-side search ───────────────────────────────────────────
@@ -633,4 +719,89 @@ test('orders-11: Delivery Tracking shows the delivered quantities and timestamp'
   await expect(row).toContainText(tripNo);
   await expect(row).toContainText(vehicleNo);
   await expect(row).toContainText('Delivered');
+});
+
+// ── Test W — optimistic concurrency: a stale version is rejected ──────────
+
+test('orders-12: a stale `version` is rejected with 409 and never overwrites (Test W)', async ({
+  request,
+}) => {
+  // Two shops are still pending from orders-01; use one that is untouched.
+  const shop = SHOPS[5];
+  const before = orderRow(
+    await apiOrders(request, `?date=${DAY}&search=${encodeURIComponent(shop)}`),
+    shop
+  );
+  const v = (before as unknown as { version: number }).version;
+
+  // User B commits a change first — the version moves on.
+  const shopId = (await (await request.get(`${API}/masters/shops`)).json()).find(
+    (s: { shopName: string }) => s.shopName === shop
+  ).id;
+  await post(request, '/orders/collection', {
+    orderDate: DAY,
+    items: [{ shopId, requiredBoxes: 7 }],
+  });
+
+  // User A now writes with the version it read BEFORE User B's change.
+  const stale = await request.post(`${API}/orders/collection`, {
+    data: { orderDate: DAY, items: [{ shopId, requiredBoxes: 99, version: v }] },
+  });
+  expect(stale.status(), 'stale write must conflict').toBe(409);
+  expect(await stale.text()).toMatch(/changed in another session/i);
+
+  // User B's value survived — no silent overwrite.
+  const after = orderRow(
+    await apiOrders(request, `?date=${DAY}&search=${encodeURIComponent(shop)}`),
+    shop
+  );
+  expect(after.requiredBoxes, "User B's committed value is intact").toBe(7);
+});
+
+// ── Multiple orders per shop + unique order numbers (backend-authoritative) ──
+
+test('orders-13: a shop can hold MULTIPLE orders on the same date, each uniquely numbered', async ({
+  request,
+}) => {
+  const multiShop = `${P} Multi Shop`;
+  const created = (await ensureMaster(request, 'shops', 'shopName', multiShop, {
+    shopName: multiShop,
+    ownerName: 'ORDX Owner',
+    phoneNumber: '9800000999',
+    associationType: 'Ass Vij',
+    email: 'ordx-multi@example.com',
+    city: CITY,
+    address: 'ORDX Address',
+    status: 'Active',
+  })) as { id: number };
+  const shopId = created.id;
+
+  await post(request, '/orders/collection', {
+    orderDate: DAY,
+    items: [{ shopId, requiredBoxes: 10, clientKey: 'ordx-multi-1' }],
+  });
+  await post(request, '/orders/collection', {
+    orderDate: DAY,
+    items: [{ shopId, requiredBoxes: 8, clientKey: 'ordx-multi-2' }],
+  });
+
+  const rowsFor = async () =>
+    (await apiOrders(request, `?date=${DAY}&search=${encodeURIComponent(multiShop)}&pageSize=200`)).rows.filter(
+      (r) => r.shopName === multiShop
+    );
+
+  const mine = await rowsFor();
+  expect(mine.length, 'two orders must both remain visible').toBe(2);
+  const nos = new Set(mine.map((r) => (r as unknown as { orderNo: string }).orderNo));
+  expect(nos.size, 'order numbers are globally unique').toBe(2);
+  for (const no of nos) expect(no).toMatch(/^ORD-\d{8}-\d{3}$/);
+
+  // Retrying with the SAME clientKey updates in place — never a third order.
+  await post(request, '/orders/collection', {
+    orderDate: DAY,
+    items: [{ shopId, requiredBoxes: 12, clientKey: 'ordx-multi-2' }],
+  });
+  const afterRetry = await rowsFor();
+  expect(afterRetry.length, 'idempotent retry must not duplicate').toBe(2);
+  expect(afterRetry.reduce((s, r) => s + r.requiredBoxes, 0)).toBe(22);
 });

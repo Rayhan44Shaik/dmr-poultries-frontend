@@ -7,14 +7,21 @@
 
 import React, { useEffect, useId, useRef, useState } from "react";
 import {
+  AlertCircle,
   AlertTriangle,
   Check,
+  CheckCircle,
   ChevronDown,
+  ClipboardList,
+  Clock,
   CloudOff,
   Inbox,
   Lock,
+  Package,
   RefreshCw,
   Search,
+  Store,
+  Truck,
   X,
 } from "lucide-react";
 import {
@@ -43,6 +50,7 @@ const STATUS_TONES: Record<string, string> = {
   "Not Assigned": "bg-slate-100 text-slate-500 border-slate-200",
   "Not Collected": "bg-slate-100 text-slate-500 border-slate-200",
   Collected: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  "Auto Completed": "bg-emerald-50 text-emerald-700 border-emerald-200",
   Complete: "bg-emerald-50 text-emerald-700 border-emerald-200",
   Closed: "bg-slate-200 text-slate-600 border-slate-300",
   Locked: "bg-slate-200 text-slate-600 border-slate-300",
@@ -516,7 +524,7 @@ export type OrdersSummaryMetric = {
   key: string;
   label: string;
   value: number | string;
-  tone?: "slate" | "emerald" | "amber" | "sky" | "rose";
+  tone?: "slate" | "emerald" | "amber" | "sky" | "rose" | "indigo";
 };
 
 /**
@@ -525,6 +533,25 @@ export type OrdersSummaryMetric = {
  * "how many boxes are required / loaded / pending / delivered" is always the
  * real persisted figure.
  */
+const SUMMARY_ICON_TONES: Record<string, string> = {
+  slate: "bg-slate-100 text-slate-600 border-slate-200",
+  emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
+  amber: "bg-amber-50 text-amber-600 border-amber-100",
+  sky: "bg-sky-50 text-sky-600 border-sky-100",
+  rose: "bg-rose-50 text-rose-600 border-rose-100",
+  indigo: "bg-indigo-50 text-indigo-600 border-indigo-100",
+};
+
+const SUMMARY_ICONS: Record<string, React.ReactNode> = {
+  shops: <Store size={16} />,
+  shopsWithOrders: <ClipboardList size={16} />,
+  required: <Package size={16} />,
+  loaded: <Truck size={16} />,
+  pending: <Clock size={16} />,
+  delivered: <CheckCircle size={16} />,
+  remaining: <AlertCircle size={16} />,
+};
+
 export function OrdersSummaryStrip({ metrics }: { metrics: OrdersSummaryMetric[] }) {
   const tones: Record<string, string> = {
     slate: "text-slate-700",
@@ -532,16 +559,29 @@ export function OrdersSummaryStrip({ metrics }: { metrics: OrdersSummaryMetric[]
     amber: "text-amber-700",
     sky: "text-sky-700",
     rose: "text-rose-700",
+    indigo: "text-indigo-700",
   };
   return (
-    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-3 lg:grid-cols-6">
+    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
       {metrics.map((metric) => (
-        <div key={metric.key} className="bg-white px-3 py-2">
-          <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-            {metric.label}
+        <div
+          key={metric.key}
+          className="flex min-w-0 items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm"
+        >
+          <div
+            className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border ${
+              SUMMARY_ICON_TONES[metric.tone ?? "slate"]
+            }`}
+          >
+            {SUMMARY_ICONS[metric.key] ?? <Package size={16} />}
           </div>
-          <div className={`text-base font-extrabold tabular-nums ${tones[metric.tone ?? "slate"]}`}>
-            {metric.value}
+          <div className="min-w-0">
+            <div className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              {metric.label}
+            </div>
+            <div className={`truncate text-lg font-extrabold leading-tight tabular-nums ${tones[metric.tone ?? "slate"]}`}>
+              {metric.value}
+            </div>
           </div>
         </div>
       ))}
@@ -558,10 +598,14 @@ export type OrdersTabDef = {
 };
 
 /**
- * ERP-style segmented tab header: one clearly active tab, quiet inactive
- * tabs, consistent 36px height, icons aligned with the label, and a single
- * rule under the whole strip so the table below reads as its content.
- * Horizontally scrollable (never wrapped) on narrow screens.
+ * ERP-style module header: ONE full-width header box containing the three
+ * Orders tabs as a segmented strip, with a subtle light-green brand
+ * background and the existing DMR brand mark. The ACTIVE tab is a raised
+ * white box with a green accent; inactive tabs stay quiet and neutral. There
+ * is no separate page-level "Orders" heading — the tabs ARE the module header.
+ * A small intentional gap, hover state, and a visible focus ring keep it a
+ * single professional navigation component. Horizontally scrollable (never
+ * wrapped) on narrow screens.
  */
 export function OrdersTabHeader({
   tabs,
@@ -575,29 +619,78 @@ export function OrdersTabHeader({
   ariaLabel: string;
 }) {
   return (
-    <div className="border-b border-slate-200" role="tablist" aria-label={ariaLabel}>
-      <div className="-mb-px flex items-stretch gap-1 overflow-x-auto">
-        {tabs.map((tab) => {
-          const active = tab.key === activeKey;
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => onSelect(tab.key)}
-              className={`inline-flex h-10 flex-shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-[12px] font-bold tracking-tight transition-colors md:px-4 md:text-[13px] ${
-                active
-                  ? "border-emerald-600 text-emerald-700"
-                  : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
-              }`}
-            >
-              <span className={active ? "text-emerald-600" : "text-slate-400"}>{tab.icon}</span>
-              {tab.label}
-            </button>
-          );
-        })}
+    <div className="rounded-2xl border border-emerald-100/80 bg-emerald-50/60 p-1.5 shadow-sm">
+      <div className="flex items-center gap-2 overflow-x-auto" role="tablist" aria-label={ariaLabel}>
+        <div className="flex items-center gap-1.5">
+          {tabs.map((tab) => {
+            const active = tab.key === activeKey;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => onSelect(tab.key)}
+                className={`inline-flex h-9 flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-4 text-[12px] font-semibold tracking-tight outline-none transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-inset md:px-5 md:text-[13px] ${
+                  active
+                    ? "border border-emerald-200 bg-white text-emerald-800 shadow-sm"
+                    : "border border-transparent bg-transparent text-slate-600 hover:bg-white/70 hover:text-slate-800"
+                }`}
+              >
+                <span className={active ? "text-emerald-600" : "text-slate-400"}>{tab.icon}</span>
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
+  );
+}
+
+// ─── Filled Only toggle (collection working-sheet filter) ───────────────────
+
+/**
+ * Compact switch that filters the Collection sheet to shops with entered
+ * data. OFF by default (the sheet shows every active shop). Server-driven:
+ * the parent passes the value straight into the /orders query.
+ */
+export function OrdersFilledOnlyToggle({
+  checked,
+  onChange,
+  label,
+  ariaLabel,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+  ariaLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={ariaLabel}
+      onClick={() => onChange(!checked)}
+      className={`inline-flex h-9 flex-shrink-0 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${
+        checked
+          ? "border-emerald-300 bg-emerald-50/70 text-emerald-700"
+          : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+      }`}
+    >
+      <span
+        className={`relative inline-flex h-4 w-7 flex-shrink-0 items-center rounded-full transition-colors ${
+          checked ? "bg-emerald-500" : "bg-slate-300"
+        }`}
+      >
+        <span
+          className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
+            checked ? "translate-x-3" : "translate-x-0.5"
+          }`}
+        />
+      </span>
+      {label}
+    </button>
   );
 }

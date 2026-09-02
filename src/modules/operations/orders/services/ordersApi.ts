@@ -18,6 +18,7 @@
 import { apiDelete, apiGet, apiPost } from "../../../../api";
 
 export type OrderStatus =
+  | "Not Collected"
   | "Pending"
   | "Collected"
   | "Assigned"
@@ -58,6 +59,8 @@ export type OrderView = {
   birds: number;
   remarks: string;
   collected: boolean;
+  /** true = finished by the automatic D+1 23:59:59 cutoff (not manually). */
+  autoFinished: boolean;
   version: number;
   assignedBoxes: number;
   deliveredBoxes: number;
@@ -72,6 +75,8 @@ export type OrderView = {
 
 export type OrdersSummary = {
   totalShops: number;
+  /** Distinct shops with ≥1 order for the selected date (backend-computed). */
+  shopsWithOrders: number;
   totalRequiredBoxes: number;
   totalAssignedBoxes: number;
   totalDeliveredBoxes: number;
@@ -79,6 +84,8 @@ export type OrdersSummary = {
   totalRemainingBoxes: number;
   deliveredShops: number;
   assignedShops: number;
+  /** true = the day's collection was automatically finished at the cutoff. */
+  autoFinished: boolean;
 };
 
 export type OrdersPage = {
@@ -98,6 +105,12 @@ export type OrdersQuery = {
   tripId?: number;
   page?: number;
   pageSize?: number;
+  /** Deterministic ordering key (collection working-sheet sorts). */
+  sort?: string;
+  /** true = only shops with entered data; false/undefined = all shops. */
+  filledOnly?: boolean;
+  /** true = only orders whose collection is FINISHED (assignment eligibility). */
+  collectedOnly?: boolean;
 };
 
 export type EligibleVehicle = {
@@ -124,12 +137,16 @@ export type OrderNotificationOutcome = {
 };
 
 export type CollectionItem = {
+  /** The specific order line being edited (omit to create a new line). */
+  orderId?: number;
   shopId: number;
   requiredBoxes: number;
   birds?: number;
   remarks?: string;
   /** Optimistic-concurrency token from the last read. */
   version?: number;
+  /** Client idempotency token for a NEW line (retry-safe creation). */
+  clientKey?: string;
 };
 
 export type AssignmentItem = {
@@ -147,6 +164,7 @@ const EMPTY_PAGE: OrdersPage = {
   totalPages: 1,
   summary: {
     totalShops: 0,
+    shopsWithOrders: 0,
     totalRequiredBoxes: 0,
     totalAssignedBoxes: 0,
     totalDeliveredBoxes: 0,
@@ -154,6 +172,7 @@ const EMPTY_PAGE: OrdersPage = {
     totalRemainingBoxes: 0,
     deliveredShops: 0,
     assignedShops: 0,
+    autoFinished: false,
   },
 };
 
@@ -172,6 +191,9 @@ function toParams(query: OrdersQuery): Record<string, string> {
   if (query.tripId) params.tripId = String(query.tripId);
   if (query.page) params.page = String(query.page);
   if (query.pageSize) params.pageSize = String(query.pageSize);
+  if (query.sort) params.sort = query.sort;
+  if (query.filledOnly != null) params.filledOnly = String(query.filledOnly);
+  if (query.collectedOnly != null) params.collectedOnly = String(query.collectedOnly);
   return params;
 }
 

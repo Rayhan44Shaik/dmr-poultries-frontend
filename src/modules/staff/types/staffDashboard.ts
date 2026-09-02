@@ -251,6 +251,26 @@ export interface SalaryCalculation {
   net: number;
 }
 
+export interface SalaryMonthSummary {
+  month: string;
+  employees: number;
+  pending: number;
+  submitted: number;
+  paid: number;
+  closed: boolean;
+}
+
+export interface SubmitMonthResult {
+  month: string;
+  submittedCount: number;
+  alreadySubmittedCount: number;
+  paidCount: number;
+  emailQueuedCount: number;
+  emailSentCount: number;
+  emailFailedCount: number;
+  emailSkippedCount: number;
+}
+
 export interface SalarySheetFilters {
   employeeId: number | null;
   month: string;

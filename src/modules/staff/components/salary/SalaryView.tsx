@@ -1,19 +1,21 @@
 // src/modules/staff/components/salary/SalaryView.tsx
 
-import { X, FileText, Lock, Info } from "lucide-react";
+import { X, FileText, Lock, Info, Download, Loader2 } from "lucide-react";
 import type { SalaryRecord } from "../../types/staffDashboard";
 
 export type SalaryViewProps = {
   record: SalaryRecord;
   onClose: () => void;
   formatCurrency?: (amount: number) => string;
+  onDownload?: () => void;
+  downloading?: boolean;
 };
 
 function Row({ label, value, strong = false }: { label: string; value: React.ReactNode; strong?: boolean }) {
   return (
-    <div className="flex items-center justify-between py-1.5">
+    <div className="flex items-center justify-between py-1.5 gap-4">
       <span className="text-xs text-slate-500">{label}</span>
-      <span className={`text-sm ${strong ? "font-bold text-slate-800" : "font-medium text-slate-700"}`}>
+      <span className={`text-sm text-right ${strong ? "font-bold text-slate-800" : "font-medium text-slate-700"}`}>
         {value}
       </span>
     </div>
@@ -37,8 +39,13 @@ function Section({
   );
 }
 
-export function SalaryView({ record, onClose, formatCurrency = (amt) =>
-  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(amt || 0)
+export function SalaryView({
+  record,
+  onClose,
+  formatCurrency = (amt) =>
+    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(amt || 0),
+  onDownload,
+  downloading = false,
 }: SalaryViewProps) {
   if (!record) return null;
 
@@ -54,9 +61,19 @@ export function SalaryView({ record, onClose, formatCurrency = (amt) =>
     record.correctionWindowDaysRemaining != null &&
     record.correctionWindowDaysRemaining > 0;
 
+  const statusBadge = (() => {
+    if (record.status === "Submitted") {
+      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200"><Lock size={11} /> Submitted</span>;
+    }
+    if (record.status === "Paid") {
+      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Paid</span>;
+    }
+    return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">Pending</span>;
+  })();
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-2xl w-full p-6 space-y-4 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
@@ -84,12 +101,12 @@ export function SalaryView({ record, onClose, formatCurrency = (amt) =>
             <span className="font-bold text-slate-800">#{record.employeeId}</span>
           </div>
           <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-            <span className="text-xs text-slate-500 block mb-1">Salary Month</span>
-            <span className="font-bold text-slate-800">{record.month}</span>
+            <span className="text-xs text-slate-500 block mb-1">Salary Month / Status</span>
+            <div className="flex items-center gap-2">{statusBadge}<span className="font-bold text-slate-800">{record.month}</span></div>
           </div>
         </div>
 
-        <Section title="Day Summary" tone="text-indigo-600">
+        <Section title="Attendance Summary" tone="text-indigo-600">
           <Row label="Working Days" value={record.workingDays ?? "—"} strong />
           <Row label="Present Days" value={record.presentDays ?? "—"} />
           <Row label="Leave Days" value={record.leaveDays ?? "—"} />
@@ -97,20 +114,20 @@ export function SalaryView({ record, onClose, formatCurrency = (amt) =>
         </Section>
 
         <Section title="Earnings" tone="text-emerald-600">
-          <Row label="Basic" value={formatCurrency(record.basicSalary)} />
+          <Row label="Basic Salary" value={formatCurrency(record.basicSalary)} />
           <Row label="Overtime" value={formatCurrency(record.overtime)} />
           <Row label="Incentives" value={formatCurrency(record.incentives)} />
           <Row label="Fuel Allowance" value={formatCurrency(record.fuelAllowance)} />
           <Row label="Night Allowance" value={formatCurrency(record.nightAllowance)} />
-          <Row label="Gross" value={formatCurrency(record.totalGross)} strong />
+          <Row label="Gross Salary" value={formatCurrency(record.totalGross)} strong />
         </Section>
 
         <Section title="Deductions" tone="text-rose-600">
-          <Row label="Leave" value={formatCurrency(record.leaveDeduction)} />
-          <Row label="Advance" value={formatCurrency(record.advanceRecovery)} />
+          <Row label="Leave Deduction" value={formatCurrency(record.leaveDeduction)} />
+          <Row label="Advance Recovery" value={formatCurrency(record.advanceRecovery)} />
           <Row label="Loan EMI" value={formatCurrency(record.loanEMI)} />
           <Row label="Late Penalty" value={formatCurrency(record.latePenalty)} />
-          <Row label="Other" value={formatCurrency(record.otherDeductions)} />
+          <Row label="Other Deductions" value={formatCurrency(record.otherDeductions)} />
           <Row label="Total Deductions" value={formatCurrency(record.totalDeductions)} strong />
         </Section>
 
@@ -119,12 +136,13 @@ export function SalaryView({ record, onClose, formatCurrency = (amt) =>
           <span className="text-xl font-extrabold text-emerald-800">{formatCurrency(record.netSalary)}</span>
         </div>
 
-        <Section title="Payment" tone="text-slate-500">
-          <Row label="Status" value={record.status} strong />
+        <Section title="Payment / Lifecycle" tone="text-slate-500">
+          <Row label="Salary Month" value={record.month} />
+          <Row label="Status" value={statusBadge} />
+          <Row label="Submitted At" value={record.submittedAt ? new Date(record.submittedAt).toLocaleString() : "—"} />
+          <Row label="Submitted By" value={record.submittedBy ?? "—"} />
           <Row label="Payment Date" value={record.paymentDate ?? "—"} />
           <Row label="Payment Reference" value={record.paymentRef ?? "—"} />
-          {record.submittedBy && <Row label="Submitted By" value={record.submittedBy} />}
-          {record.submittedAt && <Row label="Submitted At" value={new Date(record.submittedAt).toLocaleString()} />}
         </Section>
 
         {record.monthClosed && (
@@ -149,6 +167,27 @@ export function SalaryView({ record, onClose, formatCurrency = (amt) =>
             </span>
           </div>
         )}
+
+        <div className="flex justify-end gap-2 pt-2">
+          {onDownload && (
+            <button
+              type="button"
+              onClick={onDownload}
+              disabled={downloading}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition shadow-sm disabled:opacity-50"
+            >
+              {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              {downloading ? "Downloading..." : "Download Payslip"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,83 +1,130 @@
 // src/modules/operations/orders/components/OrdersCollectionTab.tsx
-// TAB 1 — ORDER COLLECTION.
+// TAB 1 — ORDER COLLECTION (day-wise shop working sheet).
 //
-// Collects the REQUIRED boxes per shop for one operational day. The rows,
-// their quantities, their locks and their statuses all come from the backend
-// Orders module (GET /api/orders) — a refresh, a cache clear or a second
-// browser reconstructs exactly the same table.
+// For the selected date, EVERY active shop is shown — not just the shops that
+// already have an order. The backend (GET /api/orders?date=…) anchors the
+// query on the SHOP set and LEFT JOINs the day's order lines, so a shop with
+// no entry yet still appears with empty birds/boxes inputs. A shop may hold
+// MULTIPLE orders on the same day: each order is its own line with its own
+// unique order number, and "Add order" creates another line for a shop.
 //
-//   · Save Progress / Finish Collection → POST /api/orders/collection
-//   · Delete a pending line             → 10-second undo, then
-//                                         DELETE /api/orders/:id
-//   · Fully delivered shops are LOCKED (the backend rejects any change and
-//     the inputs are disabled) — partially delivered shops stay editable
-//     down to their delivered quantity.
-//   · Search (shop / city / order no / trip / vehicle), the date filter and
-//     pagination all run SERVER-SIDE over the whole dataset.
+//   · Save Progress            → POST /api/orders/collection (finish=false).
+//     SAVES AND STAYS ON THIS TAB — it never navigates to Assignment, and it
+//     never makes an order assignment-eligible.
+//   · Finish Collection        → POST /api/orders/collection (finish=true).
+//     Marks the day collected; only then does Assignment gain the data
+//     (the BACKEND enforces the finish gate on every assignment write).
+//   · Search / date / sort / filled-only / pagination are all SERVER-SIDE.
+//   · A fully delivered order is LOCKED; a partially delivered order stays
+//     editable down to its delivered quantity (backend re-validates on write).
+//   · A network failure never silently loses the draft: it is kept locally,
+//     shown as "Waiting to sync", and retried when the connection returns.
 
-import { useCallback, useMemo, useState } from "react";
-import { Loader2, Lock, Plus, RefreshCw, Save, Send, Trash2 } from "lucide-react";
-import Select from "react-select";
-import type { Shop } from "../../../masters/shops/types/shop";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Bird,
+  Clock,
+  FileText,
+  Hash,
+  Loader2,
+  Lock,
+  MapPin,
+  Package,
+  Pencil,
+  Phone,
+  RefreshCw,
+  Save,
+  Send,
+  Store,
+  Trash2,
+  User,
+  X,
+} from "lucide-react";
+import { toApiError } from "../../../../api";
 import {
   opsPrimaryButtonClass,
-  opsReactSelectStyles,
   opsSecondaryButtonClass,
   opsTableDivideClass,
-  opsTableHeadRowClass,
-  opsTableTdClass,
-  opsTableThClass,
   opsTableRowClass,
 } from "../../../../shared/ui/operationsStyles";
-import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import { useToast } from "../../../../components/common/ToastProvider";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
-import { formatDayFull } from "../ordersUtils";
 import {
   deleteOrder,
   saveOrderCollection,
+  type CollectionItem,
+  type OrderAssignmentView,
   type OrderView,
   type OrdersPage,
 } from "../services/ordersApi";
 import { useOrdersI18n } from "../i18n/ordersI18n";
+import type { ShopDirectory } from "../ordersService";
 import {
   OrdersDateControl,
+  OrdersDropdown,
   OrdersEmptyState,
+  OrdersFilledOnlyToggle,
   OrdersIconButton,
   OrdersPagination,
   OrdersSearchInput,
   OrdersStatusBadge,
-  OrdersSummaryStrip,
   OrdersTableSkeleton,
 } from "./OrdersCommon";
 
-/** Draft edits keyed by order id (only what the user actually changed). */
-type Draft = Map<number, { requiredBoxes: number; birds: number }>;
+/** One working-sheet line: an existing order line, a shop placeholder, or a
+ *  locally-added order line awaiting its first save. */
+type Line = {
+  key: string;
+  shopId: number;
+  shopName: string;
+  city: string;
+  orderId: number;
+  orderNo: string;
+  clientKey?: string;
+  version?: number;
+  baseRequired: number;
+  baseBirds: number;
+  locked: boolean;
+  autoFinished: boolean;
+  assignedBoxes: number;
+  deliveredBoxes: number;
+  pendingBoxes: number;
+  remainingBoxes: number;
+  status: OrderView["status"];
+  assignments: OrderAssignmentView[];
+  isNew: boolean;
+};
+
+type NewLine = { key: string; shopId: number; shopName: string; clientKey: string };
+
+type DraftValues = { requiredBoxes: number; birds: number };
 
 type Props = {
-  /** Active shops from the Shop Master (for the "add shop" picker). */
-  shops: Shop[];
-  shopsLoading: boolean;
-  /** Server page for the selected day. */
   page: OrdersPage;
   loading: boolean;
   day: string;
   today: string;
+  shopDirectory: ShopDirectory;
   onDaySelect: (day: string) => void;
   search: string;
   onSearchChange: (value: string) => void;
+  sort: string;
+  onSortChange: (value: string) => void;
+  filledOnly: boolean;
+  onFilledOnlyChange: (value: boolean) => void;
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
-  /** Reload the current tab's server data. */
   onReload: () => Promise<unknown> | void;
-  /** Table-level Refresh (same fetch + a confirmation toast). */
   onRefresh: () => void;
   refreshing: boolean;
 };
 
 function statusKeyOf(status: OrderView["status"]): string {
   switch (status) {
+    case "Not Collected":
+      return "orders.status_not_collected";
     case "Pending":
       return "orders.status_pending";
     case "Collected":
@@ -94,16 +141,62 @@ function statusKeyOf(status: OrderView["status"]): string {
   }
 }
 
+/** Simplified Collection status: Saved → Assigned → Partially Delivered →
+ *  Delivered (derived from authoritative quantities, never recomputed). */
+function derivedStatusOf(line: Line): string {
+  if (!line.orderId && !line.isNew) return "none";
+  if (line.isNew) return "draft";
+  if (line.deliveredBoxes > 0 && line.deliveredBoxes >= line.baseRequired && line.baseRequired > 0) {
+    return "delivered";
+  }
+  if (line.deliveredBoxes > 0) return "partial";
+  if (line.assignedBoxes > 0) return "assigned";
+  return "saved";
+}
+
+function statusLabelOf(status: string, to: (key: string) => string): string {
+  switch (status) {
+    case "draft":
+    case "none":
+      return "—";
+    case "saved":
+      return "Saved";
+    case "assigned":
+      return "Assigned";
+    case "partial":
+      return "Partially Delivered";
+    case "delivered":
+      return "Delivered";
+    default:
+      return to(statusKeyOf(status as OrderView["status"]));
+  }
+}
+
+function draftStorageKey(day: string): string {
+  return `dmr.orders.collection.draft.${day}`;
+}
+
+// Compact, readable working-sheet cell styles (fixed paddings, medium weight —
+// no over-bold shop names, no oversized columns). Header uses a light green
+// brand tint with medium weight, slightly stronger contrast than the body.
+const colTh = "px-2.5 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-emerald-900/80 whitespace-nowrap";
+const colThRight = "px-2.5 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-emerald-900/80 whitespace-nowrap";
+const colTd = "px-2.5 py-2 text-[13px] text-slate-700 whitespace-nowrap";
+const colTdRight = "px-2.5 py-2 text-[13px] text-slate-700 whitespace-nowrap text-right tabular-nums";
+
 export default function OrdersCollectionTab({
-  shops,
-  shopsLoading,
   page,
   loading,
   day,
   today,
+  shopDirectory,
   onDaySelect,
   search,
   onSearchChange,
+  sort,
+  onSortChange,
+  filledOnly,
+  onFilledOnlyChange,
   pageSize,
   onPageChange,
   onPageSizeChange,
@@ -112,148 +205,287 @@ export default function OrdersCollectionTab({
   refreshing,
 }: Props) {
   const { to } = useOrdersI18n();
-  const { showNotification } = useSafeNotification();
+  const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
 
-  const [draft, setDraft] = useState<Draft>(new Map());
-  const [newShopIds, setNewShopIds] = useState<Array<{ shopId: number; boxes: number; birds: number }>>([]);
+  const [draft, setDraft] = useState<Map<string, DraftValues>>(new Map());
+  const [addedLines, setAddedLines] = useState<NewLine[]>([]);
   const [saving, setSaving] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [waitingToSync, setWaitingToSync] = useState(false);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
   const busy = saving || finishing;
 
-  // Past days are read-only; today stays editable per row (a fully
-  // delivered row is locked by the BACKEND, mirrored here for the inputs).
   const isPast = day < today;
-  const dayEditable = !isPast;
+  const autoFinished = page.summary.autoFinished;
+  const dayEditable = !isPast && !autoFinished;
 
-  const rows = page.rows;
-  const collectedShopIds = useMemo(() => new Set(rows.map((r) => r.shopId)), [rows]);
+  // Refs mirror the latest state so the offline "online" retry always reads
+  // fresh values (no stale closure).
+  const draftRef = useRef(draft);
+  const addedLinesRef = useRef(addedLines);
+  const pendingFinishRef = useRef(false);
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+  useEffect(() => {
+    addedLinesRef.current = addedLines;
+  }, [addedLines]);
 
-  const addableShops = useMemo(
+  // ── Build the display lines (server order lines + local additions) ──────
+  const serverLines = useMemo<Line[]>(
     () =>
-      shops
-        .filter((s) => !collectedShopIds.has(s.id) && !newShopIds.some((n) => n.shopId === s.id))
-        .map((s) => ({ value: s.id, label: `${s.shopName}${s.city ? ` · ${s.city}` : ""}` })),
-    [shops, collectedShopIds, newShopIds]
+      page.rows.map((row) => ({
+        key: row.id > 0 ? `o:${row.id}` : `s:${row.shopId}`,
+        shopId: row.shopId,
+        shopName: row.shopName,
+        city: row.city,
+        orderId: row.id,
+        orderNo: row.orderNo,
+        version: row.version,
+        baseRequired: row.requiredBoxes,
+        baseBirds: row.birds,
+        locked: row.locked,
+        autoFinished: row.autoFinished,
+        assignedBoxes: row.assignedBoxes,
+        deliveredBoxes: row.deliveredBoxes,
+        pendingBoxes: row.pendingBoxes,
+        remainingBoxes: row.remainingBoxes,
+        status: row.status,
+        assignments: row.assignments,
+        isNew: false,
+      })),
+    [page.rows]
   );
 
+  const addedLineObjs = useMemo<Line[]>(
+    () =>
+      addedLines.map((al) => ({
+        key: al.key,
+        shopId: al.shopId,
+        shopName: al.shopName,
+        city: page.rows.find((r) => r.shopId === al.shopId)?.city ?? "",
+        orderId: 0,
+        orderNo: "",
+        clientKey: al.clientKey,
+        version: undefined,
+        baseRequired: 0,
+        baseBirds: 0,
+        locked: false,
+        autoFinished: false,
+        assignedBoxes: 0,
+        deliveredBoxes: 0,
+        pendingBoxes: 0,
+        remainingBoxes: 0,
+        status: "Not Collected" as OrderView["status"],
+        assignments: [],
+        isNew: true,
+      })),
+    [addedLines, page.rows]
+  );
+
+  const lines = useMemo(() => [...serverLines, ...addedLineObjs], [serverLines, addedLineObjs]);
+
+  const filteredLines = useMemo(() => {
+    if (statusFilter === "all") return lines;
+    return lines.filter((line) => derivedStatusOf(line) === statusFilter);
+  }, [lines, statusFilter]);
+
   const valueOf = useCallback(
-    (row: OrderView, field: "requiredBoxes" | "birds"): number => {
-      const d = draft.get(row.id);
+    (line: Line, field: "requiredBoxes" | "birds"): number => {
+      const d = draft.get(line.key);
       if (d) return d[field];
-      return field === "requiredBoxes" ? row.requiredBoxes : row.birds;
+      return field === "requiredBoxes" ? line.baseRequired : line.baseBirds;
     },
     [draft]
   );
 
-  const updateDraft = useCallback(
-    (row: OrderView, field: "requiredBoxes" | "birds", raw: string) => {
-      const n = Math.max(0, Math.min(99999, Math.floor(Number(raw) || 0)));
-      setDraft((prev) => {
-        const next = new Map(prev);
-        const current = next.get(row.id) ?? {
-          requiredBoxes: row.requiredBoxes,
-          birds: row.birds,
-        };
-        next.set(row.id, { ...current, [field]: n });
-        return next;
-      });
-    },
-    []
-  );
+  const updateDraft = useCallback((line: Line, field: "requiredBoxes" | "birds", raw: string) => {
+    const n = Math.max(0, Math.min(99999, Math.floor(Number(raw) || 0)));
+    setDraft((prev) => {
+      const next = new Map(prev);
+      const current = next.get(line.key) ?? {
+        requiredBoxes: line.baseRequired,
+        birds: line.baseBirds,
+      };
+      next.set(line.key, { ...current, [field]: n });
+      return next;
+    });
+  }, []);
 
-  const isDirty = draft.size > 0 || newShopIds.length > 0;
+  const isDirty = draft.size > 0 || addedLines.length > 0;
 
-  /** Payload for the backend: every touched row + every newly added shop. */
-  const buildItems = useCallback(() => {
-    const items: Array<{
-      shopId: number;
-      requiredBoxes: number;
-      birds: number;
-      version?: number;
-    }> = [];
-    for (const row of rows) {
-      const d = draft.get(row.id);
-      if (!d) continue;
+  /** Payload for every line the user actually changed or added (partial save). */
+  const buildItems = useCallback((): CollectionItem[] => {
+    const items: CollectionItem[] = [];
+    for (const line of lines) {
+      if (line.isNew) {
+        const d = draft.get(line.key);
+        const requiredBoxes = d?.requiredBoxes ?? 0;
+        const birds = d?.birds ?? 0;
+        if (requiredBoxes <= 0 && birds <= 0) continue;
+        items.push({
+          shopId: line.shopId,
+          requiredBoxes,
+          birds,
+          clientKey: line.clientKey,
+        });
+        continue;
+      }
+      if (!draft.has(line.key)) continue;
+      const d = draft.get(line.key)!;
       items.push({
-        shopId: row.shopId,
+        orderId: line.orderId > 0 ? line.orderId : undefined,
+        shopId: line.shopId,
         requiredBoxes: d.requiredBoxes,
         birds: d.birds,
-        // Optimistic-concurrency token: a competing change is rejected
-        // by the backend instead of silently overwritten.
-        version: row.version,
+        version: line.orderId > 0 ? line.version : undefined,
       });
     }
-    for (const added of newShopIds) {
-      if (added.boxes <= 0) continue;
-      items.push({ shopId: added.shopId, requiredBoxes: added.boxes, birds: added.birds });
+    return items;
+  }, [lines, draft]);
+
+  /** Existing order lines that carry data (used to re-confirm on Finish). */
+  const filledItems = useCallback((): CollectionItem[] => {
+    const items: CollectionItem[] = [];
+    for (const line of serverLines) {
+      if (line.locked) continue;
+      if (line.baseRequired <= 0 && line.baseBirds <= 0) continue;
+      items.push({
+        orderId: line.orderId,
+        shopId: line.shopId,
+        requiredBoxes: line.baseRequired,
+        birds: line.baseBirds,
+        version: line.version,
+      });
     }
     return items;
-  }, [rows, draft, newShopIds]);
+  }, [serverLines]);
+
+  // ── Local draft persistence (network-failure protection) ────────────────
+  const persistLocalDraft = useCallback(() => {
+    try {
+      const snapshot = {
+        draft: Object.fromEntries(draftRef.current),
+        addedLines: addedLinesRef.current,
+      };
+      localStorage.setItem(draftStorageKey(day), JSON.stringify(snapshot));
+    } catch {
+      /* storage full/unavailable — draft still lives in React state */
+    }
+  }, [day]);
+
+  const clearLocalDraft = useCallback(() => {
+    try {
+      localStorage.removeItem(draftStorageKey(day));
+    } catch {
+      /* ignore */
+    }
+  }, [day]);
+
+  const restoreLocalDraft = useCallback((): boolean => {
+    try {
+      const raw = localStorage.getItem(draftStorageKey(day));
+      if (!raw) return false;
+      const parsed = JSON.parse(raw) as {
+        draft?: Record<string, DraftValues>;
+        addedLines?: NewLine[];
+      };
+      if (parsed.draft && Object.keys(parsed.draft).length > 0) {
+        setDraft(new Map(Object.entries(parsed.draft)));
+      }
+      if (Array.isArray(parsed.addedLines) && parsed.addedLines.length > 0) {
+        setAddedLines(parsed.addedLines);
+      }
+      return (
+        (parsed.draft && Object.keys(parsed.draft).length > 0) ||
+        (Array.isArray(parsed.addedLines) && parsed.addedLines.length > 0)
+      );
+    } catch {
+      return false;
+    }
+  }, [day]);
+
+  // Restore any unsaved draft when the day changes (or on first mount). The
+  // restore is deferred out of the synchronous effect body (React state must
+  // not be written synchronously in an effect).
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (restoreLocalDraft()) {
+        setWaitingToSync(true);
+        toastInfo(to("orders.draft_restored"), 5000);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [day]);
 
   const persist = useCallback(
     async (finish: boolean) => {
       if (busy || !dayEditable) return;
-      const items = buildItems();
-      if (items.length === 0 && !finish) {
-        showNotification(to("orders.nothing_to_save"), "info");
-        return;
-      }
-      if (finish && items.length === 0 && rows.length === 0) {
-        showNotification(to("orders.add_at_least_one_shop"), "info");
-        return;
-      }
+      let items = buildItems();
+
       if (finish) {
-        const invalid = rows
-          .map((r) => ({ row: r, boxes: valueOf(r, "requiredBoxes") }))
-          .filter((r) => r.boxes <= 0);
-        if (invalid.length > 0) {
-          showNotification(
-            to("orders.finish_invalid", {
-              shops:
-                invalid.slice(0, 5).map((r) => r.row.shopName).join(", ") +
-                (invalid.length > 5 ? "…" : ""),
-            }),
-            "info"
-          );
+        if (items.length === 0) items = filledItems();
+        if (items.length === 0) {
+          toastInfo(to("orders.add_at_least_one_shop"), 5000);
           return;
         }
+      } else if (items.length === 0) {
+        toastInfo(to("orders.nothing_to_save"), 5000);
+        return;
       }
+
       const setBusy = finish ? setFinishing : setSaving;
       setBusy(true);
       try {
-        await saveOrderCollection({
-          orderDate: day,
-          items:
-            items.length > 0
-              ? items
-              : rows.map((r) => ({
-                  shopId: r.shopId,
-                  requiredBoxes: r.requiredBoxes,
-                  birds: r.birds,
-                })),
-          finish,
-        });
+        await saveOrderCollection({ orderDate: day, items, finish });
+        clearLocalDraft();
         setDraft(new Map());
-        setNewShopIds([]);
+        setAddedLines([]);
+        setEditingKey(null);
+        setWaitingToSync(false);
         await onReload();
-        showNotification(
-          finish ? to("orders.collection_finished") : to("orders.collection_saved"),
-          "success"
-        );
+        toastSuccess(finish ? to("orders.collection_finished") : to("orders.collection_saved"), 5000);
       } catch (error) {
-        // The backend message is the real reason (quantity below delivered,
-        // stale version, delivered lock…). Never swallowed, never faked.
-        showNotification(
-          error instanceof Error ? error.message : to("orders.save_failed"),
-          "error"
-        );
-        await onReload();
+        const apiErr = toApiError(error);
+        const isNetwork =
+          apiErr.code === "NETWORK_ERROR" || apiErr.code === "TIMEOUT" || apiErr.status == null;
+        if (isNetwork) {
+          // Keep the draft, mark "Waiting to sync", and let the online event
+          // retry automatically. Never claim "saved" while offline.
+          pendingFinishRef.current = finish;
+          persistLocalDraft();
+          setWaitingToSync(true);
+          toastError(to("orders.offline_waiting"), 5000);
+        } else {
+          // Validation / conflict: keep the draft so the user can fix it, and
+          // pull authoritative state so a stale row can never linger.
+          if (apiErr.status === 409) toastError(to("orders.conflict_refresh"), 5000);
+          else toastError(apiErr.message || to("orders.save_failed"), 5000);
+          await onReload();
+        }
       } finally {
         setBusy(false);
       }
     },
-    [busy, dayEditable, buildItems, rows, valueOf, day, onReload, showNotification, to]
+    [busy, dayEditable, buildItems, filledItems, day, clearLocalDraft, persistLocalDraft, onReload, to, toastSuccess, toastError, toastInfo]
   );
+
+  // Auto-retry the pending save when the connection returns.
+  const persistRef = useRef(persist);
+  useEffect(() => {
+    persistRef.current = persist;
+  }, [persist]);
+
+  useEffect(() => {
+    if (!waitingToSync) return;
+    const onOnline = () => {
+      void persistRef.current(pendingFinishRef.current);
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [waitingToSync]);
 
   // ── Delete a PENDING line (10-second undo, then the real DELETE) ────────
   const doDelete = useCallback(
@@ -261,284 +493,318 @@ export default function OrdersCollectionTab({
       try {
         await deleteOrder(orderId);
         await onReload();
-        showNotification(to("orders.entry_deleted"), "success");
+        toastSuccess(to("orders.entry_deleted"), 5000);
       } catch (error) {
-        showNotification(
-          error instanceof Error ? error.message : to("orders.delete_failed"),
-          "error"
-        );
+        toastError(toApiError(error).message || to("orders.delete_failed"), 5000);
         await onReload();
       }
     },
-    [onReload, showNotification, to]
+    [onReload, to, toastSuccess, toastError]
   );
 
   const { requestDelete, cancel: cancelDelete, pendingItems } = usePendingDelete<number>(
     (id) => void doDelete(id)
   );
-  const pendingIds = useMemo(
-    () => new Set(pendingItems.map((p) => p.id)),
-    [pendingItems]
-  );
+  const pendingIds = useMemo(() => new Set(pendingItems.map((p) => p.id)), [pendingItems]);
 
-  const summaryMetrics = useMemo(
+  const sortOptions = useMemo(
     () => [
-      { key: "shops", label: to("orders.metric_shops"), value: page.summary.totalShops },
-      {
-        key: "required",
-        label: to("orders.metric_required"),
-        value: page.summary.totalRequiredBoxes,
-        tone: "sky" as const,
-      },
-      {
-        key: "loaded",
-        label: to("orders.metric_loaded"),
-        value: page.summary.totalAssignedBoxes,
-        tone: "emerald" as const,
-      },
-      {
-        key: "pending",
-        label: to("orders.metric_pending"),
-        value: page.summary.totalPendingBoxes,
-        tone: "amber" as const,
-      },
-      {
-        key: "delivered",
-        label: to("orders.metric_delivered"),
-        value: page.summary.totalDeliveredBoxes,
-        tone: "emerald" as const,
-      },
-      {
-        key: "remaining",
-        label: to("orders.metric_remaining"),
-        value: page.summary.totalRemainingBoxes,
-        tone: "rose" as const,
-      },
+      { value: "shopNameAsc", label: to("orders.sort_shop_az") },
+      { value: "shopNameDesc", label: to("orders.sort_shop_za") },
+      { value: "cityAsc", label: to("orders.sort_city_az") },
+      { value: "cityDesc", label: to("orders.sort_city_za") },
+      { value: "requiredBoxesDesc", label: to("orders.sort_required_desc") },
+      { value: "requiredBoxesAsc", label: to("orders.sort_required_asc") },
+      { value: "loadedDesc", label: to("orders.sort_loaded_desc") },
+      { value: "pendingDesc", label: to("orders.sort_pending_desc") },
+      { value: "deliveredDesc", label: to("orders.sort_delivered_desc") },
+      { value: "remainingDesc", label: to("orders.sort_remaining_desc") },
     ],
-    [page.summary, to]
+    [to]
   );
 
   const startIndex = (page.page - 1) * page.pageSize;
 
+  const emptyTitle = search.trim()
+    ? to("orders.no_search_results")
+    : to("orders.no_shops_available");
+
   return (
     <div className="space-y-3">
-      <OrdersSummaryStrip metrics={summaryMetrics} />
+      {/* Filter panel (below tabs) */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="px-4 py-3">
+          <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} />
+            <OrdersDropdown
+              value={sort}
+              onChange={onSortChange}
+              options={sortOptions}
+              ariaLabel={to("orders.sort_by")}
+              widthClass="w-full"
+            />
+            <OrdersDropdown
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: "all", label: "All Statuses" },
+                { value: "saved", label: "Saved" },
+                { value: "assigned", label: "Assigned" },
+                { value: "partial", label: "Partially Delivered" },
+                { value: "delivered", label: "Delivered" },
+              ]}
+              ariaLabel="Status"
+              widthClass="w-full"
+            />
+            <OrdersFilledOnlyToggle
+              checked={filledOnly}
+              onChange={onFilledOnlyChange}
+              label={to("orders.filled_only")}
+              ariaLabel={to("orders.filled_only")}
+            />
+            <OrdersSearchInput
+              value={search}
+              onChange={onSearchChange}
+              placeholder={to("orders.search_collection")}
+              className="w-full"
+            />
+          </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-visible">
-        {/* ── Table-level controls: search · date · refresh ───────────── */}
-        <div className="px-4 py-2.5 border-b border-slate-200 bg-slate-50/60 flex items-center gap-2 flex-wrap">
-          <OrdersSearchInput
-            value={search}
-            onChange={onSearchChange}
-            placeholder={to("orders.search_collection")}
-            className="w-full sm:w-72"
-          />
-          <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} />
-          <div className="ml-auto flex items-center gap-2">
-            <OrdersIconButton
-              label={`${to("orders.refresh")} — ${to("orders.refresh_collection")}`}
-              onClick={onRefresh}
-              busy={refreshing}
-            >
-              <RefreshCw size={14} />
-            </OrdersIconButton>
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-slate-100 pt-3 text-[12px] text-slate-600">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                Today
+              </span>
+              <span>
+                <span className="font-bold text-slate-800">{page.summary.totalShops}</span> shops
+              </span>
+              <span className="text-slate-300">·</span>
+              <span>
+                <span className="font-bold text-emerald-700">{page.summary.shopsWithOrders}</span> shop orders
+              </span>
+              <span className="text-slate-300">·</span>
+              <span>
+                <span className="font-bold text-sky-700">{page.summary.totalRequiredBoxes}</span> boxes
+              </span>
+            </span>
+            <span className="ml-auto inline-flex items-center">
+              <OrdersIconButton
+                label={`${to("orders.refresh")} — ${to("orders.refresh_collection")}`}
+                onClick={onRefresh}
+                busy={refreshing}
+              >
+                <RefreshCw size={14} />
+              </OrdersIconButton>
+            </span>
           </div>
         </div>
+      </div>
 
-        {/* ── Add a shop to the day's collection ─────────────────────── */}
-        {dayEditable && (
-          <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-2 flex-wrap">
-            <div className="min-w-[240px] flex-1 max-w-md">
-              <Select
-                inputId="orders-add-shop"
-                aria-label={to("orders.add_shop")}
-                isDisabled={shopsLoading || busy}
-                options={addableShops}
-                value={null}
-                placeholder={to("orders.add_shop")}
-                styles={opsReactSelectStyles() as never}
-                onChange={(option) => {
-                  const shopId = Number((option as { value?: number } | null)?.value ?? 0);
-                  if (!shopId) return;
-                  setNewShopIds((prev) => [...prev, { shopId, boxes: 0, birds: 0 }]);
-                }}
-              />
-            </div>
-            <span className="text-[11px] text-slate-400">{to("orders.collection_hint")}</span>
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-visible">
+        {/* Auto-completed collection (finished at the daily cutoff). */}
+        {autoFinished && (
+          <div className="px-4 py-2 border-b border-emerald-200 bg-emerald-50/70 text-[11px] font-semibold text-emerald-700 flex items-center gap-1.5">
+            <Lock size={12} aria-hidden />
+            {to("orders.auto_finished_note")}
           </div>
         )}
 
-        {/* ── Newly added shops (not persisted until Save) ───────────── */}
-        {newShopIds.length > 0 && (
-          <div className="px-4 py-2.5 border-b border-slate-100 space-y-2">
-            {newShopIds.map((added, index) => {
-              const shop = shops.find((s) => s.id === added.shopId);
-              return (
-                <div key={added.shopId} className="flex items-center gap-2 flex-wrap">
-                  <Plus size={13} className="text-emerald-500" aria-hidden />
-                  <span className="text-xs font-semibold text-slate-700 min-w-[160px]">
-                    {shop?.shopName ?? `Shop ${added.shopId}`}
-                  </span>
-                  <span className="text-[11px] text-slate-400 min-w-[100px]">
-                    {shop?.city || "—"}
-                  </span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={added.birds || ""}
-                    aria-label={`${to("orders.col_birds")} — ${shop?.shopName ?? ""}`}
-                    onChange={(e) =>
-                      setNewShopIds((prev) =>
-                        prev.map((n, i) =>
-                          i === index
-                            ? { ...n, birds: Math.max(0, Math.floor(Number(e.target.value) || 0)) }
-                            : n
-                        )
-                      )
-                    }
-                    className="h-8 w-24 rounded-lg border border-slate-200 px-2 text-xs"
-                    placeholder={to("orders.col_birds")}
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    value={added.boxes || ""}
-                    aria-label={`${to("orders.col_required_boxes")} — ${shop?.shopName ?? ""}`}
-                    onChange={(e) =>
-                      setNewShopIds((prev) =>
-                        prev.map((n, i) =>
-                          i === index
-                            ? { ...n, boxes: Math.max(0, Math.floor(Number(e.target.value) || 0)) }
-                            : n
-                        )
-                      )
-                    }
-                    className="h-8 w-24 rounded-lg border border-emerald-300 px-2 text-xs font-semibold"
-                    placeholder={to("orders.col_required_boxes")}
-                  />
-                  <OrdersIconButton
-                    label={to("orders.remove_added_shop")}
-                    tone="rose"
-                    onClick={() =>
-                      setNewShopIds((prev) => prev.filter((_, i) => i !== index))
-                    }
-                  >
-                    <Trash2 size={13} />
-                  </OrdersIconButton>
-                </div>
-              );
-            })}
+        {/* Waiting-to-sync banner (draft kept locally, not yet on the server). */}
+        {waitingToSync && (
+          <div className="px-4 py-2 border-b border-amber-200 bg-amber-50/60 text-[11px] font-semibold text-amber-700 flex items-center gap-1.5">
+            <Loader2 size={12} className="animate-spin" aria-hidden />
+            {to("orders.offline_waiting")}
           </div>
         )}
 
-        {/* ── Table ───────────────────────────────────────────────────── */}
+        {/* ── Working-sheet table (ALL shops, editable in-place) ────────── */}
         {loading ? (
-          <OrdersTableSkeleton rows={6} />
-        ) : rows.length === 0 ? (
-          <OrdersEmptyState
-            title={to("orders.no_orders_for_day", { date: formatDayFull(day) })}
-            hint={dayEditable ? to("orders.collection_hint") : to("orders.read_only_note")}
-          />
+          <OrdersTableSkeleton rows={8} />
+        ) : filteredLines.length === 0 ? (
+          <OrdersEmptyState title={emptyTitle} hint={to("orders.working_sheet_hint")} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px]">
-              <thead className={opsTableHeadRowClass}>
+          <div className="p-4">
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full min-w-[860px]">
+              <thead className="border-b border-slate-200 bg-white">
                 <tr>
-                  <th className={opsTableThClass}>{to("orders.col_sno")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_city")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_birds")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_required_boxes")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_pickup_boxes")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_pending_boxes")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_delivered_boxes")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_remaining_boxes")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_trip")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_status")}</th>
-                  <th className={`${opsTableThClass} text-right`}>{to("orders.col_action")}</th>
+                  <th className={`${colTh} w-12`}>
+                    <span className="inline-flex items-center gap-1">
+                      <Hash size={12} className="text-slate-400" />
+                      {to("orders.col_sno")}
+                    </span>
+                  </th>
+                  <th className={`${colTh} min-w-[170px]`}>
+                    <span className="inline-flex items-center gap-1">
+                      <Store size={12} className="text-indigo-500" />
+                      {to("orders.col_shop_name")}
+                    </span>
+                  </th>
+                  <th className={colTh}>
+                    <span className="inline-flex items-center gap-1">
+                      <User size={12} className="text-violet-500" />
+                      {to("orders.col_owner")}
+                    </span>
+                  </th>
+                  <th className={colTh}>
+                    <span className="inline-flex items-center gap-1">
+                      <Phone size={12} className="text-emerald-500" />
+                      {to("orders.col_mobile")}
+                    </span>
+                  </th>
+                  <th className={colTh}>
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin size={12} className="text-sky-500" />
+                      {to("orders.col_city")}
+                    </span>
+                  </th>
+                  <th className={colTh}>
+                    <span className="inline-flex items-center gap-1">
+                      <FileText size={12} className="text-emerald-500" />
+                      {to("orders.col_order_no")}
+                    </span>
+                  </th>
+                  <th className={colThRight}>
+                    <span className="inline-flex items-center justify-end gap-1">
+                      <Bird size={12} className="text-blue-500" />
+                      {to("orders.col_birds")}
+                    </span>
+                  </th>
+                  <th className={colThRight}>
+                    <span className="inline-flex items-center justify-end gap-1">
+                      <Package size={12} className="text-blue-500" />
+                      {to("orders.col_required_boxes")}
+                    </span>
+                  </th>
+                  <th className={`${colTh} text-center`}>
+                    <span className="inline-flex items-center gap-1">
+                      <Clock size={12} className="text-slate-400" />
+                      {to("orders.col_status")}
+                    </span>
+                  </th>
+                  <th className={`${colTh} text-right`}>
+                    <span className="inline-flex items-center justify-end gap-1">
+                      <Send size={12} className="text-slate-400" />
+                      {to("orders.col_action")}
+                    </span>
+                  </th>
                 </tr>
               </thead>
               <tbody className={opsTableDivideClass}>
-                {rows.map((row, index) => {
-                  const rowLocked = row.locked || row.assignments.some((a) => a.tripLocked);
-                  const editable = dayEditable && !rowLocked && !pendingIds.has(row.id);
-                  const tripLabel = row.assignments
-                    .map((a) => `${a.tripNo}${a.vehicleNo ? ` · ${a.vehicleNo}` : ""}`)
-                    .join(", ");
+                {filteredLines.map((line, index) => {
+                  const rowLocked = line.locked || line.assignments.some((a) => a.tripLocked);
+                  const hasOrder = line.orderId > 0;
+                  const editable = dayEditable && !rowLocked && !pendingIds.has(line.orderId) && editingKey === line.key;
+                  const required = valueOf(line, "requiredBoxes");
+                  const birds = valueOf(line, "birds");
+                  const derivedStatus = derivedStatusOf(line);
                   return (
                     <tr
-                      key={row.id}
-                      className={`${opsTableRowClass} ${pendingIds.has(row.id) ? "opacity-40" : ""}`}
+                      key={line.key}
+                      className={`${opsTableRowClass} ${
+                        pendingIds.has(line.orderId) ? "opacity-40" : ""
+                      }`}
                     >
-                      <td className={opsTableTdClass}>{startIndex + index + 1}</td>
-                      <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
+                      <td className={`${colTd} text-slate-400`}>{startIndex + index + 1}</td>
+                      <td className={`${colTd} font-bold text-slate-800`}>
                         <span className="inline-flex items-center gap-1.5">
                           {rowLocked && <Lock size={11} className="text-slate-400" aria-hidden />}
-                          {row.shopName}
+                          {line.shopName}
                         </span>
                       </td>
-                      <td className={opsTableTdClass}>{row.city || "—"}</td>
-                      <td className={opsTableTdClass}>
+                      <td className={colTd}>{shopDirectory.get(line.shopId)?.ownerName || "—"}</td>
+                      <td className={`${colTd} tabular-nums`}>
+                        {shopDirectory.get(line.shopId)?.mobile || "—"}
+                      </td>
+                      <td className={colTd}>{line.city || "—"}</td>
+                      <td className={`${colTd} font-mono text-[11px] text-slate-500`}>
+                        {hasOrder ? line.orderNo : "—"}
+                      </td>
+                      <td className={colTdRight}>
                         {editable ? (
                           <input
                             type="number"
                             min={0}
-                            value={valueOf(row, "birds") || ""}
-                            aria-label={`${to("orders.col_birds")} — ${row.shopName}`}
-                            onChange={(e) => updateDraft(row, "birds", e.target.value)}
-                            className="h-8 w-24 rounded-lg border border-slate-200 px-2 text-xs"
+                            value={birds || ""}
+                            aria-label={`${to("orders.col_birds")} — ${line.shopName}`}
+                            onChange={(e) => updateDraft(line, "birds", e.target.value)}
+                            className="no-spinner h-7 w-16 rounded-md border border-slate-200 px-2 text-right text-xs"
                           />
                         ) : (
-                          <span className="tabular-nums">{row.birds || "—"}</span>
+                          <span>{line.baseBirds || "—"}</span>
                         )}
                       </td>
-                      <td className={opsTableTdClass}>
+                      <td className={colTdRight}>
                         {editable ? (
                           <input
                             type="number"
-                            min={Math.max(1, row.deliveredBoxes, row.assignedBoxes)}
-                            value={valueOf(row, "requiredBoxes") || ""}
-                            aria-label={`${to("orders.col_required_boxes")} — ${row.shopName}`}
-                            onChange={(e) => updateDraft(row, "requiredBoxes", e.target.value)}
-                            className="h-8 w-24 rounded-lg border border-emerald-300 px-2 text-xs font-semibold"
+                            min={hasOrder ? Math.max(1, line.deliveredBoxes, line.assignedBoxes) : 0}
+                            value={required || ""}
+                            aria-label={`${to("orders.col_required_boxes")} — ${line.shopName}`}
+                            onChange={(e) => updateDraft(line, "requiredBoxes", e.target.value)}
+                            className="no-spinner h-7 w-16 rounded-md border border-emerald-300 px-2 text-right text-xs font-semibold"
                           />
                         ) : (
-                          <span className="font-semibold tabular-nums">{row.requiredBoxes}</span>
+                          <span className="font-semibold">{line.baseRequired}</span>
                         )}
                       </td>
-                      <td className={`${opsTableTdClass} tabular-nums`}>{row.assignedBoxes}</td>
-                      <td className={`${opsTableTdClass} tabular-nums font-semibold text-amber-700`}>
-                        {row.pendingBoxes}
+                      <td className={`${colTd} text-center`}>
+                        <OrdersStatusBadge status={line.autoFinished ? "Auto Completed" : line.status} label={statusLabelOf(derivedStatus, to)} />
                       </td>
-                      <td className={`${opsTableTdClass} tabular-nums font-semibold text-emerald-700`}>
-                        {row.deliveredBoxes}
-                      </td>
-                      <td className={`${opsTableTdClass} tabular-nums`}>{row.remainingBoxes}</td>
-                      <td className={`${opsTableTdClass} text-xs text-slate-500`}>
-                        {tripLabel || "—"}
-                      </td>
-                      <td className={opsTableTdClass}>
-                        <OrdersStatusBadge status={row.status} label={to(statusKeyOf(row.status))} />
-                      </td>
-                      <td className={`${opsTableTdClass} text-right`}>
-                        <OrdersIconButton
-                          label={to("orders.delete_entry", { shop: row.shopName })}
-                          tone="rose"
-                          disabled={!dayEditable || row.deliveredBoxes > 0 || busy}
-                          onClick={() =>
-                            requestDelete(row.id, {
-                              label: to("orders.delete_entry", { shop: row.shopName }),
-                            })
-                          }
-                        >
-                          <Trash2 size={13} />
-                        </OrdersIconButton>
+                      <td className={`${colTd} text-right`}>
+                        {editingKey === line.key ? (
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              type="button"
+                              title={to("orders.cancel")}
+                              aria-label={to("orders.cancel")}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+                              disabled={busy}
+                              onClick={() => setEditingKey(null)}
+                            >
+                              <X size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              title={to("orders.save")}
+                              aria-label={to("orders.save")}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40"
+                              disabled={busy || !isDirty}
+                              onClick={() => void persist(false)}
+                            >
+                              <Save size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center gap-1">
+                            <OrdersIconButton
+                              label={to("orders.edit_entry", { shop: line.shopName })}
+                              disabled={!dayEditable || rowLocked || busy}
+                              onClick={() => setEditingKey(line.key)}
+                            >
+                              <Pencil size={13} />
+                            </OrdersIconButton>
+                            <OrdersIconButton
+                              label={to("orders.delete_entry", { shop: line.shopName })}
+                              tone="rose"
+                              disabled={!dayEditable || !hasOrder || rowLocked || busy}
+                              onClick={() =>
+                                requestDelete(line.orderId, {
+                                  label: to("orders.delete_entry", { shop: line.shopName }),
+                                })
+                              }
+                            >
+                              <Trash2 size={13} />
+                            </OrdersIconButton>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+          </div>
           </div>
         )}
 
@@ -552,7 +818,7 @@ export default function OrdersCollectionTab({
           t={to}
         />
 
-        {/* ── Actions ─────────────────────────────────────────────────── */}
+        {/* ── Footer actions ───────────────────────────────────────────── */}
         {dayEditable && (
           <div className="px-4 py-3 border-t border-slate-200 bg-slate-50/60 flex items-center justify-end gap-2 flex-wrap">
             {isDirty && (
@@ -566,7 +832,9 @@ export default function OrdersCollectionTab({
               disabled={busy || !isDirty}
               onClick={() => {
                 setDraft(new Map());
-                setNewShopIds([]);
+                setAddedLines([]);
+                clearLocalDraft();
+                setWaitingToSync(false);
               }}
             >
               {to("orders.cancel")}
