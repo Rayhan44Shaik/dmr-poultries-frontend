@@ -630,6 +630,33 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
   const resetPage = useCallback(() => setCurrentPage(1), []);
 
+  // Per-shop ledger cache, keyed by "from|to|shop". Filter changes switch
+  // keys, so switching back to a previous filter is instant. Bounded to the
+  // last 20 shop×filter entries to keep memory predictable.
+  const ledgerCacheRef = useRef<Map<string, LedgerTransaction[]>>(new Map());
+  const LEDGER_CACHE_LIMIT = 20;
+
+  const getCachedLedger = useCallback(
+    async (from: string, to: string, shop: string): Promise<LedgerTransaction[] | null> => {
+      const key = `${from}|${to}|${shop}`;
+      const hit = ledgerCacheRef.current.get(key);
+      if (hit) return hit;
+      const shopId = shopMasterMap.get(shop)?.id;
+      if (!sampleMode && shopId == null) return null;
+      const ledger = sampleMode
+        ? makeSampleLedger(from, to, shop)
+        : await buildLedger(from, to, shopId);
+      ledgerCacheRef.current.set(key, ledger);
+      while (ledgerCacheRef.current.size > LEDGER_CACHE_LIMIT) {
+        const oldest = ledgerCacheRef.current.keys().next().value;
+        if (oldest === undefined) break;
+        ledgerCacheRef.current.delete(oldest);
+      }
+      return ledger;
+    },
+    [sampleMode, shopMasterMap, buildLedger],
+  );
+
   // ─── PDF preview modal state ────────────────────────────────
   const [pdfPreview, setPdfPreview] = useState<PdfPreviewState | null>(null);
   const [pdfShopSearch, setPdfShopSearch] = useState("");
@@ -702,12 +729,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       const allLedgers: ShopLedgerPdfEntry[] = [];
       const shopData: Record<string, LedgerTransaction[]> = {};
       for (const shop of shopNames) {
-        const shopId = shopMasterMap.get(shop)?.id;
-        if (!sampleMode && shopId == null) continue; // never fetch "all shops" by mistake
-        const ledger = sampleMode
-          ? makeSampleLedger(appliedDateFrom, appliedDateTo, shop)
-          : (await buildLedger(appliedDateFrom, appliedDateTo, shopId));
-        if (ledger.length > 1) {
+        const ledger = await getCachedLedger(appliedDateFrom, appliedDateTo, shop);
+        if (ledger && ledger.length > 1) {
           const master = shopMasterMap.get(shop);
           allLedgers.push({
             shop,
@@ -796,7 +819,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       setPdfGenerating(false);
       setPdfProgress(null);
     }
-  }, [appliedSelectedShop, appliedDateFrom, appliedDateTo, sampleMode, showNotification, shopMasterMap, buildLedger]);
+  }, [appliedSelectedShop, appliedDateFrom, appliedDateTo, sampleMode, showNotification, shopMasterMap, getCachedLedger]);
 
   const closePdfPreview = useCallback(() => {
     // Invalidate any in-flight export so it cannot re-open this modal.
@@ -836,7 +859,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       perShopBusyRef.current.add(shop);
       setPdfBusyShop(shop);
       try {
-        const ledger = current.shopData[shop] ?? [];
+        // Prefer the live ledger snapshot for this export; fall back to the
+        // filter-keyed cache (already built for the combined document).
+        const ledger = current.shopData[shop] ?? (await getCachedLedger(appliedDateFrom, appliedDateTo, shop)) ?? [];
         const master = shopMasterMap.get(shop);
         const generated = await generateShopLedgerPDF(
           [{
@@ -871,7 +896,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       }
       // appliedDateFrom/To pinned via useCallback deps
     },
-    [appliedDateFrom, appliedDateTo, sampleMode, shopMasterMap],
+    [appliedDateFrom, appliedDateTo, sampleMode, shopMasterMap, getCachedLedger],
   );
 
   const setActivePdfShop = (index: number, shop?: string) => {
