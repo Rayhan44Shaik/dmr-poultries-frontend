@@ -78,51 +78,31 @@ const modeColor = (mode: string) =>
 
 // 2D logo chips — flat color badges that tie table rows/columns to the
 // chart colors (Cash = emerald, Union Bank = sky, HDFC Bank = violet).
-const modeInitials = (mode: string) => {
-  if (mode === "Total") return "T";
-  const words = mode.trim().split(/\s+/).filter(Boolean);
-  const mono =
-    words.length > 1
-      ? words[0][0] + words[1][0]
-      : mode.slice(0, 2);
-  return mono.toUpperCase() || "M";
+// Logo marks — recognisable abbreviations, not bare initials.
+const MODE_MARKS: Record<string, string> = {
+  Cash: "CASH",
+  "HDFC Bank": "HDFC",
+  "Union Bank": "UNION",
+  Others: "OTHER",
 };
+const modeMark = (mode: string) =>
+  mode === "Total" ? "T" : (MODE_MARKS[mode] ?? mode.slice(0, 2).toUpperCase());
 
 function ModeBadge({ mode, size = "md" }: { mode: string; size?: "sm" | "md" }) {
   const muted = mode === "Total";
   const shell =
     size === "sm"
-      ? "h-4 w-4 rounded text-[7px]"
-      : "h-6 w-6 rounded-lg text-[10px] ring-1 ring-black/5 shadow-sm";
+      ? "h-4 rounded px-1 text-[7px]"
+      : "h-6 rounded-md px-1.5 text-[9px] ring-1 ring-black/5 shadow-sm";
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center font-black tracking-tight text-white ${shell} ${
+      className={`inline-flex shrink-0 items-center justify-center font-black tracking-wide text-white ${shell} ${
         muted ? "bg-slate-400" : ""
       }`}
       style={muted ? undefined : { background: modeColor(mode) }}
       aria-hidden="true"
     >
-      {modeInitials(mode)}
-    </span>
-  );
-}
-
-function PersonBadge({ name, muted = false }: { name: string; muted?: boolean }) {
-  const initials =
-    (name
-      .split(/\s+/)
-      .map((w) => w[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase()) || "P";
-  return (
-    <span
-      className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-extrabold ${
-        muted ? "bg-slate-200 text-slate-600" : "bg-indigo-100 text-indigo-700"
-      }`}
-      aria-hidden="true"
-    >
-      {muted ? "T" : initials}
+      {modeMark(mode)}
     </span>
   );
 }
@@ -807,7 +787,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
               <table className="min-w-full divide-y divide-slate-100">
                 <thead className="bg-slate-50/80">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.payment_mode")}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.mode")}</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.collectors")}</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.no_short")}</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("table.amount")}</th>
@@ -926,10 +906,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                         className={isTotal ? "bg-amber-50/60 font-semibold" : "hover:bg-slate-50/50"}
                       >
                         <td className="px-4 py-3 text-xs font-medium text-slate-800">
-                          <div className="flex items-center gap-2">
-                            <PersonBadge name={row.collector} muted={row.collector === "Total"} />
-                            {row.collector === "Total" ? t("common.total") : row.collector}
-                          </div>
+                          {row.collector === "Total" ? t("common.total") : row.collector}
                         </td>
                         {collectorSummary.paymentModes.map((mode: string) => (
                           <td key={mode} className="px-4 py-3 text-right text-xs text-slate-600">

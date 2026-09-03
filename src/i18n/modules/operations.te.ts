@@ -66,6 +66,7 @@
   'ops.collection.no_collections_for_shop': 'ఈ షాప్ కోసం కలెక్షన్లు ఏవీ కనుగొనబడలేదు.',
   'ops.collection.empty.title': 'కలెక్షన్లు కనబడలేదు',
   'ops.collection.empty.hint': 'తేదీ పరిధి లేదా ఫిల్టర్లు మార్చి ప్రయత్నించండి.',
+  'ops.collection.mode': 'మోడ్',
   'ops.collection.mode_share': 'మోడ్ వారీ వాటా',
   'ops.collection.collector_split': 'కలెక్టర్ వారీ విభజన',
   'ops.collection.collectors': 'కలెక్టర్లు',

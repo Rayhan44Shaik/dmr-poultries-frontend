@@ -66,6 +66,7 @@
   'ops.collection.no_collections_for_shop': 'No collections found for this shop.',
   'ops.collection.empty.title': 'No collections found',
   'ops.collection.empty.hint': 'Try changing the date range or filters.',
+  'ops.collection.mode': 'Mode',
   'ops.collection.mode_share': 'Mode-wise Share',
   'ops.collection.collector_split': 'Collector-wise Split',
   'ops.collection.collectors': 'Collectors',
