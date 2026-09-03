@@ -269,7 +269,15 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const [selectedShop, setSelectedShop] = useState("All Shops");
   const [reportType, setReportType] = useState<ReportTypeFilter>("all");
   const [searchValue, setSearchValue] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+
+  // Applied values are committed only when the user clicks Search. The input
+  // controls above are draft values; changing them does not affect the table
+  // or KPIs until Search is pressed.
+  const [appliedDateFrom, setAppliedDateFrom] = useState(toWeekAgoDefault);
+  const [appliedDateTo, setAppliedDateTo] = useState(toDateDefault);
+  const [appliedSelectedShop, setAppliedSelectedShop] = useState("All Shops");
+  const [appliedReportType, setAppliedReportType] = useState<ReportTypeFilter>("all");
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [currentPage, setCurrentPage] = useState(1);
@@ -292,10 +300,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   }, [shops, sampleMode]);
 
   const selectedShopId = useMemo(() => {
-    return selectedShop === "All Shops"
+    return appliedSelectedShop === "All Shops"
       ? undefined
-      : shops.find((s: Shop) => s.shopName === selectedShop)?.id;
-  }, [selectedShop, shops]);
+      : shops.find((s: Shop) => s.shopName === appliedSelectedShop)?.id;
+  }, [appliedSelectedShop, shops]);
 
   const buildLedger = useCallback(
     async (from: string, to: string, shopId?: number): Promise<LedgerTransaction[]> => {
@@ -321,9 +329,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
     if (sampleMode) {
       // Sample mode: build directly from deterministic local rows so the UI
-      // (search, filters, PDF, refresh, pagination, badges) is testable
-      // without a backend. Filter active date/shop locally.
-      const sample = makeSampleLedger(dateFrom, dateTo, selectedShop);
+      // (search, filters, PDF, refresh, pagination) is testable without a
+      // backend. Only the committed (Search) date/shop filters are applied.
+      const sample = makeSampleLedger(appliedDateFrom, appliedDateTo, appliedSelectedShop);
       queueMicrotask(() => {
         if (!cancelled) {
           setLedgerLoading(false);
@@ -337,7 +345,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       };
     }
 
-    buildLedger(dateFrom, dateTo, selectedShopId)
+    buildLedger(appliedDateFrom, appliedDateTo, selectedShopId)
       .then((tx) => {
         if (!cancelled) {
           setLedgerLoading(false);
@@ -359,17 +367,17 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     // `refreshNonce` drives a targeted content refresh (same pattern used by
     // other ERP tabs): the loader keeps the existing table visible while the
     // data is reloaded, so the page itself is never fully reloaded.
-  }, [dateFrom, dateTo, selectedShop, selectedShopId, buildLedger, refreshNonce, sampleMode]);
+  }, [appliedDateFrom, appliedDateTo, appliedSelectedShop, selectedShopId, buildLedger, refreshNonce, sampleMode]);
 
   const filteredLedger = useMemo(() => {
     const opening = ledgerData.slice(0, 1);
     const body = ledgerData.slice(1);
 
     const scoped = body.filter((tx) => {
-      if (reportType === "sales" && tx.type !== "sale") return false;
-      if (reportType === "collection" && tx.type !== "collection") return false;
-      if (!searchTerm.trim()) return true;
-      const needle = searchTerm.trim().toLowerCase();
+      if (appliedReportType === "sales" && tx.type !== "sale") return false;
+      if (appliedReportType === "collection" && tx.type !== "collection") return false;
+      if (!appliedSearchTerm.trim()) return true;
+      const needle = appliedSearchTerm.trim().toLowerCase();
       return [
         tx.date,
         tx.particulars,
@@ -388,7 +396,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     });
 
     return [...opening, ...scoped];
-  }, [ledgerData, reportType, searchTerm]);
+  }, [ledgerData, appliedReportType, appliedSearchTerm]);
 
   const totalRows = useMemo(() => Math.max(0, filteredLedger.length - 1), [filteredLedger]);
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
@@ -420,11 +428,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   }, [filteredLedger]);
 
   // KPIs are calculated only when the user applies a meaningful filter:
-  // a custom date range or a specific shop. Default view stays clean.
+  // a custom date range or a specific shop. These are committed on Search.
   const hasKpiFilter =
-    dateFrom !== toWeekAgoDefault() ||
-    dateTo !== toDateDefault() ||
-    selectedShop !== "All Shops";
+    appliedDateFrom !== toWeekAgoDefault() ||
+    appliedDateTo !== toDateDefault() ||
+    appliedSelectedShop !== "All Shops";
 
   const resetPage = useCallback(() => setCurrentPage(1), []);
 
@@ -436,18 +444,18 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
       if (sampleMode) {
         // Sample mode: export from local page data without a backend.
-        shopNames = selectedShop !== "All Shops"
-          ? [selectedShop]
+        shopNames = appliedSelectedShop !== "All Shops"
+          ? [appliedSelectedShop]
           : SAMPLE_SHOP_NAMES;
-      } else if (selectedShop === "All Shops") {
-        const all = await fetchShopLedger({ fromDate: dateFrom, toDate: dateTo });
+      } else if (appliedSelectedShop === "All Shops") {
+        const all = await fetchShopLedger({ fromDate: appliedDateFrom, toDate: appliedDateTo });
         const names = new Set<string>();
         all.data.forEach((r) => {
           if (r.shopName) names.add(r.shopName);
         });
         shopNames = Array.from(names).sort();
       } else {
-        shopNames = [selectedShop];
+        shopNames = [appliedSelectedShop];
       }
 
       if (shopNames.length === 0) {
@@ -458,10 +466,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       const allLedgers: { shop: string; data: LedgerTransaction[] }[] = [];
       for (const shop of shopNames) {
         const ledger = sampleMode
-          ? makeSampleLedger(dateFrom, dateTo, shop)
+          ? makeSampleLedger(appliedDateFrom, appliedDateTo, shop)
           : (await buildLedger(
-              dateFrom,
-              dateTo,
+              appliedDateFrom,
+              appliedDateTo,
               shops.find((s: Shop) => s.shopName === shop)?.id,
             ));
         if (ledger.length > 1) {
@@ -474,25 +482,40 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         return;
       }
 
-      generateShopLedgerPDF(allLedgers, dateFrom, dateTo, selectedShop);
+      generateShopLedgerPDF(allLedgers, appliedDateFrom, appliedDateTo, appliedSelectedShop);
       showNotification("PDF downloaded successfully.", "success");
     } catch {
       showNotification("Failed to load ledger data. Please try again.", "error");
     }
-  }, [selectedShop, dateFrom, dateTo, sampleMode, showNotification, shops, buildLedger]);
+  }, [appliedSelectedShop, appliedDateFrom, appliedDateTo, sampleMode, showNotification, shops, buildLedger]);
 
   const handleSearch = useCallback(() => {
-    setSearchTerm(searchValue);
+    // Commit the draft filter controls. Until Search is clicked the table,
+    // KPIs and exports keep using the previously applied filters.
+    setAppliedDateFrom(dateFrom);
+    setAppliedDateTo(dateTo);
+    setAppliedSelectedShop(selectedShop);
+    setAppliedReportType(reportType);
+    setAppliedSearchTerm(searchValue);
     resetPage();
-  }, [searchValue, resetPage]);
+  }, [dateFrom, dateTo, selectedShop, reportType, searchValue, resetPage]);
 
   const handleReset = useCallback(() => {
-    setDateFrom(toWeekAgoDefault());
-    setDateTo(toDateDefault());
+    const defaultFrom = toWeekAgoDefault();
+    const defaultTo = toDateDefault();
+
+    setDateFrom(defaultFrom);
+    setDateTo(defaultTo);
     setSelectedShop("All Shops");
     setReportType("all");
     setSearchValue("");
-    setSearchTerm("");
+
+    setAppliedDateFrom(defaultFrom);
+    setAppliedDateTo(defaultTo);
+    setAppliedSelectedShop("All Shops");
+    setAppliedReportType("all");
+    setAppliedSearchTerm("");
+
     setCurrentPage(1);
   }, []);
 
@@ -508,10 +531,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     setLedgerRefreshing(true);
     setRefreshToast(true);
     setRefreshNonce((n) => n + 1);
-  }, []);
-
-  const resetPaginationForChange = useCallback(() => {
-    setCurrentPage(1);
   }, []);
 
   // ─── WhatsApp modal state ──────────────────────────────────
@@ -537,15 +556,16 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   }, [shops, sampleMode]);
 
   const openWhatsApp = useCallback(() => {
+    // WhatsApp follows the currently applied (Search-committed) filters.
     setWaReportType("Sales");
-    setWaDateFrom(dateFrom);
-    setWaDateTo(dateTo);
-    setWaScope(selectedShop === "All Shops" ? "all" : "selected");
-    setWaShop(selectedShop === "All Shops" ? "All Shops" : selectedShop);
+    setWaDateFrom(appliedDateFrom);
+    setWaDateTo(appliedDateTo);
+    setWaScope(appliedSelectedShop === "All Shops" ? "all" : "selected");
+    setWaShop(appliedSelectedShop === "All Shops" ? "All Shops" : appliedSelectedShop);
     setWaConfirmAll(false);
     setWaError(null);
     setWhatsappOpen(true);
-  }, [dateFrom, dateTo, selectedShop]);
+  }, [appliedDateFrom, appliedDateTo, appliedSelectedShop]);
 
   const closeWhatsApp = useCallback(() => {
     if (waSending) return;
@@ -696,7 +716,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               value={shopOptions.find((opt) => opt.value === selectedShop)}
               onChange={(selected) => {
                 setSelectedShop(selected?.value || "All Shops");
-                resetPaginationForChange();
               }}
               isSearchable
               placeholder="Search or select shop..."
@@ -711,7 +730,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               value={reportTypeOptions.find((opt) => opt.value === reportType)}
               onChange={(selected) => {
                 setReportType((selected?.value as ReportTypeFilter) || "all");
-                resetPaginationForChange();
               }}
               placeholder="All"
               styles={selectStyles}
