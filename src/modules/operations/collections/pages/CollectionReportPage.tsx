@@ -32,7 +32,7 @@ import {
   Inbox,
   AlertTriangle,
   Coins,
-  TrendingUp,
+  BarChart3,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -654,22 +654,78 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
         </div>
       ) : (
       <>
-        {/* Collection Insights — donut (mode share) + stacked bars (collectors),
-            rendered purely from the authoritative report rows */}
-        <div className={`rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""}`}>
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
-            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-              <span className="rounded-lg bg-emerald-50 p-1.5 text-emerald-600">
-                <TrendingUp size={14} />
+        {/* Row 1 — Payment Mode Summary: table with its mode-share chart */}
+        <div className={`grid grid-cols-1 gap-6 lg:grid-cols-2 transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""}`}>
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+              <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <span className="rounded-lg bg-blue-50 p-1.5 text-blue-600">
+                  <Wallet size={14} />
+                </span>
+                {t("ops.collection.payment_mode_summary")}
+              </h4>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                {t("ops.collection.no_of_collections")}: {report?.totalCount ?? 0}
               </span>
-              {t("ops.collection.insights")}
-            </h4>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              {t("common.total")}: {formatCurrency(totalCollections)}
-            </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-100">
+                <thead className="bg-slate-50/80">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.payment_mode")}</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.collectors")}</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.no_short")}</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("table.amount")}</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-600">%</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {paymentModeSummary.map((row) => (
+                    <tr
+                      key={row.mode}
+                      className={row.mode === "Total" ? "bg-amber-50/60 font-semibold" : "hover:bg-slate-50/50"}
+                    >
+                      <td className="px-4 py-3 text-xs font-medium text-slate-800">{row.mode === "Total" ? t("common.total") : row.mode}</td>
+                      <td className="px-4 py-3 text-right text-xs text-slate-600">
+                        {row.mode === "Total"
+                          ? totalCollectorsCount
+                          : (collectorCountsByMode.find((c) => c.mode === row.mode)?.count ?? 0)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs text-slate-600">{row.count}</td>
+                      <td className="px-4 py-3 text-right text-xs text-slate-600">{formatCurrency(row.amount)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-xs font-medium text-slate-700 w-10 text-right">
+                            {row.percentage.toFixed(1)}%
+                          </span>
+                          <div className="w-12 h-2 rounded-full bg-slate-100 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${getBarColor(row.percentage)} transition-all duration-500`}
+                              style={{ width: `${row.percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div className="grid grid-cols-1 gap-6 p-4 lg:grid-cols-2">
-            <div className="h-64">
+
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+              <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <span className="rounded-lg bg-sky-50 p-1.5 text-sky-600">
+                  <BarChart3 size={14} />
+                </span>
+                {t("ops.collection.mode_share")}
+              </h4>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                {t("common.total")}: {formatCurrency(totalCollections)}
+              </span>
+            </div>
+            <div className="relative h-72 p-4">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -678,8 +734,8 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    innerRadius={55}
-                    outerRadius={85}
+                    innerRadius={62}
+                    outerRadius={95}
                     paddingAngle={2}
                     cornerRadius={4}
                     stroke="none"
@@ -692,8 +748,84 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                   <ChartLegend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
                 </PieChart>
               </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t("common.total")}</div>
+                  <div className="text-sm font-bold text-slate-800">{compactINR(totalCollections)}</div>
+                </div>
+              </div>
             </div>
-            <div className="h-64">
+          </div>
+        </div>
+
+        {/* Row 2 — Collector Summary: table with its collector split chart */}
+        <div className={`grid grid-cols-1 gap-6 lg:grid-cols-2 transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""}`}>
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+              <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <span className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600">
+                  <Users size={14} />
+                </span>
+                {t("ops.collection.collector_summary")}
+              </h4>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                {t("ops.collection.total_collectors")}: {totalCollectorsCount}
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-100">
+                <thead className="bg-slate-50/80">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">{t("common.collector")}</th>
+                    {collectorSummary.paymentModes.map((mode: string) => (
+                      <th key={mode} className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
+                        {mode}
+                      </th>
+                    ))}
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("common.total")}</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.share")}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {collectorSummary.rows.map((row: any, idx: number) => {
+                    const isTotal = row.collector === "Total";
+                    const share = totalCollections > 0 ? (row.total / totalCollections) * 100 : 0;
+                    return (
+                      <tr
+                        key={idx}
+                        className={isTotal ? "bg-amber-50/60 font-semibold" : "hover:bg-slate-50/50"}
+                      >
+                        <td className="px-4 py-3 text-xs font-medium text-slate-800">{row.collector === "Total" ? t("common.total") : row.collector}</td>
+                        {collectorSummary.paymentModes.map((mode: string) => (
+                          <td key={mode} className="px-4 py-3 text-right text-xs text-slate-600">
+                            {formatCurrency(row[mode] || 0)}
+                          </td>
+                        ))}
+                        <td className="px-4 py-3 text-right text-xs font-semibold text-slate-800">
+                          {formatCurrency(row.total)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-xs text-slate-600">{share.toFixed(1)}%</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+              <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <span className="rounded-lg bg-sky-50 p-1.5 text-sky-600">
+                  <BarChart3 size={14} />
+                </span>
+                {t("ops.collection.collector_split")}
+              </h4>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                {t("ops.collection.collectors")}: {collectorChartData.length}
+              </span>
+            </div>
+            <div className="h-72 p-4">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={collectorChartData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -716,116 +848,6 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
           </div>
         </div>
 
-        <div className={`grid grid-cols-1 gap-6 lg:grid-cols-2 transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""}`}>
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
-            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-              <span className="rounded-lg bg-blue-50 p-1.5 text-blue-600">
-                <Wallet size={14} />
-              </span>
-              {t("ops.collection.payment_mode_summary")}
-            </h4>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              {t("ops.collection.no_of_collections")}: {report?.totalCount ?? 0}
-            </span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-100">
-              <thead className="bg-slate-50/80">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.payment_mode")}</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.no_short")}</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("table.amount")}</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-600">%</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
-                {paymentModeSummary.map((row) => (
-                  <tr
-                    key={row.mode}
-                    className={row.mode === "Total" ? "bg-amber-50/60 font-semibold" : "hover:bg-slate-50/50"}
-                  >
-                    <td className="px-4 py-3 text-xs text-slate-800">
-                      <div className="font-medium">{row.mode === "Total" ? t("common.total") : row.mode}</div>
-                      {row.mode !== "Total" && (
-                        <div className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-slate-400">
-                          <Users size={10} />
-                          {collectorCountsByMode.find((c) => c.mode === row.mode)?.count ?? 0}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right text-xs text-slate-600">{row.count}</td>
-                    <td className="px-4 py-3 text-right text-xs text-slate-600">{formatCurrency(row.amount)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="text-xs font-medium text-slate-700 w-10 text-right">
-                          {row.percentage.toFixed(1)}%
-                        </span>
-                        <div className="w-12 h-2 rounded-full bg-slate-100 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${getBarColor(row.percentage)} transition-all duration-500`}
-                            style={{ width: `${row.percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
-            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-              <span className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600">
-                <Users size={14} />
-              </span>
-              {t("ops.collection.collector_summary")}
-            </h4>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              {t("ops.collection.total_collectors")}: {totalCollectorsCount}
-            </span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-100">
-              <thead className="bg-slate-50/80">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">{t("common.collector")}</th>
-                  {collectorSummary.paymentModes.map((mode: string) => (
-                    <th key={mode} className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
-                      {mode}
-                    </th>
-                  ))}
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("common.total")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
-                {collectorSummary.rows.map((row: any, idx: number) => {
-                  const isTotal = row.collector === "Total";
-                  return (
-                    <tr
-                      key={idx}
-                      className={isTotal ? "bg-amber-50/60 font-semibold" : "hover:bg-slate-50/50"}
-                    >
-                      <td className="px-4 py-3 text-xs text-slate-800">{row.collector === "Total" ? t("common.total") : row.collector}</td>
-                      {collectorSummary.paymentModes.map((mode: string) => (
-                        <td key={mode} className="px-4 py-3 text-right text-xs text-slate-600">
-                          {formatCurrency(row[mode] || 0)}
-                        </td>
-                      ))}
-                      <td className="px-4 py-3 text-right text-xs font-semibold text-slate-800">
-                        {formatCurrency(row.total)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
       </>
       )}
     </div>
