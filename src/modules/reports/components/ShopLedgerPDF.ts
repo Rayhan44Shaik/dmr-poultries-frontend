@@ -338,7 +338,6 @@ export const generateShopLedgerPDF = async (
         doc.text(`Page ${data.pageNumber}`, pageWidth - PAGE_MARGIN, pageHeight2 - 8, {
           align: "right",
         });
-        doc.text("DMR Poultries ERP - Weekly Statement", PAGE_MARGIN, pageHeight2 - 8);
       },
     });
 
