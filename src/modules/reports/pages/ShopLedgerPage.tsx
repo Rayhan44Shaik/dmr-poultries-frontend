@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   CheckSquare,
   Download,
-  ExternalLink,
   FileStack,
   FileText,
   IndianRupee,
@@ -2016,7 +2015,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             </div>
 
             {/* Footer */}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-5 py-3">
+            <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-5 py-3">
               <button
                 type="button"
                 onClick={closePdfPreview}
@@ -2024,34 +2023,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               >
                 Close
               </button>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    void Promise.resolve(
-                      activePdfFile.url ?? ensureShopPdf(activePdfFile.shop),
-                    ).then((url) => {
-                      if (url) window.open(url, "_blank", "noopener,noreferrer");
-                    });
-                  }}
-                  className={`${actionButtonClass} ${iconOnlyTone}`}
-                >
-                  <ExternalLink size={14} /> Open in new tab
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void Promise.resolve(
-                      activePdfFile.url ?? ensureShopPdf(activePdfFile.shop),
-                    ).then((url) => {
-                      if (url) downloadFile(url, activePdfFile.filename);
-                    });
-                  }}
-                  className={`${actionButtonClass} ${pdfButtonClass}`}
-                >
-                  <Download size={14} /> Download {activePdfFile.shop}
-                </button>
-              </div>
+              <p className="text-[11px] font-medium text-slate-400">
+                Use the shop panel to download selected shops or one combined PDF.
+              </p>
             </div>
           </div>
         </div>
