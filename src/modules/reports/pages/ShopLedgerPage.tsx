@@ -1678,11 +1678,14 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   <FileText size={15} />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="truncate text-sm font-bold text-slate-800" title={activePdfFile.filename}>
-                    {activePdfFile.filename}
+                  <h3
+                    className="truncate text-sm font-bold uppercase tracking-wide text-slate-800"
+                    title={activePdfFile.filename}
+                  >
+                    Weekly Statement
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Weekly Statement · {formatDisplayDate(appliedDateFrom)} to {formatDisplayDate(appliedDateTo)}
+                    {formatDisplayDate(appliedDateFrom)} to {formatDisplayDate(appliedDateTo)}
                   </p>
                 </div>
               </div>
