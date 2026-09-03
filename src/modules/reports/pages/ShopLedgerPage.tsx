@@ -32,6 +32,7 @@ import {
 import { generateShopLedgerPDF, prepareShopLedgerPdfAssets } from "../components/ShopLedgerPDF";
 import type { LedgerTransaction, ShopLedgerPdfEntry } from "../components/ShopLedgerPDF";
 import PdfBlobPreview from "../components/PdfBlobPreview";
+import { prefetchPdfJs } from "../components/pdfJsLoader";
 
 interface ShopLedgerProps {
   embedded?: boolean;
@@ -63,7 +64,7 @@ interface WhatsAppSendPayload {
 interface PdfPreviewState {
   combinedUrl: string;
   combinedFilename: string;
-  files: { shop: string; url: string; filename: string }[];
+  files: { shop: string; url: string | null; filename: string }[];
   selectedIndex: number;
   selectedShops: string[];
   shopData: Record<string, LedgerTransaction[]>;
@@ -634,6 +635,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   // race because both clicks read the same render's state.
   const pdfGeneratingRef = useRef(false);
   const pdfDownloadBusyRef = useRef(false);
+  // Per-shop PDFs are generated on demand — this tracks in-flight shops and
+  // the one to show a spinner for.
+  const perShopBusyRef = useRef<Set<string>>(new Set());
+  const [pdfBusyShop, setPdfBusyShop] = useState<string | null>(null);
   // Session token: only the newest export may commit its preview modal;
   // stale runs discard their generated object URLs instead of leaking them.
   const exportSessionRef = useRef(0);
@@ -647,7 +652,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const revokePdfUrls = (state: PdfPreviewState | null) => {
     if (!state) return;
     URL.revokeObjectURL(state.combinedUrl);
-    state.files.forEach((file) => URL.revokeObjectURL(file.url));
+    state.files.forEach((file) => {
+      if (file.url) URL.revokeObjectURL(file.url);
+    });
   };
 
   // ─── PDF export → preview modal ────────────────────────────
@@ -714,26 +721,30 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       revokePdfUrls(pdfPreviewRef.current);
       pdfPreviewRef.current = null;
 
+      // Warm the PDF viewer in parallel with generation so the modal's
+      // first paint never waits on the pdf.js download.
+      prefetchPdfJs();
+
       // Prepare the branded letterhead hen once and reuse it for the
       // combined PDF and every per-shop PDF in this batch.
       const letterheadAssets = await prepareShopLedgerPdfAssets();
 
+      // Only the combined document is generated up-front — that is what the
+      // modal opens on. Per-shop PDFs are built on demand when a shop is
+      // clicked or downloaded, so the modal appears in a fraction of the time
+      // (one document instead of fifty-one).
       const combined = await generateShopLedgerPDF(
         allLedgers, appliedDateFrom, appliedDateTo, appliedSelectedShop, letterheadAssets,
       );
       createdUrls.push(combined.url);
 
-      const files: { shop: string; url: string; filename: string }[] = [];
-      for (const { shop, data } of allLedgers) {
-        // Yield between shops so fifty PDF generations never freeze the
-        // page — the spinner keeps animating and clicks keep working.
-        await yieldToBrowser();
-        const generated = await generateShopLedgerPDF(
-          [{ shop, data }], appliedDateFrom, appliedDateTo, shop, letterheadAssets,
-        );
-        createdUrls.push(generated.url);
-        files.push({ shop, url: generated.url, filename: generated.filename });
-      }
+      const files: { shop: string; url: string | null; filename: string }[] = allLedgers.map(
+        ({ shop }) => ({
+          shop,
+          url: null,
+          filename: `WeeklyStatement_${shop.replace(/\s+/g, "_")}_${formatDisplayDate(appliedDateFrom)}_to_${formatDisplayDate(appliedDateTo)}.pdf`,
+        }),
+      );
 
       if (exportSessionRef.current !== session) {
         // The modal was closed (or a newer export started) while this run
@@ -792,8 +803,63 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       : { shop: "All Shops", url: pdfPreview.combinedUrl, filename: pdfPreview.combinedFilename }
     : null;
 
-  const setActivePdfShop = (index: number) => {
+  /**
+   * Generate (and cache) a shop's PDF the first time it is needed — preview
+   * click or download. Idempotent: in-flight and already-generated shops are
+   * returned without duplicate work.
+   */
+  const ensureShopPdf = useCallback(
+    async (shop: string): Promise<string | null> => {
+      const current = pdfPreviewRef.current;
+      if (!current) return null;
+      const existing = current.files.find((file) => file.shop === shop);
+      if (existing?.url) return existing.url;
+      if (perShopBusyRef.current.has(shop)) return null;
+
+      perShopBusyRef.current.add(shop);
+      setPdfBusyShop(shop);
+      try {
+        const ledger = current.shopData[shop] ?? [];
+        const master = shopMasterMap.get(shop);
+        const generated = await generateShopLedgerPDF(
+          [{
+            shop,
+            data: ledger,
+            ownerName: sampleMode ? sampleRecipientFor(shop).ownerName : master?.ownerName || undefined,
+            mobile: sampleMode ? sampleRecipientFor(shop).phoneNumber : master?.phoneNumber || undefined,
+            city: sampleMode ? sampleCityFor(shop) : master?.city || undefined,
+          }],
+          appliedDateFrom,
+          appliedDateTo,
+          shop,
+        );
+        const latest = pdfPreviewRef.current;
+        if (!latest || latest !== current) {
+          // Modal closed or replaced while generating — discard this file.
+          URL.revokeObjectURL(generated.url);
+          return null;
+        }
+        const nextState: PdfPreviewState = {
+          ...latest,
+          files: latest.files.map((file) =>
+            file.shop === shop ? { ...file, url: generated.url, filename: generated.filename } : file,
+          ),
+        };
+        pdfPreviewRef.current = nextState;
+        setPdfPreview(nextState);
+        return generated.url;
+      } finally {
+        perShopBusyRef.current.delete(shop);
+        setPdfBusyShop((prev) => (prev === shop ? null : prev));
+      }
+      // appliedDateFrom/To pinned via useCallback deps
+    },
+    [appliedDateFrom, appliedDateTo, sampleMode, shopMasterMap],
+  );
+
+  const setActivePdfShop = (index: number, shop?: string) => {
     setPdfPreview((prev) => (prev ? { ...prev, selectedIndex: index } : prev));
+    if (shop) void ensureShopPdf(shop);
   };
 
   const togglePdfShop = (shop: string) => {
@@ -816,8 +882,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     setPdfPreview((prev) => (prev ? { ...prev, selectedShops: [] } : prev));
   };
 
-  // One PDF file per selected shop.
-  const handleDownloadSelectedShops = () => {
+  // One PDF file per selected shop (generating any that aren't cached yet).
+  const handleDownloadSelectedShops = async () => {
+    if (pdfDownloadBusyRef.current) return;
     const current = pdfPreviewRef.current;
     if (!current) return;
     const chosen = current.files.filter((file) => current.selectedShops.includes(file.shop));
@@ -825,8 +892,17 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       showNotification("Select at least one shop to download.", "info");
       return;
     }
-    chosen.forEach((file) => downloadFile(file.url, file.filename));
-    showNotification(`Downloading ${chosen.length} shop PDF(s).`, "success");
+    pdfDownloadBusyRef.current = true;
+    try {
+      for (const file of chosen) {
+        const url = file.url ?? (await ensureShopPdf(file.shop));
+        if (url) downloadFile(url, file.filename);
+        await yieldToBrowser();
+      }
+      showNotification(`Downloading ${chosen.length} shop PDF(s).`, "success");
+    } finally {
+      pdfDownloadBusyRef.current = false;
+    }
   };
 
   // A single combined PDF containing only the selected shops.
@@ -894,6 +970,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     setAppliedSearchTerm("");
 
     setCurrentPage(1);
+  }, []);
+
+  // Warm the lazy pdf.js viewer during idle time so the very first PDF
+  // click paints the preview without waiting on the library download.
+  useEffect(() => {
+    const timer = window.setTimeout(() => prefetchPdfJs(), 1_500);
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Auto-hide the "Shop Ledger Refreshed" toast.
@@ -1771,7 +1854,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                           />
                           <button
                             type="button"
-                            onClick={() => setActivePdfShop(fileIndex)}
+                            onClick={() => setActivePdfShop(fileIndex, file.shop)}
                             title={file.shop}
                             className={`min-w-0 flex-1 truncate text-left text-xs transition ${
                               isActive ? "font-semibold text-red-600" : "text-slate-600"
@@ -1779,6 +1862,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                           >
                             {file.shop}
                           </button>
+                          {pdfBusyShop === file.shop && (
+                            <Loader2 size={12} className="shrink-0 animate-spin text-red-500" />
+                          )}
                         </div>
                       );
                     })}
@@ -1811,7 +1897,14 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               )}
 
               <div className="min-w-0 flex-1 bg-slate-200/60">
-                <PdfBlobPreview key={activePdfFile.url} url={activePdfFile.url} />
+                {activePdfFile.url ? (
+                  <PdfBlobPreview key={activePdfFile.url} url={activePdfFile.url} />
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center gap-2 text-xs font-medium text-slate-500">
+                    <Loader2 size={16} className="animate-spin text-red-500" />
+                    Generating preview for {activePdfFile.shop}…
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1827,14 +1920,26 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => window.open(activePdfFile.url, "_blank", "noopener,noreferrer")}
+                  onClick={() => {
+                    void Promise.resolve(
+                      activePdfFile.url ?? ensureShopPdf(activePdfFile.shop),
+                    ).then((url) => {
+                      if (url) window.open(url, "_blank", "noopener,noreferrer");
+                    });
+                  }}
                   className={`${actionButtonClass} ${iconOnlyTone}`}
                 >
                   <ExternalLink size={14} /> Open in new tab
                 </button>
                 <button
                   type="button"
-                  onClick={() => downloadFile(activePdfFile.url, activePdfFile.filename)}
+                  onClick={() => {
+                    void Promise.resolve(
+                      activePdfFile.url ?? ensureShopPdf(activePdfFile.shop),
+                    ).then((url) => {
+                      if (url) downloadFile(url, activePdfFile.filename);
+                    });
+                  }}
                   className={`${actionButtonClass} ${pdfButtonClass}`}
                 >
                   <Download size={14} /> Download {activePdfFile.shop}

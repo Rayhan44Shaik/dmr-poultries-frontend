@@ -14,6 +14,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, FileWarning, Loader2 } from "lucide-react";
 import type { PDFDocumentProxy, PDFPageProxy, PageViewport } from "pdfjs-dist";
+import { loadPdfJs } from "./pdfJsLoader";
 
 type RenderTask = { promise: Promise<void>; cancel: () => void };
 
@@ -46,10 +47,7 @@ const PdfBlobPreview: React.FC<PdfBlobPreviewProps> = ({ url }) => {
       try {
         // Legacy build: runs on every runtime we ship (browser + Electron's
         // older Chromium) while the browser bundle stays lazy-loaded.
-        const [pdfjs, workerModule] = await Promise.all([
-          import("pdfjs-dist/legacy/build/pdf.mjs"),
-          import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url"),
-        ]);
+        const [pdfjs, workerModule] = await loadPdfJs();
         pdfjs.GlobalWorkerOptions.workerSrc = workerModule.default;
 
         const response = await fetch(url);

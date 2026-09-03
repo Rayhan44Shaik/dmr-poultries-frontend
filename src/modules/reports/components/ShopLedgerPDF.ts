@@ -214,7 +214,7 @@ export const generateShopLedgerPDF = async (
   // Prepare the letterhead hen once per call (canvas cut-out); callers that
   // generate many PDFs in a batch pass their own prepared assets.
   const assets =
-    preparedAssets ?? (await prepareDmrPoultryHeaderAssets({ henUrl: henImage }));
+    preparedAssets ?? (await prepareShopLedgerPdfAssets());
 
   // Setup A4 Portrait
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
@@ -351,6 +351,18 @@ export const generateShopLedgerPDF = async (
   return { blob, url: URL.createObjectURL(blob), filename };
 };
 
-/** Prepared letterhead assets for callers that batch many PDFs. */
-export const prepareShopLedgerPdfAssets = (): Promise<DmrPoultryHeaderAssets> =>
-  prepareDmrPoultryHeaderAssets({ henUrl: henImage });
+// The hen cut-out is a canvas flood-fill — expensive. The image never
+// changes, so prepare it once per session and reuse the result for every
+// PDF this page generates.
+let cachedHeaderAssets: DmrPoultryHeaderAssets | null = null;
+let headerAssetsPromise: Promise<DmrPoultryHeaderAssets> | null = null;
+
+/** Prepared letterhead assets (memoised per session) for all PDF batches. */
+export const prepareShopLedgerPdfAssets = (): Promise<DmrPoultryHeaderAssets> => {
+  if (cachedHeaderAssets) return Promise.resolve(cachedHeaderAssets);
+  headerAssetsPromise ??= prepareDmrPoultryHeaderAssets({ henUrl: henImage }).then((assets) => {
+    cachedHeaderAssets = assets;
+    return assets;
+  });
+  return headerAssetsPromise;
+};
