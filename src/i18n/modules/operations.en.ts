@@ -64,6 +64,8 @@
   'ops.collection.no_collection_to_delete': 'No collection to delete.',
   'ops.collection.no_collection_to_edit': 'No collection to edit.',
   'ops.collection.no_collections_for_shop': 'No collections found for this shop.',
+  'ops.collection.empty.title': 'No collections found',
+  'ops.collection.empty.hint': 'Try changing the date range or filters.',
   'ops.collection.no_data_export': 'No data to export.',
   'ops.collection.no_deleted': 'No collections were deleted.',
   'ops.collection.no_longer_deletable': 'This collection is no longer deletable.',

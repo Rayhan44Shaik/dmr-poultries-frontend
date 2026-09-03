@@ -64,6 +64,8 @@
   'ops.collection.no_collection_to_delete': 'తొలగించడానికి కలెక్షన్ లేదు.',
   'ops.collection.no_collection_to_edit': 'సవరించడానికి కలెక్షన్ లేదు.',
   'ops.collection.no_collections_for_shop': 'ఈ షాప్ కోసం కలెక్షన్లు ఏవీ కనుగొనబడలేదు.',
+  'ops.collection.empty.title': 'కలెక్షన్లు కనబడలేదు',
+  'ops.collection.empty.hint': 'తేదీ పరిధి లేదా ఫిల్టర్లు మార్చి ప్రయత్నించండి.',
   'ops.collection.no_data_export': 'ఎక్స్పోర్ట్ చేయడానికి డేటా లేదు.',
   'ops.collection.no_deleted': 'ఏ కలెక్షన్‌లు తొలగించబడలేదు.',
   'ops.collection.no_longer_deletable': 'ఈ కలెక్షన్ ఇక తొలగించలేము.',

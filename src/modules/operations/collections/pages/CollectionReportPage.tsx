@@ -16,6 +16,8 @@ import {
   Search,
   Loader2,
   Download,
+  Inbox,
+  AlertTriangle,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -27,6 +29,7 @@ import {
   opsFilterLabelClass,
   opsInputClass,
   opsReactSelectStyles,
+  opsEmptyStateClass,
 } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
 
@@ -153,6 +156,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
   }, [fromDate, toDate, shopName, collector, paymentMode]);
 
   const totalCollections = report?.totalAmount ?? 0;
+  const totalCount = report?.totalCount ?? 0;
   const totalCollectorsCount = report?.totalCollectors ?? 0;
 
   // Presentation-only: bucket the backend's already-aggregated per-mode
@@ -374,25 +378,38 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
     }
   };
 
-  if (loading && !report) return <div className="p-8 text-center text-slate-500">{t("common.loading")}</div>;
+  if (loading && !report)
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-10 py-8 shadow-sm">
+          <Loader2 size={28} className="animate-spin text-emerald-600" />
+          <span className="text-sm font-medium text-slate-500">{t("common.loading")}</span>
+        </div>
+      </div>
+    );
   if (reportError && !report) {
     return (
-      <div className="p-8 text-center text-red-600">
-        {reportError}{" "}
-        <button
-          onClick={() => {
-            setReportError(null);
-            if (fromDate && toDate) {
-              void loadReport();
-            } else {
-              setLoading(true);
-              void loadWeekBounds();
-            }
-          }}
-          className="underline"
-        >
-          {t("common.retry")}
-        </button>
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="flex max-w-md flex-col items-center gap-3 rounded-2xl border border-rose-100 bg-rose-50/60 px-10 py-8 text-center shadow-sm">
+          <span className="rounded-full bg-rose-100 p-3 text-rose-600">
+            <AlertTriangle size={22} />
+          </span>
+          <p className="text-sm font-semibold text-rose-700">{reportError}</p>
+          <button
+            onClick={() => {
+              setReportError(null);
+              if (fromDate && toDate) {
+                void loadReport();
+              } else {
+                setLoading(true);
+                void loadWeekBounds();
+              }
+            }}
+            className={resetButtonClass}
+          >
+            <RotateCcw size={14} /> {t("common.retry")}
+          </button>
+        </div>
       </div>
     );
   }
@@ -400,6 +417,27 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
   // Content matching the precise structural layout and spacing of RatesEntryPage
   const content = (
     <div className="w-full space-y-5">
+      {/* Report header — title + covered period + live total pill */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="rounded-2xl bg-emerald-50 p-2.5 text-emerald-600 shadow-sm">
+            <Wallet size={20} />
+          </span>
+          <div>
+            <h3 className="text-base font-bold tracking-tight text-slate-900">
+              {t("ops.collection.collection_report_title")}
+            </h3>
+            <p className="text-xs font-medium text-slate-500">
+              {fromDate || "—"} → {toDate || "—"}
+            </p>
+          </div>
+        </div>
+        <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 shadow-sm">
+          <span className={`h-1.5 w-1.5 rounded-full ${loading ? "animate-pulse bg-amber-400" : "bg-emerald-500"}`} />
+          {formatCurrency(totalCollections)}
+        </span>
+      </div>
+
       {/* Filter Bar Card — Excel / PDF / Reset / Search sit in the last grid
           cell, right after the Pay Mode filter */}
       <div className={opsFilterCardClass}>
@@ -531,40 +569,49 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6 flex items-center gap-4">
+      {/* KPI Cards — all values backend-authoritative */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm md:p-5">
           <div className="rounded-2xl bg-blue-50 p-3 text-blue-600">
-            <Wallet size={24} />
+            <Wallet size={22} />
           </div>
-          <div>
-            <div className="text-sm font-medium text-slate-500">{t("ops.collection.total_collections")}</div>
-            <div className="text-2xl font-bold text-slate-800">{formatCurrency(totalCollections)}</div>
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">{t("ops.collection.total_collections")}</div>
+            <div className="mt-0.5 truncate text-xl font-bold text-slate-800 md:text-2xl">{formatCurrency(totalCollections)}</div>
           </div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6">
-          <div className="flex items-center gap-4 mb-3">
-            <div className="rounded-2xl bg-indigo-50 p-3 text-indigo-600">
-              <Users size={24} />
-            </div>
-            <div>
-              <div className="text-sm font-medium text-slate-500">{t("ops.collection.total_collectors")}</div>
-              <div className="text-2xl font-bold text-slate-800">{totalCollectorsCount}</div>
-            </div>
+        <div className="flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm md:p-5">
+          <div className="rounded-2xl bg-violet-50 p-3 text-violet-600">
+            <FileText size={22} />
           </div>
-          <div className="grid grid-cols-2 gap-2 text-sm pt-2 border-t border-slate-100">
-            {collectorCountsByMode.map(({ mode, count }) => (
-              <div key={mode} className="flex justify-between py-1">
-                <span className="text-slate-600">{mode}</span>
-                <span className="font-medium text-slate-800">{count}</span>
-              </div>
-            ))}
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">{t("ops.collection.no_of_collections")}</div>
+            <div className="mt-0.5 text-xl font-bold text-slate-800 md:text-2xl">{totalCount}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm md:p-5">
+          <div className="rounded-2xl bg-indigo-50 p-3 text-indigo-600">
+            <Users size={22} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">{t("ops.collection.total_collectors")}</div>
+            <div className="mt-0.5 text-xl font-bold text-slate-800 md:text-2xl">{totalCollectorsCount}</div>
           </div>
         </div>
       </div>
 
-      {/* Tables Grid Card Containers */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      {/* Tables — friendly empty state when the period has no collections;
+          dimmed + non-interactive while a refresh is in flight */}
+      {(report?.totalCount ?? 0) === 0 ? (
+        <div className={`${opsEmptyStateClass} flex flex-col items-center gap-2 py-14`}>
+          <span className="rounded-full bg-slate-100 p-3 text-slate-400">
+            <Inbox size={22} />
+          </span>
+          <p className="text-sm font-semibold text-slate-600">{t("ops.collection.empty.title")}</p>
+          <p className="text-xs text-slate-400">{t("ops.collection.empty.hint")}</p>
+        </div>
+      ) : (
+      <div className={`grid grid-cols-1 gap-6 lg:grid-cols-2 transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""}`}>
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
             <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
@@ -593,7 +640,15 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                     key={row.mode}
                     className={row.mode === "Total" ? "bg-amber-50/60 font-semibold" : "hover:bg-slate-50/50"}
                   >
-                    <td className="px-4 py-3 text-xs text-slate-800">{row.mode === "Total" ? t("common.total") : row.mode}</td>
+                    <td className="px-4 py-3 text-xs text-slate-800">
+                      <div className="font-medium">{row.mode === "Total" ? t("common.total") : row.mode}</div>
+                      {row.mode !== "Total" && (
+                        <div className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-slate-400">
+                          <Users size={10} />
+                          {collectorCountsByMode.find((c) => c.mode === row.mode)?.count ?? 0}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right text-xs text-slate-600">{row.count}</td>
                     <td className="px-4 py-3 text-right text-xs text-slate-600">{formatCurrency(row.amount)}</td>
                     <td className="px-4 py-3 text-center">
@@ -666,6 +721,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 
