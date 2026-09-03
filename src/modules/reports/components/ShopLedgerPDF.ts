@@ -33,6 +33,7 @@ export interface ShopLedgerPdfEntry {
   shop: string;
   data: LedgerTransaction[];
   ownerName?: string;
+  mobile?: string;
   city?: string;
 }
 
@@ -85,7 +86,6 @@ const drawStatementChrome = (
   assets: DmrPoultryHeaderAssets,
 ): void => {
   const pageWidth = doc.internal.pageSize.getWidth();
-  const midX = pageWidth / 2;
 
   // Same letterhead as the Step-4 delivery PDF (PROPRIETOR block, centred
   // DMR POULTRIES wordmark with address, hen mark, decorative divider).
@@ -99,27 +99,66 @@ const drawStatementChrome = (
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
-  doc.text("WEEKLY STATEMENT", midX, 48, { align: "center" });
+  doc.text("WEEKLY STATEMENT", pageWidth / 2, 48, { align: "center" });
 
-  // ─── Two-column shop details ───
-  const labelValue = (label: string, value: string, x: number, y: number) => {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(20, 20, 20);
-    doc.text(label, x, y);
-    const valueX = x + doc.getTextWidth(label) + 1.5;
-    doc.setFont("helvetica", "normal");
-    doc.text(value || "-", valueX, y);
+  // ─── Shop details table (Shop | Owner, Mobile | City, Period) ───
+  // Bordered 2-column grid with even margins, drawn in the same clean style
+  // as the Step-4 delivery receipt's information card.
+  const tableWidth = pageWidth - PAGE_MARGIN * 2;
+  const colWidth = tableWidth / 2;
+  const rowHeight = 7.6;
+  const tableTop = 51;
+  const cellPadding = 3;
+
+  const fitCellText = (raw: string, maxWidth: number): string => {
+    const text = raw && raw.trim() ? raw.trim() : "-";
+    if (doc.getTextWidth(text) <= maxWidth) return text;
+    let clipped = text;
+    while (clipped.length > 1 && doc.getTextWidth(`${clipped}…`) > maxWidth) {
+      clipped = clipped.slice(0, -1);
+    }
+    return `${clipped}…`;
   };
 
-  labelValue("Shop: ", entry.shop || "-", PAGE_MARGIN, 54.5);
-  labelValue("Owner: ", entry.ownerName || "-", midX, 54.5);
-  labelValue("City: ", entry.city || "-", PAGE_MARGIN, 60);
-  labelValue("Period: ", `${formatPdfDate(dateFrom)} to ${formatPdfDate(dateTo)}`, midX, 60);
+  const drawDetailCell = (
+    x: number,
+    y: number,
+    width: number,
+    label: string,
+    value: string,
+  ): void => {
+    doc.setDrawColor(BORDER_LIGHT[0], BORDER_LIGHT[1], BORDER_LIGHT[2]);
+    doc.setLineWidth(0.25);
+    doc.rect(x, y, width, rowHeight);
 
+    const baseline = y + rowHeight / 2 + 1.1;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(20, 20, 20);
+    doc.text(label, x + cellPadding, baseline);
+    const labelWidth = doc.getTextWidth(label);
+
+    doc.setFont("helvetica", "normal");
+    const valueText = fitCellText(value, width - cellPadding * 2 - labelWidth);
+    doc.text(valueText, x + cellPadding + labelWidth, baseline);
+  };
+
+  drawDetailCell(PAGE_MARGIN, tableTop, colWidth, "Shop: ", entry.shop || "");
+  drawDetailCell(PAGE_MARGIN + colWidth, tableTop, colWidth, "Owner: ", entry.ownerName || "");
+  drawDetailCell(PAGE_MARGIN, tableTop + rowHeight, colWidth, "Mobile: ", entry.mobile || "");
+  drawDetailCell(PAGE_MARGIN + colWidth, tableTop + rowHeight, colWidth, "City: ", entry.city || "");
+  drawDetailCell(
+    PAGE_MARGIN,
+    tableTop + rowHeight * 2,
+    tableWidth,
+    "Period: ",
+    `${formatPdfDate(dateFrom)} to ${formatPdfDate(dateTo)}`,
+  );
+
+  const dividerY = tableTop + rowHeight * 3 + 2.5;
   doc.setDrawColor(BORDER_LIGHT[0], BORDER_LIGHT[1], BORDER_LIGHT[2]);
   doc.setLineWidth(0.25);
-  doc.line(PAGE_MARGIN, 63, pageWidth - PAGE_MARGIN, 63);
+  doc.line(PAGE_MARGIN, dividerY, pageWidth - PAGE_MARGIN, dividerY);
 };
 
 /**
@@ -246,8 +285,8 @@ export const generateShopLedgerPDF = async (
     autoTable(doc, {
       head: [headers],
       body: rows,
-      startY: 66,
-      margin: { top: 66, bottom: 20, left: PAGE_MARGIN, right: PAGE_MARGIN },
+      startY: 79,
+      margin: { top: 79, bottom: 20, left: PAGE_MARGIN, right: PAGE_MARGIN },
       theme: "grid",
       showHead: "everyPage",
       rowPageBreak: "avoid",
@@ -304,7 +343,7 @@ export const generateShopLedgerPDF = async (
     });
 
     // Thank-you closing block, same style as the Step-4 delivery receipt.
-    const finalY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 66;
+    const finalY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 79;
     drawThankYouBlock(doc, finalY + 2);
   });
 

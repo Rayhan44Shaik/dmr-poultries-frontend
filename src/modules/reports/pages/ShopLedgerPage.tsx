@@ -698,6 +698,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             shop,
             data: ledger,
             ownerName: sampleMode ? sampleRecipientFor(shop).ownerName : master?.ownerName || undefined,
+            mobile: sampleMode ? sampleRecipientFor(shop).phoneNumber : master?.phoneNumber || undefined,
             city: sampleMode ? sampleCityFor(shop) : master?.city || undefined,
           });
           shopData[shop] = ledger;
@@ -849,6 +850,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           shop,
           data: current.shopData[shop] ?? [],
           ownerName: sampleMode ? sampleRecipientFor(shop).ownerName : master?.ownerName || undefined,
+          mobile: sampleMode ? sampleRecipientFor(shop).phoneNumber : master?.phoneNumber || undefined,
           city: sampleMode ? sampleCityFor(shop) : master?.city || undefined,
         };
       })
@@ -1178,6 +1180,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             shop,
             data: ledger,
             ownerName: sampleMode ? recipient.ownerName : waMaster?.ownerName || undefined,
+            mobile: sampleMode ? recipient.phoneNumber : waMaster?.phoneNumber || undefined,
             city: sampleMode ? sampleCityFor(shop) : waMaster?.city || undefined,
           }],
           waDateFrom,
