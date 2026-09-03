@@ -29,7 +29,7 @@ import {
   fetchShopLedger,
   type ShopLedgerRow,
 } from "../services/shopLedgerService";
-import { generateShopLedgerPDF } from "../components/ShopLedgerPDF";
+import { generateShopLedgerPDF, prepareShopLedgerPdfAssets } from "../components/ShopLedgerPDF";
 import type { LedgerTransaction } from "../components/ShopLedgerPDF";
 import PdfBlobPreview from "../components/PdfBlobPreview";
 
@@ -649,11 +649,20 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       // Revoke object URLs from any previous preview before replacing them.
       revokePdfUrls(pdfPreviewRef.current);
 
-      const combined = generateShopLedgerPDF(allLedgers, appliedDateFrom, appliedDateTo, appliedSelectedShop);
-      const files = allLedgers.map(({ shop, data }) => {
-        const generated = generateShopLedgerPDF([{ shop, data }], appliedDateFrom, appliedDateTo, shop);
-        return { shop, url: generated.url, filename: generated.filename };
-      });
+      // Prepare the branded letterhead hen once and reuse it for the
+      // combined PDF and every per-shop PDF in this batch.
+      const letterheadAssets = await prepareShopLedgerPdfAssets();
+
+      const combined = await generateShopLedgerPDF(
+        allLedgers, appliedDateFrom, appliedDateTo, appliedSelectedShop, letterheadAssets,
+      );
+      const files: { shop: string; url: string; filename: string }[] = [];
+      for (const { shop, data } of allLedgers) {
+        const generated = await generateShopLedgerPDF(
+          [{ shop, data }], appliedDateFrom, appliedDateTo, shop, letterheadAssets,
+        );
+        files.push({ shop, url: generated.url, filename: generated.filename });
+      }
 
       setPdfPreview({
         combinedUrl: combined.url,
@@ -736,7 +745,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   };
 
   // A single combined PDF containing only the selected shops.
-  const handleDownloadSelectedCombined = () => {
+  const handleDownloadSelectedCombined = async () => {
     const current = pdfPreviewRef.current;
     if (!current) return;
     const ledgers = current.selectedShops
@@ -747,7 +756,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       return;
     }
     const label = ledgers.length === 1 ? ledgers[0].shop : "All Shops";
-    const generated = generateShopLedgerPDF(ledgers, appliedDateFrom, appliedDateTo, label);
+    const generated = await generateShopLedgerPDF(ledgers, appliedDateFrom, appliedDateTo, label);
     downloadFile(generated.url, generated.filename);
     window.setTimeout(() => URL.revokeObjectURL(generated.url), 10_000);
     showNotification(`Combined PDF with ${ledgers.length} shop(s) downloaded.`, "success");
@@ -1005,7 +1014,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           ? makeSampleLedger(waDateFrom, waDateTo, shop)
           : await buildLedger(waDateFrom, waDateTo, shopId);
 
-        const generated = generateShopLedgerPDF([{ shop, data: ledger }], waDateFrom, waDateTo, shop);
+        const generated = await generateShopLedgerPDF([{ shop, data: ledger }], waDateFrom, waDateTo, shop);
         try {
           const message = buildWhatsAppMessage(
             waReportType,
@@ -1610,7 +1619,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     </button>
                     <button
                       type="button"
-                      onClick={handleDownloadSelectedCombined}
+                      onClick={() => void handleDownloadSelectedCombined()}
                       disabled={pdfPreview.selectedShops.length === 0}
                       className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >

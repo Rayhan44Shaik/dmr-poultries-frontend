@@ -1,5 +1,11 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import henImage from "../../../assets/dmr-hen.jpg";
+import {
+  drawPreparedDmrPoultryHeader,
+  prepareDmrPoultryHeaderAssets,
+  type DmrPoultryHeaderAssets,
+} from "../../../utils/drawDmrPoultryHeader";
 
 export interface LedgerTransaction {
   date: string;
@@ -47,19 +53,126 @@ const formatAmount = (value: number): string =>
     maximumFractionDigits: 2,
   }).format(value || 0);
 
+// Shared branded palette (matches the Step-4 delivery receipt).
+type RGB = [number, number, number];
+const NAVY: RGB = [15, 35, 79];
+const TEXT_MUTED: RGB = [75, 85, 99];
+const BORDER_LIGHT: RGB = [200, 200, 200];
+const ACCENT_RED: RGB = [142, 30, 30];
+
+// Page geometry — same margins the branded letterhead is designed for.
+const PAGE_MARGIN = 12;
+const LETTERHEAD_TOP = 7;
+
+/**
+ * Draws the branded DMR POULTRIES letterhead plus the statement title,
+ * shop and period lines. Used on every page so multi-page statements keep
+ * the same header as the Step-4 delivery receipt.
+ */
+const drawStatementChrome = (
+  doc: jsPDF,
+  shop: string,
+  dateFrom: string,
+  dateTo: string,
+  assets: DmrPoultryHeaderAssets,
+): void => {
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Same letterhead as the Step-4 delivery PDF (PROPRIETOR block, centred
+  // DMR POULTRIES wordmark with address, hen mark, decorative divider).
+  drawPreparedDmrPoultryHeader(
+    doc,
+    { margin: PAGE_MARGIN, top: LETTERHEAD_TOP },
+    assets,
+  );
+
+  // ─── Statement title block (under the letterhead) ───
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
+  doc.text("SHOP LEDGER STATEMENT", pageWidth / 2, 48, { align: "center" });
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9.5);
+  doc.setTextColor(20, 20, 20);
+  doc.text(`Shop: ${shop}`, pageWidth / 2, 54, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(TEXT_MUTED[0], TEXT_MUTED[1], TEXT_MUTED[2]);
+  doc.text(`Period: ${formatPdfDate(dateFrom)} to ${formatPdfDate(dateTo)}`, pageWidth / 2, 59, {
+    align: "center",
+  });
+
+  doc.setDrawColor(BORDER_LIGHT[0], BORDER_LIGHT[1], BORDER_LIGHT[2]);
+  doc.setLineWidth(0.25);
+  doc.line(PAGE_MARGIN, 61.5, pageWidth - PAGE_MARGIN, 61.5);
+};
+
+/**
+ * Closing "Thank You!" block — decorative centred divider and italic script,
+ * copied from the Step-4 delivery receipt so both documents end alike.
+ */
+const drawThankYouBlock = (doc: jsPDF, finalY: number): void => {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  const thanksY = Math.min(Math.max(finalY + 12, pageHeight - 32), pageHeight - 24);
+
+  doc.setDrawColor(NAVY[0], NAVY[1], NAVY[2]);
+  doc.setLineWidth(0.4);
+  doc.line(PAGE_MARGIN + 8, thanksY + 3, pageWidth / 2 - 28, thanksY + 3);
+  doc.line(pageWidth / 2 + 28, thanksY + 3, pageWidth - PAGE_MARGIN - 8, thanksY + 3);
+
+  doc.setFillColor(ACCENT_RED[0], ACCENT_RED[1], ACCENT_RED[2]);
+  doc.circle(pageWidth / 2 - 24, thanksY + 3, 1, "F");
+  doc.circle(pageWidth / 2 - 21, thanksY + 2.2, 0.75, "F");
+  doc.circle(pageWidth / 2 - 21, thanksY + 3.8, 0.75, "F");
+  doc.circle(pageWidth / 2 + 24, thanksY + 3, 1, "F");
+  doc.circle(pageWidth / 2 + 21, thanksY + 2.2, 0.75, "F");
+  doc.circle(pageWidth / 2 + 21, thanksY + 3.8, 0.75, "F");
+
+  doc.setFont("times", "italic");
+  doc.setFontSize(15);
+  doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
+  doc.text("Thank You!", pageWidth / 2, thanksY + 4.5, { align: "center" });
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(20, 20, 20);
+  doc.text("We appreciate your business", pageWidth / 2, thanksY + 10, { align: "center" });
+};
+
 /**
  * Build the Shop Ledger PDF for one shop or a set of shops (one page section
  * per shop). Returns the blob plus an object URL so callers can preview,
  * download or attach the file — nothing is saved automatically.
+ *
+ * Uses the same branded DMR POULTRIES letterhead as the Step-4 delivery
+ * receipt. `preparedAssets` lets callers reuse the prepared hen mark across
+ * many generate calls; omit it and the asset is prepared automatically.
  */
-export const generateShopLedgerPDF = (
+export const generateShopLedgerPDF = async (
   allLedgers: { shop: string; data: LedgerTransaction[] }[],
   dateFrom: string,
   dateTo: string,
-  selectedShop: string
-): GeneratedShopLedgerPdf => {
+  selectedShop: string,
+  preparedAssets?: DmrPoultryHeaderAssets,
+): Promise<GeneratedShopLedgerPdf> => {
+  // Prepare the letterhead hen once per call (canvas cut-out); callers that
+  // generate many PDFs in a batch pass their own prepared assets.
+  const assets =
+    preparedAssets ?? (await prepareDmrPoultryHeaderAssets({ henUrl: henImage }));
+
   // Setup A4 Portrait
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+
+  doc.setProperties({
+    title: "Shop Ledger Statement",
+    subject: "DMR POULTRIES shop ledger statement",
+    author: "DMR POULTRIES",
+    creator: "DMR POULTRIES",
+  });
 
   const headers = ["Date", "Particulars", "Birds", "Weight", "Rate", "Debit", "Credit", "Balance"];
 
@@ -67,25 +180,6 @@ export const generateShopLedgerPDF = (
     if (index > 0) doc.addPage();
 
     const pageWidth = doc.internal.pageSize.getWidth();
-
-    // ─── Header ───
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
-    doc.setTextColor(0, 0, 0);
-    doc.text("DMR POULTRIES - SHOP LEDGER STATEMENT", 14, 15);
-
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.4);
-    doc.line(14, 18, pageWidth - 14, 18);
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text(`Shop: ${shop}`, 14, 25);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(50, 50, 50);
-    doc.text(`Period: ${formatPdfDate(dateFrom)} to ${formatPdfDate(dateTo)}`, 14, 30);
 
     // ─── Build Rows ───
     const rows = data.map((t) => {
@@ -134,13 +228,15 @@ export const generateShopLedgerPDF = (
       formatAmount(closingBalance),
     ]);
 
-    // ─── AutoTable Styling (Strictly fitted within A4 printable bounds) ───
+    // ─── AutoTable Styling (letterhead on every page, table below it) ───
     autoTable(doc, {
       head: [headers],
       body: rows,
-      startY: 34,
-      margin: { top: 34, bottom: 15, left: 14, right: 14 },
+      startY: 64,
+      margin: { top: 64, bottom: 20, left: PAGE_MARGIN, right: PAGE_MARGIN },
       theme: "grid",
+      showHead: "everyPage",
+      rowPageBreak: "avoid",
       headStyles: {
         fillColor: [255, 255, 255],
         textColor: [0, 0, 0],
@@ -166,29 +262,43 @@ export const generateShopLedgerPDF = (
           hookData.cell.styles.fontStyle = "bold";
         }
       },
-      // Total column widths equal exactly 182mm (the exact printable width of A4 portrait with 14mm margins)
+      // Column widths sum to 186mm — the printable width of A4 portrait with
+      // 12mm margins (same margins as the branded letterhead).
       columnStyles: {
         0: { cellWidth: 20, halign: "center" }, // Date
-        1: { cellWidth: 52, halign: "left" },   // Particulars
+        1: { cellWidth: 54, halign: "left" },   // Particulars
         2: { cellWidth: 14, halign: "center" }, // Birds
         3: { cellWidth: 18, halign: "right" },  // Weight
         4: { cellWidth: 14, halign: "right" },  // Rate
-        5: { cellWidth: 21, halign: "right" },  // Debit
-        6: { cellWidth: 21, halign: "right" },  // Credit
+        5: { cellWidth: 22, halign: "right" },  // Debit
+        6: { cellWidth: 22, halign: "right" },  // Credit
         7: { cellWidth: 22, halign: "right" },  // Balance
       },
       didDrawPage: (data) => {
-        const pageHeight = doc.internal.pageSize.getHeight();
+        // Letterhead + title + shop + period on every page of the statement.
+        drawStatementChrome(doc, shop, dateFrom, dateTo, assets);
+
+        const pageHeight2 = doc.internal.pageSize.getHeight();
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8);
         doc.setTextColor(50, 50, 50);
-        doc.text(`Page ${data.pageNumber}`, pageWidth - 14, pageHeight - 8, { align: "right" });
-        doc.text("DMR Poultries ERP - Shop Ledger Statement", 14, pageHeight - 8);
+        doc.text(`Page ${data.pageNumber}`, pageWidth - PAGE_MARGIN, pageHeight2 - 8, {
+          align: "right",
+        });
+        doc.text("DMR Poultries ERP - Shop Ledger Statement", PAGE_MARGIN, pageHeight2 - 8);
       },
     });
+
+    // Thank-you closing block, same style as the Step-4 delivery receipt.
+    const finalY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 64;
+    drawThankYouBlock(doc, finalY + 2);
   });
 
   const filename = `ShopLedger_${selectedShop === "All Shops" ? "AllShops" : selectedShop.replace(/\s+/g, "_")}_${formatPdfDate(dateFrom)}_to_${formatPdfDate(dateTo)}.pdf`;
   const blob = doc.output("blob");
   return { blob, url: URL.createObjectURL(blob), filename };
 };
+
+/** Prepared letterhead assets for callers that batch many PDFs. */
+export const prepareShopLedgerPdfAssets = (): Promise<DmrPoultryHeaderAssets> =>
+  prepareDmrPoultryHeaderAssets({ henUrl: henImage });
