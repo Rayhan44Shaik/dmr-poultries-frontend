@@ -679,14 +679,14 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         // Sample mode: export from local page data without a backend.
         shopNames = appliedSelectedShop !== "All Shops"
           ? [appliedSelectedShop]
-          : SAMPLE_SHOP_NAMES;
+          : [...SAMPLE_SHOP_NAMES];
       } else if (appliedSelectedShop === "All Shops") {
         const all = await fetchShopLedger({ fromDate: appliedDateFrom, toDate: appliedDateTo });
         const names = new Set<string>();
         all.data.forEach((r) => {
           if (r.shopName) names.add(r.shopName);
         });
-        shopNames = Array.from(names).sort();
+        shopNames = Array.from(names);
       } else {
         shopNames = [appliedSelectedShop];
       }
@@ -695,6 +695,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         showNotification("No shops found in the selected date range.", "error");
         return;
       }
+
+      // Statements are presented in clean alphabetical shop order.
+      shopNames.sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
 
       const allLedgers: ShopLedgerPdfEntry[] = [];
       const shopData: Record<string, LedgerTransaction[]> = {};
@@ -1094,7 +1097,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
   const waAllShopNames = useMemo(() => {
     const source = sampleMode ? SAMPLE_SHOP_NAMES : shops.map((shop: Shop) => shop.shopName);
-    return Array.from(new Set(source));
+    return Array.from(new Set(source)).sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
   }, [shops, sampleMode]);
 
   /**
