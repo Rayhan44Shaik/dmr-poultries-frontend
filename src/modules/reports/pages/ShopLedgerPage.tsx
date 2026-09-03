@@ -858,12 +858,21 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       if (existing?.url) return existing.url;
       if (perShopBusyRef.current.has(shop)) return null;
 
+      // Only a closed (or restarted) export invalidates this run. Selecting
+      // another shop or toggling checkboxes while we generate is normal and
+      // must NOT discard the result — the file is written into whatever the
+      // latest preview state is when generation finishes.
+      const sessionAtStart = exportSessionRef.current;
+
       perShopBusyRef.current.add(shop);
       setPdfBusyShop(shop);
       try {
         // Prefer the live ledger snapshot for this export; fall back to the
         // filter-keyed cache (already built for the combined document).
-        const ledger = current.shopData[shop] ?? (await getCachedLedger(appliedDateFrom, appliedDateTo, shop)) ?? [];
+        const ledger =
+          current.shopData[shop] ??
+          (await getCachedLedger(appliedDateFrom, appliedDateTo, shop)) ??
+          [];
         const master = shopMasterMap.get(shop);
         const generated = await generateShopLedgerPDF(
           [{
@@ -877,21 +886,30 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           appliedDateTo,
           shop,
         );
-        const latest = pdfPreviewRef.current;
-        if (!latest || latest !== current) {
-          // Modal closed or replaced while generating — discard this file.
+        if (exportSessionRef.current !== sessionAtStart || !pdfPreviewRef.current) {
+          // The modal was closed (or a new export started) — discard.
           URL.revokeObjectURL(generated.url);
           return null;
         }
-        const nextState: PdfPreviewState = {
-          ...latest,
-          files: latest.files.map((file) =>
-            file.shop === shop ? { ...file, url: generated.url, filename: generated.filename } : file,
-          ),
-        };
-        pdfPreviewRef.current = nextState;
-        setPdfPreview(nextState);
-        return generated.url;
+        // Write into the latest preview state via a functional update: other
+        // parts of the state (selection, active index) may have changed while
+        // this PDF was generating, and those changes must be preserved.
+        let finalUrl: string | null = null;
+        setPdfPreview((prev) => {
+          if (!prev) return prev;
+          const nextState: PdfPreviewState = {
+            ...prev,
+            files: prev.files.map((file) =>
+              file.shop === shop
+                ? { ...file, url: generated.url, filename: generated.filename }
+                : file,
+            ),
+          };
+          pdfPreviewRef.current = nextState;
+          finalUrl = generated.url;
+          return nextState;
+        });
+        return finalUrl;
       } finally {
         perShopBusyRef.current.delete(shop);
         setPdfBusyShop((prev) => (prev === shop ? null : prev));
