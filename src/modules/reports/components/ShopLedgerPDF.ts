@@ -15,6 +15,19 @@ export interface LedgerTransaction {
   collectionNo?: string;
 }
 
+export interface GeneratedShopLedgerPdf {
+  blob: Blob;
+  /** Object URL for the blob — caller owns revoking it. */
+  url: string;
+  filename: string;
+}
+
+/** Ledger dates are stored as yyyy-MM-dd; the PDF prints dd-MM-yyyy. */
+export const formatPdfDate = (value: string): string => {
+  const parts = value.split("-");
+  return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : value;
+};
+
 const normalizePaymentMode = (value?: string): string => {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
@@ -34,15 +47,20 @@ const formatAmount = (value: number): string =>
     maximumFractionDigits: 2,
   }).format(value || 0);
 
+/**
+ * Build the Shop Ledger PDF for one shop or a set of shops (one page section
+ * per shop). Returns the blob plus an object URL so callers can preview,
+ * download or attach the file — nothing is saved automatically.
+ */
 export const generateShopLedgerPDF = (
   allLedgers: { shop: string; data: LedgerTransaction[] }[],
   dateFrom: string,
   dateTo: string,
   selectedShop: string
-) => {
+): GeneratedShopLedgerPdf => {
   // Setup A4 Portrait
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
-  
+
   const headers = ["Date", "Particulars", "Birds", "Weight", "Rate", "Debit", "Credit", "Balance"];
 
   allLedgers.forEach(({ shop, data }, index) => {
@@ -67,7 +85,7 @@ export const generateShopLedgerPDF = (
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(50, 50, 50);
-    doc.text(`Period: ${dateFrom} to ${dateTo}`, 14, 30);
+    doc.text(`Period: ${formatPdfDate(dateFrom)} to ${formatPdfDate(dateTo)}`, 14, 30);
 
     // ─── Build Rows ───
     const rows = data.map((t) => {
@@ -86,7 +104,7 @@ export const generateShopLedgerPDF = (
       }
 
       return [
-        t.date,
+        formatPdfDate(t.date),
         label,
         t.type === "sale" && t.birds > 0 ? String(t.birds) : "-",
         t.type === "sale" && t.weight > 0 ? t.weight.toFixed(2) : "-",
@@ -170,6 +188,7 @@ export const generateShopLedgerPDF = (
     });
   });
 
-  const filename = `ShopLedger_${selectedShop === "All Shops" ? "AllShops" : selectedShop.replace(/\s+/g, "_")}_${dateFrom}_to_${dateTo}.pdf`;
-  doc.save(filename);
+  const filename = `ShopLedger_${selectedShop === "All Shops" ? "AllShops" : selectedShop.replace(/\s+/g, "_")}_${formatPdfDate(dateFrom)}_to_${formatPdfDate(dateTo)}.pdf`;
+  const blob = doc.output("blob");
+  return { blob, url: URL.createObjectURL(blob), filename };
 };

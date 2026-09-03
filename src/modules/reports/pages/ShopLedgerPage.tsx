@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { format, subDays } from "date-fns";
 import {
   ArrowDownLeft,
@@ -6,6 +6,8 @@ import {
   Bird,
   CalendarDays,
   CheckCircle2,
+  Download,
+  ExternalLink,
   FileText,
   IndianRupee,
   Loader2,
@@ -35,25 +37,44 @@ interface ShopLedgerProps {
 }
 
 type ReportTypeFilter = "all" | "sales" | "collection";
-type WaReportType = "Sales" | "Collection";
+type WaReportType = "All" | "Sales" | "Collection";
 type WaScope = "selected" | "all";
+
 interface SelectOption {
   value: string;
   label: string;
 }
 
-interface WhatsAppPayload {
+interface WhatsAppSendPayload {
   reportType: WaReportType;
   dateFrom: string;
   dateTo: string;
   scope: WaScope;
-  shopName?: string;
+  shopName: string;
+  recipient: string;
+  ownerName: string;
+  shopWhatsApp: string;
+  message: string;
+  pdfBase64: string;
+  fileName: string;
+}
+
+interface PdfPreviewState {
+  combinedUrl: string;
+  combinedFilename: string;
+  files: { shop: string; url: string; filename: string }[];
+  selectedIndex: number;
+  selectedShops: string[];
+  shopData: Record<string, LedgerTransaction[]>;
 }
 
 const WHATSAPP_BACKEND_ENABLED =
   import.meta.env.VITE_WHATSAPP_BACKEND_ENABLED === "true";
 
 const REFRESH_TOAST_DURATION = 3500;
+
+const WA_SEND_COUNT_STORAGE_KEY = "dmr-shop-ledger-whatsapp-weekly-send-counts";
+const WA_LAST_SENT_STORAGE_KEY = "dmr-shop-ledger-whatsapp-weekly-last-sent";
 
 const PAGE_SIZES = [10, 15, 20, 25, 30] as const;
 const DEFAULT_PAGE_SIZE = 10;
@@ -103,6 +124,12 @@ const mapRowToTx = (row: ShopLedgerRow): LedgerTransaction => {
 const toDateDefault = () => format(new Date(), "yyyy-MM-dd");
 const toWeekAgoDefault = () => format(subDays(new Date(), 7), "yyyy-MM-dd");
 
+/** yyyy-MM-dd → dd-MM-yyyy for display (WhatsApp text, weekly labels). */
+const formatDisplayDate = (value: string): string => {
+  const parts = value.split("-");
+  return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : value;
+};
+
 const normalizePaymentMode = (value?: string): string => {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
@@ -121,6 +148,102 @@ const formatAmount = (value: number): string =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value || 0)}`;
+
+// ─── Weekly send tracking (Monday-start week) ───────────────────────────────
+// Counts are keyed by "<weekStart>:<shop>" so last week's numbers drop out
+// automatically the moment a new week begins — no cleanup job needed.
+function getWeekStartKey(date = new Date()): string {
+  const local = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const daysSinceMonday = (local.getDay() + 6) % 7;
+  local.setDate(local.getDate() - daysSinceMonday);
+  return [
+    local.getFullYear(),
+    String(local.getMonth() + 1).padStart(2, "0"),
+    String(local.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+const weeklySendKey = (weekStart: string, shop: string): string => `${weekStart}:${shop}`;
+
+function weeklySendCount(
+  counts: Record<string, number> | undefined,
+  weekStart: string,
+  shop: string,
+): number {
+  return counts?.[weeklySendKey(weekStart, shop)] || 0;
+}
+
+function loadStoredRecord<T extends string | number>(key: string): Record<string, T> {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const out: Record<string, T> = {};
+    Object.entries(parsed as Record<string, unknown>).forEach(([entryKey, value]) => {
+      if (typeof value === typeof ("" as T) && value !== null) {
+        out[entryKey] = value as T;
+      }
+    });
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+// ─── File helpers ────────────────────────────────────────────────────────────
+const downloadFile = (url: string, filename: string) => {
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.rel = "noopener";
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+};
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? "");
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(new Error("Unable to read PDF bytes."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+// ─── WhatsApp message template ───────────────────────────────────────────────
+function buildWhatsAppMessage(
+  reportType: WaReportType,
+  shop: string,
+  ownerName: string,
+  dateFrom: string,
+  dateTo: string,
+  fileName: string,
+): string {
+  const reportLabel = reportType === "All" ? "All (Sales & Collection)" : reportType;
+  return [
+    "DMR Poultries",
+    `Shop Ledger Report - ${reportLabel}`,
+    "",
+    `Shop: ${shop}`,
+    `Owner: ${ownerName}`,
+    `Period: ${formatDisplayDate(dateFrom)} to ${formatDisplayDate(dateTo)}`,
+    "",
+    `Dear ${ownerName},`,
+    `Please find attached the ${reportLabel} Shop Ledger report for ${shop} for the period ${formatDisplayDate(dateFrom)} to ${formatDisplayDate(dateTo)}.`,
+    "",
+    `Attached PDF: ${fileName}`,
+    "",
+    "Thank you.",
+    "Regards,",
+    "DMR Poultries",
+  ].join("\n");
+}
 
 // ── Frontend sample data (verification only) ────────────────────────────────
 // The page is seeded with ~50 shops and a mix of sales + collections so the
@@ -143,6 +266,25 @@ const SAMPLE_SHOP_NAMES = Array.from({ length: 50 }, (_, i) => {
 });
 
 const SAMPLE_PAYMENT_MODES = ["Cash", "UPI", "Union", "SBI"];
+
+const SAMPLE_OWNER_FIRST_NAMES = [
+  "Ramesh", "Suresh", "Anil", "Prakash", "Mohan",
+  "Vijay", "Srinivas", "Lakshman", "Narayana", "Gopal",
+];
+
+const SAMPLE_OWNER_LAST_NAMES = ["Reddy", "Kumar", "Rao", "Naidu", "Prasad"];
+
+/** Deterministic sample owner + phone per shop (stable across re-renders). */
+const sampleRecipientFor = (
+  shop: string,
+): { ownerName: string; phoneNumber: string; whatsappNumber: string } => {
+  const idx = Math.max(0, SAMPLE_SHOP_NAMES.indexOf(shop));
+  const ownerName = `${SAMPLE_OWNER_FIRST_NAMES[idx % SAMPLE_OWNER_FIRST_NAMES.length]} ${
+    SAMPLE_OWNER_LAST_NAMES[idx % SAMPLE_OWNER_LAST_NAMES.length]
+  }`;
+  const phone = `98${String(40000000 + idx * 11111111).slice(0, 8)}`;
+  return { ownerName, phoneNumber: phone, whatsappNumber: phone };
+};
 
 function makeSampleLedger(
   from: string,
@@ -198,6 +340,7 @@ function makeSampleLedger(
         base.getMonth(),
         base.getDate() + Math.max(0, dayOffset),
       );
+      // Local date components only — never toISOString() (avoids rollover).
       const date = [
         dateObj.getFullYear(),
         String(dateObj.getMonth() + 1).padStart(2, "0"),
@@ -436,10 +579,30 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
   const resetPage = useCallback(() => setCurrentPage(1), []);
 
-  // ─── Export Functions ──────────────────────────────────────
+  // ─── PDF preview modal state ────────────────────────────────
+  const [pdfPreview, setPdfPreview] = useState<PdfPreviewState | null>(null);
+  const [pdfShopSearch, setPdfShopSearch] = useState("");
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+  const pdfPreviewRef = useRef<PdfPreviewState | null>(null);
 
+  // Keep the ref in sync so download/regenerate callbacks always read the
+  // latest preview state without being re-created on every render.
+  useEffect(() => {
+    pdfPreviewRef.current = pdfPreview;
+  }, [pdfPreview]);
+
+  const revokePdfUrls = (state: PdfPreviewState | null) => {
+    if (!state) return;
+    URL.revokeObjectURL(state.combinedUrl);
+    state.files.forEach((file) => URL.revokeObjectURL(file.url));
+  };
+
+  // ─── PDF export → preview modal ────────────────────────────
   const handleExportPDF = useCallback(async () => {
+    if (pdfGenerating) return;
     try {
+      setPdfGenerating(true);
+
       let shopNames: string[] = [];
 
       if (sampleMode) {
@@ -464,16 +627,16 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       }
 
       const allLedgers: { shop: string; data: LedgerTransaction[] }[] = [];
+      const shopData: Record<string, LedgerTransaction[]> = {};
       for (const shop of shopNames) {
+        const shopId = shops.find((s: Shop) => s.shopName === shop)?.id;
+        if (!sampleMode && shopId == null) continue; // never fetch "all shops" by mistake
         const ledger = sampleMode
           ? makeSampleLedger(appliedDateFrom, appliedDateTo, shop)
-          : (await buildLedger(
-              appliedDateFrom,
-              appliedDateTo,
-              shops.find((s: Shop) => s.shopName === shop)?.id,
-            ));
+          : (await buildLedger(appliedDateFrom, appliedDateTo, shopId));
         if (ledger.length > 1) {
           allLedgers.push({ shop, data: ledger });
+          shopData[shop] = ledger;
         }
       }
 
@@ -482,12 +645,109 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         return;
       }
 
-      generateShopLedgerPDF(allLedgers, appliedDateFrom, appliedDateTo, appliedSelectedShop);
-      showNotification("PDF downloaded successfully.", "success");
+      // Revoke object URLs from any previous preview before replacing them.
+      revokePdfUrls(pdfPreviewRef.current);
+
+      const combined = generateShopLedgerPDF(allLedgers, appliedDateFrom, appliedDateTo, appliedSelectedShop);
+      const files = allLedgers.map(({ shop, data }) => {
+        const generated = generateShopLedgerPDF([{ shop, data }], appliedDateFrom, appliedDateTo, shop);
+        return { shop, url: generated.url, filename: generated.filename };
+      });
+
+      setPdfPreview({
+        combinedUrl: combined.url,
+        combinedFilename: combined.filename,
+        files,
+        selectedIndex: 0,
+        selectedShops: files.map((file) => file.shop),
+        shopData,
+      });
+      setPdfShopSearch("");
+      showNotification(
+        "PDF ready. Preview it below — download each shop separately or the combined file.",
+        "success",
+      );
     } catch {
       showNotification("Failed to load ledger data. Please try again.", "error");
+    } finally {
+      setPdfGenerating(false);
     }
-  }, [appliedSelectedShop, appliedDateFrom, appliedDateTo, sampleMode, showNotification, shops, buildLedger]);
+  }, [pdfGenerating, appliedSelectedShop, appliedDateFrom, appliedDateTo, sampleMode, showNotification, shops, buildLedger]);
+
+  const closePdfPreview = useCallback(() => {
+    revokePdfUrls(pdfPreviewRef.current);
+    pdfPreviewRef.current = null;
+    setPdfPreview(null);
+    setPdfShopSearch("");
+  }, []);
+
+  const pdfFilteredFiles = useMemo(() => {
+    if (!pdfPreview) return [];
+    const needle = pdfShopSearch.trim().toLowerCase();
+    if (!needle) return pdfPreview.files;
+    return pdfPreview.files.filter((file) => file.shop.toLowerCase().includes(needle));
+  }, [pdfPreview, pdfShopSearch]);
+
+  const activePdfFile = pdfPreview
+    ? pdfPreview.selectedIndex >= 0 && pdfPreview.files[pdfPreview.selectedIndex]
+      ? pdfPreview.files[pdfPreview.selectedIndex]
+      : { shop: "All Shops", url: pdfPreview.combinedUrl, filename: pdfPreview.combinedFilename }
+    : null;
+
+  const setActivePdfShop = (index: number) => {
+    setPdfPreview((prev) => (prev ? { ...prev, selectedIndex: index } : prev));
+  };
+
+  const togglePdfShop = (shop: string) => {
+    setPdfPreview((prev) => {
+      if (!prev) return prev;
+      const selected = prev.selectedShops.includes(shop)
+        ? prev.selectedShops.filter((name) => name !== shop)
+        : [...prev.selectedShops, shop];
+      return { ...prev, selectedShops: selected };
+    });
+  };
+
+  const selectAllPdfShops = () => {
+    setPdfPreview((prev) =>
+      prev ? { ...prev, selectedShops: prev.files.map((file) => file.shop) } : prev,
+    );
+  };
+
+  const clearPdfShops = () => {
+    setPdfPreview((prev) => (prev ? { ...prev, selectedShops: [] } : prev));
+  };
+
+  // One PDF file per selected shop.
+  const handleDownloadSelectedShops = () => {
+    const current = pdfPreviewRef.current;
+    if (!current) return;
+    const chosen = current.files.filter((file) => current.selectedShops.includes(file.shop));
+    if (chosen.length === 0) {
+      showNotification("Select at least one shop to download.", "info");
+      return;
+    }
+    chosen.forEach((file) => downloadFile(file.url, file.filename));
+    showNotification(`Downloading ${chosen.length} shop PDF(s).`, "success");
+  };
+
+  // A single combined PDF containing only the selected shops.
+  const handleDownloadSelectedCombined = () => {
+    const current = pdfPreviewRef.current;
+    if (!current) return;
+    const ledgers = current.selectedShops
+      .map((shop) => ({ shop, data: current.shopData[shop] ?? [] }))
+      .filter((entry) => entry.data.length > 0);
+    if (ledgers.length === 0) {
+      showNotification("Select at least one shop to download.", "info");
+      return;
+    }
+    const label = ledgers.length === 1 ? ledgers[0].shop : "All Shops";
+    const generated = generateShopLedgerPDF(ledgers, appliedDateFrom, appliedDateTo, label);
+    downloadFile(generated.url, generated.filename);
+    window.setTimeout(() => URL.revokeObjectURL(generated.url), 10_000);
+    showNotification(`Combined PDF with ${ledgers.length} shop(s) downloaded.`, "success");
+  };
 
   const handleSearch = useCallback(() => {
     // Commit the draft filter controls. Until Search is clicked the table,
@@ -535,90 +795,285 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
   // ─── WhatsApp modal state ──────────────────────────────────
   const [whatsappOpen, setWhatsappOpen] = useState(false);
-  const [waReportType, setWaReportType] = useState<WaReportType>("Sales");
+  const [waReportType, setWaReportType] = useState<WaReportType>("All");
   const [waDateFrom, setWaDateFrom] = useState(toWeekAgoDefault);
   const [waDateTo, setWaDateTo] = useState(toDateDefault);
   const [waScope, setWaScope] = useState<WaScope>("selected");
-  const [waShop, setWaShop] = useState("All Shops");
   const [waSending, setWaSending] = useState(false);
   const [waConfirmAll, setWaConfirmAll] = useState(false);
   const [waError, setWaError] = useState<string | null>(null);
+  const [waSendingShop, setWaSendingShop] = useState<string | null>(null);
+  const [waSendCounts, setWaSendCounts] = useState<Record<string, number>>(
+    () => loadStoredRecord<number>(WA_SEND_COUNT_STORAGE_KEY),
+  );
+  const [waLastSent, setWaLastSent] = useState<Record<string, string>>(
+    () => loadStoredRecord<string>(WA_LAST_SENT_STORAGE_KEY),
+  );
+  const [waSelectedShops, setWaSelectedShops] = useState<string[]>([]);
+  const [waShopSearch, setWaShopSearch] = useState("");
+  const [waPreviewShop, setWaPreviewShop] = useState<string | null>(null);
 
-  const waShopOptions = useMemo(() => {
-    const all = [{ value: "All Shops", label: "Select Shop" }];
+  // Monday-of-week bucket. Re-checked every minute so counts roll over to 0
+  // automatically when a new week starts (even if the page stays open past
+  // midnight on Monday).
+  const [currentWeekKey, setCurrentWeekKey] = useState(getWeekStartKey);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentWeekKey(getWeekStartKey());
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  // Persist weekly counters so they survive reloads within the same week.
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(WA_SEND_COUNT_STORAGE_KEY, JSON.stringify(waSendCounts));
+    } catch {
+      /* storage unavailable — counters stay in-memory */
+    }
+  }, [waSendCounts]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(WA_LAST_SENT_STORAGE_KEY, JSON.stringify(waLastSent));
+    } catch {
+      /* storage unavailable — last-sent stays in-memory */
+    }
+  }, [waLastSent]);
+
+  const waAllShopNames = useMemo(() => {
     const source = sampleMode ? SAMPLE_SHOP_NAMES : shops.map((shop: Shop) => shop.shopName);
-    const unique = Array.from(new Set(source));
-    const shopList = unique.map((name) => ({
-      value: name,
-      label: name,
-    }));
-    return [...all, ...shopList];
+    return Array.from(new Set(source));
   }, [shops, sampleMode]);
+
+  /**
+   * WhatsApp recipient for a shop — `whatsappNumber` from Shop Master when
+   * present, otherwise the regular `phoneNumber`. Sample mode uses
+   * deterministic sample owner/phone values.
+   */
+  const resolveWaRecipient = useCallback(
+    (shop: string): { shop: string; ownerName: string; phoneNumber: string; whatsappNumber: string } => {
+      if (sampleMode) {
+        return { shop, ...sampleRecipientFor(shop) };
+      }
+      const found = shops.find((s: Shop) => s.shopName === shop);
+      if (!found) {
+        return { shop, ownerName: "Shop Owner", phoneNumber: "", whatsappNumber: "" };
+      }
+      const whatsapp = String(found.whatsappNumber || found.phoneNumber || "").trim();
+      const phone = String(found.phoneNumber || "").trim();
+      return {
+        shop,
+        ownerName: String(found.ownerName || "Shop Owner").trim(),
+        phoneNumber: phone,
+        whatsappNumber: whatsapp || phone,
+      };
+    },
+    [sampleMode, shops],
+  );
 
   const openWhatsApp = useCallback(() => {
     // WhatsApp follows the currently applied (Search-committed) filters.
-    setWaReportType("Sales");
+    setWaReportType(
+      appliedReportType === "sales"
+        ? "Sales"
+        : appliedReportType === "collection"
+          ? "Collection"
+          : "All",
+    );
     setWaDateFrom(appliedDateFrom);
     setWaDateTo(appliedDateTo);
-    setWaScope(appliedSelectedShop === "All Shops" ? "all" : "selected");
-    setWaShop(appliedSelectedShop === "All Shops" ? "All Shops" : appliedSelectedShop);
+    const initial = appliedSelectedShop === "All Shops"
+      ? waAllShopNames
+      : waAllShopNames.filter((name) => name === appliedSelectedShop);
+    setWaSelectedShops(initial);
+    setWaScope("selected");
+    setWaPreviewShop(initial[0] ?? null);
+    setWaShopSearch("");
     setWaConfirmAll(false);
     setWaError(null);
     setWhatsappOpen(true);
-  }, [appliedDateFrom, appliedDateTo, appliedSelectedShop]);
+  }, [appliedReportType, appliedDateFrom, appliedDateTo, appliedSelectedShop, waAllShopNames]);
 
   const closeWhatsApp = useCallback(() => {
     if (waSending) return;
     setWhatsappOpen(false);
     setWaConfirmAll(false);
     setWaError(null);
+    setWaSendingShop(null);
   }, [waSending]);
+
+  const waVisibleShops = useMemo(() => {
+    const needle = waShopSearch.trim().toLowerCase();
+    if (!needle) return waAllShopNames;
+    return waAllShopNames.filter((name) => name.toLowerCase().includes(needle));
+  }, [waAllShopNames, waShopSearch]);
+
+  const waTargetShops = useMemo(
+    () =>
+      waScope === "all"
+        ? waAllShopNames
+        : waAllShopNames.filter((name) => waSelectedShops.includes(name)),
+    [waScope, waAllShopNames, waSelectedShops],
+  );
+
+  const waWeekTotal = useMemo(
+    () =>
+      waTargetShops.reduce(
+        (sum, shop) => sum + weeklySendCount(waSendCounts, currentWeekKey, shop),
+        0,
+      ),
+    [waTargetShops, waSendCounts, currentWeekKey],
+  );
+
+  const toggleWaShop = (shop: string) => {
+    setWaSelectedShops((prev) =>
+      prev.includes(shop) ? prev.filter((name) => name !== shop) : [...prev, shop],
+    );
+  };
+
+  const waPreviewRecipient = waPreviewShop ? resolveWaRecipient(waPreviewShop) : null;
+  const waPreviewFileName = waPreviewShop
+    ? `ShopLedger_${waPreviewShop.replace(/\s+/g, "_")}_${formatDisplayDate(waDateFrom)}_to_${formatDisplayDate(waDateTo)}.pdf`
+    : "";
+  const waPreviewMessage =
+    waPreviewShop && waPreviewRecipient
+      ? buildWhatsAppMessage(
+          waReportType,
+          waPreviewShop,
+          waPreviewRecipient.ownerName || "Shop Owner",
+          waDateFrom,
+          waDateTo,
+          waPreviewFileName,
+        )
+      : "";
 
   const sendWhatsApp = useCallback(async () => {
     if (waSending) return;
+    // In All mode the first press arms the confirmation; the second performs
+    // the actual send.
     if (waScope === "all" && !waConfirmAll) {
       setWaConfirmAll(true);
       return;
     }
-    if (waScope === "selected" && waShop === "All Shops") {
-      setWaError("Please select a shop before sending.");
+
+    const targets = waTargetShops;
+    if (targets.length === 0) {
+      setWaError("Please select at least one shop before sending.");
       return;
     }
     if (!waDateFrom || !waDateTo) {
       setWaError("Please choose a valid date range.");
       return;
     }
+    if (!WHATSAPP_BACKEND_ENABLED) {
+      // Never fake success. The endpoint/service must be explicitly enabled
+      // and the backend must confirm delivery before we report success.
+      setWaError("WhatsApp report service is not configured.");
+      showNotification("WhatsApp report service is not configured.", "info");
+      return;
+    }
 
-    const payload: WhatsAppPayload = {
-      reportType: waReportType,
-      dateFrom: waDateFrom,
-      dateTo: waDateTo,
-      scope: waScope,
-      shopName: waScope === "selected" ? waShop : undefined,
-    };
+    setWaSending(true);
+    setWaError(null);
+    setWaConfirmAll(false);
 
-    try {
-      setWaSending(true);
-      setWaError(null);
+    const weekStart = currentWeekKey;
+    let successCount = 0;
+    let failedCount = 0;
 
-      if (!WHATSAPP_BACKEND_ENABLED) {
-        // Never fake success. The endpoint / service must be explicitly enabled
-        // and the backend must confirm delivery before we report success.
-        setWaError("WhatsApp report service is not configured.");
-        showNotification("WhatsApp report service is not configured.", "info");
-        return;
+    for (const shop of targets) {
+      setWaSendingShop(shop);
+      try {
+        const recipient = resolveWaRecipient(shop);
+        if (!recipient.whatsappNumber) {
+          throw new Error(`No WhatsApp number on file for ${shop}.`);
+        }
+
+        const shopId = shops.find((s: Shop) => s.shopName === shop)?.id;
+        if (!sampleMode && shopId == null) {
+          throw new Error(`Shop ${shop} is not in the shops master.`);
+        }
+
+        // Same per-shop PDF the preview modal generates.
+        const ledger = sampleMode
+          ? makeSampleLedger(waDateFrom, waDateTo, shop)
+          : await buildLedger(waDateFrom, waDateTo, shopId);
+
+        const generated = generateShopLedgerPDF([{ shop, data: ledger }], waDateFrom, waDateTo, shop);
+        try {
+          const message = buildWhatsAppMessage(
+            waReportType,
+            shop,
+            recipient.ownerName || "Shop Owner",
+            waDateFrom,
+            waDateTo,
+            generated.filename,
+          );
+          const pdfBase64 = await blobToBase64(generated.blob);
+
+          const payload: WhatsAppSendPayload = {
+            reportType: waReportType,
+            dateFrom: waDateFrom,
+            dateTo: waDateTo,
+            scope: waScope,
+            shopName: recipient.shop,
+            recipient: recipient.whatsappNumber,
+            ownerName: recipient.ownerName,
+            shopWhatsApp: recipient.whatsappNumber,
+            message,
+            pdfBase64,
+            fileName: generated.filename,
+          };
+
+          await apiPost("/operations/shop-ledger/whatsapp", payload, { timeout: 60_000 });
+        } finally {
+          URL.revokeObjectURL(generated.url);
+        }
+
+        // Only after the backend confirmed delivery do we count the send.
+        successCount += 1;
+        const key = weeklySendKey(weekStart, shop);
+        setWaSendCounts((prev) => ({
+          ...prev,
+          [key]: (prev?.[key] || 0) + 1,
+        }));
+        setWaLastSent((prev) => ({ ...prev, [key]: new Date().toLocaleString() }));
+      } catch {
+        failedCount += 1;
       }
+    }
 
-      await apiPost("/operations/shop-ledger/whatsapp", payload, { timeout: 60_000 });
-      showNotification("WhatsApp report sent successfully.", "success");
-      closeWhatsApp();
-    } catch {
+    setWaSendingShop(null);
+    setWaSending(false);
+
+    if (failedCount === 0) {
+      showNotification(`WhatsApp report sent to ${successCount} shop(s).`, "success");
+      setWhatsappOpen(false);
+    } else if (successCount > 0) {
+      const message = `WhatsApp sent to ${successCount} shop(s); ${failedCount} failed.`;
+      setWaError(message);
+      showNotification(message, "error");
+    } else {
       setWaError("Unable to send WhatsApp report. Please try again.");
       showNotification("Unable to send WhatsApp report. Please try again.", "error");
-    } finally {
-      setWaSending(false);
     }
-  }, [waSending, waScope, waConfirmAll, waShop, waDateFrom, waDateTo, waReportType, closeWhatsApp, showNotification]);
+  }, [
+    waSending,
+    waScope,
+    waConfirmAll,
+    waTargetShops,
+    waDateFrom,
+    waDateTo,
+    currentWeekKey,
+    resolveWaRecipient,
+    shops,
+    sampleMode,
+    buildLedger,
+    waReportType,
+    showNotification,
+  ]);
 
   // ─── React-Select styles (original) ───
   const selectStyles: StylesConfig<SelectOption, false> = {
@@ -772,8 +1227,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             <button type="button" onClick={handleReset} className={`${actionButtonClass} ${resetButtonClass}`}>
               <RotateCcw size={14} /> Reset
             </button>
-            <button type="button" onClick={() => void handleExportPDF()} className={`${actionButtonClass} ${pdfButtonClass}`}>
-              <FileText size={14} /> PDF
+            <button
+              type="button"
+              onClick={() => void handleExportPDF()}
+              disabled={pdfGenerating}
+              className={`${actionButtonClass} ${pdfButtonClass} disabled:opacity-60`}
+            >
+              {pdfGenerating ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} PDF
             </button>
             <button
               type="button"
@@ -1023,16 +1483,202 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         </div>
       )}
 
+      {/* ── PDF PREVIEW MODAL ──────────────────────────────── */}
+      {pdfPreview && activePdfFile && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/40 p-3 md:p-6">
+          <div className="flex h-full max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600">
+                  <FileText size={15} />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="truncate text-sm font-bold text-slate-800" title={activePdfFile.filename}>
+                    {activePdfFile.filename}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Shop Ledger PDF preview · {formatDisplayDate(appliedDateFrom)} to {formatDisplayDate(appliedDateTo)}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closePdfPreview}
+                aria-label="Close PDF preview"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex min-h-0 flex-1">
+              {pdfPreview.files.length > 1 && (
+                <aside className="flex w-64 shrink-0 flex-col border-r border-slate-100 bg-slate-50/60">
+                  <div className="space-y-2 border-b border-slate-100 px-3.5 py-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Select shops</span>
+                      <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">
+                        {pdfPreview.selectedShops.length} / {pdfPreview.files.length}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={selectAllPdfShops}
+                        className="h-7 flex-1 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50"
+                      >
+                        All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={clearPdfShops}
+                        className="h-7 flex-1 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50"
+                      >
+                        None
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={pdfShopSearch}
+                        onChange={(e) => setPdfShopSearch(e.target.value)}
+                        placeholder="Search shops..."
+                        aria-label="Search shops in PDF preview"
+                        className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-7 pr-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-300"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+                    <button
+                      type="button"
+                      onClick={() => setActivePdfShop(-1)}
+                      className={`mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition ${
+                        pdfPreview.selectedIndex === -1
+                          ? "bg-red-50 font-semibold text-red-600 ring-1 ring-red-200"
+                          : "text-slate-600 hover:bg-white"
+                      }`}
+                    >
+                      <FileText size={13} className="shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">All Shops — Combined</span>
+                    </button>
+                    {pdfFilteredFiles.map((file) => {
+                      const fileIndex = pdfPreview.files.findIndex((f) => f.shop === file.shop);
+                      const isActive = pdfPreview.selectedIndex === fileIndex;
+                      return (
+                        <div
+                          key={file.shop}
+                          className={`flex items-center gap-2 rounded-lg px-2 py-1.5 transition ${
+                            isActive ? "bg-red-50 ring-1 ring-red-200" : "hover:bg-white"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={pdfPreview.selectedShops.includes(file.shop)}
+                            onChange={() => togglePdfShop(file.shop)}
+                            aria-label={`Include ${file.shop} in downloads`}
+                            className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-red-600"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setActivePdfShop(fileIndex)}
+                            title={file.shop}
+                            className={`min-w-0 flex-1 truncate text-left text-xs transition ${
+                              isActive ? "font-semibold text-red-600" : "text-slate-600"
+                            }`}
+                          >
+                            {file.shop}
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {pdfFilteredFiles.length === 0 && (
+                      <p className="px-2 py-4 text-center text-xs text-slate-400">No shops match “{pdfShopSearch}”.</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 border-t border-slate-100 px-3.5 py-3">
+                    <button
+                      type="button"
+                      onClick={handleDownloadSelectedShops}
+                      disabled={pdfPreview.selectedShops.length === 0}
+                      className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 text-[11px] font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Download size={12} />
+                      Download selected ({pdfPreview.selectedShops.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadSelectedCombined}
+                      disabled={pdfPreview.selectedShops.length === 0}
+                      className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <FileText size={12} />
+                      Download selected as one PDF
+                    </button>
+                  </div>
+                </aside>
+              )}
+
+              <div className="min-w-0 flex-1 bg-slate-200/60">
+                <iframe
+                  key={activePdfFile.url}
+                  src={activePdfFile.url}
+                  title="Shop Ledger PDF preview"
+                  className="h-full w-full border-0"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-5 py-3">
+              <button
+                type="button"
+                onClick={closePdfPreview}
+                className="h-9 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Close
+              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.open(activePdfFile.url, "_blank", "noopener,noreferrer")}
+                  className={`${actionButtonClass} ${iconOnlyTone}`}
+                >
+                  <ExternalLink size={14} /> Open in new tab
+                </button>
+                <button
+                  type="button"
+                  onClick={() => downloadFile(activePdfFile.url, activePdfFile.filename)}
+                  className={`${actionButtonClass} ${pdfButtonClass}`}
+                >
+                  <Download size={14} /> Download {activePdfFile.shop}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── WHATSAPP MODAL ─────────────────────────────────── */}
       {whatsappOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-3 md:p-6">
+          <div className="flex h-full max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
               <div className="flex items-center gap-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#25D366]/10 text-[#25D366]">
                   <ShopLedgerWhatsAppIcon size={16} />
                 </span>
-                <h3 className="text-sm font-bold text-slate-800">WhatsApp Report</h3>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">WhatsApp Report</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Send each shop’s ledger PDF to its owner’s WhatsApp number
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
@@ -1044,38 +1690,39 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               </button>
             </div>
 
-            <div className="space-y-3 px-5 py-4">
+            {/* Top bar */}
+            <div className="grid grid-cols-1 gap-3 border-b border-slate-100 px-5 py-3 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label className={labelClass}>Report Type</label>
                 <Select
                   options={[
+                    { value: "All", label: "All (Sales + Collection)" },
                     { value: "Sales", label: "Sales" },
                     { value: "Collection", label: "Collection" },
                   ]}
-                  value={{ value: waReportType, label: waReportType }}
-                  onChange={(selected) => setWaReportType((selected?.value as WaReportType) || "Sales")}
+                  value={{
+                    value: waReportType,
+                    label: waReportType === "All" ? "All (Sales + Collection)" : waReportType,
+                  }}
+                  onChange={(selected) => setWaReportType((selected?.value as WaReportType) || "All")}
                   styles={selectStyles}
                   maxMenuHeight={200}
                 />
               </div>
-
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <div>
-                  <label className={labelClass}>Date From</label>
-                  <DatePicker value={waDateFrom} onChange={setWaDateFrom} placeholder="From date" className="w-full" />
-                </div>
-                <div>
-                  <label className={labelClass}>Date To</label>
-                  <DatePicker value={waDateTo} onChange={setWaDateTo} placeholder="To date" className="w-full" />
-                </div>
+              <div>
+                <label className={labelClass}>Date From</label>
+                <DatePicker value={waDateFrom} onChange={setWaDateFrom} placeholder="From date" className="w-full" />
               </div>
-
+              <div>
+                <label className={labelClass}>Date To</label>
+                <DatePicker value={waDateTo} onChange={setWaDateTo} placeholder="To date" className="w-full" />
+              </div>
               <div>
                 <label className={labelClass}>Recipient</label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { value: "selected" as const, label: "Selected Shop" },
-                    { value: "all" as const, label: "All Shops" },
+                    { value: "selected" as const, label: "Selected" },
+                    { value: "all" as const, label: "All" },
                   ].map((opt) => (
                     <button
                       key={opt.value}
@@ -1083,9 +1730,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                       onClick={() => {
                         setWaScope(opt.value);
                         setWaConfirmAll(false);
-                        if (opt.value === "all") setWaShop("All Shops");
                       }}
-                      className={`h-8 rounded-lg border text-xs font-medium transition ${
+                      className={`h-[38px] rounded-lg border text-xs font-medium transition ${
                         waScope === opt.value
                           ? "border-emerald-300 bg-emerald-50 text-emerald-700"
                           : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
@@ -1096,66 +1742,205 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   ))}
                 </div>
               </div>
-
-              {waScope === "selected" && (
-                <div>
-                  <label className={labelClass}>Shop</label>
-                  <Select
-                    options={waShopOptions}
-                    value={waShopOptions.find((opt) => opt.value === waShop)}
-                    onChange={(selected) => setWaShop(selected?.value || "All Shops")}
-                    isSearchable
-                    placeholder="Select Shop"
-                    styles={selectStyles}
-                    maxMenuHeight={200}
-                  />
-                </div>
-              )}
-
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-3 text-xs text-slate-600">
-                <div className="grid grid-cols-1 gap-1">
-                  <div><span className="font-semibold text-slate-500">Report:</span> {waReportType}</div>
-                  <div><span className="font-semibold text-slate-500">Period:</span> {waDateFrom} – {waDateTo}</div>
-                  <div><span className="font-semibold text-slate-500">Recipient:</span> {waScope === "selected" ? waShop : "All applicable shops"}</div>
-                  {waScope === "all" && <div className="text-[11px] text-slate-400">This will send the report to all applicable shops.</div>}
-                </div>
-              </div>
-
-              {waError && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5 text-xs text-amber-800">
-                  {waError}
-                </div>
-              )}
-
-              {waScope === "all" && waConfirmAll && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5 text-xs font-medium text-amber-800">
-                  Send this report to all applicable shops?
-                </div>
-              )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-3.5">
-              <button
-                type="button"
-                onClick={closeWhatsApp}
-                disabled={waSending}
-                className="h-9 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void sendWhatsApp()}
-                disabled={waSending}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#25D366] px-3.5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-[#1DA851] disabled:opacity-60"
-              >
-                {waSending ? <Loader2 size={14} className="animate-spin" /> : <ShopLedgerWhatsAppIcon size={15} />}
-                {waSending
-                  ? "Sending…"
-                  : waScope === "all" && waConfirmAll
-                    ? "Confirm & Send"
-                    : "Send WhatsApp"}
-              </button>
+            {/* Body */}
+            <div className="flex min-h-0 flex-1">
+              {/* Left: shop selector */}
+              <aside className="flex w-72 shrink-0 flex-col border-r border-slate-100 bg-slate-50/60">
+                <div className="space-y-2 border-b border-slate-100 px-3.5 py-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                      {waScope === "all" ? "All shops" : "Select shops"}
+                    </span>
+                    {waScope === "selected" && (
+                      <span className="rounded-full bg-[#25D366]/10 px-2 py-0.5 text-[10px] font-bold text-[#1DA851]">
+                        {waSelectedShops.length} selected
+                      </span>
+                    )}
+                  </div>
+                  {waScope === "selected" && (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setWaSelectedShops(waAllShopNames)}
+                        className="h-7 flex-1 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50"
+                      >
+                        All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWaSelectedShops([])}
+                        className="h-7 flex-1 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50"
+                      >
+                        None
+                      </button>
+                    </div>
+                  )}
+                  <div className="relative">
+                    <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={waShopSearch}
+                      onChange={(e) => setWaShopSearch(e.target.value)}
+                      placeholder="Search shops..."
+                      aria-label="Search shops in WhatsApp report"
+                      className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-7 pr-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#25D366]/25 focus:border-[#25D366]/50"
+                    />
+                  </div>
+                  <p className="text-[11px] font-medium text-slate-500">
+                    This week from {formatDisplayDate(currentWeekKey)} · total {waWeekTotal} send(s)
+                  </p>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+                  {waVisibleShops.map((shop) => {
+                    const recipient = resolveWaRecipient(shop);
+                    const weekCount = weeklySendCount(waSendCounts, currentWeekKey, shop);
+                    const isSending = waSendingShop === shop;
+                    const isPreview = waPreviewShop === shop;
+                    return (
+                      <div
+                        key={shop}
+                        className={`flex items-start gap-2 rounded-lg px-2 py-1.5 transition ${
+                          isPreview ? "bg-[#25D366]/10 ring-1 ring-[#25D366]/30" : "hover:bg-white"
+                        }`}
+                      >
+                        {waScope === "selected" && (
+                          <input
+                            type="checkbox"
+                            checked={waSelectedShops.includes(shop)}
+                            onChange={() => toggleWaShop(shop)}
+                            aria-label={`Send report to ${shop}`}
+                            className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-[#25D366]"
+                          />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setWaPreviewShop(shop)}
+                          title={shop}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <span className="block truncate text-xs font-semibold text-slate-700">{shop}</span>
+                          <span className="block truncate text-[10px] text-slate-400">
+                            {recipient.ownerName || "Shop Owner"} · {recipient.whatsappNumber || "No number"}
+                          </span>
+                        </button>
+                        {isSending ? (
+                          <Loader2 size={13} className="mt-1 shrink-0 animate-spin text-[#25D366]" />
+                        ) : weekCount > 0 ? (
+                          <span className="mt-0.5 shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                            {weekCount}×
+                          </span>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                  {waVisibleShops.length === 0 && (
+                    <p className="px-2 py-4 text-center text-xs text-slate-400">No shops match “{waShopSearch}”.</p>
+                  )}
+                </div>
+
+                <div className="border-t border-slate-100 px-3.5 py-3">
+                  <button
+                    type="button"
+                    onClick={() => void sendWhatsApp()}
+                    disabled={waSending}
+                    className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-[#25D366] px-3.5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-[#1DA851] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {waSending ? <Loader2 size={14} className="animate-spin" /> : <ShopLedgerWhatsAppIcon size={14} />}
+                    {waSending
+                      ? `Sending${waSendingShop ? `: ${waSendingShop}` : "…"}`
+                      : waScope === "all"
+                        ? waConfirmAll
+                          ? "Confirm & Send All"
+                          : "Send All Shops"
+                        : `Send Selected (${waSelectedShops.length})`}
+                  </button>
+                  {waScope === "all" && waConfirmAll && !waSending && (
+                    <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium text-amber-800">
+                      Press again to send to all {waAllShopNames.length} shop(s).
+                    </p>
+                  )}
+                </div>
+              </aside>
+
+              {/* Right: recipient details + message preview */}
+              <div className="flex min-w-0 flex-1 flex-col">
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+                  {waPreviewShop && waPreviewRecipient ? (
+                    <>
+                      <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-3 text-xs">
+                        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                          <div className="min-w-0">
+                            <span className="font-semibold text-slate-500">Shop:</span>{" "}
+                            <span className="text-slate-700">{waPreviewShop}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <span className="font-semibold text-slate-500">Owner:</span>{" "}
+                            <span className="text-slate-700">{waPreviewRecipient.ownerName || "Shop Owner"}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <span className="font-semibold text-slate-500">WhatsApp:</span>{" "}
+                            <span className="text-slate-700">{waPreviewRecipient.whatsappNumber || "Not available"}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <span className="font-semibold text-slate-500">Sent this week:</span>{" "}
+                            <span className="text-slate-700">
+                              {weeklySendCount(waSendCounts, currentWeekKey, waPreviewShop)} time(s)
+                            </span>
+                          </div>
+                        </div>
+                        {weeklySendCount(waSendCounts, currentWeekKey, waPreviewShop) > 0 &&
+                          waLastSent[weeklySendKey(currentWeekKey, waPreviewShop)] && (
+                            <div className="mt-1 min-w-0">
+                              <span className="font-semibold text-slate-500">Last sent:</span>{" "}
+                              <span className="text-slate-600">
+                                {waLastSent[weeklySendKey(currentWeekKey, waPreviewShop)]}
+                              </span>
+                            </div>
+                          )}
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>Message preview</label>
+                        <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-xl border border-emerald-100 bg-emerald-50/50 px-3.5 py-3 font-sans text-[11px] leading-relaxed text-slate-700">
+                          {waPreviewMessage}
+                        </pre>
+                      </div>
+
+                      <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-3.5 py-2.5 text-xs text-slate-600">
+                        <FileText size={14} className="shrink-0 text-red-500" />
+                        <span className="min-w-0 truncate font-medium" title={waPreviewFileName}>
+                          {waPreviewFileName}
+                        </span>
+                        <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-slate-400">
+                          PDF attachment
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-slate-400">Select a shop on the left to preview its WhatsApp message.</p>
+                  )}
+
+                  {waError && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5 text-xs text-amber-800">
+                      {waError}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-3">
+                  <button
+                    type="button"
+                    onClick={closeWhatsApp}
+                    disabled={waSending}
+                    className="h-9 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
