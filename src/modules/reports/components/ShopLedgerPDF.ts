@@ -101,14 +101,14 @@ const drawStatementChrome = (
   doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
   doc.text("WEEKLY STATEMENT", pageWidth / 2, 48, { align: "center" });
 
-  // ─── Shop details card (Shop | Owner, Mobile | City, Date Range) ───
-  // A polished two-column card: soft fill, light grid, navy accent bars,
-  // small vector icons beside each field, red uppercase labels over navy
-  // values — echoing the letterhead's red/navy identity.
+  // ─── Shop details table (Shop | Owner, Mobile | City, Date Range) ───
+  // Clean bordered grid with even margins, normal print colours throughout.
+  // The only accent: a small bold-coloured icon beside each field label.
   const tableWidth = pageWidth - PAGE_MARGIN * 2;
   const colWidth = tableWidth / 2;
-  const rowHeight = 10.4;
-  const tableTop = 50.5;
+  const rowHeight = 7.6;
+  const tableTop = 51;
+  const cellPadding = 2.2;
 
   const fitCellText = (raw: string, maxWidth: number): string => {
     const text = raw && raw.trim() ? raw.trim() : "-";
@@ -120,48 +120,55 @@ const drawStatementChrome = (
     return `${clipped}…`;
   };
 
-  // Tiny vector icons (muted grey, ~3mm) drawn beside each field label.
-  const ICON_GREY: RGB = [110, 118, 132];
-  const drawIcon = (
-    kind: "shop" | "owner" | "mobile" | "city" | "dates",
-    x: number,
-    y: number,
-  ): void => {
+  type DetailIcon = "shop" | "owner" | "mobile" | "city" | "dates";
+
+  // Bold colours per icon, echoing the on-screen column badges.
+  const ICON_COLORS: Record<DetailIcon, RGB> = {
+    shop: [5, 150, 105],    // emerald
+    owner: [79, 70, 229],   // indigo
+    mobile: [2, 132, 199],  // sky
+    city: [217, 119, 6],    // amber
+    dates: [190, 18, 60],   // rose
+  };
+
+  // Small vector icons (~3mm) drawn beside each field label.
+  const drawIcon = (kind: DetailIcon, x: number, y: number): void => {
+    const color = ICON_COLORS[kind];
     doc.saveGraphicsState();
-    doc.setDrawColor(ICON_GREY[0], ICON_GREY[1], ICON_GREY[2]);
-    doc.setLineWidth(0.28);
+    doc.setDrawColor(color[0], color[1], color[2]);
+    doc.setLineWidth(0.45);
     switch (kind) {
       case "shop": {
-        doc.rect(x, y + 1.2, 3.1, 2.1);            // store body
-        doc.setLineWidth(0.4);
+        doc.rect(x, y + 1.2, 3.1, 2.1);                 // store body
+        doc.setLineWidth(0.6);
         doc.line(x - 0.35, y + 1.2, x + 3.45, y + 1.2); // awning
-        doc.rect(x + 1.15, y + 2.2, 0.85, 1.1);    // door
+        doc.rect(x + 1.15, y + 2.2, 0.85, 1.1);         // door
         break;
       }
       case "owner": {
-        doc.circle(x + 1.55, y + 0.95, 0.78);      // head
-        doc.ellipse(x + 1.55, y + 2.75, 1.55, 0.85); // shoulders
+        doc.circle(x + 1.55, y + 0.95, 0.78);           // head
+        doc.ellipse(x + 1.55, y + 2.75, 1.55, 0.85);    // shoulders
         break;
       }
       case "mobile": {
         doc.roundedRect(x + 0.85, y, 1.7, 3.1, 0.4, 0.4); // handset
-        doc.circle(x + 1.7, y + 2.55, 0.13, "F");  // home dot
-        doc.setLineWidth(0.5);
+        doc.circle(x + 1.7, y + 2.55, 0.15, "F");       // home dot
+        doc.setLineWidth(0.6);
         doc.line(x + 1.35, y + 0.45, x + 2.05, y + 0.45); // speaker
         break;
       }
       case "city": {
-        doc.circle(x + 1.55, y + 1.05, 0.95);      // pin head
-        doc.circle(x + 1.55, y + 1.05, 0.28, "F"); // pin hole
+        doc.circle(x + 1.55, y + 1.05, 0.95);           // pin head
+        doc.circle(x + 1.55, y + 1.05, 0.28, "F");      // pin hole
         doc.triangle(x + 0.75, y + 1.7, x + 2.35, y + 1.7, x + 1.55, y + 3.05, "F"); // pin tip
         break;
       }
       case "dates": {
-        doc.rect(x, y + 0.55, 3.2, 2.65);          // calendar body
-        doc.setLineWidth(0.4);
-        doc.line(x + 0.7, y + 0.15, x + 0.7, y + 0.95);  // ring
-        doc.line(x + 2.5, y + 0.15, x + 2.5, y + 0.95);  // ring
-        doc.line(x, y + 1.55, x + 3.2, y + 1.55);  // header rule
+        doc.rect(x, y + 0.55, 3.2, 2.65);               // calendar body
+        doc.setLineWidth(0.6);
+        doc.line(x + 0.7, y + 0.15, x + 0.7, y + 0.95); // ring
+        doc.line(x + 2.5, y + 0.15, x + 2.5, y + 0.95); // ring
+        doc.line(x, y + 1.55, x + 3.2, y + 1.55);       // header rule
         break;
       }
     }
@@ -172,42 +179,39 @@ const drawStatementChrome = (
     x: number,
     y: number,
     width: number,
-    icon: "shop" | "owner" | "mobile" | "city" | "dates",
+    icon: DetailIcon,
     label: string,
     value: string,
   ): void => {
-    // Card fill + border + navy accent bar on the left edge.
-    doc.setFillColor(252, 252, 253);
     doc.setDrawColor(BORDER_LIGHT[0], BORDER_LIGHT[1], BORDER_LIGHT[2]);
     doc.setLineWidth(0.25);
-    doc.rect(x, y, width, rowHeight, "FD");
-    doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]);
-    doc.rect(x, y, 0.9, rowHeight, "F");
+    doc.rect(x, y, width, rowHeight);
 
-    drawIcon(icon, x + 4.2, y + (rowHeight - 3.1) / 2);
+    drawIcon(icon, x + cellPadding, y + (rowHeight - 3.1) / 2);
 
-    // Small red uppercase label, letter-spaced like the letterhead block.
+    const baseline = y + rowHeight / 2 + 1.1;
+    const textX = x + cellPadding + 4.6;
+
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(6.4);
-    doc.setTextColor(ACCENT_RED[0], ACCENT_RED[1], ACCENT_RED[2]);
-    doc.text(label.toUpperCase(), x + 10, y + 3.7, { charSpace: 0.25 });
+    doc.setFontSize(8.5);
+    doc.setTextColor(20, 20, 20);
+    doc.text(label, textX, baseline);
+    const labelWidth = doc.getTextWidth(label);
 
-    // Navy value underneath.
-    doc.setFontSize(9);
-    doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
-    doc.text(fitCellText(value, width - 13.5), x + 10, y + 8.1);
+    doc.setFont("helvetica", "normal");
+    doc.text(fitCellText(value, width - cellPadding * 2 - 4.6 - labelWidth), textX + labelWidth, baseline);
   };
 
-  drawDetailCell(PAGE_MARGIN, tableTop, colWidth, "shop", "Shop", entry.shop || "");
-  drawDetailCell(PAGE_MARGIN + colWidth, tableTop, colWidth, "owner", "Owner", entry.ownerName || "");
-  drawDetailCell(PAGE_MARGIN, tableTop + rowHeight, colWidth, "mobile", "Mobile", entry.mobile || "");
-  drawDetailCell(PAGE_MARGIN + colWidth, tableTop + rowHeight, colWidth, "city", "City", entry.city || "");
+  drawDetailCell(PAGE_MARGIN, tableTop, colWidth, "shop", "Shop: ", entry.shop || "");
+  drawDetailCell(PAGE_MARGIN + colWidth, tableTop, colWidth, "owner", "Owner: ", entry.ownerName || "");
+  drawDetailCell(PAGE_MARGIN, tableTop + rowHeight, colWidth, "mobile", "Mobile: ", entry.mobile || "");
+  drawDetailCell(PAGE_MARGIN + colWidth, tableTop + rowHeight, colWidth, "city", "City: ", entry.city || "");
   drawDetailCell(
     PAGE_MARGIN,
     tableTop + rowHeight * 2,
     tableWidth,
     "dates",
-    "Date Range",
+    "Date Range: ",
     `${formatPdfDate(dateFrom)} to ${formatPdfDate(dateTo)}`,
   );
 
@@ -341,8 +345,8 @@ export const generateShopLedgerPDF = async (
     autoTable(doc, {
       head: [headers],
       body: rows,
-      startY: 87,
-      margin: { top: 87, bottom: 20, left: PAGE_MARGIN, right: PAGE_MARGIN },
+      startY: 79,
+      margin: { top: 79, bottom: 20, left: PAGE_MARGIN, right: PAGE_MARGIN },
       theme: "grid",
       showHead: "everyPage",
       rowPageBreak: "avoid",
@@ -398,7 +402,7 @@ export const generateShopLedgerPDF = async (
     });
 
     // Thank-you closing block, same style as the Step-4 delivery receipt.
-    const finalY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 87;
+    const finalY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 79;
     drawThankYouBlock(doc, finalY + 2);
   });
 
