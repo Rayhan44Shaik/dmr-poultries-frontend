@@ -78,35 +78,6 @@ const modeColor = (mode: string) =>
 
 // 2D logo chips — flat color badges that tie table rows/columns to the
 // chart colors (Cash = emerald, Union Bank = sky, HDFC Bank = violet).
-// Logo marks — recognisable abbreviations, not bare initials.
-const MODE_MARKS: Record<string, string> = {
-  Cash: "CASH",
-  "HDFC Bank": "HDFC",
-  "Union Bank": "UNION",
-  Others: "OTHER",
-};
-const modeMark = (mode: string) =>
-  mode === "Total" ? "T" : (MODE_MARKS[mode] ?? mode.slice(0, 2).toUpperCase());
-
-function ModeBadge({ mode, size = "md" }: { mode: string; size?: "sm" | "md" }) {
-  const muted = mode === "Total";
-  const shell =
-    size === "sm"
-      ? "h-4 rounded px-1 text-[7px]"
-      : "h-6 rounded-md px-1.5 text-[9px] ring-1 ring-black/5 shadow-sm";
-  return (
-    <span
-      className={`inline-flex shrink-0 items-center justify-center font-black tracking-wide text-white ${shell} ${
-        muted ? "bg-slate-400" : ""
-      }`}
-      style={muted ? undefined : { background: modeColor(mode) }}
-      aria-hidden="true"
-    >
-      {modeMark(mode)}
-    </span>
-  );
-}
-
 const compactINR = (value: number) =>
   new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 
@@ -799,12 +770,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                       key={row.mode}
                       className={row.mode === "Total" ? "bg-amber-50/60 font-semibold" : "hover:bg-slate-50/50"}
                     >
-                      <td className="px-4 py-3 text-xs font-medium text-slate-800">
-                        <div className="flex items-center gap-2">
-                          <ModeBadge mode={row.mode} />
-                          {row.mode === "Total" ? t("common.total") : row.mode}
-                        </div>
-                      </td>
+                      <td className="px-4 py-3 text-xs font-medium text-slate-800">{row.mode === "Total" ? t("common.total") : row.mode}</td>
                       <td className="px-4 py-3 text-right text-xs text-slate-600">
                         {row.mode === "Total"
                           ? totalCollectorsCount
@@ -886,10 +852,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">{t("common.collector")}</th>
                     {collectorSummary.paymentModes.map((mode: string) => (
                       <th key={mode} className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
-                        <span className="inline-flex items-center justify-end gap-1.5">
-                          <ModeBadge mode={mode} size="sm" />
-                          {mode}
-                        </span>
+{mode}
                       </th>
                     ))}
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("common.total")}</th>
