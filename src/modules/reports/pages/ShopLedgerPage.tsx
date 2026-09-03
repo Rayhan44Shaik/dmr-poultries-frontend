@@ -1,15 +1,20 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { format, subDays } from "date-fns";
 import {
+  ArrowDownLeft,
+  ArrowUpRight,
   Bird,
   CalendarDays,
   CheckCircle2,
   FileText,
+  IndianRupee,
   Loader2,
   RefreshCw,
   RotateCcw,
+  Scale,
   Search,
   Store,
+  Weight,
   X,
 } from "lucide-react";
 import Select, { type StylesConfig } from "react-select";
@@ -829,11 +834,46 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                       Birds
                     </span>
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Weight (KG)</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Rate</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Debit</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Credit</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Balance</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-sky-600 text-white shadow-sm">
+                        <Weight size={13} />
+                      </span>
+                      Weight (KG)
+                    </span>
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-sm">
+                        <IndianRupee size={13} />
+                      </span>
+                      Rate
+                    </span>
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-sm">
+                        <ArrowUpRight size={13} />
+                      </span>
+                      Debit
+                    </span>
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-sm">
+                        <ArrowDownLeft size={13} />
+                      </span>
+                      Credit
+                    </span>
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-slate-500 to-slate-700 text-white shadow-sm">
+                        <Scale size={13} />
+                      </span>
+                      Balance
+                    </span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
