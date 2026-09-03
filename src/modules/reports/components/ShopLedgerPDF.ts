@@ -19,7 +19,7 @@ const normalizePaymentMode = (value?: string): string => {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
   if (/upi/i.test(raw)) return "UPI";
-  if (/union/i.test(raw)) return "Union Bank";
+  if (/union/i.test(raw)) return "Union";
   if (/\bsbi\b/i.test(raw) || /state bank/i.test(raw)) return "SBI";
   if (/bank/i.test(raw)) return "Bank Transfer";
   if (/cheque|check/i.test(raw)) return "Cheque";
