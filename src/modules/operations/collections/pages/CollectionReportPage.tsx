@@ -63,13 +63,6 @@ const exportButtonClass =
 const resetButtonClass =
   "inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-100 px-3.5 py-2.5 text-xs font-semibold text-rose-700 transition-all hover:bg-rose-200 active:scale-95 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
 
-const getBarColor = (percentage: number) => {
-  if (percentage >= 80) return "bg-green-500";
-  if (percentage >= 50) return "bg-blue-500";
-  if (percentage >= 30) return "bg-yellow-500";
-  return "bg-red-500";
-};
-
 // Chart palette: stable brand colors for the known modes, hashed fallback
 // for any other mode the backend returns.
 const MODE_CHART_COLORS: Record<string, string> = {
@@ -85,24 +78,31 @@ const modeColor = (mode: string) =>
 
 // 2D logo chips — flat color badges that tie table rows/columns to the
 // chart colors (Cash = emerald, Union Bank = sky, HDFC Bank = violet).
-const modeInitials = (mode: string) =>
-  (mode
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase()) || "M";
+const modeInitials = (mode: string) => {
+  if (mode === "Total") return "T";
+  const words = mode.trim().split(/\s+/).filter(Boolean);
+  const mono =
+    words.length > 1
+      ? words[0][0] + words[1][0]
+      : mode.slice(0, 2);
+  return mono.toUpperCase() || "M";
+};
 
-function ModeBadge({ mode, muted = false }: { mode: string; muted?: boolean }) {
+function ModeBadge({ mode, size = "md" }: { mode: string; size?: "sm" | "md" }) {
+  const muted = mode === "Total";
+  const shell =
+    size === "sm"
+      ? "h-4 w-4 rounded text-[7px]"
+      : "h-6 w-6 rounded-lg text-[10px] ring-1 ring-black/5 shadow-sm";
   return (
     <span
-      className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[9px] font-extrabold text-white ${
+      className={`inline-flex shrink-0 items-center justify-center font-black tracking-tight text-white ${shell} ${
         muted ? "bg-slate-400" : ""
       }`}
       style={muted ? undefined : { background: modeColor(mode) }}
       aria-hidden="true"
     >
-      {muted ? "T" : modeInitials(mode)}
+      {modeInitials(mode)}
     </span>
   );
 }
@@ -811,7 +811,6 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.collectors")}</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.no_short")}</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("table.amount")}</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-600">%</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -822,7 +821,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                     >
                       <td className="px-4 py-3 text-xs font-medium text-slate-800">
                         <div className="flex items-center gap-2">
-                          <ModeBadge mode={row.mode} muted={row.mode === "Total"} />
+                          <ModeBadge mode={row.mode} />
                           {row.mode === "Total" ? t("common.total") : row.mode}
                         </div>
                       </td>
@@ -833,19 +832,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                       </td>
                       <td className="px-4 py-3 text-right text-xs text-slate-600">{row.count}</td>
                       <td className="px-4 py-3 text-right text-xs text-slate-600">{formatCurrency(row.amount)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <span className="text-xs font-medium text-slate-700 w-10 text-right">
-                            {row.percentage.toFixed(1)}%
-                          </span>
-                          <div className="w-12 h-2 rounded-full bg-slate-100 overflow-hidden">
-                            <div
-                              className={`h-full rounded-full ${getBarColor(row.percentage)} transition-all duration-500`}
-                              style={{ width: `${row.percentage}%` }}
-                            />
-                          </div>
-                        </div>
-                      </td>
+
                     </tr>
                   ))}
                 </tbody>
@@ -920,7 +907,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                     {collectorSummary.paymentModes.map((mode: string) => (
                       <th key={mode} className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
                         <span className="inline-flex items-center justify-end gap-1.5">
-                          <span className="h-2 w-2 rounded-full" style={{ background: modeColor(mode) }} aria-hidden="true" />
+                          <ModeBadge mode={mode} size="sm" />
                           {mode}
                         </span>
                       </th>
