@@ -417,27 +417,6 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
   // Content matching the precise structural layout and spacing of RatesEntryPage
   const content = (
     <div className="w-full space-y-5">
-      {/* Report header — title + covered period + live total pill */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="rounded-2xl bg-emerald-50 p-2.5 text-emerald-600 shadow-sm">
-            <Wallet size={20} />
-          </span>
-          <div>
-            <h3 className="text-base font-bold tracking-tight text-slate-900">
-              {t("ops.collection.collection_report_title")}
-            </h3>
-            <p className="text-xs font-medium text-slate-500">
-              {fromDate || "—"} → {toDate || "—"}
-            </p>
-          </div>
-        </div>
-        <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 shadow-sm">
-          <span className={`h-1.5 w-1.5 rounded-full ${loading ? "animate-pulse bg-amber-400" : "bg-emerald-500"}`} />
-          {formatCurrency(totalCollections)}
-        </span>
-      </div>
-
       {/* Filter Bar Card — Excel / PDF / Reset / Search sit in the last grid
           cell, right after the Pay Mode filter */}
       <div className={opsFilterCardClass}>
