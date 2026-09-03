@@ -14,6 +14,8 @@ import {
   Users,
   X,
   ChevronDown,
+  Search,
+  Loader2,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -25,6 +27,7 @@ import {
   opsFilterLabelClass,
   opsInputClass,
   opsSecondaryButtonClass,
+  opsPrimaryButtonClass,
   opsPdfButtonClass,
   opsExcelButtonClass,
 } from "../../../../shared/ui/operationsStyles";
@@ -339,6 +342,20 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
     showNotification(t("ops.collection.filters_reset_default"), "info");
   }, [weekBounds, shopSearch, showNotification, t]);
 
+  // Manual Search: re-run the report for the current filters. If the date
+  // range is not set yet (week bounds never loaded), re-fetch bounds first —
+  // the date-change effect then loads the report automatically.
+  const handleSearch = () => {
+    if (loading) return;
+    setReportError(null);
+    if (fromDate && toDate) {
+      void loadReport();
+    } else {
+      setLoading(true);
+      void loadWeekBounds();
+    }
+  };
+
   if (loading && !report) return <div className="p-8 text-center text-slate-500">{t("common.loading")}</div>;
   if (reportError && !report) {
     return (
@@ -365,20 +382,8 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
   // Content matching the precise structural layout and spacing of RatesEntryPage
   const content = (
     <div className="w-full space-y-5">
-      {/* Action Buttons */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <button onClick={exportExcel} className={opsExcelButtonClass}>
-          <FileSpreadsheet size={15} /> Excel
-        </button>
-        <button onClick={exportPDF} className={opsPdfButtonClass}>
-          <FileText size={15} /> PDF
-        </button>
-        <button onClick={resetFilters} className={opsSecondaryButtonClass}>
-          <RotateCcw size={14} /> {t("common.reset")}
-        </button>
-      </div>
-
-      {/* Filter Bar Card */}
+      {/* Filter Bar Card — Excel / PDF / Reset / Search sit in the last grid
+          cell, right after the Pay Mode filter */}
       <div className={opsFilterCardClass}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DatePicker
@@ -483,6 +488,44 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
               <option value="Others">{t("common.other")}</option>
             </select>
           </div>
+
+          {/* Actions — after Pay Mode, bottom-aligned with the inputs */}
+          <div className="flex flex-wrap items-end justify-start gap-2 lg:justify-end">
+            <button
+              type="button"
+              onClick={handleSearch}
+              disabled={loading}
+              className={opsPrimaryButtonClass}
+              title={t("common.search")}
+            >
+              {loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
+              {t("common.search")}
+            </button>
+            <button
+              type="button"
+              onClick={exportExcel}
+              disabled={!report || report.totalCount === 0}
+              className={opsExcelButtonClass}
+            >
+              <FileSpreadsheet size={15} /> Excel
+            </button>
+            <button
+              type="button"
+              onClick={exportPDF}
+              disabled={!report || report.totalCount === 0}
+              className={opsPdfButtonClass}
+            >
+              <FileText size={15} /> PDF
+            </button>
+            <button
+              type="button"
+              onClick={resetFilters}
+              disabled={loading}
+              className={opsSecondaryButtonClass}
+            >
+              <RotateCcw size={14} /> {t("common.reset")}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -521,8 +564,16 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
       {/* Tables Grid Card Containers */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
-            <h4 className="text-sm font-semibold text-slate-800">{t("ops.collection.payment_mode_summary")}</h4>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <span className="rounded-lg bg-blue-50 p-1.5 text-blue-600">
+                <Wallet size={14} />
+              </span>
+              {t("ops.collection.payment_mode_summary")}
+            </h4>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              {t("ops.collection.no_of_collections")}: {report?.totalCount ?? 0}
+            </span>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-100">
@@ -564,8 +615,16 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
-            <h4 className="text-sm font-semibold text-slate-800">{t("ops.collection.collector_summary")}</h4>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <span className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600">
+                <Users size={14} />
+              </span>
+              {t("ops.collection.collector_summary")}
+            </h4>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              {t("ops.collection.total_collectors")}: {totalCollectorsCount}
+            </span>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-100">
