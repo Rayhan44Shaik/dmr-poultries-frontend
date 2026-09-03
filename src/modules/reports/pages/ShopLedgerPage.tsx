@@ -275,179 +275,6 @@ function buildWhatsAppMessage(
   ].join("\n");
 }
 
-// ── Frontend sample data (verification only) ────────────────────────────────
-// The page is seeded with ~50 shops and a mix of sales + collections so the
-// ledger table, filters, search, pagination, PDF and badges can be checked.
-// No backend or database is touched.
-const SAMPLE_SHOP_NAMES = Array.from({ length: 50 }, (_, i) => {
-  const names = [
-    "Srinivasa", "Lakshmi", "Venkateswara", "Sri Sai", "Balaji",
-    "Anjaneya", "Krishna", "Mallikarjuna", "Padmavathi", "Ganesh",
-    "Durga", "Vijaya", "Nandini", "Amrutha", "Raghava",
-    "Sai", "Karthik", "Teja", "Mahesh", "Naveen",
-    "Prasad", "Kiran", "Ravi", "Shiva", "Bhavani",
-    "Sarada", "Kali", "Hanuman", "Ranganatha", "Sundara",
-    "Chandra", "Surya", "Vamsi", "Harika", "Devi",
-    "Mounika", "Pooja", "Reshma", "Chaitanya", "Manoj",
-    "Santhosh", "Praveen", "Ramesh", "Suresh", "Ashok",
-    "Vinod", "Sravan", "Anand", "Bhaskar", "Murali",
-  ];
-  return `${names[i]} Chicken Centre`;
-});
-
-const SAMPLE_PAYMENT_MODES = ["Cash", "UPI", "Union", "SBI"];
-
-const SAMPLE_OWNER_FIRST_NAMES = [
-  "Ramesh", "Suresh", "Anil", "Prakash", "Mohan",
-  "Vijay", "Srinivas", "Lakshman", "Narayana", "Gopal",
-];
-
-const SAMPLE_OWNER_LAST_NAMES = ["Reddy", "Kumar", "Rao", "Naidu", "Prasad"];
-
-const SAMPLE_CITIES = [
-  "Peddapuram",
-  "Samarlakota",
-  "Rajahmundry",
-  "Kakinada",
-  "Ramachandrapuram",
-  "Vijayawada",
-];
-
-/** Deterministic sample city per shop (stable across re-renders). */
-const sampleCityFor = (shop: string): string => {
-  const idx = Math.max(0, SAMPLE_SHOP_NAMES.indexOf(shop));
-  return SAMPLE_CITIES[idx % SAMPLE_CITIES.length];
-};
-
-/** Deterministic sample owner + phone per shop (stable across re-renders). */
-const sampleRecipientFor = (
-  shop: string,
-): { ownerName: string; phoneNumber: string; whatsappNumber: string } => {
-  const idx = Math.max(0, SAMPLE_SHOP_NAMES.indexOf(shop));
-  const ownerName = `${SAMPLE_OWNER_FIRST_NAMES[idx % SAMPLE_OWNER_FIRST_NAMES.length]} ${
-    SAMPLE_OWNER_LAST_NAMES[idx % SAMPLE_OWNER_LAST_NAMES.length]
-  }`;
-  const phone = `98${String(40000000 + idx * 11111111).slice(0, 8)}`;
-  return { ownerName, phoneNumber: phone, whatsappNumber: phone };
-};
-
-function makeSampleLedger(
-  from: string,
-  to: string,
-  shopName?: string
-): LedgerTransaction[] {
-  const fromTime = new Date(`${from}T00:00:00`).getTime();
-  const toTime = new Date(`${to}T23:59:59`).getTime();
-  const shops = shopName && shopName !== "All Shops"
-    ? [shopName]
-    : SAMPLE_SHOP_NAMES;
-
-  const spanDays = Math.max(1, Math.round((toTime - fromTime) / 86400000) + 1);
-
-  // Opening balance from a deterministic value per shop.
-  let balance = 0;
-  const rows: LedgerTransaction[] = [
-    {
-      date: from,
-      particulars: "Opening Balance",
-      birds: 0,
-      weight: 0,
-      rate: 0,
-      debit: 0,
-      credit: 0,
-      balance: 0,
-      type: "sale",
-    },
-  ];
-
-  const buildRand = (current: number) => (n: number) => {
-    const x = Math.sin(current * 999 + n) * 10000;
-    return x - Math.floor(x);
-  };
-
-  shops.forEach((shop, shopIdx) => {
-    let r = buildRand(shopIdx + 1);
-
-    // Every shop gets at least 1 sale and 1 collection; larger shops get more.
-    const totalLines = 6 + Math.floor(r(1) * 6); // 6..11
-    let localSeed = shopIdx + 1;
-
-    for (let i = 0; i < totalLines; i++) {
-      r = buildRand(localSeed * 131 + i);
-
-      const dayOffset = Math.min(
-        spanDays - 1,
-        Math.floor(r(2) * spanDays)
-      );
-      const base = new Date(fromTime);
-      const dateObj = new Date(
-        base.getFullYear(),
-        base.getMonth(),
-        base.getDate() + Math.max(0, dayOffset),
-      );
-      // Local date components only — never toISOString() (avoids rollover).
-      const date = [
-        dateObj.getFullYear(),
-        String(dateObj.getMonth() + 1).padStart(2, "0"),
-        String(dateObj.getDate()).padStart(2, "0"),
-      ].join("-");
-
-      // Mostly sales, with a solid mix of collections and a few corrections.
-      const kind =
-        i % 3 === 2
-          ? "collection"
-          : i % 7 === 5
-            ? "correction"
-            : "sale";
-
-      const birds = kind === "sale" ? 220 + Math.round(r(4) * 620) : 0;
-      const rate = kind === "sale"
-        ? 110 + Math.round(r(5) * 18)
-        : 0;
-      const weight = kind === "sale"
-        ? Math.round(birds * 2.1 * 10) / 10
-        : 0;
-
-      const amount = kind === "sale"
-        ? Math.round(weight * rate * 100) / 100
-        : kind === "collection"
-          ? Math.round((6000 + r(6) * 30000) * 100) / 100
-          : Math.round(r(7) * 1800 * 100) / 100;
-
-      const tx: LedgerTransaction = {
-        date,
-        // Particulars = shop name only — no trip / collection reference numbers.
-        particulars: shop,
-        birds,
-        weight,
-        rate,
-        debit: kind === "sale" ? amount : 0,
-        credit: kind === "collection" ? amount : 0,
-        balance: 0,
-        type: kind as "sale" | "collection" | "correction",
-        collectionNo: undefined,
-        paymentMode:
-          kind === "collection"
-            ? SAMPLE_PAYMENT_MODES[(shopIdx + i) % SAMPLE_PAYMENT_MODES.length]
-            : undefined,
-      };
-
-      if (tx.type === "sale") balance += tx.debit;
-      else if (tx.type === "collection") balance -= tx.credit;
-      tx.balance = balance;
-      rows.push(tx);
-
-      localSeed++;
-    }
-  });
-
-  // Fix the opening row balance so the running balance is coherent.
-  rows[0].balance = rows.length > 1 ? rows[1].balance - (rows[1].debit - rows[1].credit) : 0;
-  if (rows[0].balance < 0) rows[0].balance = 0;
-
-  return rows.sort((a, b) => a.date.localeCompare(b.date));
-}
-
 const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const { showNotification } = useSafeNotification();
   const { shops } = useShops();
@@ -483,17 +310,14 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const [ledgerRefreshing, setLedgerRefreshing] = useState(false);
   const [ledgerError, setLedgerError] = useState<string | null>(null);
   const [refreshToast, setRefreshToast] = useState(false);
-  const [sampleMode] = useState(true); // Page-level sample data for first verification.
 
-  // In sample mode the page uses the 50 sample shops so the Shop filter works
-  // without a backend. Real mode uses the shops master from the API.
   const shopOptions = useMemo(() => {
     const all = [{ value: "All Shops", label: "All Shops" }];
-    const source = sampleMode ? SAMPLE_SHOP_NAMES : shops.map((shop: Shop) => shop.shopName);
+    const source = shops.map((shop: Shop) => shop.shopName);
     const unique = Array.from(new Set(source));
     const shopList = unique.map((name) => ({ value: name, label: name }));
     return [...all, ...shopList];
-  }, [shops, sampleMode]);
+  }, [shops]);
 
   const selectedShopId = useMemo(() => {
     return appliedSelectedShop === "All Shops"
@@ -523,24 +347,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   useEffect(() => {
     let cancelled = false;
 
-    if (sampleMode) {
-      // Sample mode: build directly from deterministic local rows so the UI
-      // (search, filters, PDF, refresh, pagination) is testable without a
-      // backend. Only the committed (Search) date/shop filters are applied.
-      const sample = makeSampleLedger(appliedDateFrom, appliedDateTo, appliedSelectedShop);
-      queueMicrotask(() => {
-        if (!cancelled) {
-          setLedgerLoading(false);
-          setLedgerRefreshing(false);
-          setLedgerError(null);
-          setLedgerData(sample);
-        }
-      });
-      return () => {
-        cancelled = true;
-      };
-    }
-
     buildLedger(appliedDateFrom, appliedDateTo, selectedShopId)
       .then((tx) => {
         if (!cancelled) {
@@ -563,7 +369,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     // `refreshNonce` drives a targeted content refresh (same pattern used by
     // other ERP tabs): the loader keeps the existing table visible while the
     // data is reloaded, so the page itself is never fully reloaded.
-  }, [appliedDateFrom, appliedDateTo, appliedSelectedShop, selectedShopId, buildLedger, refreshNonce, sampleMode]);
+  }, [appliedDateFrom, appliedDateTo, appliedSelectedShop, selectedShopId, buildLedger, refreshNonce]);
 
   const filteredLedger = useMemo(() => {
     const opening = ledgerData.slice(0, 1);
@@ -644,10 +450,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       const hit = ledgerCacheRef.current.get(key);
       if (hit) return hit;
       const shopId = shopMasterMap.get(shop)?.id;
-      if (!sampleMode && shopId == null) return null;
-      const ledger = sampleMode
-        ? makeSampleLedger(from, to, shop)
-        : await buildLedger(from, to, shopId);
+      if (shopId == null) return null;
+      const ledger = await buildLedger(from, to, shopId);
       ledgerCacheRef.current.set(key, ledger);
       while (ledgerCacheRef.current.size > LEDGER_CACHE_LIMIT) {
         const oldest = ledgerCacheRef.current.keys().next().value;
@@ -656,7 +460,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       }
       return ledger;
     },
-    [sampleMode, shopMasterMap, buildLedger],
+    [shopMasterMap, buildLedger],
   );
 
   // ─── PDF preview modal state ────────────────────────────────
@@ -685,10 +489,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
   const revokePdfUrls = (state: PdfPreviewState | null) => {
     if (!state) return;
-    URL.revokeObjectURL(state.combinedUrl);
+    const urls = new Set<string>([state.combinedUrl]);
     state.files.forEach((file) => {
-      if (file.url) URL.revokeObjectURL(file.url);
+      if (file.url) urls.add(file.url);
     });
+    urls.forEach((url) => URL.revokeObjectURL(url));
   };
 
   // ─── PDF export → preview modal ────────────────────────────
@@ -704,12 +509,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
       let shopNames: string[] = [];
 
-      if (sampleMode) {
-        // Sample mode: export from local page data without a backend.
-        shopNames = appliedSelectedShop !== "All Shops"
-          ? [appliedSelectedShop]
-          : [...SAMPLE_SHOP_NAMES];
-      } else if (appliedSelectedShop === "All Shops") {
+      if (appliedSelectedShop === "All Shops") {
         const all = await fetchShopLedger({ fromDate: appliedDateFrom, toDate: appliedDateTo });
         const names = new Set<string>();
         all.data.forEach((r) => {
@@ -737,9 +537,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           allLedgers.push({
             shop,
             data: ledger,
-            ownerName: sampleMode ? sampleRecipientFor(shop).ownerName : master?.ownerName || undefined,
-            mobile: sampleMode ? sampleRecipientFor(shop).phoneNumber : master?.phoneNumber || undefined,
-            city: sampleMode ? sampleCityFor(shop) : master?.city || undefined,
+            ownerName: master?.ownerName || undefined,
+            mobile: master?.phoneNumber || undefined,
+            city: master?.city || undefined,
           });
           shopData[shop] = ledger;
         }
@@ -781,7 +581,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       const files: { shop: string; url: string | null; filename: string }[] = allLedgers.map(
         ({ shop }) => ({
           shop,
-          url: null,
+          url: allLedgers.length === 1 ? combined.url : null,
           filename: `WeeklyStatement_${shop.replace(/\s+/g, "_")}_${formatDisplayDate(appliedDateFrom)}_to_${formatDisplayDate(appliedDateTo)}.pdf`,
         }),
       );
@@ -821,7 +621,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       setPdfGenerating(false);
       setPdfProgress(null);
     }
-  }, [appliedSelectedShop, appliedDateFrom, appliedDateTo, sampleMode, showNotification, shopMasterMap, getCachedLedger]);
+  }, [appliedSelectedShop, appliedDateFrom, appliedDateTo, showNotification, shopMasterMap, getCachedLedger]);
 
   const closePdfPreview = useCallback(() => {
     // Invalidate any in-flight export so it cannot re-open this modal.
@@ -878,9 +678,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           [{
             shop,
             data: ledger,
-            ownerName: sampleMode ? sampleRecipientFor(shop).ownerName : master?.ownerName || undefined,
-            mobile: sampleMode ? sampleRecipientFor(shop).phoneNumber : master?.phoneNumber || undefined,
-            city: sampleMode ? sampleCityFor(shop) : master?.city || undefined,
+            ownerName: master?.ownerName || undefined,
+            mobile: master?.phoneNumber || undefined,
+            city: master?.city || undefined,
           }],
           appliedDateFrom,
           appliedDateTo,
@@ -916,7 +716,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       }
       // appliedDateFrom/To pinned via useCallback deps
     },
-    [appliedDateFrom, appliedDateTo, sampleMode, shopMasterMap, getCachedLedger],
+    [appliedDateFrom, appliedDateTo, shopMasterMap, getCachedLedger],
   );
 
   const setActivePdfShop = (index: number, shop?: string) => {
@@ -987,9 +787,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         return {
           shop,
           data: current.shopData[shop] ?? [],
-          ownerName: sampleMode ? sampleRecipientFor(shop).ownerName : master?.ownerName || undefined,
-          mobile: sampleMode ? sampleRecipientFor(shop).phoneNumber : master?.phoneNumber || undefined,
-          city: sampleMode ? sampleCityFor(shop) : master?.city || undefined,
+          ownerName: master?.ownerName || undefined,
+          mobile: master?.phoneNumber || undefined,
+          city: master?.city || undefined,
         };
       })
       .filter((entry) => entry.data.length > 0);
@@ -1159,20 +959,16 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   }, [waLastSent, currentWeekKey]);
 
   const waAllShopNames = useMemo(() => {
-    const source = sampleMode ? SAMPLE_SHOP_NAMES : shops.map((shop: Shop) => shop.shopName);
+    const source = shops.map((shop: Shop) => shop.shopName);
     return Array.from(new Set(source)).sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
-  }, [shops, sampleMode]);
+  }, [shops]);
 
   /**
    * WhatsApp recipient for a shop — `whatsappNumber` from Shop Master when
-   * present, otherwise the regular `phoneNumber`. Sample mode uses
-   * deterministic sample owner/phone values.
+   * present, otherwise the regular `phoneNumber`.
    */
   const resolveWaRecipient = useCallback(
     (shop: string): { shop: string; ownerName: string; phoneNumber: string; whatsappNumber: string } => {
-      if (sampleMode) {
-        return { shop, ...sampleRecipientFor(shop) };
-      }
       const found = shopMasterMap.get(shop);
       if (!found) {
         return { shop, ownerName: "Shop Owner", phoneNumber: "", whatsappNumber: "" };
@@ -1186,7 +982,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         whatsappNumber: whatsapp || phone,
       };
     },
-    [sampleMode, shopMasterMap],
+    [shopMasterMap],
   );
 
   /** Drop the attachment preview document (and its blob URL). */
@@ -1214,14 +1010,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       try {
         const ledger = (await getCachedLedger(waDateFrom, waDateTo, shop)) ?? [];
         const master = shopMasterMap.get(shop);
-        const recipient = resolveWaRecipient(shop);
         const generated = await generateShopLedgerPDF(
           [{
             shop,
             data: ledger,
-            ownerName: sampleMode ? recipient.ownerName : master?.ownerName || undefined,
-            mobile: sampleMode ? recipient.phoneNumber : master?.phoneNumber || undefined,
-            city: sampleMode ? sampleCityFor(shop) : master?.city || undefined,
+            ownerName: master?.ownerName || undefined,
+            mobile: master?.phoneNumber || undefined,
+            city: master?.city || undefined,
           }],
           waDateFrom,
           waDateTo,
@@ -1244,7 +1039,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         setWaAttachmentBusy(false);
       }
     },
-    [waDateFrom, waDateTo, sampleMode, shopMasterMap, getCachedLedger, resolveWaRecipient],
+    [waDateFrom, waDateTo, shopMasterMap, getCachedLedger],
   );
 
   const handleWaToggleAttachmentPreview = () => {
@@ -1400,23 +1195,21 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         }
 
         const shopId = shopMasterMap.get(shop)?.id;
-        if (!sampleMode && shopId == null) {
+        if (shopId == null) {
           throw new Error(`Shop ${shop} is not in the shops master.`);
         }
 
         // Same per-shop PDF the preview modal generates.
-        const ledger = sampleMode
-          ? makeSampleLedger(waDateFrom, waDateTo, shop)
-          : await buildLedger(waDateFrom, waDateTo, shopId);
+        const ledger = await buildLedger(waDateFrom, waDateTo, shopId);
 
         const waMaster = shopMasterMap.get(shop);
         const generated = await generateShopLedgerPDF(
           [{
             shop,
             data: ledger,
-            ownerName: sampleMode ? recipient.ownerName : waMaster?.ownerName || undefined,
-            mobile: sampleMode ? recipient.phoneNumber : waMaster?.phoneNumber || undefined,
-            city: sampleMode ? sampleCityFor(shop) : waMaster?.city || undefined,
+            ownerName: waMaster?.ownerName || undefined,
+            mobile: waMaster?.phoneNumber || undefined,
+            city: waMaster?.city || undefined,
           }],
           waDateFrom,
           waDateTo,
@@ -1493,7 +1286,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     currentWeekKey,
     resolveWaRecipient,
     shopMasterMap,
-    sampleMode,
     buildLedger,
     waReportType,
     showNotification,
