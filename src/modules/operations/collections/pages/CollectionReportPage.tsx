@@ -1,6 +1,6 @@
 // src/modules/collections/pages/CollectionReportPage.tsx
 
-import { useState, useEffect, useMemo, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { collectionService } from "../services/collectionService";
 import type { CollectionApiEntry, CollectionReportSummary } from "../types/collection";
 import { useShops } from "../../../masters/shops/hooks/useShops";
@@ -31,7 +31,6 @@ import {
   Download,
   Inbox,
   AlertTriangle,
-  Coins,
   BarChart3,
 } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -63,43 +62,6 @@ const exportButtonClass =
   "inline-flex items-center justify-center gap-1.5 rounded-xl border border-sky-200 bg-sky-100 px-3.5 py-2.5 text-xs font-semibold text-sky-700 transition-all hover:bg-sky-200 active:scale-95 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
 const resetButtonClass =
   "inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-100 px-3.5 py-2.5 text-xs font-semibold text-rose-700 transition-all hover:bg-rose-200 active:scale-95 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
-
-// ── KPI card shell — one source of truth so all cards stay pixel-identical ──
-type KpiTone = "blue" | "violet" | "indigo" | "sky";
-const KPI_TONES: Record<KpiTone, { chip: string; bar: string }> = {
-  blue: { chip: "bg-blue-50 text-blue-600", bar: "bg-blue-400" },
-  violet: { chip: "bg-violet-50 text-violet-600", bar: "bg-violet-400" },
-  indigo: { chip: "bg-indigo-50 text-indigo-600", bar: "bg-indigo-400" },
-  sky: { chip: "bg-sky-50 text-sky-600", bar: "bg-sky-400" },
-};
-
-function KpiCard({
-  icon,
-  tone,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  tone: KpiTone;
-  label: string;
-  value: string;
-}) {
-  const t = KPI_TONES[tone];
-  return (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-      <span className={`absolute inset-x-0 top-0 h-1 ${t.bar}`} aria-hidden="true" />
-      <div className="flex min-h-[84px] items-center gap-4 p-4 md:p-5">
-        <span className={`shrink-0 rounded-2xl p-3 ${t.chip}`}>{icon}</span>
-        <div className="min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</div>
-          <div className="mt-0.5 whitespace-nowrap text-xl font-extrabold tabular-nums tracking-tight text-slate-800 md:text-2xl">
-            {value}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 const getBarColor = (percentage: number) => {
   if (percentage >= 80) return "bg-green-500";
@@ -230,9 +192,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
   }, [fromDate, toDate, shopName, collector, paymentMode]);
 
   const totalCollections = report?.totalAmount ?? 0;
-  const totalCount = report?.totalCount ?? 0;
   const totalCollectorsCount = report?.totalCollectors ?? 0;
-  const avgPerCollection = totalCount > 0 ? totalCollections / totalCount : 0;
 
   // Presentation-only: bucket the backend's already-aggregated per-mode
   // distinct-collector counts into Known modes + "Others", in a fixed
@@ -715,38 +675,6 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
             </button>
           </div>
         </div>
-      </div>
-
-      {/* KPI Cards — all values backend-authoritative */}
-      <div
-        className={`grid grid-cols-1 gap-4 transition-opacity duration-200 sm:grid-cols-2 lg:grid-cols-4 ${
-          loading ? "pointer-events-none opacity-50" : ""
-        }`}
-      >
-        <KpiCard
-          tone="blue"
-          icon={<Wallet size={22} />}
-          label={t("ops.collection.total_collections")}
-          value={formatCurrency(totalCollections)}
-        />
-        <KpiCard
-          tone="violet"
-          icon={<FileText size={22} />}
-          label={t("ops.collection.no_of_collections")}
-          value={String(totalCount)}
-        />
-        <KpiCard
-          tone="indigo"
-          icon={<Users size={22} />}
-          label={t("ops.collection.total_collectors")}
-          value={String(totalCollectorsCount)}
-        />
-        <KpiCard
-          tone="sky"
-          icon={<Coins size={22} />}
-          label={t("ops.collection.avg_per_collection")}
-          value={formatCurrency(avgPerCollection)}
-        />
       </div>
 
       {/* Tables — friendly empty state when the period has no collections;
