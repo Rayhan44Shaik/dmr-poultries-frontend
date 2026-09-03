@@ -103,12 +103,11 @@ const drawStatementChrome = (
 
   // ─── Shop details table (Shop | Owner, Mobile | City, Date Range) ───
   // Clean bordered grid with even margins, normal print colours throughout.
-  // The only accent: a small bold-coloured icon beside each field label.
   const tableWidth = pageWidth - PAGE_MARGIN * 2;
   const colWidth = tableWidth / 2;
   const rowHeight = 7.6;
   const tableTop = 51;
-  const cellPadding = 2.2;
+  const cellPadding = 2.6;
 
   const fitCellText = (raw: string, maxWidth: number): string => {
     const text = raw && raw.trim() ? raw.trim() : "-";
@@ -120,80 +119,10 @@ const drawStatementChrome = (
     return `${clipped}…`;
   };
 
-  type DetailIcon = "shop" | "owner" | "mobile" | "city" | "dates";
-
-  // Bold colours per icon, echoing the on-screen column badges.
-  const ICON_COLORS: Record<DetailIcon, RGB> = {
-    shop: [5, 150, 105],    // emerald
-    owner: [79, 70, 229],   // indigo
-    mobile: [2, 132, 199],  // sky
-    city: [217, 119, 6],    // amber
-    dates: [190, 18, 60],   // rose
-  };
-
-  /**
-   * Small solid-style glyphs on a shared 3.4mm design grid — consistent
-   * optical weight, filled shapes with fine outlines so they stay crisp at
-   * print size (drawn on white, so knocked-out details read cleanly).
-   */
-  const drawIcon = (kind: DetailIcon, x: number, y: number): void => {
-    const color = ICON_COLORS[kind];
-    doc.saveGraphicsState();
-    doc.setDrawColor(color[0], color[1], color[2]);
-    doc.setFillColor(color[0], color[1], color[2]);
-    doc.setLineJoin("round");
-    doc.setLineCap("round");
-    switch (kind) {
-      case "shop": {
-        // Storefront: filled awning band, fine body outline, solid door.
-        doc.rect(x, y + 0.15, 3.4, 0.9, "F");
-        doc.setLineWidth(0.35);
-        doc.roundedRect(x + 0.3, y + 1.05, 2.8, 2.15, 0.25, 0.25, "S");
-        doc.rect(x + 1.35, y + 2.05, 0.7, 1.15, "F");
-        break;
-      }
-      case "owner": {
-        // Person: solid head + solid shoulders.
-        doc.circle(x + 1.7, y + 1.0, 0.85, "F");
-        doc.ellipse(x + 1.7, y + 2.9, 1.65, 0.72, "F");
-        break;
-      }
-      case "mobile": {
-        // Handset: slim outline with speaker line + home dot.
-        doc.setLineWidth(0.38);
-        doc.roundedRect(x + 1.0, y, 1.7, 3.3, 0.45, 0.45, "S");
-        doc.setLineWidth(0.5);
-        doc.line(x + 1.5, y + 0.45, x + 2.2, y + 0.45);
-        doc.circle(x + 1.85, y + 2.72, 0.17, "F");
-        break;
-      }
-      case "city": {
-        // Map pin: outlined head with a solid centre dot + solid tip.
-        doc.setLineWidth(0.38);
-        doc.circle(x + 1.7, y + 1.15, 0.95, "S");
-        doc.circle(x + 1.7, y + 1.15, 0.3, "F");
-        doc.triangle(x + 0.9, y + 1.75, x + 2.5, y + 1.75, x + 1.7, y + 3.3, "F");
-        break;
-      }
-      case "dates": {
-        // Calendar: fine body outline, solid header band, rings above it.
-        doc.setLineWidth(0.35);
-        doc.roundedRect(x, y + 0.5, 3.4, 2.85, 0.3, 0.3, "S");
-        doc.setLineWidth(0.55);
-        doc.line(x + 0.85, y + 0.1, x + 0.85, y + 0.95);
-        doc.line(x + 2.55, y + 0.1, x + 2.55, y + 0.95);
-        doc.rect(x, y + 0.5, 3.4, 0.7, "F");
-        break;
-      }
-    }
-    doc.restoreGraphicsState();
-  };
-
   const drawDetailCell = (
     x: number,
     y: number,
     width: number,
-    icon: DetailIcon,
     label: string,
     value: string,
   ): void => {
@@ -201,30 +130,25 @@ const drawStatementChrome = (
     doc.setLineWidth(0.25);
     doc.rect(x, y, width, rowHeight);
 
-    drawIcon(icon, x + cellPadding, y + (rowHeight - 3.1) / 2);
-
     const baseline = y + rowHeight / 2 + 1.1;
-    const textX = x + cellPadding + 5.0;
-
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
     doc.setTextColor(20, 20, 20);
-    doc.text(label, textX, baseline);
+    doc.text(label, x + cellPadding, baseline);
     const labelWidth = doc.getTextWidth(label);
 
     doc.setFont("helvetica", "normal");
-    doc.text(fitCellText(value, width - cellPadding * 2 - 5.0 - labelWidth), textX + labelWidth, baseline);
+    doc.text(fitCellText(value, width - cellPadding * 2 - labelWidth), x + cellPadding + labelWidth, baseline);
   };
 
-  drawDetailCell(PAGE_MARGIN, tableTop, colWidth, "shop", "Shop: ", entry.shop || "");
-  drawDetailCell(PAGE_MARGIN + colWidth, tableTop, colWidth, "owner", "Owner: ", entry.ownerName || "");
-  drawDetailCell(PAGE_MARGIN, tableTop + rowHeight, colWidth, "mobile", "Mobile: ", entry.mobile || "");
-  drawDetailCell(PAGE_MARGIN + colWidth, tableTop + rowHeight, colWidth, "city", "City: ", entry.city || "");
+  drawDetailCell(PAGE_MARGIN, tableTop, colWidth, "Shop: ", entry.shop || "");
+  drawDetailCell(PAGE_MARGIN + colWidth, tableTop, colWidth, "Owner: ", entry.ownerName || "");
+  drawDetailCell(PAGE_MARGIN, tableTop + rowHeight, colWidth, "Mobile: ", entry.mobile || "");
+  drawDetailCell(PAGE_MARGIN + colWidth, tableTop + rowHeight, colWidth, "City: ", entry.city || "");
   drawDetailCell(
     PAGE_MARGIN,
     tableTop + rowHeight * 2,
     tableWidth,
-    "dates",
     "Date Range: ",
     `${formatPdfDate(dateFrom)} to ${formatPdfDate(dateTo)}`,
   );
