@@ -83,13 +83,25 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
   const [report, setReport] = useState<CollectionReportSummary | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
 
+  const loadWeekBounds = useCallback(() => {
+    return collectionService
+      .fetchWeekBounds()
+      .then((bounds) => {
+        setWeekBounds({ from: bounds.weekStart, to: bounds.weekEnd });
+        setFromDate((prev) => prev || bounds.weekStart);
+        setToDate((prev) => prev || bounds.weekEnd);
+      })
+      .catch(() => {
+        // Backend unreachable: resolve the initial loading state and surface
+        // the error/retry UI below instead of spinning forever.
+        setLoading(false);
+        setReportError(t("ops.collection.report_load_failed"));
+      });
+  }, [t]);
+
   useEffect(() => {
-    void collectionService.fetchWeekBounds().then((bounds) => {
-      setWeekBounds({ from: bounds.weekStart, to: bounds.weekEnd });
-      setFromDate((prev) => prev || bounds.weekStart);
-      setToDate((prev) => prev || bounds.weekEnd);
-    }).catch(() => undefined);
-  }, []);
+    void loadWeekBounds();
+  }, [loadWeekBounds]);
 
   const loadReport = async () => {
     if (!fromDate || !toDate) return;
@@ -332,7 +344,18 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
     return (
       <div className="p-8 text-center text-red-600">
         {reportError}{" "}
-        <button onClick={() => void loadReport()} className="underline">
+        <button
+          onClick={() => {
+            setReportError(null);
+            if (fromDate && toDate) {
+              void loadReport();
+            } else {
+              setLoading(true);
+              void loadWeekBounds();
+            }
+          }}
+          className="underline"
+        >
           {t("common.retry")}
         </button>
       </div>
