@@ -28,6 +28,14 @@ export interface GeneratedShopLedgerPdf {
   filename: string;
 }
 
+/** One shop's ledger section plus the shop-master details shown on the PDF. */
+export interface ShopLedgerPdfEntry {
+  shop: string;
+  data: LedgerTransaction[];
+  ownerName?: string;
+  city?: string;
+}
+
 /** Ledger dates are stored as yyyy-MM-dd; the PDF prints dd-MM-yyyy. */
 export const formatPdfDate = (value: string): string => {
   const parts = value.split("-");
@@ -56,7 +64,6 @@ const formatAmount = (value: number): string =>
 // Shared branded palette (matches the Step-4 delivery receipt).
 type RGB = [number, number, number];
 const NAVY: RGB = [15, 35, 79];
-const TEXT_MUTED: RGB = [75, 85, 99];
 const BORDER_LIGHT: RGB = [200, 200, 200];
 const ACCENT_RED: RGB = [142, 30, 30];
 
@@ -65,18 +72,20 @@ const PAGE_MARGIN = 12;
 const LETTERHEAD_TOP = 7;
 
 /**
- * Draws the branded DMR POULTRIES letterhead plus the statement title,
- * shop and period lines. Used on every page so multi-page statements keep
- * the same header as the Step-4 delivery receipt.
+ * Draws the branded DMR POULTRIES letterhead plus the weekly-statement title
+ * and the two-column shop details (Shop / Owner, City / Period). Used on every
+ * page so multi-page statements keep the same header as the Step-4 delivery
+ * receipt.
  */
 const drawStatementChrome = (
   doc: jsPDF,
-  shop: string,
+  entry: ShopLedgerPdfEntry,
   dateFrom: string,
   dateTo: string,
   assets: DmrPoultryHeaderAssets,
 ): void => {
   const pageWidth = doc.internal.pageSize.getWidth();
+  const midX = pageWidth / 2;
 
   // Same letterhead as the Step-4 delivery PDF (PROPRIETOR block, centred
   // DMR POULTRIES wordmark with address, hen mark, decorative divider).
@@ -86,27 +95,31 @@ const drawStatementChrome = (
     assets,
   );
 
-  // ─── Statement title block (under the letterhead) ───
+  // ─── Statement title ───
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
-  doc.text("SHOP LEDGER STATEMENT", pageWidth / 2, 48, { align: "center" });
+  doc.text("WEEKLY STATEMENT", midX, 48, { align: "center" });
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9.5);
-  doc.setTextColor(20, 20, 20);
-  doc.text(`Shop: ${shop}`, pageWidth / 2, 54, { align: "center" });
+  // ─── Two-column shop details ───
+  const labelValue = (label: string, value: string, x: number, y: number) => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(20, 20, 20);
+    doc.text(label, x, y);
+    const valueX = x + doc.getTextWidth(label) + 1.5;
+    doc.setFont("helvetica", "normal");
+    doc.text(value || "-", valueX, y);
+  };
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(TEXT_MUTED[0], TEXT_MUTED[1], TEXT_MUTED[2]);
-  doc.text(`Period: ${formatPdfDate(dateFrom)} to ${formatPdfDate(dateTo)}`, pageWidth / 2, 59, {
-    align: "center",
-  });
+  labelValue("Shop: ", entry.shop || "-", PAGE_MARGIN, 54.5);
+  labelValue("Owner: ", entry.ownerName || "-", midX, 54.5);
+  labelValue("City: ", entry.city || "-", PAGE_MARGIN, 60);
+  labelValue("Period: ", `${formatPdfDate(dateFrom)} to ${formatPdfDate(dateTo)}`, midX, 60);
 
   doc.setDrawColor(BORDER_LIGHT[0], BORDER_LIGHT[1], BORDER_LIGHT[2]);
   doc.setLineWidth(0.25);
-  doc.line(PAGE_MARGIN, 61.5, pageWidth - PAGE_MARGIN, 61.5);
+  doc.line(PAGE_MARGIN, 63, pageWidth - PAGE_MARGIN, 63);
 };
 
 /**
@@ -153,7 +166,7 @@ const drawThankYouBlock = (doc: jsPDF, finalY: number): void => {
  * many generate calls; omit it and the asset is prepared automatically.
  */
 export const generateShopLedgerPDF = async (
-  allLedgers: { shop: string; data: LedgerTransaction[] }[],
+  allLedgers: ShopLedgerPdfEntry[],
   dateFrom: string,
   dateTo: string,
   selectedShop: string,
@@ -168,15 +181,16 @@ export const generateShopLedgerPDF = async (
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
 
   doc.setProperties({
-    title: "Shop Ledger Statement",
-    subject: "DMR POULTRIES shop ledger statement",
+    title: "Weekly Statement",
+    subject: "DMR POULTRIES weekly statement",
     author: "DMR POULTRIES",
     creator: "DMR POULTRIES",
   });
 
   const headers = ["Date", "Particulars", "Birds", "Weight", "Rate", "Debit", "Credit", "Balance"];
 
-  allLedgers.forEach(({ shop, data }, index) => {
+  allLedgers.forEach((entry, index) => {
+    const { data } = entry;
     if (index > 0) doc.addPage();
 
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -232,8 +246,8 @@ export const generateShopLedgerPDF = async (
     autoTable(doc, {
       head: [headers],
       body: rows,
-      startY: 64,
-      margin: { top: 64, bottom: 20, left: PAGE_MARGIN, right: PAGE_MARGIN },
+      startY: 66,
+      margin: { top: 66, bottom: 20, left: PAGE_MARGIN, right: PAGE_MARGIN },
       theme: "grid",
       showHead: "everyPage",
       rowPageBreak: "avoid",
@@ -275,8 +289,8 @@ export const generateShopLedgerPDF = async (
         7: { cellWidth: 22, halign: "right" },  // Balance
       },
       didDrawPage: (data) => {
-        // Letterhead + title + shop + period on every page of the statement.
-        drawStatementChrome(doc, shop, dateFrom, dateTo, assets);
+        // Letterhead + title + shop details on every page of the statement.
+        drawStatementChrome(doc, entry, dateFrom, dateTo, assets);
 
         const pageHeight2 = doc.internal.pageSize.getHeight();
         doc.setFont("helvetica", "normal");
@@ -285,12 +299,12 @@ export const generateShopLedgerPDF = async (
         doc.text(`Page ${data.pageNumber}`, pageWidth - PAGE_MARGIN, pageHeight2 - 8, {
           align: "right",
         });
-        doc.text("DMR Poultries ERP - Shop Ledger Statement", PAGE_MARGIN, pageHeight2 - 8);
+        doc.text("DMR Poultries ERP - Weekly Statement", PAGE_MARGIN, pageHeight2 - 8);
       },
     });
 
     // Thank-you closing block, same style as the Step-4 delivery receipt.
-    const finalY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 64;
+    const finalY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 66;
     drawThankYouBlock(doc, finalY + 2);
   });
 

@@ -30,7 +30,7 @@ import {
   type ShopLedgerRow,
 } from "../services/shopLedgerService";
 import { generateShopLedgerPDF, prepareShopLedgerPdfAssets } from "../components/ShopLedgerPDF";
-import type { LedgerTransaction } from "../components/ShopLedgerPDF";
+import type { LedgerTransaction, ShopLedgerPdfEntry } from "../components/ShopLedgerPDF";
 import PdfBlobPreview from "../components/PdfBlobPreview";
 
 interface ShopLedgerProps {
@@ -274,6 +274,21 @@ const SAMPLE_OWNER_FIRST_NAMES = [
 ];
 
 const SAMPLE_OWNER_LAST_NAMES = ["Reddy", "Kumar", "Rao", "Naidu", "Prasad"];
+
+const SAMPLE_CITIES = [
+  "Peddapuram",
+  "Samarlakota",
+  "Rajahmundry",
+  "Kakinada",
+  "Ramachandrapuram",
+  "Vijayawada",
+];
+
+/** Deterministic sample city per shop (stable across re-renders). */
+const sampleCityFor = (shop: string): string => {
+  const idx = Math.max(0, SAMPLE_SHOP_NAMES.indexOf(shop));
+  return SAMPLE_CITIES[idx % SAMPLE_CITIES.length];
+};
 
 /** Deterministic sample owner + phone per shop (stable across re-renders). */
 const sampleRecipientFor = (
@@ -627,7 +642,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         return;
       }
 
-      const allLedgers: { shop: string; data: LedgerTransaction[] }[] = [];
+      const allLedgers: ShopLedgerPdfEntry[] = [];
       const shopData: Record<string, LedgerTransaction[]> = {};
       for (const shop of shopNames) {
         const shopId = shops.find((s: Shop) => s.shopName === shop)?.id;
@@ -636,7 +651,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           ? makeSampleLedger(appliedDateFrom, appliedDateTo, shop)
           : (await buildLedger(appliedDateFrom, appliedDateTo, shopId));
         if (ledger.length > 1) {
-          allLedgers.push({ shop, data: ledger });
+          const master = shops.find((s: Shop) => s.shopName === shop);
+          allLedgers.push({
+            shop,
+            data: ledger,
+            ownerName: sampleMode ? sampleRecipientFor(shop).ownerName : master?.ownerName || undefined,
+            city: sampleMode ? sampleCityFor(shop) : master?.city || undefined,
+          });
           shopData[shop] = ledger;
         }
       }
@@ -748,8 +769,16 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const handleDownloadSelectedCombined = async () => {
     const current = pdfPreviewRef.current;
     if (!current) return;
-    const ledgers = current.selectedShops
-      .map((shop) => ({ shop, data: current.shopData[shop] ?? [] }))
+    const ledgers: ShopLedgerPdfEntry[] = current.selectedShops
+      .map((shop) => {
+        const master = shops.find((s: Shop) => s.shopName === shop);
+        return {
+          shop,
+          data: current.shopData[shop] ?? [],
+          ownerName: sampleMode ? sampleRecipientFor(shop).ownerName : master?.ownerName || undefined,
+          city: sampleMode ? sampleCityFor(shop) : master?.city || undefined,
+        };
+      })
       .filter((entry) => entry.data.length > 0);
     if (ledgers.length === 0) {
       showNotification("Select at least one shop to download.", "info");
@@ -1014,7 +1043,18 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           ? makeSampleLedger(waDateFrom, waDateTo, shop)
           : await buildLedger(waDateFrom, waDateTo, shopId);
 
-        const generated = await generateShopLedgerPDF([{ shop, data: ledger }], waDateFrom, waDateTo, shop);
+        const waMaster = shops.find((s: Shop) => s.shopName === shop);
+        const generated = await generateShopLedgerPDF(
+          [{
+            shop,
+            data: ledger,
+            ownerName: sampleMode ? recipient.ownerName : waMaster?.ownerName || undefined,
+            city: sampleMode ? sampleCityFor(shop) : waMaster?.city || undefined,
+          }],
+          waDateFrom,
+          waDateTo,
+          shop,
+        );
         try {
           const message = buildWhatsAppMessage(
             waReportType,
@@ -1505,7 +1545,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     {activePdfFile.filename}
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Shop Ledger PDF preview · {formatDisplayDate(appliedDateFrom)} to {formatDisplayDate(appliedDateTo)}
+                    Weekly Statement · {formatDisplayDate(appliedDateFrom)} to {formatDisplayDate(appliedDateTo)}
                   </p>
                 </div>
               </div>
