@@ -8,6 +8,8 @@ import {
   CheckCircle2,
   CheckSquare,
   Download,
+  Eye,
+  EyeOff,
   FileStack,
   FileText,
   IndianRupee,
@@ -1060,6 +1062,15 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const waSendingRef = useRef(false);
   const waSucceededRef = useRef<string[]>([]);
   const [waSucceededShops, setWaSucceededShops] = useState<string[]>([]);
+  // Attachment verification: the exact per-shop PDF the message will carry,
+  // generated on demand from the modal's own filters and previewable/downloadable
+  // before sending.
+  const [waAttachmentUrl, setWaAttachmentUrl] = useState<string | null>(null);
+  const [waAttachmentBusy, setWaAttachmentBusy] = useState(false);
+  const [waAttachmentOpen, setWaAttachmentOpen] = useState(false);
+  const waAttachmentUrlRef = useRef<string | null>(null);
+  const waAttachmentBusyRef = useRef(false);
+  const waAttachmentShopRef = useRef<string | null>(null);
 
   const resetWaSucceeded = useCallback(() => {
     waSucceededRef.current = [];
@@ -1160,6 +1171,85 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     [sampleMode, shopMasterMap],
   );
 
+  /** Drop the attachment preview document (and its blob URL). */
+  const resetWaAttachment = useCallback(() => {
+    if (waAttachmentUrlRef.current) {
+      URL.revokeObjectURL(waAttachmentUrlRef.current);
+      waAttachmentUrlRef.current = null;
+    }
+    waAttachmentShopRef.current = null;
+    setWaAttachmentUrl(null);
+    setWaAttachmentOpen(false);
+  }, []);
+
+  /**
+   * Generate the exact attachment for a shop from the modal's own filters.
+   * Shares the ledger cache with the PDF modal, so nothing is fetched or
+   * built twice.
+   */
+  const ensureWaAttachment = useCallback(
+    async (shop: string): Promise<string | null> => {
+      if (waAttachmentBusyRef.current) return waAttachmentUrlRef.current;
+      waAttachmentBusyRef.current = true;
+      setWaAttachmentBusy(true);
+      waAttachmentShopRef.current = shop;
+      try {
+        const ledger = (await getCachedLedger(waDateFrom, waDateTo, shop)) ?? [];
+        const master = shopMasterMap.get(shop);
+        const recipient = resolveWaRecipient(shop);
+        const generated = await generateShopLedgerPDF(
+          [{
+            shop,
+            data: ledger,
+            ownerName: sampleMode ? recipient.ownerName : master?.ownerName || undefined,
+            mobile: sampleMode ? recipient.phoneNumber : master?.phoneNumber || undefined,
+            city: sampleMode ? sampleCityFor(shop) : master?.city || undefined,
+          }],
+          waDateFrom,
+          waDateTo,
+          shop,
+        );
+        // The user moved to another shop/dates while this was building —
+        // discard it instead of showing a stale attachment.
+        if (waAttachmentShopRef.current !== shop) {
+          URL.revokeObjectURL(generated.url);
+          return null;
+        }
+        if (waAttachmentUrlRef.current) {
+          URL.revokeObjectURL(waAttachmentUrlRef.current);
+        }
+        waAttachmentUrlRef.current = generated.url;
+        setWaAttachmentUrl(generated.url);
+        return generated.url;
+      } finally {
+        waAttachmentBusyRef.current = false;
+        setWaAttachmentBusy(false);
+      }
+    },
+    [waDateFrom, waDateTo, sampleMode, shopMasterMap, getCachedLedger, resolveWaRecipient],
+  );
+
+  const handleWaToggleAttachmentPreview = () => {
+    if (waAttachmentOpen) {
+      setWaAttachmentOpen(false);
+      return;
+    }
+    setWaAttachmentOpen(true);
+    if (waPreviewShop) void ensureWaAttachment(waPreviewShop);
+  };
+
+  const handleWaDownloadAttachment = () => {
+    if (!waPreviewShop) return;
+    void Promise.resolve(
+      waAttachmentUrlRef.current ?? ensureWaAttachment(waPreviewShop),
+    ).then((url) => {
+      if (url) {
+        downloadFile(url, waPreviewFileName);
+        showNotification("Attachment PDF downloaded.", "success");
+      }
+    });
+  };
+
   const openWhatsApp = useCallback(() => {
     if (waSendingRef.current) return; // never re-open the modal mid-send
     // WhatsApp follows the currently applied (Search-committed) filters.
@@ -1182,8 +1272,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     setWaConfirmAll(false);
     setWaError(null);
     resetWaSucceeded();
+    resetWaAttachment();
     setWhatsappOpen(true);
-  }, [appliedReportType, appliedDateFrom, appliedDateTo, appliedSelectedShop, waAllShopNames, resetWaSucceeded]);
+  }, [appliedReportType, appliedDateFrom, appliedDateTo, appliedSelectedShop, waAllShopNames, resetWaSucceeded, resetWaAttachment]);
 
   const closeWhatsApp = useCallback(() => {
     if (waSendingRef.current) return;
@@ -1191,7 +1282,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     setWaConfirmAll(false);
     setWaError(null);
     setWaSendingShop(null);
-  }, []);
+    resetWaAttachment();
+  }, [resetWaAttachment]);
 
   const waVisibleShops = useMemo(() => {
     const needle = waShopSearch.trim().toLowerCase();
@@ -2123,6 +2215,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   onChange={(value) => {
                     setWaDateFrom(value);
                     resetWaSucceeded();
+                    resetWaAttachment();
                   }}
                   placeholder="From date"
                   className="w-full"
@@ -2135,6 +2228,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   onChange={(value) => {
                     setWaDateTo(value);
                     resetWaSucceeded();
+                    resetWaAttachment();
                   }}
                   placeholder="To date"
                   className="w-full"
@@ -2242,7 +2336,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         )}
                         <button
                           type="button"
-                          onClick={() => setWaPreviewShop(shop)}
+                          onClick={() => {
+                            setWaPreviewShop(shop);
+                            resetWaAttachment();
+                          }}
                           title={shop}
                           className="min-w-0 flex-1 text-left"
                         >
@@ -2336,14 +2433,60 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         </pre>
                       </div>
 
-                      <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-3.5 py-2.5 text-xs text-slate-600">
-                        <FileText size={14} className="shrink-0 text-red-500" />
-                        <span className="min-w-0 truncate font-medium" title={waPreviewFileName}>
-                          {waPreviewFileName}
-                        </span>
-                        <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-slate-400">
-                          PDF attachment
-                        </span>
+                      <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-sm">
+                            <FileText size={16} />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-semibold text-slate-700" title={waPreviewFileName}>
+                              {waPreviewFileName}
+                            </p>
+                            <p className="text-[10px] font-medium text-slate-400">
+                              PDF attachment · {formatDisplayDate(waDateFrom)} to {formatDisplayDate(waDateTo)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleWaToggleAttachmentPreview}
+                            disabled={waAttachmentBusy && !waAttachmentOpen}
+                            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {waAttachmentBusy ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : waAttachmentOpen ? (
+                              <EyeOff size={12} />
+                            ) : (
+                              <Eye size={12} />
+                            )}
+                            {waAttachmentOpen ? "Hide" : "Check PDF"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleWaDownloadAttachment}
+                            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 text-[11px] font-semibold text-red-600 transition hover:bg-red-100"
+                          >
+                            <Download size={12} /> Download
+                          </button>
+                        </div>
+
+                        {waAttachmentOpen && (
+                          <div className="mt-3 h-80 overflow-hidden rounded-lg border border-slate-200 bg-slate-200/60">
+                            {waAttachmentUrl ? (
+                              <PdfBlobPreview key={waAttachmentUrl} url={waAttachmentUrl} />
+                            ) : (
+                              <div className="flex h-full flex-col items-center justify-center gap-2 text-xs font-medium text-slate-500">
+                                <Loader2 size={15} className="animate-spin text-red-500" />
+                                Building the attachment for {waPreviewShop}…
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <p className="mt-2 text-[10px] leading-relaxed text-slate-400">
+                          This is the exact PDF the shop owner receives — built from the report type and
+                          date range above. Verify it before sending.
+                        </p>
                       </div>
                     </>
                   ) : (
