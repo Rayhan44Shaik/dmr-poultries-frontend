@@ -1,12 +1,15 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { format, subDays } from "date-fns";
 import {
+  Bird,
+  CalendarDays,
   CheckCircle2,
   FileText,
   Loader2,
   RefreshCw,
   RotateCcw,
   Search,
+  Store,
   X,
 } from "lucide-react";
 import Select, { type StylesConfig } from "react-select";
@@ -802,9 +805,30 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             <table className="min-w-full text-sm">
               <thead className="sticky top-0 bg-slate-100/95 backdrop-blur-sm border-b border-slate-200 text-slate-700 shadow-sm">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Particulars</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Birds</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-md bg-indigo-50 text-indigo-500">
+                        <CalendarDays size={11} />
+                      </span>
+                      Date
+                    </span>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-50 text-emerald-600">
+                        <Store size={11} />
+                      </span>
+                      Particulars
+                    </span>
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-50 text-amber-500">
+                        <Bird size={11} />
+                      </span>
+                      Birds
+                    </span>
+                  </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Weight (KG)</th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Rate</th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Debit</th>
