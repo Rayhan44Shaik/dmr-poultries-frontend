@@ -766,11 +766,12 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         combinedUrl: combined.url,
         combinedFilename: combined.filename,
         files,
-        // Multi-shop exports open on the combined "All Shops" PDF so the
-        // preview immediately shows all filtered data; a single-shop export
-        // opens directly on that shop's PDF.
+        // Multi-shop exports open on the combined "All Shops" PDF with
+        // nothing selected — the user explicitly picks the shops they want
+        // before any selection-based download. A single-shop export opens
+        // directly on that shop's PDF (already selected by definition).
         selectedIndex: files.length > 1 ? -1 : 0,
-        selectedShops: files.map((file) => file.shop),
+        selectedShops: files.length > 1 ? [] : files.map((file) => file.shop),
         shopData,
       };
       pdfPreviewRef.current = nextState;
