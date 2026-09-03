@@ -7,6 +7,19 @@ import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
 import Select from "react-select";
 import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip as ChartTooltip,
+  Legend as ChartLegend,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+} from "recharts";
+import {
   FileSpreadsheet,
   FileText,
   RotateCcw,
@@ -18,6 +31,8 @@ import {
   Download,
   Inbox,
   AlertTriangle,
+  Coins,
+  TrendingUp,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -55,6 +70,28 @@ const getBarColor = (percentage: number) => {
   if (percentage >= 30) return "bg-yellow-500";
   return "bg-red-500";
 };
+
+// Chart palette: stable brand colors for the known modes, hashed fallback
+// for any other mode the backend returns.
+const MODE_CHART_COLORS: Record<string, string> = {
+  Cash: "#10b981",
+  "Union Bank": "#0ea5e9",
+  "HDFC Bank": "#8b5cf6",
+  Others: "#f59e0b",
+};
+const MODE_CHART_PALETTE = ["#10b981", "#0ea5e9", "#8b5cf6", "#f59e0b", "#ef4444", "#14b8a6", "#f97316", "#6366f1"];
+const modeColor = (mode: string) =>
+  MODE_CHART_COLORS[mode] ??
+  MODE_CHART_PALETTE[(mode.length + mode.charCodeAt(0)) % MODE_CHART_PALETTE.length];
+
+const compactINR = (value: number) =>
+  new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+
+// Shared chart tooltip: ₹-formatted value, mode/collector name.
+const chartCurrency = (value: unknown, name: unknown): [string, string] => [
+  `₹ ${Number(value ?? 0).toLocaleString("en-IN")}`,
+  String(name ?? ""),
+];
 
 const KNOWN_MODES = ["Cash", "Union Bank", "HDFC Bank"];
 
@@ -158,6 +195,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
   const totalCollections = report?.totalAmount ?? 0;
   const totalCount = report?.totalCount ?? 0;
   const totalCollectorsCount = report?.totalCollectors ?? 0;
+  const avgPerCollection = totalCount > 0 ? totalCollections / totalCount : 0;
 
   // Presentation-only: bucket the backend's already-aggregated per-mode
   // distinct-collector counts into Known modes + "Others", in a fixed
@@ -245,6 +283,22 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
 
     return { rows, paymentModes };
   }, [report]);
+
+  // Chart-ready views of the authoritative report rows (presentation-only).
+  const modeChartData = useMemo(
+    () =>
+      (report?.paymentModeSummary ?? []).map((r) => ({
+        name: r.paymentMode,
+        value: r.amount,
+        count: r.count,
+        percentage: r.percentage,
+      })),
+    [report]
+  );
+  const collectorChartData = useMemo(
+    () => collectorSummary.rows.filter((row) => row.collector !== "Total"),
+    [collectorSummary]
+  );
 
   const getExportFileName = (ext: "xlsx" | "pdf") => {
     const dateStr = fromDate && toDate ? `${fromDate}_to_${toDate}` : "report";
@@ -549,7 +603,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
       </div>
 
       {/* KPI Cards — all values backend-authoritative */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm md:p-5">
           <div className="rounded-2xl bg-blue-50 p-3 text-blue-600">
             <Wallet size={22} />
@@ -577,6 +631,15 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
             <div className="mt-0.5 text-xl font-bold text-slate-800 md:text-2xl">{totalCollectorsCount}</div>
           </div>
         </div>
+        <div className="flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm md:p-5">
+          <div className="rounded-2xl bg-sky-50 p-3 text-sky-600">
+            <Coins size={22} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">{t("ops.collection.avg_per_collection")}</div>
+            <div className="mt-0.5 text-xl font-bold text-slate-800 md:text-2xl">{formatCurrency(avgPerCollection)}</div>
+          </div>
+        </div>
       </div>
 
       {/* Tables — friendly empty state when the period has no collections;
@@ -590,7 +653,70 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
           <p className="text-xs text-slate-400">{t("ops.collection.empty.hint")}</p>
         </div>
       ) : (
-      <div className={`grid grid-cols-1 gap-6 lg:grid-cols-2 transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""}`}>
+      <>
+        {/* Collection Insights — donut (mode share) + stacked bars (collectors),
+            rendered purely from the authoritative report rows */}
+        <div className={`rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""}`}>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <span className="rounded-lg bg-emerald-50 p-1.5 text-emerald-600">
+                <TrendingUp size={14} />
+              </span>
+              {t("ops.collection.insights")}
+            </h4>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              {t("common.total")}: {formatCurrency(totalCollections)}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-6 p-4 lg:grid-cols-2">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={modeChartData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={85}
+                    paddingAngle={2}
+                    cornerRadius={4}
+                    stroke="none"
+                  >
+                    {modeChartData.map((row) => (
+                      <Cell key={row.name} fill={modeColor(row.name)} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip formatter={chartCurrency} />
+                  <ChartLegend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={collectorChartData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis dataKey="collector" tick={{ fontSize: 10, fill: "#64748b" }} tickLine={false} axisLine={{ stroke: "#e2e8f0" }} interval={0} />
+                  <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickLine={false} axisLine={false} tickFormatter={(v: number) => compactINR(v)} />
+                  <ChartTooltip cursor={{ fill: "rgba(148,163,184,0.08)" }} formatter={chartCurrency} />
+                  <ChartLegend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+                  {collectorSummary.paymentModes.map((mode: string, idx: number) => (
+                    <Bar
+                      key={mode}
+                      dataKey={mode}
+                      stackId="amount"
+                      fill={modeColor(mode)}
+                      radius={idx === collectorSummary.paymentModes.length - 1 ? [4, 4, 0, 0] : undefined}
+                    />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        <div className={`grid grid-cols-1 gap-6 lg:grid-cols-2 transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""}`}>
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
             <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
@@ -700,6 +826,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
           </div>
         </div>
       </div>
+      </>
       )}
     </div>
   );
