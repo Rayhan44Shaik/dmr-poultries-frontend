@@ -419,6 +419,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     return { totalDebit, totalCredit, totalBirds, totalWeight, closingBalance };
   }, [filteredLedger]);
 
+  // KPIs are calculated only when the user applies a meaningful filter:
+  // a custom date range or a specific shop. Default view stays clean.
+  const hasKpiFilter =
+    dateFrom !== toWeekAgoDefault() ||
+    dateTo !== toDateDefault() ||
+    selectedShop !== "All Shops";
+
   const resetPage = useCallback(() => setCurrentPage(1), []);
 
   // ─── Export Functions ──────────────────────────────────────
@@ -778,31 +785,37 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           </div>
         )}
 
-        {/* ── KPI CARDS ────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-            <p className="text-xs text-slate-500">Total Debit (Sales)</p>
-            <p className="text-xl font-bold text-emerald-600">{formatAmount(summary.totalDebit)}</p>
+        {/* ── KPI CARDS (only for an applied date/shop filter) ── */}
+        {hasKpiFilter ? (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+              <p className="text-xs text-slate-500">Total Debit (Sales)</p>
+              <p className="text-xl font-bold text-emerald-600">{formatAmount(summary.totalDebit)}</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+              <p className="text-xs text-slate-500">Total Credit (Collections)</p>
+              <p className="text-xl font-bold text-blue-600">{formatAmount(summary.totalCredit)}</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+              <p className="text-xs text-slate-500">Total Birds</p>
+              <p className="text-xl font-bold text-slate-800">{summary.totalBirds}</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+              <p className="text-xs text-slate-500">Total Weight (KG)</p>
+              <p className="text-xl font-bold text-slate-800">{summary.totalWeight.toFixed(2)}</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+              <p className="text-xs text-slate-500">Closing Balance</p>
+              <p className={`text-xl font-bold ${summary.closingBalance >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                {formatAmount(summary.closingBalance)}
+              </p>
+            </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-            <p className="text-xs text-slate-500">Total Credit (Collections)</p>
-            <p className="text-xl font-bold text-blue-600">{formatAmount(summary.totalCredit)}</p>
+        ) : (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-2.5 text-xs font-medium text-slate-500">
+            KPI totals appear after you filter by a date range or select a shop.
           </div>
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-            <p className="text-xs text-slate-500">Total Birds</p>
-            <p className="text-xl font-bold text-slate-800">{summary.totalBirds}</p>
-          </div>
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-            <p className="text-xs text-slate-500">Total Weight (KG)</p>
-            <p className="text-xl font-bold text-slate-800">{summary.totalWeight.toFixed(2)}</p>
-          </div>
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-            <p className="text-xs text-slate-500">Closing Balance</p>
-            <p className={`text-xl font-bold ${summary.closingBalance >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-              {formatAmount(summary.closingBalance)}
-            </p>
-          </div>
-        </div>
+        )}
 
         {/* ── TABLE ────────────────────────────────────────── */}
         <div className="rounded-2xl border border-slate-200/70 overflow-hidden bg-white shadow-sm">
