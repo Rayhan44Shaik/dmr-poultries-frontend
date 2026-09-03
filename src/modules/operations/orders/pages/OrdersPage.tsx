@@ -83,10 +83,19 @@ const OrdersPage: React.FC = () => {
 
   // ── Server data ─────────────────────────────────────────────────────────
   const [data, setData] = useState<OrdersPageData>(() => emptyOrdersPage());
+  // EVERY open vehicle trip (Step 4 not submitted), whatever day it was
+  // raised on. Order Assignment lists them all: a day's orders may be
+  // loaded onto any truck that has not delivered yet.
   const [vehicles, setVehicles] = useState<EligibleVehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Which request the data currently in `data` came from. Comparing it with
+  // the key the CURRENT view state asks for tells a tab whether the figures
+  // on screen still describe the filters the user is looking at — so a KPI
+  // can say "Updating…" instead of quietly presenting the previous day's
+  // totals. Written only from the async callback, like every other field.
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
 
   const [shopDirectory, setShopDirectory] = useState<ShopDirectory>(new Map());
   const [supervisorDirectory, setSupervisorDirectory] = useState<SupervisorDirectory>(new Map());
@@ -132,6 +141,12 @@ const OrdersPage: React.FC = () => {
     filledOnly,
   ]);
 
+  /** Identity of the request the current view state asks for. */
+  const queryKey = useMemo(
+    () => `${activeTab}|${JSON.stringify(currentQuery)}`,
+    [activeTab, currentQuery]
+  );
+
   // A monotonically increasing token: only the newest response is applied,
   // so a slow earlier request can never overwrite fresher data.
   const requestToken = useRef(0);
@@ -144,10 +159,11 @@ const OrdersPage: React.FC = () => {
   const fetchPage = useCallback(
     (): Promise<boolean> => {
       const token = (requestToken.current += 1);
+      const key = queryKey;
       return Promise.all([
         listOrders(currentQuery),
         activeTab === "assignment"
-          ? listEligibleVehicles(day)
+          ? listEligibleVehicles()
           : Promise.resolve<EligibleVehicle[]>([]),
       ]).then(
         ([next, eligible]) => {
@@ -155,6 +171,7 @@ const OrdersPage: React.FC = () => {
           setData(next);
           if (activeTab === "assignment") setVehicles(eligible);
           setError(null);
+          setLoadedKey(key);
           setLoading(false);
           setRefreshing(false);
           return true;
@@ -168,7 +185,7 @@ const OrdersPage: React.FC = () => {
         }
       );
     },
-    [currentQuery, activeTab, day]
+    [currentQuery, activeTab, queryKey]
   );
 
   useEffect(() => {
@@ -413,8 +430,12 @@ const OrdersPage: React.FC = () => {
           onPageSizeChange={setTabPageSize}
           onReload={() => fetchPage()}
           onRefresh={() => void handleRefresh()}
+          shopDirectory={shopDirectory}
+          supervisorDirectory={supervisorDirectory}
           onFinished={() => setActiveTab("tracking")}
           refreshing={refreshing}
+          dataReady={loadedKey !== null}
+          syncing={refreshing || loadedKey !== queryKey}
         />
       ) : (
         <OrdersDeliveryTrackingTab

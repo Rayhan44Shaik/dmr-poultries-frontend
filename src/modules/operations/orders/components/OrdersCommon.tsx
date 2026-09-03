@@ -619,7 +619,7 @@ export function OrdersTabHeader({
   ariaLabel: string;
 }) {
   return (
-    <div className="rounded-2xl border border-emerald-100/80 bg-emerald-50/60 p-1.5 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
       <div className="flex items-center gap-2 overflow-x-auto" role="tablist" aria-label={ariaLabel}>
         <div className="flex items-center gap-1.5">
           {tabs.map((tab) => {
@@ -633,8 +633,8 @@ export function OrdersTabHeader({
                 onClick={() => onSelect(tab.key)}
                 className={`inline-flex h-9 flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-4 text-[12px] font-semibold tracking-tight outline-none transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-inset md:px-5 md:text-[13px] ${
                   active
-                    ? "border border-emerald-200 bg-white text-emerald-800 shadow-sm"
-                    : "border border-transparent bg-transparent text-slate-600 hover:bg-white/70 hover:text-slate-800"
+                    ? "border border-emerald-200 bg-emerald-50 text-emerald-800 shadow-sm"
+                    : "border border-transparent bg-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-800"
                 }`}
               >
                 <span className={active ? "text-emerald-600" : "text-slate-400"}>{tab.icon}</span>

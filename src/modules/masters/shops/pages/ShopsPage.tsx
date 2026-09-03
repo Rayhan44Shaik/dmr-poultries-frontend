@@ -546,7 +546,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
         )}
 
         {/* Table Content */}
-        <div className="p-4 relative min-h-[120px]">
+        <div className="p-0 relative min-h-[120px]">
           {loading && shops.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
               <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

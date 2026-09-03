@@ -5,7 +5,7 @@
 // transports requests and surfaces the server's own validation messages.
 //
 //   GET    /orders                      list + search + date + pagination
-//   GET    /orders/eligible-vehicles    assignable vehicle trips for a day
+//   GET    /orders/eligible-vehicles    OPEN vehicle trips (Step 4 not done)
 //   GET    /orders/notifications/:trip  real supervisor-notification outcomes
 //   POST   /orders/collection           save progress / finish collection
 //   POST   /orders/assignments          save progress / finish assignment
@@ -84,6 +84,13 @@ export type OrdersSummary = {
   totalRemainingBoxes: number;
   deliveredShops: number;
   assignedShops: number;
+  /** Distinct shops that ordered ≥1 box (SHOP-level, not order-line level).
+   *  `orderedShops === fullyAssignedShops + pendingAssignmentShops` always. */
+  orderedShops: number;
+  /** Shops whose ENTIRE ordered quantity is committed to vehicle trips. */
+  fullyAssignedShops: number;
+  /** Shops still waiting for assignment (nothing / not everything loaded). */
+  pendingAssignmentShops: number;
   /** true = the day's collection was automatically finished at the cutoff. */
   autoFinished: boolean;
 };
@@ -172,6 +179,9 @@ const EMPTY_PAGE: OrdersPage = {
     totalRemainingBoxes: 0,
     deliveredShops: 0,
     assignedShops: 0,
+    orderedShops: 0,
+    fullyAssignedShops: 0,
+    pendingAssignmentShops: 0,
     autoFinished: false,
   },
 };
@@ -203,6 +213,11 @@ export async function listOrders(query: OrdersQuery): Promise<OrdersPage> {
   return data;
 }
 
+/**
+ * Vehicle trips that can still receive an assignment: Step 2 done, Step 4 NOT
+ * submitted, not completed or rate-locked. Called WITHOUT a date by Order
+ * Assignment, which lists every open trip regardless of the day it was raised.
+ */
 export async function listEligibleVehicles(date?: string): Promise<EligibleVehicle[]> {
   const { data } = await apiGet<EligibleVehicle[]>("/orders/eligible-vehicles", {
     params: date ? { date } : undefined,

@@ -8,6 +8,8 @@
 //   - operational-day and formatting helpers.
 
 import type { ShopDelivery, Trip } from "../../../shared/trip";
+import type { OrderView } from "./services/ordersApi";
+import type { ShopDirectory } from "./ordersService";
 import {
   isOrderPlanRemarks,
   type OrdersProgress,
@@ -465,4 +467,71 @@ export function formatKg(value: number, withUnit = true): string {
 
 export function formatCount(value: number): string {
   return num(value).toLocaleString("en-IN");
+}
+
+// ─── Loaded-shop list (Order Assignment → "View Loaded Shops") ───────────────
+
+/** One shop carrying boxes on a specific vehicle trip. */
+export type LoadedShopRow = {
+  /** Stable identity — the assignment row, unique per (order, trip). */
+  key: string;
+  orderNo: string;
+  shopName: string;
+  owner: string;
+  city: string;
+  mobile: string;
+  sequence: number;
+  requiredBoxes: number;
+  pickupBoxes: number;
+  deliveredBoxes: number;
+  /** Loaded but not yet delivered ON THIS TRIP (never negative). */
+  openBoxes: number;
+  status: OrderView["status"];
+};
+
+/**
+ * Server order rows → the shops actually LOADED on `tripId`.
+ *
+ * "Loaded" means the order holds an assignment on THIS trip with more than
+ * zero pickup boxes: an order assigned to another vehicle, or present on this
+ * one with zero boxes, is not on the truck and is left out. Shop Master
+ * decorations (owner / city / mobile) are read straight from the directory —
+ * never invented — and fall back to the order's own city, then "".
+ */
+export function toLoadedShops(
+  rows: OrderView[],
+  tripId: number,
+  shopDirectory: ShopDirectory
+): LoadedShopRow[] {
+  const out: LoadedShopRow[] = [];
+  for (const row of rows) {
+    const assignment = row.assignments.find((a) => a.tripId === tripId);
+    if (!assignment || assignment.pickupBoxes <= 0) continue;
+    const shop = shopDirectory.get(row.shopId);
+    out.push({
+      key: `a:${assignment.id}`,
+      orderNo: row.orderNo,
+      shopName: row.shopName,
+      owner: shop?.ownerName ?? "",
+      city: shop?.city || row.city || "",
+      mobile: shop?.mobile ?? "",
+      sequence: assignment.sequence,
+      requiredBoxes: row.requiredBoxes,
+      pickupBoxes: assignment.pickupBoxes,
+      deliveredBoxes: assignment.deliveredBoxes,
+      openBoxes: Math.max(0, assignment.pickupBoxes - assignment.deliveredBoxes),
+      status: row.status,
+    });
+  }
+  return out;
+}
+
+/** Route order: sequence, then shop name, then order no — fully deterministic. */
+export function sortLoadedShops(rows: LoadedShopRow[]): LoadedShopRow[] {
+  return [...rows].sort(
+    (a, b) =>
+      a.sequence - b.sequence ||
+      a.shopName.localeCompare(b.shopName) ||
+      a.orderNo.localeCompare(b.orderNo)
+  );
 }

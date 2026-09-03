@@ -138,62 +138,87 @@ export default function ShopDeliveryForm({
   return (
     <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-4">
       {/* Form Header */}
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-        <div>
-          <h3 className="text-base font-semibold text-slate-800">
-            {editingId !== null ? t("ops.trip.edit_shop_delivery") : t("ops.trip.add_new_shop_delivery")}
-          </h3>
-          <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-            <Clock size={12} className="text-slate-400" />
-            {t("ops.trip.auto_captured")}: <span className="font-medium text-slate-600">{autoCaptureTime}</span>
-          </p>
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 border-b border-slate-100 pb-3">
+        <div className="flex flex-wrap items-start gap-x-6 gap-y-3 flex-1 min-w-0">
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold text-slate-800">
+              {editingId !== null ? t("ops.trip.edit_shop_delivery") : t("ops.trip.add_new_shop_delivery")}
+            </h3>
+            <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+              <Clock size={12} className="text-slate-400" />
+              {t("ops.trip.auto_captured")}: <span className="font-medium text-slate-600">{autoCaptureTime}</span>
+            </p>
+          </div>
+
+          {/* Delivery Mode Toggle (header) */}
+          <div className="shrink-0">
+            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+              {t("ops.trip.delivery_mode")}
+            </label>
+            <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200/60 min-w-[260px]">
+              <button
+                type="button"
+                onClick={() => setMode("box")}
+                className={`flex items-center justify-center gap-1.5 rounded-md text-xs transition-colors h-[34px] whitespace-nowrap ${
+                  mode === "box"
+                    ? "bg-white text-blue-700 shadow-sm font-semibold"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Box size={13} />
+                {t("ops.trip.box_mode")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("weight")}
+                className={`flex items-center justify-center gap-1.5 rounded-md text-xs transition-colors h-[34px] whitespace-nowrap ${
+                  mode === "weight"
+                    ? "bg-white text-blue-700 shadow-sm font-semibold"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Scale size={13} />
+                {t("ops.trip.weight_mode")}
+              </button>
+            </div>
+          </div>
+
+          {/* Bird Type Select (header) */}
+          <div className="w-full sm:w-56 shrink-0">
+            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
+              <Layers size={13} className="text-slate-400" />
+              {t("operations.bird_type")} <span className="text-rose-500">*</span>
+            </label>
+            <Select
+              key={`bird-${birdOptions.length}`}
+              value={
+                formData.birdTypeId
+                  ? { value: formData.birdTypeId, label: formData.birdType }
+                  : null
+              }
+              options={birdOptions}
+              placeholder={birdOptions.length > 0 ? t("ops.trip.select_bird") : t("ops.trip.no_bird_types_available")}
+              isSearchable
+              isDisabled={birdOptions.length === 0 || birdOptions[0]?.isDisabled}
+              onChange={handleBirdSelect}
+              maxMenuHeight={150}
+              styles={customSelectStyles}
+            />
+          </div>
         </div>
+
         <button
           type="button"
           onClick={onClose}
-          className="h-7 w-7 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+          className="h-7 w-7 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors shrink-0"
         >
           <X size={16} />
         </button>
       </div>
 
-      {/* Row 1: Delivery Mode & Shop Name */}
-      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
-        {/* Delivery Mode Toggle */}
-        <div className="sm:col-span-5">
-          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-            {t("ops.trip.delivery_mode")}
-          </label>
-          <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200/60 h-[38px]">
-            <button
-              type="button"
-              onClick={() => setMode("box")}
-              className={`flex items-center justify-center gap-1.5 rounded-md text-xs transition-all ${
-                mode === "box"
-                  ? "bg-white text-blue-700 shadow-2xs font-semibold"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Box size={13} />
-              {t("ops.trip.box_mode")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("weight")}
-              className={`flex items-center justify-center gap-1.5 rounded-md text-xs transition-all ${
-                mode === "weight"
-                  ? "bg-white text-blue-700 shadow-2xs font-semibold"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Scale size={13} />
-              {t("ops.trip.weight_mode")}
-            </button>
-          </div>
-        </div>
-
-        {/* Shop Select */}
-        <div className="sm:col-span-7">
+      {/* Row 1: Shop Name */}
+      <div className="grid grid-cols-1 gap-3 items-start">
+        <div>
           <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
             <ShoppingCart size={13} className="text-slate-400" />
             {t("operations.shop_name")} <span className="text-rose-500">*</span>
@@ -219,36 +244,9 @@ export default function ShopDeliveryForm({
         </div>
       </div>
 
-      {/* Row 2: Bird Type & Box Selector */}
-      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
-        {/* Bird Type Select */}
-        <div className="sm:col-span-5">
-          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
-            <Layers size={13} className="text-slate-400" />
-            {t("operations.bird_type")} <span className="text-rose-500">*</span>
-          </label>
-          <Select
-            key={`bird-${birdOptions.length}`}
-            value={
-              formData.birdTypeId
-                ? { value: formData.birdTypeId, label: formData.birdType }
-                : null
-            }
-            options={birdOptions}
-            placeholder={birdOptions.length > 0 ? t("ops.trip.select_bird") : t("ops.trip.no_bird_types_available")}
-            isSearchable
-            isDisabled={birdOptions.length === 0 || birdOptions[0]?.isDisabled}
-            onChange={handleBirdSelect}
-            maxMenuHeight={150}
-            styles={customSelectStyles}
-          />
-          <span className="text-[10px] text-slate-400 mt-0.5 block">
-            {t("ops.trip.bird_types_available", { count: birdOptions.length })}
-          </span>
-        </div>
-
-        {/* Box Selector Container */}
-        <div className="sm:col-span-7">
+      {/* Row 2: Box Selector */}
+      <div className="grid grid-cols-1 gap-3 items-start">
+        <div>
           <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
             <PackageCheck size={13} className="text-slate-400" />
             {t("ops.trip.select_available_boxes")}

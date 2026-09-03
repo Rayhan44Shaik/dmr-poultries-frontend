@@ -119,6 +119,8 @@ async function gotoOrders(page: Page, tab: 'collection' | 'assignment' | 'tracki
 const searchBox = (page: Page) => page.getByRole('textbox', { name: /search shop, city/i });
 const requiredInput = (page: Page, shop: string) =>
   page.getByRole('spinbutton', { name: new RegExp(`Required Boxes.*${shop}`, 'i') });
+const editButton = (page: Page, shop: string) =>
+  page.getByRole('button', { name: new RegExp(`Edit ${shop}`, 'i') });
 const pickupInput = (page: Page, shop: string) =>
   page.getByRole('spinbutton', { name: new RegExp(`Pickup Boxes.*${shop}`, 'i') });
 
@@ -271,9 +273,14 @@ test('orders-01: working sheet shows ALL shops; Save Progress stays on Collectio
   await page.waitForLoadState('networkidle');
 
   // Enter birds/boxes directly on the sheet (no add-shop picker anymore).
+  // Rows are read-only until Edit is clicked; enter each shop's boxes via its
+  // per-row edit action, then Save Progress commits all of them at once.
+  await editButton(page, SHOPS[0]).click();
   await requiredInput(page, SHOPS[0]).fill('20');
+  await editButton(page, SHOPS[1]).click();
   await requiredInput(page, SHOPS[1]).fill('10');
   for (let i = 2; i < SHOPS.length; i += 1) {
+    await editButton(page, SHOPS[i]).click();
     await requiredInput(page, SHOPS[i]).fill('5');
   }
 
@@ -291,7 +298,7 @@ test('orders-01: working sheet shows ALL shops; Save Progress stays on Collectio
   expect(orderRow(persisted, SHOPS[0]).requiredBoxes).toBe(20);
   expect(orderRow(persisted, SHOPS[1]).requiredBoxes).toBe(10);
 
-  // KPI includes Total Shops and Shops With Orders.
+  // The summary line reports total shops and shops-with-orders.
   await expect(page.getByText(/shops with orders/i)).toBeVisible();
   expect(persisted.summary.shopsWithOrders).toBe(SHOPS.length);
 
@@ -311,11 +318,12 @@ test('orders-01: working sheet shows ALL shops; Save Progress stays on Collectio
   await toast.getByRole('button', { name: /close/i }).click();
   await expect(toast).toBeHidden();
 
-  // Test I — a full reload rebuilds the table from the backend.
+  // Test I — a full reload rebuilds the table from the backend. Rows render
+  // read-only values until Edit is clicked; the saved box count is visible.
   await page.reload();
   await page.waitForLoadState('networkidle');
   await searchBox(page).fill(SHOPS[0]);
-  await expect(requiredInput(page, SHOPS[0])).toHaveValue('20');
+  await expect(page.getByRole('row').filter({ hasText: SHOPS[0] })).toContainText('20');
 });
 
 // ── Test K — pagination over the real dataset ─────────────────────────────
@@ -497,6 +505,7 @@ test('orders-07: changing the order quantity recomputes the pending quantity (Te
   await page.waitForLoadState('networkidle');
 
   // Raise 20 → 30: 18 boxes now remain to assign.
+  await editButton(page, SHOPS[0]).click();
   await requiredInput(page, SHOPS[0]).fill('30');
   const raised = await saveCollection(page);
   expect(raised.ok()).toBeTruthy();
@@ -507,6 +516,7 @@ test('orders-07: changing the order quantity recomputes the pending quantity (Te
   }
 
   // Cutting it BELOW what is already assigned is refused by the backend.
+  await editButton(page, SHOPS[0]).click();
   await requiredInput(page, SHOPS[0]).fill('4');
   const [rejected] = await Promise.all([
     page.waitForResponse((r) => /\/orders\/collection$/.test(r.url()) && r.request().method() === 'POST'),
@@ -520,6 +530,7 @@ test('orders-07: changing the order quantity recomputes the pending quantity (Te
   await page.waitForLoadState('networkidle');
   await searchBox(page).fill(SHOPS[0]);
   await page.waitForLoadState('networkidle');
+  await editButton(page, SHOPS[0]).click();
   await requiredInput(page, SHOPS[0]).fill('20');
   expect((await saveCollection(page)).ok()).toBeTruthy();
 });

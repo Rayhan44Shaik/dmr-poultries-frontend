@@ -60,6 +60,18 @@ export function supervisorMobileOf(trip: Trip, directory: SupervisorDirectory): 
   return directory.get(trip.supervisorName?.trim().toLowerCase() ?? "") ?? "";
 }
 
+/**
+ * Supervisor mobile from the Employee Master by NAME (the directory's key).
+ * Used where only a supervisor name is at hand — the assignable-vehicle list
+ * carries the name, not a Trip object. "" when the master has no number.
+ */
+export function supervisorMobileByName(
+  name: string,
+  directory: SupervisorDirectory
+): string {
+  return directory.get(name.trim().toLowerCase()) ?? "";
+}
+
 /** Shop CITY from the Shop Master (falls back to the shop name). */
 export function cityOf(
   shopId: number,

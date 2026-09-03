@@ -225,6 +225,9 @@ export default function OrdersCollectionTab({
   const draftRef = useRef(draft);
   const addedLinesRef = useRef(addedLines);
   const pendingFinishRef = useRef(false);
+  // Hard guard against duplicate/racing submits (double-click, tab switch,
+  // retry and a manual click arriving in the same tick).
+  const saveInFlightRef = useRef(false);
   useEffect(() => {
     draftRef.current = draft;
   }, [draft]);
@@ -411,6 +414,8 @@ export default function OrdersCollectionTab({
   // not be written synchronously in an effect).
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      // The working sheet changed — never keep a stale per-row edit open.
+      setEditingKey(null);
       if (restoreLocalDraft()) {
         setWaitingToSync(true);
         toastInfo(to("orders.draft_restored"), 5000);
@@ -422,7 +427,7 @@ export default function OrdersCollectionTab({
 
   const persist = useCallback(
     async (finish: boolean) => {
-      if (busy || !dayEditable) return;
+      if (saveInFlightRef.current || busy || !dayEditable) return;
       let items = buildItems();
 
       if (finish) {
@@ -436,6 +441,7 @@ export default function OrdersCollectionTab({
         return;
       }
 
+      saveInFlightRef.current = true;
       const setBusy = finish ? setFinishing : setSaving;
       setBusy(true);
       try {
@@ -466,6 +472,7 @@ export default function OrdersCollectionTab({
           await onReload();
         }
       } finally {
+        saveInFlightRef.current = false;
         setBusy(false);
       }
     },
@@ -530,18 +537,19 @@ export default function OrdersCollectionTab({
     : to("orders.no_shops_available");
 
   return (
-    <div className="space-y-3">
-      {/* Filter panel (below tabs) */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="px-4 py-3">
-          <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="w-full space-y-3">
+      {/* Main container — mirrors the Master Shops spacing rhythm */}
+      <div className="w-full bg-white rounded-xl border border-slate-200/90 shadow-sm">
+        {/* Filter toolbar */}
+        <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/40 rounded-t-xl">
+          <div className="flex items-center gap-3 flex-wrap">
             <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} />
             <OrdersDropdown
               value={sort}
               onChange={onSortChange}
               options={sortOptions}
               ariaLabel={to("orders.sort_by")}
-              widthClass="w-full"
+              widthClass="w-52"
             />
             <OrdersDropdown
               value={statusFilter}
@@ -554,7 +562,7 @@ export default function OrdersCollectionTab({
                 { value: "delivered", label: "Delivered" },
               ]}
               ariaLabel="Status"
-              widthClass="w-full"
+              widthClass="w-40"
             />
             <OrdersFilledOnlyToggle
               checked={filledOnly}
@@ -566,28 +574,9 @@ export default function OrdersCollectionTab({
               value={search}
               onChange={onSearchChange}
               placeholder={to("orders.search_collection")}
-              className="w-full"
+              className="w-full sm:w-64"
             />
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-slate-100 pt-3 text-[12px] text-slate-600">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
-                Today
-              </span>
-              <span>
-                <span className="font-bold text-slate-800">{page.summary.totalShops}</span> shops
-              </span>
-              <span className="text-slate-300">·</span>
-              <span>
-                <span className="font-bold text-emerald-700">{page.summary.shopsWithOrders}</span> shop orders
-              </span>
-              <span className="text-slate-300">·</span>
-              <span>
-                <span className="font-bold text-sky-700">{page.summary.totalRequiredBoxes}</span> boxes
-              </span>
-            </span>
-            <span className="ml-auto inline-flex items-center">
+            <div className="ml-auto">
               <OrdersIconButton
                 label={`${to("orders.refresh")} — ${to("orders.refresh_collection")}`}
                 onClick={onRefresh}
@@ -595,12 +584,29 @@ export default function OrdersCollectionTab({
               >
                 <RefreshCw size={14} />
               </OrdersIconButton>
-            </span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-visible">
+        {/* Summary / status bar */}
+        <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3 flex-wrap text-xs text-slate-600">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+              Today
+            </span>
+            <span>
+              <span className="font-bold text-slate-800">{page.summary.totalShops}</span> shops
+            </span>
+            <span className="text-slate-300">·</span>
+            <span>
+              <span className="font-bold text-emerald-700">{page.summary.shopsWithOrders}</span> shops with orders
+            </span>
+            <span className="text-slate-300">·</span>
+            <span>
+              <span className="font-bold text-sky-700">{page.summary.totalRequiredBoxes}</span> boxes
+            </span>
+          </span>
+        </div>
         {/* Auto-completed collection (finished at the daily cutoff). */}
         {autoFinished && (
           <div className="px-4 py-2 border-b border-emerald-200 bg-emerald-50/70 text-[11px] font-semibold text-emerald-700 flex items-center gap-1.5">
@@ -623,9 +629,9 @@ export default function OrdersCollectionTab({
         ) : filteredLines.length === 0 ? (
           <OrdersEmptyState title={emptyTitle} hint={to("orders.working_sheet_hint")} />
         ) : (
-          <div className="p-4">
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
-            <table className="w-full min-w-[860px]">
+          <div className="p-0 relative min-h-[120px]">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[860px]">
               <thead className="border-b border-slate-200 bg-white">
                 <tr>
                   <th className={`${colTh} w-12`}>

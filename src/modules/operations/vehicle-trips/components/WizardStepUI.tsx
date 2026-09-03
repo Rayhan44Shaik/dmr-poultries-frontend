@@ -1,4 +1,4 @@
-import { Check, CircleAlert, CircleX, Save, Send, X } from "lucide-react";
+import { Check, CircleAlert, CircleX, Loader2, Save, Send, X } from "lucide-react";
 import { useI18n } from "../../../../i18n";
 
 /**
@@ -81,7 +81,7 @@ export function WizardActionBar({
   submitLabel,
 }: WizardActionBarProps) {
   const { t } = useI18n();
-  const base = "w-full sm:w-auto h-10 px-5 rounded-xl text-xs font-semibold transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center justify-center gap-1.5";
+  const base = "w-full sm:w-auto h-10 px-5 rounded-xl text-xs font-semibold transition-[color,background-color,border-color,box-shadow,opacity] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center justify-center gap-1.5";
   return (
     <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-slate-100">
       <button type="button" onClick={onCancel} disabled={busy} className={`${base} border border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}>
@@ -89,11 +89,11 @@ export function WizardActionBar({
       </button>
       {onSave && (
         <button type="button" onClick={() => void onSave()} disabled={busy || saveDisabled} className={`${base} border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100`}>
-          <Save size={14} /> {busy ? t("ops.trip.please_wait") : t(saveLabel)}
+          {busy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} {t(saveLabel)}
         </button>
       )}
       <button type="button" onClick={() => void onSubmit()} disabled={busy || submitDisabled} className={`${base} bg-blue-600 text-white hover:bg-blue-700 shadow-sm`}>
-        <Send size={14} /> {busy ? t("ops.trip.please_wait") : t(submitLabel)}
+        {busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} {t(submitLabel)}
       </button>
     </div>
   );
