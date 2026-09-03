@@ -86,11 +86,67 @@ const modeColor = (mode: string) =>
 const compactINR = (value: number) =>
   new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 
-// Shared chart tooltip: ₹-formatted value, mode/collector name.
-const chartCurrency = (value: unknown, name: unknown): [string, string] => [
-  `₹ ${Number(value ?? 0).toLocaleString("en-IN")}`,
-  String(name ?? ""),
-];
+// ── Chart tooltip — polished card shared by the donut and stacked bars ──────
+// White rounded card, color-coded dots, ₹ amounts and each row's share of
+// the tooltip total, plus a total footer.
+type ChartTipEntry = {
+  name?: string | number;
+  value?: string | number;
+  color?: string;
+  dataKey?: string | number;
+  payload?: { fill?: string };
+};
+
+function ChartTipBox({
+  active,
+  payload,
+  totalLabel,
+}: {
+  active?: boolean;
+  payload?: ChartTipEntry[];
+  totalLabel: string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const rows = payload.filter((p) => Number(p.value ?? 0) > 0);
+  if (rows.length === 0) return null;
+  const total = rows.reduce((sum, p) => sum + Number(p.value ?? 0), 0);
+  const inr = (v: number) => `₹ ${v.toLocaleString("en-IN")}`;
+  const dotColor = (p: ChartTipEntry) => p.color ?? p.payload?.fill ?? "#94a3b8";
+  const title = rows.length === 1 ? String(rows[0].name ?? "") : "";
+  return (
+    <div className="min-w-[11rem] rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-xl backdrop-blur-sm">
+      {title ? (
+        <div className="mb-1.5 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: dotColor(rows[0]) }} />
+          <span className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{title}</span>
+        </div>
+      ) : null}
+      <div className="space-y-1">
+        {rows.map((p, idx) => {
+          const value = Number(p.value ?? 0);
+          const share = total > 0 ? (value / total) * 100 : 0;
+          return (
+            <div key={idx} className="flex items-center gap-2 text-[11px]">
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: dotColor(p) }} />
+              <span className="mr-auto font-medium text-slate-600">
+                {rows.length > 1 ? String(p.name ?? p.dataKey ?? "") : totalLabel}
+              </span>
+              <span className="font-bold tabular-nums text-slate-800">{inr(value)}</span>
+              <span className="w-9 text-right font-semibold tabular-nums text-slate-400">{share.toFixed(1)}%</span>
+            </div>
+          );
+        })}
+      </div>
+      {rows.length > 1 ? (
+        <div className="mt-1.5 flex items-center gap-2 border-t border-slate-100 pt-1.5 text-[11px]">
+          <span className="mr-auto font-bold uppercase tracking-wide text-slate-500">{totalLabel}</span>
+          <span className="font-extrabold tabular-nums text-slate-900">{inr(total)}</span>
+          <span className="w-9" />
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 const KNOWN_MODES = ["Cash", "Union Bank", "HDFC Bank"];
 
@@ -779,7 +835,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                       <Cell key={row.name} fill={modeColor(row.name)} />
                     ))}
                   </Pie>
-                  <ChartTooltip formatter={chartCurrency} />
+                  <ChartTooltip content={<ChartTipBox totalLabel={t("common.total")} />} />
                   <ChartLegend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
                 </PieChart>
               </ResponsiveContainer>
@@ -866,7 +922,10 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                   <XAxis dataKey="collector" tick={{ fontSize: 10, fill: "#64748b" }} tickLine={false} axisLine={{ stroke: "#e2e8f0" }} interval={0} />
                   <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickLine={false} axisLine={false} tickFormatter={(v: number) => compactINR(v)} />
-                  <ChartTooltip cursor={{ fill: "rgba(148,163,184,0.08)" }} formatter={chartCurrency} />
+                  <ChartTooltip
+                    cursor={{ fill: "rgba(148,163,184,0.08)" }}
+                    content={<ChartTipBox totalLabel={t("common.total")} />}
+                  />
                   <ChartLegend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
                   {collectorSummary.paymentModes.map((mode: string, idx: number) => (
                     <Bar
