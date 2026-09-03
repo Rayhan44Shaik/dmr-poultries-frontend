@@ -233,18 +233,18 @@ export const generateShopLedgerPDF = async (
     const pageWidth = doc.internal.pageSize.getWidth();
 
     // ─── Build Rows ───
+    // Particulars shows only the entry kind (Sale / Collection - mode /
+    // Correction) — the shop is already named in the header of the statement.
     const rows = data.map((t) => {
       let label = t.particulars;
       if (t.particulars !== "Opening Balance") {
         if (t.type === "sale") {
-          label = `${t.particulars} : Sale`;
+          label = "Sale";
         } else if (t.type === "collection") {
           const paymentMode = normalizePaymentMode(t.paymentMode);
-          label = paymentMode
-            ? `${t.particulars} : Collection - ${paymentMode}`
-            : `${t.particulars} : Collection`;
+          label = paymentMode ? `Collection - ${paymentMode}` : "Collection";
         } else {
-          label = `${t.particulars} : Correction`;
+          label = "Correction";
         }
       }
 
@@ -314,16 +314,17 @@ export const generateShopLedgerPDF = async (
         }
       },
       // Column widths sum to 186mm — the printable width of A4 portrait with
-      // 12mm margins (same margins as the branded letterhead).
+      // 12mm margins (same margins as the branded letterhead). Particulars is
+      // compact since it carries only the entry kind.
       columnStyles: {
         0: { cellWidth: 20, halign: "center" }, // Date
-        1: { cellWidth: 54, halign: "left" },   // Particulars
+        1: { cellWidth: 30, halign: "left" },   // Particulars
         2: { cellWidth: 14, halign: "center" }, // Birds
         3: { cellWidth: 18, halign: "right" },  // Weight
         4: { cellWidth: 14, halign: "right" },  // Rate
-        5: { cellWidth: 22, halign: "right" },  // Debit
-        6: { cellWidth: 22, halign: "right" },  // Credit
-        7: { cellWidth: 22, halign: "right" },  // Balance
+        5: { cellWidth: 30, halign: "right" },  // Debit
+        6: { cellWidth: 30, halign: "right" },  // Credit
+        7: { cellWidth: 30, halign: "right" },  // Balance
       },
       didDrawPage: (data) => {
         // Letterhead + title + shop details on every page of the statement.
