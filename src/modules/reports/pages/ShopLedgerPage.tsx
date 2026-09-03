@@ -2171,9 +2171,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 </span>
                 <div>
                   <h3 className="text-sm font-bold text-slate-800">WhatsApp Report</h3>
-                  <p className="text-[11px] text-slate-400">
-                    Send each shop’s ledger PDF to its owner’s WhatsApp number
-                  </p>
                 </div>
               </div>
               <button
