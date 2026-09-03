@@ -78,6 +78,14 @@ const modeColor = (mode: string) =>
 
 // 2D logo chips — flat color badges that tie table rows/columns to the
 // chart colors (Cash = emerald, Union Bank = sky, HDFC Bank = violet).
+// Display names for payment modes — short forms for tables/charts only;
+// filter values and API payloads keep the full backend names.
+const MODE_DISPLAY: Record<string, string> = {
+  "HDFC Bank": "HDFC",
+  "Union Bank": "Union",
+};
+const modeDisplay = (mode: string) => MODE_DISPLAY[mode] ?? mode;
+
 const compactINR = (value: number) =>
   new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 
@@ -336,7 +344,8 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
   const modeChartData = useMemo(
     () =>
       (report?.paymentModeSummary ?? []).map((r) => ({
-        name: r.paymentMode,
+        name: modeDisplay(r.paymentMode),
+        mode: r.paymentMode,
         value: r.amount,
         count: r.count,
         percentage: r.percentage,
@@ -770,7 +779,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                       key={row.mode}
                       className={row.mode === "Total" ? "bg-amber-50/60 font-semibold" : "hover:bg-slate-50/50"}
                     >
-                      <td className="px-4 py-3 text-xs font-medium text-slate-800">{row.mode === "Total" ? t("common.total") : row.mode}</td>
+                      <td className="px-4 py-3 text-xs font-medium text-slate-800">{row.mode === "Total" ? t("common.total") : modeDisplay(row.mode)}</td>
                       <td className="px-4 py-3 text-right text-xs text-slate-600">
                         {row.mode === "Total"
                           ? totalCollectorsCount
@@ -814,7 +823,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                     stroke="none"
                   >
                     {modeChartData.map((row) => (
-                      <Cell key={row.name} fill={modeColor(row.name)} />
+                      <Cell key={row.mode} fill={modeColor(row.mode)} />
                     ))}
                   </Pie>
                   <ChartTooltip content={<ChartTipBox totalLabel={t("common.total")} />} />
@@ -852,7 +861,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">{t("common.collector")}</th>
                     {collectorSummary.paymentModes.map((mode: string) => (
                       <th key={mode} className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
-{mode}
+{modeDisplay(mode)}
                       </th>
                     ))}
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("common.total")}</th>
@@ -915,6 +924,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                     <Bar
                       key={mode}
                       dataKey={mode}
+                      name={modeDisplay(mode)}
                       stackId="amount"
                       fill={modeColor(mode)}
                       radius={idx === collectorSummary.paymentModes.length - 1 ? [4, 4, 0, 0] : undefined}
