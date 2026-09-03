@@ -17,6 +17,44 @@ import type { PDFDocumentProxy, PDFPageProxy, PageViewport } from "pdfjs-dist";
 import { loadPdfJs } from "./pdfJsLoader";
 
 type RenderTask = { promise: Promise<void>; cancel: () => void };
+type PdfLoadingTask = { destroy: () => Promise<void> };
+
+interface PoolEntry {
+  doc: PDFDocumentProxy;
+  task: PdfLoadingTask;
+  refs: number;
+}
+
+/**
+ * Parsed-document pool keyed by blob URL. Remounts (React StrictMode) and
+ * re-selecting a shop reuse the already-parsed document instead of parsing
+ * the whole PDF again — the biggest preview stall after generation.
+ */
+const docPool = new Map<string, PoolEntry>();
+
+async function acquireDoc(
+  url: string,
+  create: (url: string) => Promise<{ doc: PDFDocumentProxy; task: PdfLoadingTask }>,
+): Promise<PDFDocumentProxy> {
+  const hit = docPool.get(url);
+  if (hit) {
+    hit.refs += 1;
+    return hit.doc;
+  }
+  const { doc, task } = await create(url);
+  docPool.set(url, { doc, task, refs: 1 });
+  return doc;
+}
+
+function releaseDoc(url: string): void {
+  const hit = docPool.get(url);
+  if (!hit) return;
+  hit.refs -= 1;
+  if (hit.refs <= 0) {
+    docPool.delete(url);
+    void hit.task.destroy();
+  }
+}
 
 interface PdfBlobPreviewProps {
   /** Object URL of the PDF blob to display. */
@@ -27,7 +65,6 @@ const PdfBlobPreview: React.FC<PdfBlobPreviewProps> = ({ url }) => {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const docRef = useRef<PDFDocumentProxy | null>(null);
-  const loadingTaskRef = useRef<{ destroy: () => Promise<void> } | null>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
 
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -50,13 +87,15 @@ const PdfBlobPreview: React.FC<PdfBlobPreviewProps> = ({ url }) => {
         const [pdfjs, workerModule] = await loadPdfJs();
         pdfjs.GlobalWorkerOptions.workerSrc = workerModule.default;
 
-        const response = await fetch(url);
-        const buffer = await response.arrayBuffer();
-        const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buffer) });
-        loadingTaskRef.current = loadingTask;
-        const pdf = await loadingTask.promise;
+        const pdf = await acquireDoc(url, async (blobUrl) => {
+          const response = await fetch(blobUrl);
+          const buffer = await response.arrayBuffer();
+          const task = pdfjs.getDocument({ data: new Uint8Array(buffer) });
+          const loaded = await task.promise;
+          return { doc: loaded, task };
+        });
         if (cancelled) {
-          void loadingTask.destroy();
+          releaseDoc(url);
           return;
         }
         docRef.current = pdf;
@@ -72,8 +111,7 @@ const PdfBlobPreview: React.FC<PdfBlobPreviewProps> = ({ url }) => {
       renderTaskRef.current?.cancel();
       renderTaskRef.current = null;
       docRef.current = null;
-      void loadingTaskRef.current?.destroy();
-      loadingTaskRef.current = null;
+      releaseDoc(url);
     };
   }, [url]);
 

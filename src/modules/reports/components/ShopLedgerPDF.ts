@@ -72,6 +72,12 @@ const ACCENT_RED: RGB = [142, 30, 30];
 const PAGE_MARGIN = 12;
 const LETTERHEAD_TOP = 7;
 
+/** Yield to the browser between shop sections so the UI never blocks. */
+const yieldToBrowser = (): Promise<void> =>
+  new Promise((resolve) => {
+    globalThis.setTimeout(resolve, 0);
+  });
+
 /**
  * Draws the branded DMR POULTRIES letterhead plus the weekly-statement title
  * and the two-column shop details (Shop / Owner, City / Period). Used on every
@@ -208,6 +214,7 @@ export const generateShopLedgerPDF = async (
   dateTo: string,
   selectedShop: string,
   preparedAssets?: DmrPoultryHeaderAssets,
+  onProgress?: (done: number, total: number) => void,
 ): Promise<GeneratedShopLedgerPdf> => {
   // Prepare the letterhead hen once per call (canvas cut-out); callers that
   // generate many PDFs in a batch pass their own prepared assets.
@@ -226,9 +233,8 @@ export const generateShopLedgerPDF = async (
 
   const headers = ["Date", "Particulars", "Birds", "Weight", "Rate", "Debit", "Credit", "Balance"];
 
-  allLedgers.forEach((entry, index) => {
+  const renderShopSection = (entry: ShopLedgerPdfEntry): void => {
     const { data } = entry;
-    if (index > 0) doc.addPage();
 
     const pageWidth = doc.internal.pageSize.getWidth();
 
@@ -343,7 +349,17 @@ export const generateShopLedgerPDF = async (
     // Thank-you closing block, same style as the Step-4 delivery receipt.
     const finalY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 79;
     drawThankYouBlock(doc, finalY + 2);
-  });
+  };
+
+  // Sections are rendered one shop at a time with a yield between them so a
+  // 50-shop statement never blocks the main thread — the spinner keeps
+  // animating and progress updates live.
+  for (let index = 0; index < allLedgers.length; index++) {
+    if (index > 0) doc.addPage();
+    renderShopSection(allLedgers[index]);
+    onProgress?.(index + 1, allLedgers.length);
+    if (index < allLedgers.length - 1) await yieldToBrowser();
+  }
 
   const filename = `WeeklyStatement_${selectedShop === "All Shops" ? "AllShops" : selectedShop.replace(/\s+/g, "_")}_${formatPdfDate(dateFrom)}_to_${formatPdfDate(dateTo)}.pdf`;
   const blob = doc.output("blob");

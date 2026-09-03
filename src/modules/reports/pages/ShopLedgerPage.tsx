@@ -634,6 +634,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const [pdfPreview, setPdfPreview] = useState<PdfPreviewState | null>(null);
   const [pdfShopSearch, setPdfShopSearch] = useState("");
   const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState<string | null>(null);
   const pdfPreviewRef = useRef<PdfPreviewState | null>(null);
   // Synchronous in-flight guard — state alone cannot stop a double-click
   // race because both clicks read the same render's state.
@@ -741,7 +742,14 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       // clicked or downloaded, so the modal appears in a fraction of the time
       // (one document instead of fifty-one).
       const combined = await generateShopLedgerPDF(
-        allLedgers, appliedDateFrom, appliedDateTo, appliedSelectedShop, letterheadAssets,
+        allLedgers,
+        appliedDateFrom,
+        appliedDateTo,
+        appliedSelectedShop,
+        letterheadAssets,
+        (done, total) => {
+          setPdfProgress(total > 1 ? `${done}/${total}` : null);
+        },
       );
       createdUrls.push(combined.url);
 
@@ -786,6 +794,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     } finally {
       pdfGeneratingRef.current = false;
       setPdfGenerating(false);
+      setPdfProgress(null);
     }
   }, [appliedSelectedShop, appliedDateFrom, appliedDateTo, sampleMode, showNotification, shopMasterMap, buildLedger]);
 
@@ -1505,9 +1514,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               type="button"
               onClick={() => void handleExportPDF()}
               disabled={pdfGenerating}
+              title="Generate Weekly Statement PDFs"
               className={`${actionButtonClass} ${pdfButtonClass} disabled:opacity-60`}
             >
-              {pdfGenerating ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} PDF
+              {pdfGenerating ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+              {pdfProgress ?? "PDF"}
             </button>
             <button
               type="button"
