@@ -807,24 +807,24 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-md bg-indigo-50 text-indigo-500">
-                        <CalendarDays size={11} />
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-sm">
+                        <CalendarDays size={13} />
                       </span>
                       Date
                     </span>
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-50 text-emerald-600">
-                        <Store size={11} />
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm">
+                        <Store size={13} />
                       </span>
                       Particulars
                     </span>
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-50 text-amber-500">
-                        <Bird size={11} />
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-sm">
+                        <Bird size={13} />
                       </span>
                       Birds
                     </span>
