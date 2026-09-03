@@ -1099,7 +1099,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
   const waPreviewRecipient = waPreviewShop ? resolveWaRecipient(waPreviewShop) : null;
   const waPreviewFileName = waPreviewShop
-    ? `ShopLedger_${waPreviewShop.replace(/\s+/g, "_")}_${formatDisplayDate(waDateFrom)}_to_${formatDisplayDate(waDateTo)}.pdf`
+    ? `WeeklyStatement_${waPreviewShop.replace(/\s+/g, "_")}_${formatDisplayDate(waDateFrom)}_to_${formatDisplayDate(waDateTo)}.pdf`
     : "";
   const waPreviewMessage =
     waPreviewShop && waPreviewRecipient

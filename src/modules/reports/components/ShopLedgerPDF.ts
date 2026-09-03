@@ -151,7 +151,7 @@ const drawStatementChrome = (
     PAGE_MARGIN,
     tableTop + rowHeight * 2,
     tableWidth,
-    "Period: ",
+    "Date Range: ",
     `${formatPdfDate(dateFrom)} to ${formatPdfDate(dateTo)}`,
   );
 
@@ -347,7 +347,7 @@ export const generateShopLedgerPDF = async (
     drawThankYouBlock(doc, finalY + 2);
   });
 
-  const filename = `ShopLedger_${selectedShop === "All Shops" ? "AllShops" : selectedShop.replace(/\s+/g, "_")}_${formatPdfDate(dateFrom)}_to_${formatPdfDate(dateTo)}.pdf`;
+  const filename = `WeeklyStatement_${selectedShop === "All Shops" ? "AllShops" : selectedShop.replace(/\s+/g, "_")}_${formatPdfDate(dateFrom)}_to_${formatPdfDate(dateTo)}.pdf`;
   const blob = doc.output("blob");
   return { blob, url: URL.createObjectURL(blob), filename };
 };
