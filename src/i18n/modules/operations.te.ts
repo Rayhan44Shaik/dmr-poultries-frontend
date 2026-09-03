@@ -70,6 +70,8 @@
   'ops.collection.collector_split': 'కలెక్టర్ వారీ విభజన',
   'ops.collection.collectors': 'కలెక్టర్లు',
   'ops.collection.share': 'వాటా %',
+  'ops.collection.details': 'కలెక్షన్ వివరాలు',
+  'ops.collection.records': 'రికార్డులు',
   'ops.collection.avg_per_collection': 'సగటు కలెక్షన్',
   'ops.collection.no_data_export': 'ఎక్స్పోర్ట్ చేయడానికి డేటా లేదు.',
   'ops.collection.no_deleted': 'ఏ కలెక్షన్‌లు తొలగించబడలేదు.',

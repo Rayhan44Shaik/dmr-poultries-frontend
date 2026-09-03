@@ -70,6 +70,8 @@
   'ops.collection.collector_split': 'Collector-wise Split',
   'ops.collection.collectors': 'Collectors',
   'ops.collection.share': 'Share %',
+  'ops.collection.details': 'Collection Details',
+  'ops.collection.records': 'records',
   'ops.collection.avg_per_collection': 'Avg / Collection',
   'ops.collection.no_data_export': 'No data to export.',
   'ops.collection.no_deleted': 'No collections were deleted.',

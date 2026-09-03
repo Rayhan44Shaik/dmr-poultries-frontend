@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { collectionService } from "../services/collectionService";
-import type { CollectionReportSummary } from "../types/collection";
+import type { CollectionApiEntry, CollectionReportSummary } from "../types/collection";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
 import Select from "react-select";
@@ -340,7 +340,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
     }
   }, [report, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate, t]);
 
-  const exportPDF = useCallback(() => {
+  const exportPDF = useCallback(async () => {
     if (!report || report.totalCount === 0) {
       showNotification(t("ops.collection.no_data_export"), "error");
       return;
@@ -401,12 +401,90 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
         styles: { fontSize: 8 },
       });
 
+      // ── Collection Details (transaction rows) ────────────────────────────
+      // Rows come from the backend's /collection-entry/recent endpoint
+      // (contract endpoint; per shop). Date-range filtering and ordering here
+      // are presentation-only — summary totals above remain authoritative.
+      try {
+        const selectedShopId = shopName
+          ? collectionService.getShopIdForName(shopName) ?? null
+          : null;
+        let detailRows: CollectionApiEntry[] = [];
+        if (selectedShopId) {
+          detailRows = await collectionService.fetchRecentCollectionsForShop(selectedShopId, 500);
+        } else {
+          const perShop = await Promise.all(
+            shops.map((shop) =>
+              collectionService
+                .fetchRecentCollectionsForShop(shop.id, 500)
+                .catch((): CollectionApiEntry[] => [])
+            )
+          );
+          detailRows = perShop.flat();
+        }
+        detailRows = detailRows
+          .filter(
+            (row) =>
+              (!row.collectionDate ||
+                (row.collectionDate >= fromDate && row.collectionDate <= toDate))
+          )
+          .sort(
+            (a, b) =>
+              a.collectionDate.localeCompare(b.collectionDate) ||
+              a.collectionNo.localeCompare(b.collectionNo, undefined, { numeric: true })
+          );
+
+        doc.addPage();
+        let dy = 20;
+        doc.setFontSize(12);
+        doc.setTextColor(30, 58, 138);
+        doc.text(`${t("ops.collection.details")} (${detailRows.length} ${t("ops.collection.records")})`, margin, dy);
+        dy += 5;
+        if (detailRows.length > 0) {
+          const detailBody = detailRows.map((row) => [
+            row.collectionDate || "—",
+            row.collectionNo || "—",
+            row.shopName || "—",
+            row.paymentMode || "—",
+            (row.amount ?? 0).toFixed(2),
+          ]);
+          detailBody.push([
+            "",
+            "",
+            t("common.total"),
+            "",
+            detailRows.reduce((sum, row) => sum + (row.amount ?? 0), 0).toFixed(2),
+          ]);
+          autoTable(doc, {
+            head: [[
+              t("common.date"),
+              t("ops.collection.collection_no_label"),
+              t("operations.shop_name"),
+              t("operations.payment_mode"),
+              t("table.amount"),
+            ]],
+            body: detailBody,
+            startY: dy,
+            theme: "striped",
+            headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: "bold" },
+            styles: { fontSize: 8 },
+            columnStyles: { 4: { halign: "right" } },
+          });
+        } else {
+          doc.setFontSize(9);
+          doc.setTextColor(100, 116, 139);
+          doc.text(t("ops.collection.empty.title"), margin, dy + 4);
+        }
+      } catch {
+        // Detail section is best-effort; summary PDF still exports.
+      }
+
       doc.save(getExportFileName("pdf"));
       showNotification(t("notification.export_success"), "success");
     } catch (error) {
       showNotification(t("ops.collection.pdf_failed"), "error");
     }
-  }, [report, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate, t]);
+  }, [report, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate, t, shopName, shops]);
 
   const resetFilters = useCallback(() => {
     setFromDate(weekBounds.from);
@@ -478,7 +556,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
           <DatePicker
             value={fromDate}
             onChange={setFromDate}
-            label={t("common.from") + " *"}
+            label={t("common.from")}
             className="w-full"
             placeholder={t("placeholder.enter_date")}
             required
@@ -486,7 +564,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
           <DatePicker
             value={toDate}
             onChange={setToDate}
-            label={t("common.to") + " *"}
+            label={t("common.to")}
             className="w-full"
             placeholder={t("placeholder.enter_date")}
             required

@@ -66,6 +66,7 @@ function buildRows() {
       for (let i = 0; i < count; i++) {
         rows.push({
           date,
+          collectionNo: `COL-${date.replaceAll("-", "")}-${shop.id}${i + 1}`,
           shopId: shop.id,
           shopName: shop.shopName,
           collector: COLLECTORS[Math.floor(rnd() * COLLECTORS.length)],
@@ -173,6 +174,31 @@ const server = http.createServer((req, res) => {
     }
     case "/api/operations/collection-entry/report":
       return send(200, buildReport(url.searchParams));
+    case "/api/operations/collection-entry/recent": {
+      const shopId = Number(url.searchParams.get("shopId"));
+      const limit = Math.min(Number(url.searchParams.get("limit")) || 10, 500);
+      if (!Number.isFinite(shopId) || shopId <= 0) return send(200, []);
+      const rows = ROWS.filter((r) => r.shopId === shopId)
+        .sort(
+          (a, b) =>
+            b.date.localeCompare(a.date) || b.collectionNo.localeCompare(a.collectionNo)
+        )
+        .slice(0, limit)
+        .map((r, idx) => ({
+          id: shopId * 10000 + idx,
+          collectionNo: r.collectionNo,
+          collectionDate: r.date,
+          shopId: r.shopId,
+          shopName: r.shopName,
+          amount: r.amount,
+          collector: r.collector,
+          paymentMode: r.paymentMode,
+          status: "Approved",
+          canDelete: true,
+          _mock: true,
+        }));
+      return send(200, rows);
+    }
     default:
       return send(404, { error: "not_found", path: url.pathname, mock: true });
   }
