@@ -20,7 +20,6 @@ const REPORT_LABELS: Record<ReportType, string> = {
   weekly: 'Weekly Report',
   vehicle: 'Vehicle Report',
   shopSales: 'Shop Sales Report',
-  collection: 'Collection Report',
   shopLedger: 'Shop Ledger',
   expenses: 'Expenses Report',
 };
@@ -29,7 +28,6 @@ const REPORT_DESCRIPTIONS: Record<ReportType, string> = {
   weekly: 'Complete business summary for the selected week',
   vehicle: 'Detailed report for all vehicles and trips',
   shopSales: 'Sales details for all shops for selected period',
-  collection: 'Collection details for all shops and collectors',
   shopLedger: 'Individual shop ledger with sales & collections',
   expenses: 'All business expenses report for selected period',
 };
@@ -38,7 +36,6 @@ const REPORT_INCLUDES: Record<ReportType, string[]> = {
   weekly: ['Sales, Collections & Outstanding Summary', 'Trips, Birds, Mortality Summary', 'Expense Summary (Fuel, Maintenance, Fastag, Office)', 'Profit & Loss Summary'],
   vehicle: ['Trip Summary (Vehicle Wise)', 'KM Summary & Distance', 'Fuel Consumption & Expense', 'Maintenance, Fastag, Insurance & Permit', 'Vehicle Availability & Status'],
   shopSales: ['Shop Wise Sales Summary', 'Daily Sales Breakdown', 'Birds, Weight, Boxes, Amount', 'Sales Comparison', 'Top Performing Shops'],
-  collection: ['Collection Register', 'Shop Wise Collection Summary', 'Collector Wise Collection', 'Payment Mode Wise Collection', 'Pending vs Collected Summary'],
   shopLedger: ['Opening Balance', 'Sales (Debit)', 'Collections (Credit)', 'Running Balance', 'Closing Balance & Outstanding'],
   expenses: ['Fuel Expense', 'Vehicle Maintenance Expense', 'Fastag Expense', 'Office Expense', 'Insurance & Permit Expense', 'Total Expense Summary'],
 };
@@ -60,8 +57,6 @@ const getDefaultFilters = (type: ReportType): ReportFilters => {
       return { ...common, vehicle: 'All Vehicles', driver: 'All Drivers', tripStatus: 'All' };
     case 'shopSales':
       return { ...common, shop: 'All Shops', groupBy: 'Shop' };
-    case 'collection':
-      return { ...common, shop: 'All Shops', collector: 'All Collectors', paymentMode: 'All' };
     case 'shopLedger':
       return { ...common, shop: 'All Shops', groupBy: 'Shop' };
     case 'expenses':
@@ -105,6 +100,15 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
     }
   }, [location.pathname, location.search, navigate, searchParams]);
 
+  // Legacy deep-link: the Collection Report was replaced by the single
+  // Operations → Collection Report implementation. Send old
+  // /reports?tab=collection links (bookmarks, /reports/* aliases) there.
+  useEffect(() => {
+    if (searchParams.get('tab') === 'collection') {
+      navigate('/operations?tab=collection-report', { replace: true });
+    }
+  }, [location.pathname, navigate, searchParams]);
+
   // Update filters when active tab changes from query params
   useEffect(() => {
     setFilters(getDefaultFilters(activeTab));
@@ -123,16 +127,6 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
       { value: 'All Drivers', label: 'All Drivers' },
       ...employees
         .filter((e) => e.department === 'Driver')
-        .map((e) => ({ value: e.employeeName, label: e.employeeName })),
-    ],
-    [employees]
-  );
-
-  const collectorOptions = useMemo(
-    () => [
-      { value: 'All Collectors', label: 'All Collectors' },
-      ...employees
-        .filter((e) => e.department === 'Collection')
         .map((e) => ({ value: e.employeeName, label: e.employeeName })),
     ],
     [employees]
@@ -211,7 +205,6 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
               vehicleOptions={vehicleOptions}
               driverOptions={driverOptions}
               shopOptions={shopOptions}
-              collectorOptions={collectorOptions}
             />
             <ReportCard
               title={REPORT_LABELS[activeTab]}
@@ -226,6 +219,9 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
       </div>
     </div>
   );
+
+  // The legacy collection tab redirects to Operations before anything renders.
+  if (searchParams.get('tab') === 'collection') return null;
 
   if (embedded) return content;
   return <div className="w-full">{content}</div>;

@@ -9,7 +9,6 @@ interface Props {
   vehicleOptions: { value: string; label: string }[];
   driverOptions: { value: string; label: string }[];
   shopOptions: { value: string; label: string }[];
-  collectorOptions: { value: string; label: string }[];
 }
 
 const ReportFiltersComponent: React.FC<Props> = React.memo(({
@@ -19,7 +18,6 @@ const ReportFiltersComponent: React.FC<Props> = React.memo(({
   vehicleOptions,
   driverOptions,
   shopOptions,
-  collectorOptions,
 }) => {
   const handleChange = useCallback((field: keyof ReportFilters, value: any) => {
     setFilters(prev => ({ ...prev, [field]: value }));
@@ -29,14 +27,6 @@ const ReportFiltersComponent: React.FC<Props> = React.memo(({
     { value: 'All', label: 'All' },
     { value: 'Pending', label: 'Pending' },
     { value: 'Completed', label: 'Completed' },
-  ], []);
-
-  const paymentOptions = useMemo(() => [
-    { value: 'All', label: 'All' },
-    { value: 'Cash', label: 'Cash' },
-    { value: 'Bank Transfer', label: 'Bank Transfer' },
-    { value: 'UPI', label: 'UPI' },
-    { value: 'Other', label: 'Other' },
   ], []);
 
   const groupByOptions = useMemo(() => [
@@ -107,49 +97,6 @@ const ReportFiltersComponent: React.FC<Props> = React.memo(({
             />
           </div>
         );
-      case 'collection':
-        return (
-          <>
-            <div className="col-span-1">
-              <label className="text-xs font-medium text-slate-500 block mb-1">Shop</label>
-              <Select
-                options={shopOptions}
-                value={shopOptions.find(s => s.value === filters.shop) || null}
-                onChange={(selected) => handleChange('shop', selected?.value || 'All Shops')}
-                placeholder="All Shops"
-                isSearchable
-                className="text-sm"
-                styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
-                menuPortalTarget={document.body}
-              />
-            </div>
-            <div className="col-span-1">
-              <label className="text-xs font-medium text-slate-500 block mb-1">Collector</label>
-              <Select
-                options={collectorOptions}
-                value={collectorOptions.find(c => c.value === filters.collector) || null}
-                onChange={(selected) => handleChange('collector', selected?.value || 'All Collectors')}
-                placeholder="All Collectors"
-                isSearchable
-                className="text-sm"
-                styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
-                menuPortalTarget={document.body}
-              />
-            </div>
-            <div className="col-span-1">
-              <label className="text-xs font-medium text-slate-500 block mb-1">Payment Mode</label>
-              <Select
-                options={paymentOptions}
-                value={paymentOptions.find(p => p.value === (filters.paymentMode || 'All'))}
-                onChange={(selected) => handleChange('paymentMode', selected?.value || 'All')}
-                placeholder="All Payment Modes"
-                className="text-sm"
-                styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
-                menuPortalTarget={document.body}
-              />
-            </div>
-          </>
-        );
       case 'expenses':
         return (
           <div className="col-span-1">
@@ -168,7 +115,7 @@ const ReportFiltersComponent: React.FC<Props> = React.memo(({
       default:
         return null;
     }
-  }, [reportType, filters, handleChange, vehicleOptions, driverOptions, shopOptions, collectorOptions, statusOptions, paymentOptions, groupByOptions]);
+  }, [reportType, filters, handleChange, vehicleOptions, driverOptions, shopOptions, statusOptions, groupByOptions]);
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">

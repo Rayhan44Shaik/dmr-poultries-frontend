@@ -173,36 +173,6 @@ const computeShopSalesReport = (sales: any[], _trips: any[], filters: ReportFilt
   };
 };
 
-const computeCollectionReport = (collections: any[], _sales: any[], filters: ReportFilters): ReportData => {
-  const filteredCollections = filterByDateRange(collections, 'collectionDate', filters.dateFrom, filters.dateTo);
-  const approved = filteredCollections.filter(c => c.status === 'Approved');
-
-  const shopGroups = groupAndSum(approved, 'shopName', ['amount']);
-  const collectorGroups = groupAndSum(approved, 'collectorName', ['amount']);
-  const modeGroups = groupAndSum(approved, 'paymentModeName', ['amount']);
-
-  const isEmpty = approved.length === 0;
-
-  return {
-    title: 'Collection Report',
-    summary: isEmpty ? {} : {
-      'Total Collections': approved.reduce((s, c) => s + safeNumber(c.amount), 0),
-      'Total Shops': shopGroups.length,
-      'Total Collectors': collectorGroups.length,
-      'Payment Modes': modeGroups.length,
-    },
-    details: {
-      shopWise: shopGroups,
-      collectorWise: collectorGroups,
-      paymentModeWise: modeGroups,
-    },
-    total: {
-      amount: approved.reduce((s, c) => s + safeNumber(c.amount), 0),
-    },
-    isEmpty,
-  };
-};
-
 const computeShopLedger = (sales: any[], collections: any[], filters: ReportFilters): ReportData => {
   const filteredSales = filterByDateRange(sales, 'tripDate', filters.dateFrom, filters.dateTo);
   const filteredCollections = filterByDateRange(collections, 'collectionDate', filters.dateFrom, filters.dateTo);
@@ -285,8 +255,6 @@ export function getReportData(type: ReportType, filters: ReportFilters): ReportD
         return computeVehicleReport(trips, fuelExpenses, filters);
       case 'shopSales':
         return computeShopSalesReport(sales, trips, filters);
-      case 'collection':
-        return computeCollectionReport(collections, sales, filters);
       case 'shopLedger':
         return computeShopLedger(sales, collections, filters);
       case 'expenses':

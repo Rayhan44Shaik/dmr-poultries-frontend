@@ -2,7 +2,6 @@ export type ReportType =
   | 'weekly'
   | 'vehicle'
   | 'shopSales'
-  | 'collection'
   | 'shopLedger'
   | 'expenses';
 
@@ -17,8 +16,6 @@ export interface ReportFilters {
   driver?: string;
   tripStatus?: string;
   shop?: string;
-  collector?: string;
-  paymentMode?: string;
   groupBy?: string;
   includeSections?: string[];
 }

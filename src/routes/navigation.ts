@@ -178,7 +178,9 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Shop Ledger", labelKey: "nav.shopLedger", path: "/reports?tab=shopLedger", icon: BookOpen, keywords: "shop ledger statement" },
       { label: "Daily / Weekly Reports", labelKey: "nav.dailyWeeklyReports", path: "/reports?tab=weekly", icon: CalendarDays, keywords: "daily weekly reports" },
       { label: "shopSales", labelKey: "nav.shopSalesReport", path: "/reports?tab=shopSales", icon: ShoppingBag, keywords: "shop sales report" },
-      { label: "Collection Report", labelKey: "nav.collectionReport", path: "/reports?tab=collection", icon: CreditCard, keywords: "collection report register" },
+      // Collection Report now lives in Operations → Collection. The Reports
+      // menu item opens that single implementation instead of a duplicate.
+      { label: "Collection Report", labelKey: "nav.collectionReport", path: "/operations?tab=collection-report", icon: CreditCard, keywords: "collection report register" },
       { label: "Vehicle Reports", labelKey: "nav.vehicleReports", path: "/reports?tab=vehicle", icon: Truck, keywords: "vehicle reports fleet" },
       { label: "expenses", labelKey: "nav.expensesReport", path: "/reports?tab=expenses", icon: FileText, keywords: "Expenses" },
     ],
