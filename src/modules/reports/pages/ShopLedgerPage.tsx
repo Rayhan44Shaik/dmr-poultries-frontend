@@ -6,15 +6,20 @@ import {
   Bird,
   CalendarDays,
   CheckCircle2,
+  CheckSquare,
   Download,
   ExternalLink,
+  FileStack,
   FileText,
   IndianRupee,
+  Layers,
+  ListChecks,
   Loader2,
   RefreshCw,
   RotateCcw,
   Scale,
   Search,
+  Square,
   Store,
   Weight,
   X,
@@ -1785,30 +1790,68 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             {/* Body */}
             <div className="flex min-h-0 flex-1">
               {pdfPreview.files.length > 1 && (
-                <aside className="flex w-64 shrink-0 flex-col border-r border-slate-100 bg-slate-50/60">
-                  <div className="space-y-2 border-b border-slate-100 px-3.5 py-3">
+                <aside className="flex w-72 shrink-0 flex-col border-r border-slate-100 bg-slate-50/70">
+                  {/* Header: title + count chip + selection progress */}
+                  <div className="space-y-2.5 border-b border-slate-100 bg-white/70 px-3.5 py-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Select shops</span>
-                      <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">
+                      <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-sm">
+                          <ListChecks size={12} />
+                        </span>
+                        Select shops
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition ${
+                          pdfPreview.selectedShops.length === pdfPreview.files.length
+                            ? "bg-red-600 text-white shadow-sm"
+                            : "bg-red-50 text-red-600"
+                        }`}
+                      >
                         {pdfPreview.selectedShops.length} / {pdfPreview.files.length}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5">
+
+                    <div
+                      className="h-1 w-full overflow-hidden rounded-full bg-slate-100"
+                      role="progressbar"
+                      aria-valuemin={0}
+                      aria-valuemax={pdfPreview.files.length}
+                      aria-valuenow={pdfPreview.selectedShops.length}
+                    >
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-red-500 to-rose-500 transition-all duration-200"
+                        style={{
+                          width: `${
+                            pdfPreview.files.length === 0
+                              ? 0
+                              : Math.round((pdfPreview.selectedShops.length / pdfPreview.files.length) * 100)
+                          }%`,
+                        }}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5">
                       <button
                         type="button"
                         onClick={selectAllPdfShops}
-                        className="h-7 flex-1 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50"
+                        className={`flex h-7 items-center justify-center gap-1 rounded-lg border text-[11px] font-semibold transition ${
+                          pdfPreview.selectedShops.length === pdfPreview.files.length
+                            ? "border-red-300 bg-red-50 text-red-700"
+                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                        }`}
                       >
-                        All
+                        <CheckSquare size={11} /> All
                       </button>
                       <button
                         type="button"
                         onClick={clearPdfShops}
-                        className="h-7 flex-1 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50"
+                        disabled={pdfPreview.selectedShops.length === 0}
+                        className="flex h-7 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        None
+                        <Square size={11} /> None
                       </button>
                     </div>
+
                     <div className="relative">
                       <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
@@ -1817,79 +1860,139 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         onChange={(e) => setPdfShopSearch(e.target.value)}
                         placeholder="Search shops..."
                         aria-label="Search shops in PDF preview"
-                        className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-7 pr-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-300"
+                        className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-7 pr-7 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-300"
                       />
+                      {pdfShopSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setPdfShopSearch("")}
+                          aria-label="Clear shop search"
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 transition hover:text-slate-600"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+                  {/* Shop list */}
+                  <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-2.5">
+                    {/* Combined view card */}
                     <button
                       type="button"
                       onClick={() => setActivePdfShop(-1)}
-                      className={`mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition ${
+                      className={`mb-1.5 flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left shadow-sm transition ${
                         pdfPreview.selectedIndex === -1
-                          ? "bg-red-50 font-semibold text-red-600 ring-1 ring-red-200"
-                          : "text-slate-600 hover:bg-white"
+                          ? "border-red-200 bg-red-50 ring-1 ring-red-300"
+                          : "border-slate-200/80 bg-white hover:border-slate-300"
                       }`}
                     >
-                      <FileText size={13} className="shrink-0" />
-                      <span className="min-w-0 flex-1 truncate">All Shops — Combined</span>
-                    </button>
-                    {pdfFilteredFiles.map((file) => {
-                      const fileIndex = pdfPreview.files.findIndex((f) => f.shop === file.shop);
-                      const isActive = pdfPreview.selectedIndex === fileIndex;
-                      return (
-                        <div
-                          key={file.shop}
-                          className={`flex items-center gap-2 rounded-lg px-2 py-1.5 transition ${
-                            isActive ? "bg-red-50 ring-1 ring-red-200" : "hover:bg-white"
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white shadow-sm ${
+                          pdfPreview.selectedIndex === -1
+                            ? "bg-gradient-to-br from-red-500 to-rose-600"
+                            : "bg-gradient-to-br from-slate-500 to-slate-700"
+                        }`}
+                      >
+                        <Layers size={13} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={`block truncate text-xs ${
+                            pdfPreview.selectedIndex === -1 ? "font-bold text-red-700" : "font-semibold text-slate-700"
                           }`}
                         >
-                          <input
-                            type="checkbox"
-                            checked={pdfPreview.selectedShops.includes(file.shop)}
-                            onChange={() => togglePdfShop(file.shop)}
-                            aria-label={`Include ${file.shop} in downloads`}
-                            className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-red-600"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setActivePdfShop(fileIndex, file.shop)}
-                            title={file.shop}
-                            className={`min-w-0 flex-1 truncate text-left text-xs transition ${
-                              isActive ? "font-semibold text-red-600" : "text-slate-600"
+                          All Shops
+                        </span>
+                        <span className="block text-[10px] text-slate-400">
+                          Combined statement · {pdfPreview.files.length} shops
+                        </span>
+                      </span>
+                    </button>
+
+                    <div className="space-y-0.5">
+                      {pdfFilteredFiles.map((file) => {
+                        const fileIndex = pdfPreview.files.findIndex((f) => f.shop === file.shop);
+                        const isActive = pdfPreview.selectedIndex === fileIndex;
+                        const isSelected = pdfPreview.selectedShops.includes(file.shop);
+                        const isBusy = pdfBusyShop === file.shop;
+                        return (
+                          <div
+                            key={file.shop}
+                            className={`group flex items-center gap-2 rounded-xl border px-2 py-1.5 transition ${
+                              isActive
+                                ? "border-red-200 bg-red-50/70 ring-1 ring-red-300"
+                                : isSelected
+                                  ? "border-red-100 bg-red-50/40"
+                                  : "border-transparent hover:border-slate-200/70 hover:bg-white"
                             }`}
                           >
-                            {file.shop}
-                          </button>
-                          {pdfBusyShop === file.shop && (
-                            <Loader2 size={12} className="shrink-0 animate-spin text-red-500" />
-                          )}
-                        </div>
-                      );
-                    })}
+            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => togglePdfShop(file.shop)}
+                              aria-label={`Include ${file.shop} in downloads`}
+                              className="h-4 w-4 shrink-0 cursor-pointer accent-red-600"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setActivePdfShop(fileIndex, file.shop)}
+                              title={file.shop}
+                              className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                            >
+                              <span
+                                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-bold transition ${
+                                  isSelected ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-500"
+                                }`}
+                              >
+                                {file.shop.charAt(0).toUpperCase()}
+                              </span>
+                              <span
+                                className={`min-w-0 flex-1 truncate text-xs transition ${
+                                  isActive ? "font-bold text-red-700" : isSelected ? "font-medium text-slate-700" : "text-slate-600"
+                                }`}
+                              >
+                                {file.shop}
+                              </span>
+                            </button>
+                            {isBusy ? (
+                              <Loader2 size={13} className="shrink-0 animate-spin text-red-500" />
+                            ) : file.url ? (
+                              <CheckCircle2 size={13} className="shrink-0 text-emerald-500" aria-label="PDF ready" />
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+
                     {pdfFilteredFiles.length === 0 && (
                       <p className="px-2 py-4 text-center text-xs text-slate-400">No shops match “{pdfShopSearch}”.</p>
                     )}
+                    {pdfShopSearch && pdfFilteredFiles.length > 0 && (
+                      <p className="mt-1.5 px-2 text-center text-[10px] font-medium text-slate-400">
+                        Showing {pdfFilteredFiles.length} of {pdfPreview.files.length} shops
+                      </p>
+                    )}
                   </div>
 
-                  <div className="space-y-2 border-t border-slate-100 px-3.5 py-3">
+                  {/* Actions */}
+                  <div className="space-y-2 border-t border-slate-100 bg-white/70 px-3.5 py-3">
                     <button
                       type="button"
-                      onClick={handleDownloadSelectedShops}
+                      onClick={() => void handleDownloadSelectedShops()}
                       disabled={pdfPreview.selectedShops.length === 0}
-                      className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 text-[11px] font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 text-xs font-semibold text-white shadow-sm transition hover:from-red-600 hover:to-rose-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:from-red-500 disabled:hover:to-rose-600"
                     >
-                      <Download size={12} />
+                      <Download size={13} />
                       Download selected ({pdfPreview.selectedShops.length})
                     </button>
                     <button
                       type="button"
                       onClick={() => void handleDownloadSelectedCombined()}
                       disabled={pdfPreview.selectedShops.length === 0}
-                      className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <FileText size={12} />
+                      <FileStack size={13} />
                       Download selected as one PDF
                     </button>
                   </div>
