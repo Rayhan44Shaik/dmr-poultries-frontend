@@ -131,44 +131,58 @@ const drawStatementChrome = (
     dates: [190, 18, 60],   // rose
   };
 
-  // Small vector icons (~3mm) drawn beside each field label.
+  /**
+   * Small solid-style glyphs on a shared 3.4mm design grid — consistent
+   * optical weight, filled shapes with fine outlines so they stay crisp at
+   * print size (drawn on white, so knocked-out details read cleanly).
+   */
   const drawIcon = (kind: DetailIcon, x: number, y: number): void => {
     const color = ICON_COLORS[kind];
     doc.saveGraphicsState();
     doc.setDrawColor(color[0], color[1], color[2]);
-    doc.setLineWidth(0.45);
+    doc.setFillColor(color[0], color[1], color[2]);
+    doc.setLineJoin("round");
+    doc.setLineCap("round");
     switch (kind) {
       case "shop": {
-        doc.rect(x, y + 1.2, 3.1, 2.1);                 // store body
-        doc.setLineWidth(0.6);
-        doc.line(x - 0.35, y + 1.2, x + 3.45, y + 1.2); // awning
-        doc.rect(x + 1.15, y + 2.2, 0.85, 1.1);         // door
+        // Storefront: filled awning band, fine body outline, solid door.
+        doc.rect(x, y + 0.15, 3.4, 0.9, "F");
+        doc.setLineWidth(0.35);
+        doc.roundedRect(x + 0.3, y + 1.05, 2.8, 2.15, 0.25, 0.25, "S");
+        doc.rect(x + 1.35, y + 2.05, 0.7, 1.15, "F");
         break;
       }
       case "owner": {
-        doc.circle(x + 1.55, y + 0.95, 0.78);           // head
-        doc.ellipse(x + 1.55, y + 2.75, 1.55, 0.85);    // shoulders
+        // Person: solid head + solid shoulders.
+        doc.circle(x + 1.7, y + 1.0, 0.85, "F");
+        doc.ellipse(x + 1.7, y + 2.9, 1.65, 0.72, "F");
         break;
       }
       case "mobile": {
-        doc.roundedRect(x + 0.85, y, 1.7, 3.1, 0.4, 0.4); // handset
-        doc.circle(x + 1.7, y + 2.55, 0.15, "F");       // home dot
-        doc.setLineWidth(0.6);
-        doc.line(x + 1.35, y + 0.45, x + 2.05, y + 0.45); // speaker
+        // Handset: slim outline with speaker line + home dot.
+        doc.setLineWidth(0.38);
+        doc.roundedRect(x + 1.0, y, 1.7, 3.3, 0.45, 0.45, "S");
+        doc.setLineWidth(0.5);
+        doc.line(x + 1.5, y + 0.45, x + 2.2, y + 0.45);
+        doc.circle(x + 1.85, y + 2.72, 0.17, "F");
         break;
       }
       case "city": {
-        doc.circle(x + 1.55, y + 1.05, 0.95);           // pin head
-        doc.circle(x + 1.55, y + 1.05, 0.28, "F");      // pin hole
-        doc.triangle(x + 0.75, y + 1.7, x + 2.35, y + 1.7, x + 1.55, y + 3.05, "F"); // pin tip
+        // Map pin: outlined head with a solid centre dot + solid tip.
+        doc.setLineWidth(0.38);
+        doc.circle(x + 1.7, y + 1.15, 0.95, "S");
+        doc.circle(x + 1.7, y + 1.15, 0.3, "F");
+        doc.triangle(x + 0.9, y + 1.75, x + 2.5, y + 1.75, x + 1.7, y + 3.3, "F");
         break;
       }
       case "dates": {
-        doc.rect(x, y + 0.55, 3.2, 2.65);               // calendar body
-        doc.setLineWidth(0.6);
-        doc.line(x + 0.7, y + 0.15, x + 0.7, y + 0.95); // ring
-        doc.line(x + 2.5, y + 0.15, x + 2.5, y + 0.95); // ring
-        doc.line(x, y + 1.55, x + 3.2, y + 1.55);       // header rule
+        // Calendar: fine body outline, solid header band, rings above it.
+        doc.setLineWidth(0.35);
+        doc.roundedRect(x, y + 0.5, 3.4, 2.85, 0.3, 0.3, "S");
+        doc.setLineWidth(0.55);
+        doc.line(x + 0.85, y + 0.1, x + 0.85, y + 0.95);
+        doc.line(x + 2.55, y + 0.1, x + 2.55, y + 0.95);
+        doc.rect(x, y + 0.5, 3.4, 0.7, "F");
         break;
       }
     }
@@ -190,7 +204,7 @@ const drawStatementChrome = (
     drawIcon(icon, x + cellPadding, y + (rowHeight - 3.1) / 2);
 
     const baseline = y + rowHeight / 2 + 1.1;
-    const textX = x + cellPadding + 4.6;
+    const textX = x + cellPadding + 5.0;
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
@@ -199,7 +213,7 @@ const drawStatementChrome = (
     const labelWidth = doc.getTextWidth(label);
 
     doc.setFont("helvetica", "normal");
-    doc.text(fitCellText(value, width - cellPadding * 2 - 4.6 - labelWidth), textX + labelWidth, baseline);
+    doc.text(fitCellText(value, width - cellPadding * 2 - 5.0 - labelWidth), textX + labelWidth, baseline);
   };
 
   drawDetailCell(PAGE_MARGIN, tableTop, colWidth, "shop", "Shop: ", entry.shop || "");
