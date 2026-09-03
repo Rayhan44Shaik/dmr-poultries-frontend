@@ -1134,10 +1134,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800";
 
   const resetButtonClass =
-    "border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700";
+    "border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 focus-visible:outline-none";
 
   const pdfButtonClass =
-    "border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700";
+    "border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 focus-visible:outline-none";
 
   const labelClass = "block text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1";
 
@@ -1147,12 +1147,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       embedded ? '' : 'px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen'
     }`}>
       <div className="bg-white rounded-2xl p-4 md:p-6 border border-slate-200/85 shadow-sm space-y-4">
-
-        {sampleMode && (
-          <div className="rounded-xl border border-indigo-200 bg-indigo-50/80 px-4 py-2 text-xs font-medium text-indigo-700">
-            Sample data only on this page — used to test search, filters, refresh, pagination, PDF &amp; WhatsApp behavior.
-          </div>
-        )}
 
         {/* ── FILTER ROW ───────────────────────────────────── */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
