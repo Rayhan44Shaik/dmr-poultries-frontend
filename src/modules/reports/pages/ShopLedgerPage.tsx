@@ -192,6 +192,28 @@ function loadStoredRecord<T extends string | number>(key: string): Record<string
   }
 }
 
+/**
+ * Keep only the current week's entries — storage stays bounded and a new week
+ * deterministically reads 0 (no stale carry-over, ever).
+ */
+function pruneWeeklyRecord<T extends string | number>(
+  record: Record<string, T> | undefined,
+  weekStart: string,
+): Record<string, T> {
+  const prefix = `${weekStart}:`;
+  const out: Record<string, T> = {};
+  Object.entries(record ?? {}).forEach(([key, value]) => {
+    if (key.startsWith(prefix)) out[key] = value;
+  });
+  return out;
+}
+
+/** Yield to the browser so long batch work never blocks paint or input. */
+const yieldToBrowser = (): Promise<void> =>
+  new Promise((resolve) => {
+    window.setTimeout(resolve, 0);
+  });
+
 // ─── File helpers ────────────────────────────────────────────────────────────
 const downloadFile = (url: string, filename: string) => {
   const anchor = document.createElement("a");
@@ -423,6 +445,14 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const { showNotification } = useSafeNotification();
   const { shops } = useShops();
 
+  // O(1) shop-master lookups (id, owner, city, phone) — no repeated array
+  // scans inside render loops or batch exports.
+  const shopMasterMap = useMemo(() => {
+    const map = new Map<string, Shop>();
+    shops.forEach((shop: Shop) => map.set(shop.shopName, shop));
+    return map;
+  }, [shops]);
+
   const [dateFrom, setDateFrom] = useState(toWeekAgoDefault);
   const [dateTo, setDateTo] = useState(toDateDefault);
   const [selectedShop, setSelectedShop] = useState("All Shops");
@@ -461,8 +491,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const selectedShopId = useMemo(() => {
     return appliedSelectedShop === "All Shops"
       ? undefined
-      : shops.find((s: Shop) => s.shopName === appliedSelectedShop)?.id;
-  }, [appliedSelectedShop, shops]);
+      : shopMasterMap.get(appliedSelectedShop)?.id;
+  }, [appliedSelectedShop, shopMasterMap]);
 
   const buildLedger = useCallback(
     async (from: string, to: string, shopId?: number): Promise<LedgerTransaction[]> => {
@@ -600,6 +630,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const [pdfShopSearch, setPdfShopSearch] = useState("");
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const pdfPreviewRef = useRef<PdfPreviewState | null>(null);
+  // Synchronous in-flight guard — state alone cannot stop a double-click
+  // race because both clicks read the same render's state.
+  const pdfGeneratingRef = useRef(false);
+  const pdfDownloadBusyRef = useRef(false);
+  // Session token: only the newest export may commit its preview modal;
+  // stale runs discard their generated object URLs instead of leaking them.
+  const exportSessionRef = useRef(0);
 
   // Keep the ref in sync so download/regenerate callbacks always read the
   // latest preview state without being re-created on every render.
@@ -615,7 +652,12 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
   // ─── PDF export → preview modal ────────────────────────────
   const handleExportPDF = useCallback(async () => {
-    if (pdfGenerating) return;
+    if (pdfGeneratingRef.current) return;
+    pdfGeneratingRef.current = true;
+
+    const session = ++exportSessionRef.current;
+    const createdUrls: string[] = [];
+
     try {
       setPdfGenerating(true);
 
@@ -645,13 +687,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       const allLedgers: ShopLedgerPdfEntry[] = [];
       const shopData: Record<string, LedgerTransaction[]> = {};
       for (const shop of shopNames) {
-        const shopId = shops.find((s: Shop) => s.shopName === shop)?.id;
+        const shopId = shopMasterMap.get(shop)?.id;
         if (!sampleMode && shopId == null) continue; // never fetch "all shops" by mistake
         const ledger = sampleMode
           ? makeSampleLedger(appliedDateFrom, appliedDateTo, shop)
           : (await buildLedger(appliedDateFrom, appliedDateTo, shopId));
         if (ledger.length > 1) {
-          const master = shops.find((s: Shop) => s.shopName === shop);
+          const master = shopMasterMap.get(shop);
           allLedgers.push({
             shop,
             data: ledger,
@@ -669,6 +711,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
       // Revoke object URLs from any previous preview before replacing them.
       revokePdfUrls(pdfPreviewRef.current);
+      pdfPreviewRef.current = null;
 
       // Prepare the branded letterhead hen once and reuse it for the
       // combined PDF and every per-shop PDF in this batch.
@@ -677,15 +720,29 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       const combined = await generateShopLedgerPDF(
         allLedgers, appliedDateFrom, appliedDateTo, appliedSelectedShop, letterheadAssets,
       );
+      createdUrls.push(combined.url);
+
       const files: { shop: string; url: string; filename: string }[] = [];
       for (const { shop, data } of allLedgers) {
+        // Yield between shops so fifty PDF generations never freeze the
+        // page — the spinner keeps animating and clicks keep working.
+        await yieldToBrowser();
         const generated = await generateShopLedgerPDF(
           [{ shop, data }], appliedDateFrom, appliedDateTo, shop, letterheadAssets,
         );
+        createdUrls.push(generated.url);
         files.push({ shop, url: generated.url, filename: generated.filename });
       }
 
-      setPdfPreview({
+      if (exportSessionRef.current !== session) {
+        // The modal was closed (or a newer export started) while this run
+        // was generating — discard this run's files instead of flashing a
+        // stale preview back open.
+        createdUrls.forEach((url) => URL.revokeObjectURL(url));
+        return;
+      }
+
+      const nextState: PdfPreviewState = {
         combinedUrl: combined.url,
         combinedFilename: combined.filename,
         files,
@@ -695,20 +752,26 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         selectedIndex: files.length > 1 ? -1 : 0,
         selectedShops: files.map((file) => file.shop),
         shopData,
-      });
+      };
+      pdfPreviewRef.current = nextState;
+      setPdfPreview(nextState);
       setPdfShopSearch("");
       showNotification(
         "PDF ready. Preview it below — download each shop separately or the combined file.",
         "success",
       );
     } catch {
+      createdUrls.forEach((url) => URL.revokeObjectURL(url));
       showNotification("Failed to load ledger data. Please try again.", "error");
     } finally {
+      pdfGeneratingRef.current = false;
       setPdfGenerating(false);
     }
-  }, [pdfGenerating, appliedSelectedShop, appliedDateFrom, appliedDateTo, sampleMode, showNotification, shops, buildLedger]);
+  }, [appliedSelectedShop, appliedDateFrom, appliedDateTo, sampleMode, showNotification, shopMasterMap, buildLedger]);
 
   const closePdfPreview = useCallback(() => {
+    // Invalidate any in-flight export so it cannot re-open this modal.
+    exportSessionRef.current += 1;
     revokePdfUrls(pdfPreviewRef.current);
     pdfPreviewRef.current = null;
     setPdfPreview(null);
@@ -767,11 +830,21 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
   // A single combined PDF containing only the selected shops.
   const handleDownloadSelectedCombined = async () => {
+    if (pdfDownloadBusyRef.current) return;
+    pdfDownloadBusyRef.current = true;
+    try {
+      await runDownloadSelectedCombined();
+    } finally {
+      pdfDownloadBusyRef.current = false;
+    }
+  };
+
+  const runDownloadSelectedCombined = async () => {
     const current = pdfPreviewRef.current;
     if (!current) return;
     const ledgers: ShopLedgerPdfEntry[] = current.selectedShops
       .map((shop) => {
-        const master = shops.find((s: Shop) => s.shopName === shop);
+        const master = shopMasterMap.get(shop);
         return {
           shop,
           data: current.shopData[shop] ?? [],
@@ -854,35 +927,80 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const [waSelectedShops, setWaSelectedShops] = useState<string[]>([]);
   const [waShopSearch, setWaShopSearch] = useState("");
   const [waPreviewShop, setWaPreviewShop] = useState<string | null>(null);
+  // Synchronous send guard (double-click race) plus a per-run success ledger
+  // so a retry after partial failure never re-sends to shops that already
+  // received the report — no duplicate messages, ever.
+  const waSendingRef = useRef(false);
+  const waSucceededRef = useRef<string[]>([]);
+  const [waSucceededShops, setWaSucceededShops] = useState<string[]>([]);
+
+  const resetWaSucceeded = useCallback(() => {
+    waSucceededRef.current = [];
+    setWaSucceededShops([]);
+  }, []);
+
+  // Lock background scroll while a modal is open (with scrollbar-width
+  // compensation) so the page never jumps or scrolls behind the overlay.
+  const anyModalOpen = whatsappOpen || pdfPreview !== null;
+  useEffect(() => {
+    if (!anyModalOpen) return;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    document.body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
+    };
+  }, [anyModalOpen]);
 
   // Monday-of-week bucket. Re-checked every minute so counts roll over to 0
   // automatically when a new week starts (even if the page stays open past
   // midnight on Monday).
   const [currentWeekKey, setCurrentWeekKey] = useState(getWeekStartKey);
+  const currentWeekKeyRef = useRef(currentWeekKey);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setCurrentWeekKey(getWeekStartKey());
+      const week = getWeekStartKey();
+      if (currentWeekKeyRef.current === week) return;
+      // New week started: roll the bucket over and prune last week's data so
+      // every counter deterministically reads 0 again — even if this tab
+      // stays open across midnight on Monday.
+      currentWeekKeyRef.current = week;
+      setCurrentWeekKey(week);
+      setWaSendCounts((prev) => pruneWeeklyRecord(prev, week));
+      setWaLastSent((prev) => pruneWeeklyRecord(prev, week));
     }, 60_000);
     return () => window.clearInterval(timer);
   }, []);
 
-  // Persist weekly counters so they survive reloads within the same week.
+  // Persist weekly counters (current week only) so they survive reloads
+  // within the same week while storage stays bounded.
   useEffect(() => {
     try {
-      window.localStorage.setItem(WA_SEND_COUNT_STORAGE_KEY, JSON.stringify(waSendCounts));
+      window.localStorage.setItem(
+        WA_SEND_COUNT_STORAGE_KEY,
+        JSON.stringify(pruneWeeklyRecord(waSendCounts, currentWeekKey)),
+      );
     } catch {
       /* storage unavailable — counters stay in-memory */
     }
-  }, [waSendCounts]);
+  }, [waSendCounts, currentWeekKey]);
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(WA_LAST_SENT_STORAGE_KEY, JSON.stringify(waLastSent));
+      window.localStorage.setItem(
+        WA_LAST_SENT_STORAGE_KEY,
+        JSON.stringify(pruneWeeklyRecord(waLastSent, currentWeekKey)),
+      );
     } catch {
       /* storage unavailable — last-sent stays in-memory */
     }
-  }, [waLastSent]);
+  }, [waLastSent, currentWeekKey]);
 
   const waAllShopNames = useMemo(() => {
     const source = sampleMode ? SAMPLE_SHOP_NAMES : shops.map((shop: Shop) => shop.shopName);
@@ -899,7 +1017,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       if (sampleMode) {
         return { shop, ...sampleRecipientFor(shop) };
       }
-      const found = shops.find((s: Shop) => s.shopName === shop);
+      const found = shopMasterMap.get(shop);
       if (!found) {
         return { shop, ownerName: "Shop Owner", phoneNumber: "", whatsappNumber: "" };
       }
@@ -912,10 +1030,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         whatsappNumber: whatsapp || phone,
       };
     },
-    [sampleMode, shops],
+    [sampleMode, shopMasterMap],
   );
 
   const openWhatsApp = useCallback(() => {
+    if (waSendingRef.current) return; // never re-open the modal mid-send
     // WhatsApp follows the currently applied (Search-committed) filters.
     setWaReportType(
       appliedReportType === "sales"
@@ -935,16 +1054,17 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     setWaShopSearch("");
     setWaConfirmAll(false);
     setWaError(null);
+    resetWaSucceeded();
     setWhatsappOpen(true);
-  }, [appliedReportType, appliedDateFrom, appliedDateTo, appliedSelectedShop, waAllShopNames]);
+  }, [appliedReportType, appliedDateFrom, appliedDateTo, appliedSelectedShop, waAllShopNames, resetWaSucceeded]);
 
   const closeWhatsApp = useCallback(() => {
-    if (waSending) return;
+    if (waSendingRef.current) return;
     setWhatsappOpen(false);
     setWaConfirmAll(false);
     setWaError(null);
     setWaSendingShop(null);
-  }, [waSending]);
+  }, []);
 
   const waVisibleShops = useMemo(() => {
     const needle = waShopSearch.trim().toLowerCase();
@@ -992,7 +1112,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       : "";
 
   const sendWhatsApp = useCallback(async () => {
-    if (waSending) return;
+    if (waSendingRef.current) return;
     // In All mode the first press arms the confirmation; the second performs
     // the actual send.
     if (waScope === "all" && !waConfirmAll) {
@@ -1017,6 +1137,14 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       return;
     }
 
+    // Retry safety: skip shops that already received this exact report.
+    const pendingTargets = targets.filter((shop) => !waSucceededRef.current.includes(shop));
+    if (pendingTargets.length === 0) {
+      setWaError("Every selected shop already received this report for these settings.");
+      return;
+    }
+
+    waSendingRef.current = true;
     setWaSending(true);
     setWaError(null);
     setWaConfirmAll(false);
@@ -1025,7 +1153,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     let successCount = 0;
     let failedCount = 0;
 
-    for (const shop of targets) {
+    try {
+      for (const shop of pendingTargets) {
       setWaSendingShop(shop);
       try {
         const recipient = resolveWaRecipient(shop);
@@ -1033,7 +1162,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           throw new Error(`No WhatsApp number on file for ${shop}.`);
         }
 
-        const shopId = shops.find((s: Shop) => s.shopName === shop)?.id;
+        const shopId = shopMasterMap.get(shop)?.id;
         if (!sampleMode && shopId == null) {
           throw new Error(`Shop ${shop} is not in the shops master.`);
         }
@@ -1043,7 +1172,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           ? makeSampleLedger(waDateFrom, waDateTo, shop)
           : await buildLedger(waDateFrom, waDateTo, shopId);
 
-        const waMaster = shops.find((s: Shop) => s.shopName === shop);
+        const waMaster = shopMasterMap.get(shop);
         const generated = await generateShopLedgerPDF(
           [{
             shop,
@@ -1085,8 +1214,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           URL.revokeObjectURL(generated.url);
         }
 
-        // Only after the backend confirmed delivery do we count the send.
+        // Only after the backend confirmed delivery do we count the send
+        // and record it as done for this modal run (dedupes any retry).
         successCount += 1;
+        waSucceededRef.current = [...waSucceededRef.current, shop];
+        setWaSucceededShops(waSucceededRef.current);
         const key = weeklySendKey(weekStart, shop);
         setWaSendCounts((prev) => ({
           ...prev,
@@ -1096,16 +1228,18 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       } catch {
         failedCount += 1;
       }
+      }
+    } finally {
+      waSendingRef.current = false;
+      setWaSendingShop(null);
+      setWaSending(false);
     }
-
-    setWaSendingShop(null);
-    setWaSending(false);
 
     if (failedCount === 0) {
       showNotification(`WhatsApp report sent to ${successCount} shop(s).`, "success");
       setWhatsappOpen(false);
     } else if (successCount > 0) {
-      const message = `WhatsApp sent to ${successCount} shop(s); ${failedCount} failed.`;
+      const message = `WhatsApp sent to ${successCount} shop(s); ${failedCount} failed. Press Send again to retry only the failed shop(s).`;
       setWaError(message);
       showNotification(message, "error");
     } else {
@@ -1113,7 +1247,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       showNotification("Unable to send WhatsApp report. Please try again.", "error");
     }
   }, [
-    waSending,
     waScope,
     waConfirmAll,
     waTargetShops,
@@ -1121,7 +1254,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     waDateTo,
     currentWeekKey,
     resolveWaRecipient,
-    shops,
+    shopMasterMap,
     sampleMode,
     buildLedger,
     waReportType,
@@ -1129,7 +1262,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   ]);
 
   // ─── React-Select styles (original) ───
-  const selectStyles: StylesConfig<SelectOption, false> = {
+  const selectStyles = useMemo<StylesConfig<SelectOption, false>>(() => ({
     control: (base) => ({
       ...base,
       borderRadius: 8,
@@ -1166,7 +1299,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       ...base,
       color: "#94a3b8",
     }),
-  };
+  }), []);
 
   const reportTypeOptions: { value: ReportTypeFilter; label: string }[] = [
     { value: "all", label: "All" },
@@ -1287,7 +1420,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               onClick={openWhatsApp}
               title="WhatsApp"
               aria-label="WhatsApp"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#25D366]/50 bg-[#25D366] text-white shadow-sm transition hover:bg-[#1DA851] focus:outline-none focus:ring-2 focus:ring-[#25D366]/35"
+              disabled={waSending}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#25D366]/50 bg-[#25D366] text-white shadow-sm transition hover:bg-[#1DA851] focus:outline-none focus:ring-2 focus:ring-[#25D366]/35 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <ShopLedgerWhatsAppIcon size={17} />
             </button>
@@ -1746,18 +1880,37 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     value: waReportType,
                     label: waReportType === "All" ? "All (Sales + Collection)" : waReportType,
                   }}
-                  onChange={(selected) => setWaReportType((selected?.value as WaReportType) || "All")}
+                  onChange={(selected) => {
+                    setWaReportType((selected?.value as WaReportType) || "All");
+                    resetWaSucceeded();
+                  }}
                   styles={selectStyles}
                   maxMenuHeight={200}
                 />
               </div>
               <div>
                 <label className={labelClass}>Date From</label>
-                <DatePicker value={waDateFrom} onChange={setWaDateFrom} placeholder="From date" className="w-full" />
+                <DatePicker
+                  value={waDateFrom}
+                  onChange={(value) => {
+                    setWaDateFrom(value);
+                    resetWaSucceeded();
+                  }}
+                  placeholder="From date"
+                  className="w-full"
+                />
               </div>
               <div>
                 <label className={labelClass}>Date To</label>
-                <DatePicker value={waDateTo} onChange={setWaDateTo} placeholder="To date" className="w-full" />
+                <DatePicker
+                  value={waDateTo}
+                  onChange={(value) => {
+                    setWaDateTo(value);
+                    resetWaSucceeded();
+                  }}
+                  placeholder="To date"
+                  className="w-full"
+                />
               </div>
               <div>
                 <label className={labelClass}>Recipient</label>
@@ -1772,6 +1925,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                       onClick={() => {
                         setWaScope(opt.value);
                         setWaConfirmAll(false);
+                        resetWaSucceeded();
                       }}
                       className={`h-[38px] rounded-lg border text-xs font-medium transition ${
                         waScope === opt.value
@@ -1840,6 +1994,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     const recipient = resolveWaRecipient(shop);
                     const weekCount = weeklySendCount(waSendCounts, currentWeekKey, shop);
                     const isSending = waSendingShop === shop;
+                    const shopSucceeded = waSucceededShops.includes(shop);
                     const isPreview = waPreviewShop === shop;
                     return (
                       <div
@@ -1870,6 +2025,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         </button>
                         {isSending ? (
                           <Loader2 size={13} className="mt-1 shrink-0 animate-spin text-[#25D366]" />
+                        ) : shopSucceeded ? (
+                          <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600" />
                         ) : weekCount > 0 ? (
                           <span className="mt-0.5 shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
                             {weekCount}×
