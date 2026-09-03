@@ -5,17 +5,17 @@ import { collectionService } from "../services/collectionService";
 import type { CollectionReportSummary } from "../types/collection";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
-import { useShopSearch } from "../../../../core/hooks/useShopSearch";
+import Select from "react-select";
 import {
   FileSpreadsheet,
   FileText,
   RotateCcw,
   Wallet,
   Users,
-  X,
   ChevronDown,
   Search,
   Loader2,
+  Download,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -26,10 +26,7 @@ import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
-  opsSecondaryButtonClass,
-  opsPrimaryButtonClass,
-  opsPdfButtonClass,
-  opsExcelButtonClass,
+  opsReactSelectStyles,
 } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
 
@@ -39,6 +36,15 @@ const formatCurrency = (amount: number) =>
     currency: "INR",
     minimumFractionDigits: 2,
   }).format(amount);
+
+// Soft-toned toolbar buttons: Search (light green), Export (light blue),
+// Reset (light red) — consistent shell, tone differs per action.
+const searchButtonClass =
+  "inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-100 px-3.5 py-2.5 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-200 active:scale-95 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
+const exportButtonClass =
+  "inline-flex items-center justify-center gap-1.5 rounded-xl border border-sky-200 bg-sky-100 px-3.5 py-2.5 text-xs font-semibold text-sky-700 transition-all hover:bg-sky-200 active:scale-95 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
+const resetButtonClass =
+  "inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-100 px-3.5 py-2.5 text-xs font-semibold text-rose-700 transition-all hover:bg-rose-200 active:scale-95 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
 
 const getBarColor = (percentage: number) => {
   if (percentage >= 80) return "bg-green-500";
@@ -59,7 +65,6 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
 
   const [loading, setLoading] = useState(true);
   const { shops } = useShops();
-  const allShopNames = shops.map((s) => s.shopName).sort();
 
   const { employees } = useEmployees();
   const collectors = useMemo(
@@ -77,8 +82,21 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
   const [shopName, setShopName] = useState("");
   const [collector, setCollector] = useState("");
   const [paymentMode, setPaymentMode] = useState("");
+  const [exportOpen, setExportOpen] = useState(false);
 
-  const shopSearch = useShopSearch(allShopNames, shopName, setShopName);
+  // Shop picker: same master shop list + searchable select used across the app
+  // (Pending Collections filters, Shop Ledger) — options come from
+  // GET /api/masters/shops via useShops.
+  const selectStyles = useMemo(() => opsReactSelectStyles(), []);
+  const shopOptions = useMemo(
+    () => [
+      { value: "", label: t("ops.collection.all_shops") },
+      ...shops
+        .map((s) => ({ value: s.shopName, label: s.shopName }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    ],
+    [shops, t]
+  );
 
   // Backend-authoritative report: totals/percentages/breakdowns come from
   // GET /collection-entry/report. This page only formats and displays them —
@@ -338,9 +356,9 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
     setShopName("");
     setCollector("");
     setPaymentMode("");
-    shopSearch.setQuery("");
+    setExportOpen(false);
     showNotification(t("ops.collection.filters_reset_default"), "info");
-  }, [weekBounds, shopSearch, showNotification, t]);
+  }, [weekBounds, showNotification, t]);
 
   // Manual Search: re-run the report for the current filters. If the date
   // range is not set yet (week bounds never loaded), re-fetch bounds first —
@@ -404,62 +422,16 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
           />
           <div>
             <label className={opsFilterLabelClass}>{t("operations.shop_name")}</label>
-            <div className="relative">
-              <input
-                type="text"
-                value={shopSearch.query}
-                onChange={(e) => shopSearch.handleInputChange(e.target.value)}
-                onFocus={() => shopSearch.setIsOpen(true)}
-                onBlur={() => setTimeout(() => shopSearch.setIsOpen(false), 200)}
-                placeholder={t("ops.collection.all_shops")}
-                className={`${opsInputClass} pr-8`}
-              />
-              {shopSearch.query && (
-                <button
-                  type="button"
-                  className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                  onClick={() => {
-                    shopSearch.setQuery("");
-                    setShopName("");
-                    shopSearch.setIsOpen(false);
-                  }}
-                >
-                  <X size={16} />
-                </button>
-              )}
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
-              {shopSearch.isOpen && (
-                <ul className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 text-sm shadow-lg">
-                  <li
-                    className="cursor-pointer px-3 py-2 hover:bg-slate-50 text-emerald-600 font-medium"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      shopSearch.setQuery("");
-                      setShopName("");
-                      shopSearch.setIsOpen(false);
-                    }}
-                  >
-                    {t("ops.collection.all_shops")}
-                  </li>
-                  {shopSearch.filteredShops.length > 0 ? (
-                    shopSearch.filteredShops.slice(0, 5).map((shop) => (
-                      <li
-                        key={shop}
-                        className="cursor-pointer px-3 py-2 hover:bg-slate-50"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          shopSearch.handleSelect(shop);
-                        }}
-                      >
-                        {shop}
-                      </li>
-                    ))
-                  ) : (
-                    <li className="px-3 py-2 text-slate-500">{t("empty.no_shops")}</li>
-                  )}
-                </ul>
-              )}
-            </div>
+            <Select
+              options={shopOptions}
+              value={shopOptions.find((o) => o.value === shopName) ?? shopOptions[0]}
+              onChange={(selected) => setShopName(selected?.value || "")}
+              isSearchable
+              isClearable={false}
+              placeholder={t("ops.collection.all_shops")}
+              styles={selectStyles}
+              menuPortalTarget={document.body}
+            />
           </div>
           <div>
             <label className={opsFilterLabelClass}>{t("common.collector")}</label>
@@ -489,39 +461,69 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
             </select>
           </div>
 
-          {/* Actions — after Pay Mode, bottom-aligned with the inputs */}
+          {/* Actions — after Pay Mode, bottom-aligned with the inputs.
+              Search = light green, Export = light blue (Excel & PDF inside),
+              Reset = light red. */}
           <div className="flex flex-wrap items-end justify-start gap-2 lg:justify-end">
             <button
               type="button"
               onClick={handleSearch}
               disabled={loading}
-              className={opsPrimaryButtonClass}
+              className={searchButtonClass}
               title={t("common.search")}
             >
               {loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
               {t("common.search")}
             </button>
-            <button
-              type="button"
-              onClick={exportExcel}
-              disabled={!report || report.totalCount === 0}
-              className={opsExcelButtonClass}
-            >
-              <FileSpreadsheet size={15} /> Excel
-            </button>
-            <button
-              type="button"
-              onClick={exportPDF}
-              disabled={!report || report.totalCount === 0}
-              className={opsPdfButtonClass}
-            >
-              <FileText size={15} /> PDF
-            </button>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setExportOpen((open) => !open)}
+                onBlur={() => setTimeout(() => setExportOpen(false), 150)}
+                disabled={!report || report.totalCount === 0}
+                className={exportButtonClass}
+                title={t("common.export")}
+              >
+                <Download size={15} />
+                {t("common.export")}
+                <ChevronDown size={14} />
+              </button>
+              {exportOpen && (
+                <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setExportOpen(false);
+                      exportExcel();
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50"
+                  >
+                    <FileSpreadsheet size={14} className="text-emerald-600" />
+                    Excel
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setExportOpen(false);
+                      exportPDF();
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-rose-50"
+                  >
+                    <FileText size={14} className="text-rose-600" />
+                    PDF
+                  </button>
+                </div>
+              )}
+            </div>
+
             <button
               type="button"
               onClick={resetFilters}
               disabled={loading}
-              className={opsSecondaryButtonClass}
+              className={resetButtonClass}
             >
               <RotateCcw size={14} /> {t("common.reset")}
             </button>
