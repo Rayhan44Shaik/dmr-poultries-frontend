@@ -31,6 +31,7 @@ import {
 } from "../services/shopLedgerService";
 import { generateShopLedgerPDF } from "../components/ShopLedgerPDF";
 import type { LedgerTransaction } from "../components/ShopLedgerPDF";
+import PdfBlobPreview from "../components/PdfBlobPreview";
 
 interface ShopLedgerProps {
   embedded?: boolean;
@@ -658,7 +659,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         combinedUrl: combined.url,
         combinedFilename: combined.filename,
         files,
-        selectedIndex: 0,
+        // Multi-shop exports open on the combined "All Shops" PDF so the
+        // preview immediately shows all filtered data; a single-shop export
+        // opens directly on that shop's PDF.
+        selectedIndex: files.length > 1 ? -1 : 0,
         selectedShops: files.map((file) => file.shop),
         shopData,
       });
@@ -1618,12 +1622,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               )}
 
               <div className="min-w-0 flex-1 bg-slate-200/60">
-                <iframe
-                  key={activePdfFile.url}
-                  src={activePdfFile.url}
-                  title="Shop Ledger PDF preview"
-                  className="h-full w-full border-0"
-                />
+                <PdfBlobPreview key={activePdfFile.url} url={activePdfFile.url} />
               </div>
             </div>
 
