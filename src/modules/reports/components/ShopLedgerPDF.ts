@@ -15,6 +15,25 @@ export interface LedgerTransaction {
   collectionNo?: string;
 }
 
+const normalizePaymentMode = (value?: string): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (/upi/i.test(raw)) return "UPI";
+  if (/union/i.test(raw)) return "Union";
+  if (/\bsbi\b/i.test(raw) || /state bank/i.test(raw)) return "SBI";
+  if (/bank/i.test(raw)) return "Bank Transfer";
+  if (/cheque|check/i.test(raw)) return "Cheque";
+  if (/credit/i.test(raw)) return "Credit";
+  if (/cash/i.test(raw)) return "Cash";
+  return raw;
+};
+
+const formatAmount = (value: number): string =>
+  new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value || 0);
+
 export const generateShopLedgerPDF = (
   allLedgers: { shop: string; data: LedgerTransaction[] }[],
   dateFrom: string,
@@ -56,8 +75,13 @@ export const generateShopLedgerPDF = (
       if (t.particulars !== "Opening Balance") {
         if (t.type === "sale") {
           label = `${t.particulars} : Sale`;
+        } else if (t.type === "collection") {
+          const paymentMode = normalizePaymentMode(t.paymentMode);
+          label = paymentMode
+            ? `${t.particulars} : Collection - ${paymentMode}`
+            : `${t.particulars} : Collection`;
         } else {
-          label = `${t.particulars}`;
+          label = `${t.particulars} : Correction`;
         }
       }
 
@@ -67,9 +91,9 @@ export const generateShopLedgerPDF = (
         t.type === "sale" && t.birds > 0 ? String(t.birds) : "-",
         t.type === "sale" && t.weight > 0 ? t.weight.toFixed(2) : "-",
         t.type === "sale" && t.rate > 0 ? t.rate.toFixed(2) : "-",
-        t.debit > 0 ? t.debit.toFixed(2) : "-",
-        t.credit > 0 ? t.credit.toFixed(2) : "-",
-        t.balance.toFixed(2),
+        t.debit > 0 ? formatAmount(t.debit) : "-",
+        t.credit > 0 ? formatAmount(t.credit) : "-",
+        formatAmount(t.balance),
       ];
     });
 
@@ -87,9 +111,9 @@ export const generateShopLedgerPDF = (
       String(totalBirds),
       totalWeight.toFixed(2),
       "",
-      totalDebit.toFixed(2),
-      totalCredit.toFixed(2),
-      closingBalance.toFixed(2),
+      formatAmount(totalDebit),
+      formatAmount(totalCredit),
+      formatAmount(closingBalance),
     ]);
 
     // ─── AutoTable Styling (Strictly fitted within A4 printable bounds) ───
