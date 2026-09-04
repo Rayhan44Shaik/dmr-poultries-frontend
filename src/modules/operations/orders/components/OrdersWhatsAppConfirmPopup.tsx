@@ -22,7 +22,6 @@ import type { OrdersT } from "../i18n/ordersI18n";
 import {
   buildAssignmentWhatsAppMessage,
   formatCount,
-  weightForBirds,
   type AssignmentSheetRow,
 } from "../ordersUtils";
 import {
@@ -146,8 +145,6 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
   }, [onClose, sending]);
 
   const totalBoxes = rows.reduce((s, r) => s + r.boxes, 0);
-  const totalBirds = rows.reduce((s, r) => s + r.birds, 0);
-  const estWeight = weightForBirds(totalBirds, trip.avgBirdWeight);
 
   const handleSend = async () => {
     const outcome = await onConfirmSend();
@@ -206,15 +203,9 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
                 {t("orders.assignment_details")}
               </p>
               <div className="mt-2 grid grid-cols-2 gap-1.5">
-                <Fact label={t("orders.pdf_order_no")} value={orderTripNo || "—"} />
                 <Fact label={t("orders.pdf_order_date")} value={orderDate || trip.tripDate} />
                 <Fact label={t("orders.col_total_shops")} value={rows.length} />
                 <Fact label={t("orders.col_assigned_boxes")} value={formatCount(totalBoxes)} />
-                <Fact label={t("orders.total_birds")} value={formatCount(totalBirds)} />
-                <Fact
-                  label={t("orders.est_weight")}
-                  value={trip.avgBirdWeight ? `${estWeight.toFixed(2)} kg` : "—"}
-                />
                 <Fact
                   label={t("orders.wa_send_to")}
                   value={supervisorMobile || "—"}

@@ -20,6 +20,7 @@ const EN: Record<string, string> = {
   "orders.col_sno": "S.No",
   "orders.col_shop_name": "Shop Name",
   "orders.col_village": "Village",
+  "orders.city": "City",
   "orders.col_birds": "No. of Birds",
   "orders.col_boxes": "No. of Boxes",
   "orders.col_no_of_boxes": "No. of Boxes",
@@ -265,7 +266,7 @@ const EN: Record<string, string> = {
   "orders.over_assign_message":
     "Not enough unassigned boxes: {shops}. Values adjusted to the remaining balance.",
   // WhatsApp check-popup + Shop Assignment Sheet PDF.
-  "orders.wa_check_title": "WhatsApp — check the message before sending",
+  "orders.wa_check_title": "WhatsApp",
   "orders.wa_message_preview": "Message preview (exactly what will be sent)",
   "orders.wa_send_note":
     "Sends this assignment to the supervisor on WhatsApp, one message per shop with its delivery PDF.",
@@ -384,6 +385,7 @@ const TE: Record<string, string> = {
   "orders.col_sno": "సం.సం",
   "orders.col_shop_name": "షాప్ పేరు",
   "orders.col_village": "గ్రామం",
+  "orders.city": "సిటీ",
   "orders.col_birds": "పక్షుల సంఖ్య",
   "orders.col_boxes": "బాక్స్‌ల సంఖ్య",
   "orders.col_no_of_boxes": "బాక్స్‌ల సంఖ్య",
@@ -626,7 +628,7 @@ const TE: Record<string, string> = {
   "orders.over_assign_message":
     "కేటాయించని బాక్స్‌లు సరిపోవు: {shops}. విలువలు మిగిలిన బ్యాలెన్స్‌కు సరిచేయబడ్డాయి.",
   // వాట్సాప్ చెక్-పాప్‌అప్ + షాప్ అసైన్‌మెంట్ షీట్ PDF.
-  "orders.wa_check_title": "వాట్సాప్ — పంపే ముందు సందేశాన్ని తనిఖీ చేయండి",
+  "orders.wa_check_title": "వాట్సాప్",
   "orders.wa_message_preview": "సందేశం మునుజూపు (ఇదే సందేశం పంపబడుతుంది)",
   "orders.wa_send_note":
     "ఈ కేటాయింపును సూపర్‌వైజర్‌కు వాట్సాప్‌లో పంపుతుంది — ప్రతి షాప్‌కు ఒక సందేశం, దాని డెలివరీ PDFతో.",

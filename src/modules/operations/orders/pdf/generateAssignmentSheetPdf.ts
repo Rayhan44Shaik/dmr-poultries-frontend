@@ -17,7 +17,7 @@ import {
   prepareDmrPoultryHeaderAssets,
   type DmrPoultryHeaderAssets,
 } from "../../../../utils/drawDmrPoultryHeader";
-import { weightForBirds, type AssignmentSheetRow } from "../ordersUtils";
+import type { AssignmentSheetRow } from "../ordersUtils";
 import { ordersTranslate } from "../i18n/ordersI18n";
 
 type RGB = [number, number, number];
@@ -58,7 +58,6 @@ const toNum = (value: unknown): number => {
 };
 const fmt = (value: unknown): string =>
   value == null || value === "" ? "—" : String(value);
-const kg = (value: unknown): string => `${toNum(value).toFixed(2)} kg`;
 const count = (value: unknown): string => toNum(value).toLocaleString("en-IN");
 
 export async function generateAssignmentSheetPdf({
@@ -77,7 +76,7 @@ export async function generateAssignmentSheetPdf({
 
   const doc = createDmrPoultryPdf("portrait");
   doc.setProperties({
-    title: `${trip.tripNo || "Trip"} — Shop Assignment Sheet`,
+    title: `${trip.tripNo || "Trip"} — DMR POULTRIES`,
     subject: "DMR POULTRIES shop assignment sheet",
     author: "DMR POULTRIES",
     creator: "DMR POULTRIES",
@@ -156,27 +155,12 @@ export async function generateAssignmentSheetPdf({
     y = lastTableY(y) + 5;
   };
 
-  const avgBirdWeight = toNum(trip.avgBirdWeight);
-  const estWeightOf = (birds: number) => weightForBirds(birds, avgBirdWeight);
   const totalBoxes = rows.reduce((s, r) => s + r.boxes, 0);
   const totalBirds = rows.reduce((s, r) => s + r.birds, 0);
-  const totalWeight = rows.reduce((s, r) => s + estWeightOf(r.birds), 0);
   const availableAfter = capacity > 0 ? Math.max(0, capacity - alreadyAssignedOther - totalBoxes) : 0;
 
   // ─── PAGE 1: branded letterhead (hen logo + DMR header) ─────────────
   y = drawPreparedDmrPoultryHeader(doc, { margin, top: 8 }, assets) + 3;
-
-  ensureSpace(16);
-  doc.setFillColor(EMERALD[0], EMERALD[1], EMERALD[2]);
-  doc.roundedRect(margin, y, contentWidth, 11, 1.6, 1.6, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(255, 255, 255);
-  doc.text(t("orders.assignment_sheet_title"), margin + 4, y + 7.2);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(trip.tripNo || "—", pageWidth - margin - 4, y + 7.2, { align: "right" });
-  y += 14;
 
   // ─── TRIP DETAILS ────────────────────────────────────────────────────
   drawSectionBand("TRIP DETAILS");
@@ -192,19 +176,15 @@ export async function generateAssignmentSheetPdf({
   ]);
 
   // ─── ORDER / ASSIGNMENT SUMMARY ─────────────────────────────────────
-  drawSectionBand(t("orders.assignment_details"), `${t("orders.pdf_order_no")}: ${fmt(orderTripNo)}`);
+  drawSectionBand(t("orders.assignment_details"));
   kvGrid([
-    [t("orders.pdf_order_no"), fmt(orderTripNo)],
     [t("orders.pdf_order_date"), fmt(orderDate)],
     [t("orders.col_total_shops"), count(rows.length)],
     [t("orders.col_assigned_boxes"), count(totalBoxes)],
-    [t("orders.total_birds"), count(totalBirds)],
-    [t("orders.est_weight"), kg(totalWeight)],
     [
       t("orders.available_boxes"),
       capacity > 0 ? `${count(availableAfter)} / ${count(capacity)}` : "—",
     ],
-    [t("orders.col_status"), t("orders.status_pending_assign")],
   ]);
 
   // ─── SHOPS TO DELIVER (in delivery order) ────────────────────────────
@@ -222,23 +202,19 @@ export async function generateAssignmentSheetPdf({
     row.mobile || "—",
     count(row.boxes),
     row.birds > 0 ? count(row.birds) : "—",
-    avgBirdWeight > 0 && row.birds > 0 ? kg(estWeightOf(row.birds)) : "—",
-    t("orders.status_pending_assign"),
   ]);
   if (body.length === 0) {
-    body.push(["—", t("orders.sequence_empty"), "—", "—", "0", "—", "—", "—"]);
+    body.push(["—", t("orders.sequence_empty"), "—", "—", "0", "—"]);
   }
   autoTable(doc, {
     head: [
       [
         "Seq",
         t("orders.col_shop_name"),
-        t("orders.col_village"),
+        t("orders.city"),
         t("orders.shop_mobile"),
         t("orders.col_boxes"),
         t("orders.col_birds"),
-        t("orders.est_weight"),
-        t("orders.hdr_status"),
       ],
     ],
     body,
@@ -268,13 +244,11 @@ export async function generateAssignmentSheetPdf({
     },
     columnStyles: {
       0: { cellWidth: 10, halign: "center" },
-      1: { cellWidth: 44 },
-      2: { cellWidth: 24 },
-      3: { cellWidth: 24 },
-      4: { cellWidth: 14, halign: "right" },
-      5: { cellWidth: 16, halign: "right" },
-      6: { cellWidth: 20, halign: "right" },
-      7: { cellWidth: contentWidth - 152, halign: "center" },
+      1: { cellWidth: contentWidth - 102 },
+      2: { cellWidth: 26 },
+      3: { cellWidth: 26 },
+      4: { cellWidth: 20, halign: "right" },
+      5: { cellWidth: 20, halign: "right" },
     },
     margin: { left: margin, right: margin },
     didParseCell: (data) => {
@@ -291,7 +265,6 @@ export async function generateAssignmentSheetPdf({
     [t("orders.col_total_shops"), count(rows.length)],
     [t("orders.col_assigned_boxes"), count(totalBoxes)],
     [t("orders.total_birds"), count(totalBirds)],
-    [t("orders.est_weight"), kg(totalWeight)],
   ]);
 
   // ─── FOOTER / PAGE CHROME (same pattern as the other DMR PDFs) ──────
@@ -306,7 +279,7 @@ export async function generateAssignmentSheetPdf({
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8);
       doc.setTextColor(255, 255, 255);
-      doc.text(`DMR POULTRIES — ${t("orders.assignment_sheet_title")}`, margin, 5);
+      doc.text("DMR POULTRIES", margin, 5);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
       doc.text(trip.tripNo || "", w - margin, 5, { align: "right" });
