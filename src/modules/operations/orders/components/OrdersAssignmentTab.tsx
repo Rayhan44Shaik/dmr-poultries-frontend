@@ -707,25 +707,6 @@ function AssignmentEditor({
     }
   }, [waBusy, vehicle, isDirty, selected, assertNoConflicts, orderTrip.tripNo, supervisorMobile, showNotification, to]);
 
-  // ── Vehicle summary (the vehicle itself is chosen from the › table) ──────
-  // Compact vehicle information strip — the useful fact set, rendered
-  // small (never as a hero panel).
-  const summary: Array<[string, string]> = vehicle
-    ? [
-        [to("orders.vehicle_no"), vehicle.trip.vehicleNo || "—"],
-        [
-          to("orders.farm_address"),
-          `${vehicle.trip.sourceFarm || "—"}${vehicle.trip.farmAddress ? ` · ${vehicle.trip.farmAddress}` : ""}`,
-        ],
-        [to("orders.bird_type"), vehicle.trip.birdType || "—"],
-        [to("orders.avg_bird_weight"), avgBirdWeight ? `${avgBirdWeight.toFixed(2)} KG` : "—"],
-        [to("orders.vehicle_box_capacity"), String(capacity)],
-        [to("orders.available_boxes"), String(available)],
-        [to("orders.supervisor"), vehicle.trip.supervisorName || "—"],
-        [to("orders.driver"), vehicle.trip.driverName || "—"],
-        [to("orders.supervisor_mobile"), supervisorMobile || "—"],
-      ]
-    : [];
 
   // ── Day pool table: PENDING (unassigned) + ASSIGNED shops together ───────
   //     Only pending rows are assignable — the same-shop/same-day rule stays
@@ -1218,19 +1199,9 @@ function AssignmentEditor({
 
           {vehicle && (
             <>
-              {/* Compact vehicle information strip (never a hero panel) */}
-              <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 space-y-3">
-                <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-2.5">
-                  {summary.map(([label, value]) => (
-                    <div key={label} className="min-w-0">
-                      <dt className="text-[11px] font-semibold text-slate-400">{label}</dt>
-                      <dd className="text-sm font-semibold text-slate-800 truncate" title={value}>
-                        {value}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-                {/* Compact capacity indicator (not dashboard cards) */}
+              {/* Live capacity only — the truck's static facts already sit in
+                  the sheet header, so they are never repeated here. */}
+              <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3">
                 <div className="flex items-center gap-4 flex-wrap rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600">
                   <span>
                     {to("orders.vehicle_box_capacity")}: <b className="text-slate-800">{capacity}</b>
@@ -1381,21 +1352,36 @@ function AssignmentEditor({
                             {formatCount(row.orderedBoxes)}
                           </td>
                           <td className={opsTableTdClass}>
-                            <input
-                              type="number"
-                              min={1}
-                              max={row.orderedBoxes}
-                              value={row.assigned === 0 ? "" : row.assigned}
-                              placeholder="0"
-                              aria-label={`${to("orders.assigned_boxes")} — ${row.shopName}`}
-                              onChange={(e) => setAssigned(row.clientKey, e.target.value)}
-                              onWheel={onOrdersNumberWheel}
-                              className={`${ORDERS_NO_SPINNER} h-8 w-full rounded-lg border px-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 ${
-                                row.assigned === 0
-                                  ? "border-amber-300 bg-amber-50/60 text-amber-800"
-                                  : "border-emerald-300/70 bg-emerald-50/50 text-emerald-900"
-                              }`}
-                            />
+                            {/* PARTIAL ASSIGNMENT: send part of a shop's order on
+                                this truck — the balance stays pending for another
+                                vehicle. */}
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min={1}
+                                max={row.orderedBoxes}
+                                value={row.assigned === 0 ? "" : row.assigned}
+                                placeholder="0"
+                                aria-label={`${to("orders.assigned_boxes")} — ${row.shopName}`}
+                                onChange={(e) => setAssigned(row.clientKey, e.target.value)}
+                                onWheel={onOrdersNumberWheel}
+                                className={`${ORDERS_NO_SPINNER} h-8 w-24 rounded-lg border px-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 ${
+                                  row.assigned === 0
+                                    ? "border-amber-300 bg-amber-50/60 text-amber-800"
+                                    : "border-emerald-300/70 bg-emerald-50/50 text-emerald-900"
+                                }`}
+                              />
+                              <span className="whitespace-nowrap text-[11px] font-semibold text-slate-400">
+                                / {formatCount(row.orderedBoxes)}
+                                {row.assigned > 0 && row.assigned < row.orderedBoxes && (
+                                  <b className="ml-1.5 text-amber-600">
+                                    {to("orders.part_assign_left", {
+                                      boxes: row.orderedBoxes - row.assigned,
+                                    })}
+                                  </b>
+                                )}
+                              </span>
+                            </div>
                           </td>
                           <td className={`${opsTableTdClass} text-right text-slate-500`}>
                             {avgBirdWeight
@@ -1431,27 +1417,6 @@ function AssignmentEditor({
                 </table>
               </div>
 
-              {/* Shops already on another vehicle for this day (persisted) */}
-              {pool.assigned.length > 0 && (
-                <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2 block">
-                    {to("orders.col_assigned")} — {to("orders.col_vehicle_no")}
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {pool.assigned.map(({ row, tripNo, vehicleNo, delivered }) => (
-                      <span
-                        key={row.shopId}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600"
-                      >
-                        {row.shopName || "—"}
-                        <span className={delivered ? "text-emerald-600" : "text-slate-400"}>
-                          — {tripNo} ({vehicleNo || "—"})
-                        </span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
             </>
           )}
         </>
