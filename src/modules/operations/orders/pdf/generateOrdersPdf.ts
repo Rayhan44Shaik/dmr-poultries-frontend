@@ -274,9 +274,11 @@ export async function generateOrdersPdf({
   const statusStr = (b: ShopDeliveryBreakdown): string =>
     b.status === "delivered_with_diff"
       ? ordersTranslate("orders.status_delivered_diff", language)
-      : b.status === "not_delivered"
-        ? ordersTranslate("orders.status_not_delivered", language)
-        : ordersTranslate("orders.status_delivered", language);
+      : b.status === "part_delivered"
+        ? ordersTranslate("orders.status_part_delivered", language)
+        : b.status === "not_delivered"
+          ? ordersTranslate("orders.status_not_delivered", language)
+          : ordersTranslate("orders.status_delivered", language);
   const listedRows = breakdown.filter((b) => b.ordered);
   const seqBody: (string | number)[][] = listedRows.map((b, index) => [
     b.serialNo || index + 1,

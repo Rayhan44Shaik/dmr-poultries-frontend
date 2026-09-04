@@ -44,6 +44,7 @@ import {
   fetchOrdersData,
   loadShopDirectory,
   loadSupervisorDirectory,
+  recordShopDelivery,
   sendOrdersWhatsApp,
   shopMobileOf,
   supervisorMobileOf,
@@ -52,7 +53,7 @@ import {
   type SupervisorDirectory,
 } from "../ordersService";
 import { useToast } from "../../../../components/common/ToastProvider";
-import { buildShopBreakdown, rowsInSequence } from "../ordersUtils";
+import { buildShopBreakdown, rowsInSequence, type ShopDeliveryBreakdown } from "../ordersUtils";
 import { generateOrdersPdf } from "../pdf/generateOrdersPdf";
 import type { OrdersFetch, OrdersTrip } from "../types";
 import { useOrdersI18n } from "../i18n/ordersI18n";
@@ -266,6 +267,30 @@ const OrdersPage: React.FC = () => {
     [whatsappBusyId, mobileOf, to, showNotification]
   );
 
+  // ── Shop-level delivery capture (Tab 3 detail) ─────────────────────────
+  // Partial by design: only the entered boxes are written as a Step 4
+  // record, so the shop stays "Part Delivered" until the rest is in. The
+  // view caps the entry at the shop's remaining boxes — that is also the
+  // duplicate guard (nothing left to capture once the order is complete).
+  const handleRecordDelivery = useCallback(
+    async (ot: OrdersTrip, shop: ShopDeliveryBreakdown, boxes: number) => {
+      try {
+        await recordShopDelivery(ot.trip, { shopId: shop.shopId, boxes });
+        await load();
+        showNotification(
+          to("orders.delivery_saved_partial", { shop: shop.shopName || "—", boxes }),
+          "success"
+        );
+      } catch (e) {
+        showNotification(
+          e instanceof Error ? e.message : to("orders.refresh_failed"),
+          "error"
+        );
+      }
+    },
+    [load, to, showNotification]
+  );
+
   // ── Detail view (opened from Tab 3) — rendered as a modal over the tab ─
   const viewing: OrdersTrip | null =
     (viewingId != null && data?.tracking.find((t) => t.trip.id === viewingId)) || null;
@@ -387,6 +412,7 @@ const OrdersPage: React.FC = () => {
           onClose={() => setViewingId(null)}
           onPdf={() => void handlePdf(viewing)}
           onWhatsApp={() => void handleWhatsApp(viewing)}
+          onRecordDelivery={(shop, boxes) => handleRecordDelivery(viewing, shop, boxes)}
         />
       )}
     </div>

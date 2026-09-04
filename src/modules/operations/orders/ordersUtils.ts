@@ -524,6 +524,7 @@ export function formatDayFull(day: string): string {
 
 export type ShopDeliveryBreakdownStatus =
   | "delivered"
+  | "part_delivered"
   | "delivered_with_diff"
   | "not_delivered"
   | "not_listed";
@@ -541,6 +542,12 @@ export type ShopDeliveryBreakdown = {
   orderedBoxes: number;
   orderedWeight: number;
   orderedBirds: number;
+  /**
+   * Boxes THIS vehicle is carrying for the shop (the assignment plan row).
+   * The shop's order can be split over vehicles, so the deliverable balance
+   * is measured against this, not against orderedBoxes.
+   */
+  tripBoxes: number;
   deliveredBoxes: number;
   deliveredWeight: number;
   deliveredBirds: number;
@@ -623,9 +630,12 @@ export function buildShopBreakdown(
       ? "not_listed"
       : !delivered
         ? "not_delivered"
-        : boxDifference < 0 || birdDifference < 0
-          ? "delivered_with_diff"
-          : "delivered";
+        // PART DELIVERED — part of the order is in, the rest stays open.
+        : deliveredBoxes > 0 && deliveredBoxes < orderedBoxes
+          ? "part_delivered"
+          : boxDifference < 0 || birdDifference < 0
+            ? "delivered_with_diff"
+            : "delivered";
     out.push({
       shopId,
       shopName: acc.first.shopName || "—",
@@ -634,6 +644,7 @@ export function buildShopBreakdown(
       serialNo: num(acc.first.serialNo ?? acc.first.id),
       ordered: !additional,
       orderedBoxes,
+      tripBoxes: num(plan.boxNo ?? plan.selectedBoxIds?.length),
       orderedWeight: ordered ? ordered.weight : num(plan.farmWeight ?? plan.weight),
       orderedBirds,
       deliveredBoxes,
@@ -653,6 +664,78 @@ export function buildShopBreakdown(
 }
 
 /**
+ * Boxes still to be delivered for one shop on THIS vehicle (0 = complete).
+ * Drives the shop-level capture: the input's maximum, and the "no duplicate"
+ * lock. Measured against what the vehicle carries (tripBoxes) — a shop's
+ * order can be split over vehicles — falling back to the shop's order.
+ */
+export function shopRemainingBoxes(row: {
+  orderedBoxes: number;
+  deliveredBoxes: number;
+  tripBoxes?: number;
+}): number {
+  const basis = num(row.tripBoxes) > 0 ? num(row.tripBoxes) : num(row.orderedBoxes);
+  return Math.max(0, basis - num(row.deliveredBoxes));
+}
+
+/**
+ * Build the Step 4 capture row for ONE shop-level delivery.
+ *
+ * Pure — no clock beyond the injected `now`, no I/O. The row copies the
+ * shop's plan facts (id 0 = new record) and stamps `autoCaptureTime`, which
+ * is what marks a row as an actual delivery. Partial by design: only the
+ * entered boxes are captured, so the remaining boxes stay open.
+ */
+export function buildShopDeliveryRow(
+  trip: Trip,
+  plan: ShopDelivery | null,
+  entry: { shopId: number; boxes: number },
+  now = new Date()
+): ShopDelivery {
+  const rows = rowsInSequence(trip);
+  const boxes = Math.max(1, Math.round(num(entry.boxes)));
+  const orderedBoxes = plan ? Math.max(1, rowBoxes(plan)) : boxes;
+  const orderedBirds = plan ? num(plan.farmBirds ?? plan.birds) : 0;
+  // Birds follow the shop's own order ratio; weight follows the trip average.
+  const birds = Math.round((orderedBirds * boxes) / orderedBoxes);
+  const weight = weightForBirds(birds, trip.avgBirdWeight);
+  const nextSerial = rows.reduce((max, r) => Math.max(max, num(r.serialNo)), 0) + 1;
+  const base: ShopDelivery = plan
+    ? { ...plan }
+    : {
+        id: 0,
+        boxNo: boxes,
+        shopId: num(entry.shopId),
+        shopName: "",
+        birdTypeId: 0,
+        birdType: "",
+        birds,
+        weight,
+        mortality: 0,
+        rate: null,
+        amount: 0,
+        remarks: "",
+      };
+  return {
+    ...base,
+    id: 0,
+    serialNo: nextSerial,
+    shopId: num(entry.shopId) || num(plan?.shopId),
+    boxNo: boxes,
+    birds,
+    weight,
+    mortality: 0,
+    mortKg: 0,
+    deliveryMode: "box",
+    // Empty on purpose — deliveredRowBoxes() must read the entered boxNo.
+    selectedBoxIds: [],
+    perBoxData: [],
+    autoCaptureTime: now.toISOString(),
+    clientKey: `dlv-${num(entry.shopId)}-${nextSerial}`,
+  };
+}
+
+/**
  * Table-level search for the SHOP DELIVERY REPORT modal — one compact
  * input filtering shop-level records by shop name, village, status, trip
  * number or vehicle (no separate filter panels). Empty query = all rows.
@@ -664,6 +747,7 @@ export function filterShopBreakdown(
     ordered: string;
     notListed: string;
     delivered: string;
+    partDelivered: string;
     deliveredWithDiff: string;
     notDelivered: string;
   },
@@ -679,11 +763,13 @@ export function filterShopBreakdown(
       row.status === "not_listed" ? labels.notListed : labels.ordered,
       row.status === "delivered"
         ? labels.delivered
-        : row.status === "delivered_with_diff"
-          ? labels.deliveredWithDiff
-          : row.status === "not_delivered"
-            ? labels.notDelivered
-            : "",
+        : row.status === "part_delivered"
+          ? labels.partDelivered
+          : row.status === "delivered_with_diff"
+            ? labels.deliveredWithDiff
+            : row.status === "not_delivered"
+              ? labels.notDelivered
+              : "",
       tripNo,
       vehicleNo,
     ]

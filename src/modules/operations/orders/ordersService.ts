@@ -33,6 +33,7 @@ import type { Vehicle } from "../../masters/vehicles/types/vehicle";
 import {
   addLocalDays,
   buildOrdersTrip,
+  buildShopDeliveryRow,
   collectionTotals,
   computeOrdersProgress,
   isCapturedRow,
@@ -463,6 +464,34 @@ export async function finishAssignment(
   const { data } = await apiPost<RawTrip>(
     `/trips/${vehicleTrip.id}/steps/deliveries`,
     { ...toStep4Payload({ deliveries } as unknown as Partial<Trip>), mode: "submit", remarks }
+  );
+  return mapApiTripToTrip(data, vehicleTrip);
+}
+
+/**
+ * Record ONE shop's delivery (Step 4) on an order-assigned vehicle trip —
+ * the shop-level capture behind Tab 3.
+ *
+ * PARTIAL by design: only the boxes entered are captured, so the remaining
+ * boxes stay open ("Part Delivered") until the rest is delivered. The
+ * caller clamps the entry to the remaining boxes, which is also the
+ * duplicate guard — a shop whose order is fully in has nothing left to
+ * capture and is locked in the UI.
+ */
+export async function recordShopDelivery(
+  vehicleTrip: Trip,
+  entry: { shopId: number; boxes: number }
+): Promise<Trip> {
+  const rows = rowsInSequence(vehicleTrip);
+  const plan = rows.find((r) => num(r.shopId) === num(entry.shopId)) ?? null;
+  const captured = buildShopDeliveryRow(vehicleTrip, plan, entry);
+  const deliveries = normalizeBirdType([...rows, captured]);
+  if (ORDERS_SAMPLE_DATA_ENABLED) {
+    return applySampleDeliveries(vehicleTrip.id, deliveries);
+  }
+  const { data } = await apiPost<RawTrip>(
+    `/trips/${vehicleTrip.id}/steps/deliveries`,
+    { ...toStep4Payload({ deliveries } as unknown as Partial<Trip>), mode: "save" }
   );
   return mapApiTripToTrip(data, vehicleTrip);
 }
