@@ -1516,7 +1516,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-sm">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-500 text-white">
                         <CalendarDays size={13} />
                       </span>
                       Date
@@ -1524,7 +1524,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-500 text-white">
                         <Store size={13} />
                       </span>
                       Particulars
@@ -1532,7 +1532,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-sm">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-500 text-white">
                         <Bird size={13} />
                       </span>
                       Birds
@@ -1540,7 +1540,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-sky-600 text-white shadow-sm">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-cyan-500 text-white">
                         <Weight size={13} />
                       </span>
                       Weight (KG)
@@ -1548,7 +1548,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-sm">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-500 text-white">
                         <IndianRupee size={13} />
                       </span>
                       Rate
@@ -1556,7 +1556,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-sm">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-green-500 text-white">
                         <ArrowUpRight size={13} />
                       </span>
                       Debit
@@ -1564,7 +1564,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-sm">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-sky-500 text-white">
                         <ArrowDownLeft size={13} />
                       </span>
                       Credit
@@ -1572,7 +1572,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-slate-500 to-slate-700 text-white shadow-sm">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-500 text-white">
                         <Scale size={13} />
                       </span>
                       Balance
