@@ -364,7 +364,7 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
               </span>
             ) : result ? (
               <span className="text-slate-400">
-                {result.pages} {ordersTranslate("orders.pdf_pages")} · {result.fileName}
+                {ordersTranslate("orders.pdf_pages", { pages: result.pages })} · {result.fileName}
               </span>
             ) : null}
           </div>
