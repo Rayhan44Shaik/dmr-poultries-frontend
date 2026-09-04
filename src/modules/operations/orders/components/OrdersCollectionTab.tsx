@@ -585,7 +585,7 @@ function CollectionEntries({
             placeholder={to("orders.search_collection")}
             className="w-full sm:w-64"
           />
-          <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} />
+          <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} hideDayChip />
           <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
             {to("orders.sort")}
           </span>
@@ -602,10 +602,10 @@ function CollectionEntries({
               {to("orders.collection_complete")}
             </span>
           )}
-          {/* CLOSED marker sits right beside the day's KPI summary — an
-              auto-closed day is closed by the clock, not by "Finish". */}
+          {/* Day state sits right beside the day's KPI summary — TODAY while
+              the day is open, CLOSED once the 48h window has passed. */}
           <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
-            {isAutoClosed && (
+            {isAutoClosed ? (
               <span
                 title={to("orders.auto_closed_note", {
                   deadline: formatCollectionDeadline(day),
@@ -615,7 +615,11 @@ function CollectionEntries({
                 <Lock size={11} />
                 {to("orders.closed_day")}
               </span>
-            )}
+            ) : day === today ? (
+              <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold tracking-wide text-emerald-700 whitespace-nowrap">
+                {to("orders.today_chip")}
+              </span>
+            ) : null}
             <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
               {to("orders.collection_summary", {
                 shops: totals.totalShops,

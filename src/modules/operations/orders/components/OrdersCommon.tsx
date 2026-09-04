@@ -249,6 +249,7 @@ export function OrdersDateControl({
   onDaySelect,
   t,
   className = "",
+  hideDayChip = false,
 }: {
   day: string;
   today: string;
@@ -256,6 +257,12 @@ export function OrdersDateControl({
   /** Orders translator — params are needed for the auto-close deadline. */
   t: OrdersT;
   className?: string;
+  /**
+   * Order Collection shows the day state (TODAY / CLOSED) beside its
+   * shops · boxes · birds summary instead, so it hides the chip here to keep
+   * one marker per row.
+   */
+  hideDayChip?: boolean;
 }) {
   if (!day || !today) return null;
   const minDate = addLocalDays(today, -6);
@@ -278,7 +285,7 @@ export function OrdersDateControl({
         className="w-44"
         data-testid="orders-date-picker"
       />
-      {day === today ? (
+      {hideDayChip ? null : day === today ? (
         <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold tracking-wide text-emerald-700 whitespace-nowrap">
           {t("orders.today_chip")}
         </span>
