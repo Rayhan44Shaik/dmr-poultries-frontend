@@ -940,8 +940,9 @@ export type AssignmentSheetInput = {
 
 /**
  * The WhatsApp message text for a shop assignment — exactly what the popup
- * shows for confirmation before the send goes out. Plain text (WhatsApp has
- * no rich layout), shops in DELIVERY order with their assigned boxes.
+ * shows for confirmation before the send goes out. Compact on purpose: the
+ * per-shop DELIVERY SEQUENCE lives in the attached PDF, the message just
+ * carries the facts and the totals, and points at that PDF.
  */
 export function buildAssignmentWhatsAppMessage(input: AssignmentSheetInput): string {
   const d = (value: string) => (value && value.trim() ? value.trim() : "—");
@@ -956,11 +957,7 @@ export function buildAssignmentWhatsAppMessage(input: AssignmentSheetInput): str
     `Order: ${d(input.orderTripNo)} · Date: ${d(input.orderDate || input.tripDate)}`,
     `Shops: ${input.rows.length} · Boxes: ${totalBoxes} · Birds: ${totalBirds}`,
     "",
-    "*Delivery sequence:*",
+    "📄 Delivery sequence of shops: please check the PDF.",
   ];
-  input.rows.forEach((row, i) => {
-    const village = row.village ? ` (${row.village})` : "";
-    lines.push(`${i + 1}. ${row.shopName}${village} — ${row.boxes} box`);
-  });
   return lines.join("\n");
 }

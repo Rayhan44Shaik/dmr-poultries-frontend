@@ -165,13 +165,12 @@ export async function generateAssignmentSheetPdf({
         2: { cellWidth: labelCol, fontStyle: "bold", textColor: MUTED },
         3: { cellWidth: valueCol },
       },
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, top: 12, bottom: 12 },
     });
     y = lastTableY(y) + 5;
   };
 
   const totalBoxes = rows.reduce((s, r) => s + r.boxes, 0);
-  const totalBirds = rows.reduce((s, r) => s + r.birds, 0);
   const availableAfter = capacity > 0 ? Math.max(0, capacity - alreadyAssignedOther - totalBoxes) : 0;
 
   // ─── PAGE 1: branded letterhead (hen logo + DMR header) ─────────────
@@ -221,15 +220,25 @@ export async function generateAssignmentSheetPdf({
   if (body.length === 0) {
     body.push(["—", t("orders.sequence_empty"), "—", "—", "0", "—"]);
   }
+  // Column plan (content 182mm): the fixed columns get exactly what their
+  // content needs, Shop Name takes the REST and wraps — long names can never
+  // squeeze City/Mobile/Boxes/Birds again. Available at a glance with 30+
+  // shops: every page repeats the header and keeps clear of the page chrome.
+  const COL_SEQ = 10;
+  const COL_CITY = 28;
+  const COL_MOBILE = 28;
+  const COL_BOXES = 16;
+  const COL_BIRDS = 18;
+  const COL_SHOP = contentWidth - COL_SEQ - COL_CITY - COL_MOBILE - COL_BOXES - COL_BIRDS;
   autoTable(doc, {
     head: [
       [
         "Seq",
         t("orders.col_shop_name"),
         t("orders.city"),
-        t("orders.shop_mobile"),
-        t("orders.col_boxes"),
-        t("orders.col_birds"),
+        t("orders.col_mobile"),
+        t("orders.boxes"),
+        t("orders.birds"),
       ],
     ],
     body,
@@ -251,21 +260,23 @@ export async function generateAssignmentSheetPdf({
     styles: {
       font: "helvetica",
       fontSize: 8,
-      cellPadding: { top: 2, bottom: 2 },
+      cellPadding: { top: 2, bottom: 2, left: 1.6, right: 1.6 },
       valign: "middle",
+      overflow: "linebreak",
       textColor: TEXT_DARK,
       lineColor: GRID_LINE,
       lineWidth: 0.15,
     },
     columnStyles: {
-      0: { cellWidth: 10, halign: "center" },
-      1: { cellWidth: contentWidth - 102 },
-      2: { cellWidth: 26 },
-      3: { cellWidth: 26 },
-      4: { cellWidth: 20, halign: "right" },
-      5: { cellWidth: 20, halign: "right" },
+      0: { cellWidth: COL_SEQ, halign: "center" },
+      1: { cellWidth: COL_SHOP, halign: "left" },
+      2: { cellWidth: COL_CITY },
+      3: { cellWidth: COL_MOBILE, halign: "center" },
+      4: { cellWidth: COL_BOXES, halign: "right", fontStyle: "bold" },
+      5: { cellWidth: COL_BIRDS, halign: "right" },
     },
-    margin: { left: margin, right: margin },
+    // Top clears the running navy page strip; bottom clears the footer line.
+    margin: { left: margin, right: margin, top: 12, bottom: 12 },
     didParseCell: (data) => {
       if (data.section === "body" && data.row.index % 2 === 1) {
         data.cell.styles.fillColor = ALT_ROW;
@@ -274,12 +285,11 @@ export async function generateAssignmentSheetPdf({
   });
   y = lastTableY(y) + 5;
 
-  // ─── TOTALS ──────────────────────────────────────────────────────────
+  // ─── TOTALS (boxes are the figure that matters) ──────────────────────
   drawSectionBand(t("orders.pdf_totals"));
   kvGrid([
     [t("orders.col_total_shops"), count(rows.length)],
     [t("orders.col_assigned_boxes"), count(totalBoxes)],
-    [t("orders.total_birds"), count(totalBirds)],
   ]);
 
   // ─── FOOTER / PAGE CHROME (same pattern as the other DMR PDFs) ──────
