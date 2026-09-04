@@ -157,6 +157,8 @@ const EN: Record<string, string> = {
   "orders.locked": "LOCKED",
   "orders.closed_day": "CLOSED",
   "orders.read_only_note": "This operational day is closed — view only.",
+  "orders.auto_closed_note":
+    "Collection auto-closed at {deadline} — view only.",
   "orders.no_collection_day": "No order collection for {day}",
   "orders.collection_complete": "Complete",
   "orders.finish_collection_locked":
@@ -420,6 +422,8 @@ const TE: Record<string, string> = {
   "orders.locked": "లాక్",
   "orders.closed_day": "మూసి వేయబడింది",
   "orders.read_only_note": "ఈ పని రోజు మూసి వేయబడింది — చూడటం మాత్రమే.",
+  "orders.auto_closed_note":
+    "సేకరణ {deadline}కు ఆటోమేటిక్‌గా మూసివేయబడింది — చూడటం మాత్రమే.",
   "orders.no_collection_day": "{day} కి ఆర్డర్ సేకరణ లేదు",
   "orders.collection_complete": "పూర్తయింది",
   "orders.finish_collection_locked":

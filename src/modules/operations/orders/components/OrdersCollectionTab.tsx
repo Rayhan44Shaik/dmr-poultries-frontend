@@ -1,13 +1,16 @@
 // src/modules/operations/orders/components/OrdersCollectionTab.tsx
 // TAB 1 — ORDER COLLECTION (day-based).
 //
-// Shows the shops collected for the SELECTED OPERATIONAL DAY. Today is
-// editable (boxes per shop — birds optional, Save Progress / Finish
-// Collection); PAST DAYS AND FINISHED DAYS ARE READ-ONLY (locked, view
-// only — no edit, no boxes/birds, no delete, no reorder, no assignment
-// changes here). The day is chosen with the single global date selector
-// (shared DatePicker) — no Previous/Next day buttons, no date-card
-// scroller.
+// Shows the shops collected for the SELECTED OPERATIONAL DAY. A day accepts
+// entries for 48h from its start — 04/09 is still editable on 05/09 and is
+// AUTO-CLOSED at 06/09 12:00 AM whether or not anyone pressed "Finish
+// Collection" (see ordersUtils.isCollectionAutoClosed). Closed days,
+// finished days and fully-assigned days are READ-ONLY (locked, view only —
+// no edit, no boxes/birds, no delete, no reorder, no assignment changes
+// here), and an auto-closed day shows a CLOSED marker right beside the
+// day's shops / boxes / birds summary. The day is chosen with the single
+// global date selector (shared DatePicker) — no Previous/Next day buttons,
+// no date-card scroller.
 //
 // The table's job is to COLLECT THE SHOP ORDER: S.No, Shop, Village,
 // Birds (optional), Boxes (mandatory), Weight, Status. Assignment facts
@@ -42,8 +45,10 @@ import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 import {
   collectionTotals,
+  formatCollectionDeadline,
   formatDayFull,
   formatKg,
+  isCollectionAutoClosed,
   rowBoxes,
   weightForBirds,
 } from "../ordersUtils";
@@ -218,9 +223,12 @@ function CollectionEntries({
   const { to } = useOrdersI18n();
   const { showNotification } = useSafeNotification();
 
-  // Past days and completed days are read-only (view only).
+  // A day stays editable for 48h from its start — the 04/09 collection is
+  // still open on 05/09 and AUTO-CLOSES at 06/09 12:00 AM, finished or not.
+  const isAutoClosed = isCollectionAutoClosed(day);
   const isPast = day < today;
-  const isLocked = isPast || Boolean(collection?.finished) || Boolean(collection?.fullyAssigned);
+  const isLocked =
+    isAutoClosed || Boolean(collection?.finished) || Boolean(collection?.fullyAssigned);
   const isEditable = !isLocked;
 
   // ── Entries (local editing state, seeded from the day's collection) ──
@@ -541,8 +549,8 @@ function CollectionEntries({
   const startIndex = filteredShopList.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE;
 
   // ── Render ────────────────────────────────────────────────────────────────
-  // Past day with nothing collected: clean empty state (read-only by nature).
-  if (isPast && !collection) {
+  // Closed day with nothing collected: clean empty state (read-only by nature).
+  if (isAutoClosed && !collection) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         {/* Controls only — the active tab already identifies the section. */}
@@ -588,19 +596,34 @@ function CollectionEntries({
             ariaLabel={to("orders.sort")}
             widthClass="w-44"
           />
-          {isLocked && !isPast && (
+          {isLocked && !isAutoClosed && (
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2 py-0.5 text-[11px] font-bold text-slate-600">
               <Lock size={11} />
               {to("orders.collection_complete")}
             </span>
           )}
-          <span className="ml-auto text-[11px] font-semibold text-slate-400 whitespace-nowrap">
-            {to("orders.collection_summary", {
-              shops: totals.totalShops,
-              boxes: totals.totalBoxes,
-              birds: totals.totalBirds,
-            })}
-          </span>
+          {/* CLOSED marker sits right beside the day's KPI summary — an
+              auto-closed day is closed by the clock, not by "Finish". */}
+          <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+            {isAutoClosed && (
+              <span
+                title={to("orders.auto_closed_note", {
+                  deadline: formatCollectionDeadline(day),
+                })}
+                className="inline-flex items-center gap-1 rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[11px] font-bold text-rose-700 whitespace-nowrap"
+              >
+                <Lock size={11} />
+                {to("orders.closed_day")}
+              </span>
+            )}
+            <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+              {to("orders.collection_summary", {
+                shops: totals.totalShops,
+                boxes: totals.totalBoxes,
+                birds: totals.totalBirds,
+              })}
+            </span>
+          </div>
           <OrdersIconButton
             label={`${to("orders.refresh")} — ${to("orders.refresh_collection")}`}
             onClick={onRefresh}
@@ -827,8 +850,8 @@ function CollectionEntries({
         ) : (
           <div className="border-t border-slate-200 bg-slate-50/70 px-5 py-3 flex items-center gap-2 text-[11px] font-semibold text-slate-500">
             <Lock size={13} />
-            {isPast
-              ? to("orders.read_only_note")
+            {isAutoClosed
+              ? to("orders.auto_closed_note", { deadline: formatCollectionDeadline(day) })
               : to("orders.finish_collection_locked")}
           </div>
         )}

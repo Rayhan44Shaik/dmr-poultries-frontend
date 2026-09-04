@@ -428,6 +428,37 @@ export function isPastDay(day: string, today: string): boolean {
   return day < today;
 }
 
+// ─── Collection auto-close window ────────────────────────────────────────────
+
+/**
+ * An operational day's Order Collection stays open for 48 hours from the start
+ * of that day: the 04/09 collection can still be edited on 05/09 and is
+ * AUTO-CLOSED at 06/09 12:00 AM — finished or not. The clock, not the
+ * "Finish Collection" button, decides when a day stops accepting entries.
+ */
+export const COLLECTION_GRACE_DAYS = 2;
+
+/** Local midnight that ends the day's editing window (day + 2 days, 00:00). */
+export function collectionDeadline(day: string): Date {
+  const d = new Date(`${day}T00:00:00`);
+  d.setDate(d.getDate() + COLLECTION_GRACE_DAYS);
+  return d;
+}
+
+/** True once the window has passed — the day is closed by the clock. */
+export function isCollectionAutoClosed(day: string, now = new Date()): boolean {
+  const deadline = collectionDeadline(day);
+  if (Number.isNaN(deadline.getTime())) return false;
+  return now.getTime() >= deadline.getTime();
+}
+
+/** "06/09 12:00 AM" — the moment the day's collection closed. */
+export function formatCollectionDeadline(day: string): string {
+  const d = collectionDeadline(day);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit" })} 12:00 AM`;
+}
+
 /** Compact chip label: "29 Aug". */
 export function formatDayLabel(day: string): string {
   return new Date(`${day}T00:00:00`).toLocaleDateString("en-IN", {

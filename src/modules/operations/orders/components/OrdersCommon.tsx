@@ -22,7 +22,7 @@ import {
   opsPrimaryButtonClass,
 } from "../../../../shared/ui/operationsStyles";
 import { DatePicker } from "../../../../components/common/DatePicker";
-import { addLocalDays } from "../ordersUtils";
+import { addLocalDays, formatCollectionDeadline, isCollectionAutoClosed } from "../ordersUtils";
 import type { OrdersT } from "../i18n/ordersI18n";
 
 // ─── Numeric fields (module-wide behaviour) ──────────────────────────────────
@@ -253,7 +253,8 @@ export function OrdersDateControl({
   day: string;
   today: string;
   onDaySelect: (day: string) => void;
-  t: (key: string) => string;
+  /** Orders translator — params are needed for the auto-close deadline. */
+  t: OrdersT;
   className?: string;
 }) {
   if (!day || !today) return null;
@@ -281,10 +282,10 @@ export function OrdersDateControl({
         <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold tracking-wide text-emerald-700 whitespace-nowrap">
           {t("orders.today_chip")}
         </span>
-      ) : day < today ? (
+      ) : isCollectionAutoClosed(day) ? (
         <span
-          className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2 py-0.5 text-[10px] font-bold text-slate-500 whitespace-nowrap"
-          title={t("orders.read_only_note")}
+          className="inline-flex items-center gap-1 rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-bold text-rose-700 whitespace-nowrap"
+          title={t("orders.auto_closed_note", { deadline: formatCollectionDeadline(day) })}
         >
           <Lock size={10} />
           {t("orders.closed_day")}

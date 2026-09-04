@@ -201,6 +201,7 @@ function buildSampleTrips(): Trip[] {
   const today = localDay(0);
   const yesterday = localDay(-1);
   const twoDaysAgo = localDay(-2);
+  const threeDaysAgo = localDay(-3);
   const ordYest = `ORD-${stamp(yesterday)}-01`;
   const ordTwo = `ORD-${stamp(twoDaysAgo)}-01`;
 
@@ -259,6 +260,13 @@ function buildSampleTrips(): Trip[] {
         planRow(2, 7, 30, 300, assigned(ordTwo, `${twoDaysAgo}T10:35:00`)),
       ],
     }),
+
+    // ── 3 DAYS AGO — never finished, and the 48h window has passed, so the
+    //    clock auto-closed it: CLOSED chip beside the KPI summary, view only ──
+    containerTrip(9004, threeDaysAgo, false, [
+      planRow(1, 8, 18, 180),
+      planRow(2, 2, 22, 220),
+    ]),
 
     // ── TODAY — truck with Step 2 done and nothing delivered: free to assign ─
     deliveryTrip(9105, today, 1, 3, "Imran S", "Mohan Rao", {
