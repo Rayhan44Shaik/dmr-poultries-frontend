@@ -736,6 +736,23 @@ export function buildShopDeliveryRow(
 }
 
 /**
+ * Move one row of a sequence to another position — the single rule behind the
+ * drag handle, the ↑/↓ arrows and "first / last". Targets clamp to the list,
+ * so with 45 shops on a vehicle the last shop can be sent to #1 in one move
+ * instead of 44 arrow clicks. The other rows shift around it (no swap).
+ */
+export function moveInSequence<T>(rows: T[], from: number, to: number): T[] {
+  if (rows.length < 2) return rows;
+  const f = Math.max(0, Math.min(rows.length - 1, Math.round(from)));
+  const t = Math.max(0, Math.min(rows.length - 1, Math.round(to)));
+  if (f === t) return rows;
+  const next = [...rows];
+  const [moved] = next.splice(f, 1);
+  next.splice(t, 0, moved as T);
+  return next;
+}
+
+/**
  * Table-level search for the SHOP DELIVERY REPORT modal — one compact
  * input filtering shop-level records by shop name, village, status, trip
  * number or vehicle (no separate filter panels). Empty query = all rows.

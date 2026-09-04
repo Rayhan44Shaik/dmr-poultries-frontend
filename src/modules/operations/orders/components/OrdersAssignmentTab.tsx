@@ -27,6 +27,9 @@ import {
   ArrowDown,
   ArrowUp,
   ChevronRight,
+  ChevronsDown,
+  ChevronsUp,
+  GripVertical,
   Loader2,
   Lock,
   RefreshCw,
@@ -51,6 +54,7 @@ import {
   farmCityOf,
   formatCount,
   formatDayFull,
+  moveInSequence,
   weightForBirds,
 } from "../ordersUtils";
 import {
@@ -467,16 +471,44 @@ function AssignmentEditor({
     });
   }, [shopDirectory]);
 
-  const moveRow = useCallback((clientKey: string, dir: -1 | 1) => {
+  // ── Sequence editing (a vehicle can carry ~45 shops, so stepping with ↑/↓
+  //     is never the only way): drag a row, jump it to first/last, or sort the
+  //     whole sequence in one click. All three go through moveInSequence.
+  const moveRowTo = useCallback((clientKey: string, to: number) => {
     setSelected((prev) => {
-      const index = prev.findIndex((r) => r.clientKey === clientKey);
-      const target = index + dir;
-      if (index < 0 || target < 0 || target >= prev.length) return prev;
+      const from = prev.findIndex((r) => r.clientKey === clientKey);
+      if (from < 0) return prev;
+      return moveInSequence(prev, from, to);
+    });
+  }, []);
+
+  const moveRow = useCallback(
+    (clientKey: string, dir: -1 | 1) => {
+      setSelected((prev) => {
+        const from = prev.findIndex((r) => r.clientKey === clientKey);
+        if (from < 0) return prev;
+        return moveInSequence(prev, from, from + dir);
+      });
+    },
+    []
+  );
+
+  const sortSelected = useCallback((mode: "shop_az" | "village_az") => {
+    setSelected((prev) => {
       const next = [...prev];
-      [next[index], next[target]] = [next[target], next[index]];
+      next.sort((a, b) =>
+        mode === "shop_az"
+          ? (a.shopName || "").localeCompare(b.shopName || "")
+          : (a.village || "").localeCompare(b.village || "") ||
+            (a.shopName || "").localeCompare(b.shopName || "")
+      );
       return next;
     });
   }, []);
+
+  // Drag state — which row is lifted, and where it would land.
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
 
   const setAssigned = useCallback((clientKey: string, raw: string) => {
     setSelected((prev) =>
@@ -1044,6 +1076,29 @@ function AssignmentEditor({
             <span className="text-[11px] font-semibold text-slate-400">
               {to("orders.assign_hint")}
             </span>
+            {/* One-click sequence sorting — with ~45 shops on a vehicle,
+                sorting the list beats dragging it row by row. */}
+            <span className="inline-flex items-center gap-1">
+              <span className="text-[11px] font-semibold text-slate-400">
+                {to("orders.sequence_sort")}:
+              </span>
+              <button
+                type="button"
+                onClick={() => sortSelected("shop_az")}
+                disabled={busy || selected.length < 2}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-600 transition-colors hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-40"
+              >
+                {to("orders.seq_shop_az")}
+              </button>
+              <button
+                type="button"
+                onClick={() => sortSelected("village_az")}
+                disabled={busy || selected.length < 2}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-600 transition-colors hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-40"
+              >
+                {to("orders.seq_village_az")}
+              </button>
+            </span>
             {/* The vehicle comes from the › row above — no second selector. */}
             <span className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-[11px] font-bold text-emerald-700">
               {vehicle.trip.tripNo} · {vehicle.trip.vehicleNo || "—"}
@@ -1085,7 +1140,11 @@ function AssignmentEditor({
                 </div>
               </div>
 
-              {/* Assignment table: editable sequence (↑/↓ auto-renumber) + assigned boxes */}
+              {/* Assignment table: editable sequence — drag a row, ↑/↓ one
+                  step, ⤒/⤓ first/last, or sort the whole list — + boxes. */}
+              <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-1.5 text-[10px] font-semibold text-slate-400">
+                {to("orders.drag_hint")}
+              </div>
               <div className="max-h-80 overflow-y-auto">
                 <table className="w-full min-w-[900px] text-xs md:text-sm">
                   <thead>
@@ -1104,14 +1163,61 @@ function AssignmentEditor({
                   <tbody className={opsTableDivideClass}>
                     {selected.map((row, index) => {
                       const ds = deliveryStatusOf(row.shopId);
+                      const lifted = dragKey === row.clientKey;
+                      const isDropTarget =
+                        dropIndex === index && !!dragKey && !lifted;
                       return (
-                        <tr key={row.clientKey} className={`${opsTableRowClass} align-middle`}>
+                        <tr
+                          key={row.clientKey}
+                          draggable={!busy}
+                          onDragStart={(e) => {
+                            setDragKey(row.clientKey);
+                            setDropIndex(index);
+                            e.dataTransfer.effectAllowed = "move";
+                            try {
+                              e.dataTransfer.setData("text/plain", row.clientKey);
+                            } catch {
+                              /* dataTransfer is read-only in some browsers */
+                            }
+                          }}
+                          onDragOver={(e) => {
+                            if (!dragKey) return;
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+                            if (dropIndex !== index) setDropIndex(index);
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const from = dragKey || e.dataTransfer.getData("text/plain");
+                            if (from) moveRowTo(from, index);
+                            setDragKey(null);
+                            setDropIndex(null);
+                          }}
+                          onDragEnd={() => {
+                            setDragKey(null);
+                            setDropIndex(null);
+                          }}
+                          className={`${opsTableRowClass} align-middle ${
+                            lifted ? "opacity-40" : ""
+                          } ${
+                            isDropTarget
+                              ? "border-t-2 border-t-emerald-500 bg-emerald-50/50"
+                              : ""
+                          }`}
+                        >
                           <td className={opsTableTdClass}>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1.5">
+                              {/* Drag handle (the whole row drags as well) */}
+                              <GripVertical
+                                size={14}
+                                aria-label={to("orders.drag_handle")}
+                                className="shrink-0 cursor-grab text-slate-300 active:cursor-grabbing"
+                              />
                               <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-[12px] font-bold text-emerald-700">
                                 {index + 1}
                               </span>
-                              <div className="flex flex-col -my-1.5">
+                              {/* ↑ ↓ step one place · ⤒ ⤓ jump to first / last */}
+                              <div className="grid grid-cols-2 -my-1.5">
                                 <button
                                   type="button"
                                   onClick={() => moveRow(row.clientKey, -1)}
@@ -1123,12 +1229,32 @@ function AssignmentEditor({
                                 </button>
                                 <button
                                   type="button"
+                                  onClick={() => moveRowTo(row.clientKey, 0)}
+                                  disabled={index === 0 || busy}
+                                  title={to("orders.move_first")}
+                                  aria-label={`${to("orders.move_first")} — ${row.shopName}`}
+                                  className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
+                                >
+                                  <ChevronsUp size={12} />
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => moveRow(row.clientKey, 1)}
                                   disabled={index === selected.length - 1 || busy}
                                   aria-label={`${to("orders.col_sequence")} ↓ ${row.shopName}`}
                                   className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
                                 >
                                   <ArrowDown size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveRowTo(row.clientKey, selected.length - 1)}
+                                  disabled={index === selected.length - 1 || busy}
+                                  title={to("orders.move_last")}
+                                  aria-label={`${to("orders.move_last")} — ${row.shopName}`}
+                                  className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
+                                >
+                                  <ChevronsDown size={12} />
                                 </button>
                               </div>
                             </div>

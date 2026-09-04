@@ -77,6 +77,15 @@ const EN: Record<string, string> = {
   "orders.assignment_summary":
     "Capacity: {capacity} · Assigned: {assigned} · Remaining: {remaining} · Shops: {shops}",
   "orders.col_sequence": "Sequence",
+  // Sequence editing at scale (~45 shops a vehicle): drag, jump, or sort.
+  "orders.drag_handle": "Drag to reorder",
+  "orders.drag_hint":
+    "Drag a row to reorder · ↑ ↓ move one place · ⤒ ⤓ send to first / last · or sort the whole list",
+  "orders.move_first": "Move to first",
+  "orders.move_last": "Move to last",
+  "orders.sequence_sort": "Sort sequence",
+  "orders.seq_shop_az": "Shop A→Z",
+  "orders.seq_village_az": "Village A→Z",
   "orders.assigned_boxes": "Assigned",
   "orders.assign_hint":
     "Reorder the delivery sequence and set the boxes each shop receives from this vehicle.",
@@ -369,6 +378,15 @@ const TE: Record<string, string> = {
   "orders.assignment_summary":
     "సామర్థ్యం: {capacity} · అసైన్: {assigned} · మిగిలినవి: {remaining} · షాప్‌లు: {shops}",
   "orders.col_sequence": "క్రమం",
+  // పెద్ద సంఖ్యలో షాప్‌ల క్రమం (~45 ఒక వాహనానికి): డ్రాగ్, జంప్, లేదా సార్ట్.
+  "orders.drag_handle": "క్రమం మార్చడానికి డ్రాగ్ చేయండి",
+  "orders.drag_hint":
+    "వరుస మార్చడానికి వరుసను డ్రాగ్ చేయండి · ↑ ↓ ఒక స్థానం · ⤒ ⤓ మొదటి / చివరి స్థానానికి · లేదా మొత్తం జాబితాను సార్ట్ చేయండి",
+  "orders.move_first": "మొదటి స్థానానికి",
+  "orders.move_last": "చివరి స్థానానికి",
+  "orders.sequence_sort": "క్రమాన్ని సార్ట్ చేయండి",
+  "orders.seq_shop_az": "షాప్ A→Z",
+  "orders.seq_village_az": "గ్రామం A→Z",
   "orders.assigned_boxes": "అసైన్",
   "orders.assign_hint":
     "డెలివరీ క్రమాన్ని మార్చండి మరియు ప్రతి షాప్‌కు ఈ వాహనం నుండి ఎన్ని బాక్స్‌లు వస్తాయో నిర్దేశించండి.",
