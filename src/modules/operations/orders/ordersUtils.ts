@@ -165,12 +165,26 @@ export function vehicleCapacityOf(
   return Math.max(0, num(vehicle?.noOfBoxes) || num(trip.vehicleBoxCapacity) || 0);
 }
 
-/** Boxes already assigned to a trip (all Orders plan rows on it). */
+/** Boxes already assigned to a trip (all UNCAPTURED Orders plan rows on it). */
 export function assignedBoxesOnTrip(trip: Trip): number {
   return rowsInSequence(trip).reduce(
-    (sum, row) => (isOrderPlanRow(row) ? sum + rowBoxes(row) : sum),
+    (sum, row) => (isOrderPlanRow(row) && !isCapturedRow(row) ? sum + rowBoxes(row) : sum),
     0
   );
+}
+
+/**
+ * Boxes ONE vehicle carries of one shop's order, measured from the trip's
+ * rows for that shop: the UNCAPTURED plan rows are the assigned share (they
+ * keep the assigned box count even after partial Step 4 captures, which the
+ * Orders module persists as separate captured rows). When every plan row
+ * was captured in place (external Step 4 edits), the captured boxes are the
+ * closest truth for what the vehicle took.
+ */
+export function planShareBoxes(rows: ShopDelivery[]): number {
+  const uncaptured = rows.filter((r) => !isCapturedRow(r));
+  if (uncaptured.length > 0) return uncaptured.reduce((s, r) => s + rowBoxes(r), 0);
+  return rows.filter(isCapturedRow).reduce((s, r) => s + deliveredRowBoxes(r), 0);
 }
 
 /** Enrich an eligible vehicle trip with capacity facts for the UI. */
@@ -895,4 +909,58 @@ export function formatKg(value: number, withUnit = true): string {
 
 export function formatCount(value: number): string {
   return num(value).toLocaleString("en-IN");
+}
+
+// ─── WhatsApp assignment message (the text previewed before sending) ──────────
+
+/** One shop line of the assignment message / sheet (delivery order). */
+export type AssignmentSheetRow = {
+  serialNo: number;
+  shopId: number;
+  shopName: string;
+  village: string;
+  mobile: string;
+  /** Boxes assigned to THIS vehicle (the shop's share). */
+  boxes: number;
+  /** Birds for that share (prorated from the shop's order). */
+  birds: number;
+};
+
+export type AssignmentSheetInput = {
+  tripNo: string;
+  tripDate: string;
+  vehicleNo: string;
+  supervisorName: string;
+  supervisorMobile: string;
+  driverName: string;
+  orderTripNo: string;
+  orderDate: string;
+  rows: AssignmentSheetRow[];
+};
+
+/**
+ * The WhatsApp message text for a shop assignment — exactly what the popup
+ * shows for confirmation before the send goes out. Plain text (WhatsApp has
+ * no rich layout), shops in DELIVERY order with their assigned boxes.
+ */
+export function buildAssignmentWhatsAppMessage(input: AssignmentSheetInput): string {
+  const d = (value: string) => (value && value.trim() ? value.trim() : "—");
+  const totalBoxes = input.rows.reduce((s, r) => s + r.boxes, 0);
+  const totalBirds = input.rows.reduce((s, r) => s + r.birds, 0);
+  const lines = [
+    "*DMR POULTRIES — Shop Assignment*",
+    "",
+    `Trip: ${d(input.tripNo)} · Vehicle: ${d(input.vehicleNo)}`,
+    `Supervisor: ${d(input.supervisorName)}${input.supervisorMobile ? ` (${input.supervisorMobile})` : ""}`,
+    `Driver: ${d(input.driverName)}`,
+    `Order: ${d(input.orderTripNo)} · Date: ${d(input.orderDate || input.tripDate)}`,
+    `Shops: ${input.rows.length} · Boxes: ${totalBoxes} · Birds: ${totalBirds}`,
+    "",
+    "*Delivery sequence:*",
+  ];
+  input.rows.forEach((row, i) => {
+    const village = row.village ? ` (${row.village})` : "";
+    lines.push(`${i + 1}. ${row.shopName}${village} — ${row.boxes} box`);
+  });
+  return lines.join("\n");
 }

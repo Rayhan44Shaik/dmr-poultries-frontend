@@ -39,7 +39,6 @@ import {
 } from "lucide-react";
 import type { Trip } from "../../../../shared/trip";
 import {
-  opsEmptyStateClass,
   opsPrimaryButtonClass,
   opsSecondaryButtonClass,
   opsSectionTitleClass,
@@ -58,26 +57,39 @@ import {
   farmCityOf,
   formatCount,
   formatDayFull,
+  isCapturedRow,
   moveInSequence,
+  orderRowsOnTrip,
+  planShareBoxes,
+  rowBoxes,
   weightForBirds,
+  type AssignmentSheetRow,
 } from "../ordersUtils";
 import {
-  findDayShopConflicts,
+  findDayOverAssignments,
   finishAssignment,
   saveAssignment,
   sendOrdersWhatsApp,
+  shopMobileOf,
   supervisorMobileOf,
   villageOf,
+  type OrdersWhatsAppResult,
   type ShopDirectory,
   type SupervisorDirectory,
 } from "../ordersService";
 import { useOrdersI18n } from "../i18n/ordersI18n";
 import type {
+  DayShopAssignmentPart,
   DayVehicleView,
   OrderShopRow,
   OrdersDayCollection,
   OrdersEligibleVehicle,
 } from "../types";
+import {
+  ORDERS_TABLE_FONT_CLASS,
+  ordersTableZebraRow,
+  ordersZebraTone,
+} from "../ordersTableStyles";
 import {
   ORDERS_NO_SPINNER,
   OrdersDateControl,
@@ -90,6 +102,7 @@ import {
   WhatsAppIcon,
   onOrdersNumberWheel,
 } from "./OrdersCommon";
+import OrdersWhatsAppConfirmPopup from "./OrdersWhatsAppConfirmPopup";
 
 const AVAILABLE_PAGE_SIZE = 10;
 
@@ -109,8 +122,20 @@ type SelectedRow = {
   village: string;
   orderedBirds: number;
   orderedBoxes: number;
-  assigned: number; // 1 … orderedBoxes
+  /**
+   * Boxes of this shop's order already assigned to OTHER vehicles (from the
+   * day's persisted data) — this vehicle can take at most
+   * `orderedBoxes − assignedElsewhere`, so two vehicles can split 40 into
+   * 20 + 20 but never into 20 + 40.
+   */
+  assignedElsewhere: number;
+  assigned: number; // 1 … orderedBoxes − assignedElsewhere
 };
+
+/** Boxes one selected shop may still take on this vehicle. */
+function maxAssignable(row: Pick<SelectedRow, "orderedBoxes" | "assignedElsewhere">): number {
+  return Math.max(0, row.orderedBoxes - row.assignedElsewhere);
+}
 
 function assignedBirdsFor(row: SelectedRow): number {
   if (row.assigned <= 0 || row.orderedBoxes <= 0) return 0;
@@ -199,24 +224,15 @@ function OrdersAssignmentTab({
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
 
-  // ── Compact table-level sort (real dropdown; same visual control as
-  //     Order Collection) ──────────────────────────────────────────────────
-  const [sortMode, setSortMode] = useState<"pending" | "az" | "za" | "vehicle_trip">("pending");
-  const sortOptions = useMemo(
-    () => [
-      { value: "pending", label: to("orders.sort_pending_first") },
-      { value: "az", label: to("orders.sort_name_az") },
-      { value: "za", label: to("orders.sort_name_za") },
-      { value: "vehicle_trip", label: to("orders.sort_vehicle_trip") },
-    ],
-    [to]
-  );
+  // The pool always sorts PENDING FIRST — the top-level Sort dropdown was
+  // removed as clutter (the operational order is the only one used).
+  const sortMode: "pending" | "az" | "za" | "vehicle_trip" = "pending";
 
   if (loading) return <OrdersTableSkeleton rows={4} />;
   const isPast = day < today;
 
   // ONE card with the SAME toolbar / table visual language as Order
-  // Collection: [ Search ][ Date + TODAY ][ Sort ] … [↻ Refresh].
+  // Collection: [ Search ][ Date ] … [↻ Refresh].
   // Refresh is ALWAYS the last control, far right.
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
@@ -227,17 +243,7 @@ function OrdersAssignmentTab({
           placeholder={to("orders.search_assignment")}
           className="w-full sm:w-64"
         />
-        <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} />
-        <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
-          {to("orders.sort")}
-        </span>
-        <OrdersDropdown
-          value={sortMode}
-          onChange={(v) => setSortMode(v as "pending" | "az" | "za" | "vehicle_trip")}
-          options={sortOptions}
-          ariaLabel={to("orders.sort")}
-          widthClass="w-44"
-        />
+        <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} hideDayChip />
         {isPast ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2 py-0.5 text-[11px] font-bold text-slate-600">
             <Lock size={11} />
@@ -322,7 +328,7 @@ function PastAssignmentsTable({
   }, [views, q]);
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-xs md:text-sm">
+      <table className={`w-full ${ORDERS_TABLE_FONT_CLASS}`}>
         <thead>
           <tr className={opsTableHeadRowClass}>
             <th className={opsTableThClass}>{t("orders.col_trip_no")}</th>
@@ -334,8 +340,8 @@ function PastAssignmentsTable({
             </tr>
           </thead>
           <tbody className={opsTableDivideClass}>
-            {filtered.map((view) => (
-              <tr key={view.trip.id} className={opsTableRowClass}>
+            {filtered.map((view, index) => (
+              <tr key={view.trip.id} className={ordersTableZebraRow(index)}>
                 <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
                   {view.trip.tripNo}
                 </td>
@@ -344,7 +350,7 @@ function PastAssignmentsTable({
                 <td className={`${opsTableTdClass} text-right text-slate-600`}>
                   {view.deliveredShops}/{view.shops}
                 </td>
-                <td className={`${opsTableTdClass} text-right font-semibold text-slate-700`}>
+                <td className={`${opsTableTdClass} text-right font-medium text-slate-700`}>
                   {view.boxes}
                 </td>
                 <td className={opsTableTdClass}>
@@ -397,7 +403,7 @@ function AssignmentEditor({
   onChanged: () => void;
   onFinished: (vehicleTrip: Trip) => void;
 }) {
-  const { to } = useOrdersI18n();
+  const { to, language } = useOrdersI18n();
   const { showNotification } = useSafeNotification();
   const orderTrip = collection.trip;
 
@@ -454,10 +460,14 @@ function AssignmentEditor({
     [selected]
   );
 
-  const toggleShop = useCallback((row: OrderShopRow, checked: boolean) => {
+  const toggleShop = useCallback((row: OrderShopRow, checked: boolean, assignedElsewhere = 0) => {
     setSelected((prev) => {
       if (checked) {
         if (prev.some((r) => r.shopId === row.shopId)) return prev;
+        const orderedBoxes = Math.max(1, Number(row.boxNo) || 0);
+        // A partially-assigned shop comes in with only its BALANCE pre-filled:
+        // 40 ordered, 20 already on another truck → this one gets 20, not 40.
+        const takeable = Math.max(0, orderedBoxes - assignedElsewhere);
         return [
           ...prev,
           {
@@ -466,8 +476,9 @@ function AssignmentEditor({
             shopName: row.shopName || "—",
             village: villageOf(row.shopId, row.shopName, shopDirectory),
             orderedBirds: Number(row.birds) || 0,
-            orderedBoxes: Math.max(1, Number(row.boxNo) || 0),
-            assigned: Math.max(1, Number(row.boxNo) || 0),
+            orderedBoxes,
+            assignedElsewhere,
+            assigned: takeable,
           },
         ];
       }
@@ -518,8 +529,10 @@ function AssignmentEditor({
     setSelected((prev) =>
       prev.map((r) => {
         if (r.clientKey !== clientKey) return r;
-        // Assigned boxes: 1 … ordered (0 = not assigned to this vehicle).
-        const n = Math.max(0, Math.min(r.orderedBoxes, Math.floor(Number(raw) || 0)));
+        // Assigned boxes: 1 … remaining balance (0 = not assigned to this
+        // vehicle). The cap already discounts boxes on other vehicles, so a
+        // 40-box shop split 20 + 20 can never become 20 + 40.
+        const n = Math.max(0, Math.min(maxAssignable(r), Math.floor(Number(raw) || 0)));
         return { ...r, assigned: n };
       })
     );
@@ -532,8 +545,16 @@ function AssignmentEditor({
   // ── Capacity math (boxes are the priority figure; hard block) ────────────
   const avgBirdWeight = vehicle ? Number(vehicle.trip.avgBirdWeight) || 0 : 0;
   const capacity = vehicle ? vehicle.capacity : 0;
+  // The vehicle's rows for THIS order are replaced on save, so they never
+  // count against its capacity — only boxes from OTHER orders do. (The old
+  // code subtracted the collection's TOTAL assigned boxes, which breaks
+  // once an order is split over several vehicles.)
+  const ownOrderBoxes = useMemo(
+    () => (vehicle ? planShareBoxes(orderRowsOnTrip(vehicle.trip, orderTrip.tripNo)) : 0),
+    [vehicle, orderTrip.tripNo]
+  );
   const alreadyAssignedOther = vehicle
-    ? Math.max(0, vehicle.alreadyAssigned - collection.assignedBoxes)
+    ? Math.max(0, vehicle.alreadyAssigned - ownOrderBoxes)
     : 0;
   const requested = selected.reduce((s, r) => s + r.assigned, 0);
   const available = vehicle ? Math.max(0, capacity - alreadyAssignedOther) : 0;
@@ -549,12 +570,15 @@ function AssignmentEditor({
     return () => window.removeEventListener("keydown", onKey);
   }, [vehicleTripId]);
 
-  /** Shops already saved on a truck — shown in the vehicle list. */
+  /** Shops already saved on a truck — shown in the vehicle list. A shop
+      split over two vehicles counts once for EACH of them. */
   const savedShopsByTripNo = useMemo(() => {
     const counts = new Map<string, number>();
     for (const a of collection.shops.values()) {
-      if (!a?.tripNo) continue;
-      counts.set(a.tripNo, (counts.get(a.tripNo) ?? 0) + 1);
+      if (!a) continue;
+      for (const p of a.parts ?? []) {
+        counts.set(p.tripNo, (counts.get(p.tripNo) ?? 0) + 1);
+      }
     }
     return counts;
   }, [collection]);
@@ -595,23 +619,42 @@ function AssignmentEditor({
     return true;
   }, [vehicle, requested, available, capacity, alreadyAssignedOther, showNotification, to]);
 
-  // ── Pre-save conflict re-check from FRESH persisted data ─────────────────
-  const assertNoConflicts = useCallback(async (): Promise<boolean> => {
+  // ── Pre-save balance re-check from FRESH persisted data ─────────────────
+  // The hard rule behind split orders: summed over ALL vehicles, a shop can
+  // never take more boxes than were collected (40 ordered → V1 20 + V2 20 is
+  // fine; V2 asking for 40 is not). Always checked against a fresh fetch, so
+  // a shop another operator just placed on a different truck is caught here
+  // even if this screen has stale data.
+  const assertFitsBalance = useCallback(async (): Promise<boolean> => {
     if (!vehicle || selected.length === 0) return true;
     setConflictChecking(true);
     try {
-      const conflicts = await findDayShopConflicts(
+      const issues = await findDayOverAssignments(
         day,
-        selected.map((r) => ({ shopId: r.shopId, shopName: r.shopName })),
+        selected.map((r) => ({ shopId: r.shopId, shopName: r.shopName, boxes: r.assigned })),
         vehicle.trip.tripNo
       );
-      if (conflicts.length > 0) {
+      if (issues.length > 0) {
+        // Auto-correct the selection to the fresh remaining balance and make
+        // the operator re-confirm — no invalid state is ever saved.
+        const remainingOf = new Map(issues.map((i) => [i.shopId, i.remaining]));
+        setSelected((prev) =>
+          prev
+            .map((r) =>
+              remainingOf.has(r.shopId)
+                ? { ...r, assigned: remainingOf.get(r.shopId)! }
+                : r
+            )
+            .filter((r) => r.assigned > 0)
+        );
         showNotification(
-          to("orders.conflict_message", { shops: conflicts.join(", ") }),
+          to("orders.over_assign_message", {
+            shops: issues
+              .map((i) => `${i.shopName} (${i.requested} > ${i.remaining} left)`)
+              .join(", "),
+          }),
           "error"
         );
-        // Drop the conflicting shops from the selection and refresh.
-        setSelected((prev) => prev.filter((r) => !conflicts.includes(r.shopName)));
         onChanged();
         return false;
       }
@@ -632,7 +675,7 @@ function AssignmentEditor({
       showNotification(to("orders.selection_empty"), "info");
       return;
     }
-    if (!(await assertNoConflicts())) return;
+    if (!(await assertFitsBalance())) return;
     setSaving(true);
     try {
       await saveAssignment(vehicle.trip, [
@@ -647,7 +690,7 @@ function AssignmentEditor({
     } finally {
       setSaving(false);
     }
-  }, [busy, vehicle, checkCapacity, selected, assertNoConflicts, orderTrip.tripNo, showNotification, to, onChanged]);
+  }, [busy, vehicle, checkCapacity, selected, assertFitsBalance, orderTrip.tripNo, showNotification, to, onChanged]);
 
   // ── Finish Assignment (validated) ────────────────────────────────────────
   const handleFinish = useCallback(async () => {
@@ -660,7 +703,7 @@ function AssignmentEditor({
       return;
     }
     if (!checkCapacity()) return;
-    if (!(await assertNoConflicts())) return;
+    if (!(await assertFitsBalance())) return;
     setFinishing(true);
     try {
       const vehicleTrip = await finishAssignment(
@@ -676,22 +719,60 @@ function AssignmentEditor({
     } finally {
       setFinishing(false);
     }
-  }, [busy, vehicle, selected, savedOnVehicle, checkCapacity, assertNoConflicts, orderTrip.tripNo, showNotification, to, onFinished]);
+  }, [busy, vehicle, selected, savedOnVehicle, checkCapacity, assertFitsBalance, orderTrip.tripNo, showNotification, to, onFinished]);
 
-  // ── WhatsApp (existing mechanism — assignment list to the supervisor) ────
-  const handleWhatsApp = useCallback(async () => {
-    if (waBusy || !vehicle) return;
-    // Ensure the assignment is persisted first (per-delivery endpoint needs ids).
+  // ── WhatsApp: CONFIRM FIRST — the card opens a check popup (message text +
+  //    branded assignment sheet PDF); nothing goes out until "Confirm & Send".
+  const [waPopupOpen, setWaPopupOpen] = useState(false);
+
+  // The shops the sheet + message list, in DELIVERY order: the live
+  // selection when there is one, otherwise this vehicle's saved rows for the
+  // order (so the operator can re-send after an earlier partial save).
+  const waSheetRows = useMemo<AssignmentSheetRow[]>(() => {
+    if (!vehicle) return [];
+    if (selected.length > 0) {
+      return selected
+        .filter((r) => r.assigned > 0)
+        .map((r, i) => ({
+          serialNo: i + 1,
+          shopId: r.shopId,
+          shopName: r.shopName,
+          village: r.village || villageOf(r.shopId, r.shopName, shopDirectory),
+          mobile: shopMobileOf(r.shopId, shopDirectory),
+          boxes: r.assigned,
+          birds: assignedBirdsFor(r),
+        }));
+    }
+    return orderRowsOnTrip(vehicle.trip, orderTrip.tripNo)
+      .filter((r) => !isCapturedRow(r))
+      .map((r, i) => ({
+        serialNo: i + 1,
+        shopId: r.shopId,
+        shopName: r.shopName || "Shop",
+        village: villageOf(r.shopId, r.shopName || "", shopDirectory),
+        mobile: shopMobileOf(r.shopId, shopDirectory),
+        boxes: rowBoxes(r),
+        birds: Number(r.birds) || 0,
+      }));
+  }, [vehicle, selected, orderTrip.tripNo, shopDirectory]);
+
+  // Persist-if-dirty, then send through the EXISTING per-delivery WhatsApp
+  // mechanism — unchanged from the pre-popup behaviour.
+  const handleWhatsAppConfirm = useCallback(async (): Promise<OrdersWhatsAppResult | null> => {
+    if (waBusy || !vehicle) return null;
     let trip = vehicle.trip;
     if (isDirty) {
-      if (!(await assertNoConflicts())) return;
+      if (!(await assertFitsBalance())) return null;
       try {
         trip = await saveAssignment(vehicle.trip, [
           { orderTripNo: orderTrip.tripNo, rows: toOrderShopRows(selected) },
         ]);
+        setSavedSnapshot(selectionSnapshot(vehicleTripId, []));
+        setSelected([]);
+        onChanged();
       } catch {
         showNotification(to("orders.refresh_failed"), "error");
-        return;
+        return null;
       }
     }
     setWaBusy(true);
@@ -713,25 +794,37 @@ function AssignmentEditor({
             : to("orders.whatsapp_failed", { message: result.message ?? "—" });
         showNotification(message, "error");
       }
+      return result;
     } catch {
       showNotification(to("orders.whatsapp_failed", { message: "network" }), "error");
+      return null;
     } finally {
+      // Sending finished — the popup's result block takes over the display.
       setWaBusy(false);
-      setWaProgress(null);
     }
-  }, [waBusy, vehicle, isDirty, selected, assertNoConflicts, orderTrip.tripNo, supervisorMobile, showNotification, to]);
+  }, [waBusy, vehicle, isDirty, selected, assertFitsBalance, orderTrip.tripNo, vehicleTripId, supervisorMobile, showNotification, onChanged, to]);
 
 
-  // ── Day pool table: PENDING (unassigned) + ASSIGNED shops together ───────
-  //     Only pending rows are assignable — the same-shop/same-day rule stays
-  //     visible at a glance. Table-level search over the FULL pool (shop /
-  //     village / vehicle / trip), sorted by the selected mode, then
-  //     paginated (existing global component; 10 rows per page).
+  // ── Day pool table: PENDING + PARTIALLY-SPLIT + ASSIGNED shops together ──
+  //     pending  — the shop is on no vehicle yet (full balance assignable)
+  //     partial  — some boxes are on other vehicles; only the BALANCE is
+  //                still assignable here (40 ordered, 20 taken → 20 left)
+  //     assigned — the balance is fully placed (or the shop is already on
+  //                THIS vehicle) → read-only row
+  //     Table-level search over the FULL pool (shop / village / vehicle /
+  //     trip), sorted by the selected mode, then paginated (existing global
+  //     component; 10 rows per page).
   type PoolRow = OrderShopRow & {
     poolIndex: number;
-    kind: "pending" | "assigned";
-    assignedVehicleNo: string;
-    assignedTripNo: string;
+    kind: "pending" | "partial" | "assigned";
+    /** Every vehicle carrying a share of this shop's order. */
+    parts: DayShopAssignmentPart[];
+    /** Boxes already on vehicles OTHER than the chosen one. */
+    assignedElsewhere: number;
+    /** Boxes still assignable: ordered − Σ parts (never negative). */
+    remainingBoxes: number;
+    /** A share of this shop is already saved on the chosen vehicle. */
+    onThisVehicle: boolean;
     delivered: boolean;
   };
   // ── Collected-shops search + filter ─────────────────────────────────────
@@ -760,21 +853,35 @@ function AssignmentEditor({
     const list: PoolRow[] = [];
     collection.rows.forEach((row, i) => {
       const a = collection.shops.get(row.shopId);
+      const parts = a?.parts ?? [];
+      const partsTotal = a?.assignedBoxesTotal ?? 0;
+      const orderedBoxes = Math.max(1, Number(row.boxNo) || 0);
+      const boxesOnThisVehicle = parts
+        .filter((p) => p.tripNo === thisTripNo)
+        .reduce((sum, p) => sum + p.boxes, 0);
+      const onThisVehicle = boxesOnThisVehicle > 0 || parts.some((p) => p.tripNo === thisTripNo);
+      const remainingBoxes = Math.max(0, orderedBoxes - partsTotal);
+      const kind: PoolRow["kind"] =
+        parts.length === 0 ? "pending" : remainingBoxes > 0 && !onThisVehicle ? "partial" : "assigned";
       const item: PoolRow = {
         ...row,
         poolIndex: i,
-        kind: a ? "assigned" : "pending",
-        assignedVehicleNo: a?.vehicleNo ?? "",
-        assignedTripNo: a?.tripNo ?? "",
+        kind,
+        parts,
+        assignedElsewhere: Math.max(0, partsTotal - boxesOnThisVehicle),
+        remainingBoxes,
+        onThisVehicle,
         delivered: a?.delivered ?? false,
       };
-      // Refine filter first (cheap), then the two search terms.
-      if (poolFilter === "pending" && item.kind !== "pending") return;
+      // Refine filter first (cheap), then the two search terms. "Pending"
+      // keeps the rows that still NEED a vehicle (pending + partial balance);
+      // "Assigned" is the fully-placed ones.
+      if (poolFilter === "pending" && item.kind === "assigned") return;
       if (poolFilter === "assigned" && item.kind !== "assigned") return;
-      if (poolFilter === "this_vehicle" && item.assignedTripNo !== thisTripNo) return;
+      if (poolFilter === "this_vehicle" && !item.onThisVehicle) return;
       if (q || pq) {
         const hay =
-          `${row.shopName} ${villageOf(row.shopId, row.shopName, shopDirectory)} ${item.assignedVehicleNo} ${item.assignedTripNo}`.toLowerCase();
+          `${row.shopName} ${villageOf(row.shopId, row.shopName, shopDirectory)} ${parts.map((p) => `${p.vehicleNo} ${p.tripNo}`).join(" ")}`.toLowerCase();
         if (q && !hay.includes(q)) return;
         if (pq && !hay.includes(pq)) return;
       }
@@ -790,17 +897,19 @@ function AssignmentEditor({
       );
     } else if (sortMode === "vehicle_trip") {
       // Pending (no vehicle) first, then grouped by Vehicle No → Trip No.
+      const vehicleOf = (r: PoolRow) => r.parts[0]?.vehicleNo ?? "";
+      const tripOf = (r: PoolRow) => r.parts[0]?.tripNo ?? "";
       list.sort(
         (a, b) =>
-          a.assignedVehicleNo.localeCompare(b.assignedVehicleNo) ||
-          a.assignedTripNo.localeCompare(b.assignedTripNo) ||
+          vehicleOf(a).localeCompare(vehicleOf(b)) ||
+          tripOf(a).localeCompare(tripOf(b)) ||
           a.poolIndex - b.poolIndex
       );
     } else {
-      // Pending First: unassigned shops up top (collection order), then
-      // assigned (collection order).
+      // Pending First: shops needing a vehicle up top (collection order),
+      // then the fully-placed ones (collection order).
       list.sort((a, b) =>
-        a.kind === b.kind ? a.poolIndex - b.poolIndex : a.kind === "pending" ? -1 : 1
+        a.kind === b.kind ? a.poolIndex - b.poolIndex : a.kind === "assigned" ? 1 : -1
       );
     }
     return list;
@@ -846,7 +955,10 @@ function AssignmentEditor({
           <div className={opsTableHeaderBarClass}>
             <span className={opsSectionTitleClass}>{to("orders.vehicles_ready")}</span>
             <span className="text-[11px] font-semibold text-slate-400">
-              {eligibleVehicles.length} · {to("orders.step2_submitted_note")}
+              {to("orders.vehicles_count", {
+                pending: pendingVehicles.length,
+                saved: assignedVehicles.length,
+              })}
             </span>
           </div>
           {eligibleVehicles.length === 0 ? (
@@ -881,7 +993,16 @@ function AssignmentEditor({
                           <li key={v.trip.id}>
                             <button
                               type="button"
-                              onClick={() => setVehicleTripId(v.trip.id)}
+                              onClick={() => {
+                                // The pool filter follows the truck: a vehicle
+                                // that already carries shops opens on its
+                                // ASSIGNED shops; an empty one opens on the
+                                // PENDING pool, ready for new work.
+                                setVehicleTripId(v.trip.id);
+                                setPoolFilter(
+                                  savedShopsOn(v.trip.tripNo) > 0 ? "this_vehicle" : "pending"
+                                );
+                              }}
                               aria-label={`${to("orders.assign_shops")} — ${v.trip.vehicleNo || "—"} · ${v.trip.tripNo}`}
                               aria-current={selectedCard ? "true" : undefined}
                               className={`w-full border-l-[3px] px-3.5 py-3 text-left transition-colors ${
@@ -931,9 +1052,6 @@ function AssignmentEditor({
           collected-shops pool (to assign or already assigned) plus the
           delivery sequence and the save actions. ───────────────────────── */}
       <section className="min-w-0 flex-1">
-        {!vehicle && (
-          <div className={opsEmptyStateClass}>{to("orders.select_vehicle_hint")}</div>
-        )}
 
         {/* ASSIGNMENT PANEL — the chosen truck: its facts on top, the shop
             pool and the delivery sequence in the body, and Save / WhatsApp /
@@ -954,16 +1072,6 @@ function AssignmentEditor({
                   <h3 className="truncate text-sm font-extrabold text-slate-800">
                     {to("orders.assign_shops")}
                   </h3>
-                  <p className="truncate text-[11px] font-semibold text-slate-500">
-                    {[
-                      vehicle.trip.vehicleNo,
-                      vehicle.trip.tripNo,
-                      vehicle.trip.supervisorName,
-                      vehicle.trip.driverName,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
                 </div>
               </div>
               <button
@@ -1048,7 +1156,7 @@ function AssignmentEditor({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px]">
+            <table className={`w-full min-w-[980px] ${ORDERS_TABLE_FONT_CLASS}`}>
               <thead>
                 <tr className={opsTableHeadRowClass}>
                   <th className={`${opsTableThClass} w-14`}>{to("orders.select_col")}</th>
@@ -1065,33 +1173,35 @@ function AssignmentEditor({
               <tbody className={opsTableDivideClass}>
                 {pageAvailable.map((row, index) => {
                   const checked = selectedIds.has(row.shopId);
-                  const isAssignedRow = row.kind === "assigned";
+                  const isLockedRow = row.kind === "assigned";
+                  // Two-tone rows; a checked row's emerald state colour wins.
+                  const tone = checked && !isLockedRow ? "bg-emerald-50/50" : ordersZebraTone(index);
                   return (
                     <tr
                       key={row.shopId}
-                      className={`${opsTableRowClass} ${
-                        isAssignedRow
+                      className={`${opsTableRowClass} ${tone} ${
+                        isLockedRow
                           ? "cursor-default opacity-60"
-                          : `cursor-pointer ${checked ? "bg-emerald-50/50" : ""}`
+                          : "cursor-pointer"
                       }`}
                       onClick={() => {
-                        if (!isAssignedRow) toggleShop(row, !checked);
+                        if (!isLockedRow) toggleShop(row, !checked, row.assignedElsewhere);
                       }}
                     >
                       <td className={opsTableTdClass} onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={checked}
-                          disabled={isAssignedRow}
-                          onChange={(e) => toggleShop(row, e.target.checked)}
+                          disabled={isLockedRow}
+                          onChange={(e) => toggleShop(row, e.target.checked, row.assignedElsewhere)}
                           aria-label={`${to("orders.select_col")} — ${row.shopName}`}
                           className={`h-4 w-4 accent-emerald-600 ${
-                            isAssignedRow ? "cursor-not-allowed opacity-40" : "cursor-pointer"
+                            isLockedRow ? "cursor-not-allowed opacity-40" : "cursor-pointer"
                           }`}
                         />
                       </td>
                       <td className={opsTableTdClass}>
-                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-bold text-slate-600">
+                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold text-slate-600">
                           {availableStartIndex + index + 1}
                         </span>
                       </td>
@@ -1101,10 +1211,10 @@ function AssignmentEditor({
                       <td className={opsTableTdClass}>
                         {villageOf(row.shopId, row.shopName, shopDirectory) || "—"}
                       </td>
-                      <td className={`${opsTableTdClass} text-right font-semibold`}>
+                      <td className={`${opsTableTdClass} text-right font-medium`}>
                         {formatCount(Number(row.birds) || 0)}
                       </td>
-                      <td className={`${opsTableTdClass} text-right font-bold text-emerald-800`}>
+                      <td className={`${opsTableTdClass} text-right font-semibold text-emerald-800`}>
                         {formatCount(Math.max(1, Number(row.boxNo) || 0))}
                       </td>
                       <td className={`${opsTableTdClass} text-right text-slate-500`}>
@@ -1113,28 +1223,47 @@ function AssignmentEditor({
                           : "—"}
                       </td>
                       <td className={`${opsTableTdClass} whitespace-nowrap`}>
-                        {isAssignedRow ? (
-                          <span className="text-slate-600">
-                            {row.assignedVehicleNo || "—"}
-                            {row.assignedTripNo ? ` · ${row.assignedTripNo}` : ""}
+                        {row.parts.length > 0 ? (
+                          <span
+                            className="text-slate-600"
+                            title={row.parts
+                              .map((p) => `${p.vehicleNo || "—"} · ${p.tripNo} (${formatCount(p.boxes)})`)
+                              .join(", ")}
+                          >
+                            {row.parts[0].vehicleNo || "—"}
+                            {row.parts[0].tripNo ? ` · ${row.parts[0].tripNo}` : ""}
+                            {row.parts.length > 1 && (
+                              <span className="ml-1 text-slate-400">+{row.parts.length - 1}</span>
+                            )}
                           </span>
                         ) : (
                           <span className="text-slate-300">—</span>
                         )}
                       </td>
                       <td className={opsTableTdClass}>
-                        {isAssignedRow ? (
+                        {row.kind === "assigned" ? (
+                          // The shop's order is fully placed on a vehicle (or
+                          // delivered) — show the vehicle it belongs to.
                           row.delivered ? (
                             <OrdersStatusBadge status="Delivered" label={to("orders.status_delivered")} />
                           ) : (
                             <OrdersStatusBadge status="Assigned" label={to("orders.col_assigned")} />
                           )
-                        ) : checked ? (
-                          <OrdersStatusBadge status="Assigned" label={to("orders.col_assigned")} />
+                        ) : row.kind === "partial" ? (
+                          // SPLIT ORDER: some boxes are on other trucks — only
+                          // the balance is still assignable.
+                          <OrdersStatusBadge
+                            status="Part Assigned"
+                            label={`${to("orders.status_part_assigned")} · ${to("orders.part_assign_left", { boxes: row.remainingBoxes })}`}
+                          />
                         ) : (
-                          <span className="text-[11px] font-semibold text-emerald-600">
-                            {to("orders.available")}
-                          </span>
+                          // Waiting for a vehicle — NOT assignable-yet-saved;
+                          // ticking it keeps this "Pending for Assign" state
+                          // until Save Progress / Finish persists it.
+                          <OrdersStatusBadge
+                            status="Pending for Assign"
+                            label={to("orders.status_pending_assign")}
+                          />
                         )}
                       </td>
                     </tr>
@@ -1235,7 +1364,7 @@ function AssignmentEditor({
                 {to("orders.drag_hint")}
               </div>
               <div className="max-h-80 overflow-y-auto">
-                <table className="w-full min-w-[900px]">
+                <table className={`w-full min-w-[900px] ${ORDERS_TABLE_FONT_CLASS}`}>
                   <thead>
                     <tr className={opsTableHeadRowClass}>
                       <th className={`${opsTableThClass} w-20`}>{to("orders.col_sequence")}</th>
@@ -1287,11 +1416,9 @@ function AssignmentEditor({
                             setDropIndex(null);
                           }}
                           className={`${opsTableRowClass} align-middle ${
-                            lifted ? "opacity-40" : ""
-                          } ${
-                            isDropTarget
-                              ? "border-t-2 border-t-emerald-500 bg-emerald-50/50"
-                              : ""
+                            isDropTarget ? "bg-emerald-50/50" : ordersZebraTone(index)
+                          } ${lifted ? "opacity-40" : ""} ${
+                            isDropTarget ? "border-t-2 border-t-emerald-500" : ""
                           }`}
                         >
                           <td className={opsTableTdClass}>
@@ -1302,7 +1429,7 @@ function AssignmentEditor({
                                 aria-label={to("orders.drag_handle")}
                                 className="shrink-0 cursor-grab text-slate-300 active:cursor-grabbing"
                               />
-                              <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-[12px] font-bold text-emerald-700">
+                              <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-[12px] font-semibold text-emerald-700">
                                 {index + 1}
                               </span>
                               {/* ↑ ↓ step one place · ⤒ ⤓ jump to first / last */}
@@ -1352,40 +1479,51 @@ function AssignmentEditor({
                             {row.shopName || "—"}
                           </td>
                           <td className={opsTableTdClass}>{row.village || "—"}</td>
-                          <td className={`${opsTableTdClass} text-right font-semibold`}>
+                          <td className={`${opsTableTdClass} text-right font-medium`}>
                             {formatCount(row.orderedBirds)}
                           </td>
-                          <td className={`${opsTableTdClass} text-right font-bold text-emerald-800`}>
+                          <td className={`${opsTableTdClass} text-right font-semibold text-emerald-800`}>
                             {formatCount(row.orderedBoxes)}
                           </td>
                           <td className={opsTableTdClass}>
                             {/* PARTIAL ASSIGNMENT: send part of a shop's order on
                                 this truck — the balance stays pending for another
-                                vehicle. */}
+                                vehicle. The cap is the shop's REMAINING balance
+                                (ordered − boxes already on other vehicles), so
+                                splitting 40 into 20 + 20 works while 20 + 40
+                                is impossible. */}
                             <div className="flex items-center gap-2">
                               <input
                                 type="number"
                                 min={1}
-                                max={row.orderedBoxes}
+                                max={maxAssignable(row)}
                                 value={row.assigned === 0 ? "" : row.assigned}
                                 placeholder="0"
                                 aria-label={`${to("orders.assigned_boxes")} — ${row.shopName}`}
                                 onChange={(e) => setAssigned(row.clientKey, e.target.value)}
                                 onWheel={onOrdersNumberWheel}
-                                className={`${ORDERS_NO_SPINNER} h-8 w-24 rounded-lg border px-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 ${
+                                className={`${ORDERS_NO_SPINNER} h-8 w-24 rounded-lg border px-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 ${
                                   row.assigned === 0
                                     ? "border-amber-300 bg-amber-50/60 text-amber-800"
                                     : "border-emerald-300/70 bg-emerald-50/50 text-emerald-900"
                                 }`}
                               />
                               <span className="whitespace-nowrap text-[11px] font-semibold text-slate-400">
-                                / {formatCount(row.orderedBoxes)}
-                                {row.assigned > 0 && row.assigned < row.orderedBoxes && (
-                                  <b className="ml-1.5 text-amber-600">
+                                / {formatCount(maxAssignable(row))}
+                                {row.assignedElsewhere > 0 && (
+                                  <span
+                                    className="ml-1.5 text-slate-500"
+                                    title={to("orders.on_other_vehicles", { boxes: row.assignedElsewhere })}
+                                  >
+                                    ({to("orders.on_other_vehicles", { boxes: row.assignedElsewhere })})
+                                  </span>
+                                )}
+                                {row.assigned > 0 && row.assigned < maxAssignable(row) && (
+                                  <span className="ml-1.5 font-semibold text-amber-600">
                                     {to("orders.part_assign_left", {
-                                      boxes: row.orderedBoxes - row.assigned,
+                                      boxes: maxAssignable(row) - row.assigned,
                                     })}
-                                  </b>
+                                  </span>
                                 )}
                               </span>
                             </div>
@@ -1401,7 +1539,7 @@ function AssignmentEditor({
                             ) : ds === "assigned" ? (
                               <OrdersStatusBadge status="Assigned" label={to("orders.status_assigned")} />
                             ) : (
-                              <OrdersStatusBadge status="Pending" label={to("orders.status_pending")} />
+                              <OrdersStatusBadge status="Pending for Assign" label={to("orders.status_pending_assign")} />
                             )}
                           </td>
                           <td className={opsTableTdClass}>
@@ -1446,12 +1584,14 @@ function AssignmentEditor({
             )}
           </div>
           <div className="flex items-center gap-2.5">
-            {/* WhatsApp — real brand icon + green treatment (existing mechanism) */}
+            {/* WhatsApp — real brand icon + green treatment. Opens the CHECK
+                POPUP first (message text + branded sheet PDF); the send itself
+                happens on the popup's "Confirm & Send". */}
             <button
               type="button"
-              onClick={() => void handleWhatsApp()}
-              disabled={waBusy || !vehicle}
-              title={to("orders.whatsapp")}
+              onClick={() => setWaPopupOpen(true)}
+              disabled={waBusy || !vehicle || waSheetRows.length === 0}
+              title={to("orders.wa_check_title")}
               aria-label={to("orders.whatsapp")}
               className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600/40 bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -1534,6 +1674,29 @@ function AssignmentEditor({
             </div>
           </div>
         </div>
+      )}
+
+      {/* WhatsApp CHECK POPUP — preview message + branded sheet, then confirm. */}
+      {waPopupOpen && vehicle && (
+        <OrdersWhatsAppConfirmPopup
+          trip={vehicle.trip}
+          supervisorMobile={supervisorMobile}
+          orderTripNo={orderTrip.tripNo}
+          orderDate={orderTrip.tripDate}
+          rows={waSheetRows}
+          capacity={capacity}
+          alreadyAssignedOther={alreadyAssignedOther}
+          language={language}
+          t={to}
+          sending={waBusy}
+          sendProgress={waProgress}
+          onClose={() => {
+            if (waBusy) return;
+            setWaPopupOpen(false);
+            setWaProgress(null);
+          }}
+          onConfirmSend={handleWhatsAppConfirm}
+        />
       )}
     </div>
   );

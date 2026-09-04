@@ -151,6 +151,7 @@ const EN: Record<string, string> = {
   "orders.part_assign_left": "{boxes} left",
   "orders.vehicles_waiting": "Waiting for shops",
   "orders.vehicle_list_assigned": "Shops assigned",
+  "orders.vehicles_count": "{pending} pending · {saved} saved",
   "orders.boxes_short": "boxes",
   "orders.vehicle_shops_assigned": "{n} shops assigned",
   "orders.vehicle_shops_none": "No shops yet",
@@ -257,6 +258,26 @@ const EN: Record<string, string> = {
   "orders.vehicles_assigned": "{vehicles} vehicle(s) · {shops} shop(s) assigned",
   "orders.conflict_message":
     "{shops} already assigned to another vehicle for this day. Selection refreshed.",
+  // Split-order (partial assignment across vehicles) — hard balance cap.
+  "orders.status_pending_assign": "Pending for Assign",
+  "orders.status_part_assigned": "Part Assigned",
+  "orders.on_other_vehicles": "{boxes} on other vehicles",
+  "orders.over_assign_message":
+    "Not enough unassigned boxes: {shops}. Values adjusted to the remaining balance.",
+  // WhatsApp check-popup + Shop Assignment Sheet PDF.
+  "orders.wa_check_title": "WhatsApp — check the message before sending",
+  "orders.wa_message_preview": "Message preview (exactly what will be sent)",
+  "orders.wa_send_note":
+    "Sends this assignment to the supervisor on WhatsApp, one message per shop with its delivery PDF.",
+  "orders.wa_confirm_send": "Confirm & Send",
+  "orders.wa_send_to": "Send to",
+  "orders.assignment_sheet_title": "Shop Assignment Sheet",
+  "orders.assignment_details": "ASSIGNMENT DETAILS",
+  "orders.col_assigned_boxes": "Assigned Boxes",
+  "orders.est_weight": "Est. Weight",
+  "orders.shops_to_deliver": "SHOPS TO DELIVER (IN ORDER)",
+  "orders.assignment_sheet_sub": "{shops} shops · {boxes} boxes",
+  "orders.sequence_empty": "No shops selected",
 
   // Differences
   "orders.col_difference": "Difference",
@@ -493,6 +514,7 @@ const TE: Record<string, string> = {
   "orders.part_assign_left": "{boxes} మిగిలి ఉన్నాయి",
   "orders.vehicles_waiting": "షాప్‌ల కోసం వేచి ఉన్నవి",
   "orders.vehicle_list_assigned": "షాప్‌లు కేటాయించబడ్డాయి",
+  "orders.vehicles_count": "{pending} పెండింగ్ · {saved} సేవ్",
   "orders.boxes_short": "బాక్స్‌లు",
   "orders.vehicle_shops_assigned": "{n} షాప్‌లు కేటాయించబడ్డాయి",
   "orders.vehicle_shops_none": "ఇంకా షాప్‌లు లేవు",
@@ -597,6 +619,26 @@ const TE: Record<string, string> = {
   "orders.vehicles_assigned": "{vehicles} వాహనాలు · {shops} షాపులు కేటాయించబడ్డాయి",
   "orders.conflict_message":
     "{shops} ఇప్పటికే ఈ రోజుకి వేరే వాహనానికి కేటాయించబడ్డాయి. ఎంపిక పునరుద్ధరించబడింది.",
+  // స్ప్లిట్ ఆర్డర్ (వాహనాల మధ్య పాక్షిక కేటాయింపు) — హార్డ్ బ్యాలెన్స్ క్యాప్.
+  "orders.status_pending_assign": "కేటాయింపు పెండింగ్‌లో",
+  "orders.status_part_assigned": "పాక్షికంగా కేటాయించబడింది",
+  "orders.on_other_vehicles": "{boxes} ఇతర వాహనాలపై",
+  "orders.over_assign_message":
+    "కేటాయించని బాక్స్‌లు సరిపోవు: {shops}. విలువలు మిగిలిన బ్యాలెన్స్‌కు సరిచేయబడ్డాయి.",
+  // వాట్సాప్ చెక్-పాప్‌అప్ + షాప్ అసైన్‌మెంట్ షీట్ PDF.
+  "orders.wa_check_title": "వాట్సాప్ — పంపే ముందు సందేశాన్ని తనిఖీ చేయండి",
+  "orders.wa_message_preview": "సందేశం మునుజూపు (ఇదే సందేశం పంపబడుతుంది)",
+  "orders.wa_send_note":
+    "ఈ కేటాయింపును సూపర్‌వైజర్‌కు వాట్సాప్‌లో పంపుతుంది — ప్రతి షాప్‌కు ఒక సందేశం, దాని డెలివరీ PDFతో.",
+  "orders.wa_confirm_send": "నిర్ధారించి పంపండి",
+  "orders.wa_send_to": "పంపాల్సిన నంబర్",
+  "orders.assignment_sheet_title": "షాప్ అసైన్‌మెంట్ షీట్",
+  "orders.assignment_details": "కేటాయింపు వివరాలు",
+  "orders.col_assigned_boxes": "కేటాయించిన బాక్స్‌లు",
+  "orders.est_weight": "అంచనా బరువు",
+  "orders.shops_to_deliver": "డెలివరీ చేయాల్సిన షాప్‌లు (క్రమంలో)",
+  "orders.assignment_sheet_sub": "{shops} షాప్‌లు · {boxes} బాక్స్‌లు",
+  "orders.sequence_empty": "షాప్‌లు ఎంపిక చేయలేదు",
 
   // Differences
   "orders.col_difference": "వ్యత్యాసం",

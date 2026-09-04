@@ -37,7 +37,6 @@ import {
   opsTableHeadRowClass,
   opsTableTdClass,
   opsTableThClass,
-  opsTableRowClass,
 } from "../../../../shared/ui/operationsStyles";
 import TripPagination from "../../vehicle-trips/components/TripPagination";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
@@ -61,6 +60,10 @@ import {
 } from "../ordersService";
 import { useOrdersI18n } from "../i18n/ordersI18n";
 import type { OrderShopRow, OrdersDayCollection } from "../types";
+import {
+  ORDERS_TABLE_FONT_CLASS,
+  ordersTableZebraRow,
+} from "../ordersTableStyles";
 import {
   ORDERS_NO_SPINNER,
   OrdersDateControl,
@@ -643,7 +646,7 @@ function CollectionEntries({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1060px] text-xs md:text-sm">
+          <table className={`w-full min-w-[1060px] ${ORDERS_TABLE_FONT_CLASS}`}>
             <thead>
               <tr className={opsTableHeadRowClass}>
                 <th className={`${opsTableThClass} w-16`}>{to("orders.col_sno")}</th>
@@ -703,9 +706,25 @@ function CollectionEntries({
                         <OrdersStatusBadge status="Delivered" label={to("orders.status_delivered")} />
                       </span>
                     );
+                  } else if (
+                    // SPLIT still open: part of the order is on vehicles, the
+                    // balance is still waiting for another truck.
+                    assignment.assignedBoxesTotal < assignment.boxes
+                  ) {
+                    const pendingAssign = assignment.boxes - assignment.assignedBoxesTotal;
+                    statusNode = (
+                      <span
+                        title={`${assignment.tripNo} · ${assignment.vehicleNo} · ${to("orders.seq_n", { n: assignment.sequence })}`}
+                      >
+                        <OrdersStatusBadge
+                          status="Part Assigned"
+                          label={`${to("orders.status_part_assigned")} · ${pendingAssign} ${to("orders.word_boxes")}`}
+                        />
+                      </span>
+                    );
                   } else {
-                    // Compact indicator only — sequence lives on hover;
-                    // details belong to Tab 2 / Tab 3.
+                    // Fully placed on vehicles — this is the ONLY case that
+                    // reads "Assigned"; everything else reads pending/part.
                     statusNode = (
                       <span
                         title={`${assignment.tripNo} · ${assignment.vehicleNo} · ${to("orders.seq_n", { n: assignment.sequence })}`}
@@ -717,9 +736,9 @@ function CollectionEntries({
                 }
 
                 return (
-                  <tr key={shop.id} className={`${opsTableRowClass} align-middle`}>
+                  <tr key={shop.id} className={ordersTableZebraRow(index, "align-middle")}>
                     <td className={opsTableTdClass}>
-                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-bold text-slate-600">
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold text-slate-600">
                         {startIndex + index + 1}
                       </span>
                     </td>
@@ -739,10 +758,10 @@ function CollectionEntries({
                           aria-label={`${to("orders.col_birds")} — ${shop.shopName}`}
                           onChange={(e) => updateEntry(shop.id, "birds", e.target.value)}
                           onWheel={onOrdersNumberWheel}
-                          className={`${ORDERS_NO_SPINNER} h-8 w-full rounded-lg border border-emerald-300/70 bg-emerald-50/50 px-2 text-sm font-bold text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
+                          className={`${ORDERS_NO_SPINNER} h-8 w-full rounded-lg border border-emerald-300/70 bg-emerald-50/50 px-2 text-sm font-medium text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
                         />
                       ) : (
-                        <span className="font-bold text-slate-700">{hasEntry ? birds : "—"}</span>
+                        <span className="font-medium text-slate-700">{hasEntry ? birds : "—"}</span>
                       )}
                     </td>
                     <td className={opsTableTdClass}>
@@ -755,15 +774,15 @@ function CollectionEntries({
                           aria-label={`${to("orders.col_boxes")} — ${shop.shopName}`}
                           onChange={(e) => updateEntry(shop.id, "boxes", e.target.value)}
                           onWheel={onOrdersNumberWheel}
-                          className={`${ORDERS_NO_SPINNER} h-8 w-full rounded-lg border border-emerald-300/70 bg-emerald-50/50 px-2 text-sm font-bold text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
+                          className={`${ORDERS_NO_SPINNER} h-8 w-full rounded-lg border border-emerald-300/70 bg-emerald-50/50 px-2 text-sm font-medium text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
                         />
                       ) : (
-                        <span className="font-bold text-slate-700">{hasEntry ? boxes : "—"}</span>
+                        <span className="font-medium text-slate-700">{hasEntry ? boxes : "—"}</span>
                       )}
                     </td>
                     <td className={`${opsTableTdClass} text-right`}>
                       {assignment && assignment.avgBirdWeight > 0 && birds > 0 ? (
-                        <span className="font-semibold text-slate-600">
+                        <span className="font-medium text-slate-600">
                           {formatKg(weightForBirds(birds, assignment.avgBirdWeight))}
                         </span>
                       ) : (
@@ -778,7 +797,7 @@ function CollectionEntries({
                     <td className={opsTableTdClass}>
                       {assignment ? (
                         <span
-                          className={`font-bold ${assignment.delivered ? "text-emerald-600" : "text-slate-700"}`}
+                          className={`font-semibold ${assignment.delivered ? "text-emerald-600" : "text-slate-700"}`}
                           title={assignment.delivered ? to("orders.status_delivered") : to("orders.status_assigned")}
                         >
                           {assignment.tripNo}
