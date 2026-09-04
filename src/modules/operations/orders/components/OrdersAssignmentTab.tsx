@@ -21,12 +21,12 @@
 // Capacity is a HARD BLOCK with the exact numbers (Capacity / Already
 // Assigned / Available / Requested). No invalid state is ever saved.
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
-  ChevronRight,
+  PackageCheck,
   ChevronsDown,
   ChevronsUp,
   GripVertical,
@@ -535,6 +535,30 @@ function AssignmentEditor({
   const available = vehicle ? Math.max(0, capacity - alreadyAssignedOther) : 0;
   // Order rows already persisted on THIS vehicle (earlier partial saves).
   // They let the operator dispatch the truck with an empty selection.
+  // The assignment sheet is a modal — Escape closes it, like every other sheet.
+  useEffect(() => {
+    if (vehicleTripId == null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setVehicleTripId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [vehicleTripId]);
+
+  /** Shops already saved on a truck — shown in the vehicle list. */
+  const savedShopsByTripNo = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const a of collection.shops.values()) {
+      if (!a?.tripNo) continue;
+      counts.set(a.tripNo, (counts.get(a.tripNo) ?? 0) + 1);
+    }
+    return counts;
+  }, [collection]);
+  const savedShopsOn = useCallback(
+    (tripNo: string): number => savedShopsByTripNo.get(tripNo) ?? 0,
+    [savedShopsByTripNo]
+  );
+
   const savedOnVehicle = useMemo(
     () =>
       vehicle
@@ -600,7 +624,7 @@ function AssignmentEditor({
       await saveAssignment(vehicle.trip, [
         { orderTripNo: orderTrip.tripNo, rows: toOrderShopRows(selected) },
       ]);
-      setSavedSnapshot(selectionSnapshot(null, []));
+      setSavedSnapshot(selectionSnapshot(vehicleTripId, []));
       setSelected([]);
       showNotification(to("orders.assignment_saved"), "success");
       onChanged();
@@ -837,20 +861,21 @@ function AssignmentEditor({
           <table className="w-full min-w-[980px] text-xs md:text-sm">
             <thead>
               <tr className={opsTableHeadRowClass}>
-                <th className={`${opsTableThClass} w-12`} />
                 <th className={`${opsTableThClass} w-40`}>{to("orders.col_trip_no")}</th>
                 <th className={`${opsTableThClass} w-36`}>{to("orders.vehicle_no")}</th>
                 <th className={`${opsTableThClass} w-32`}>{to("orders.supervisor_mobile")}</th>
                 <th className={`${opsTableThClass} w-40`}>{to("orders.supervisor")}</th>
                 <th className={opsTableThClass}>{to("orders.farm_city")}</th>
-                <th className={`${opsTableThClass} w-36 text-right`}>
+                <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_shops")}</th>
+                <th className={`${opsTableThClass} w-40 text-right`}>
                   {to("orders.vehicle_box_capacity")}
                 </th>
+                <th className={`${opsTableThClass} w-36 text-right`}>{to("orders.col_available")}</th>
+                <th className={`${opsTableThClass} w-40 text-right`}>{to("orders.col_action")}</th>
               </tr>
             </thead>
             <tbody className={opsTableDivideClass}>
               {eligibleVehicles.map((v) => {
-                const open = vehicleTripId === v.trip.id;
                 const mobile = supervisorMobileOf(v.trip, supervisorDirectory);
                 const farmFull = `${v.trip.sourceFarm || "—"}${
                   v.trip.farmAddress ? ` · ${v.trip.farmAddress}` : ""
@@ -861,24 +886,8 @@ function AssignmentEditor({
                 return (
                   <tr
                     key={v.trip.id}
-                    className={`${opsTableRowClass} ${open ? "bg-emerald-50/70" : ""}`}
+                    className={opsTableRowClass}
                   >
-                    <td className={opsTableTdClass}>
-                      {/* › opens this vehicle's shop-assignment panel */}
-                      <button
-                        type="button"
-                        onClick={() => setVehicleTripId(open ? null : v.trip.id)}
-                        aria-expanded={open}
-                        aria-label={`${to("orders.assign_to_vehicle")} — ${v.trip.vehicleNo || v.trip.tripNo}`}
-                        title={to("orders.assign_to_vehicle")}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-emerald-300 hover:text-emerald-700"
-                      >
-                        <ChevronRight
-                          size={15}
-                          className={open ? "rotate-90 text-emerald-600" : ""}
-                        />
-                      </button>
-                    </td>
                     <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
                       {v.trip.tripNo || "—"}
                     </td>
@@ -890,8 +899,35 @@ function AssignmentEditor({
                     <td className={`${opsTableTdClass} font-semibold text-slate-700 whitespace-nowrap`} title={farmFull}>
                       {city}
                     </td>
+                    <td className={`${opsTableTdClass} text-right`}>
+                      <span className="inline-flex h-7 min-w-[28px] items-center justify-center rounded-lg bg-slate-100 px-1.5 text-[12px] font-bold text-slate-600">
+                        {savedShopsOn(v.trip.tripNo)}
+                      </span>
+                    </td>
                     <td className={`${opsTableTdClass} text-right font-bold text-slate-800`}>
                       {formatCount(v.capacity)}
+                    </td>
+                    <td className={`${opsTableTdClass} text-right`}>
+                      <span className="inline-flex flex-col items-end leading-tight">
+                        <b className="text-slate-800">{formatCount(v.available)}</b>
+                        {v.alreadyAssigned > 0 && (
+                          <span className="text-[10px] font-semibold text-slate-400">
+                            {formatCount(v.alreadyAssigned)} {to("orders.col_assigned")}
+                          </span>
+                        )}
+                      </span>
+                    </td>
+                    <td className={`${opsTableTdClass} text-right`}>
+                      {/* Opens the assignment sheet for THIS truck. */}
+                      <button
+                        type="button"
+                        onClick={() => setVehicleTripId(v.trip.id)}
+                        aria-label={`${to("orders.assign_shops")} — ${v.trip.vehicleNo || v.trip.tripNo}`}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600/40 bg-emerald-500 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-colors hover:bg-emerald-600"
+                      >
+                        <PackageCheck size={14} />
+                        {to("orders.assign_shops")}
+                      </button>
                     </td>
                   </tr>
                 );
@@ -909,8 +945,71 @@ function AssignmentEditor({
         </p>
       )}
 
+      {/* ASSIGNMENT SHEET — one clean modal per truck: the vehicle's facts on
+          top, the shop pool and the delivery sequence in the body, and
+          Save / WhatsApp / Submit in the footer. */}
       {vehicle && (
-        <>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${to("orders.assign_shops")} — ${vehicle.trip.vehicleNo || vehicle.trip.tripNo}`}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-3"
+        >
+          <div className="flex h-full w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            {/* ── Header ── */}
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="rounded-lg bg-emerald-100 p-1.5 text-emerald-600">
+                  <PackageCheck size={17} />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="truncate text-sm font-extrabold text-slate-800">
+                    {to("orders.assign_shops")}
+                  </h3>
+                  <p className="truncate text-[11px] font-semibold text-slate-500">
+                    {[
+                      vehicle.trip.vehicleNo,
+                      vehicle.trip.tripNo,
+                      vehicle.trip.supervisorName,
+                      vehicle.trip.driverName,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVehicleTripId(null)}
+                aria-label={to("orders.close")}
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            {/* ── The truck's facts, all in one strip ── */}
+            <div className="grid grid-cols-2 gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-2.5 sm:grid-cols-4 lg:grid-cols-7">
+              {[
+                [to("orders.col_trip_no"), vehicle.trip.tripNo || "—"],
+                [to("orders.vehicle_no"), vehicle.trip.vehicleNo || "—"],
+                [to("orders.supervisor"), vehicle.trip.supervisorName || "—"],
+                [to("orders.supervisor_mobile"), supervisorMobileOf(vehicle.trip, supervisorDirectory) || "—"],
+                [to("orders.farm_city"), farmCityOf(vehicle.trip)],
+                [to("orders.vehicle_box_capacity"), formatCount(capacity)],
+                [to("orders.col_available"), formatCount(available)],
+              ].map(([label, value]) => (
+                <div key={label} className="min-w-0 rounded-lg border border-slate-200/80 bg-white px-2 py-1.5">
+                  <p className="text-[9px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
+                  <p className="truncate text-[11px] font-bold text-slate-800" title={String(value)}>
+                    {value}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* ── Body: shop pool + delivery sequence ── */}
+            <div className="min-h-0 flex-1 overflow-y-auto">
       {/* 1 — Day pool: pending + assigned collected shops (select
           pending shops one by one; assigned rows are visible, locked) */}
       <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/70 flex items-center gap-2.5 flex-wrap">
@@ -1069,6 +1168,16 @@ function AssignmentEditor({
       )}
 
       {/* 2 — Selected shops → select vehicle → sequence & boxes */}
+      {selected.length === 0 && (
+        <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            {to("orders.selected_shops")}: <b>0</b>
+          </p>
+          <p className="mt-1 text-[11px] font-semibold text-slate-400">
+            {to("orders.sequence_empty_hint")}
+          </p>
+        </div>
+      )}
       {selected.length > 0 && (
         <>
           <div className="border-t border-slate-200 bg-emerald-50/60 px-4 py-2.5 flex items-center gap-3 flex-wrap">
@@ -1348,13 +1457,10 @@ function AssignmentEditor({
         </>
       )}
 
-        </>
-      )}
+            </div>
 
-      {/* 3 — Actions (available while a vehicle is open, so a partially
-          saved truck can still be dispatched with an empty selection) */}
-      {vehicle && (
-        <div className="border-t border-slate-200 bg-slate-50/70 px-5 py-3.5 flex items-center justify-between flex-wrap gap-3">
+            {/* ── Footer: the message, then the actions ── */}
+            <div className="border-t border-slate-200 bg-slate-50/70 px-5 py-3.5 flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
             {isDirty && (
               <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
@@ -1406,6 +1512,8 @@ function AssignmentEditor({
               )}
               {finishing ? to("orders.submitting") : to("orders.finish_assignment")}
             </button>
+          </div>
+        </div>
           </div>
         </div>
       )}
