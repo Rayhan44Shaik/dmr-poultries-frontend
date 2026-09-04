@@ -7,21 +7,14 @@
 
 import React, { useEffect, useId, useRef, useState } from "react";
 import {
-  AlertCircle,
   AlertTriangle,
   Check,
-  CheckCircle,
   ChevronDown,
-  ClipboardList,
-  Clock,
   CloudOff,
   Inbox,
   Lock,
-  Package,
   RefreshCw,
   Search,
-  Store,
-  Truck,
   X,
 } from "lucide-react";
 import {
@@ -29,10 +22,25 @@ import {
   opsPrimaryButtonClass,
 } from "../../../../shared/ui/operationsStyles";
 import { DatePicker } from "../../../../components/common/DatePicker";
-import TripPagination from "../../vehicle-trips/components/TripPagination";
-import { addLocalDays } from "../ordersUtils";
+import { addLocalDays, formatCollectionDeadline, isCollectionAutoClosed } from "../ordersUtils";
 import type { OrdersT } from "../i18n/ordersI18n";
-import { ORDERS_DEFAULT_PAGE_SIZE, ORDERS_PAGE_SIZES } from "./ordersUiConstants";
+
+// ─── Numeric fields (module-wide behaviour) ──────────────────────────────────
+
+/**
+ * Orders' quantity fields show NO native up/down spinner and never react to
+ * the mouse wheel: a wheel scroll over a focused field blurs it instead of
+ * stepping the value, so birds / boxes / assigned-boxes quantities can never
+ * be changed by accident while scrolling the table.
+ *
+ * `.no-spinner` (src/index.css) hides the browser's spinner arrows; the wheel
+ * handler is attached to every numeric input in the module.
+ */
+export const ORDERS_NO_SPINNER = "no-spinner";
+
+export function onOrdersNumberWheel(event: React.WheelEvent<HTMLInputElement>): void {
+  event.currentTarget.blur();
+}
 
 // ─── Status badge ────────────────────────────────────────────────────────────
 
@@ -47,10 +55,10 @@ const STATUS_TONES: Record<string, string> = {
   "Awaiting assignment": "bg-sky-50 text-sky-700 border-sky-200",
   "Partial assignment": "bg-amber-50 text-amber-700 border-amber-200",
   "Delivered with Difference": "bg-amber-50 text-amber-700 border-amber-300",
+  "Part Delivered": "bg-amber-50 text-amber-700 border-amber-300",
   "Not Assigned": "bg-slate-100 text-slate-500 border-slate-200",
   "Not Collected": "bg-slate-100 text-slate-500 border-slate-200",
   Collected: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  "Auto Completed": "bg-emerald-50 text-emerald-700 border-emerald-200",
   Complete: "bg-emerald-50 text-emerald-700 border-emerald-200",
   Closed: "bg-slate-200 text-slate-600 border-slate-300",
   Locked: "bg-slate-200 text-slate-600 border-slate-300",
@@ -242,18 +250,23 @@ export function OrdersDateControl({
   onDaySelect,
   t,
   className = "",
-  daysBack = 6,
+  hideDayChip = false,
 }: {
   day: string;
   today: string;
   onDaySelect: (day: string) => void;
-  t: (key: string) => string;
+  /** Orders translator — params are needed for the auto-close deadline. */
+  t: OrdersT;
   className?: string;
-  /** How far back the calendar may go (Delivery Tracking looks further). */
-  daysBack?: number;
+  /**
+   * Order Collection shows the day state (TODAY / CLOSED) beside its
+   * shops · boxes · birds summary instead, so it hides the chip here to keep
+   * one marker per row.
+   */
+  hideDayChip?: boolean;
 }) {
   if (!day || !today) return null;
-  const minDate = addLocalDays(today, -Math.max(0, daysBack));
+  const minDate = addLocalDays(today, -6);
   return (
     <div className={`inline-flex items-center gap-2 ${className}`}>
       <DatePicker
@@ -273,14 +286,14 @@ export function OrdersDateControl({
         className="w-44"
         data-testid="orders-date-picker"
       />
-      {day === today ? (
+      {hideDayChip ? null : day === today ? (
         <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold tracking-wide text-emerald-700 whitespace-nowrap">
           {t("orders.today_chip")}
         </span>
-      ) : day < today ? (
+      ) : isCollectionAutoClosed(day) ? (
         <span
-          className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2 py-0.5 text-[10px] font-bold text-slate-500 whitespace-nowrap"
-          title={t("orders.read_only_note")}
+          className="inline-flex items-center gap-1 rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-bold text-rose-700 whitespace-nowrap"
+          title={t("orders.auto_closed_note", { deadline: formatCollectionDeadline(day) })}
         >
           <Lock size={10} />
           {t("orders.closed_day")}
@@ -463,234 +476,3 @@ export function OrdersDropdown({
 }
 
 export type { OrdersT };
-
-// ─── Table-level pagination bar (10 rows default + rows-per-page) ──────────
-
-/**
- * ONE pagination bar for every Orders table: total count, rows-per-page and
- * the shared Previous / page-numbers / Next control. The numbers come from
- * the SERVER-side page envelope (`total`, `page`, `totalPages`), so a page
- * change never re-slices a partially loaded dataset.
- */
-export function OrdersPagination({
-  page,
-  totalPages,
-  total,
-  pageSize,
-  onPageChange,
-  onPageSizeChange,
-  t,
-}: {
-  page: number;
-  totalPages: number;
-  total: number;
-  pageSize: number;
-  onPageChange: (page: number) => void;
-  onPageSizeChange: (size: number) => void;
-  t: (key: string, params?: Record<string, string | number>) => string;
-}) {
-  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const to = Math.min(total, page * pageSize);
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-2.5">
-      <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap">
-          {t("orders.pagination_range", { from, to, total })}
-        </span>
-        <OrdersDropdown
-          value={String(pageSize)}
-          onChange={(v) => onPageSizeChange(Number(v) || ORDERS_DEFAULT_PAGE_SIZE)}
-          options={ORDERS_PAGE_SIZES.map((size) => ({
-            value: String(size),
-            label: t("orders.rows_per_page", { size }),
-          }))}
-          ariaLabel={t("orders.rows_per_page_label")}
-          widthClass="w-36"
-        />
-      </div>
-      <TripPagination
-        currentPage={page}
-        totalPages={Math.max(1, totalPages)}
-        onPageChange={onPageChange}
-        hidePageInfo
-      />
-    </div>
-  );
-}
-
-// ─── Quantity summary strip (real backend figures, never hard-coded) ───────
-
-export type OrdersSummaryMetric = {
-  key: string;
-  label: string;
-  value: number | string;
-  tone?: "slate" | "emerald" | "amber" | "sky" | "rose" | "indigo";
-};
-
-/**
- * Compact metric strip above the table. Values come straight from the
- * server-side `summary` envelope (the FILTERED dataset, not the page), so
- * "how many boxes are required / loaded / pending / delivered" is always the
- * real persisted figure.
- */
-const SUMMARY_ICON_TONES: Record<string, string> = {
-  slate: "bg-slate-100 text-slate-600 border-slate-200",
-  emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  amber: "bg-amber-50 text-amber-600 border-amber-100",
-  sky: "bg-sky-50 text-sky-600 border-sky-100",
-  rose: "bg-rose-50 text-rose-600 border-rose-100",
-  indigo: "bg-indigo-50 text-indigo-600 border-indigo-100",
-};
-
-const SUMMARY_ICONS: Record<string, React.ReactNode> = {
-  shops: <Store size={16} />,
-  shopsWithOrders: <ClipboardList size={16} />,
-  required: <Package size={16} />,
-  loaded: <Truck size={16} />,
-  pending: <Clock size={16} />,
-  delivered: <CheckCircle size={16} />,
-  remaining: <AlertCircle size={16} />,
-};
-
-export function OrdersSummaryStrip({ metrics }: { metrics: OrdersSummaryMetric[] }) {
-  const tones: Record<string, string> = {
-    slate: "text-slate-700",
-    emerald: "text-emerald-700",
-    amber: "text-amber-700",
-    sky: "text-sky-700",
-    rose: "text-rose-700",
-    indigo: "text-indigo-700",
-  };
-  return (
-    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-      {metrics.map((metric) => (
-        <div
-          key={metric.key}
-          className="flex min-w-0 items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm"
-        >
-          <div
-            className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border ${
-              SUMMARY_ICON_TONES[metric.tone ?? "slate"]
-            }`}
-          >
-            {SUMMARY_ICONS[metric.key] ?? <Package size={16} />}
-          </div>
-          <div className="min-w-0">
-            <div className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-              {metric.label}
-            </div>
-            <div className={`truncate text-lg font-extrabold leading-tight tabular-nums ${tones[metric.tone ?? "slate"]}`}>
-              {metric.value}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Professional tab header ───────────────────────────────────────────────
-
-export type OrdersTabDef = {
-  key: string;
-  label: string;
-  icon: React.ReactNode;
-};
-
-/**
- * ERP-style module header: ONE full-width header box containing the three
- * Orders tabs as a segmented strip, with a subtle light-green brand
- * background and the existing DMR brand mark. The ACTIVE tab is a raised
- * white box with a green accent; inactive tabs stay quiet and neutral. There
- * is no separate page-level "Orders" heading — the tabs ARE the module header.
- * A small intentional gap, hover state, and a visible focus ring keep it a
- * single professional navigation component. Horizontally scrollable (never
- * wrapped) on narrow screens.
- */
-export function OrdersTabHeader({
-  tabs,
-  activeKey,
-  onSelect,
-  ariaLabel,
-}: {
-  tabs: OrdersTabDef[];
-  activeKey: string;
-  onSelect: (key: string) => void;
-  ariaLabel: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
-      <div className="flex items-center gap-2 overflow-x-auto" role="tablist" aria-label={ariaLabel}>
-        <div className="flex items-center gap-1.5">
-          {tabs.map((tab) => {
-            const active = tab.key === activeKey;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => onSelect(tab.key)}
-                className={`inline-flex h-9 flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-4 text-[12px] font-semibold tracking-tight outline-none transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-inset md:px-5 md:text-[13px] ${
-                  active
-                    ? "border border-emerald-200 bg-emerald-50 text-emerald-800 shadow-sm"
-                    : "border border-transparent bg-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-800"
-                }`}
-              >
-                <span className={active ? "text-emerald-600" : "text-slate-400"}>{tab.icon}</span>
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Filled Only toggle (collection working-sheet filter) ───────────────────
-
-/**
- * Compact switch that filters the Collection sheet to shops with entered
- * data. OFF by default (the sheet shows every active shop). Server-driven:
- * the parent passes the value straight into the /orders query.
- */
-export function OrdersFilledOnlyToggle({
-  checked,
-  onChange,
-  label,
-  ariaLabel,
-}: {
-  checked: boolean;
-  onChange: (next: boolean) => void;
-  label: string;
-  ariaLabel: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={ariaLabel}
-      onClick={() => onChange(!checked)}
-      className={`inline-flex h-9 flex-shrink-0 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${
-        checked
-          ? "border-emerald-300 bg-emerald-50/70 text-emerald-700"
-          : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-      }`}
-    >
-      <span
-        className={`relative inline-flex h-4 w-7 flex-shrink-0 items-center rounded-full transition-colors ${
-          checked ? "bg-emerald-500" : "bg-slate-300"
-        }`}
-      >
-        <span
-          className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
-            checked ? "translate-x-3" : "translate-x-0.5"
-          }`}
-        />
-      </span>
-      {label}
-    </button>
-  );
-}

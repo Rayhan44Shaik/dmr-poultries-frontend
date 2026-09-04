@@ -20,7 +20,7 @@
 //   the VISIBLE rows and never mix ordered vs delivered quantities).
 
 import React, { useMemo, useState } from "react";
-import { FileText, X } from "lucide-react";
+import { Check, FileText, Loader2, Truck, X } from "lucide-react";
 import {
   opsTableCardClass,
   opsTableDivideClass,
@@ -35,17 +35,26 @@ import {
   formatCount,
   formatDeliveredAtLabel,
   rowsInSequence,
+  shopRemainingBoxes,
   type ShopDeliveryBreakdown,
 } from "../ordersUtils";
-import { cityOf, shopMobileOf, type ShopDirectory } from "../ordersService";
-import { useOrdersI18n } from "../i18n/ordersI18n";
-import type { OrdersTrip } from "../types";
 import {
+  shopMobileOf,
+  villageOf,
+  type OrdersWhatsAppResult,
+  type ShopDirectory,
+} from "../ordersService";
+import { useOrdersI18n, type OrdersT } from "../i18n/ordersI18n";
+import type { OrdersTrip } from "../types";
+import OrdersPdfPreview from "./OrdersPdfPreview";
+import {
+  ORDERS_NO_SPINNER,
   OrdersDropdown,
   OrdersIconButton,
   OrdersSearchInput,
   OrdersStatusBadge,
   WhatsAppIcon,
+  onOrdersNumberWheel,
 } from "./OrdersCommon";
 
 const PAGE_SIZE = 10;
@@ -57,13 +66,23 @@ type Props = {
   pdfBusy: boolean;
   whatsappBusy: boolean;
   onClose: () => void;
-  onPdf: () => void;
-  onWhatsApp: () => void;
+  /** Sends the report; resolves with the per-shop outcome for the popup. */
+  onWhatsApp: () => Promise<OrdersWhatsAppResult | null>;
+  /**
+   * Record one shop's delivery (Step 4) — partial allowed. Resolves after the
+   * page refetched, so the report re-derives from persisted data.
+   */
+  onRecordDelivery: (shop: ShopDeliveryBreakdown, boxes: number) => Promise<void>;
+  /** Save Progress from the check popup — error message, or null. */
+  onSaveProgress: () => Promise<string | null>;
+  /** Submit the delivery trip from the check popup — error message, or null. */
+  onSubmitTrip: () => Promise<string | null>;
 };
 
 type ReportStatusFilter =
   | "all"
   | "delivered"
+  | "part_delivered"
   | "delivered_with_diff"
   | "not_delivered"
   | "not_listed";
@@ -94,10 +113,16 @@ function WeightDiffCell({ value, show }: { value: number; show: boolean }) {
 }
 
 /** Delivery Status cell for the report. */
-function DeliveryStatusCell({ row, to }: { row: ShopDeliveryBreakdown; to: (k: string) => string }) {
+function DeliveryStatusCell({ row, to }: { row: ShopDeliveryBreakdown; to: OrdersT }) {
   switch (row.status) {
     case "delivered":
       return <OrdersStatusBadge status="Delivered" label={to("orders.status_delivered")} />;
+    case "part_delivered":
+      return (
+        <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-700 whitespace-nowrap">
+          {to("orders.status_part_delivered")}
+        </span>
+      );
     case "delivered_with_diff":
       return <OrdersStatusBadge status="Delivered with Difference" label={to("orders.status_delivered_diff")} />;
     case "not_delivered":
@@ -111,6 +136,74 @@ function DeliveryStatusCell({ row, to }: { row: ShopDeliveryBreakdown; to: (k: s
   }
 }
 
+/**
+ * Shop-level delivery capture (last column of the report).
+ *
+ * The order is already on the row (Ordered Birds / Boxes) — this records what
+ * actually reached the shop. PARTIAL: the box input is capped at the balance
+ * (ordered − delivered), so a shop can be delivered in several lots, and a
+ * shop whose order is fully in shows COMPLETE with no input at all — that is
+ * the duplicate guard.
+ */
+function ShopDeliveryCapture({
+  row,
+  remaining,
+  busy,
+  value,
+  onValue,
+  onSubmit,
+  to,
+}: {
+  row: ShopDeliveryBreakdown;
+  remaining: number;
+  busy: boolean;
+  value: string;
+  onValue: (v: string) => void;
+  onSubmit: (boxes: number) => void;
+  to: OrdersT;
+}) {
+  if (remaining <= 0) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 whitespace-nowrap">
+        <Check size={12} />
+        {to("orders.delivery_complete")}
+      </span>
+    );
+  }
+  const parsed = Number(value);
+  const valid = Number.isFinite(parsed) && parsed >= 1 && parsed <= remaining;
+  return (
+    <div className="flex items-center gap-1.5">
+      <input
+        type="number"
+        min={1}
+        max={remaining}
+        value={value}
+        placeholder={String(remaining)}
+        disabled={busy}
+        onChange={(e) => onValue(e.target.value)}
+        onWheel={onOrdersNumberWheel}
+        aria-label={`${to("orders.delivered_boxes")} — ${row.shopName}`}
+        className={`${ORDERS_NO_SPINNER} h-8 w-20 rounded-lg border border-slate-200 px-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
+      />
+      <button
+        type="button"
+        onClick={() => onSubmit(parsed)}
+        disabled={busy || !valid}
+        title={to("orders.delivery_balance_hint", { remaining })}
+        aria-label={`${to("orders.deliver")} — ${row.shopName}`}
+        className="inline-flex items-center gap-1 rounded-lg border border-emerald-600/40 bg-emerald-500 px-2.5 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {busy ? <Loader2 size={13} className="animate-spin" /> : <Truck size={13} />}
+        {to("orders.deliver")}
+      </button>
+      <span className="text-[10px] font-semibold text-slate-400 whitespace-nowrap">
+        {to("orders.balance")}: {formatCount(remaining)}
+      </span>
+    </div>
+  );
+}
+
 function OrdersDeliveryDetailView({
   orderTrip,
   shopDirectory,
@@ -118,20 +211,29 @@ function OrdersDeliveryDetailView({
   pdfBusy,
   whatsappBusy,
   onClose,
-  onPdf,
   onWhatsApp,
+  onRecordDelivery,
+  onSaveProgress,
+  onSubmitTrip,
 }: Props) {
   const { to } = useOrdersI18n();
   const { trip, progress, originalShopIds } = orderTrip;
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ReportStatusFilter>("all");
+  // "Check PDF" popup (preview -> download / send / correct).
+  const [pdfOpen, setPdfOpen] = useState(false);
+  // Shop-level capture: per-shop box entry + one in-flight shop at a time.
+  const [qty, setQty] = useState<Record<number, string>>({});
+  const [busyShopId, setBusyShopId] = useState<number | null>(null);
+  // A completed trip is closed — its deliveries are history, not editable.
+  const canDeliver = (progress?.status ?? "Assigned") !== "Completed";
 
   const breakdown = useMemo(
     () =>
       buildShopBreakdown(
         rowsInSequence(trip),
         originalShopIds,
-        (shopId, shopName) => cityOf(shopId, shopName, shopDirectory),
+        (shopId, shopName) => villageOf(shopId, shopName, shopDirectory),
         orderTrip.originalQuantities,
         (shopId) => shopMobileOf(shopId, shopDirectory)
       ),
@@ -142,12 +244,32 @@ function OrdersDeliveryDetailView({
     () => [
       { value: "all", label: to("orders.all") },
       { value: "delivered", label: to("orders.status_delivered") },
+      { value: "part_delivered", label: to("orders.status_part_delivered") },
       { value: "delivered_with_diff", label: to("orders.status_delivered_diff") },
       { value: "not_delivered", label: to("orders.status_not_delivered") },
       { value: "not_listed", label: to("orders.status_not_listed") },
     ],
     [to]
   );
+
+  /** One shop's (partial) delivery — the balance is the hard maximum. */
+  const handleDeliver = async (row: ShopDeliveryBreakdown) => {
+    if (busyShopId !== null) return;
+    const remaining = shopRemainingBoxes(row);
+    const boxes = Math.floor(Number(qty[row.shopId] ?? ""));
+    if (!Number.isFinite(boxes) || boxes < 1 || boxes > remaining) return;
+    setBusyShopId(row.shopId);
+    try {
+      await onRecordDelivery(row, boxes);
+      setQty((prev) => {
+        const next = { ...prev };
+        delete next[row.shopId];
+        return next;
+      });
+    } finally {
+      setBusyShopId(null);
+    }
+  };
 
   // One table-level search over the WHOLE report (listed + unlisted rows).
   const searched = useMemo(
@@ -159,6 +281,7 @@ function OrdersDeliveryDetailView({
           ordered: to("orders.status_ordered"),
           notListed: to("orders.status_not_listed"),
           delivered: to("orders.status_delivered"),
+          partDelivered: to("orders.status_part_delivered"),
           deliveredWithDiff: to("orders.status_delivered_diff"),
           notDelivered: to("orders.status_not_delivered"),
         },
@@ -282,7 +405,9 @@ function OrdersDeliveryDetailView({
               )}
             </div>
             <div className="flex items-center gap-2">
-              <OrdersIconButton label={to("orders.pdf")} onClick={onPdf} busy={pdfBusy}>
+              {/* Check the report in a popup first — it holds the download
+                  and the send, so what you verify is what goes out. */}
+              <OrdersIconButton label={to("orders.pdf_check_title")} onClick={() => setPdfOpen(true)} busy={pdfBusy}>
                 <FileText size={15} />
               </OrdersIconButton>
               <OrdersIconButton
@@ -356,12 +481,12 @@ function OrdersDeliveryDetailView({
                 </div>
               </div>
               <div className={`${opsTableCardClass} overflow-x-auto`}>
-                <table className="w-full min-w-[1400px] text-xs md:text-sm">
+                <table className="w-full min-w-[1620px] text-xs md:text-sm">
                   <thead>
                     <tr className={opsTableHeadRowClass}>
                       <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
                       <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
-                      <th className={opsTableThClass}>{to("orders.col_city")}</th>
+                      <th className={opsTableThClass}>{to("orders.col_village")}</th>
                       <th className={`${opsTableThClass} w-32`}>{to("orders.shop_mobile")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_birds")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_boxes")}</th>
@@ -371,12 +496,15 @@ function OrdersDeliveryDetailView({
                       <th className={`${opsTableThClass} w-40`}>{to("orders.delivery_time")}</th>
                       <th className={`${opsTableThClass} w-20 text-right`}>{to("orders.col_difference")}</th>
                       <th className={`${opsTableThClass} w-40`}>{to("orders.col_delivery_status")}</th>
+                      {/* Shop-level capture: the order is on this row, the
+                          delivery is entered here (partial allowed). */}
+                      <th className={`${opsTableThClass} w-64`}>{to("orders.record_delivery")}</th>
                     </tr>
                   </thead>
                   <tbody className={opsTableDivideClass}>
                     {pageRows.length === 0 && (
                       <tr>
-                        <td className={opsTableTdClass} colSpan={12}>
+                        <td className={opsTableTdClass} colSpan={13}>
                           <span className="text-slate-400 text-sm py-4 block text-center">
                             {query || statusFilter !== "all"
                               ? to("orders.no_results")
@@ -387,10 +515,12 @@ function OrdersDeliveryDetailView({
                     )}
                     {pageRows.map((row, index) => {
                       // Difference is only meaningful once a Step 4 capture
-                      // exists (delivered / delivered-with-diff rows).
+                      // exists (part / delivered / delivered-with-diff rows).
                       const showDiff =
                         row.status === "delivered" ||
+                        row.status === "part_delivered" ||
                         row.status === "delivered_with_diff";
+                      const remaining = shopRemainingBoxes(row);
                       return (
                         <tr key={row.shopId} className="align-middle transition-colors">
                           <td className={opsTableTdClass}>
@@ -401,7 +531,7 @@ function OrdersDeliveryDetailView({
                           <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
                             {row.shopName || "—"}
                           </td>
-                          <td className={opsTableTdClass}>{row.city || "—"}</td>
+                          <td className={opsTableTdClass}>{row.village || "—"}</td>
                           <td className={`${opsTableTdClass} text-slate-600 whitespace-nowrap`}>
                             {row.mobile || "—"}
                           </td>
@@ -428,6 +558,23 @@ function OrdersDeliveryDetailView({
                           </td>
                           <td className={opsTableTdClass}>
                             <DeliveryStatusCell row={row} to={to} />
+                          </td>
+                          <td className={opsTableTdClass}>
+                            {canDeliver && !row.additional ? (
+                              <ShopDeliveryCapture
+                                row={row}
+                                remaining={remaining}
+                                busy={busyShopId === row.shopId}
+                                value={qty[row.shopId] ?? ""}
+                                onValue={(v) =>
+                                  setQty((prev) => ({ ...prev, [row.shopId]: v }))
+                                }
+                                onSubmit={() => void handleDeliver(row)}
+                                to={to}
+                              />
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -458,6 +605,7 @@ function OrdersDeliveryDetailView({
                         <th className={opsTableThClass} />
                         <th className={`${opsTableThClass} text-right`}>{to("orders.total_ordered")}</th>
                         <th className={`${opsTableThClass} text-right`}>{to("orders.total_delivered")}</th>
+                        <th className={`${opsTableThClass} text-right`}>{to("orders.pending_boxes")}</th>
                         <th className={`${opsTableThClass} text-right`}>{to("orders.col_difference")}</th>
                       </tr>
                     </thead>
@@ -466,6 +614,14 @@ function OrdersDeliveryDetailView({
                         <td className={`${opsTableTdClass} font-semibold text-slate-600`}>{to("orders.word_boxes")}</td>
                         <td className={`${opsTableTdClass} text-right font-semibold`}>{formatCount(totals.orderedBoxes)}</td>
                         <td className={`${opsTableTdClass} text-right font-semibold`}>{formatCount(totals.deliveredBoxes)}</td>
+                        <td className={`${opsTableTdClass} text-right font-semibold`}>
+                          {/* PART DELIVERY: 25 ordered, 10 in → 15 box pending */}
+                          {totals.orderedBoxes - totals.deliveredBoxes > 0 ? (
+                            <b className="text-amber-600">{formatCount(totals.orderedBoxes - totals.deliveredBoxes)}</b>
+                          ) : (
+                            <span className="text-slate-300">0</span>
+                          )}
+                        </td>
                         <td className={opsTableTdClass}>
                           <DiffCell value={totals.deliveredBoxes - totals.orderedBoxes} show />
                         </td>
@@ -474,6 +630,13 @@ function OrdersDeliveryDetailView({
                         <td className={`${opsTableTdClass} font-semibold text-slate-600`}>{to("orders.word_birds")}</td>
                         <td className={`${opsTableTdClass} text-right font-semibold`}>{formatCount(totals.orderedBirds)}</td>
                         <td className={`${opsTableTdClass} text-right font-semibold`}>{formatCount(totals.deliveredBirds)}</td>
+                        <td className={`${opsTableTdClass} text-right font-semibold`}>
+                          {totals.orderedBirds - totals.deliveredBirds > 0 ? (
+                            <b className="text-amber-600">{formatCount(totals.orderedBirds - totals.deliveredBirds)}</b>
+                          ) : (
+                            <span className="text-slate-300">0</span>
+                          )}
+                        </td>
                         <td className={opsTableTdClass}>
                           <DiffCell value={totals.deliveredBirds - totals.orderedBirds} show />
                         </td>
@@ -482,6 +645,13 @@ function OrdersDeliveryDetailView({
                         <td className={`${opsTableTdClass} font-semibold text-slate-600`}>{to("orders.weight_kg")}</td>
                         <td className={`${opsTableTdClass} text-right font-semibold`}>{totals.orderedWeight.toFixed(2)}</td>
                         <td className={`${opsTableTdClass} text-right font-semibold`}>{totals.deliveredWeight.toFixed(2)}</td>
+                        <td className={`${opsTableTdClass} text-right font-semibold`}>
+                          {totals.orderedWeight - totals.deliveredWeight > 0 ? (
+                            <b className="text-amber-600">{(totals.orderedWeight - totals.deliveredWeight).toFixed(2)}</b>
+                          ) : (
+                            <span className="text-slate-300">0</span>
+                          )}
+                        </td>
                         <td className={opsTableTdClass}>
                           <WeightDiffCell value={totals.deliveredWeight - totals.orderedWeight} show />
                         </td>
@@ -512,7 +682,7 @@ function OrdersDeliveryDetailView({
                       <tr className={opsTableHeadRowClass}>
                         <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
                         <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
-                        <th className={opsTableThClass}>{to("orders.col_city")}</th>
+                        <th className={opsTableThClass}>{to("orders.col_village")}</th>
                         <th className={`${opsTableThClass} w-32`}>{to("orders.shop_mobile")}</th>
                         <th className={`${opsTableThClass} w-32 text-right`}>{to("orders.delivered_birds")}</th>
                         <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_boxes")}</th>
@@ -536,7 +706,7 @@ function OrdersDeliveryDetailView({
                               </span>
                             </span>
                           </td>
-                          <td className={opsTableTdClass}>{row.city || "—"}</td>
+                          <td className={opsTableTdClass}>{row.village || "—"}</td>
                           <td className={`${opsTableTdClass} text-slate-600 whitespace-nowrap`}>
                             {row.mobile || "—"}
                           </td>
@@ -562,6 +732,30 @@ function OrdersDeliveryDetailView({
           </div>
         </div>
       </div>
+
+      {/* Check PDF popup — verify the report, then download / send, or go
+          back and correct an entry. */}
+      {pdfOpen && (
+        <OrdersPdfPreview
+          orderTrip={orderTrip}
+          breakdown={breakdown}
+          supervisorMobile={supervisorMobile}
+          ordersTranslate={to}
+          onWhatsApp={onWhatsApp}
+          onSaveProgress={onSaveProgress}
+          onSubmitTrip={onSubmitTrip}
+          onDownload={(res) => {
+            const anchor = document.createElement("a");
+            anchor.href = res.url;
+            anchor.download = res.fileName;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+          }}
+          onCorrect={() => setPdfOpen(false)}
+          onClose={() => setPdfOpen(false)}
+        />
+      )}
     </div>
   );
 }
