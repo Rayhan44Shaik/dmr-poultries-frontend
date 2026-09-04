@@ -30,11 +30,16 @@
 // and WhatsApp work unchanged.
 
 import React, { useCallback, useEffect, useState } from "react";
-import { ClipboardList, PackageCheck, Route } from "lucide-react";
+import { ClipboardList, DatabaseZap, PackageCheck, Route } from "lucide-react";
 import { useI18n } from "../../../../i18n";
 import { useShops } from "../../../masters/shops/hooks/useShops";
+import type { Shop } from "../../../masters/shops/types/shop";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import type { Trip } from "../../../../shared/trip";
+import {
+  ORDERS_SAMPLE_DATA_ENABLED,
+  sampleShopRecords,
+} from "../sampleOrdersData";
 import {
   fetchOrdersData,
   loadShopDirectory,
@@ -65,11 +70,20 @@ const TAB_DEFS: Array<{ key: TabKey; labelKey: string; icon: React.ReactNode }> 
   { key: "tracking", labelKey: "orders.tab_tracking", icon: <Route size={13} /> },
 ];
 
+/** Sample mode never touches the network — the shop list is the bundled master. */
+function useSampleShops(): { shops: Shop[]; loading: boolean } {
+  return { shops: sampleShopRecords(), loading: false };
+}
+
+// The flag is a module constant, so exactly one of these two hooks is ever
+// mounted for the life of the app — the hook order stays stable.
+const useOrdersShopSource = ORDERS_SAMPLE_DATA_ENABLED ? useSampleShops : useShops;
+
 const OrdersPage: React.FC = () => {
   const { language } = useI18n();
   const { to } = useOrdersI18n();
   const { showNotification } = useSafeNotification();
-  const { shops, loading: shopsLoading } = useShops();
+  const { shops, loading: shopsLoading } = useOrdersShopSource();
 
   const [data, setData] = useState<OrdersFetch | null>(null);
   const [loading, setLoading] = useState(true);
@@ -282,6 +296,18 @@ const OrdersPage: React.FC = () => {
             </button>
           );
         })}
+
+        {/* Honest marker while the page runs on bundled sample data (no
+            backend). Save / Finish actions work against the in-memory store. */}
+        {ORDERS_SAMPLE_DATA_ENABLED && (
+          <span
+            title={to("orders.sample_hint")}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] md:text-[11px] font-bold text-amber-700"
+          >
+            <DatabaseZap size={12} />
+            {to("orders.sample_badge")}
+          </span>
+        )}
       </div>
 
       {loading ? (

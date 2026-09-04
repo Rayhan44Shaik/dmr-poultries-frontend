@@ -60,6 +60,14 @@ import {
   type OrdersTrip,
   type ShopOrderQuantities,
 } from "./types";
+import {
+  ORDERS_SAMPLE_DATA_ENABLED,
+  SAMPLE_SHOPS,
+  applySampleDeliveries,
+  sampleSupervisorDirectory,
+  sampleTrips,
+  sampleVehicleCapacities,
+} from "./sampleOrdersData";
 
 type RawTrip = Record<string, unknown>;
 
@@ -76,11 +84,22 @@ const num = (v: unknown): number => {
  * per-day read-only assignment views.
  */
 export async function fetchOrdersData(): Promise<OrdersFetch> {
-  const [trips, vehicles] = await Promise.all([
-    listTrips(),
-    loadVehicles().catch(() => [] as Vehicle[]),
-  ]);
-  const vehicleList = vehicles.map((v) => ({ id: v.id, noOfBoxes: v.noOfBoxes }));
+  // Sample-data mode makes NO request at all (see sampleOrdersData.ts): the
+  // bundled trips go through the very same derivation below, so every Orders
+  // rule (containers, capacity, uniqueness, progress) still applies.
+  let trips: Trip[];
+  let vehicleList: Array<{ id: number; noOfBoxes?: number }>;
+  if (ORDERS_SAMPLE_DATA_ENABLED) {
+    trips = sampleTrips();
+    vehicleList = sampleVehicleCapacities();
+  } else {
+    const [liveTrips, vehicles] = await Promise.all([
+      listTrips(),
+      loadVehicles().catch(() => [] as Vehicle[]),
+    ]);
+    trips = liveTrips;
+    vehicleList = vehicles.map((v) => ({ id: v.id, noOfBoxes: v.noOfBoxes }));
+  }
 
   const today = localToday();
   const days = Array.from({ length: 7 }, (_, i) => addLocalDays(today, i - 6));
@@ -297,6 +316,9 @@ export async function saveCollection(
   tripNo: string | null,
   rows: OrderShopRow[]
 ): Promise<Trip> {
+  if (ORDERS_SAMPLE_DATA_ENABLED) {
+    return applySampleDeliveries(containerId, rows, {}, tripNo ?? undefined);
+  }
   const body: Record<string, unknown> = {
     ...toOrderPayload(rows),
     mode: "save",
@@ -313,6 +335,14 @@ export async function finishCollection(
   tripNo: string | null,
   rows: OrderShopRow[]
 ): Promise<Trip> {
+  if (ORDERS_SAMPLE_DATA_ENABLED) {
+    return applySampleDeliveries(
+      containerId,
+      rows,
+      { startStepSubmitted: true },
+      tripNo ?? undefined
+    );
+  }
   const body: Record<string, unknown> = {
     ...toOrderPayload(rows),
     mode: "save",
@@ -397,6 +427,9 @@ export async function saveAssignment(
   groups: AssignmentGroup[]
 ): Promise<Trip> {
   const deliveries = buildAssignmentDeliveries(vehicleTrip, groups);
+  if (ORDERS_SAMPLE_DATA_ENABLED) {
+    return applySampleDeliveries(vehicleTrip.id, deliveries);
+  }
   const { data } = await apiPost<RawTrip>(
     `/trips/${vehicleTrip.id}/steps/deliveries`,
     { ...toStep4Payload({ deliveries } as unknown as Partial<Trip>), mode: "save" }
@@ -420,6 +453,12 @@ export async function finishAssignment(
   for (const group of groups) {
     const tag = `order:${group.orderTripNo}`;
     if (!remarks.includes(tag)) remarks = remarks ? `${remarks} | ${tag}` : tag;
+  }
+  if (ORDERS_SAMPLE_DATA_ENABLED) {
+    return applySampleDeliveries(vehicleTrip.id, deliveries, {
+      deliveryStepSubmitted: true,
+      remarks,
+    });
   }
   const { data } = await apiPost<RawTrip>(
     `/trips/${vehicleTrip.id}/steps/deliveries`,
@@ -465,6 +504,14 @@ export type ShopDirectory = Map<
 export type SupervisorDirectory = Map<string, string>; // name (lower) -> mobile
 
 export async function loadShopDirectory(): Promise<ShopDirectory> {
+  if (ORDERS_SAMPLE_DATA_ENABLED) {
+    return new Map(
+      SAMPLE_SHOPS.map((shop) => [
+        shop.id,
+        { shopName: shop.shopName, village: shop.village, mobile: shop.mobile },
+      ])
+    );
+  }
   const shops = await loadShops().catch(() => []);
   const dir: ShopDirectory = new Map();
   for (const shop of shops) {
@@ -480,6 +527,7 @@ export async function loadShopDirectory(): Promise<ShopDirectory> {
 }
 
 export async function loadSupervisorDirectory(): Promise<SupervisorDirectory> {
+  if (ORDERS_SAMPLE_DATA_ENABLED) return sampleSupervisorDirectory();
   const employees = await loadEmployees().catch(() => []);
   const dir: SupervisorDirectory = new Map();
   for (const emp of employees) {

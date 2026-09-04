@@ -135,6 +135,9 @@ const EN: Record<string, string> = {
     "WhatsApp backend is not configured (VITE_WHATSAPP_BACKEND_ENABLED)",
   "orders.whatsapp_no_rows": "No shops to send yet — add shops first",
   "orders.loading": "Loading orders…",
+  "orders.sample_badge": "Sample data",
+  "orders.sample_hint":
+    "Showing bundled sample data — no backend is connected. Save, Finish and Assignment work against the in-memory sample store and reset on refresh.",
   "orders.error_title": "Could not load orders",
   "orders.error_message":
     "The backend did not respond. Check the connection and try again.",
@@ -396,6 +399,9 @@ const TE: Record<string, string> = {
   "orders.whatsapp_not_configured": "WhatsApp బ్యాకెండ్ సక్రిమం చేయబడలేదు (VITE_WHATSAPP_BACKEND_ENABLED)",
   "orders.whatsapp_no_rows": "ఇంకా పంపాల్సిన షాప్‌లు లేవు — ముందు షాప్‌లు జోడించండి",
   "orders.loading": "ఆర్డర్లు లోడ్ అవుతున్నాయి…",
+  "orders.sample_badge": "నమూనా డేటా",
+  "orders.sample_hint":
+    "నమూనా డేటా చూపబడుతోంది — బ్యాకెండ్ కనెక్ట్ కాలేదు. సేవ్, ఫినిష్, అసైన్‌మెంట్ మెమరీలో పని చేస్తాయి; రిఫ్రెష్ చేస్తే మళ్లీ మొదటి స్థితికి వస్తాయి.",
   "orders.error_title": "ఆర్డర్లను లోడ్ చేయలేకపోయాను",
   "orders.error_message": "బ్యాకెండ్ సమాధానం ఇవ్వలేదు. కనెక్షన్ తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
   "orders.retry": "మళ్లీ ప్రయత్నించండి",
