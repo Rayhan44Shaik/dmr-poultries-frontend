@@ -405,6 +405,50 @@ export function weightForBirds(birds: number, avgBirdWeight: number | null | und
   return Number((b * w).toFixed(2));
 }
 
+// ─── Farm location ───────────────────────────────────────────────────────────
+
+/** Segments that name an area, never a city (district / state / pincode). */
+const FARM_AREA_WORDS =
+  /(?:\bdist(?:rict)?\.?\b|\bmandal\b|\bmdal\b|\bvillage\b|\bstate\b|\bpin(?:code)?\b|andhra pradesh|telangana|\b\d{6}\b)/i;
+/** Segments that are a plot / door detail, never a city. */
+const FARM_PLOT_WORDS = /(?:\bsurvey\b|\bsy\.?\b|\bplot\b|\bd\.?\s?no\b|\bdoor\b|\bflat\b)/i;
+/** Trailing suffixes that hide the place name ("Ibrahimpatnam Road"). */
+const FARM_PLACE_SUFFIX =
+  /\s+(?:road|rd|highway|hwy|nh\s?\d*|sh\s?\d*|street|st|nagar|colony|phase|x\s?road|junction|jnc|circle|chowl?k|bazaar|bazar|bypass|ring road)$/i;
+
+/**
+ * The city / town of a farm address — a short, recognisable place name
+ * ("Vijayawada", "Kodad") instead of the full address line.
+ *
+ * Reads the address from the last segment backwards and returns the first
+ * place name: district / state / pincode / plot lines are skipped, and a
+ * place hidden behind a suffix ("Ibrahimpatnam Road") is reduced to the place
+ * itself. Falls back to the farm name, then the raw value — never empty.
+ */
+export function farmCityOf(trip: Pick<Trip, "farmAddress" | "sourceFarm">): string {
+  const raw =
+    String(trip.farmAddress ?? "").trim() || String(trip.sourceFarm ?? "").trim();
+  if (!raw) return "—";
+  const segments = raw
+    .split(/[,;\n|]/)
+    .map((s) => s.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  for (let i = segments.length - 1; i >= 0; i -= 1) {
+    const seg = segments[i];
+    if (FARM_AREA_WORDS.test(seg) || FARM_PLOT_WORDS.test(seg)) continue;
+    const place = seg.replace(FARM_PLACE_SUFFIX, "").replace(/[,.\s]+$/, "").trim();
+    // A bare number / initials is not a city either.
+    if (place && /[A-Za-z\u0C00-\u0C7F]/.test(place)) return place;
+  }
+  // Every segment was structural — drop the area words from the last one.
+  const last = (segments[segments.length - 1] ?? raw)
+    .replace(FARM_AREA_WORDS, "")
+    .replace(FARM_PLACE_SUFFIX, "")
+    .replace(/[,.\s]+$/, "")
+    .trim();
+  return last || raw;
+}
+
 // ─── Day-based operational dates (local timezone — the user's day) ──────────
 
 /** Local calendar date (YYYY-MM-DD) — the operational day. */

@@ -164,10 +164,10 @@ function containerTrip(id: number, day: string, finished: boolean, rows: ShopDel
 
 /** Step-2 farm details per vehicle (shown in the assignment vehicle table). */
 const FARM_BY_VEHICLE: Record<number, { farm: string; address: string }> = {
-  1: { farm: "Sri Venkateswara Broiler Farm", address: "Survey 42/1, Ibrahimpatnam Road, Rangareddy Dist." },
-  2: { farm: "Godavari Poultry Farms", address: "NH-16, Kovvuru Mandal, West Godavari Dist." },
-  3: { farm: "Deccan Country Birds Farm", address: "Plot 7, Kukatpally Road, Medchal Dist." },
-  4: { farm: "Krishna Layer Farm", address: "Vuyyuru Road, Krishna Dist." },
+  1: { farm: "Sri Venkateswara Broiler Farm", address: "Survey 42/1, Ibrahimpatnam Road, Vijayawada" },
+  2: { farm: "Godavari Poultry Farms", address: "NH-16, Kovvuru Mandal, Kodad" },
+  3: { farm: "Deccan Country Birds Farm", address: "Plot 7, Kukatpally Road, Hyderabad" },
+  4: { farm: "Krishna Layer Farm", address: "Vuyyuru Road, Gudivada" },
 };
 
 /** A vehicle trip carrying one collection order's rows. */

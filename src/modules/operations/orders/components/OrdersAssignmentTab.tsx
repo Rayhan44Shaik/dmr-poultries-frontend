@@ -48,6 +48,7 @@ import TripPagination from "../../vehicle-trips/components/TripPagination";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import {
   collectionTotals,
+  farmCityOf,
   formatCount,
   formatDayFull,
   weightForBirds,
@@ -782,7 +783,7 @@ function AssignmentEditor({
                 <th className={`${opsTableThClass} w-36`}>{to("orders.vehicle_no")}</th>
                 <th className={`${opsTableThClass} w-32`}>{to("orders.supervisor_mobile")}</th>
                 <th className={`${opsTableThClass} w-40`}>{to("orders.supervisor")}</th>
-                <th className={opsTableThClass}>{to("orders.farm_address")}</th>
+                <th className={opsTableThClass}>{to("orders.farm_city")}</th>
                 <th className={`${opsTableThClass} w-36 text-right`}>
                   {to("orders.vehicle_box_capacity")}
                 </th>
@@ -792,9 +793,12 @@ function AssignmentEditor({
               {eligibleVehicles.map((v) => {
                 const open = vehicleTripId === v.trip.id;
                 const mobile = supervisorMobileOf(v.trip, supervisorDirectory);
-                const farm = `${v.trip.sourceFarm || "—"}${
+                const farmFull = `${v.trip.sourceFarm || "—"}${
                   v.trip.farmAddress ? ` · ${v.trip.farmAddress}` : ""
                 }`;
+                // The column shows the CITY only (Vijayawada, Kodad…) — the
+                // full address stays one hover away.
+                const city = farmCityOf(v.trip);
                 return (
                   <tr
                     key={v.trip.id}
@@ -824,8 +828,8 @@ function AssignmentEditor({
                     </td>
                     <td className={opsTableTdClass}>{mobile || "—"}</td>
                     <td className={opsTableTdClass}>{v.trip.supervisorName || "—"}</td>
-                    <td className={`${opsTableTdClass} max-w-[260px] truncate`} title={farm}>
-                      {farm}
+                    <td className={`${opsTableTdClass} font-semibold text-slate-700 whitespace-nowrap`} title={farmFull}>
+                      {city}
                     </td>
                     <td className={`${opsTableTdClass} text-right font-bold text-slate-800`}>
                       {formatCount(v.capacity)}
