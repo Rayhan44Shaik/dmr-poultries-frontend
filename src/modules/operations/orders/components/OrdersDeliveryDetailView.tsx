@@ -38,9 +38,15 @@ import {
   shopRemainingBoxes,
   type ShopDeliveryBreakdown,
 } from "../ordersUtils";
-import { shopMobileOf, villageOf, type ShopDirectory } from "../ordersService";
+import {
+  shopMobileOf,
+  villageOf,
+  type OrdersWhatsAppResult,
+  type ShopDirectory,
+} from "../ordersService";
 import { useOrdersI18n, type OrdersT } from "../i18n/ordersI18n";
 import type { OrdersTrip } from "../types";
+import OrdersPdfPreview from "./OrdersPdfPreview";
 import {
   ORDERS_NO_SPINNER,
   OrdersDropdown,
@@ -60,8 +66,8 @@ type Props = {
   pdfBusy: boolean;
   whatsappBusy: boolean;
   onClose: () => void;
-  onPdf: () => void;
-  onWhatsApp: () => void;
+  /** Sends the report; resolves with the per-shop outcome for the popup. */
+  onWhatsApp: () => Promise<OrdersWhatsAppResult | null>;
   /**
    * Record one shop's delivery (Step 4) — partial allowed. Resolves after the
    * page refetched, so the report re-derives from persisted data.
@@ -201,7 +207,6 @@ function OrdersDeliveryDetailView({
   pdfBusy,
   whatsappBusy,
   onClose,
-  onPdf,
   onWhatsApp,
   onRecordDelivery,
 }: Props) {
@@ -209,6 +214,8 @@ function OrdersDeliveryDetailView({
   const { trip, progress, originalShopIds } = orderTrip;
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ReportStatusFilter>("all");
+  // "Check PDF" popup (preview -> download / send / correct).
+  const [pdfOpen, setPdfOpen] = useState(false);
   // Shop-level capture: per-shop box entry + one in-flight shop at a time.
   const [qty, setQty] = useState<Record<number, string>>({});
   const [busyShopId, setBusyShopId] = useState<number | null>(null);
@@ -392,7 +399,9 @@ function OrdersDeliveryDetailView({
               )}
             </div>
             <div className="flex items-center gap-2">
-              <OrdersIconButton label={to("orders.pdf")} onClick={onPdf} busy={pdfBusy}>
+              {/* Check the report in a popup first — it holds the download
+                  and the send, so what you verify is what goes out. */}
+              <OrdersIconButton label={to("orders.pdf_check_title")} onClick={() => setPdfOpen(true)} busy={pdfBusy}>
                 <FileText size={15} />
               </OrdersIconButton>
               <OrdersIconButton
@@ -694,6 +703,19 @@ function OrdersDeliveryDetailView({
           </div>
         </div>
       </div>
+
+      {/* Check PDF popup — verify the report, then download / send, or go
+          back and correct an entry. */}
+      {pdfOpen && (
+        <OrdersPdfPreview
+          orderTrip={orderTrip}
+          breakdown={breakdown}
+          supervisorMobile={supervisorMobile}
+          onWhatsApp={onWhatsApp}
+          onCorrect={() => setPdfOpen(false)}
+          onClose={() => setPdfOpen(false)}
+        />
+      )}
     </div>
   );
 }

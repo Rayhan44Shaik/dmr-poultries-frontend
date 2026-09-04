@@ -38,6 +38,21 @@ export type OrdersPdfInput = {
   progress: OrdersProgress | null;
   breakdown: ShopDeliveryBreakdown[];
   language?: "en" | "te";
+  /**
+   * "download" (default) also saves the file to disk. "preview" only builds
+   * it, so the caller can show it in the check-before-send popup.
+   */
+  mode?: "download" | "preview";
+};
+
+/** The built document — the popup previews `url`, the button saves `blob`. */
+export type OrdersPdfResult = {
+  fileName: string;
+  blob: Blob;
+  /** Object URL for the preview frame. The caller revokes it. */
+  url: string;
+  /** "Page x of y" — handy to confirm the whole report is in the document. */
+  pages: number;
 };
 
 const toNum = (value: unknown): number => {
@@ -55,7 +70,8 @@ export async function generateOrdersPdf({
   progress,
   breakdown,
   language = "en",
-}: OrdersPdfInput): Promise<void> {
+  mode = "download",
+}: OrdersPdfInput): Promise<OrdersPdfResult> {
   const doc = createDmrPoultryPdf("portrait");
   doc.setProperties({
     title: `${trip.tripNo || "Trip"} — Shop Delivery Report`,
@@ -431,5 +447,8 @@ export async function generateOrdersPdf({
   }
 
   const safeTripNo = String(trip.tripNo || "Trip").replace(/[^a-zA-Z0-9_-]+/g, "_");
-  doc.save(`${safeTripNo}_ShopDeliveryReport.pdf`);
+  const fileName = `${safeTripNo}_ShopDeliveryReport.pdf`;
+  if (mode === "download") doc.save(fileName);
+  const blob = doc.output("blob") as Blob;
+  return { fileName, blob, url: URL.createObjectURL(blob), pages: pageCount };
 }

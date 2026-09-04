@@ -49,6 +49,7 @@ import {
   shopMobileOf,
   supervisorMobileOf,
   villageOf,
+  type OrdersWhatsAppResult,
   type ShopDirectory,
   type SupervisorDirectory,
 } from "../ordersService";
@@ -236,8 +237,8 @@ const OrdersPage: React.FC = () => {
   );
 
   const handleWhatsApp = useCallback(
-    async (ot: OrdersTrip) => {
-      if (whatsappBusyId != null) return;
+    async (ot: OrdersTrip): Promise<OrdersWhatsAppResult | null> => {
+      if (whatsappBusyId != null) return null;
       setWhatsappBusyId(ot.trip.id);
       try {
         const result = await sendOrdersWhatsApp(ot.trip, mobileOf(ot.trip));
@@ -255,11 +256,13 @@ const OrdersPage: React.FC = () => {
         } else {
           showNotification(to("orders.whatsapp_failed", { message: result.message ?? "—" }), "error");
         }
+        return result;
       } catch (e) {
         showNotification(
           e instanceof Error ? e.message : to("orders.whatsapp_failed", { message: "network" }),
           "error"
         );
+        return null;
       } finally {
         setWhatsappBusyId(null);
       }
@@ -410,8 +413,7 @@ const OrdersPage: React.FC = () => {
           pdfBusy={pdfBusyId === viewing.trip.id}
           whatsappBusy={whatsappBusyId === viewing.trip.id}
           onClose={() => setViewingId(null)}
-          onPdf={() => void handlePdf(viewing)}
-          onWhatsApp={() => void handleWhatsApp(viewing)}
+          onWhatsApp={() => handleWhatsApp(viewing)}
           onRecordDelivery={(shop, boxes) => handleRecordDelivery(viewing, shop, boxes)}
         />
       )}
