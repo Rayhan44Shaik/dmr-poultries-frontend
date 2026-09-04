@@ -162,6 +162,14 @@ function containerTrip(id: number, day: string, finished: boolean, rows: ShopDel
   });
 }
 
+/** Step-2 farm details per vehicle (shown in the assignment vehicle table). */
+const FARM_BY_VEHICLE: Record<number, { farm: string; address: string }> = {
+  1: { farm: "Sri Venkateswara Broiler Farm", address: "Survey 42/1, Ibrahimpatnam Road, Rangareddy Dist." },
+  2: { farm: "Godavari Poultry Farms", address: "NH-16, Kovvuru Mandal, West Godavari Dist." },
+  3: { farm: "Deccan Country Birds Farm", address: "Plot 7, Kukatpally Road, Medchal Dist." },
+  4: { farm: "Krishna Layer Farm", address: "Vuyyuru Road, Krishna Dist." },
+};
+
 /** A vehicle trip carrying one collection order's rows. */
 function deliveryTrip(
   id: number,
@@ -173,6 +181,7 @@ function deliveryTrip(
   over: Partial<Trip> & { deliveries: ShopDelivery[] }
 ): Trip {
   const vehicle = vehicleById(vehicleId);
+  const farm = FARM_BY_VEHICLE[vehicleId];
   return createEmptyTrip({
     id,
     tripNo: `TRP-${stamp(day)}-${String(seq).padStart(2, "0")}`,
@@ -181,6 +190,8 @@ function deliveryTrip(
     vehicleNo: vehicle.vehicleNo,
     driverName,
     supervisorName,
+    sourceFarm: farm.farm,
+    farmAddress: farm.address,
     avgBirdWeight: AVG_BIRD_WEIGHT,
     startStepSubmitted: true,
     farmStepSubmitted: true,

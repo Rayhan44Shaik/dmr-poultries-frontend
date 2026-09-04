@@ -54,6 +54,12 @@ const EN: Record<string, string> = {
   "orders.partial_assigned": "Partial on {vehicle} ({assigned}/{total} shops)",
   "orders.select_order": "Select a collected order to assign it to a vehicle",
   "orders.select_vehicle": "Select vehicle",
+  "orders.vehicles_ready": "Vehicles ready for assignment",
+  "orders.step2_submitted_note": "Step 2 submitted, delivery pending",
+  "orders.assign_to_vehicle": "Assign shops to this vehicle",
+  "orders.select_vehicle_hint":
+    "Open a vehicle with the › arrow to assign the day's collected shops to it.",
+  "orders.saved_on_vehicle": "Saved on this vehicle",
   "orders.no_eligible_vehicles":
     "No vehicle trips available for assignment. Create a trip with Step 2 (Farm) completed in Vehicle Trip Entry first.",
   "orders.vehicle_locked":
@@ -322,6 +328,12 @@ const TE: Record<string, string> = {
   "orders.partial_assigned": "{vehicle} పై పాక్షికంగా ({assigned}/{total} షాప్‌లు)",
   "orders.select_order": "వాహనానికి అసైన్ చేయడానికి సేకరించిన ఆర్డర్ ఎంచుకోండి",
   "orders.select_vehicle": "వాహనం ఎంచుకోండి",
+  "orders.vehicles_ready": "అసైన్‌మెంట్‌కు సిద్ధంగా ఉన్న వాహనాలు",
+  "orders.step2_submitted_note": "స్టెప్ 2 సబ్మిట్ అయింది, డెలివరీ పెండింగ్",
+  "orders.assign_to_vehicle": "ఈ వాహనానికి షాప్‌లను కేటాయించండి",
+  "orders.select_vehicle_hint":
+    "రోజు సేకరించిన షాప్‌లను కేటాయించడానికి › బాణం గుర్తుతో వాహనాన్ని తెరవండి.",
+  "orders.saved_on_vehicle": "ఈ వాహనంపై సేవ్ చేయబడింది",
   "orders.no_eligible_vehicles":
     "అసైన్‌మెంట్‌కు అందుబాటులో ఉన్న వాహన ట్రిప్‌లు లేవు. ముందు వాహన ట్రిప్ ఎంట్రీలో స్టెప్ 2 (ఫామ్) పూర్తి చేసిన ట్రిప్ సృష్టించండి.",
   "orders.vehicle_locked":

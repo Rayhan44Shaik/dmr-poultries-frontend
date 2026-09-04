@@ -26,6 +26,7 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
+  ChevronRight,
   Loader2,
   Lock,
   RefreshCw,
@@ -33,11 +34,9 @@ import {
   Send,
   X,
 } from "lucide-react";
-import Select from "react-select";
 import type { Trip } from "../../../../shared/trip";
 import {
   opsPrimaryButtonClass,
-  opsReactSelectStyles,
   opsSecondaryButtonClass,
   opsTableDivideClass,
   opsTableHeadRowClass,
@@ -58,6 +57,7 @@ import {
   finishAssignment,
   saveAssignment,
   sendOrdersWhatsApp,
+  supervisorMobileOf,
   villageOf,
   type ShopDirectory,
   type SupervisorDirectory,
@@ -500,6 +500,15 @@ function AssignmentEditor({
     : 0;
   const requested = selected.reduce((s, r) => s + r.assigned, 0);
   const available = vehicle ? Math.max(0, capacity - alreadyAssignedOther) : 0;
+  // Order rows already persisted on THIS vehicle (earlier partial saves).
+  // They let the operator dispatch the truck with an empty selection.
+  const savedOnVehicle = useMemo(
+    () =>
+      vehicle
+        ? pool.assigned.filter((a) => a.tripNo === vehicle.trip.tripNo && !a.delivered).length
+        : 0,
+    [pool.assigned, vehicle]
+  );
   const remaining = available - requested;
   const totals = useMemo(() => collectionTotals(toOrderShopRows(selected)), [selected]);
 
@@ -573,7 +582,9 @@ function AssignmentEditor({
   const handleFinish = useCallback(async () => {
     if (busy || !vehicle) return;
     const unassigned = selected.filter((r) => r.assigned < 1);
-    if (selected.length === 0 || unassigned.length > 0) {
+    // An empty selection is allowed when earlier partial saves already put
+    // shops on this vehicle — those rows are dispatched as they stand.
+    if ((selected.length === 0 && savedOnVehicle === 0) || unassigned.length > 0) {
       showNotification(to("orders.finish_assignment_invalid"), "info");
       return;
     }
@@ -581,9 +592,12 @@ function AssignmentEditor({
     if (!(await assertNoConflicts())) return;
     setFinishing(true);
     try {
-      const vehicleTrip = await finishAssignment(vehicle.trip, [
-        { orderTripNo: orderTrip.tripNo, rows: toOrderShopRows(selected) },
-      ]);
+      const vehicleTrip = await finishAssignment(
+        vehicle.trip,
+        selected.length > 0
+          ? [{ orderTripNo: orderTrip.tripNo, rows: toOrderShopRows(selected) }]
+          : []
+      );
       showNotification(to("orders.assignment_finished"), "success");
       onFinished(vehicleTrip);
     } catch {
@@ -591,7 +605,7 @@ function AssignmentEditor({
     } finally {
       setFinishing(false);
     }
-  }, [busy, vehicle, selected, checkCapacity, assertNoConflicts, orderTrip.tripNo, showNotification, to, onFinished]);
+  }, [busy, vehicle, selected, savedOnVehicle, checkCapacity, assertNoConflicts, orderTrip.tripNo, showNotification, to, onFinished]);
 
   // ── WhatsApp (existing mechanism — assignment list to the supervisor) ────
   const handleWhatsApp = useCallback(async () => {
@@ -636,19 +650,7 @@ function AssignmentEditor({
     }
   }, [waBusy, vehicle, isDirty, selected, assertNoConflicts, orderTrip.tripNo, supervisorMobile, showNotification, to]);
 
-  // ── Vehicle options / summary ────────────────────────────────────────────
-  const vehicleOptions = useMemo(
-    () =>
-      eligibleVehicles.map((v) => ({
-        value: v.trip.id,
-        label: `${v.trip.vehicleNo} · ${v.trip.sourceFarm || "—"} · ${v.capacity} ${to("orders.col_boxes").toLowerCase()}`,
-      })),
-    [eligibleVehicles, to]
-  );
-  const vehicleValue =
-    vehicleOptions.find((o) => o.value === vehicleTripId) ??
-    (vehicle ? { value: vehicle.trip.id, label: vehicle.trip.vehicleNo || String(vehicle.trip.id) } : null);
-
+  // ── Vehicle summary (the vehicle itself is chosen from the › table) ──────
   // Compact vehicle information strip — the useful fact set, rendered
   // small (never as a hero panel).
   const summary: Array<[string, string]> = vehicle
@@ -752,10 +754,100 @@ function AssignmentEditor({
     return a.delivered ? "delivered" : "assigned";
   };
 
-  // ── Render — SHOP-FIRST, table-first (same visual language as
-  //     Order Collection; vehicle comes AFTER the shop selection) ─────────
+  // ── Render — VEHICLE-FIRST: the trucks that finished Step 2 are listed
+  //     with their trip / vehicle / supervisor / farm / capacity facts, and a
+  //     › arrow opens that vehicle's shop-assignment panel. ─────────────────
   return (
     <div>
+      {/* 0 — Vehicles ready for assignment (Step 2 submitted, Step 4 not) */}
+      <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between gap-2 flex-wrap">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+          {to("orders.vehicles_ready")}
+        </span>
+        <span className="text-[11px] font-semibold text-slate-400">
+          {eligibleVehicles.length} · {to("orders.step2_submitted_note")}
+        </span>
+      </div>
+      {eligibleVehicles.length === 0 ? (
+        <div className="px-4 py-5">
+          <OrdersEmptyState title={to("orders.no_eligible_vehicles")} />
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] text-xs md:text-sm">
+            <thead>
+              <tr className={opsTableHeadRowClass}>
+                <th className={`${opsTableThClass} w-12`} />
+                <th className={`${opsTableThClass} w-40`}>{to("orders.col_trip_no")}</th>
+                <th className={`${opsTableThClass} w-36`}>{to("orders.vehicle_no")}</th>
+                <th className={`${opsTableThClass} w-32`}>{to("orders.supervisor_mobile")}</th>
+                <th className={`${opsTableThClass} w-40`}>{to("orders.supervisor")}</th>
+                <th className={opsTableThClass}>{to("orders.farm_address")}</th>
+                <th className={`${opsTableThClass} w-36 text-right`}>
+                  {to("orders.vehicle_box_capacity")}
+                </th>
+              </tr>
+            </thead>
+            <tbody className={opsTableDivideClass}>
+              {eligibleVehicles.map((v) => {
+                const open = vehicleTripId === v.trip.id;
+                const mobile = supervisorMobileOf(v.trip, supervisorDirectory);
+                const farm = `${v.trip.sourceFarm || "—"}${
+                  v.trip.farmAddress ? ` · ${v.trip.farmAddress}` : ""
+                }`;
+                return (
+                  <tr
+                    key={v.trip.id}
+                    className={`${opsTableRowClass} ${open ? "bg-emerald-50/70" : ""}`}
+                  >
+                    <td className={opsTableTdClass}>
+                      {/* › opens this vehicle's shop-assignment panel */}
+                      <button
+                        type="button"
+                        onClick={() => setVehicleTripId(open ? null : v.trip.id)}
+                        aria-expanded={open}
+                        aria-label={`${to("orders.assign_to_vehicle")} — ${v.trip.vehicleNo || v.trip.tripNo}`}
+                        title={to("orders.assign_to_vehicle")}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-emerald-300 hover:text-emerald-700"
+                      >
+                        <ChevronRight
+                          size={15}
+                          className={open ? "rotate-90 text-emerald-600" : ""}
+                        />
+                      </button>
+                    </td>
+                    <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
+                      {v.trip.tripNo || "—"}
+                    </td>
+                    <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
+                      {v.trip.vehicleNo || "—"}
+                    </td>
+                    <td className={opsTableTdClass}>{mobile || "—"}</td>
+                    <td className={opsTableTdClass}>{v.trip.supervisorName || "—"}</td>
+                    <td className={`${opsTableTdClass} max-w-[260px] truncate`} title={farm}>
+                      {farm}
+                    </td>
+                    <td className={`${opsTableTdClass} text-right font-bold text-slate-800`}>
+                      {formatCount(v.capacity)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Shop assignment happens INSIDE one chosen vehicle — the panels below
+          stay hidden until a vehicle row is opened with ›. */}
+      {!vehicle && eligibleVehicles.length > 0 && (
+        <p className="border-t border-slate-100 bg-slate-50/40 px-4 py-3 text-[11px] font-semibold text-slate-400">
+          {to("orders.select_vehicle_hint")}
+        </p>
+      )}
+
+      {vehicle && (
+        <>
       {/* 1 — Day pool: pending + assigned collected shops (select
           pending shops one by one; assigned rows are visible, locked) */}
       <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between gap-2 flex-wrap">
@@ -900,27 +992,10 @@ function AssignmentEditor({
             <span className="text-[11px] font-semibold text-slate-400">
               {to("orders.assign_hint")}
             </span>
-            <div className="ml-auto w-full sm:w-80">
-              {eligibleVehicles.length === 0 ? (
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  {to("orders.no_eligible_vehicles")}
-                </p>
-              ) : (
-                <Select
-                  options={vehicleOptions}
-                  value={vehicleValue}
-                  onChange={(opt) => {
-                    if (!opt) return;
-                    setVehicleTripId(opt.value);
-                  }}
-                  placeholder={to("orders.select_vehicle")}
-                  styles={opsReactSelectStyles()}
-                  className="text-xs"
-                  isSearchable
-                  menuPosition="fixed"
-                />
-              )}
-            </div>
+            {/* The vehicle comes from the › row above — no second selector. */}
+            <span className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-[11px] font-bold text-emerald-700">
+              {vehicle.trip.tripNo} · {vehicle.trip.vehicleNo || "—"}
+            </span>
           </div>
 
           {vehicle && (
@@ -1093,13 +1168,22 @@ function AssignmentEditor({
         </>
       )}
 
-      {/* 3 — Actions (only when there is something to assign) */}
-      {selected.length > 0 && (
+        </>
+      )}
+
+      {/* 3 — Actions (available while a vehicle is open, so a partially
+          saved truck can still be dispatched with an empty selection) */}
+      {vehicle && (
         <div className="border-t border-slate-200 bg-slate-50/70 px-5 py-3.5 flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
             {isDirty && (
               <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
                 {to("orders.unsaved_changes")}
+              </span>
+            )}
+            {selected.length === 0 && savedOnVehicle > 0 && (
+              <span className="text-[11px] font-semibold text-slate-500 bg-white border border-slate-200 rounded-full px-2.5 py-1">
+                {to("orders.saved_on_vehicle")}: <b>{savedOnVehicle}</b>
               </span>
             )}
           </div>
@@ -1132,7 +1216,7 @@ function AssignmentEditor({
             <button
               type="button"
               onClick={() => void handleFinish()}
-              disabled={busy || !vehicle || selected.length === 0}
+              disabled={busy || !vehicle || (selected.length === 0 && savedOnVehicle === 0)}
               className={opsPrimaryButtonClass}
             >
               {finishing || conflictChecking ? (
