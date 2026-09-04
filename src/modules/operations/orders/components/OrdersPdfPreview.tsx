@@ -277,6 +277,10 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
                   value={`${sum((b) => b.deliveredBoxes)}/${sum((b) => b.orderedBoxes)}`}
                 />
                 <Fact
+                  label={ordersTranslate("orders.pending_boxes")}
+                  value={`${sum((b) => Math.max(0, b.orderedBoxes - b.deliveredBoxes))} box`}
+                />
+                <Fact
                   label={ordersTranslate("orders.delivered_weight")}
                   value={`${sum((b) => b.deliveredWeight).toFixed(2)} kg`}
                 />

@@ -267,7 +267,7 @@ function TrackingTable({
             <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_delivered_boxes")}</th>
             <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_birds")}</th>
             <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.delivered_weight")}</th>
-            <th className={`${opsTableThClass} w-20 text-right`}>{to("orders.status_pending")}</th>
+            <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.pending_boxes")}</th>
             <th className={`${opsTableThClass} w-28`}>{to("orders.col_status")}</th>
             <th className={`${opsTableThClass} w-28`}>{to("orders.col_action")}</th>
           </tr>
@@ -305,8 +305,22 @@ function TrackingTable({
                 </td>
                 <td className={`${opsTableTdClass} text-right`}>
                   {progress ? (
-                    progress.pendingShops > 0 ? (
-                      <b className="text-amber-600">{progress.pendingShops}</b>
+                    progress.pendingBoxes > 0 ? (
+                      // Partial deliveries live here: 25 ordered, 10 in → 15 box
+                      // still pending, even when every shop has a capture.
+                      <span className="inline-flex flex-col items-end leading-tight">
+                        <b className="text-amber-600">
+                          {formatCount(progress.pendingBoxes)} {to("orders.word_boxes")}
+                        </b>
+                        {progress.pendingShops > 0 && (
+                          <span className="text-[10px] font-semibold text-slate-400">
+                            {progress.pendingShops} {to("orders.col_shops")}
+                            {progress.partDeliveredShops > 0
+                              ? ` · ${progress.partDeliveredShops} ${to("orders.status_part_delivered")}`
+                              : ""}
+                          </span>
+                        )}
+                      </span>
                     ) : (
                       <span className="text-slate-300">0</span>
                     )

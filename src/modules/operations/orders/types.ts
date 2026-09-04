@@ -84,6 +84,20 @@ export type OrdersProgress = {
   deliveredBirds: number;
   /** Weight (KG) actually delivered for the original shops (Step 4 rows). */
   deliveredWeight: number;
+  /**
+   * Original shops that got SOME boxes but not all — a partial delivery, which
+   * stays open until the balance is closed.
+   */
+  partDeliveredShops: number;
+  /**
+   * Boxes still to deliver (ordered − delivered, never below 0). This is the
+   * number a partial delivery leaves behind: 25 ordered, 10 in → 15 pending.
+   */
+  pendingBoxes: number;
+  /** Birds still to deliver. */
+  pendingBirds: number;
+  /** Weight (KG) still to deliver. */
+  pendingWeight: number;
   /** Shops present in Step 4 data but NOT part of the original order. */
   additionalShopCount: number;
   /** Assigned = 0 delivered · In Progress = partial · Completed = all or trip ended. */
@@ -132,6 +146,8 @@ export type DayShopAssignment = {
   birds: number;
   /** A Step 4 capture exists for this shop on that trip. */
   delivered: boolean;
+  /** Boxes actually captured for this shop (a partial delivery is < `boxes`). */
+  deliveredBoxes: number;
   /** Trip-level status (kept in sync with Delivery Tracking). */
   tripStatus: OrdersTrackingStatus;
   /** Vehicle trip avg bird weight (for the weight estimate column). */

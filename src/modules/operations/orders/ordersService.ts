@@ -36,6 +36,7 @@ import {
   buildShopDeliveryRow,
   collectionTotals,
   computeOrdersProgress,
+  deliveredRowBoxes,
   isCapturedRow,
   isEligibleVehicleTrip,
   isOrderContainer,
@@ -190,6 +191,11 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
         boxes: orderedBoxes,
         birds: orderedBirds,
         delivered: acc.rows.some(isCapturedRow),
+        // A partial delivery (10 of 25 boxes) must stay visible as a balance,
+        // so the collection table can tell "delivered" from "part delivered".
+        deliveredBoxes: acc.rows
+          .filter(isCapturedRow)
+          .reduce((sum, r) => sum + deliveredRowBoxes(r), 0),
         tripStatus: tripStatusOf(acc.trip),
         avgBirdWeight: num(acc.trip.avgBirdWeight),
       });

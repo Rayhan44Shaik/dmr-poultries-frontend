@@ -192,7 +192,7 @@ const HAND_WRITTEN_VEHICLES: SampleVehicle[] = [
 ];
 
 /** How many trucks the sample fleet holds. */
-const SAMPLE_VEHICLE_COUNT = 20;
+const SAMPLE_VEHICLE_COUNT = 24;
 
 export const SAMPLE_VEHICLES: SampleVehicle[] = [
   ...HAND_WRITTEN_VEHICLES,
@@ -401,35 +401,40 @@ function deliveredAt(day: string, shopIndex: number): string {
 }
 
 /**
- * Deterministic uneven split of `total` items into `parts` buckets (every
- * bucket ≥ 1, sum exactly `total`). `bigFirst` hands the first bucket ~40% of
- * the day's shops — the multi-page delivery report case.
+ * The scenario: 7 operational days → 7 collection containers + the vehicle
+ * trips below (≈ 93 trips in all).
+ *
+ * `kind`
+ *  - "today"  : collection still open, trucks assignable (some partly assigned)
+ *  - "past"   : collection finished, trucks in Delivery Tracking
+ *  - "closed" : collection left unfinished — the D+2 00:00 clock CLOSED it
+ *
+ * `boxes` is the day's per-shop order size: a day of small retailers (3…6
+ * boxes) puts 15+ shops on one truck, which is the multi-page report case.
  */
-function splitCounts(total: number, parts: number, seed: number, bigFirst: boolean): number[] {
-  if (parts <= 0) return [];
-  if (parts === 1) return [total];
-  const sizes: number[] = [];
-  let remaining = total;
-  if (bigFirst) {
-    const first = Math.max(2, Math.round(total * 0.4));
-    sizes.push(Math.min(first, remaining - (parts - 1)));
-    remaining -= sizes[0];
-  }
-  const rest = bigFirst ? parts - 1 : parts;
-  const base = Math.max(1, Math.floor(remaining / rest));
-  for (let i = 0; i < rest; i += 1) {
-    sizes.push(Math.max(1, base + (((i + seed) % 3) - 1)));
-  }
-  // Reconcile the rounding drift so the buckets add up exactly.
-  let sum = sizes.reduce((a, b) => a + b, 0);
-  for (let i = 0; sum !== total; i = (i + 1) % sizes.length) {
-    const delta = total > sum ? 1 : -1;
-    if (sizes[i] + delta >= 1) {
-      sizes[i] += delta;
-      sum += delta;
-    }
-  }
-  return sizes;
+const SCENARIO: Array<{
+  offset: number;
+  shops: number;
+  vehicles: number;
+  kind: "today" | "past" | "closed";
+  boxes: [number, number];
+}> = [
+  { offset: 0, shops: 40, vehicles: 14, kind: "today", boxes: [8, 29] },
+  { offset: -1, shops: 60, vehicles: 22, kind: "past", boxes: [8, 29] },
+  { offset: -2, shops: 48, vehicles: 3, kind: "past", boxes: [3, 6] },
+  { offset: -3, shops: 55, vehicles: 22, kind: "past", boxes: [8, 29] },
+  { offset: -4, shops: 45, vehicles: 3, kind: "past", boxes: [3, 5] },
+  { offset: -5, shops: 20, vehicles: 0, kind: "closed", boxes: [8, 29] },
+  { offset: -6, shops: 60, vehicles: 22, kind: "past", boxes: [8, 29] },
+];
+
+/** Trucks per day that already carry a partial assignment (today only). */
+const PARTIALLY_ASSIGNED_TODAY = 5;
+
+/** Deterministic per-shop order size for a day. */
+function boxesForDay(spec: { boxes: [number, number] }, shopId: number, index: number): number {
+  const [min, max] = spec.boxes;
+  return min + ((shopId * 7 + index * 3) % (max - min + 1));
 }
 
 /** Which shops a day's order holds — rotated so each day covers new ground. */
@@ -437,33 +442,6 @@ function shopIdsForDay(dayIndex: number, count: number): number[] {
   const start = (dayIndex * 17) % SAMPLE_SHOPS.length;
   return Array.from({ length: count }, (_, i) => SAMPLE_SHOPS[(start + i) % SAMPLE_SHOPS.length].id);
 }
-
-/**
- * The scenario: 7 operational days → 7 containers + 93 vehicle trips.
- *
- * `kind`
- *  - "today"  : collection still open, trucks assignable (some partly assigned)
- *  - "past"   : collection finished, trucks in Delivery Tracking
- *  - "closed" : collection left unfinished — the D+2 00:00 clock CLOSED it
- */
-const SCENARIO: Array<{
-  offset: number;
-  shops: number;
-  vehicles: number;
-  kind: "today" | "past" | "closed";
-  bigFirst?: boolean;
-}> = [
-  { offset: 0, shops: 36, vehicles: 14, kind: "today" },
-  { offset: -1, shops: 45, vehicles: 16, kind: "past" },
-  { offset: -2, shops: 52, vehicles: 16, kind: "past", bigFirst: true },
-  { offset: -3, shops: 40, vehicles: 16, kind: "past" },
-  { offset: -4, shops: 60, vehicles: 16, kind: "past", bigFirst: true },
-  { offset: -5, shops: 20, vehicles: 0, kind: "closed" },
-  { offset: -6, shops: 48, vehicles: 15, kind: "past" },
-];
-
-/** Trucks per past day that already carry a partial assignment (today only). */
-const PARTIALLY_ASSIGNED_TODAY = 5;
 
 function buildSampleTrips(): Trip[] {
   const trips: Trip[] = [];
@@ -474,46 +452,63 @@ function buildSampleTrips(): Trip[] {
     const day = localDay(spec.offset);
     const orderNo = `ORD-${stamp(day)}-01`;
     const dayShops = shopIdsForDay(dayIndex, spec.shops);
+    // ONE order of record per shop per day: the collection row and every
+    // vehicle row use these numbers, so delivered can never exceed ordered.
+    const orderedBoxesOf = new Map<number, number>();
+    dayShops.forEach((shopId, i) => orderedBoxesOf.set(shopId, boxesForDay(spec, shopId, i)));
 
     // ── the day's collection container (Tab 1) ─────────────────────────────
-    const containerRows = dayShops.map((shopId, i) => {
-      const boxes = 8 + ((shopId * 7 + i * 3) % 22); // 8 … 29 boxes
-      return planRow(0, i + 1, shopId, boxes, boxes * BIRDS_PER_BOX);
-    });
     trips.push(
       containerTrip(
         (containerId += 1),
         day,
         spec.kind !== "today" && spec.kind !== "closed",
-        containerRows
+        dayShops.map((shopId, i) => {
+          const boxes = orderedBoxesOf.get(shopId)!;
+          return planRow(0, i + 1, shopId, boxes, boxes * BIRDS_PER_BOX);
+        })
       )
     );
 
     if (spec.vehicles === 0) return; // the auto-closed day has no trucks
 
-    const perVehicle = splitCounts(dayShops.length, spec.vehicles, dayIndex, !!spec.bigFirst);
+    // ── spread the day's shops over the trucks, respecting box capacity ────
+    const trucks = Array.from({ length: spec.vehicles }, (_, i) => {
+      const vehicleId = ((dayIndex * 5 + i * 3) % SAMPLE_VEHICLES.length) + 1;
+      return { vehicleId, capacity: vehicleById(vehicleId).noOfBoxes, shops: [] as number[] };
+    });
     let cursor = 0;
+    for (const shopId of dayShops) {
+      const boxes = orderedBoxesOf.get(shopId)!;
+      let placed = false;
+      for (let attempt = 0; attempt < trucks.length; attempt += 1) {
+        const truck = trucks[(cursor + attempt) % trucks.length];
+        const load = truck.shops.reduce((sum, id) => sum + (orderedBoxesOf.get(id) ?? 0), 0);
+        if (load + boxes <= truck.capacity) {
+          truck.shops.push(shopId);
+          cursor = (cursor + attempt + 1) % trucks.length;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) trucks[cursor % trucks.length].shops.push(shopId); // never lose an order
+    }
 
-    perVehicle.forEach((shopCount, vIndex) => {
-      const shopIds = dayShops.slice(cursor, cursor + shopCount);
-      cursor += shopCount;
-      const vehicleId = ((dayIndex * 5 + vIndex * 3) % SAMPLE_VEHICLES.length) + 1;
-      const vehicle = vehicleById(vehicleId);
+    trucks.forEach((truck, vIndex) => {
+      // Past days are tracking trips: an empty truck would carry no order rows.
+      if (truck.shops.length === 0 && spec.kind !== "today") return;
+
+      const vehicle = vehicleById(truck.vehicleId);
       const supervisor = SAMPLE_SUPERVISORS[(dayIndex + vIndex) % SAMPLE_SUPERVISORS.length];
       const driver = SAMPLE_DRIVERS[(dayIndex * 2 + vIndex) % SAMPLE_DRIVERS.length];
       const seq = vIndex + 1;
-
-      // Load the truck to 70…90% of its box capacity, split over its shops.
-      const targetBoxes = Math.round(vehicle.noOfBoxes * (0.7 + (vIndex % 4) * 0.066));
-      const base = Math.max(2, Math.floor(targetBoxes / Math.max(1, shopIds.length)));
-      const boxesOf = (j: number) => Math.max(2, base + ((j % 3) - 1));
+      const boxesOf = (shopId: number) => orderedBoxesOf.get(shopId)!;
 
       // ── TODAY: assignable trucks; the first few already partly assigned ──
       if (spec.kind === "today") {
-        const partial = vIndex < PARTIALLY_ASSIGNED_TODAY;
-        const carried = partial ? shopIds.slice(0, 1 + (vIndex % 3)) : [];
+        const carried = vIndex < PARTIALLY_ASSIGNED_TODAY ? truck.shops.slice(0, 1 + (vIndex % 3)) : [];
         trips.push(
-          deliveryTrip((tripId += 1), day, seq, vehicleId, driver, supervisor.name, {
+          deliveryTrip((tripId += 1), day, seq, truck.vehicleId, driver, supervisor.name, {
             status: "Pending",
             deliveryStepSubmitted: false,
             pickupStepSubmitted: false,
@@ -522,8 +517,8 @@ function buildSampleTrips(): Trip[] {
                 tripId,
                 j + 1,
                 shopId,
-                boxesOf(j),
-                boxesOf(j) * BIRDS_PER_BOX,
+                boxesOf(shopId),
+                boxesOf(shopId) * BIRDS_PER_BOX,
                 assigned(orderNo)
               )
             ),
@@ -533,19 +528,19 @@ function buildSampleTrips(): Trip[] {
       }
 
       // ── PAST DAYS: tracking trips in all three delivery states ───────────
-      //   0…3 → Completed        (every shop delivered)
+      //   0…3 → Completed        (every shop delivered in full)
       //   4…6 → In Progress      (some delivered, one PART DELIVERED, rest not)
       //   7…9 → Assigned         (nothing delivered yet)
       const bucket = (vIndex + dayIndex) % 10;
       const completed = bucket < 4;
       const inProgress = bucket >= 4 && bucket < 7;
-      const fullCount = inProgress ? Math.max(1, Math.floor(shopIds.length / 2)) : shopIds.length;
+      const fullCount = inProgress ? Math.max(1, Math.floor(truck.shops.length / 2)) : truck.shops.length;
       const partShopIndex = inProgress ? fullCount : -1;
 
       const rows: ShopDelivery[] = [];
       let serial = 1;
-      shopIds.forEach((shopId, j) => {
-        const boxes = boxesOf(j);
+      truck.shops.forEach((shopId, j) => {
+        const boxes = boxesOf(shopId);
         const birds = boxes * BIRDS_PER_BOX;
         const done = completed || (inProgress && j < fullCount);
         if (done) {
@@ -579,7 +574,7 @@ function buildSampleTrips(): Trip[] {
       });
 
       trips.push(
-        deliveryTrip((tripId += 1), day, seq, vehicleId, driver, supervisor.name, {
+        deliveryTrip((tripId += 1), day, seq, truck.vehicleId, driver, supervisor.name, {
           status: completed ? "Completed" : "Pending",
           deliveryStepSubmitted: true,
           endStepSubmitted: completed,

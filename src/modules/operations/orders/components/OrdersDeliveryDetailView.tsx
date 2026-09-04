@@ -605,6 +605,7 @@ function OrdersDeliveryDetailView({
                         <th className={opsTableThClass} />
                         <th className={`${opsTableThClass} text-right`}>{to("orders.total_ordered")}</th>
                         <th className={`${opsTableThClass} text-right`}>{to("orders.total_delivered")}</th>
+                        <th className={`${opsTableThClass} text-right`}>{to("orders.pending_boxes")}</th>
                         <th className={`${opsTableThClass} text-right`}>{to("orders.col_difference")}</th>
                       </tr>
                     </thead>
@@ -613,6 +614,14 @@ function OrdersDeliveryDetailView({
                         <td className={`${opsTableTdClass} font-semibold text-slate-600`}>{to("orders.word_boxes")}</td>
                         <td className={`${opsTableTdClass} text-right font-semibold`}>{formatCount(totals.orderedBoxes)}</td>
                         <td className={`${opsTableTdClass} text-right font-semibold`}>{formatCount(totals.deliveredBoxes)}</td>
+                        <td className={`${opsTableTdClass} text-right font-semibold`}>
+                          {/* PART DELIVERY: 25 ordered, 10 in → 15 box pending */}
+                          {totals.orderedBoxes - totals.deliveredBoxes > 0 ? (
+                            <b className="text-amber-600">{formatCount(totals.orderedBoxes - totals.deliveredBoxes)}</b>
+                          ) : (
+                            <span className="text-slate-300">0</span>
+                          )}
+                        </td>
                         <td className={opsTableTdClass}>
                           <DiffCell value={totals.deliveredBoxes - totals.orderedBoxes} show />
                         </td>
@@ -621,6 +630,13 @@ function OrdersDeliveryDetailView({
                         <td className={`${opsTableTdClass} font-semibold text-slate-600`}>{to("orders.word_birds")}</td>
                         <td className={`${opsTableTdClass} text-right font-semibold`}>{formatCount(totals.orderedBirds)}</td>
                         <td className={`${opsTableTdClass} text-right font-semibold`}>{formatCount(totals.deliveredBirds)}</td>
+                        <td className={`${opsTableTdClass} text-right font-semibold`}>
+                          {totals.orderedBirds - totals.deliveredBirds > 0 ? (
+                            <b className="text-amber-600">{formatCount(totals.orderedBirds - totals.deliveredBirds)}</b>
+                          ) : (
+                            <span className="text-slate-300">0</span>
+                          )}
+                        </td>
                         <td className={opsTableTdClass}>
                           <DiffCell value={totals.deliveredBirds - totals.orderedBirds} show />
                         </td>
@@ -629,6 +645,13 @@ function OrdersDeliveryDetailView({
                         <td className={`${opsTableTdClass} font-semibold text-slate-600`}>{to("orders.weight_kg")}</td>
                         <td className={`${opsTableTdClass} text-right font-semibold`}>{totals.orderedWeight.toFixed(2)}</td>
                         <td className={`${opsTableTdClass} text-right font-semibold`}>{totals.deliveredWeight.toFixed(2)}</td>
+                        <td className={`${opsTableTdClass} text-right font-semibold`}>
+                          {totals.orderedWeight - totals.deliveredWeight > 0 ? (
+                            <b className="text-amber-600">{(totals.orderedWeight - totals.deliveredWeight).toFixed(2)}</b>
+                          ) : (
+                            <span className="text-slate-300">0</span>
+                          )}
+                        </td>
                         <td className={opsTableTdClass}>
                           <WeightDiffCell value={totals.deliveredWeight - totals.orderedWeight} show />
                         </td>

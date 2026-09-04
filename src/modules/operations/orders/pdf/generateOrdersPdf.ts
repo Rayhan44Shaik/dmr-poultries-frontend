@@ -291,7 +291,19 @@ export async function generateOrdersPdf({
     ["Total Weight", kg(progress?.totalWeight ?? 0)],
     ["Total Birds", count(progress?.totalBirds ?? 0)],
     ["Delivered", `${progress?.deliveredShops ?? 0} / ${progress?.totalShops ?? 0}`],
-    ["Pending", count(progress?.pendingShops ?? 0)],
+    ["Pending Shops", count(progress?.pendingShops ?? 0)],
+    [
+      "Pending Boxes",
+      count(
+        breakdown
+          .filter((b) => b.ordered)
+          .reduce((sum, b) => sum + Math.max(0, b.orderedBoxes - b.deliveredBoxes), 0)
+      ),
+    ],
+    [
+      "Part Delivered Shops",
+      count(breakdown.filter((b) => b.status === "part_delivered").length),
+    ],
     ["Additional Shops", count(progress?.additionalShopCount ?? 0)],
     ["Status", fmt(progress?.status ?? "")],
   ]);
@@ -322,6 +334,10 @@ export async function generateOrdersPdf({
     diffStr(b.birdDifference),
     b.orderedBoxes > 0 ? count(b.orderedBoxes) : "—",
     b.deliveredBoxes > 0 ? count(b.deliveredBoxes) : "—",
+    // PART DELIVERY: 25 ordered, 10 delivered → 15 box pending.
+    Math.max(0, b.orderedBoxes - b.deliveredBoxes) > 0
+      ? count(Math.max(0, b.orderedBoxes - b.deliveredBoxes))
+      : "0",
     diffStr(b.boxDifference),
     statusStr(b),
     formatDeliveredAtLabel(b.deliveredAt, true),
@@ -330,16 +346,7 @@ export async function generateOrdersPdf({
     seqBody.push([
       "—",
       ordersTranslate("orders.no_saved_collection", language),
-      "—",
-      "—",
-      "—",
-      "—",
-      "—",
-      "—",
-      "—",
-      "—",
-      "—",
-      "—",
+      ...Array.from({ length: 11 }, () => "—"),
     ]);
   }
 
@@ -353,21 +360,23 @@ export async function generateOrdersPdf({
       "Seq",
       ordersTranslate("orders.col_shop_name", language),
       ordersTranslate("orders.col_village", language),
-      ordersTranslate("orders.shop_mobile", language),
-      ordersTranslate("orders.ordered_birds", language),
-      ordersTranslate("orders.delivered_birds", language),
-      `${ordersTranslate("orders.col_difference", language)} (${ordersTranslate("orders.word_birds", language)})`,
-      ordersTranslate("orders.ordered_boxes", language),
-      ordersTranslate("orders.delivered_boxes", language),
-      `${ordersTranslate("orders.col_difference", language)} (${ordersTranslate("orders.word_boxes", language)})`,
-      ordersTranslate("orders.col_delivery_status", language),
-      ordersTranslate("orders.col_delivered_at", language),
+      ordersTranslate("orders.hdr_mobile", language),
+      ordersTranslate("orders.hdr_ord_birds", language),
+      ordersTranslate("orders.hdr_del_birds", language),
+      ordersTranslate("orders.hdr_diff_birds", language),
+      ordersTranslate("orders.hdr_ord_boxes", language),
+      ordersTranslate("orders.hdr_del_boxes", language),
+      ordersTranslate("orders.pending_boxes", language),
+      ordersTranslate("orders.hdr_diff_boxes", language),
+      ordersTranslate("orders.hdr_status", language),
+      ordersTranslate("orders.hdr_delivered_at", language),
     ],
     seqBody,
     {
       // Room for real shop names (a 45-shop vehicle must not turn into a
-      // wall of two-line rows) and a one-line delivery time.
-      widths: [8, 34, 16, 18, 10, 10, 10, 10, 10, 10, 20, null],
+      // wall of two-line rows), the pending-box column, and a one-line
+      // delivery time.
+      widths: [8, 30, 15, 15, 10, 10, 10, 10, 10, 11, 10, 17, null],
     }
   );
 
@@ -422,6 +431,12 @@ export async function generateOrdersPdf({
     const deliveredBirds = sum(breakdown, (b) => b.deliveredBirds);
     const orderedBoxes = sum(orderedRows, (b) => b.orderedBoxes);
     const deliveredBoxes = sum(breakdown, (b) => b.deliveredBoxes);
+    // Pending is measured per ORDERED shop, never as a difference of totals —
+    // a not-listed delivery would otherwise hide a real balance.
+    const pendingBoxes = orderedRows.reduce(
+      (acc, b) => acc + Math.max(0, b.orderedBoxes - b.deliveredBoxes),
+      0
+    );
     const totalWeight = sum(orderedRows, (b) => b.orderedWeight);
     const deliveredWeight = sum(breakdown, (b) => b.deliveredWeight);
 
@@ -435,6 +450,7 @@ export async function generateOrdersPdf({
       [ordersTranslate("orders.delivered_birds", language), count(deliveredBirds)],
       [ordersTranslate("orders.ordered_boxes", language), count(orderedBoxes)],
       [ordersTranslate("orders.delivered_boxes", language), count(deliveredBoxes)],
+      [ordersTranslate("orders.pending_boxes", language), count(pendingBoxes)],
       [ordersTranslate("orders.box_difference", language), diffStr(deliveredBoxes - orderedBoxes)],
       [ordersTranslate("orders.total_weight", language), kg(totalWeight)],
       [ordersTranslate("orders.delivered_weight", language), kg(deliveredWeight)],

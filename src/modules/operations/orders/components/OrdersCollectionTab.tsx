@@ -467,7 +467,12 @@ function CollectionEntries({
       const assignment = collection?.shops.get(shopId) ?? null;
       if (!hasEntry) return to("orders.status_not_collected");
       if (!assignment) return to("orders.status_collected");
-      return assignment.delivered ? to("orders.status_delivered") : to("orders.status_assigned");
+      if (!assignment.delivered) return to("orders.status_assigned");
+      // PART DELIVERY: some boxes are in, the rest are still pending.
+      if (assignment.deliveredBoxes > 0 && assignment.deliveredBoxes < assignment.boxes) {
+        return to("orders.status_part_delivered");
+      }
+      return to("orders.status_delivered");
     },
     [collection, to]
   );
@@ -670,6 +675,24 @@ function CollectionEntries({
                     // Order collected but not yet on any vehicle.
                     statusNode = (
                       <OrdersStatusBadge status="Collected" label={to("orders.status_collected")} />
+                    );
+                  } else if (
+                    assignment.delivered &&
+                    assignment.deliveredBoxes > 0 &&
+                    assignment.deliveredBoxes < assignment.boxes
+                  ) {
+                    // PART DELIVERY — the balance stays visible (25 ordered,
+                    // 10 in → 15 box pending), never a green "Delivered".
+                    const remaining = assignment.boxes - assignment.deliveredBoxes;
+                    statusNode = (
+                      <span
+                        title={`${assignment.tripNo} · ${assignment.vehicleNo} · ${to("orders.seq_n", { n: assignment.sequence })} · ${to("orders.pending_boxes_hint", { boxes: remaining })}`}
+                      >
+                        <OrdersStatusBadge
+                          status="Part Delivered"
+                          label={`${to("orders.status_part_delivered")} · ${remaining} ${to("orders.word_boxes")}`}
+                        />
+                      </span>
                     );
                   } else if (assignment.delivered) {
                     // Step 4 confirmed this shop was delivered → GREEN.

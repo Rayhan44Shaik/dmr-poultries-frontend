@@ -240,13 +240,43 @@ export function computeOrdersProgress(
     totalWeight += ordered ? ordered.weight : num(row.farmWeight ?? row.weight);
     totalBirds += ordered ? ordered.birds : num(row.farmBirds ?? row.birds);
   }
+  // Delivered totals per shop — a shop can have several captures (each partial
+  // delivery adds one), so the balance is measured shop by shop, never per row.
+  const capturedByShop = new Map<number, { boxes: number; birds: number; weight: number }>();
   for (const row of rows) {
-    if (isOrderPlanRow(row) && isCapturedRow(row)) {
-      deliveredBoxes += deliveredRowBoxes(row);
-      // Step 4 rewrites the row in place: birds/weight = delivered values.
-      deliveredBirds += num(row.birds);
-      deliveredWeight += num(row.weight);
-    }
+    if (!isOrderPlanRow(row) || !isCapturedRow(row)) continue;
+    const shopId = num(row.shopId);
+    if (!shopId) continue;
+    const acc = capturedByShop.get(shopId) ?? { boxes: 0, birds: 0, weight: 0 };
+    acc.boxes += deliveredRowBoxes(row);
+    // Step 4 rewrites the row in place: birds/weight = delivered values.
+    acc.birds += num(row.birds);
+    acc.weight += num(row.weight);
+    capturedByShop.set(shopId, acc);
+  }
+  for (const acc of capturedByShop.values()) {
+    deliveredBoxes += acc.boxes;
+    deliveredBirds += acc.birds;
+    deliveredWeight += acc.weight;
+  }
+
+  // ── PENDING = what the order asked for minus what actually came in ───────
+  // A partial delivery (10 of 25 boxes) leaves 15 boxes pending, and that shop
+  // is counted separately so the balance never looks like a finished shop.
+  let pendingBoxes = 0;
+  let pendingBirds = 0;
+  let pendingWeight = 0;
+  let partDeliveredShops = 0;
+  for (const [shopId, row] of planByShop) {
+    const ordered = originalQuantities?.get(shopId);
+    const orderedBoxes = ordered ? ordered.boxes : rowBoxes(row);
+    const orderedBirds = ordered ? ordered.birds : num(row.farmBirds ?? row.birds);
+    const orderedWeight = ordered ? ordered.weight : num(row.farmWeight ?? row.weight);
+    const got = capturedByShop.get(shopId);
+    pendingBoxes += Math.max(0, orderedBoxes - (got?.boxes ?? 0));
+    pendingBirds += Math.max(0, orderedBirds - (got?.birds ?? 0));
+    pendingWeight += Math.max(0, orderedWeight - (got?.weight ?? 0));
+    if (got && got.boxes > 0 && got.boxes < orderedBoxes) partDeliveredShops += 1;
   }
 
   // Fallback when the marker was lost (e.g. remarks edited in Step 4):
@@ -298,6 +328,10 @@ export function computeOrdersProgress(
     totalBirds,
     deliveredShops,
     pendingShops,
+    partDeliveredShops,
+    pendingBoxes,
+    pendingBirds,
+    pendingWeight: Number(pendingWeight.toFixed(2)),
     deliveredBoxes,
     deliveredBirds,
     deliveredWeight: Number(deliveredWeight.toFixed(2)),
