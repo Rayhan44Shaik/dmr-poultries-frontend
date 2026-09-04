@@ -58,7 +58,7 @@ const EN: Record<string, string> = {
   "orders.step2_submitted_note": "Step 2 submitted, delivery pending",
   "orders.assign_to_vehicle": "Assign shops to this vehicle",
   "orders.select_vehicle_hint":
-    "Open a vehicle with the › arrow to assign the day's collected shops to it.",
+    "Pick a vehicle on the left to assign the day's collected shops to it.",
   "orders.saved_on_vehicle": "Saved on this vehicle",
   "orders.no_eligible_vehicles":
     "No vehicle trips available for assignment. Create a trip with Step 2 (Farm) completed in Vehicle Trip Entry first.",
@@ -149,6 +149,11 @@ const EN: Record<string, string> = {
   "orders.pending_boxes": "Pending Boxes",
   "orders.assign_shops": "Assign Shops",
   "orders.part_assign_left": "{boxes} left",
+  "orders.vehicles_waiting": "Waiting for shops",
+  "orders.vehicle_list_assigned": "Shops assigned",
+  "orders.boxes_short": "boxes",
+  "orders.vehicle_shops_assigned": "{n} shops assigned",
+  "orders.vehicle_shops_none": "No shops yet",
   "orders.sequence_empty_hint": "Tick the shops above to build this vehicle's delivery sequence — drag the rows to set the order, then Save Progress or Finish Assignment.",
   "orders.col_available": "Available",
   "orders.hdr_mobile": "Mobile",
@@ -396,7 +401,7 @@ const TE: Record<string, string> = {
   "orders.step2_submitted_note": "స్టెప్ 2 సబ్మిట్ అయింది, డెలివరీ పెండింగ్",
   "orders.assign_to_vehicle": "ఈ వాహనానికి షాప్‌లను కేటాయించండి",
   "orders.select_vehicle_hint":
-    "రోజు సేకరించిన షాప్‌లను కేటాయించడానికి › బాణం గుర్తుతో వాహనాన్ని తెరవండి.",
+    "రోజు సేకరించిన షాప్‌లను కేటాయించడానికి ఎడమ వైపున వాహనాన్ని ఎంచుకోండి.",
   "orders.saved_on_vehicle": "ఈ వాహనంపై సేవ్ చేయబడింది",
   "orders.no_eligible_vehicles":
     "అసైన్‌మెంట్‌కు అందుబాటులో ఉన్న వాహన ట్రిప్‌లు లేవు. ముందు వాహన ట్రిప్ ఎంట్రీలో స్టెప్ 2 (ఫామ్) పూర్తి చేసిన ట్రిప్ సృష్టించండి.",
@@ -486,6 +491,11 @@ const TE: Record<string, string> = {
   "orders.pending_boxes": "పెండింగ్ బాక్సులు",
   "orders.assign_shops": "షాప్‌లను కేటాయించండి",
   "orders.part_assign_left": "{boxes} మిగిలి ఉన్నాయి",
+  "orders.vehicles_waiting": "షాప్‌ల కోసం వేచి ఉన్నవి",
+  "orders.vehicle_list_assigned": "షాప్‌లు కేటాయించబడ్డాయి",
+  "orders.boxes_short": "బాక్స్‌లు",
+  "orders.vehicle_shops_assigned": "{n} షాప్‌లు కేటాయించబడ్డాయి",
+  "orders.vehicle_shops_none": "ఇంకా షాప్‌లు లేవు",
   "orders.sequence_empty_hint": "ఈ వాహనానికి డెలివరీ క్రమం సిద్ధం చేయడానికి పైన షాప్‌లను ఎంచుకోండి — వరుస కోసం వరుసలను లాగండి, ఆపై Save Progress లేదా Finish Assignment నొక్కండి.",
   "orders.col_available": "అందుబాటులో",
   "orders.hdr_mobile": "మొబైల్",

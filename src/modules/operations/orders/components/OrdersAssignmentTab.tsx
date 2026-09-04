@@ -39,9 +39,13 @@ import {
 } from "lucide-react";
 import type { Trip } from "../../../../shared/trip";
 import {
+  opsEmptyStateClass,
   opsPrimaryButtonClass,
   opsSecondaryButtonClass,
+  opsSectionTitleClass,
+  opsTableCardClass,
   opsTableDivideClass,
+  opsTableHeaderBarClass,
   opsTableHeadRowClass,
   opsTableTdClass,
   opsTableThClass,
@@ -559,6 +563,16 @@ function AssignmentEditor({
     [savedShopsByTripNo]
   );
 
+  // The vehicle list is split in two so the operator sees at a glance which
+  // trucks are still WAITING for shops and which ones already carry them.
+  const [pendingVehicles, assignedVehicles] = useMemo(
+    () => [
+      eligibleVehicles.filter((v) => savedShopsOn(v.trip.tripNo) === 0),
+      eligibleVehicles.filter((v) => savedShopsOn(v.trip.tripNo) > 0),
+    ],
+    [eligibleVehicles, savedShopsOn]
+  );
+
   const savedOnVehicle = useMemo(
     () =>
       vehicle
@@ -823,120 +837,113 @@ function AssignmentEditor({
   //     with their trip / vehicle / supervisor / farm / capacity facts, and a
   //     › arrow opens that vehicle's shop-assignment panel. ─────────────────
   return (
-    <div>
-      {/* 0 — Vehicles ready for assignment (Step 2 submitted, Step 4 not) */}
-      <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between gap-2 flex-wrap">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-          {to("orders.vehicles_ready")}
-        </span>
-        <span className="text-[11px] font-semibold text-slate-400">
-          {eligibleVehicles.length} · {to("orders.step2_submitted_note")}
-        </span>
-      </div>
-      {eligibleVehicles.length === 0 ? (
-        <div className="px-4 py-5">
-          <OrdersEmptyState title={to("orders.no_eligible_vehicles")} />
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-xs md:text-sm">
-            <thead>
-              <tr className={opsTableHeadRowClass}>
-                <th className={`${opsTableThClass} w-40`}>{to("orders.col_trip_no")}</th>
-                <th className={`${opsTableThClass} w-36`}>{to("orders.vehicle_no")}</th>
-                <th className={`${opsTableThClass} w-32`}>{to("orders.supervisor_mobile")}</th>
-                <th className={`${opsTableThClass} w-40`}>{to("orders.supervisor")}</th>
-                <th className={opsTableThClass}>{to("orders.farm_city")}</th>
-                <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_shops")}</th>
-                <th className={`${opsTableThClass} w-40 text-right`}>
-                  {to("orders.vehicle_box_capacity")}
-                </th>
-                <th className={`${opsTableThClass} w-36 text-right`}>{to("orders.col_available")}</th>
-                <th className={`${opsTableThClass} w-40 text-right`}>{to("orders.col_action")}</th>
-              </tr>
-            </thead>
-            <tbody className={opsTableDivideClass}>
-              {eligibleVehicles.map((v) => {
-                const mobile = supervisorMobileOf(v.trip, supervisorDirectory);
-                const farmFull = `${v.trip.sourceFarm || "—"}${
-                  v.trip.farmAddress ? ` · ${v.trip.farmAddress}` : ""
-                }`;
-                // The column shows the CITY only (Vijayawada, Kodad…) — the
-                // full address stays one hover away.
-                const city = farmCityOf(v.trip);
-                return (
-                  <tr
-                    key={v.trip.id}
-                    className={opsTableRowClass}
-                  >
-                    <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
-                      {v.trip.tripNo || "—"}
-                    </td>
-                    <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
-                      {v.trip.vehicleNo || "—"}
-                    </td>
-                    <td className={opsTableTdClass}>{mobile || "—"}</td>
-                    <td className={opsTableTdClass}>{v.trip.supervisorName || "—"}</td>
-                    <td className={`${opsTableTdClass} font-semibold text-slate-700 whitespace-nowrap`} title={farmFull}>
-                      {city}
-                    </td>
-                    <td className={`${opsTableTdClass} text-right`}>
-                      <span className="inline-flex h-7 min-w-[28px] items-center justify-center rounded-lg bg-slate-100 px-1.5 text-[12px] font-bold text-slate-600">
-                        {savedShopsOn(v.trip.tripNo)}
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+      {/* ── LEFT — the day's vehicles: the ones still WAITING for shops on
+          top, the ones that already carry shops below. Picking one drives the
+          shop panel on the right. ───────────────────────────────────────── */}
+      <aside className="w-full shrink-0 lg:sticky lg:top-4 lg:w-[336px]">
+        <div className={opsTableCardClass}>
+          <div className={opsTableHeaderBarClass}>
+            <span className={opsSectionTitleClass}>{to("orders.vehicles_ready")}</span>
+            <span className="text-[11px] font-semibold text-slate-400">
+              {eligibleVehicles.length} · {to("orders.step2_submitted_note")}
+            </span>
+          </div>
+          {eligibleVehicles.length === 0 ? (
+            <div className="px-4 py-5">
+              <OrdersEmptyState title={to("orders.no_eligible_vehicles")} />
+            </div>
+          ) : (
+            <div className="max-h-[calc(100vh-190px)] overflow-y-auto">
+              {(
+                [
+                  ["pending", pendingVehicles, to("orders.vehicles_waiting")],
+                  ["assigned", assignedVehicles, to("orders.vehicle_list_assigned")],
+                ] as const
+              ).map(([bucket, list, label]) =>
+                list.length === 0 ? null : (
+                  <div key={bucket}>
+                    <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-y border-slate-100 bg-slate-50/95 px-3.5 py-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        {label}
                       </span>
-                    </td>
-                    <td className={`${opsTableTdClass} text-right font-bold text-slate-800`}>
-                      {formatCount(v.capacity)}
-                    </td>
-                    <td className={`${opsTableTdClass} text-right`}>
-                      <span className="inline-flex flex-col items-end leading-tight">
-                        <b className="text-slate-800">{formatCount(v.available)}</b>
-                        {v.alreadyAssigned > 0 && (
-                          <span className="text-[10px] font-semibold text-slate-400">
-                            {formatCount(v.alreadyAssigned)} {to("orders.col_assigned")}
-                          </span>
-                        )}
+                      <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600">
+                        {list.length}
                       </span>
-                    </td>
-                    <td className={`${opsTableTdClass} text-right`}>
-                      {/* Opens the assignment sheet for THIS truck. */}
-                      <button
-                        type="button"
-                        onClick={() => setVehicleTripId(v.trip.id)}
-                        aria-label={`${to("orders.assign_shops")} — ${v.trip.vehicleNo || v.trip.tripNo}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600/40 bg-emerald-500 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-colors hover:bg-emerald-600"
-                      >
-                        <PackageCheck size={14} />
-                        {to("orders.assign_shops")}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </div>
+                    <ul className="divide-y divide-slate-100">
+                      {list.map((v) => {
+                        const mobile = supervisorMobileOf(v.trip, supervisorDirectory);
+                        const city = farmCityOf(v.trip);
+                        const shops = savedShopsOn(v.trip.tripNo);
+                        const selectedCard = vehicleTripId === v.trip.id;
+                        return (
+                          <li key={v.trip.id}>
+                            <button
+                              type="button"
+                              onClick={() => setVehicleTripId(v.trip.id)}
+                              aria-label={`${to("orders.assign_shops")} — ${v.trip.vehicleNo || "—"} · ${v.trip.tripNo}`}
+                              aria-current={selectedCard ? "true" : undefined}
+                              className={`w-full border-l-[3px] px-3.5 py-3 text-left transition-colors ${
+                                selectedCard
+                                  ? "border-emerald-500 bg-emerald-50/70"
+                                  : "border-transparent hover:bg-slate-50"
+                              }`}
+                            >
+                              <span className="flex items-center justify-between gap-2">
+                                <span className="truncate text-sm font-bold text-slate-800">
+                                  {v.trip.vehicleNo || "—"}
+                                </span>
+                                <span className="shrink-0 text-[11px] font-semibold text-slate-400">
+                                  {v.trip.tripNo || "—"}
+                                </span>
+                              </span>
+                              <span className="mt-0.5 block truncate text-[12px] font-medium text-slate-500">
+                                {v.trip.supervisorName || "—"} · {v.trip.driverName || "—"}
+                              </span>
+                              <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold text-slate-500">
+                                <span>{city}</span>
+                                <span className="text-slate-300">·</span>
+                                <span>
+                                  {formatCount(v.capacity)} {to("orders.boxes_short")}
+                                </span>
+                                <span className="text-slate-300">·</span>
+                                <span className={shops > 0 ? "text-emerald-700" : "text-amber-600"}>
+                                  {shops > 0
+                                    ? to("orders.vehicle_shops_assigned", { n: shops })
+                                    : to("orders.vehicle_shops_none")}
+                                </span>
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )
+              )}
+            </div>
+          )}
         </div>
-      )}
+      </aside>
 
-      {/* Shop assignment happens INSIDE one chosen vehicle — the panels below
-          stay hidden until a vehicle row is opened with ›. */}
-      {!vehicle && eligibleVehicles.length > 0 && (
-        <p className="border-t border-slate-100 bg-slate-50/40 px-4 py-3 text-[11px] font-semibold text-slate-400">
-          {to("orders.select_vehicle_hint")}
-        </p>
-      )}
+      {/* ── RIGHT — the shops for the vehicle picked on the left: the
+          collected-shops pool (to assign or already assigned) plus the
+          delivery sequence and the save actions. ───────────────────────── */}
+      <section className="min-w-0 flex-1">
+        {!vehicle && (
+          <div className={opsEmptyStateClass}>{to("orders.select_vehicle_hint")}</div>
+        )}
 
-      {/* ASSIGNMENT SHEET — one clean modal per truck: the vehicle's facts on
-          top, the shop pool and the delivery sequence in the body, and
-          Save / WhatsApp / Submit in the footer. */}
-      {vehicle && (
+        {/* ASSIGNMENT PANEL — the chosen truck: its facts on top, the shop
+            pool and the delivery sequence in the body, and Save / WhatsApp /
+            Submit in the footer. */}
+        {vehicle && (
         <div
-          role="dialog"
-          aria-modal="true"
           aria-label={`${to("orders.assign_shops")} — ${vehicle.trip.vehicleNo || vehicle.trip.tripNo}`}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-3"
+          className={opsTableCardClass}
         >
-          <div className="flex h-full w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="flex w-full flex-col overflow-hidden">
             {/* ── Header ── */}
             <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-3">
               <div className="flex min-w-0 items-center gap-2.5">
@@ -990,7 +997,7 @@ function AssignmentEditor({
             </div>
 
             {/* ── Body: shop pool + delivery sequence ── */}
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0">
       {/* 1 — Day pool: pending + assigned collected shops (select
           pending shops one by one; assigned rows are visible, locked) */}
       <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/70 flex items-center gap-2.5 flex-wrap">
@@ -1041,7 +1048,7 @@ function AssignmentEditor({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-xs md:text-sm">
+            <table className="w-full min-w-[980px]">
               <thead>
                 <tr className={opsTableHeadRowClass}>
                   <th className={`${opsTableThClass} w-14`}>{to("orders.select_col")}</th>
@@ -1224,11 +1231,11 @@ function AssignmentEditor({
 
               {/* Assignment table: editable sequence — drag a row, ↑/↓ one
                   step, ⤒/⤓ first/last, or sort the whole list — + boxes. */}
-              <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-1.5 text-[10px] font-semibold text-slate-400">
+              <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-1.5 text-[11px] font-semibold text-slate-400">
                 {to("orders.drag_hint")}
               </div>
               <div className="max-h-80 overflow-y-auto">
-                <table className="w-full min-w-[900px] text-xs md:text-sm">
+                <table className="w-full min-w-[900px]">
                   <thead>
                     <tr className={opsTableHeadRowClass}>
                       <th className={`${opsTableThClass} w-20`}>{to("orders.col_sequence")}</th>
@@ -1481,7 +1488,8 @@ function AssignmentEditor({
         </div>
           </div>
         </div>
-      )}
+        )}
+      </section>
 
       {/* Capacity-exceeded block (clean modal with the exact numbers) */}
       {capacityExceeded && (
