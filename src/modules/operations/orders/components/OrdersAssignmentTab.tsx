@@ -721,9 +721,11 @@ function AssignmentEditor({
   // narrow the table — the selection lives in `selected`, so ticking shops
   // while searching/filtering keeps every earlier pick.
   const [poolQuery, setPoolQuery] = useState("");
+  // Defaults to PENDING — with ~100 collected shops the operator almost always
+  // wants the ones still waiting for a vehicle, not the already-assigned rows.
   const [poolFilter, setPoolFilter] = useState<
     "all" | "pending" | "assigned" | "this_vehicle"
-  >("all");
+  >("pending");
   const pq = poolQuery.trim().toLowerCase();
   const poolFilterOptions = useMemo(
     () => [

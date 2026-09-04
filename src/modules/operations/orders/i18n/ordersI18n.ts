@@ -314,6 +314,7 @@ const EN: Record<string, string> = {
   "orders.not_listed_shops": "Not Listed Shops",
   "orders.box_difference": "Box Difference",
   "orders.pdf_report_title": "SHOP DELIVERY REPORT",
+  "orders.pdf_order_no": "Order No",
   "orders.pdf_totals": "TOTALS",
 };
 
@@ -622,6 +623,7 @@ const TE: Record<string, string> = {
   "orders.not_listed_shops": "పట్టికలో లేని షాప్‌లు",
   "orders.box_difference": "బాక్స్ తేడా",
   "orders.pdf_report_title": "షాప్ డెలివరీ రిపోర్ట్",
+  "orders.pdf_order_no": "ఆర్డర్ నంబర్",
   "orders.pdf_totals": "మొత్తాలు",
 };
 

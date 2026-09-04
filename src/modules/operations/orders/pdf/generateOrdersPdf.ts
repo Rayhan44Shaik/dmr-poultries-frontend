@@ -18,7 +18,12 @@ import {
   type DmrPoultryHeaderAssets,
 } from "../../../../utils/drawDmrPoultryHeader";
 import type { OrdersProgress } from "../types";
-import { formatDeliveredAtLabel, type ShopDeliveryBreakdown } from "../ordersUtils";
+import {
+  formatDeliveredAtLabel,
+  rowsInSequence,
+  type ShopDeliveryBreakdown,
+} from "../ordersUtils";
+import { parseOrderRef } from "../types";
 import { ordersTranslate } from "../i18n/ordersI18n";
 
 type RGB = [number, number, number];
@@ -94,6 +99,33 @@ export async function generateOrdersPdf({
     minute: "2-digit",
     hour12: true,
   });
+
+  // ─── Which ORDER(S) this vehicle is delivering ─────────────────────────
+  // Every assigned row carries "[ORDER] O:<orderTripNo>" and a finished
+  // assignment tags the trip remarks with "order:<orderTripNo>" — both are
+  // read so the report always names the order, never just the vehicle trip.
+  const orderRefs = Array.from(
+    new Set(
+      [
+        ...rowsInSequence(trip)
+          .map((r) => parseOrderRef(r.remarks))
+          .filter((v): v is string => Boolean(v)),
+        ...String(trip.remarks ?? "")
+          .split("|")
+          .map((tag) => tag.trim())
+          .filter((tag) => tag.startsWith("order:"))
+          .map((tag) => tag.slice("order:".length).trim())
+          .filter(Boolean),
+      ].filter(Boolean)
+    )
+  );
+  const orderDateOf = (ref: string): string => {
+    const m = /^ORD-(\d{4})(\d{2})(\d{2})-\d+$/.exec(ref);
+    return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
+  };
+  const orderNoLabel = orderRefs.length > 0 ? orderRefs.join(", ") : "—";
+  const orderDateLabel =
+    orderRefs.map(orderDateOf).filter(Boolean).join(", ") || "—";
 
   const assets: DmrPoultryHeaderAssets = await prepareDmrPoultryHeaderAssets({ henUrl: henImage });
 
@@ -268,8 +300,14 @@ export async function generateOrdersPdf({
   ]);
 
   // ─── ORDER SUMMARY ───────────────────────────────────────────────────
-  drawSectionBand("ORDER SUMMARY");
+  drawSectionBand("ORDER DETAILS");
   kvGrid([
+    ["Order No", orderNoLabel],
+    ["Order Date", orderDateLabel],
+    ["Order Shops", count(breakdown.filter((b) => b.ordered).length)],
+    ["Order Boxes", count(breakdown.reduce((s, b) => s + b.orderedBoxes, 0))],
+    ["Order Birds", count(breakdown.reduce((s, b) => s + b.orderedBirds, 0))],
+    ["Order Weight", kg(breakdown.reduce((s, b) => s + b.orderedWeight, 0))],
     ["Total Shops", count(progress?.totalShops ?? 0)],
     ["Total Boxes", count(progress?.totalBoxes ?? 0)],
     ["Total Weight", kg(progress?.totalWeight ?? 0)],
@@ -308,7 +346,7 @@ export async function generateOrdersPdf({
     b.deliveredBoxes > 0 ? count(b.deliveredBoxes) : "—",
     diffStr(b.boxDifference),
     statusStr(b),
-    formatDeliveredAtLabel(b.deliveredAt),
+    formatDeliveredAtLabel(b.deliveredAt, true),
   ]);
   if (seqBody.length === 0) {
     seqBody.push([
@@ -327,6 +365,10 @@ export async function generateOrdersPdf({
     ]);
   }
 
+  drawSectionBand(
+    ordersTranslate("orders.pdf_report_title", language),
+    `${ordersTranslate("orders.pdf_order_no", language)}: ${orderNoLabel}`
+  );
   ensureSpace(30);
   simpleTable(
     [
@@ -345,7 +387,9 @@ export async function generateOrdersPdf({
     ],
     seqBody,
     {
-      widths: [8, 30, 17, 20, 11, 11, 11, 11, 11, 11, 22, null],
+      // Room for real shop names (a 45-shop vehicle must not turn into a
+      // wall of two-line rows) and a one-line delivery time.
+      widths: [8, 34, 16, 18, 10, 10, 10, 10, 10, 10, 20, null],
     }
   );
 

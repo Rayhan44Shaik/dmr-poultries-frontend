@@ -804,10 +804,23 @@ export function filterShopBreakdown(
  * "2026-08-29T16:35:00.000Z" → "29 Aug 2026 · 04:35 PM". Falls back to the
  * raw stored value when it cannot be parsed.
  */
-export function formatDeliveredAtLabel(iso: string | null | undefined): string {
+export function formatDeliveredAtLabel(
+  iso: string | null | undefined,
+  compact = false
+): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
+  // "03 Sept 09:15" — for narrow PDF cells, so a row stays one line tall.
+  if (compact) {
+    const day = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+    const hhmm = d.toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    return `${day} ${hhmm}`;
+  }
   const date = d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
   const time = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
   return `${date} · ${time}`;
