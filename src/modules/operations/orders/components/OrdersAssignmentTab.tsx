@@ -683,6 +683,26 @@ function AssignmentEditor({
     assignedTripNo: string;
     delivered: boolean;
   };
+  // ── Collected-shops search + filter ─────────────────────────────────────
+  // A real operational day can carry ~100 shops, so the pool has its OWN
+  // search box and a refine filter on top of the tab-level search. They only
+  // narrow the table — the selection lives in `selected`, so ticking shops
+  // while searching/filtering keeps every earlier pick.
+  const [poolQuery, setPoolQuery] = useState("");
+  const [poolFilter, setPoolFilter] = useState<
+    "all" | "pending" | "assigned" | "this_vehicle"
+  >("all");
+  const pq = poolQuery.trim().toLowerCase();
+  const poolFilterOptions = useMemo(
+    () => [
+      { value: "all", label: to("orders.pool_filter_all") },
+      { value: "pending", label: to("orders.pool_filter_pending") },
+      { value: "assigned", label: to("orders.pool_filter_assigned") },
+      { value: "this_vehicle", label: to("orders.pool_filter_this_vehicle") },
+    ],
+    [to]
+  );
+  const thisTripNo = vehicle?.trip.tripNo ?? "";
   const filteredPool = useMemo(() => {
     const list: PoolRow[] = [];
     collection.rows.forEach((row, i) => {
@@ -695,10 +715,15 @@ function AssignmentEditor({
         assignedTripNo: a?.tripNo ?? "",
         delivered: a?.delivered ?? false,
       };
-      if (q) {
+      // Refine filter first (cheap), then the two search terms.
+      if (poolFilter === "pending" && item.kind !== "pending") return;
+      if (poolFilter === "assigned" && item.kind !== "assigned") return;
+      if (poolFilter === "this_vehicle" && item.assignedTripNo !== thisTripNo) return;
+      if (q || pq) {
         const hay =
           `${row.shopName} ${villageOf(row.shopId, row.shopName, shopDirectory)} ${item.assignedVehicleNo} ${item.assignedTripNo}`.toLowerCase();
-        if (!hay.includes(q)) return;
+        if (q && !hay.includes(q)) return;
+        if (pq && !hay.includes(pq)) return;
       }
       list.push(item);
     });
@@ -726,10 +751,10 @@ function AssignmentEditor({
       );
     }
     return list;
-  }, [collection, q, shopDirectory, sortMode]);
+  }, [collection, q, pq, poolFilter, thisTripNo, shopDirectory, sortMode]);
 
   const [availablePage, setAvailablePage] = useState(1);
-  const availableKey = `${q}|${sortMode}|${filteredPool.length}`;
+  const availableKey = `${q}|${pq}|${poolFilter}|${sortMode}|${filteredPool.length}`;
   const [lastAvailableKey, setLastAvailableKey] = useState(availableKey);
   if (lastAvailableKey !== availableKey) {
     setLastAvailableKey(availableKey);
@@ -854,25 +879,48 @@ function AssignmentEditor({
         <>
       {/* 1 — Day pool: pending + assigned collected shops (select
           pending shops one by one; assigned rows are visible, locked) */}
-      <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between gap-2 flex-wrap">
+      <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/70 flex items-center gap-2.5 flex-wrap">
         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
           {to("orders.collected_shops")}
         </span>
-        <span className="text-[11px] font-semibold text-slate-400">
-          {filteredPool.length} / {collection.totalShops}
+        {/* ~100 shops a day: search the pool + refine it without losing the
+            shops already ticked. */}
+        <OrdersSearchInput
+          value={poolQuery}
+          onChange={setPoolQuery}
+          placeholder={to("orders.search_pool")}
+          className="w-full sm:w-60"
+        />
+        <OrdersDropdown
+          value={poolFilter}
+          onChange={(v) =>
+            setPoolFilter(v as "all" | "pending" | "assigned" | "this_vehicle")
+          }
+          options={poolFilterOptions}
+          ariaLabel={to("orders.filter_shops")}
+          widthClass="w-48"
+        />
+        <span className="ml-auto text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+          {to("orders.pool_showing", {
+            shown: filteredPool.length,
+            total: collection.totalShops,
+            selected: selected.length,
+          })}
         </span>
       </div>
       {filteredPool.length === 0 ? (
         <div className="px-4 py-5">
           <OrdersEmptyState
             title={
-              q
+              q || pq
                 ? to("orders.no_search_results")
-                : to("orders.pool_summary", {
-                    collected: collection.totalShops,
-                    assigned: collection.assignedShops,
-                    available: 0,
-                  })
+                : poolFilter !== "all"
+                  ? to("orders.no_filter_results")
+                  : to("orders.pool_summary", {
+                      collected: collection.totalShops,
+                      assigned: collection.assignedShops,
+                      available: 0,
+                    })
             }
           />
         </div>
