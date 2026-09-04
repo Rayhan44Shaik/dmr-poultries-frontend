@@ -7,9 +7,15 @@
 // Sheet PDF (hen logo, trip facts, per-shop shares), the recipient number —
 // and only "Confirm & Send" triggers the persistence + send. One build,
 // many uses: the same PDF blob is framed, downloaded and handed to the send.
+//
+// The operator can RE-ORDER the shops here (same ↑↓ pattern as the
+// assignment tab); the list, the WhatsApp message and the PDF all track
+// that sequence, and Confirm persists it so the send matches the preview.
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  ArrowDown,
+  ArrowUp,
   CheckCircle2,
   Download,
   Loader2,
@@ -59,8 +65,9 @@ type Props = {
   /** Live per-shop send progress ("" = idle). */
   sendProgress: string | null;
   onClose: () => void;
-  /** Persist + send; resolves with the outcome (null = aborted/failed). */
-  onConfirmSend: () => Promise<OrdersWhatsAppResult | null>;
+  /** Persist + send; resolves with the outcome (null = aborted/failed).
+   *  When the operator re-ordered shops, receives the new sequence. */
+  onConfirmSend: (orderedShopIds?: number[]) => Promise<OrdersWhatsAppResult | null>;
 };
 
 const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
@@ -82,6 +89,44 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
   const [buildError, setBuildError] = useState("");
   const [sentResult, setSentResult] = useState<OrdersWhatsAppResult | null>(null);
 
+  // ── The delivery sequence lives HERE so ↑↓ works inside the popup.
+  //    Stored as a PERMUTATION of the parent rows (null = parent order) —
+  //    derived state avoids any resync effect: a parent refresh after the
+  //    confirm-save hands back rows that are already in this permutation's
+  //    order, and switching vehicles remounts the popup (key = trip id).
+  const [perm, setPerm] = useState<number[] | null>(null);
+  const orderedRows = useMemo(
+    () =>
+      perm
+        ? perm
+            .map((i) => rows[i])
+            .filter((r): r is AssignmentSheetRow => Boolean(r))
+        : rows,
+    [rows, perm]
+  );
+
+  // True when the visible order differs from what the parent persisted.
+  const orderChanged = perm !== null && perm.some((v, i) => v !== i);
+
+  const moveRow = (index: number, dir: -1 | 1) => {
+    const j = index + dir;
+    if (sending || j < 0 || j >= orderedRows.length) return;
+    setPerm((prev) => {
+      const next = prev ? [...prev] : rows.map((_, i) => i);
+      const tmp = next[index];
+      next[index] = next[j];
+      next[j] = tmp;
+      return next;
+    });
+  };
+
+  // Numbered EVERYWHERE from ONE source — the list, the message and the PDF
+  // can never disagree about the sequence.
+  const numberedRows = useMemo(
+    () => orderedRows.map((r, i) => ({ ...r, serialNo: i + 1 })),
+    [orderedRows]
+  );
+
   // The message text — exactly what the send will carry.
   const message = useMemo(
     () =>
@@ -94,13 +139,15 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
         driverName: trip.driverName,
         orderTripNo,
         orderDate,
-        rows,
+        rows: numberedRows,
       }),
-    [trip, supervisorMobile, orderTripNo, orderDate, rows]
+    [trip, supervisorMobile, orderTripNo, orderDate, numberedRows]
   );
 
-  // ── Build the sheet once — the frame, the download and the send summary
-  //    all use this very same blob.
+  // ── Sheets: built once per sequence — the frame, the download and the
+  //    send summary all use the very same blob. Re-ordering re-builds it
+  //    (the header art is cached inside the generator, so this is fast);
+  //    the previous frame stays visible until the new one is ready.
   useEffect(() => {
     let alive = true;
     let url: string | null = null;
@@ -109,7 +156,7 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
       supervisorMobile,
       orderTripNo,
       orderDate,
-      rows,
+      rows: numberedRows,
       capacity,
       alreadyAssignedOther,
       language,
@@ -122,6 +169,7 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
         }
         url = built.url;
         setResult(built);
+        setBuildError("");
       })
       .catch(() => {
         if (alive) setBuildError(t("orders.pdf_failed"));
@@ -130,8 +178,8 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
       alive = false;
       if (url) URL.revokeObjectURL(url);
     };
-    // The sheet depends on WHO/WHAT, not on the blob bookkeeping itself.
-  }, [trip, supervisorMobile, orderTripNo, orderDate, rows, capacity, alreadyAssignedOther, language, t]);
+    // The sheet depends on WHO/WHAT/ORDER, not on the blob bookkeeping.
+  }, [trip, supervisorMobile, orderTripNo, orderDate, numberedRows, capacity, alreadyAssignedOther, language, t]);
 
   // "Building" = no result yet and no failure (derived, no extra state).
   const building = result === null && !buildError;
@@ -144,10 +192,14 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, sending]);
 
-  const totalBoxes = rows.reduce((s, r) => s + r.boxes, 0);
+  const totalBoxes = orderedRows.reduce((s, r) => s + r.boxes, 0);
 
   const handleSend = async () => {
-    const outcome = await onConfirmSend();
+    // Persist the new sequence too when the operator re-ordered here, so the
+    // actual WhatsApp send matches the previewed one.
+    const outcome = await onConfirmSend(
+      orderChanged ? orderedRows.map((r) => r.shopId) : undefined
+    );
     setSentResult(outcome);
   };
 
@@ -196,15 +248,82 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
         </div>
 
         <div className="flex min-h-0 flex-1">
-          {/* ── Left: order facts + the shops + the message text ── */}
+          {/* ── Left: the shops (re-orderable) → the message → the facts ── */}
           <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-r border-slate-100 bg-white/80">
+            {/* 1) SHOPS TO DELIVER — in delivery sequence, re-orderable */}
             <div className="border-b border-slate-100 px-3.5 py-3">
+              <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                {t("orders.shops_to_deliver")} ({orderedRows.length})
+              </p>
+              <ul className="mt-2 space-y-1.5">
+                {numberedRows.map((row, i) => (
+                  <li
+                    key={row.shopId}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-200/80 px-2 py-1.5"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[11px] font-bold text-slate-700" title={row.shopName}>
+                        {row.serialNo}. {row.shopName}
+                      </p>
+                      <p className="truncate text-[10px] font-semibold text-slate-400">
+                        {row.village || "—"}
+                        {row.mobile ? ` · ${row.mobile}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <div className="text-right">
+                        <p className="text-[11px] font-bold text-emerald-700">
+                          {formatCount(row.boxes)} box
+                        </p>
+                        <p className="text-[10px] font-semibold text-slate-400">
+                          {row.birds > 0 ? `${formatCount(row.birds)} birds` : "—"}
+                        </p>
+                      </div>
+                      {/* Re-order mirrors the assignment tab's ↑↓ controls */}
+                      <div className="flex flex-col">
+                        <button
+                          type="button"
+                          onClick={() => moveRow(i, -1)}
+                          disabled={sending || i === 0}
+                          aria-label="Move up"
+                          className="rounded p-0.5 text-slate-400 transition hover:bg-slate-100 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-30"
+                        >
+                          <ArrowUp size={11} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveRow(i, 1)}
+                          disabled={sending || i === numberedRows.length - 1}
+                          aria-label="Move down"
+                          className="rounded p-0.5 text-slate-400 transition hover:bg-slate-100 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-30"
+                        >
+                          <ArrowDown size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* 2) The message text — what WhatsApp will carry */}
+            <div className="border-b border-slate-100 px-3.5 py-3">
+              <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                {t("orders.wa_message_preview")}
+              </p>
+              <pre className="mt-2 max-h-56 overflow-y-auto whitespace-pre-wrap rounded-lg border border-emerald-200 bg-[#e7f8ec] px-2.5 py-2 font-sans text-[11px] font-medium leading-relaxed text-slate-700">
+                {message}
+              </pre>
+            </div>
+
+            {/* 3) ASSIGNMENT DETAILS — under the WhatsApp message */}
+            <div className="px-3.5 py-3">
               <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
                 {t("orders.assignment_details")}
               </p>
               <div className="mt-2 grid grid-cols-2 gap-1.5">
                 <Fact label={t("orders.pdf_order_date")} value={orderDate || trip.tripDate} />
-                <Fact label={t("orders.col_total_shops")} value={rows.length} />
+                <Fact label={t("orders.col_total_shops")} value={orderedRows.length} />
                 <Fact label={t("orders.col_assigned_boxes")} value={formatCount(totalBoxes)} />
                 <Fact
                   label={t("orders.wa_send_to")}
@@ -219,48 +338,6 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
                   }
                 />
               </div>
-            </div>
-
-            <div className="border-b border-slate-100 px-3.5 py-3">
-              <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-                {t("orders.shops_to_deliver")} ({rows.length})
-              </p>
-              <ul className="mt-2 space-y-1.5">
-                {rows.map((row, i) => (
-                  <li
-                    key={row.shopId}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-200/80 px-2 py-1.5"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-[11px] font-bold text-slate-700" title={row.shopName}>
-                        {row.serialNo || i + 1}. {row.shopName}
-                      </p>
-                      <p className="truncate text-[10px] font-semibold text-slate-400">
-                        {row.village || "—"}
-                        {row.mobile ? ` · ${row.mobile}` : ""}
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-[11px] font-bold text-emerald-700">
-                        {formatCount(row.boxes)} box
-                      </p>
-                      <p className="text-[10px] font-semibold text-slate-400">
-                        {row.birds > 0 ? `${formatCount(row.birds)} birds` : "—"}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* The message text — what WhatsApp will carry */}
-            <div className="px-3.5 py-3">
-              <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-                {t("orders.wa_message_preview")}
-              </p>
-              <pre className="mt-2 max-h-56 overflow-y-auto whitespace-pre-wrap rounded-lg border border-emerald-200 bg-[#e7f8ec] px-2.5 py-2 font-sans text-[11px] font-medium leading-relaxed text-slate-700">
-                {message}
-              </pre>
             </div>
           </aside>
 
@@ -309,13 +386,13 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
           {sentResult && sentResult.sent > 0 ? (
             <div className="mt-2 max-h-24 overflow-y-auto rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-2">
               <ul className="space-y-0.5">
-                {rows.map((row, i) => (
+                {numberedRows.map((row) => (
                   <li
                     key={row.shopId}
                     className="flex items-center justify-between gap-2 text-[11px] font-medium"
                   >
                     <span className="truncate text-slate-600" title={row.shopName}>
-                      {row.serialNo || i + 1}. {row.shopName}
+                      {row.serialNo}. {row.shopName}
                     </span>
                     <span className="shrink-0 tabular-nums text-slate-600">
                       {formatCount(row.boxes)} box ·{" "}
@@ -348,7 +425,7 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
             <button
               type="button"
               onClick={() => void handleSend()}
-              disabled={sending || rows.length === 0 || sentResult?.failed === 0}
+              disabled={sending || orderedRows.length === 0 || sentResult?.failed === 0}
               className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {sending ? (

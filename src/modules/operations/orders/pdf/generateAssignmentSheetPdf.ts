@@ -60,6 +60,21 @@ const fmt = (value: unknown): string =>
   value == null || value === "" ? "—" : String(value);
 const count = (value: unknown): string => toNum(value).toLocaleString("en-IN");
 
+// Preparing the hen logo + header artwork fetches the image and runs canvas
+// work — expensive. Cache the prepared assets once per session so the sheet
+// RE-BUILDS in milliseconds when only the shop sequence (or language) changes.
+let headerAssetsPromise: Promise<DmrPoultryHeaderAssets> | null = null;
+function loadHeaderAssets(): Promise<DmrPoultryHeaderAssets> {
+  if (!headerAssetsPromise) {
+    headerAssetsPromise = prepareDmrPoultryHeaderAssets({ henUrl: henImage });
+    // A failed prepare falls back to a fresh attempt on the next build.
+    headerAssetsPromise.catch(() => {
+      headerAssetsPromise = null;
+    });
+  }
+  return headerAssetsPromise;
+}
+
 export async function generateAssignmentSheetPdf({
   trip,
   supervisorMobile,
@@ -97,7 +112,7 @@ export async function generateAssignmentSheetPdf({
     hour12: true,
   });
 
-  const assets: DmrPoultryHeaderAssets = await prepareDmrPoultryHeaderAssets({ henUrl: henImage });
+  const assets: DmrPoultryHeaderAssets = await loadHeaderAssets();
 
   const lastTableY = (fallback: number): number => {
     const table = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable;

@@ -757,52 +757,86 @@ function AssignmentEditor({
   }, [vehicle, selected, orderTrip.tripNo, shopDirectory]);
 
   // Persist-if-dirty, then send through the EXISTING per-delivery WhatsApp
-  // mechanism — unchanged from the pre-popup behaviour.
-  const handleWhatsAppConfirm = useCallback(async (): Promise<OrdersWhatsAppResult | null> => {
-    if (waBusy || !vehicle) return null;
-    let trip = vehicle.trip;
-    if (isDirty) {
-      if (!(await assertFitsBalance())) return null;
+  // mechanism — unchanged from the pre-popup behaviour. When the popup
+  // re-ordered the shops (orderedShopIds), persist THAT sequence too, so the
+  // saved data, the sheet and the actual send never disagree.
+  const handleWhatsAppConfirm = useCallback(
+    async (orderedShopIds?: number[]): Promise<OrdersWhatsAppResult | null> => {
+      if (waBusy || !vehicle) return null;
+      let trip = vehicle.trip;
+      let payload: OrderShopRow[] | null = null;
+      if (orderedShopIds && orderedShopIds.length > 0) {
+        if (selected.length > 0) {
+          // Live selection: same rows, re-ordered to the popup's sequence.
+          const byShop = new Map(selected.map((r) => [r.shopId, r]));
+          const reordered = orderedShopIds.flatMap((id) => {
+            const row = byShop.get(id);
+            return row ? [row] : [];
+          });
+          payload = toOrderShopRows(reordered);
+        } else {
+          // Re-send of saved rows: re-number the persisted rows, no other
+          // field changes — the order becomes the new saved sequence.
+          const saved = orderRowsOnTrip(vehicle.trip, orderTrip.tripNo).filter(
+            (r) => !isCapturedRow(r)
+          );
+          const byShop = new Map(saved.map((r) => [r.shopId, r]));
+          const reordered = orderedShopIds.flatMap((id) => {
+            const row = byShop.get(id);
+            return row ? [row] : [];
+          });
+          payload = reordered.map(
+            (r, i) => ({ ...r, serialNo: i + 1 }) as unknown as OrderShopRow
+          );
+        }
+      }
+      if (isDirty || payload) {
+        if (!(await assertFitsBalance())) return null;
+        try {
+          trip = await saveAssignment(vehicle.trip, [
+            {
+              orderTripNo: orderTrip.tripNo,
+              rows: payload ?? toOrderShopRows(selected),
+            },
+          ]);
+          setSavedSnapshot(selectionSnapshot(vehicleTripId, []));
+          setSelected([]);
+          onChanged();
+        } catch {
+          showNotification(to("orders.refresh_failed"), "error");
+          return null;
+        }
+      }
+      setWaBusy(true);
+      setWaProgress("");
       try {
-        trip = await saveAssignment(vehicle.trip, [
-          { orderTripNo: orderTrip.tripNo, rows: toOrderShopRows(selected) },
-        ]);
-        setSavedSnapshot(selectionSnapshot(vehicleTripId, []));
-        setSelected([]);
-        onChanged();
+        const result = await sendOrdersWhatsApp(
+          trip,
+          supervisorMobile,
+          (sent, total, shop) => setWaProgress(shop || `${sent}/${total}`)
+        );
+        if (result.sent > 0 && result.failed === 0) {
+          showNotification(to("orders.whatsapp_done", { sent: result.sent, total: result.sent }), "success");
+        } else if (result.sent > 0) {
+          showNotification(to("orders.whatsapp_partial", { sent: result.sent, failed: result.failed }), "info");
+        } else {
+          const message =
+            result.message && result.message.includes("not configured")
+              ? to("orders.whatsapp_not_configured")
+              : to("orders.whatsapp_failed", { message: result.message ?? "—" });
+          showNotification(message, "error");
+        }
+        return result;
       } catch {
-        showNotification(to("orders.refresh_failed"), "error");
+        showNotification(to("orders.whatsapp_failed", { message: "network" }), "error");
         return null;
+      } finally {
+        // Sending finished — the popup's result block takes over the display.
+        setWaBusy(false);
       }
-    }
-    setWaBusy(true);
-    setWaProgress("");
-    try {
-      const result = await sendOrdersWhatsApp(
-        trip,
-        supervisorMobile,
-        (sent, total, shop) => setWaProgress(shop || `${sent}/${total}`)
-      );
-      if (result.sent > 0 && result.failed === 0) {
-        showNotification(to("orders.whatsapp_done", { sent: result.sent, total: result.sent }), "success");
-      } else if (result.sent > 0) {
-        showNotification(to("orders.whatsapp_partial", { sent: result.sent, failed: result.failed }), "info");
-      } else {
-        const message =
-          result.message && result.message.includes("not configured")
-            ? to("orders.whatsapp_not_configured")
-            : to("orders.whatsapp_failed", { message: result.message ?? "—" });
-        showNotification(message, "error");
-      }
-      return result;
-    } catch {
-      showNotification(to("orders.whatsapp_failed", { message: "network" }), "error");
-      return null;
-    } finally {
-      // Sending finished — the popup's result block takes over the display.
-      setWaBusy(false);
-    }
-  }, [waBusy, vehicle, isDirty, selected, assertFitsBalance, orderTrip.tripNo, vehicleTripId, supervisorMobile, showNotification, onChanged, to]);
+    },
+    [waBusy, vehicle, isDirty, selected, assertFitsBalance, orderTrip.tripNo, vehicleTripId, supervisorMobile, showNotification, onChanged, to]
+  );
 
 
   // ── Day pool table: PENDING + PARTIALLY-SPLIT + ASSIGNED shops together ──
@@ -1679,6 +1713,7 @@ function AssignmentEditor({
       {/* WhatsApp CHECK POPUP — preview message + branded sheet, then confirm. */}
       {waPopupOpen && vehicle && (
         <OrdersWhatsAppConfirmPopup
+          key={vehicle.trip.id}
           trip={vehicle.trip}
           supervisorMobile={supervisorMobile}
           orderTripNo={orderTrip.tripNo}
