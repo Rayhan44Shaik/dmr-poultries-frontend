@@ -70,6 +70,7 @@ import type {
   OrdersEligibleVehicle,
 } from "../types";
 import {
+  ORDERS_NO_SPINNER,
   OrdersDateControl,
   OrdersEmptyState,
   OrdersDropdown,
@@ -78,6 +79,7 @@ import {
   OrdersStatusBadge,
   OrdersTableSkeleton,
   WhatsAppIcon,
+  onOrdersNumberWheel,
 } from "./OrdersCommon";
 
 const AVAILABLE_PAGE_SIZE = 10;
@@ -1023,7 +1025,8 @@ function AssignmentEditor({
                               placeholder="0"
                               aria-label={`${to("orders.assigned_boxes")} — ${row.shopName}`}
                               onChange={(e) => setAssigned(row.clientKey, e.target.value)}
-                              className={`h-8 w-full rounded-lg border px-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 ${
+                              onWheel={onOrdersNumberWheel}
+                              className={`${ORDERS_NO_SPINNER} h-8 w-full rounded-lg border px-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 ${
                                 row.assigned === 0
                                   ? "border-amber-300 bg-amber-50/60 text-amber-800"
                                   : "border-emerald-300/70 bg-emerald-50/50 text-emerald-900"

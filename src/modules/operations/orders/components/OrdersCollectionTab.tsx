@@ -57,6 +57,7 @@ import {
 import { useOrdersI18n } from "../i18n/ordersI18n";
 import type { OrderShopRow, OrdersDayCollection } from "../types";
 import {
+  ORDERS_NO_SPINNER,
   OrdersDateControl,
   OrdersEmptyState,
   OrdersDropdown,
@@ -64,6 +65,7 @@ import {
   OrdersSearchInput,
   OrdersStatusBadge,
   OrdersTableSkeleton,
+  onOrdersNumberWheel,
 } from "./OrdersCommon";
 
 /** Fixed page size — 10 rows per page (global pagination component). */
@@ -686,7 +688,8 @@ function CollectionEntries({
                           placeholder="0"
                           aria-label={`${to("orders.col_birds")} — ${shop.shopName}`}
                           onChange={(e) => updateEntry(shop.id, "birds", e.target.value)}
-                          className="h-8 w-full rounded-lg border border-emerald-300/70 bg-emerald-50/50 px-2 text-sm font-bold text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+                          onWheel={onOrdersNumberWheel}
+                          className={`${ORDERS_NO_SPINNER} h-8 w-full rounded-lg border border-emerald-300/70 bg-emerald-50/50 px-2 text-sm font-bold text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
                         />
                       ) : (
                         <span className="font-bold text-slate-700">{hasEntry ? birds : "—"}</span>
@@ -701,7 +704,8 @@ function CollectionEntries({
                           placeholder="0"
                           aria-label={`${to("orders.col_boxes")} — ${shop.shopName}`}
                           onChange={(e) => updateEntry(shop.id, "boxes", e.target.value)}
-                          className="h-8 w-full rounded-lg border border-emerald-300/70 bg-emerald-50/50 px-2 text-sm font-bold text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+                          onWheel={onOrdersNumberWheel}
+                          className={`${ORDERS_NO_SPINNER} h-8 w-full rounded-lg border border-emerald-300/70 bg-emerald-50/50 px-2 text-sm font-bold text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
                         />
                       ) : (
                         <span className="font-bold text-slate-700">{hasEntry ? boxes : "—"}</span>
