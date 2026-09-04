@@ -30,7 +30,6 @@ import {
   opsTableHeadRowClass,
   opsTableTdClass,
   opsTableThClass,
-  opsTableRowClass,
 } from "../../../../shared/ui/operationsStyles";
 import {
   paginationBarClass,
@@ -43,6 +42,10 @@ import { paginate, villageOf, type ShopDirectory } from "../ordersService";
 import { useOrdersI18n } from "../i18n/ordersI18n";
 import type { OrdersTrip } from "../types";
 import { DatePicker } from "../../../../components/common/DatePicker";
+import {
+  ORDERS_TABLE_FONT_CLASS,
+  ordersTableZebraRow,
+} from "../ordersTableStyles";
 import {
   OrdersDateControl,
   OrdersDropdown,
@@ -253,7 +256,7 @@ function TrackingTable({
   const { to } = useOrdersI18n();
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1480px] text-xs md:text-sm">
+      <table className={`w-full min-w-[1480px] ${ORDERS_TABLE_FONT_CLASS}`}>
         <thead>
           <tr className={opsTableHeadRowClass}>
             <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
@@ -277,13 +280,13 @@ function TrackingTable({
             const { trip, progress } = ot;
             const status = progress?.status ?? "Assigned";
             return (
-              <tr key={trip.id} className={`${opsTableRowClass} align-middle`}>
+              <tr key={trip.id} className={ordersTableZebraRow(index, "align-middle")}>
                 <td className={opsTableTdClass}>
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-bold text-slate-600">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold text-slate-600">
                     {(safePage - 1) * PAGE_SIZE + index + 1}
                   </span>
                 </td>
-                <td className={`${opsTableTdClass} font-bold text-emerald-700`}>{trip.tripNo}</td>
+                <td className={`${opsTableTdClass} font-semibold text-emerald-700`}>{trip.tripNo}</td>
                 <td className={`${opsTableTdClass} text-slate-500 whitespace-nowrap`}>{formatDayShort(trip.tripDate)}</td>
                 <td className={opsTableTdClass}>{trip.vehicleNo || "—"}</td>
                 <td className={opsTableTdClass}>{trip.supervisorName || "—"}</td>
@@ -291,16 +294,16 @@ function TrackingTable({
                 <td className={opsTableTdClass}>
                   <ProgressBar ot={ot} />
                 </td>
-                <td className={`${opsTableTdClass} text-right font-bold text-emerald-800`}>
+                <td className={`${opsTableTdClass} text-right font-semibold text-emerald-800`}>
                   {progress ? formatCount(progress.totalBoxes) : "—"}
                 </td>
-                <td className={`${opsTableTdClass} text-right font-semibold`}>
+                <td className={`${opsTableTdClass} text-right font-medium`}>
                   {progress ? formatCount(progress.deliveredBoxes) : "—"}
                 </td>
-                <td className={`${opsTableTdClass} text-right font-semibold`}>
+                <td className={`${opsTableTdClass} text-right font-medium`}>
                   {progress && progress.deliveredBirds > 0 ? formatCount(progress.deliveredBirds) : <span className="text-slate-300">—</span>}
                 </td>
-                <td className={`${opsTableTdClass} text-right font-semibold`}>
+                <td className={`${opsTableTdClass} text-right font-medium`}>
                   {progress && progress.deliveredWeight > 0 ? progress.deliveredWeight.toFixed(2) : <span className="text-slate-300">—</span>}
                 </td>
                 <td className={`${opsTableTdClass} text-right`}>
@@ -309,9 +312,9 @@ function TrackingTable({
                       // Partial deliveries live here: 25 ordered, 10 in → 15 box
                       // still pending, even when every shop has a capture.
                       <span className="inline-flex flex-col items-end leading-tight">
-                        <b className="text-amber-600">
+                        <span className="font-semibold text-amber-600">
                           {formatCount(progress.pendingBoxes)} {to("orders.word_boxes")}
-                        </b>
+                        </span>
                         {progress.pendingShops > 0 && (
                           <span className="text-[10px] font-semibold text-slate-400">
                             {progress.pendingShops} {to("orders.col_shops")}
@@ -332,7 +335,7 @@ function TrackingTable({
                   <StatusBadge status={status} />
                   {progress && progress.additionalShopCount > 0 && (
                     <span
-                      className="ml-1.5 inline-flex items-center rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-bold text-rose-600"
+                      className="ml-1.5 inline-flex items-center rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold text-rose-600"
                       title={to("orders.additional_legend")}
                     >
                       +{progress.additionalShopCount}

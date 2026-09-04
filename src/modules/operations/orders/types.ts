@@ -4,8 +4,9 @@
 //   1. ORDER COLLECTION   (one collection per operational day; day-by-day
 //                          navigation; past days read-only)
 //   2. ORDER ASSIGNMENT   (select vehicle → select shops one by one →
-//                          sequence + boxes → save/finish; same shop cannot
-//                          be assigned to two vehicles on the same day)
+//                          sequence + boxes → save/finish; a shop's order can
+//                          be SPLIT across vehicles — the sum over all
+//                          vehicles can never exceed the collected boxes)
 //   3. DELIVERY TRACKING  (Step 4 delivery rows are the source of truth;
 //                          ordered-vs-delivered report with differences)
 //
@@ -23,9 +24,11 @@
 //   - Rows written by the Orders module carry the marker `[ORDER]` in
 //     `remarks` (+ ` O:<orderTripNo>` reference) so the original order can
 //     be told apart from shops added later in Step 4.
-//   - Same shop + same day uniqueness is DERIVED from this persisted data
-//     on every load (a shop is "available" only while no vehicle trip
-//     carries its order row for that day).
+//   - The shop balance is DERIVED from this persisted data on every load:
+//     a shop may be carried by several vehicles for the day (partial
+//     assignment), but the boxes summed over all its vehicles may NEVER
+//     exceed the collected boxes — the remaining balance is what another
+//     vehicle can take.
 
 import type { ShopDelivery, Trip } from "../../../shared/trip";
 
@@ -132,9 +135,31 @@ export type ShopOrderQuantities = Map<
 >;
 
 /**
+ * The share ONE vehicle trip carries of one collected shop (an order can be
+ * split over several vehicles — 40 collected → 20 on TRP-A + 20 on TRP-B).
+ * `boxes` is the share measured from the trip's plan rows; the sum of the
+ * parts' `boxes` can never exceed the shop's collected boxes.
+ */
+export type DayShopAssignmentPart = {
+  /** Vehicle trip id (stable identity — tripNo is display text). */
+  tripId: number;
+  tripNo: string;
+  vehicleNo: string;
+  /** Boxes of the shop's order this vehicle carries. */
+  boxes: number;
+  /** A Step 4 capture exists for this shop on that trip. */
+  delivered: boolean;
+  /** Boxes actually captured for this shop on that trip. */
+  deliveredBoxes: number;
+};
+
+/**
  * Where ONE collected shop ended up for its day — derived from the
  * persisted vehicle-trip rows (the single source of truth for "is shop X
- * assigned to vehicle Y on day D?" and "was it delivered?").
+ * assigned to a vehicle for day D?" and "was it delivered?"). The flat
+ * fields describe the FIRST (primary) vehicle; `parts` lists EVERY vehicle
+ * carrying a share, and `assignedBoxesTotal` is their sum — the shop's
+ * assignable balance is `boxes − assignedBoxesTotal`.
  */
 export type DayShopAssignment = {
   /** Vehicle trip number (shown in the collection table). */
@@ -142,16 +167,22 @@ export type DayShopAssignment = {
   vehicleNo: string;
   /** Delivery sequence of this shop on that vehicle trip. */
   sequence: number;
+  /** The shop's ORDERED boxes (from the collection row — authoritative). */
   boxes: number;
   birds: number;
-  /** A Step 4 capture exists for this shop on that trip. */
+  /** A Step 4 capture exists for this shop on any of its vehicles. */
   delivered: boolean;
-  /** Boxes actually captured for this shop (a partial delivery is < `boxes`). */
+  /** Boxes actually captured for this shop across all its vehicles
+   *  (a partial delivery is < `boxes`). */
   deliveredBoxes: number;
   /** Trip-level status (kept in sync with Delivery Tracking). */
   tripStatus: OrdersTrackingStatus;
   /** Vehicle trip avg bird weight (for the weight estimate column). */
   avgBirdWeight: number;
+  /** Every vehicle trip carrying a share of this shop's order. */
+  parts: DayShopAssignmentPart[];
+  /** Σ parts.boxes — the boxes already assigned to vehicles (never > boxes). */
+  assignedBoxesTotal: number;
 };
 
 /** The collection of ONE operational day (one container per day). */
@@ -164,11 +195,11 @@ export type OrdersDayCollection = {
   totalBirds: number;
   /** Collection finished (startStepSubmitted) — locked for editing. */
   finished: boolean;
-  /** Shops already assigned to a vehicle trip for this day. */
+  /** Shops with at least one vehicle carrying part of their order. */
   assignedShops: number;
-  /** Boxes already assigned to vehicle trips for this day. */
+  /** Boxes assigned to vehicle trips for this day (Σ over all vehicles). */
   assignedBoxes: number;
-  /** Every entered shop is assigned (nothing left to assign/edit). */
+  /** Every collected box is assigned (no shop has a remaining balance). */
   fullyAssigned: boolean;
   /** Per-shop assignment facts (null = not assigned yet). */
   shops: Map<number, DayShopAssignment | null>;

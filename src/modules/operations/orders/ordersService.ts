@@ -25,7 +25,6 @@ import {
   mapApiTripToTrip,
   toStep4Payload,
 } from "../vehicle-trips/services/tripHeaderApiService";
-import { sendDeliveryWhatsApp } from "../vehicle-trips/services/deliveryWhatsAppService";
 import { loadShops } from "../../masters/shops/services/shopService";
 import { loadVehicles } from "../../masters/vehicles/services/vehicleService";
 import { loadEmployees } from "../../masters/employees/services/employeeService";
@@ -44,6 +43,7 @@ import {
   isTrackingTrip,
   localToday,
   nextOrderTripNo,
+  planShareBoxes,
   rowBoxes,
   rowsInSequence,
   toEligibleVehicle,
@@ -124,13 +124,30 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
     containerQuantitiesByNo.set(container.tripNo, q);
   }
 
+  /**
+   * Per-trip ordered-quantity overrides for shops SPLIT across several
+   * vehicles: each trip's ordered basis for a shared shop is its own share.
+   * Filled by the collection loop below; read by `quantitiesForTrip`.
+   */
+  const tripShareOverrides = new Map<number, ShopOrderQuantities>();
+
   /** Resolve a trip's original order quantities via its order marker. */
   const quantitiesForTrip = (t: Trip): ShopOrderQuantities | undefined => {
+    let base: ShopOrderQuantities | undefined;
     for (const row of rowsInSequence(t)) {
       const ref = parseOrderRef(row.remarks);
-      if (ref && containerQuantitiesByNo.has(ref)) return containerQuantitiesByNo.get(ref);
+      if (ref && containerQuantitiesByNo.has(ref)) {
+        base = containerQuantitiesByNo.get(ref);
+        break;
+      }
     }
-    return undefined;
+    const overrides = tripShareOverrides.get(t.id);
+    if (!overrides) return base;
+    // Merge: unshared shops keep the container's authoritative quantities;
+    // shared shops are replaced by THIS trip's share.
+    const merged: ShopOrderQuantities = new Map(base ?? []);
+    for (const [shopId, q] of overrides) merged.set(shopId, q);
+    return merged;
   };
 
   // Trip-level status cache (shared by every shop assignment fact).
@@ -150,8 +167,10 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
           : `id-${row.id}`,
     })) as OrderShopRow[];
 
-    // Where each collected shop ended up (persisted vehicle-trip rows).
-    const byShop = new Map<number, { trip: Trip; rows: ShopDelivery[] }>();
+    // Where each collected shop ended up (persisted vehicle-trip rows) —
+    // one bucket PER VEHICLE TRIP, because a shop's order can be SPLIT over
+    // several vehicles (40 collected → 20 on TRP-A + 20 on TRP-B).
+    const byShop = new Map<number, Array<{ trip: Trip; rows: ShopDelivery[] }>>();
     for (const other of trips) {
       if (other.deleted) continue;
       const orderRows = rowsInSequence(other).filter(
@@ -161,21 +180,31 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
       for (const r of orderRows) {
         const shopId = num(r.shopId);
         if (!shopId) continue;
-        const acc = byShop.get(shopId) ?? { trip: other, rows: [] };
-        acc.rows.push(r);
-        byShop.set(shopId, acc);
+        let buckets = byShop.get(shopId);
+        if (!buckets) {
+          buckets = [];
+          byShop.set(shopId, buckets);
+        }
+        let bucket = buckets.find((b) => b.trip.id === other.id);
+        if (!bucket) {
+          bucket = { trip: other, rows: [] };
+          buckets.push(bucket);
+        }
+        bucket.rows.push(r);
       }
     }
 
     const shops = new Map<number, DayShopAssignment | null>();
     let assignedShops = 0;
     let assignedBoxes = 0;
+    let allFullyAssigned = rows.length > 0;
     for (const row of rows) {
       const shopId = num(row.shopId);
       if (!shopId) continue;
-      const acc = byShop.get(shopId);
-      if (!acc) {
+      const buckets = byShop.get(shopId);
+      if (!buckets || buckets.length === 0) {
         shops.set(shopId, null);
+        allFullyAssigned = false;
         continue;
       }
       assignedShops += 1;
@@ -183,22 +212,57 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
       // authoritative order; Step 4 rewrites the vehicle row in place).
       const orderedBoxes = rowBoxes(row);
       const orderedBirds = num(row.birds);
-      assignedBoxes += orderedBoxes;
-      shops.set(shopId, {
-        tripNo: acc.trip.tripNo,
-        vehicleNo: acc.trip.vehicleNo ?? "",
-        sequence: Math.min(...acc.rows.map((r) => num(r.serialNo ?? r.id))),
-        boxes: orderedBoxes,
-        birds: orderedBirds,
-        delivered: acc.rows.some(isCapturedRow),
-        // A partial delivery (10 of 25 boxes) must stay visible as a balance,
-        // so the collection table can tell "delivered" from "part delivered".
-        deliveredBoxes: acc.rows
+      // One part per vehicle trip carrying a share of this shop's order.
+      const parts = buckets.map((bucket) => ({
+        tripId: bucket.trip.id,
+        tripNo: bucket.trip.tripNo,
+        vehicleNo: bucket.trip.vehicleNo ?? "",
+        boxes: planShareBoxes(bucket.rows),
+        delivered: bucket.rows.some(isCapturedRow),
+        deliveredBoxes: bucket.rows
           .filter(isCapturedRow)
           .reduce((sum, r) => sum + deliveredRowBoxes(r), 0),
-        tripStatus: tripStatusOf(acc.trip),
-        avgBirdWeight: num(acc.trip.avgBirdWeight),
+      }));
+      const assignedBoxesTotal = parts.reduce((sum, p) => sum + p.boxes, 0);
+      assignedBoxes += assignedBoxesTotal;
+      // The balance (40 ordered → 20 on one truck) stays assignable — only a
+      // shop with nothing left counts towards a fully-assigned day.
+      if (assignedBoxesTotal < orderedBoxes) allFullyAssigned = false;
+      const primary = buckets[0];
+      shops.set(shopId, {
+        tripNo: primary.trip.tripNo,
+        vehicleNo: primary.trip.vehicleNo ?? "",
+        sequence: Math.min(...buckets.flatMap((b) => b.rows.map((r) => num(r.serialNo ?? r.id)))),
+        boxes: orderedBoxes,
+        birds: orderedBirds,
+        delivered: parts.some((p) => p.delivered),
+        // A partial delivery (10 of 25 boxes) must stay visible as a balance,
+        // so the collection table can tell "delivered" from "part delivered".
+        deliveredBoxes: parts.reduce((sum, p) => sum + p.deliveredBoxes, 0),
+        tripStatus: tripStatusOf(primary.trip),
+        avgBirdWeight: num(primary.trip.avgBirdWeight),
+        parts,
+        assignedBoxesTotal,
       });
+
+      // SPLIT ORDER: when several vehicles share a shop's order, each trip's
+      // ordered basis is its OWN share (20 of 40), never the whole order.
+      if (buckets.length > 1) {
+        for (const bucket of buckets) {
+          const share = planShareBoxes(bucket.rows);
+          const overrides = tripShareOverrides.get(bucket.trip.id) ?? new Map();
+          const base = containerQuantitiesByNo.get(container.tripNo)?.get(shopId);
+          overrides.set(shopId, {
+            boxes: share,
+            birds: orderedBoxes > 0 ? Math.round(((base?.birds ?? orderedBirds) * share) / orderedBoxes) : 0,
+            weight:
+              orderedBoxes > 0
+                ? Number((((base?.weight ?? 0) * share) / orderedBoxes).toFixed(2))
+                : 0,
+          });
+          tripShareOverrides.set(bucket.trip.id, overrides);
+        }
+      }
     }
 
     const totals = collectionTotals(rows);
@@ -211,7 +275,7 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
       finished: container.startStepSubmitted === true,
       assignedShops,
       assignedBoxes,
-      fullyAssigned: rows.length > 0 && assignedShops >= rows.length,
+      fullyAssigned: allFullyAssigned,
       shops,
     };
   }
@@ -539,27 +603,63 @@ export async function submitShopDeliveries(vehicleTrip: Trip): Promise<Trip> {
   return mapApiTripToTrip(data, vehicleTrip);
 }
 
+/** One selected shop that would push its order over the collected boxes. */
+export type DayOverAssignment = {
+  shopId: number;
+  shopName: string;
+  /** Boxes the shop ordered for the day (the collection total). */
+  ordered: number;
+  /** Boxes already assigned to OTHER vehicle trips (from fresh data). */
+  elsewhere: number;
+  /** Boxes still assignable: ordered − elsewhere (never negative). */
+  remaining: number;
+  /** Boxes this vehicle is trying to take. */
+  requested: number;
+};
+
 /**
- * Same-shop / same-day duplicate guard — enforced from FRESH persisted data
- * (never just React state). Returns the shop names that are already assigned
- * to a DIFFERENT vehicle for the day (empty = safe to save).
+ * The split-order balance guard — enforced from FRESH persisted data (never
+ * just React state), so two operators working two vehicles can never push a
+ * shop over its collected boxes:
+ *
+ *   40 collected → TRP-A saved 20 → TRP-B may take at most 20.
+ *   TRP-B asking for 40 returns an issue with remaining = 20.
+ *
+ * The vehicle's OWN previously saved rows are excluded (a save REPLACES the
+ * vehicle's rows for the order, so they never count against the balance).
+ * Returns one issue per shop whose requested boxes exceed its remaining
+ * balance (empty = safe to save).
  */
-export async function findDayShopConflicts(
+export async function findDayOverAssignments(
   day: string,
-  selected: Array<{ shopId: number; shopName: string }>,
+  selected: Array<{ shopId: number; shopName: string; boxes: number }>,
   vehicleTripNo: string
-): Promise<string[]> {
+): Promise<DayOverAssignment[]> {
   const fresh = await fetchOrdersData();
   const coll = fresh.collectionsByDay[day];
   if (!coll) return [];
-  const conflicts: string[] = [];
-  for (const { shopId, shopName } of selected) {
-    const assignment = coll.shops.get(shopId);
-    if (assignment && assignment.tripNo !== vehicleTripNo) {
-      conflicts.push(shopName || `Shop ${shopId}`);
+  const issues: DayOverAssignment[] = [];
+  for (const sel of selected) {
+    const orderRow = coll.rows.find((r) => num(r.shopId) === num(sel.shopId));
+    if (!orderRow) continue; // not part of the day's collection — nothing to check
+    const ordered = rowBoxes(orderRow);
+    const parts = coll.shops.get(sel.shopId)?.parts ?? [];
+    const elsewhere = parts
+      .filter((p) => p.tripNo !== vehicleTripNo)
+      .reduce((sum, p) => sum + p.boxes, 0);
+    const remaining = Math.max(0, ordered - elsewhere);
+    if (sel.boxes > remaining) {
+      issues.push({
+        shopId: sel.shopId,
+        shopName: sel.shopName || `Shop ${sel.shopId}`,
+        ordered,
+        elsewhere,
+        remaining,
+        requested: sel.boxes,
+      });
     }
   }
-  return conflicts;
+  return issues;
 }
 
 // ─── Reference data (shop villages, vehicle capacity, supervisor mobiles) ───
@@ -657,6 +757,11 @@ export async function sendOrdersWhatsApp(
   }
 
   const result: OrdersWhatsAppResult = { enabled: true, sent: 0, failed: 0, skipped: 0 };
+  // Loaded lazily: the WhatsApp/PDF chain pulls heavy deps (jspdf, image
+  // assets) which the assignment logic — and its unit tests — never needs.
+  const { sendDeliveryWhatsApp } = await import(
+    "../vehicle-trips/services/deliveryWhatsAppService"
+  );
   let sent = 0;
   for (const row of rows) {
     onProgress?.(sent, rows.length, row.shopName || "Shop");

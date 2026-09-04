@@ -54,6 +54,8 @@ const STATUS_TONES: Record<string, string> = {
   Draft: "bg-slate-100 text-slate-600 border-slate-200",
   "Awaiting assignment": "bg-sky-50 text-sky-700 border-sky-200",
   "Partial assignment": "bg-amber-50 text-amber-700 border-amber-200",
+  "Part Assigned": "bg-amber-50 text-amber-700 border-amber-300",
+  "Pending for Assign": "bg-sky-50 text-sky-700 border-sky-200",
   "Delivered with Difference": "bg-amber-50 text-amber-700 border-amber-300",
   "Part Delivered": "bg-amber-50 text-amber-700 border-amber-300",
   "Not Assigned": "bg-slate-100 text-slate-500 border-slate-200",
