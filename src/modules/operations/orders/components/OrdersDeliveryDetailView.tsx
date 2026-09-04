@@ -73,6 +73,10 @@ type Props = {
    * page refetched, so the report re-derives from persisted data.
    */
   onRecordDelivery: (shop: ShopDeliveryBreakdown, boxes: number) => Promise<void>;
+  /** Save Progress from the check popup — error message, or null. */
+  onSaveProgress: () => Promise<string | null>;
+  /** Submit the delivery trip from the check popup — error message, or null. */
+  onSubmitTrip: () => Promise<string | null>;
 };
 
 type ReportStatusFilter =
@@ -209,6 +213,8 @@ function OrdersDeliveryDetailView({
   onClose,
   onWhatsApp,
   onRecordDelivery,
+  onSaveProgress,
+  onSubmitTrip,
 }: Props) {
   const { to } = useOrdersI18n();
   const { trip, progress, originalShopIds } = orderTrip;
@@ -711,7 +717,18 @@ function OrdersDeliveryDetailView({
           orderTrip={orderTrip}
           breakdown={breakdown}
           supervisorMobile={supervisorMobile}
+          ordersTranslate={to}
           onWhatsApp={onWhatsApp}
+          onSaveProgress={onSaveProgress}
+          onSubmitTrip={onSubmitTrip}
+          onDownload={(res) => {
+            const anchor = document.createElement("a");
+            anchor.href = res.url;
+            anchor.download = res.fileName;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+          }}
           onCorrect={() => setPdfOpen(false)}
           onClose={() => setPdfOpen(false)}
         />

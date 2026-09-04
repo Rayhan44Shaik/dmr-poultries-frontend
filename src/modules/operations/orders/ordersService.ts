@@ -497,6 +497,43 @@ export async function recordShopDelivery(
 }
 
 /**
+ * Save the delivery state exactly as it stands — the explicit "Save Progress"
+ * from the report check popup, so the operator can bank the entries before
+ * sending the report out.
+ */
+export async function saveShopDeliveries(vehicleTrip: Trip): Promise<Trip> {
+  const rows = rowsInSequence(vehicleTrip);
+  if (ORDERS_SAMPLE_DATA_ENABLED) {
+    return applySampleDeliveries(vehicleTrip.id, rows);
+  }
+  const { data } = await apiPost<RawTrip>(
+    `/trips/${vehicleTrip.id}/steps/deliveries`,
+    { ...toStep4Payload({ deliveries: rows } as unknown as Partial<Trip>), mode: "save" }
+  );
+  return mapApiTripToTrip(data, vehicleTrip);
+}
+
+/**
+ * Submit the delivery trip from the report check popup — the deliveries are
+ * confirmed and the trip closes as Completed (the same contract the backend
+ * uses for a submitted Step 4).
+ */
+export async function submitShopDeliveries(vehicleTrip: Trip): Promise<Trip> {
+  const rows = rowsInSequence(vehicleTrip);
+  if (ORDERS_SAMPLE_DATA_ENABLED) {
+    return applySampleDeliveries(vehicleTrip.id, rows, {
+      status: "Completed",
+      submittedAtTimestamp: new Date().toISOString(),
+    });
+  }
+  const { data } = await apiPost<RawTrip>(
+    `/trips/${vehicleTrip.id}/steps/deliveries`,
+    { ...toStep4Payload({ deliveries: rows } as unknown as Partial<Trip>), mode: "submit", remarks: "[ORDER] delivery submitted" }
+  );
+  return mapApiTripToTrip(data, vehicleTrip);
+}
+
+/**
  * Same-shop / same-day duplicate guard — enforced from FRESH persisted data
  * (never just React state). Returns the shop names that are already assigned
  * to a DIFFERENT vehicle for the day (empty = safe to save).

@@ -1,157 +1,124 @@
-// src/modules/operations/orders/components/OrdersPdfPreview.tsx
-// "CHECK PDF" popup — opened from the Delivery detail once shops are delivered.
-//
-// One neat sheet to verify the report BEFORE it goes out:
-//   · a summary of exactly what the document says (shops delivered, part
-//     delivered, pending, boxes / birds / weight) so a wrong entry is spotted
-//     here, not on the supervisor's phone;
-//   · the generated PDF itself, in-frame;
-//   · Download PDF · Send on WhatsApp · Correct deliveries (back to the
-//     editable shop table) · Close;
-//   · after sending, the submit message with the per-shop details and the
-//     sent / failed counts.
-//
-// The document is built once (generateOrdersPdf mode:"preview") and reused for
-// the download, so what you checked is byte-for-byte what you send.
+/**
+ * OrdersPdfPreview — CHECK the delivery report, then send or download it.
+ *
+ * Opens from the delivery report's PDF button once shops are delivered, styled
+ * like the Shop Ledger PDF modal: a full-screen sheet with the details panel
+ * on the left, the rendered document on the right and the actions in a footer,
+ * so the operator can see exactly what the report says, correct a wrong entry,
+ * and only then send it.
+ *
+ * The document is rendered with the same PdfBlobPreview the Shop Ledger uses
+ * (pdf.js on a canvas) — Chrome blocks its built-in PDF plugin inside
+ * nested/sandboxed iframes, which would leave a plain <iframe> blank in the
+ * preview/Electron shells.
+ *
+ * One build, many uses: the PDF is generated once and the same blob is framed
+ * here, downloaded, and handed to WhatsApp, so the file that was checked is
+ * byte-for-byte the file that goes out.
+ */
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
   CheckCircle2,
   Download,
   FileText,
   Loader2,
   PencilLine,
+  Send,
+  Save,
+  ShieldCheck,
   X,
 } from "lucide-react";
+import PdfBlobPreview from "../../../reports/components/PdfBlobPreview";
 import {
-  opsPrimaryButtonClass,
-  opsSecondaryButtonClass,
-} from "../../../../shared/ui/operationsStyles";
-import { generateOrdersPdf, type OrdersPdfResult } from "../pdf/generateOrdersPdf";
-import { formatCount, type ShopDeliveryBreakdown } from "../ordersUtils";
-import type { OrdersWhatsAppResult } from "../ordersService";
+  generateOrdersPdf,
+  type OrdersPdfResult,
+} from "../pdf/generateOrdersPdf";
+import {
+  formatDeliveredAtLabel,
+  orderDateOfRef,
+  orderRefsOnTrip,
+  type ShopDeliveryBreakdown,
+} from "../ordersUtils";
 import type { OrdersTrip } from "../types";
-import { useOrdersI18n } from "../i18n/ordersI18n";
-import { WhatsAppIcon } from "./OrdersCommon";
+import type { OrdersT } from "../i18n/ordersI18n";
+import type { OrdersWhatsAppResult } from "../ordersService";
 
-type Props = {
+interface OrdersPdfPreviewProps {
+  /** The tracking trip (vehicle trip + progress + original order data). */
   orderTrip: OrdersTrip;
-  breakdown: ShopDeliveryBreakdown[];
   supervisorMobile: string;
-  /** Sends the report (existing per-shop WhatsApp mechanism). */
-  onWhatsApp: () => Promise<OrdersWhatsAppResult | null>;
-  /** Back to the editable shop table — correct an entry, then re-check. */
-  onCorrect: () => void;
+  breakdown: ShopDeliveryBreakdown[];
+  ordersTranslate: OrdersT;
   onClose: () => void;
-};
-
-function Fact({ label, value, tone = "slate" }: { label: string; value: string; tone?: "slate" | "emerald" | "amber" | "rose" }) {
-  const tones: Record<string, string> = {
-    slate: "text-slate-800",
-    emerald: "text-emerald-700",
-    amber: "text-amber-700",
-    rose: "text-rose-700",
-  };
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-1.5">
-      <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</div>
-      <div className={`text-sm font-bold ${tones[tone]}`}>{value}</div>
-    </div>
-  );
+  onDownload: (result: OrdersPdfResult) => void;
+  onWhatsApp: () => Promise<OrdersWhatsAppResult | null>;
+  /** "Correct deliveries" — close the popup back to the editable shop table. */
+  onCorrect: () => void;
+  /** Save Progress from the popup — returns an error message, or null. */
+  onSaveProgress: () => Promise<string | null>;
+  /** Submit the trip — returns an error message, or null. */
+  onSubmitTrip: () => Promise<string | null>;
 }
 
-function OrdersPdfPreview({
+const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
   orderTrip,
-  breakdown,
   supervisorMobile,
+  breakdown,
+  ordersTranslate,
+  onClose,
+  onDownload,
   onWhatsApp,
   onCorrect,
-  onClose,
-}: Props) {
-  const { to, language } = useOrdersI18n();
-  const { trip, progress } = orderTrip;
-  const [doc, setDoc] = useState<OrdersPdfResult | null>(null);
-  const [buildError, setBuildError] = useState<string | null>(null);
+  onSaveProgress,
+  onSubmitTrip,
+}) => {
+  const trip = orderTrip.trip;
+  const progress = orderTrip.progress;
+  const [building, setBuilding] = useState(true);
+  const [result, setResult] = useState<OrdersPdfResult | null>(null);
+  const [buildError, setBuildError] = useState("");
   const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState<OrdersWhatsAppResult | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitNote, setSubmitNote] = useState("");
+  const [sendNote, setSendNote] = useState("");
+  const [sendResult, setSendResult] = useState<OrdersWhatsAppResult | null>(null);
 
-  // Build once; the same blob feeds the preview frame and the download.
+  // ── Build the report once — the frame, the download and the WhatsApp send
+  //    all use this very same blob.
   useEffect(() => {
-    let live = true;
-    void (async () => {
-      try {
-        const built = await generateOrdersPdf({
-          trip,
-          supervisorMobile,
-          progress,
-          breakdown,
-          language,
-          mode: "preview",
-        });
-        if (!live) {
+    let alive = true;
+    let url: string | null = null;
+    setBuilding(true);
+    generateOrdersPdf({
+      trip,
+      supervisorMobile,
+      progress,
+      breakdown,
+      mode: "preview",
+    })
+      .then((built) => {
+        if (!alive) {
           URL.revokeObjectURL(built.url);
           return;
         }
-        setDoc(built);
-      } catch (e) {
-        if (live) setBuildError(e instanceof Error ? e.message : String(e));
-      }
-    })();
+        url = built.url;
+        setResult(built);
+      })
+      .catch(() => {
+        if (alive) setBuildError(ordersTranslate("orders.pdf_failed"));
+      })
+      .finally(() => {
+        if (alive) setBuilding(false);
+      });
     return () => {
-      live = false;
+      alive = false;
+      if (url) URL.revokeObjectURL(url);
     };
-    // Rebuild only when the report content changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trip.id, breakdown.length, language]);
+  }, [trip, supervisorMobile, progress, breakdown, ordersTranslate]);
 
-  // Never leak the object URL.
-  useEffect(
-    () => () => {
-      if (doc) URL.revokeObjectURL(doc.url);
-    },
-    [doc]
-  );
-
-  // ── What the document says (the check-before-send summary) ──────────────
-  const sums = useMemo(() => {
-    const sum = (pick: (b: ShopDeliveryBreakdown) => number) =>
-      breakdown.reduce((acc, b) => acc + pick(b), 0);
-    const is = (status: string) => breakdown.filter((b) => b.status === status).length;
-    return {
-      shops: breakdown.length,
-      delivered: is("delivered") + is("delivered_with_diff"),
-      part: is("part_delivered"),
-      pending: is("not_delivered"),
-      notListed: is("not_listed"),
-      orderedBoxes: sum((b) => b.orderedBoxes),
-      deliveredBoxes: sum((b) => b.deliveredBoxes),
-      deliveredBirds: sum((b) => b.deliveredBirds),
-      deliveredWeight: sum((b) => b.deliveredWeight),
-    };
-  }, [breakdown]);
-
-  const handleDownload = useCallback(() => {
-    if (!doc) return;
-    const a = document.createElement("a");
-    a.href = doc.url;
-    a.download = doc.fileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }, [doc]);
-
-  const handleSend = useCallback(async () => {
-    if (sending) return;
-    setSending(true);
-    try {
-      setSent(await onWhatsApp());
-    } finally {
-      setSending(false);
-    }
-  }, [sending, onWhatsApp]);
-
-  // Escape closes the popup.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -160,153 +127,345 @@ function OrdersPdfPreview({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const sendNote = sent
-    ? sent.sent > 0 && sent.failed === 0
-      ? to("orders.pdf_sent_ok", { sent: sent.sent })
-      : sent.sent > 0
-        ? to("orders.pdf_sent_partial", { sent: sent.sent, failed: sent.failed })
-        : sent.message?.includes("not configured")
-          ? to("orders.whatsapp_not_configured")
-          : to("orders.whatsapp_failed", { message: sent.message ?? "—" })
-    : "";
+  const totalShops = progress?.totalShops ?? breakdown.filter((b) => b.ordered).length;
+  const deliveredShops =
+    progress?.deliveredShops ?? breakdown.filter((b) => b.deliveredBoxes > 0).length;
+  const ordered = breakdown.filter((b) => b.ordered);
+  const delivered = breakdown.filter((b) => b.status === "delivered").length;
+  const partial = breakdown.filter((b) => b.status === "part_delivered").length;
+  const pending = breakdown.filter((b) => b.status === "not_delivered").length;
+  const sum = (pick: (b: ShopDeliveryBreakdown) => number) =>
+    breakdown.reduce((acc, b) => acc + pick(b), 0);
+  const orderRefs = useMemo(() => orderRefsOnTrip(trip), [trip]);
+  const orderDates = orderRefs.map(orderDateOfRef).filter(Boolean);
+
+  const handleSend = async () => {
+    setSending(true);
+    setSendNote("");
+    try {
+      const outcome = await onWhatsApp();
+      if (outcome) {
+        setSendResult(outcome);
+        setSendNote(
+          outcome.failed === 0
+            ? `${ordersTranslate("orders.pdf_sent_ok")}: ${outcome.message}`
+            : `${ordersTranslate("orders.pdf_sent_partial")}: ${outcome.message}`
+        );
+      } else {
+        setSendNote("");
+      }
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSubmitNote("");
+    const error = await onSaveProgress();
+    setSaved(!error);
+    setSubmitNote(error ? error : ordersTranslate("orders.pdf_saved_ok"));
+    setSaving(false);
+  };
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setSubmitNote("");
+    const error = await onSubmitTrip();
+    setSubmitNote(error ? error : ordersTranslate("orders.pdf_submitted_ok"));
+    setSubmitting(false);
+  };
+
+  const statusLabel = (status: ShopDeliveryBreakdown["status"]): string =>
+    status === "delivered"
+      ? ordersTranslate("orders.status_delivered")
+      : status === "delivered_with_diff"
+        ? ordersTranslate("orders.status_delivered_diff")
+        : status === "part_delivered"
+          ? ordersTranslate("orders.status_part_delivered")
+          : status === "not_delivered"
+            ? ordersTranslate("orders.status_not_delivered")
+            : ordersTranslate("orders.not_listed_deliveries");
+
+  const Fact = ({ label, value }: { label: string; value: string | number }) => (
+    <div className="min-w-0 rounded-lg border border-slate-200/80 bg-slate-50/80 px-2 py-1.5">
+      <p className="text-[9px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="truncate text-[11px] font-bold text-slate-800" title={String(value)}>
+        {value}
+      </p>
+    </div>
+  );
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-3" role="dialog" aria-modal="true">
-      <div className="flex h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={ordersTranslate("orders.pdf_check_title")}
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/70 p-3"
+    >
+      <div className="flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         {/* Header */}
-        <div className="flex items-center gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-3">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-600">
-            <FileText size={16} />
-          </span>
-          <div className="min-w-0">
-            <h3 className="truncate text-sm font-bold text-slate-800">
-              {to("orders.pdf_check_title")} — {trip.tripNo}
-            </h3>
-            <p className="truncate text-[11px] font-semibold text-slate-400">
-              {trip.vehicleNo || "—"} · {trip.supervisorName || "—"} · {trip.driverName || "—"}
-            </p>
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="rounded-lg bg-rose-100 p-1.5 text-rose-600">
+              <FileText size={17} />
+            </span>
+            <div className="min-w-0">
+              <h3 className="truncate text-sm font-extrabold text-slate-800">
+                {ordersTranslate("orders.pdf_check_title")}
+              </h3>
+              <p className="truncate text-[11px] font-semibold text-slate-500">
+                {[trip.tripNo, trip.vehicleNo, trip.supervisorName, trip.driverName]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label={to("orders.close")}
-            className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-colors hover:text-slate-700"
+            aria-label={ordersTranslate("orders.close")}
+            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
           >
-            <X size={15} />
+            <X size={17} />
           </button>
         </div>
 
-        {/* Summary — what the document says */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-5 py-2.5">
-          <Fact
-            label={to("orders.col_total_shops")}
-            value={`${sums.delivered + sums.part}/${sums.shops}`}
-          />
-          <Fact label={to("orders.status_delivered")} value={String(sums.delivered)} tone="emerald" />
-          <Fact label={to("orders.status_part_delivered")} value={String(sums.part)} tone="amber" />
-          <Fact label={to("orders.status_not_delivered")} value={String(sums.pending)} tone={sums.pending ? "rose" : "slate"} />
-          <Fact label={to("orders.delivered_boxes")} value={formatCount(sums.deliveredBoxes)} />
-          <Fact label={to("orders.ordered_boxes")} value={formatCount(sums.orderedBoxes)} />
-          <Fact label={to("orders.delivered_birds")} value={formatCount(sums.deliveredBirds)} />
-          <Fact label={to("orders.delivered_weight")} value={`${sums.deliveredWeight.toFixed(2)} kg`} />
-          {doc && (
-            <span className="ml-auto text-[11px] font-semibold text-slate-400">
-              {to("orders.pdf_pages", { pages: doc.pages })} · {doc.fileName}
-            </span>
-          )}
-        </div>
+        <div className="flex min-h-0 flex-1">
+          {/* ── Details panel: the order, then every shop ── */}
+          <aside className="flex w-64 shrink-0 flex-col overflow-y-auto border-r border-slate-100 bg-white/80">
+            <div className="border-b border-slate-100 px-3.5 py-3">
+              <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                {ordersTranslate("orders.pdf_order_details")}
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-1.5">
+                <Fact
+                  label={ordersTranslate("orders.pdf_order_no")}
+                  value={orderRefs.length > 0 ? orderRefs.join(", ") : "—"}
+                />
+                <Fact
+                  label={ordersTranslate("orders.pdf_order_date")}
+                  value={orderDates.length > 0 ? orderDates.join(", ") : trip.tripDate}
+                />
+                <Fact label={ordersTranslate("orders.col_total_shops")} value={`${totalShops}`} />
+                <Fact label={ordersTranslate("orders.col_status")} value={progress?.status ?? "—"} />
+                <Fact
+                  label={ordersTranslate("orders.total_boxes")}
+                  value={`${sum((b) => b.orderedBoxes)} box`}
+                />
+                <Fact
+                  label={ordersTranslate("orders.total_birds")}
+                  value={sum((b) => b.orderedBirds).toLocaleString("en-IN")}
+                />
+              </div>
+            </div>
 
-        {/* The document */}
-        <div className="min-h-0 flex-1 bg-slate-100">
-          {buildError ? (
-            <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-              <AlertTriangle size={22} className="text-rose-500" />
-              <p className="text-sm font-bold text-slate-700">{to("orders.pdf_failed")}</p>
-              <p className="max-w-md text-xs text-slate-500">{buildError}</p>
+            <div className="border-b border-slate-100 px-3.5 py-3">
+              <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                {ordersTranslate("orders.pdf_check_summary")}
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-1.5">
+                <Fact
+                  label={ordersTranslate("orders.delivered_shops")}
+                  value={`${deliveredShops}/${totalShops}`}
+                />
+                <Fact label={ordersTranslate("orders.status_part_delivered")} value={partial} />
+                <Fact label={ordersTranslate("orders.status_not_delivered")} value={pending} />
+                <Fact label={ordersTranslate("orders.status_delivered")} value={delivered} />
+                <Fact
+                  label={ordersTranslate("orders.delivered_boxes")}
+                  value={`${sum((b) => b.deliveredBoxes)}/${sum((b) => b.orderedBoxes)}`}
+                />
+                <Fact
+                  label={ordersTranslate("orders.delivered_weight")}
+                  value={`${sum((b) => b.deliveredWeight).toFixed(2)} kg`}
+                />
+              </div>
             </div>
-          ) : doc ? (
-            <iframe
-              title={`${to("orders.pdf_check_title")} — ${trip.tripNo}`}
-              src={doc.url}
-              className="h-full w-full border-0"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center gap-2 text-xs font-semibold text-slate-400">
-              <Loader2 size={14} className="animate-spin" />
-              {to("orders.pdf_building")}
-            </div>
-          )}
-        </div>
 
-        {/* Submit message — shown after sending */}
-        {sent && (
-          <div className="border-t border-slate-200 bg-slate-50/70 px-5 py-2.5">
-            <div className="flex items-center gap-2">
-              {sent.sent > 0 ? (
-                <CheckCircle2 size={14} className="text-emerald-600" />
-              ) : (
-                <AlertTriangle size={14} className="text-amber-600" />
-              )}
-              <span className="text-[11px] font-bold text-slate-700">{sendNote}</span>
+            <div className="min-h-0 flex-1 px-3.5 py-3">
+              <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                {ordersTranslate("orders.pdf_shop_details")} ({ordered.length})
+              </p>
+              <ul className="mt-2 space-y-1.5">
+                {ordered.map((shop) => (
+                  <li
+                    key={shop.shopId}
+                    className="rounded-lg border border-slate-200/80 px-2 py-1.5"
+                  >
+                    <p className="truncate text-[11px] font-bold text-slate-700" title={shop.shopName}>
+                      {shop.serialNo}. {shop.shopName}
+                    </p>
+                    <p className="truncate text-[10px] font-semibold text-slate-400">
+                      {shop.village || "—"}
+                      {shop.mobile ? ` · ${shop.mobile}` : ""}
+                    </p>
+                    <p className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold">
+                      <span className="text-slate-600">
+                        {shop.deliveredBoxes}/{shop.orderedBoxes} box ·{" "}
+                        {shop.deliveredBirds.toLocaleString("en-IN")}/
+                        {shop.orderedBirds.toLocaleString("en-IN")}
+                      </span>
+                      <span
+                        className={
+                          shop.status === "delivered"
+                            ? "text-emerald-600"
+                            : shop.status === "part_delivered"
+                              ? "text-amber-600"
+                              : "text-rose-600"
+                        }
+                      >
+                        {statusLabel(shop.status)}
+                      </span>
+                    </p>
+                    {shop.deliveredAt ? (
+                      <p className="text-[10px] font-medium text-slate-400">
+                        {formatDeliveredAtLabel(shop.deliveredAt, true)}
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
             </div>
-            {/* The details that went out, shop by shop. */}
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {breakdown.map((b) => (
-                <span
-                  key={b.shopId}
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600"
-                >
-                  {b.shopName}
-                  <span className="text-slate-400">
-                    {formatCount(b.deliveredBoxes)}/{formatCount(b.orderedBoxes)} ·{" "}
-                    {b.status === "not_delivered"
-                      ? to("orders.status_not_delivered")
-                      : b.status === "part_delivered"
-                        ? to("orders.status_part_delivered")
-                        : to("orders.status_delivered")}
-                  </span>
-                </span>
-              ))}
-            </div>
+          </aside>
+
+          {/* ── The document itself ── */}
+          <div className="flex min-w-0 flex-1 flex-col bg-slate-200/60">
+            {building ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 text-xs font-medium text-slate-500">
+                <Loader2 size={16} className="animate-spin text-rose-500" />
+                {ordersTranslate("orders.pdf_building")}
+              </div>
+            ) : buildError ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 text-xs font-semibold text-rose-600">
+                {buildError}
+              </div>
+            ) : result ? (
+              <PdfBlobPreview key={result.url} url={result.url} />
+            ) : null}
           </div>
-        )}
+        </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-2.5 border-t border-slate-200 bg-white px-5 py-3">
-          <button
-            type="button"
-            onClick={handleDownload}
-            disabled={!doc}
-            className={`${opsSecondaryButtonClass} border-slate-300 text-slate-700 hover:bg-slate-50`}
-          >
-            <Download size={14} />
-            {to("orders.pdf_download")}
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleSend()}
-            disabled={sending || !doc}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600/40 bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {sending ? <Loader2 size={14} className="animate-spin" /> : <WhatsAppIcon size={14} />}
-            {sending ? to("orders.sending") : to("orders.pdf_send_whatsapp")}
-          </button>
-          <button
-            type="button"
-            onClick={onCorrect}
-            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
-          >
-            <PencilLine size={14} />
-            {to("orders.pdf_correct")}
-          </button>
-          <button type="button" onClick={onClose} className={`${opsPrimaryButtonClass} ml-auto`}>
-            {to("orders.close")}
-          </button>
+        {/* ── Footer: the message, then the actions ── */}
+        <div className="border-t border-slate-100 px-5 py-3">
+          <div className="flex min-h-[18px] items-center gap-1.5 text-[11px] font-semibold">
+            {sending || submitting || saving ? (
+              <>
+                <Loader2 size={13} className="animate-spin text-rose-500" />
+                <span className="text-slate-500">{ordersTranslate("orders.sending")}</span>
+              </>
+            ) : submitNote ? (
+              <span className={submitNote === ordersTranslate("orders.pdf_saved_ok") || submitNote === ordersTranslate("orders.pdf_submitted_ok") ? "text-emerald-600" : "text-rose-600"}>
+                {submitNote}
+              </span>
+            ) : sendNote ? (
+              <span className={sendResult && sendResult.failed > 0 ? "text-amber-600" : "text-emerald-600"}>
+                {sendNote}
+              </span>
+            ) : result ? (
+              <span className="text-slate-400">
+                {result.pages} {ordersTranslate("orders.pdf_pages")} · {result.fileName}
+              </span>
+            ) : null}
+          </div>
+
+          {/* The submit message: what was sent / submitted, shop by shop */}
+          {sendResult ? (
+            <div className="mt-2 max-h-24 overflow-y-auto rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-2">
+              <ul className="space-y-0.5">
+                {ordered.map((shop) => (
+                  <li
+                    key={shop.shopId}
+                    className="flex items-center justify-between gap-2 text-[11px] font-medium"
+                  >
+                    <span className="truncate text-slate-600" title={shop.shopName}>
+                      {shop.shopName}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-slate-600">
+                      {shop.deliveredBoxes}/{shop.orderedBoxes} box
+                      {" · "}
+                      <span
+                        className={
+                          shop.orderedBoxes > 0 && shop.deliveredBoxes >= shop.orderedBoxes
+                            ? "font-bold text-emerald-700"
+                            : shop.deliveredBoxes > 0
+                              ? "font-bold text-amber-600"
+                              : "font-bold text-rose-600"
+                        }
+                      >
+                        {statusLabel(shop.status)}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-9 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-semibold text-slate-600 transition hover:bg-slate-50"
+            >
+              {ordersTranslate("orders.close")}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={saved || saving}
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saved ? <CheckCircle2 size={14} className="text-emerald-600" /> : <Save size={14} />}
+              {saved
+                ? ordersTranslate("orders.pdf_saved_btn")
+                : ordersTranslate("orders.pdf_save_progress")}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSend()}
+              disabled={sending || !result}
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 text-[13px] font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Send size={14} />
+              {ordersTranslate("orders.pdf_send_whatsapp")}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSubmit()}
+              disabled={submitting || deliveredShops === 0}
+              title={
+                deliveredShops === 0
+                  ? ordersTranslate("orders.pdf_submit_blocked")
+                  : undefined
+              }
+              className="flex h-9 items-center gap-1.5 rounded-lg bg-gradient-to-br from-slate-700 to-slate-900 px-3.5 text-[13px] font-semibold text-white shadow-sm transition hover:from-slate-800 hover:to-black disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ShieldCheck size={14} />
+              {ordersTranslate("orders.pdf_submit")}
+            </button>
+            <button
+              type="button"
+              onClick={() => result && onDownload(result)}
+              disabled={!result}
+              className="flex h-9 items-center gap-1.5 rounded-lg bg-gradient-to-br from-rose-500 to-rose-600 px-3.5 text-[13px] font-semibold text-white shadow-sm transition hover:from-rose-600 hover:to-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download size={14} />
+              {ordersTranslate("orders.pdf_download")}
+            </button>
+            <button
+              type="button"
+              onClick={onCorrect}
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-semibold text-slate-600 transition hover:bg-slate-50"
+            >
+              <PencilLine size={14} />
+              {ordersTranslate("orders.pdf_correct")}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
-}
-
+};
 
 export default OrdersPdfPreview;

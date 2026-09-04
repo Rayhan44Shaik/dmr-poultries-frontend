@@ -45,6 +45,8 @@ import {
   loadShopDirectory,
   loadSupervisorDirectory,
   recordShopDelivery,
+  saveShopDeliveries,
+  submitShopDeliveries,
   sendOrdersWhatsApp,
   shopMobileOf,
   supervisorMobileOf,
@@ -294,6 +296,39 @@ const OrdersPage: React.FC = () => {
     [load, to, showNotification]
   );
 
+  // ── Check-popup actions: bank the entries, then submit the trip ─────────
+  const handleSaveProgress = useCallback(
+    async (ot: OrdersTrip): Promise<string | null> => {
+      try {
+        await saveShopDeliveries(ot.trip);
+        await load();
+        showNotification(to("orders.pdf_saved_ok"), "success");
+        return null;
+      } catch (e) {
+        const message = e instanceof Error ? e.message : to("orders.refresh_failed");
+        showNotification(message, "error");
+        return message;
+      }
+    },
+    [load, to, showNotification]
+  );
+
+  const handleSubmitTrip = useCallback(
+    async (ot: OrdersTrip): Promise<string | null> => {
+      try {
+        await submitShopDeliveries(ot.trip);
+        await load();
+        showNotification(to("orders.pdf_submitted_ok"), "success");
+        return null;
+      } catch (e) {
+        const message = e instanceof Error ? e.message : to("orders.refresh_failed");
+        showNotification(message, "error");
+        return message;
+      }
+    },
+    [load, to, showNotification]
+  );
+
   // ── Detail view (opened from Tab 3) — rendered as a modal over the tab ─
   const viewing: OrdersTrip | null =
     (viewingId != null && data?.tracking.find((t) => t.trip.id === viewingId)) || null;
@@ -415,6 +450,8 @@ const OrdersPage: React.FC = () => {
           onClose={() => setViewingId(null)}
           onWhatsApp={() => handleWhatsApp(viewing)}
           onRecordDelivery={(shop, boxes) => handleRecordDelivery(viewing, shop, boxes)}
+          onSaveProgress={() => handleSaveProgress(viewing)}
+          onSubmitTrip={() => handleSubmitTrip(viewing)}
         />
       )}
     </div>

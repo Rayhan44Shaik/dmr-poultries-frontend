@@ -804,6 +804,33 @@ export function filterShopBreakdown(
  * "2026-08-29T16:35:00.000Z" → "29 Aug 2026 · 04:35 PM". Falls back to the
  * raw stored value when it cannot be parsed.
  */
+/**
+ * The ORDER(S) a vehicle trip is delivering.
+ *
+ * Read from the persisted data — every assigned row carries
+ * "[ORDER] O:<orderTripNo>" and a finished assignment tags the trip remarks
+ * with "order:<orderTripNo>" — so the report and the check popup always name
+ * the order, never just the vehicle trip.
+ */
+export function orderRefsOnTrip(trip: Trip): string[] {
+  const fromRows = rowsInSequence(trip)
+    .map((r) => parseOrderRef(r.remarks))
+    .filter((v): v is string => Boolean(v));
+  const fromTrip = String(trip.remarks ?? "")
+    .split("|")
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.startsWith("order:"))
+    .map((tag) => tag.slice("order:".length).trim())
+    .filter(Boolean);
+  return Array.from(new Set([...fromRows, ...fromTrip]));
+}
+
+/** "ORD-20260903-01" → "2026-09-03" (empty when the ref carries no date). */
+export function orderDateOfRef(ref: string): string {
+  const m = /^ORD-(\d{4})(\d{2})(\d{2})-\d+$/.exec(ref);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
+}
+
 export function formatDeliveredAtLabel(
   iso: string | null | undefined,
   compact = false

@@ -20,10 +20,10 @@ import {
 import type { OrdersProgress } from "../types";
 import {
   formatDeliveredAtLabel,
-  rowsInSequence,
+  orderDateOfRef,
+  orderRefsOnTrip,
   type ShopDeliveryBreakdown,
 } from "../ordersUtils";
-import { parseOrderRef } from "../types";
 import { ordersTranslate } from "../i18n/ordersI18n";
 
 type RGB = [number, number, number];
@@ -100,32 +100,10 @@ export async function generateOrdersPdf({
     hour12: true,
   });
 
-  // ─── Which ORDER(S) this vehicle is delivering ─────────────────────────
-  // Every assigned row carries "[ORDER] O:<orderTripNo>" and a finished
-  // assignment tags the trip remarks with "order:<orderTripNo>" — both are
-  // read so the report always names the order, never just the vehicle trip.
-  const orderRefs = Array.from(
-    new Set(
-      [
-        ...rowsInSequence(trip)
-          .map((r) => parseOrderRef(r.remarks))
-          .filter((v): v is string => Boolean(v)),
-        ...String(trip.remarks ?? "")
-          .split("|")
-          .map((tag) => tag.trim())
-          .filter((tag) => tag.startsWith("order:"))
-          .map((tag) => tag.slice("order:".length).trim())
-          .filter(Boolean),
-      ].filter(Boolean)
-    )
-  );
-  const orderDateOf = (ref: string): string => {
-    const m = /^ORD-(\d{4})(\d{2})(\d{2})-\d+$/.exec(ref);
-    return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
-  };
+  const orderRefs = orderRefsOnTrip(trip);
   const orderNoLabel = orderRefs.length > 0 ? orderRefs.join(", ") : "—";
   const orderDateLabel =
-    orderRefs.map(orderDateOf).filter(Boolean).join(", ") || "—";
+    orderRefs.map(orderDateOfRef).filter(Boolean).join(", ") || "—";
 
   const assets: DmrPoultryHeaderAssets = await prepareDmrPoultryHeaderAssets({ henUrl: henImage });
 
