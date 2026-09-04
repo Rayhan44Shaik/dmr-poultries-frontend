@@ -1,17 +1,18 @@
 // src/modules/operations/orders/ordersUtils.ts
-// Pure helpers for the Orders module — no React, no API, no business state.
+// Pure business logic for the Orders module — no React, no API.
 //
-// Every quantity rule (remaining boxes, delivered locks, statuses) is owned
-// by the BACKEND Orders module. What is left here is:
-//   - reading the trip-side `[ORDER]` plan rows Step 4 delivers against,
-//   - deriving the ordered-vs-delivered breakdown the detail sheet / PDF show,
-//   - operational-day and formatting helpers.
+// The 3-tab workflow is DERIVED entirely from persisted data on every load:
+//   - collection containers  (no vehicle, step flags + plan rows)
+//   - eligible vehicle trips (Step 2 complete, not yet delivered)
+//   - delivery tracking      (Step 4 rows are the source of truth)
+// Refreshing always reproduces the correct state — no local business state.
 
-import type { ShopDelivery, Trip } from "../../../shared/trip";
-import type { OrderView } from "./services/ordersApi";
-import type { ShopDirectory } from "./ordersService";
+import type { BoxDetail, ShopDelivery, Trip } from "../../../shared/trip";
 import {
   isOrderPlanRemarks,
+  parseOrderRef,
+  type OrderShopRow,
+  type OrdersEligibleVehicle,
   type OrdersProgress,
   type OrdersTrip,
   type ShopOrderQuantities,
@@ -24,27 +25,13 @@ const num = (value: unknown): number => {
 
 // ─── Row helpers ─────────────────────────────────────────────────────────────
 
-/** True for rows the Orders backend projected (assignment plan row). */
+/** True for rows the Orders module wrote (original order plan). */
 export function isOrderPlanRow(row: ShopDelivery): boolean {
   return isOrderPlanRemarks(row.remarks);
 }
 
-/**
- * True when Step 4 actually DELIVERED this shop (real delivery data), not
- * merely when a row exists.
- *
- * The backend stamps `auto_capture_time` on every `trip_deliveries` INSERT —
- * including the box-less, weight-0 plan rows Order Assignment projects — so a
- * capture timestamp alone cannot tell a planned stop from a delivered one. A
- * real Step 4 capture always carries actual delivered quantities: delivered
- * weight > 0, or one or more selected pickup boxes. This mirrors the backend
- * predicate used by ordersService.syncTripAssignments.
- */
+/** True when Step 4 actually captured this delivery (real delivery data). */
 export function isCapturedRow(row: ShopDelivery): boolean {
-  const hasDeliveredActuals =
-    (Number(row.weight) || 0) > 0 ||
-    (Array.isArray(row.selectedBoxIds) && row.selectedBoxIds.length > 0);
-  if (!hasDeliveredActuals) return false;
   return Boolean(
     row.autoCaptureTime ||
       (row as { deliveredAt?: string }).deliveredAt ||
@@ -86,18 +73,125 @@ export function deliveredRowBoxes(row: ShopDelivery): number {
 
 // ─── Trip classification ─────────────────────────────────────────────────────
 
-/** True when a trip carries at least one Orders plan row. */
+/** True when a trip has at least one Orders plan row. */
 export function hasOrderRows(trip: Trip): boolean {
   return rowsInSequence(trip).some(isOrderPlanRow);
 }
 
-/** A vehicle trip whose order delivery progress is tracked. */
+/**
+ * A collection container: NO vehicle (vehicleId 0/empty), Orders plan rows,
+ * not deleted. startStepSubmitted = "collection finished (collected)".
+ */
+export function isOrderContainer(trip: Trip): boolean {
+  return (
+    trip.deleted !== true &&
+    (trip.vehicleId == null || trip.vehicleId === 0) &&
+    !trip.vehicleNo &&
+    hasOrderRows(trip)
+  );
+}
+
+/** Container whose collection is finished → shows in Tab 2. */
+export function isCollectedOrder(trip: Trip): boolean {
+  return isOrderContainer(trip) && trip.startStepSubmitted === true;
+}
+
+/** Container still being collected → the single Tab 1 working collection. */
+export function isActiveCollection(trip: Trip): boolean {
+  return isOrderContainer(trip) && trip.startStepSubmitted !== true;
+}
+
+/**
+ * A vehicle trip eligible for order assignment: Step 2 (farm) submitted,
+ * Step 4 (deliveries) NOT submitted, vehicle set.
+ *
+ * Trips that already carry PARTIAL order rows stay eligible (their
+ * `alreadyAssigned` boxes are deducted from the available capacity, and the
+ * assignment editor resumes on them). Fully finished assignments set
+ * deliveryStepSubmitted and are therefore excluded here — a vehicle that
+ * already delivered an order is locked.
+ */
+export function isEligibleVehicleTrip(trip: Trip): boolean {
+  return (
+    trip.deleted !== true &&
+    trip.farmStepSubmitted === true &&
+    trip.deliveryStepSubmitted !== true &&
+    (trip.vehicleId != null && trip.vehicleId > 0)
+  );
+}
+
+/** A trip with an assigned order whose delivery progress is tracked (Tab 3). */
 export function isTrackingTrip(trip: Trip): boolean {
   return (
     trip.deleted !== true &&
-    trip.vehicleId != null &&
-    trip.vehicleId > 0 &&
+    trip.deliveryStepSubmitted === true &&
     hasOrderRows(trip)
+  );
+}
+
+/** Next collection container tripNo for today (ORD-YYYYMMDD-NN). */
+export function nextOrderTripNo(allTrips: Trip[], now = new Date()): string {
+  const date = localToday(now);
+  const stamp = date.replace(/-/g, "");
+  let max = 0;
+  for (const t of allTrips) {
+    const m = String(t.tripNo ?? "").match(/^ORD-(\d{8})-(\d+)$/);
+    if (m && m[1] === stamp) max = Math.max(max, num(m[2]));
+  }
+  return `ORD-${stamp}-${String(max + 1).padStart(2, "0")}`;
+}
+
+/** One-week operational window (project date convention: tripDate). */
+export function isWithinOneWeek(dateStr: string | undefined, now = new Date()): boolean {
+  if (!dateStr) return false;
+  const d = new Date(`${String(dateStr).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return false;
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
+  const start = new Date(end);
+  start.setDate(start.getDate() - 6); // current 7-day window, inclusive
+  start.setHours(0, 0, 0, 0);
+  return d >= start && d <= end;
+}
+
+// ─── Vehicle capacity ────────────────────────────────────────────────────────
+
+/** Vehicle master box capacity for a trip's vehicle (fallback: trip field). */
+export function vehicleCapacityOf(
+  trip: Trip,
+  vehicles: Array<{ id: number; noOfBoxes?: number }>
+): number {
+  const vehicle = trip.vehicleId ? vehicles.find((v) => v.id === trip.vehicleId) : undefined;
+  return Math.max(0, num(vehicle?.noOfBoxes) || num(trip.vehicleBoxCapacity) || 0);
+}
+
+/** Boxes already assigned to a trip (all Orders plan rows on it). */
+export function assignedBoxesOnTrip(trip: Trip): number {
+  return rowsInSequence(trip).reduce(
+    (sum, row) => (isOrderPlanRow(row) ? sum + rowBoxes(row) : sum),
+    0
+  );
+}
+
+/** Enrich an eligible vehicle trip with capacity facts for the UI. */
+export function toEligibleVehicle(
+  trip: Trip,
+  vehicles: Array<{ id: number; noOfBoxes?: number }>
+): OrdersEligibleVehicle {
+  const capacity = vehicleCapacityOf(trip, vehicles);
+  const alreadyAssigned = assignedBoxesOnTrip(trip);
+  return {
+    trip,
+    capacity,
+    alreadyAssigned,
+    available: Math.max(0, capacity - alreadyAssigned),
+  };
+}
+
+/** Rows of a vehicle trip that belong to one specific collection order. */
+export function orderRowsOnTrip(trip: Trip, orderTripNo: string): ShopDelivery[] {
+  return rowsInSequence(trip).filter(
+    (row) => isOrderPlanRow(row) && parseOrderRef(row.remarks) === orderTripNo
   );
 }
 
@@ -110,9 +204,9 @@ export function isTrackingTrip(trip: Trip): boolean {
  * - delivered shop  = an original shop with at least one captured row
  * - additional shop = a shop in Step 4 data that was never in the order
  *
- * `originalQuantities` (from /api/orders) supplies the ORDERED totals —
- * Step 4 rewrites the vehicle rows in place, so the row itself no longer
- * carries the ordered box count after a delivery.
+ * `originalQuantities` (from the day's collection container) supplies the
+ * ORDERED totals — Step 4 rewrites vehicle rows in place, so the row itself
+ * no longer carries the ordered box count after a delivery.
  */
 export function computeOrdersProgress(
   trip: Trip,
@@ -179,11 +273,13 @@ export function computeOrdersProgress(
   const totalShops = originalShopIds.size;
   const pendingShops = Math.max(0, totalShops - deliveredShops);
 
-  // ── AUTHORITATIVE completion ─────────────────────────────────────────
-  // A trip is "Completed" ONLY when the Trip Entry lifecycle says so
-  // (`trips.status = 'Completed'`). Delivery percentage, 100% boxes, all
-  // shops delivered or a Step 4 submission are NEVER sufficient — Orders
-  // keeps no independent completion state.
+  // ── AUTHORITATIVE completion (CRITICAL RULE #4 / #5) ─────────────────
+  // A trip is "Completed" ONLY when the existing Trip Entry lifecycle says
+  // so: `trips.status = 'Completed'` (set by Trip Entry's Step 5 submission
+  // / status transition — the same field the Recent Trips list uses).
+  // Delivery percentage, 100% boxes, all shops delivered or a Step 4
+  // submission ALONE are NEVER sufficient — Orders keeps no independent
+  // completion state.
   const tripCompleted = trip.status === "Completed" && trip.deleted !== true;
 
   let status: OrdersProgress["status"];
@@ -210,10 +306,7 @@ export function computeOrdersProgress(
   };
 }
 
-export function buildOrdersTrip(
-  trip: Trip,
-  originalQuantities?: ShopOrderQuantities
-): OrdersTrip {
+export function buildOrdersTrip(trip: Trip, originalQuantities?: ShopOrderQuantities): OrdersTrip {
   const rows = rowsInSequence(trip);
   const originalShopIds = new Set<number>();
   const additionalShopIds = new Set<number>();
@@ -222,14 +315,94 @@ export function buildOrdersTrip(
     if (!shopId) continue;
     if (isOrderPlanRow(row)) originalShopIds.add(shopId);
   }
-  if (originalShopIds.size > 0) {
+  const hasMarker = originalShopIds.size > 0;
+  if (hasMarker) {
     for (const row of rows) {
       const shopId = num(row.shopId);
       if (shopId && !originalShopIds.has(shopId)) additionalShopIds.add(shopId);
     }
   }
-  const progress = computeOrdersProgress(trip, originalQuantities);
+  const progress = isTrackingTrip(trip) ? computeOrdersProgress(trip, originalQuantities) : null;
   return { trip, progress, originalShopIds, additionalShopIds, originalQuantities };
+}
+
+// ─── Collection editor: boxes + quantities ──────────────────────────────────
+
+/**
+ * Assigns real pickup boxes to shop rows in sequence order (the existing
+ * Step 4 box logic: each box belongs to one shop). Returns a NEW array of
+ * rows with selectedBoxIds + birds/weight derived from the assigned boxes.
+ * When the trip has no pickup box data yet, quantities stay as entered
+ * (honest "no data yet" state — no invented calculations).
+ */
+export function assignBoxesToRows(
+  rows: OrderShopRow[],
+  boxDetails: BoxDetail[]
+): OrderShopRow[] {
+  const boxes = [...(boxDetails ?? [])].sort((a, b) => num(a.boxNo) - num(b.boxNo));
+  const used = new Set<number>();
+  const out: OrderShopRow[] = [];
+
+  for (const row of rows) {
+    const wanted = Math.max(0, Math.floor(num(row.boxNo)));
+    const selected: number[] = [];
+    let birds = 0;
+    let weight = 0;
+    for (const box of boxes) {
+      if (selected.length >= wanted) break;
+      const key = num(box.boxNo);
+      if (used.has(key)) continue;
+      used.add(key);
+      selected.push(key);
+      birds += num(box.birds);
+      weight += num(box.weight);
+    }
+    out.push({
+      ...row,
+      selectedBoxIds: selected,
+      boxNo: selected.length > 0 ? selected.length : row.boxNo,
+      birds: selected.length > 0 ? birds : num(row.birds),
+      weight: selected.length > 0 ? Number(weight.toFixed(2)) : num(row.weight),
+    });
+  }
+  return out;
+}
+
+/** Live summary of collection/assignment rows. */
+export function collectionTotals(rows: OrderShopRow[]) {
+  let boxes = 0;
+  let weight = 0;
+  let birds = 0;
+  for (const row of rows) {
+    boxes += num(row.boxNo);
+    weight += num(row.weight);
+    birds += num(row.birds);
+  }
+  return {
+    totalShops: rows.length,
+    totalBoxes: boxes,
+    totalWeight: Number(weight.toFixed(2)),
+    totalBirds: birds,
+  };
+}
+
+/** A collection row is "Entered" once it has boxes (and birds where known). */
+export function rowStatus(
+  row: OrderShopRow,
+  hasBoxData: boolean
+): "Entered" | "Draft" {
+  if (num(row.boxNo) > 0) {
+    if (!hasBoxData || num(row.birds) > 0) return "Entered";
+  }
+  return "Draft";
+}
+
+/** Weight derived from the trip's average bird weight (Step 2 data). */
+export function weightForBirds(birds: number, avgBirdWeight: number | null | undefined): number {
+  const b = Math.max(0, num(birds));
+  const w = num(avgBirdWeight);
+  if (!b || !w) return 0;
+  return Number((b * w).toFixed(2));
 }
 
 // ─── Day-based operational dates (local timezone — the user's day) ──────────
@@ -283,8 +456,7 @@ export type ShopDeliveryBreakdownStatus =
 export type ShopDeliveryBreakdown = {
   shopId: number;
   shopName: string;
-  /** Shop Master CITY (the column formerly labelled "Village"). */
-  city: string;
+  village: string;
   /** Shop Mobile — Shop Master only ("" when the master has none). */
   mobile: string;
   /** Sequence of the first row for this shop. */
@@ -311,14 +483,15 @@ export type ShopDeliveryBreakdown = {
 };
 
 /** Merges the persisted rows per shop into the detail-view columns.
- * Ordered values come from the ORIGINAL order (`originalQuantities`, read
- * from /api/orders — authoritative, since Step 4 rewrites vehicle rows in
- * place); delivered values are the actual captured Step 4 figures. Without
- * order context it falls back to the row's own plan snapshot. */
+ * Ordered values come from the ORIGINAL order (the collection container via
+ * `originalQuantities` — authoritative, since Step 4 rewrites vehicle rows
+ * in place); delivered values are the actual captured Step 4 figures.
+ * Without container context it falls back to the row's own plan snapshot
+ * (farmBirds/farmWeight keep the ordered birds/weight). */
 export function buildShopBreakdown(
   rows: ShopDelivery[],
   originalShopIds: Set<number>,
-  cityOf: (shopId: number, shopName: string) => string,
+  villageOf: (shopId: number, shopName: string) => string,
   originalQuantities?: ShopOrderQuantities,
   mobileOf?: (shopId: number) => string
 ): ShopDeliveryBreakdown[] {
@@ -366,6 +539,9 @@ export function buildShopBreakdown(
     // NOT LISTED = Step 4 delivered a shop that was never in the original
     // order (no plan row for it). Shown, flagged — never discarded.
     const additional = originalShopIds.size > 0 && !originalShopIds.has(shopId);
+    // Difference vs the ORIGINAL order:
+    //  - not listed  → no original order, difference is "—" (0 here)
+    //  - not delivered → delivered 0 vs ordered n → −n (visible shortfall)
     const boxDifference = additional ? 0 : deliveredBoxes - orderedBoxes;
     const birdDifference = additional ? 0 : deliveredBirds - orderedBirds;
     const status: ShopDeliveryBreakdownStatus = additional
@@ -378,7 +554,7 @@ export function buildShopBreakdown(
     out.push({
       shopId,
       shopName: acc.first.shopName || "—",
-      city: cityOf(shopId, acc.first.shopName || ""),
+      village: villageOf(shopId, acc.first.shopName || ""),
       mobile: mobileOf ? mobileOf(shopId) : "",
       serialNo: num(acc.first.serialNo ?? acc.first.id),
       ordered: !additional,
@@ -403,7 +579,7 @@ export function buildShopBreakdown(
 
 /**
  * Table-level search for the SHOP DELIVERY REPORT modal — one compact
- * input filtering shop-level records by shop name, city, status, trip
+ * input filtering shop-level records by shop name, village, status, trip
  * number or vehicle (no separate filter panels). Empty query = all rows.
  */
 export function filterShopBreakdown(
@@ -424,7 +600,7 @@ export function filterShopBreakdown(
   return rows.filter((row) => {
     const haystack = [
       row.shopName,
-      row.city,
+      row.village,
       row.status === "not_listed" ? labels.notListed : labels.ordered,
       row.status === "delivered"
         ? labels.delivered
@@ -467,71 +643,4 @@ export function formatKg(value: number, withUnit = true): string {
 
 export function formatCount(value: number): string {
   return num(value).toLocaleString("en-IN");
-}
-
-// ─── Loaded-shop list (Order Assignment → "View Loaded Shops") ───────────────
-
-/** One shop carrying boxes on a specific vehicle trip. */
-export type LoadedShopRow = {
-  /** Stable identity — the assignment row, unique per (order, trip). */
-  key: string;
-  orderNo: string;
-  shopName: string;
-  owner: string;
-  city: string;
-  mobile: string;
-  sequence: number;
-  requiredBoxes: number;
-  pickupBoxes: number;
-  deliveredBoxes: number;
-  /** Loaded but not yet delivered ON THIS TRIP (never negative). */
-  openBoxes: number;
-  status: OrderView["status"];
-};
-
-/**
- * Server order rows → the shops actually LOADED on `tripId`.
- *
- * "Loaded" means the order holds an assignment on THIS trip with more than
- * zero pickup boxes: an order assigned to another vehicle, or present on this
- * one with zero boxes, is not on the truck and is left out. Shop Master
- * decorations (owner / city / mobile) are read straight from the directory —
- * never invented — and fall back to the order's own city, then "".
- */
-export function toLoadedShops(
-  rows: OrderView[],
-  tripId: number,
-  shopDirectory: ShopDirectory
-): LoadedShopRow[] {
-  const out: LoadedShopRow[] = [];
-  for (const row of rows) {
-    const assignment = row.assignments.find((a) => a.tripId === tripId);
-    if (!assignment || assignment.pickupBoxes <= 0) continue;
-    const shop = shopDirectory.get(row.shopId);
-    out.push({
-      key: `a:${assignment.id}`,
-      orderNo: row.orderNo,
-      shopName: row.shopName,
-      owner: shop?.ownerName ?? "",
-      city: shop?.city || row.city || "",
-      mobile: shop?.mobile ?? "",
-      sequence: assignment.sequence,
-      requiredBoxes: row.requiredBoxes,
-      pickupBoxes: assignment.pickupBoxes,
-      deliveredBoxes: assignment.deliveredBoxes,
-      openBoxes: Math.max(0, assignment.pickupBoxes - assignment.deliveredBoxes),
-      status: row.status,
-    });
-  }
-  return out;
-}
-
-/** Route order: sequence, then shop name, then order no — fully deterministic. */
-export function sortLoadedShops(rows: LoadedShopRow[]): LoadedShopRow[] {
-  return [...rows].sort(
-    (a, b) =>
-      a.sequence - b.sequence ||
-      a.shopName.localeCompare(b.shopName) ||
-      a.orderNo.localeCompare(b.orderNo)
-  );
 }

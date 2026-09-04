@@ -1,52 +1,43 @@
 // src/modules/operations/orders/components/OrdersAssignmentTab.tsx
-// TAB 2 — ORDER ASSIGNMENT.
+// TAB 2 — ORDER ASSIGNMENT (day-based, vehicle-first).
 //
-// ONE workspace, not a stack of panels. The card below the key figures holds
-// the day/search toolbar, then EVERY OPEN vehicle trip — Step 2 done and
-// Step 4 not yet submitted — whatever day it was raised on, because a day's
-// orders may legitimately be loaded onto a truck from another day. Each row
-// carries vehicle no, trip no and date, supervisor and supervisor mobile from
-// the masters, beside that truck's live load. Expanding a row opens the shop
-// assignment for THAT truck inline, right under it, with its own Save /
-// Finish actions. There is no separate vehicle picker and no separate details
-// panel: the row you expand IS the trip you are assigning to.
+// Today (editable):
+//   1. select a vehicle (existing trip, Step 2 complete)
+//   2. see the day's AVAILABLE shops (collected, not yet assigned to any
+//      vehicle for this day — a shop already on another vehicle for the
+//      same day is excluded and shown as "Assigned TRP-…/vehicle")
+//   3. tick shops ONE BY ONE (compact checkbox table, paginated 10/page —
+//      scales to 40+/100+ shops, no huge cards)
+//   4. selected shops move to "SELECTED FOR VEHICLE" in delivery order
+//   5. set the delivery sequence with ↑/↓ (no typed numbers)
+//   6. assign boxes (1 … ordered; ordered vs assigned shown together)
+//   7. Save Progress (partial persists, no validation) / Finish Assignment
+//      (validated: ≥ 1 shop, boxes in range, hard capacity block, and a
+//      fresh persisted-data conflict re-check before writing)
 //
-// Everything the tables show — required / pickup / pending / delivered boxes,
-// the trip and vehicle, the status and every LOCK — is served by the backend
-// Orders module, so Step 2, Step 4 and Delivery Tracking can never disagree
-// with it.
+// PAST DAYS: read-only — per-vehicle assignment cards from the persisted
+// data (inspect only; no edits, no new assignments).
 //
-//   · Save Progress / Finish Assignment → POST /api/orders/assignments
-//     (`finish: true` makes the BACKEND send the supervisor email +
-//      WhatsApp after the transaction commits, and returns the real
-//      per-channel outcome — no window.open, no setTimeout, no fake toast)
-//   · Remove a pending shop             → 10-second undo, then
-//                                         DELETE /api/orders/assignments/:id
-//   · A fully delivered shop is LOCKED; a partially delivered shop may only
-//     be changed between its delivered quantity and the order quantity.
-//     Both limits are re-validated by the backend on every write.
-//
-// Unsaved edits are kept PER TRIP, so collapsing a row — or opening another
-// truck to compare — never throws away what was typed. Only changing the day
-// clears them, because the orders themselves change underneath.
+// Capacity is a HARD BLOCK with the exact numbers (Capacity / Already
+// Assigned / Available / Requested). No invalid state is ever saved.
 
-import { Fragment, useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   AlertTriangle,
-  CalendarDays,
-  CheckCircle2,
-  ChevronDown,
-  ListChecks,
+  ArrowDown,
+  ArrowUp,
   Loader2,
   Lock,
   RefreshCw,
   Save,
   Send,
-  Trash2,
-  Truck,
+  X,
 } from "lucide-react";
+import Select from "react-select";
+import type { Trip } from "../../../../shared/trip";
 import {
   opsPrimaryButtonClass,
+  opsReactSelectStyles,
   opsSecondaryButtonClass,
   opsTableDivideClass,
   opsTableHeadRowClass,
@@ -54,620 +45,830 @@ import {
   opsTableThClass,
   opsTableRowClass,
 } from "../../../../shared/ui/operationsStyles";
-import { useToast } from "../../../../components/common/ToastProvider";
-import { usePendingDelete } from "../../../../hooks/usePendingDelete";
-import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
-import { formatDayFull } from "../ordersUtils";
+import TripPagination from "../../vehicle-trips/components/TripPagination";
+import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import {
-  supervisorMobileByName,
+  collectionTotals,
+  formatCount,
+  formatDayFull,
+  weightForBirds,
+} from "../ordersUtils";
+import {
+  findDayShopConflicts,
+  finishAssignment,
+  saveAssignment,
+  sendOrdersWhatsApp,
+  villageOf,
   type ShopDirectory,
   type SupervisorDirectory,
 } from "../ordersService";
-import {
-  deleteOrderAssignment,
-  saveOrderAssignment,
-  type EligibleVehicle,
-  type OrderNotificationOutcome,
-  type OrderView,
-  type OrdersPage,
-} from "../services/ordersApi";
 import { useOrdersI18n } from "../i18n/ordersI18n";
+import type {
+  DayVehicleView,
+  OrderShopRow,
+  OrdersDayCollection,
+  OrdersEligibleVehicle,
+} from "../types";
 import {
   OrdersDateControl,
   OrdersEmptyState,
+  OrdersDropdown,
   OrdersIconButton,
-  OrdersPagination,
   OrdersSearchInput,
   OrdersStatusBadge,
   OrdersTableSkeleton,
+  WhatsAppIcon,
 } from "./OrdersCommon";
-import OrdersAssignmentKpis from "./OrdersAssignmentKpis";
-import { fillPercent, TONE_BAR, TONE_ICON } from "./ordersUiConstants";
-import OrdersLoadedShopsDialog from "./OrdersLoadedShopsDialog";
 
-/**
- * One unsaved edit. `basePickupBoxes` is the SERVER value at the moment the
- * row was first touched, so the projected totals and the save payload stay
- * correct even after the user pages away from the edited row — the draft is
- * keyed by order id, never by the visible page.
- */
-type DraftEntry = {
-  pickupBoxes: number;
-  sequence: number;
-  basePickupBoxes: number;
-  /** Optimistic-concurrency token captured with the first edit. */
-  version?: number;
-};
+const AVAILABLE_PAGE_SIZE = 10;
 
-type Draft = ReadonlyMap<number, DraftEntry>;
-/** Unsaved edits per trip — collapsing a row must not discard them. */
-type DraftsByTrip = ReadonlyMap<number, Draft>;
-
-/** Shared empties: setting an already-empty value is an identity no-op, so
- *  clearing twice cannot cause a second render. */
-const EMPTY_DRAFT: Draft = new Map<number, DraftEntry>();
-const EMPTY_DRAFTS: DraftsByTrip = new Map<number, Draft>();
-
-/** Columns in the vehicle table, for the expanded row's colSpan. */
-const VEHICLE_COLUMNS = 8;
-
-/** Stable empty notification list (identity no-op when already empty). */
-const NO_NOTIFICATIONS: OrderNotificationOutcome[] = [];
-
-// The vehicle table is a compact record list, not a data grid: the shared ops
-// cell padding runs it past the card and clips the action column.
-const vehicleThClass =
-  "px-2.5 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap";
-const vehicleTdClass = "px-2.5 py-2.5 text-sm text-slate-700 whitespace-nowrap";
-
-type Props = {
-  page: OrdersPage;
-  loading: boolean;
-  day: string;
-  today: string;
-  onDaySelect: (day: string) => void;
-  /** EVERY open trip (Step 4 not submitted), newest trip date first. */
-  vehicles: EligibleVehicle[];
-  /** The expanded trip: expanding a row IS selecting it for assignment. */
-  selectedTripId: number | null;
-  onSelectTrip: (tripId: number | null) => void;
-  search: string;
-  onSearchChange: (value: string) => void;
-  pageSize: number;
-  onPageChange: (page: number) => void;
-  onPageSizeChange: (size: number) => void;
-  onReload: () => Promise<unknown> | void;
-  /** Table-level Refresh (same fetch + a confirmation toast). */
-  onRefresh: () => void;
-  /** Shop Master reference data (owner / city / mobile decorations). */
-  shopDirectory: ShopDirectory;
-  /** Employee Master supervisor mobiles, keyed by lower-case name. */
-  supervisorDirectory: SupervisorDirectory;
-  /** Assignment finished — the page moves on to Delivery Tracking. */
-  onFinished: () => void;
-  refreshing: boolean;
-  /** false = nothing has loaded successfully yet (figures show skeletons). */
-  dataReady: boolean;
-  /** true = a fetch is in flight / the held data predates the current
-   *  filters — the figures keep their last good values and say "Updating…". */
-  syncing: boolean;
-};
-
-function statusKeyOf(status: OrderView["status"]): string {
-  switch (status) {
-    case "Pending":
-      return "orders.status_pending";
-    case "Collected":
-      return "orders.status_collected";
-    case "Assigned":
-      return "orders.status_assigned";
-    case "Partially Delivered":
-      return "orders.status_partially_delivered";
-    case "Delivered":
-      return "orders.status_delivered";
-    case "Completed":
-    default:
-      return "orders.status_completed";
-  }
+let clientKeySeq = 0;
+function newClientKey(): string {
+  clientKeySeq += 1;
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `ak-${Date.now()}-${clientKeySeq}`;
 }
 
-export default function OrdersAssignmentTab({
-  page,
+/** One shop in the vehicle's delivery order (after selection). */
+type SelectedRow = {
+  clientKey: string;
+  shopId: number;
+  shopName: string;
+  village: string;
+  orderedBirds: number;
+  orderedBoxes: number;
+  assigned: number; // 1 … orderedBoxes
+};
+
+function assignedBirdsFor(row: SelectedRow): number {
+  if (row.assigned <= 0 || row.orderedBoxes <= 0) return 0;
+  return Math.round((row.orderedBirds * row.assigned) / row.orderedBoxes);
+}
+
+function toOrderShopRows(rows: SelectedRow[]): OrderShopRow[] {
+  return rows
+    .filter((r) => r.assigned > 0)
+    .map((r, i) => {
+      const birds = assignedBirdsFor(r);
+      return {
+        id: 0,
+        clientKey: r.clientKey,
+        serialNo: i + 1,
+        boxNo: r.assigned,
+        shopId: r.shopId,
+        shopName: r.shopName,
+        birdTypeId: 0,
+        birdType: "",
+        birds,
+        weight: 0,
+        mortality: 0,
+        mortKg: 0,
+        rate: null,
+        amount: 0,
+        remarks: "[ORDER]",
+        deliveryMode: "box" as const,
+        selectedBoxIds: [],
+        village: r.village,
+      };
+    });
+}
+
+function selectionSnapshot(
+  vehicleTripId: number | null,
+  rows: SelectedRow[]
+): string {
+  return JSON.stringify([vehicleTripId, rows.map((r) => [r.shopId, r.assigned])]);
+}
+
+type Props = {
+  loading: boolean;
+  /** Selected operational day (YYYY-MM-DD). */
+  day: string;
+  /** Operational today (YYYY-MM-DD). */
+  today: string;
+  /** Day changed from the global date selector. */
+  onDaySelect: (day: string) => void;
+  /** The selected day's persisted collection (null = nothing collected yet). */
+  collection: OrdersDayCollection | null;
+  /** Vehicle trips eligible for assignment. */
+  eligibleVehicles: OrdersEligibleVehicle[];
+  /** Per-day read-only assignment views (persisted vehicle trips). */
+  dayVehicleViews: DayVehicleView[];
+  shopDirectory: ShopDirectory;
+  supervisorDirectory: SupervisorDirectory;
+  /** Data refetched after a mutation. */
+  onChanged: () => void;
+  /** Assignment finished — page moves to Tab 3. */
+  onFinished: (vehicleTrip: Trip) => void;
+  /** Table-level refresh — page refetches Orders data (soft toast after). */
+  onRefresh: () => void;
+  /** Refresh in flight (duplicate-call guard + busy icon). */
+  refreshing: boolean;
+};
+
+function OrdersAssignmentTab({
   loading,
   day,
   today,
   onDaySelect,
-  vehicles,
-  selectedTripId,
-  onSelectTrip,
-  search,
-  onSearchChange,
-  pageSize,
-  onPageChange,
-  onPageSizeChange,
-  onReload,
-  onRefresh,
+  collection,
+  eligibleVehicles,
+  dayVehicleViews,
   shopDirectory,
   supervisorDirectory,
+  onChanged,
   onFinished,
+  onRefresh,
   refreshing,
-  dataReady,
-  syncing,
 }: Props) {
   const { to } = useOrdersI18n();
-  const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
+  // One compact table-level search (shop / village / trip / vehicle /
+  // supervisor) — filters the available-shop list AND the past-day table.
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
 
-  const [draftsByTrip, setDraftsByTrip] = useState<DraftsByTrip>(EMPTY_DRAFTS);
-  const [saving, setSaving] = useState(false);
-  const [finishing, setFinishing] = useState(false);
-  const [notifications, setNotifications] =
-    useState<OrderNotificationOutcome[]>(NO_NOTIFICATIONS);
-  const [loadedShopsTripId, setLoadedShopsTripId] = useState<number | null>(null);
-  const busy = saving || finishing;
+  // ── Compact table-level sort (real dropdown; same visual control as
+  //     Order Collection) ──────────────────────────────────────────────────
+  const [sortMode, setSortMode] = useState<"pending" | "az" | "za" | "vehicle_trip">("pending");
+  const sortOptions = useMemo(
+    () => [
+      { value: "pending", label: to("orders.sort_pending_first") },
+      { value: "az", label: to("orders.sort_name_az") },
+      { value: "za", label: to("orders.sort_name_za") },
+      { value: "vehicle_trip", label: to("orders.sort_vehicle_trip") },
+    ],
+    [to]
+  );
 
+  if (loading) return <OrdersTableSkeleton rows={4} />;
   const isPast = day < today;
-  const vehicle = vehicles.find((v) => v.tripId === selectedTripId) ?? null;
-  const vehicleLocked = vehicle ? vehicle.status === "Completed" : false;
-  const canEdit = Boolean(vehicle) && !isPast && !vehicleLocked;
 
-  const rows = page.rows;
-
-  // Drafts belong to a DAY: its orders are what they edit. Switching the
-  // expanded trip keeps them, so comparing two trucks costs no typing.
-  // Adjusting the state DURING render (React's documented pattern) re-runs
-  // this component before anything is committed — no frame of stale values.
-  const [scopeDay, setScopeDay] = useState(day);
-  if (scopeDay !== day) {
-    setScopeDay(day);
-    setDraftsByTrip(EMPTY_DRAFTS);
-    setNotifications(NO_NOTIFICATIONS);
-    // The list would otherwise re-read a different day for the trip it was
-    // opened with.
-    setLoadedShopsTripId(null);
-  }
-
-  const draft = (selectedTripId != null && draftsByTrip.get(selectedTripId)) || EMPTY_DRAFT;
-
-  /** Orders on the CURRENT page, by id — used to refresh a draft's version. */
-  const rowsById = useMemo(() => {
-    const map = new Map<number, OrderView>();
-    for (const row of rows) map.set(row.id, row);
-    return map;
-  }, [rows]);
-
-  /** The assignment of the EXPANDED trip for one order (null = none yet). */
-  const assignmentOf = useCallback(
-    (row: OrderView) =>
-      selectedTripId ? row.assignments.find((a) => a.tripId === selectedTripId) ?? null : null,
-    [selectedTripId]
-  );
-
-  /** Boxes committed to OTHER trips — the order's remaining quantity here. */
-  const committedElsewhere = useCallback(
-    (row: OrderView) =>
-      row.assignments
-        .filter((a) => a.tripId !== selectedTripId)
-        .reduce((s, a) => s + Math.max(a.pickupBoxes, a.deliveredBoxes), 0),
-    [selectedTripId]
-  );
-
-  /** Highest value this trip may hold for the order (backend re-validates). */
-  const maxHere = useCallback(
-    (row: OrderView) => Math.max(0, row.requiredBoxes - committedElsewhere(row)),
-    [committedElsewhere]
-  );
-
-  const boxesOf = useCallback(
-    (row: OrderView) => {
-      const d = draft.get(row.id);
-      if (d) return d.pickupBoxes;
-      return assignmentOf(row)?.pickupBoxes ?? 0;
-    },
-    [draft, assignmentOf]
-  );
-
-  const sequenceOf = useCallback(
-    (row: OrderView, index: number) => {
-      const d = draft.get(row.id);
-      if (d) return d.sequence;
-      return assignmentOf(row)?.sequence ?? index + 1;
-    },
-    [draft, assignmentOf]
-  );
-
-  /** Replaces the EXPANDED trip's draft; an emptied draft is dropped. */
-  const updateTripDraft = useCallback(
-    (tripId: number, update: (prev: Draft) => Draft) => {
-      setDraftsByTrip((prev) => {
-        const updated = update(prev.get(tripId) ?? EMPTY_DRAFT);
-        if (updated === prev.get(tripId)) return prev;
-        const next = new Map(prev);
-        if (updated.size === 0) next.delete(tripId);
-        else next.set(tripId, updated);
-        return next;
-      });
-    },
-    []
-  );
-
-  const updateDraft = useCallback(
-    (row: OrderView, index: number, field: "pickupBoxes" | "sequence", raw: string) => {
-      if (selectedTripId == null) return;
-      const parsed = Math.max(0, Math.min(99999, Math.floor(Number(raw) || 0)));
-      const assignment = assignmentOf(row);
-      updateTripDraft(selectedTripId, (prev) => {
-        const next = new Map(prev);
-        const current: DraftEntry = next.get(row.id) ?? {
-          pickupBoxes: assignment?.pickupBoxes ?? 0,
-          sequence: assignment?.sequence ?? index + 1,
-          basePickupBoxes: assignment?.pickupBoxes ?? 0,
-          version: assignment?.version,
-        };
-        next.set(row.id, {
-          ...current,
-          [field]: field === "sequence" ? Math.max(1, parsed) : parsed,
-        });
-        return next;
-      });
-    },
-    [selectedTripId, assignmentOf, updateTripDraft]
-  );
-
-  const isDirty = draft.size > 0;
-
-  /**
-   * Boxes each trip's unsaved draft ADDS to (or removes from) it, measured
-   * against the server values captured when each row was first edited.
-   * Computed from the DRAFTS — not from the visible rows — so paging through
-   * the table never changes the figures.
-   */
-  const draftDeltaByTrip = useMemo(() => {
-    const deltas = new Map<number, number>();
-    for (const [tripId, entries] of draftsByTrip) {
-      let delta = 0;
-      for (const entry of entries.values()) {
-        delta += entry.pickupBoxes - entry.basePickupBoxes;
-      }
-      deltas.set(tripId, delta);
-    }
-    return deltas;
-  }, [draftsByTrip]);
-
-  /** The day-level projection the key figures footnote. */
-  const totalDraftDelta = useMemo(() => {
-    let total = 0;
-    for (const delta of draftDeltaByTrip.values()) total += delta;
-    return total;
-  }, [draftDeltaByTrip]);
-
-  const persist = useCallback(
-    async (finish: boolean) => {
-      if (busy || !canEdit || !selectedTripId) return;
-      const items: Array<{
-        orderId: number;
-        sequence: number;
-        pickupBoxes: number;
-        version?: number;
-      }> = [];
-      // Every edited order is sent — including rows the user has since paged
-      // away from — so no input is silently dropped. The backend upserts only
-      // the listed orders and leaves the trip's other assignments untouched.
-      // The concurrency token is taken FRESH from the current page when the
-      // row is still visible, and otherwise from the token captured with the
-      // edit, so a genuine conflict is still rejected with a 409.
-      for (const [orderId, d] of draft) {
-        const visible = rowsById.get(orderId);
-        items.push({
-          orderId,
-          sequence: d.sequence,
-          pickupBoxes: d.pickupBoxes,
-          version: visible ? assignmentOf(visible)?.version : d.version,
-        });
-      }
-      // Deterministic payload order (identical request for identical edits).
-      items.sort((a, b) => a.orderId - b.orderId);
-
-      if (items.length === 0 && !finish) {
-        toastInfo(to("orders.nothing_to_save"), 5000);
-        return;
-      }
-      if (finish && items.length === 0) {
-        // Re-confirm the already persisted assignment (the backend
-        // re-validates every line and then fires the supervisor
-        // notifications).
-        for (const row of rows) {
-          const a = assignmentOf(row);
-          if (a && a.pickupBoxes > 0) {
-            items.push({
-              orderId: row.id,
-              sequence: a.sequence,
-              pickupBoxes: a.pickupBoxes,
-              version: a.version,
-            });
-          }
-        }
-        if (items.length === 0) {
-          toastInfo(to("orders.assign_at_least_one_shop"), 5000);
-          return;
-        }
-      }
-
-      const setBusy = finish ? setFinishing : setSaving;
-      setBusy(true);
-      try {
-        const result = await saveOrderAssignment({
-          tripId: selectedTripId,
-          orderDate: day,
-          items,
-          finish,
-        });
-        updateTripDraft(selectedTripId, () => EMPTY_DRAFT);
-        setNotifications(finish ? result.notifications : NO_NOTIFICATIONS);
-        await onReload();
-        if (finish) {
-          toastSuccess(to("orders.assignment_finished"), 5000);
-          onFinished();
-        } else {
-          toastSuccess(to("orders.assignment_saved"), 5000);
-        }
-      } catch (error) {
-        // The backend's own validation message (box limit, delivered lock,
-        // completed trip, stale version) is what the user sees.
-        toastError(
-          error instanceof Error ? error.message : to("orders.save_failed"),
-          5000
-        );
-        await onReload();
-      } finally {
-        setBusy(false);
-      }
-    },
-    [
-      busy,
-      canEdit,
-      selectedTripId,
-      rows,
-      rowsById,
-      draft,
-      assignmentOf,
-      updateTripDraft,
-      day,
-      onReload,
-      onFinished,
-      toastSuccess,
-      toastError,
-      toastInfo,
-      to,
-    ]
-  );
-
-  // ── Remove a PENDING shop from the assignment (10-second undo) ──────────
-  const doRemove = useCallback(
-    async (assignmentId: number) => {
-      try {
-        await deleteOrderAssignment(assignmentId);
-        await onReload();
-        toastSuccess(to("orders.assignment_removed"), 5000);
-      } catch (error) {
-        toastError(
-          error instanceof Error ? error.message : to("orders.delete_failed"),
-          5000
-        );
-        await onReload();
-      }
-    },
-    [onReload, toastSuccess, toastError, to]
-  );
-
-  const { requestDelete, cancel: cancelDelete, pendingItems } = usePendingDelete<number>(
-    (id) => void doRemove(id)
-  );
-  const pendingAssignmentIds = useMemo(
-    () => new Set(pendingItems.map((p) => p.id)),
-    [pendingItems]
-  );
-
-  /**
-   * EVERY assignable vehicle trip for the day. `alreadyAssigned` is the
-   * server's total for the WHOLE trip, so the load is never a sum of the
-   * visible rows; each truck's own unsaved draft is added on top.
-   */
-  const vehicleRows = useMemo(
-    () =>
-      vehicles.map((v) => {
-        const loaded = Math.max(0, v.alreadyAssigned + (draftDeltaByTrip.get(v.tripId) ?? 0));
-        return {
-          trip: v,
-          supervisorMobile: supervisorMobileByName(v.supervisorName, supervisorDirectory),
-          loaded,
-          over: Math.max(0, loaded - v.capacity),
-          available: Math.max(0, v.capacity - loaded),
-          percent: fillPercent(loaded, v.capacity),
-          expanded: v.tripId === selectedTripId,
-          locked: v.status === "Completed",
-        };
-      }),
-    [vehicles, draftDeltaByTrip, supervisorDirectory, selectedTripId]
-  );
-
-  /** The vehicle the loaded-shop list is open for (null = closed). */
-  const loadedShopsVehicle = useMemo(
-    () => vehicles.find((v) => v.tripId === loadedShopsTripId) ?? null,
-    [vehicles, loadedShopsTripId]
-  );
-
-  const toggleExpand = useCallback(
-    (tripId: number) => onSelectTrip(tripId === selectedTripId ? null : tripId),
-    [onSelectTrip, selectedTripId]
-  );
-
-  const startIndex = (page.page - 1) * page.pageSize;
-
-  // ── The shop assignment for ONE expanded trip ──────────────────────────
-  const renderAssignmentPanel = (tripDate: string) => (
-    <div className="border-t border-emerald-200 bg-slate-50/70 px-3 py-3">
-      {tripDate !== day && (
-        <p className="mb-2 flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-1.5 text-[11px] font-semibold text-sky-800">
-          <CalendarDays size={12} aria-hidden />
-          {to("orders.cross_date_note", {
-            orderDate: formatDayFull(day),
-            tripDate: formatDayFull(tripDate),
+  // ONE card with the SAME toolbar / table visual language as Order
+  // Collection: [ Search ][ Date + TODAY ][ Sort ] … [↻ Refresh].
+  // Refresh is ALWAYS the last control, far right.
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+      <div className="px-5 py-2.5 border-b border-slate-200 bg-slate-50/60 flex items-center gap-3 flex-wrap">
+        <OrdersSearchInput
+          value={query}
+          onChange={setQuery}
+          placeholder={to("orders.search_assignment")}
+          className="w-full sm:w-64"
+        />
+        <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} />
+        <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+          {to("orders.sort")}
+        </span>
+        <OrdersDropdown
+          value={sortMode}
+          onChange={(v) => setSortMode(v as "pending" | "az" | "za" | "vehicle_trip")}
+          options={sortOptions}
+          ariaLabel={to("orders.sort")}
+          widthClass="w-44"
+        />
+        {isPast ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+            <Lock size={11} />
+            {to("orders.closed_day")}
+          </span>
+        ) : null}
+        <span className="ml-auto text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+          {to("orders.pool_summary", {
+            collected: collection?.totalShops ?? 0,
+            assigned: collection?.assignedShops ?? 0,
+            available: (collection?.totalShops ?? 0) - (collection?.assignedShops ?? 0),
           })}
-        </p>
-      )}
-      {isPast && (
-        <p className="mb-2 flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600">
-          <Lock size={12} aria-hidden /> {to("orders.read_only_note")}
-        </p>
-      )}
-      {vehicleLocked && (
-        <p className="mb-2 flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600">
-          <Lock size={12} aria-hidden /> {to("orders.trip_locked")}
-        </p>
-      )}
+        </span>
+        <OrdersIconButton
+          label={`${to("orders.refresh")} — ${to("orders.refresh_assignment")}`}
+          onClick={onRefresh}
+          busy={refreshing}
+        >
+          <RefreshCw size={14} />
+        </OrdersIconButton>
+      </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        {loading ? (
-          <OrdersTableSkeleton rows={4} />
-        ) : rows.length === 0 ? (
+      {isPast ? (
+        dayVehicleViews.length === 0 ? (
           <OrdersEmptyState
-            title={to("orders.no_orders_for_day", { date: formatDayFull(day) })}
-            hint={to("orders.assignment_empty")}
+            title={to("orders.no_collection_day", { day: formatDayFull(day) })}
+            hint={to("orders.read_only_note")}
           />
         ) : (
+          <PastAssignmentsTable views={dayVehicleViews} t={to} q={q} />
+        )
+      ) : !collection ? (
+        <OrdersEmptyState
+          title={to("orders.assignment_empty")}
+          hint={to("orders.select_order")}
+        />
+      ) : (
+        <AssignmentEditor
+          key={`${day}|${collection.trip.id}`}
+          day={day}
+          collection={collection}
+          eligibleVehicles={eligibleVehicles}
+          shopDirectory={shopDirectory}
+          supervisorDirectory={supervisorDirectory}
+          q={q}
+          sortMode={sortMode}
+          onChanged={onChanged}
+          onFinished={onFinished}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Past-day assignments (compact read-only table — one row per vehicle) ──
+
+function PastAssignmentsTable({
+  views,
+  t,
+  q,
+}: {
+  views: DayVehicleView[];
+  t: (key: string, params?: Record<string, string | number>) => string;
+  /** Lower-cased search (trip / vehicle / supervisor / shop). */
+  q: string;
+}) {
+  const filtered = useMemo(() => {
+    if (!q) return views;
+    return views.filter((view) => {
+      const haystack = [
+        view.trip.tripNo,
+        view.trip.vehicleNo,
+        view.trip.supervisorName,
+        view.trip.driverName,
+        ...view.rows.map((r) => r.shopName),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [views, q]);
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs md:text-sm">
+        <thead>
+          <tr className={opsTableHeadRowClass}>
+            <th className={opsTableThClass}>{t("orders.col_trip_no")}</th>
+              <th className={opsTableThClass}>{t("orders.col_vehicle_no")}</th>
+              <th className={opsTableThClass}>{t("orders.driver")}</th>
+              <th className={`${opsTableThClass} w-28 text-right`}>{t("orders.col_shops")}</th>
+              <th className={`${opsTableThClass} w-24 text-right`}>{t("orders.col_boxes")}</th>
+              <th className={`${opsTableThClass} w-32`}>{t("orders.col_status")}</th>
+            </tr>
+          </thead>
+          <tbody className={opsTableDivideClass}>
+            {filtered.map((view) => (
+              <tr key={view.trip.id} className={opsTableRowClass}>
+                <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
+                  {view.trip.tripNo}
+                </td>
+                <td className={opsTableTdClass}>{view.trip.vehicleNo || "—"}</td>
+                <td className={opsTableTdClass}>{view.trip.driverName || "—"}</td>
+                <td className={`${opsTableTdClass} text-right text-slate-600`}>
+                  {view.deliveredShops}/{view.shops}
+                </td>
+                <td className={`${opsTableTdClass} text-right font-semibold text-slate-700`}>
+                  {view.boxes}
+                </td>
+                <td className={opsTableTdClass}>
+                  <OrdersStatusBadge
+                    status={view.allDelivered ? "Completed" : view.status}
+                    label={
+                      view.allDelivered
+                        ? t("orders.status_completed")
+                        : t(`orders.status_${view.status.toLowerCase().replace(/\s+/g, "_")}` as string)
+                    }
+                  />
+                </td>
+              </tr>
+          ))}
+          {filtered.length === 0 && (
+            <tr>
+              <td colSpan={6} className="px-4 py-8">
+                <OrdersEmptyState title={t("orders.no_search_results")} />
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Assignment editor (one day → one vehicle at a time) ────────────────────
+
+function AssignmentEditor({
+  day,
+  collection,
+  eligibleVehicles,
+  shopDirectory,
+  supervisorDirectory,
+  q,
+  sortMode,
+  onChanged,
+  onFinished,
+}: {
+  day: string;
+  collection: OrdersDayCollection;
+  eligibleVehicles: OrdersEligibleVehicle[];
+  shopDirectory: ShopDirectory;
+  supervisorDirectory: SupervisorDirectory;
+  /** Lower-cased search (shop / village / vehicle / trip). */
+  q: string;
+  /** Table-level sort (Pending First / A→Z / Z→A / Vehicle · Trip). */
+  sortMode: "pending" | "az" | "za" | "vehicle_trip";
+  onChanged: () => void;
+  onFinished: (vehicleTrip: Trip) => void;
+}) {
+  const { to } = useOrdersI18n();
+  const { showNotification } = useSafeNotification();
+  const orderTrip = collection.trip;
+
+  // ── Day pool split: available vs already assigned (persisted facts) ──────
+  const pool = useMemo(() => {
+    const available: OrderShopRow[] = [];
+    const assigned: Array<{ row: OrderShopRow; tripNo: string; vehicleNo: string; delivered: boolean }> = [];
+    for (const row of collection.rows) {
+      const a = collection.shops.get(row.shopId);
+      if (!a) {
+        available.push(row);
+      } else {
+        assigned.push({
+          row,
+          tripNo: a.tripNo,
+          vehicleNo: a.vehicleNo,
+          delivered: a.delivered,
+        });
+      }
+    }
+    return { available, assigned };
+  }, [collection]);
+
+  // ── Step 1: vehicle ──────────────────────────────────────────────────────
+  const [vehicleTripId, setVehicleTripId] = useState<number | null>(null);
+  const vehicle = useMemo(
+    () => eligibleVehicles.find((v) => v.trip.id === vehicleTripId) ?? null,
+    [eligibleVehicles, vehicleTripId]
+  );
+
+  // ── Step 3: selection (one shop at a time) + Step 5/6: order & boxes ─────
+  const [selected, setSelected] = useState<SelectedRow[]>([]);
+  const [savedSnapshot, setSavedSnapshot] = useState<string>(() =>
+    selectionSnapshot(null, [])
+  );
+  const isDirty =
+    selectionSnapshot(vehicleTripId, selected) !== savedSnapshot;
+
+  const [saving, setSaving] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const [waBusy, setWaBusy] = useState(false);
+  const [waProgress, setWaProgress] = useState<string | null>(null);
+  const [conflictChecking, setConflictChecking] = useState(false);
+  const [capacityExceeded, setCapacityExceeded] = useState<null | {
+    capacity: number;
+    assigned: number;
+    available: number;
+    requested: number;
+  }>(null);
+  const busy = saving || finishing || conflictChecking;
+
+  const selectedIds = useMemo(
+    () => new Set(selected.map((r) => r.shopId)),
+    [selected]
+  );
+
+  const toggleShop = useCallback((row: OrderShopRow, checked: boolean) => {
+    setSelected((prev) => {
+      if (checked) {
+        if (prev.some((r) => r.shopId === row.shopId)) return prev;
+        return [
+          ...prev,
+          {
+            clientKey: newClientKey(),
+            shopId: row.shopId,
+            shopName: row.shopName || "—",
+            village: villageOf(row.shopId, row.shopName, shopDirectory),
+            orderedBirds: Number(row.birds) || 0,
+            orderedBoxes: Math.max(1, Number(row.boxNo) || 0),
+            assigned: Math.max(1, Number(row.boxNo) || 0),
+          },
+        ];
+      }
+      return prev.filter((r) => r.shopId !== row.shopId);
+    });
+  }, [shopDirectory]);
+
+  const moveRow = useCallback((clientKey: string, dir: -1 | 1) => {
+    setSelected((prev) => {
+      const index = prev.findIndex((r) => r.clientKey === clientKey);
+      const target = index + dir;
+      if (index < 0 || target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }, []);
+
+  const setAssigned = useCallback((clientKey: string, raw: string) => {
+    setSelected((prev) =>
+      prev.map((r) => {
+        if (r.clientKey !== clientKey) return r;
+        // Assigned boxes: 1 … ordered (0 = not assigned to this vehicle).
+        const n = Math.max(0, Math.min(r.orderedBoxes, Math.floor(Number(raw) || 0)));
+        return { ...r, assigned: n };
+      })
+    );
+  }, []);
+
+  const supervisorMobile = vehicle
+    ? supervisorDirectory.get(vehicle.trip.supervisorName?.trim().toLowerCase() ?? "") ?? ""
+    : "";
+
+  // ── Capacity math (boxes are the priority figure; hard block) ────────────
+  const avgBirdWeight = vehicle ? Number(vehicle.trip.avgBirdWeight) || 0 : 0;
+  const capacity = vehicle ? vehicle.capacity : 0;
+  const alreadyAssignedOther = vehicle
+    ? Math.max(0, vehicle.alreadyAssigned - collection.assignedBoxes)
+    : 0;
+  const requested = selected.reduce((s, r) => s + r.assigned, 0);
+  const available = vehicle ? Math.max(0, capacity - alreadyAssignedOther) : 0;
+  const remaining = available - requested;
+  const totals = useMemo(() => collectionTotals(toOrderShopRows(selected)), [selected]);
+
+  const checkCapacity = useCallback((): boolean => {
+    if (!vehicle) {
+      showNotification(to("orders.select_vehicle"), "info");
+      return false;
+    }
+    if (requested > available) {
+      setCapacityExceeded({ capacity, assigned: alreadyAssignedOther, available, requested });
+      return false;
+    }
+    return true;
+  }, [vehicle, requested, available, capacity, alreadyAssignedOther, showNotification, to]);
+
+  // ── Pre-save conflict re-check from FRESH persisted data ─────────────────
+  const assertNoConflicts = useCallback(async (): Promise<boolean> => {
+    if (!vehicle || selected.length === 0) return true;
+    setConflictChecking(true);
+    try {
+      const conflicts = await findDayShopConflicts(
+        day,
+        selected.map((r) => ({ shopId: r.shopId, shopName: r.shopName })),
+        vehicle.trip.tripNo
+      );
+      if (conflicts.length > 0) {
+        showNotification(
+          to("orders.conflict_message", { shops: conflicts.join(", ") }),
+          "error"
+        );
+        // Drop the conflicting shops from the selection and refresh.
+        setSelected((prev) => prev.filter((r) => !conflicts.includes(r.shopName)));
+        onChanged();
+        return false;
+      }
+      return true;
+    } catch {
+      showNotification(to("orders.refresh_failed"), "error");
+      return false;
+    } finally {
+      setConflictChecking(false);
+    }
+  }, [vehicle, selected, day, showNotification, to, onChanged]);
+
+  // ── Save Progress (partial persists, no final validation) ────────────────
+  const handleSave = useCallback(async () => {
+    if (busy || !vehicle) return;
+    if (!checkCapacity()) return;
+    if (selected.length === 0) {
+      showNotification(to("orders.selection_empty"), "info");
+      return;
+    }
+    if (!(await assertNoConflicts())) return;
+    setSaving(true);
+    try {
+      await saveAssignment(vehicle.trip, [
+        { orderTripNo: orderTrip.tripNo, rows: toOrderShopRows(selected) },
+      ]);
+      setSavedSnapshot(selectionSnapshot(null, []));
+      setSelected([]);
+      showNotification(to("orders.assignment_saved"), "success");
+      onChanged();
+    } catch {
+      showNotification(to("orders.refresh_failed"), "error");
+    } finally {
+      setSaving(false);
+    }
+  }, [busy, vehicle, checkCapacity, selected, assertNoConflicts, orderTrip.tripNo, showNotification, to, onChanged]);
+
+  // ── Finish Assignment (validated) ────────────────────────────────────────
+  const handleFinish = useCallback(async () => {
+    if (busy || !vehicle) return;
+    const unassigned = selected.filter((r) => r.assigned < 1);
+    if (selected.length === 0 || unassigned.length > 0) {
+      showNotification(to("orders.finish_assignment_invalid"), "info");
+      return;
+    }
+    if (!checkCapacity()) return;
+    if (!(await assertNoConflicts())) return;
+    setFinishing(true);
+    try {
+      const vehicleTrip = await finishAssignment(vehicle.trip, [
+        { orderTripNo: orderTrip.tripNo, rows: toOrderShopRows(selected) },
+      ]);
+      showNotification(to("orders.assignment_finished"), "success");
+      onFinished(vehicleTrip);
+    } catch {
+      showNotification(to("orders.refresh_failed"), "error");
+    } finally {
+      setFinishing(false);
+    }
+  }, [busy, vehicle, selected, checkCapacity, assertNoConflicts, orderTrip.tripNo, showNotification, to, onFinished]);
+
+  // ── WhatsApp (existing mechanism — assignment list to the supervisor) ────
+  const handleWhatsApp = useCallback(async () => {
+    if (waBusy || !vehicle) return;
+    // Ensure the assignment is persisted first (per-delivery endpoint needs ids).
+    let trip = vehicle.trip;
+    if (isDirty) {
+      if (!(await assertNoConflicts())) return;
+      try {
+        trip = await saveAssignment(vehicle.trip, [
+          { orderTripNo: orderTrip.tripNo, rows: toOrderShopRows(selected) },
+        ]);
+      } catch {
+        showNotification(to("orders.refresh_failed"), "error");
+        return;
+      }
+    }
+    setWaBusy(true);
+    setWaProgress("");
+    try {
+      const result = await sendOrdersWhatsApp(
+        trip,
+        supervisorMobile,
+        (sent, total, shop) => setWaProgress(shop || `${sent}/${total}`)
+      );
+      if (result.sent > 0 && result.failed === 0) {
+        showNotification(to("orders.whatsapp_done", { sent: result.sent, total: result.sent }), "success");
+      } else if (result.sent > 0) {
+        showNotification(to("orders.whatsapp_partial", { sent: result.sent, failed: result.failed }), "info");
+      } else {
+        const message =
+          result.message && result.message.includes("not configured")
+            ? to("orders.whatsapp_not_configured")
+            : to("orders.whatsapp_failed", { message: result.message ?? "—" });
+        showNotification(message, "error");
+      }
+    } catch {
+      showNotification(to("orders.whatsapp_failed", { message: "network" }), "error");
+    } finally {
+      setWaBusy(false);
+      setWaProgress(null);
+    }
+  }, [waBusy, vehicle, isDirty, selected, assertNoConflicts, orderTrip.tripNo, supervisorMobile, showNotification, to]);
+
+  // ── Vehicle options / summary ────────────────────────────────────────────
+  const vehicleOptions = useMemo(
+    () =>
+      eligibleVehicles.map((v) => ({
+        value: v.trip.id,
+        label: `${v.trip.vehicleNo} · ${v.trip.sourceFarm || "—"} · ${v.capacity} ${to("orders.col_boxes").toLowerCase()}`,
+      })),
+    [eligibleVehicles, to]
+  );
+  const vehicleValue =
+    vehicleOptions.find((o) => o.value === vehicleTripId) ??
+    (vehicle ? { value: vehicle.trip.id, label: vehicle.trip.vehicleNo || String(vehicle.trip.id) } : null);
+
+  // Compact vehicle information strip — the useful fact set, rendered
+  // small (never as a hero panel).
+  const summary: Array<[string, string]> = vehicle
+    ? [
+        [to("orders.vehicle_no"), vehicle.trip.vehicleNo || "—"],
+        [
+          to("orders.farm_address"),
+          `${vehicle.trip.sourceFarm || "—"}${vehicle.trip.farmAddress ? ` · ${vehicle.trip.farmAddress}` : ""}`,
+        ],
+        [to("orders.bird_type"), vehicle.trip.birdType || "—"],
+        [to("orders.avg_bird_weight"), avgBirdWeight ? `${avgBirdWeight.toFixed(2)} KG` : "—"],
+        [to("orders.vehicle_box_capacity"), String(capacity)],
+        [to("orders.available_boxes"), String(available)],
+        [to("orders.supervisor"), vehicle.trip.supervisorName || "—"],
+        [to("orders.driver"), vehicle.trip.driverName || "—"],
+        [to("orders.supervisor_mobile"), supervisorMobile || "—"],
+      ]
+    : [];
+
+  // ── Day pool table: PENDING (unassigned) + ASSIGNED shops together ───────
+  //     Only pending rows are assignable — the same-shop/same-day rule stays
+  //     visible at a glance. Table-level search over the FULL pool (shop /
+  //     village / vehicle / trip), sorted by the selected mode, then
+  //     paginated (existing global component; 10 rows per page).
+  type PoolRow = OrderShopRow & {
+    poolIndex: number;
+    kind: "pending" | "assigned";
+    assignedVehicleNo: string;
+    assignedTripNo: string;
+    delivered: boolean;
+  };
+  const filteredPool = useMemo(() => {
+    const list: PoolRow[] = [];
+    collection.rows.forEach((row, i) => {
+      const a = collection.shops.get(row.shopId);
+      const item: PoolRow = {
+        ...row,
+        poolIndex: i,
+        kind: a ? "assigned" : "pending",
+        assignedVehicleNo: a?.vehicleNo ?? "",
+        assignedTripNo: a?.tripNo ?? "",
+        delivered: a?.delivered ?? false,
+      };
+      if (q) {
+        const hay =
+          `${row.shopName} ${villageOf(row.shopId, row.shopName, shopDirectory)} ${item.assignedVehicleNo} ${item.assignedTripNo}`.toLowerCase();
+        if (!hay.includes(q)) return;
+      }
+      list.push(item);
+    });
+    if (sortMode === "az") {
+      list.sort(
+        (a, b) => (a.shopName || "").localeCompare(b.shopName || "") || a.poolIndex - b.poolIndex
+      );
+    } else if (sortMode === "za") {
+      list.sort(
+        (a, b) => (b.shopName || "").localeCompare(a.shopName || "") || a.poolIndex - b.poolIndex
+      );
+    } else if (sortMode === "vehicle_trip") {
+      // Pending (no vehicle) first, then grouped by Vehicle No → Trip No.
+      list.sort(
+        (a, b) =>
+          a.assignedVehicleNo.localeCompare(b.assignedVehicleNo) ||
+          a.assignedTripNo.localeCompare(b.assignedTripNo) ||
+          a.poolIndex - b.poolIndex
+      );
+    } else {
+      // Pending First: unassigned shops up top (collection order), then
+      // assigned (collection order).
+      list.sort((a, b) =>
+        a.kind === b.kind ? a.poolIndex - b.poolIndex : a.kind === "pending" ? -1 : 1
+      );
+    }
+    return list;
+  }, [collection, q, shopDirectory, sortMode]);
+
+  const [availablePage, setAvailablePage] = useState(1);
+  const availableKey = `${q}|${sortMode}|${filteredPool.length}`;
+  const [lastAvailableKey, setLastAvailableKey] = useState(availableKey);
+  if (lastAvailableKey !== availableKey) {
+    setLastAvailableKey(availableKey);
+    if (availablePage !== 1) setAvailablePage(1);
+  }
+  const availableTotalPages = Math.max(
+    1,
+    Math.ceil(filteredPool.length / AVAILABLE_PAGE_SIZE)
+  );
+  const safeAvailablePage = Math.min(availablePage, availableTotalPages);
+  const availableStartIndex =
+    filteredPool.length === 0 ? 0 : (safeAvailablePage - 1) * AVAILABLE_PAGE_SIZE;
+  const pageAvailable = filteredPool.slice(
+    (safeAvailablePage - 1) * AVAILABLE_PAGE_SIZE,
+    safeAvailablePage * AVAILABLE_PAGE_SIZE
+  );
+
+  // ── Delivery state of a selected shop from persisted day data ───────────
+  // Pending (not assigned anywhere yet) / Assigned / Delivered (Step 4).
+  const deliveryStatusOf = (shopId: number): "pending" | "assigned" | "delivered" => {
+    const a = collection.shops.get(shopId);
+    if (!a) return "pending";
+    return a.delivered ? "delivered" : "assigned";
+  };
+
+  // ── Render — SHOP-FIRST, table-first (same visual language as
+  //     Order Collection; vehicle comes AFTER the shop selection) ─────────
+  return (
+    <div>
+      {/* 1 — Day pool: pending + assigned collected shops (select
+          pending shops one by one; assigned rows are visible, locked) */}
+      <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between gap-2 flex-wrap">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+          {to("orders.collected_shops")}
+        </span>
+        <span className="text-[11px] font-semibold text-slate-400">
+          {filteredPool.length} / {collection.totalShops}
+        </span>
+      </div>
+      {filteredPool.length === 0 ? (
+        <div className="px-4 py-5">
+          <OrdersEmptyState
+            title={
+              q
+                ? to("orders.no_search_results")
+                : to("orders.pool_summary", {
+                    collected: collection.totalShops,
+                    assigned: collection.assignedShops,
+                    available: 0,
+                  })
+            }
+          />
+        </div>
+      ) : (
+        <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1240px]">
-              <thead className={opsTableHeadRowClass}>
-                <tr>
-                  <th className={opsTableThClass}>{to("orders.col_sno")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_order_no")}</th>
+            <table className="w-full min-w-[980px] text-xs md:text-sm">
+              <thead>
+                <tr className={opsTableHeadRowClass}>
+                  <th className={`${opsTableThClass} w-14`}>{to("orders.select_col")}</th>
+                  <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
                   <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_city")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_sequence")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_required_boxes")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_pickup_boxes")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_pending_boxes")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_delivered_boxes")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_remaining_boxes")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_trip")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_status")}</th>
-                  <th className={`${opsTableThClass} text-right`}>{to("orders.col_action")}</th>
+                  <th className={opsTableThClass}>{to("orders.col_village")}</th>
+                  <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_birds")}</th>
+                  <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.ordered_boxes")}</th>
+                  <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.weight")}</th>
+                  <th className={`${opsTableThClass} w-40`}>{to("orders.vehicle_trip")}</th>
+                  <th className={`${opsTableThClass} w-28`}>{to("orders.col_status")}</th>
                 </tr>
               </thead>
               <tbody className={opsTableDivideClass}>
-                {rows.map((row, index) => {
-                  const assignment = assignmentOf(row);
-                  const locked =
-                    row.locked ||
-                    Boolean(assignment?.locked) ||
-                    Boolean(assignment?.tripLocked) ||
-                    (assignment != null && pendingAssignmentIds.has(assignment.id));
-                  const editable = canEdit && !locked;
-                  const limit = maxHere(row);
-                  const minHere = assignment?.deliveredBoxes ?? 0;
-                  const value = boxesOf(row);
-                  const overLimit = value > limit;
-                  const underDelivered = value < minHere;
+                {pageAvailable.map((row, index) => {
+                  const checked = selectedIds.has(row.shopId);
+                  const isAssignedRow = row.kind === "assigned";
                   return (
                     <tr
-                      key={row.id}
+                      key={row.shopId}
                       className={`${opsTableRowClass} ${
-                        assignment != null && pendingAssignmentIds.has(assignment.id)
-                          ? "opacity-40"
-                          : ""
+                        isAssignedRow
+                          ? "cursor-default opacity-60"
+                          : `cursor-pointer ${checked ? "bg-emerald-50/50" : ""}`
                       }`}
+                      onClick={() => {
+                        if (!isAssignedRow) toggleShop(row, !checked);
+                      }}
                     >
-                      <td className={opsTableTdClass}>{startIndex + index + 1}</td>
-                      <td className={`${opsTableTdClass} font-mono text-xs text-slate-500`}>
-                        {row.orderNo}
+                      <td className={opsTableTdClass} onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={isAssignedRow}
+                          onChange={(e) => toggleShop(row, e.target.checked)}
+                          aria-label={`${to("orders.select_col")} — ${row.shopName}`}
+                          className={`h-4 w-4 accent-emerald-600 ${
+                            isAssignedRow ? "cursor-not-allowed opacity-40" : "cursor-pointer"
+                          }`}
+                        />
                       </td>
-                      <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
-                        <span className="inline-flex items-center gap-1.5">
-                          {locked && <Lock size={11} className="text-slate-400" aria-hidden />}
-                          {row.shopName}
+                      <td className={opsTableTdClass}>
+                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-bold text-slate-600">
+                          {availableStartIndex + index + 1}
                         </span>
                       </td>
-                      <td className={opsTableTdClass}>{row.city || "—"}</td>
-                      <td className={opsTableTdClass}>
-                        {editable ? (
-                          <input
-                            type="number"
-                            min={1}
-                            value={sequenceOf(row, index)}
-                            aria-label={`${to("orders.col_sequence")} — ${row.shopName}`}
-                            onChange={(e) => updateDraft(row, index, "sequence", e.target.value)}
-                            className="no-spinner h-8 w-16 rounded-lg border border-slate-200 px-2 text-xs"
-                          />
-                        ) : (
-                          <span className="tabular-nums">{assignment?.sequence ?? "—"}</span>
-                        )}
-                      </td>
-                      <td className={`${opsTableTdClass} font-semibold tabular-nums`}>
-                        {row.requiredBoxes}
+                      <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
+                        {row.shopName || "—"}
                       </td>
                       <td className={opsTableTdClass}>
-                        {editable ? (
-                          <span className="inline-flex flex-col">
-                            <input
-                              type="number"
-                              min={minHere}
-                              max={limit}
-                              value={value || ""}
-                              aria-label={`${to("orders.col_pickup_boxes")} — ${row.shopName}`}
-                              onChange={(e) =>
-                                updateDraft(row, index, "pickupBoxes", e.target.value)
-                              }
-                              className={`no-spinner h-8 w-24 rounded-lg border px-2 text-xs font-semibold ${
-                                overLimit || underDelivered
-                                  ? "border-rose-400 text-rose-700"
-                                  : "border-emerald-300"
-                              }`}
-                            />
-                            <span
-                              className={`mt-0.5 text-[10px] ${
-                                overLimit || underDelivered ? "text-rose-600" : "text-slate-400"
-                              }`}
-                            >
-                              {to("orders.max_hint", { min: minHere, max: limit })}
-                            </span>
+                        {villageOf(row.shopId, row.shopName, shopDirectory) || "—"}
+                      </td>
+                      <td className={`${opsTableTdClass} text-right font-semibold`}>
+                        {formatCount(Number(row.birds) || 0)}
+                      </td>
+                      <td className={`${opsTableTdClass} text-right font-bold text-emerald-800`}>
+                        {formatCount(Math.max(1, Number(row.boxNo) || 0))}
+                      </td>
+                      <td className={`${opsTableTdClass} text-right text-slate-500`}>
+                        {avgBirdWeight
+                          ? `${weightForBirds(Number(row.birds) || 0, avgBirdWeight).toFixed(2)} kg`
+                          : "—"}
+                      </td>
+                      <td className={`${opsTableTdClass} whitespace-nowrap`}>
+                        {isAssignedRow ? (
+                          <span className="text-slate-600">
+                            {row.assignedVehicleNo || "—"}
+                            {row.assignedTripNo ? ` · ${row.assignedTripNo}` : ""}
                           </span>
                         ) : (
-                          <span className="tabular-nums">{assignment?.pickupBoxes ?? 0}</span>
+                          <span className="text-slate-300">—</span>
                         )}
                       </td>
-                      <td className={`${opsTableTdClass} tabular-nums font-semibold text-amber-700`}>
-                        {row.pendingBoxes}
-                      </td>
-                      <td className={`${opsTableTdClass} tabular-nums font-semibold text-emerald-700`}>
-                        {row.deliveredBoxes}
-                      </td>
-                      <td className={`${opsTableTdClass} tabular-nums`}>{row.remainingBoxes}</td>
-                      <td className={`${opsTableTdClass} text-xs text-slate-500`}>
-                        {row.assignments.map((a) => a.tripNo).join(", ") || "—"}
-                      </td>
                       <td className={opsTableTdClass}>
-                        <OrdersStatusBadge status={row.status} label={to(statusKeyOf(row.status))} />
-                      </td>
-                      <td className={`${opsTableTdClass} text-right`}>
-                        <OrdersIconButton
-                          label={to("orders.remove_assignment", { shop: row.shopName })}
-                          tone="rose"
-                          disabled={
-                            !canEdit ||
-                            !assignment ||
-                            assignment.deliveredBoxes > 0 ||
-                            assignment.tripLocked ||
-                            busy
-                          }
-                          onClick={() => {
-                            if (!assignment) return;
-                            requestDelete(assignment.id, {
-                              label: to("orders.remove_assignment", { shop: row.shopName }),
-                            });
-                          }}
-                        >
-                          <Trash2 size={13} />
-                        </OrdersIconButton>
+                        {isAssignedRow ? (
+                          row.delivered ? (
+                            <OrdersStatusBadge status="Delivered" label={to("orders.status_delivered")} />
+                          ) : (
+                            <OrdersStatusBadge status="Assigned" label={to("orders.col_assigned")} />
+                          )
+                        ) : checked ? (
+                          <OrdersStatusBadge status="Assigned" label={to("orders.col_assigned")} />
+                        ) : (
+                          <span className="text-[11px] font-semibold text-emerald-600">
+                            {to("orders.available")}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -675,324 +876,319 @@ export default function OrdersAssignmentTab({
               </tbody>
             </table>
           </div>
-        )}
-
-        <OrdersPagination
-          page={page.page}
-          totalPages={page.totalPages}
-          total={page.total}
-          pageSize={pageSize}
-          onPageChange={onPageChange}
-          onPageSizeChange={onPageSizeChange}
-          t={to}
-        />
-
-        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-slate-50/60 px-4 py-3">
-          {isDirty && (
-            <span className="mr-auto text-[11px] font-semibold text-amber-700">
-              {to("orders.unsaved_changes")}
-            </span>
-          )}
-          <button
-            type="button"
-            className={opsSecondaryButtonClass}
-            disabled={busy || !isDirty}
-            onClick={() => selectedTripId != null && updateTripDraft(selectedTripId, () => EMPTY_DRAFT)}
-          >
-            {to("orders.cancel")}
-          </button>
-          <button
-            type="button"
-            className={opsSecondaryButtonClass}
-            disabled={busy || !canEdit}
-            onClick={() => void persist(false)}
-          >
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            {saving ? to("orders.saving") : to("orders.save_progress")}
-          </button>
-          <button
-            type="button"
-            className={opsPrimaryButtonClass}
-            disabled={busy || !canEdit}
-            onClick={() => void persist(true)}
-          >
-            {finishing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-            {finishing ? to("orders.submitting") : to("orders.finish_assignment")}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="space-y-3">
-      {/* Order Assignment's OWN key figures: shops / boxes against ordered,
-          assigned and pending, straight from the server summary for the whole
-          filtered day. */}
-      <OrdersAssignmentKpis
-        shopsOrdered={page.summary.orderedShops}
-        shopsAssigned={page.summary.fullyAssignedShops}
-        shopsPending={page.summary.pendingAssignmentShops}
-        boxesOrdered={page.summary.totalRequiredBoxes}
-        boxesAssigned={page.summary.totalAssignedBoxes}
-        boxesPending={page.summary.totalPendingBoxes}
-        draftBoxesDelta={totalDraftDelta}
-        ready={dataReady}
-        /* `busy` covers the save → reload window: persist() only clears it
-           after onReload() has re-read the server, so the figures never show
-           pre-save totals as if they were the saved result. */
-        syncing={syncing || busy}
-        t={to}
-      />
-
-      {/* Real supervisor-notification outcome (never a fabricated success). */}
-      {notifications.length > 0 && (
-        <div className="space-y-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5">
-          {notifications.map((n) => (
-            <div key={n.channel} className="flex items-center gap-2 text-[11px]">
-              {n.status === "sent" ? (
-                <CheckCircle2 size={13} className="text-emerald-600" aria-hidden />
-              ) : (
-                <AlertTriangle size={13} className="text-amber-600" aria-hidden />
-              )}
-              <span className="font-bold uppercase tracking-wide text-slate-500">
-                {n.channel === "email" ? to("orders.channel_email") : to("orders.channel_whatsapp")}
-              </span>
-              <span className={n.status === "sent" ? "text-emerald-700" : "text-amber-700"}>
-                {n.status === "sent"
-                  ? to("orders.notify_sent", { recipient: n.recipient })
-                  : n.message || to("orders.notify_not_sent")}
-              </span>
+          {filteredPool.length > AVAILABLE_PAGE_SIZE && (
+            <div className="px-4 py-2.5 border-t border-slate-100">
+              <TripPagination
+                currentPage={safeAvailablePage}
+                totalPages={availableTotalPages}
+                onPageChange={setAvailablePage}
+              />
             </div>
-          ))}
+          )}
+        </>
+      )}
+
+      {/* 2 — Selected shops → select vehicle → sequence & boxes */}
+      {selected.length > 0 && (
+        <>
+          <div className="border-t border-slate-200 bg-emerald-50/60 px-4 py-2.5 flex items-center gap-3 flex-wrap">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+              {to("orders.selected_shops")}: <b>{selected.length}</b>
+            </span>
+            <span className="text-[11px] font-semibold text-slate-400">
+              {to("orders.assign_hint")}
+            </span>
+            <div className="ml-auto w-full sm:w-80">
+              {eligibleVehicles.length === 0 ? (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  {to("orders.no_eligible_vehicles")}
+                </p>
+              ) : (
+                <Select
+                  options={vehicleOptions}
+                  value={vehicleValue}
+                  onChange={(opt) => {
+                    if (!opt) return;
+                    setVehicleTripId(opt.value);
+                  }}
+                  placeholder={to("orders.select_vehicle")}
+                  styles={opsReactSelectStyles()}
+                  className="text-xs"
+                  isSearchable
+                  menuPosition="fixed"
+                />
+              )}
+            </div>
+          </div>
+
+          {vehicle && (
+            <>
+              {/* Compact vehicle information strip (never a hero panel) */}
+              <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 space-y-3">
+                <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-2.5">
+                  {summary.map(([label, value]) => (
+                    <div key={label} className="min-w-0">
+                      <dt className="text-[11px] font-semibold text-slate-400">{label}</dt>
+                      <dd className="text-sm font-semibold text-slate-800 truncate" title={value}>
+                        {value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                {/* Compact capacity indicator (not dashboard cards) */}
+                <div className="flex items-center gap-4 flex-wrap rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600">
+                  <span>
+                    {to("orders.vehicle_box_capacity")}: <b className="text-slate-800">{capacity}</b>
+                  </span>
+                  <span>
+                    {to("orders.col_assigned")}: <b className="text-slate-800">{alreadyAssignedOther + requested}</b>
+                  </span>
+                  <span>
+                    {to("orders.available_boxes")}:{" "}
+                    <b className={remaining < 0 ? "text-rose-600" : "text-emerald-700"}>{remaining}</b>
+                  </span>
+                  <span>
+                    {to("orders.col_shops")}: <b className="text-slate-800">{selected.length}</b>
+                  </span>
+                  <span className="ml-auto text-[11px] text-slate-400">
+                    {to("orders.collection_summary", { shops: totals.totalShops, boxes: totals.totalBoxes, birds: totals.totalBirds })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Assignment table: editable sequence (↑/↓ auto-renumber) + assigned boxes */}
+              <div className="max-h-80 overflow-y-auto">
+                <table className="w-full min-w-[900px] text-xs md:text-sm">
+                  <thead>
+                    <tr className={opsTableHeadRowClass}>
+                      <th className={`${opsTableThClass} w-20`}>{to("orders.col_sequence")}</th>
+                      <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
+                      <th className={opsTableThClass}>{to("orders.col_village")}</th>
+                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_birds")}</th>
+                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_boxes")}</th>
+                      <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.assigned_boxes")}</th>
+                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.weight")}</th>
+                      <th className={`${opsTableThClass} w-28`}>{to("orders.col_delivery_status")}</th>
+                      <th className={`${opsTableThClass} w-12`} />
+                    </tr>
+                  </thead>
+                  <tbody className={opsTableDivideClass}>
+                    {selected.map((row, index) => {
+                      const ds = deliveryStatusOf(row.shopId);
+                      return (
+                        <tr key={row.clientKey} className={`${opsTableRowClass} align-middle`}>
+                          <td className={opsTableTdClass}>
+                            <div className="flex items-center gap-1">
+                              <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-[12px] font-bold text-emerald-700">
+                                {index + 1}
+                              </span>
+                              <div className="flex flex-col -my-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => moveRow(row.clientKey, -1)}
+                                  disabled={index === 0 || busy}
+                                  aria-label={`${to("orders.col_sequence")} ↑ ${row.shopName}`}
+                                  className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
+                                >
+                                  <ArrowUp size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveRow(row.clientKey, 1)}
+                                  disabled={index === selected.length - 1 || busy}
+                                  aria-label={`${to("orders.col_sequence")} ↓ ${row.shopName}`}
+                                  className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
+                                >
+                                  <ArrowDown size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                          <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
+                            {row.shopName || "—"}
+                          </td>
+                          <td className={opsTableTdClass}>{row.village || "—"}</td>
+                          <td className={`${opsTableTdClass} text-right font-semibold`}>
+                            {formatCount(row.orderedBirds)}
+                          </td>
+                          <td className={`${opsTableTdClass} text-right font-bold text-emerald-800`}>
+                            {formatCount(row.orderedBoxes)}
+                          </td>
+                          <td className={opsTableTdClass}>
+                            <input
+                              type="number"
+                              min={1}
+                              max={row.orderedBoxes}
+                              value={row.assigned === 0 ? "" : row.assigned}
+                              placeholder="0"
+                              aria-label={`${to("orders.assigned_boxes")} — ${row.shopName}`}
+                              onChange={(e) => setAssigned(row.clientKey, e.target.value)}
+                              className={`h-8 w-full rounded-lg border px-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 ${
+                                row.assigned === 0
+                                  ? "border-amber-300 bg-amber-50/60 text-amber-800"
+                                  : "border-emerald-300/70 bg-emerald-50/50 text-emerald-900"
+                              }`}
+                            />
+                          </td>
+                          <td className={`${opsTableTdClass} text-right text-slate-500`}>
+                            {avgBirdWeight
+                              ? `${weightForBirds(assignedBirdsFor(row), avgBirdWeight).toFixed(2)} kg`
+                              : "—"}
+                          </td>
+                          <td className={opsTableTdClass}>
+                            {ds === "delivered" ? (
+                              <OrdersStatusBadge status="Delivered" label={to("orders.status_delivered")} />
+                            ) : ds === "assigned" ? (
+                              <OrdersStatusBadge status="Assigned" label={to("orders.status_assigned")} />
+                            ) : (
+                              <OrdersStatusBadge status="Pending" label={to("orders.status_pending")} />
+                            )}
+                          </td>
+                          <td className={opsTableTdClass}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelected((prev) => prev.filter((r) => r.clientKey !== row.clientKey))
+                              }
+                              disabled={busy}
+                              aria-label={`${to("orders.close")} — ${row.shopName}`}
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200/80 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-colors disabled:opacity-30"
+                            >
+                              <X size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Shops already on another vehicle for this day (persisted) */}
+              {pool.assigned.length > 0 && (
+                <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2 block">
+                    {to("orders.col_assigned")} — {to("orders.col_vehicle_no")}
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {pool.assigned.map(({ row, tripNo, vehicleNo, delivered }) => (
+                      <span
+                        key={row.shopId}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600"
+                      >
+                        {row.shopName || "—"}
+                        <span className={delivered ? "text-emerald-600" : "text-slate-400"}>
+                          — {tripNo} ({vehicleNo || "—"})
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {/* 3 — Actions (only when there is something to assign) */}
+      {selected.length > 0 && (
+        <div className="border-t border-slate-200 bg-slate-50/70 px-5 py-3.5 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            {isDirty && (
+              <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
+                {to("orders.unsaved_changes")}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2.5">
+            {/* WhatsApp — real brand icon + green treatment (existing mechanism) */}
+            <button
+              type="button"
+              onClick={() => void handleWhatsApp()}
+              disabled={waBusy || !vehicle}
+              title={to("orders.whatsapp")}
+              aria-label={to("orders.whatsapp")}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600/40 bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {waBusy ? <Loader2 size={14} className="animate-spin" /> : <WhatsAppIcon size={14} />}
+              {waProgress ? `${to("orders.whatsapp")} · ${waProgress}` : to("orders.whatsapp")}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={busy || !vehicle || selected.length === 0}
+              className={`${opsSecondaryButtonClass} border-emerald-300 text-emerald-700 hover:bg-emerald-50`}
+            >
+              {saving || conflictChecking ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Save size={14} />
+              )}
+              {saving ? to("orders.saving") : to("orders.save_progress")}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleFinish()}
+              disabled={busy || !vehicle || selected.length === 0}
+              className={opsPrimaryButtonClass}
+            >
+              {finishing || conflictChecking ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Send size={14} />
+              )}
+              {finishing ? to("orders.submitting") : to("orders.finish_assignment")}
+            </button>
+          </div>
         </div>
       )}
 
-      {/* ONE workspace: the day/search toolbar, then the day's vehicles, each
-          expanding in place into its own shop assignment. */}
-      <div className="overflow-visible rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50/60 px-4 py-2.5">
-          <OrdersSearchInput
-            value={search}
-            onChange={onSearchChange}
-            placeholder={to("orders.search_assignment")}
-            className="w-full sm:w-72"
-          />
-          <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} />
-          <span
-            className={`w-24 flex-shrink-0 truncate text-[10.5px] font-semibold text-slate-400 transition-opacity duration-150 motion-reduce:transition-none ${
-              syncing ? "opacity-100" : "opacity-0"
-            }`}
-            role="status"
-            aria-live="polite"
-          >
-            {syncing ? to("orders.kpi_syncing") : ""}
-          </span>
-          <div className="ml-auto flex items-center gap-2">
-            <OrdersIconButton
-              label={`${to("orders.refresh")} — ${to("orders.refresh_assignment")}`}
-              onClick={onRefresh}
-              busy={refreshing}
-            >
-              <RefreshCw size={14} />
-            </OrdersIconButton>
+      {/* Capacity-exceeded block (clean modal with the exact numbers) */}
+      {capacityExceeded && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden border border-rose-200">
+            <div className="bg-gradient-to-br from-rose-50 to-amber-50 p-6">
+              <div className="flex items-start gap-4">
+                <div className="mt-0.5 p-2 rounded-full bg-white/80 border border-rose-200">
+                  <AlertTriangle size={20} className="text-rose-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">
+                    {to("orders.capacity_exceeded_title")}
+                  </h3>
+                  <dl className="mt-2 rounded-lg border border-rose-100 bg-white/80 divide-y divide-rose-50 text-sm">
+                    {[
+                      [to("orders.vehicle_box_capacity"), capacityExceeded.capacity],
+                      [to("orders.already_assigned"), capacityExceeded.assigned],
+                      [to("orders.available_boxes"), capacityExceeded.available],
+                      [to("orders.requested"), capacityExceeded.requested],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex items-center justify-between gap-6 px-3 py-1.5">
+                        <dt className="font-semibold text-slate-500">{label}</dt>
+                        <dd className="font-bold text-slate-800">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <p className="text-sm font-semibold text-rose-700 mt-2">
+                    {to("orders.capacity_exceeded_line")}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end px-6 py-4 bg-slate-50 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setCapacityExceeded(null)}
+                className="px-5 py-2 rounded-lg text-sm font-bold text-white shadow-xs transition-all active:scale-[0.98] bg-rose-600 hover:bg-rose-700"
+              >
+                {to("orders.close")}
+              </button>
+            </div>
           </div>
         </div>
-
-        {vehicleRows.length === 0 ? (
-          <p className="px-4 py-3 text-[11.5px] font-semibold text-slate-500">
-            {to("orders.no_eligible_vehicles")}
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px]">
-              <thead className={opsTableHeadRowClass}>
-                <tr>
-                  <th className={vehicleThClass}>{to("orders.col_vehicle_no")}</th>
-                  <th className={vehicleThClass}>{to("orders.col_trip")}</th>
-                  <th className={vehicleThClass}>{to("orders.supervisor")}</th>
-                  <th className={vehicleThClass}>{to("orders.supervisor_mobile")}</th>
-                  <th className={vehicleThClass}>{to("orders.kpi_trip_capacity")}</th>
-                  <th className={vehicleThClass}>{to("orders.kpi_trip_loaded")}</th>
-                  <th className={vehicleThClass}>{to("orders.kpi_trip_available")}</th>
-                  <th className={`${vehicleThClass} text-right`}>{to("orders.col_action")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {vehicleRows.map((v) => (
-                  <Fragment key={v.trip.tripId}>
-                    <tr className={v.expanded ? "bg-emerald-50/60" : "hover:bg-slate-50/70"}>
-                      <td className={`${vehicleTdClass} font-bold text-slate-800`}>
-                        <span className="inline-flex items-center gap-1.5">
-                          <span
-                            className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border ${
-                              v.over > 0 ? TONE_ICON.rose : TONE_ICON.emerald
-                            }`}
-                            aria-hidden
-                          >
-                            {v.over > 0 ? <AlertTriangle size={14} /> : <Truck size={14} />}
-                          </span>
-                          {v.trip.vehicleNo || "—"}
-                          {v.locked && <Lock size={11} className="text-slate-400" aria-hidden />}
-                        </span>
-                      </td>
-                      <td className={vehicleTdClass}>
-                        <span className="flex flex-col leading-tight">
-                          <span className="font-semibold text-slate-700">
-                            {v.trip.tripNo || "—"}
-                          </span>
-                          <span
-                            className={`text-[10.5px] font-bold ${
-                              v.trip.tripDate === day ? "text-emerald-600" : "text-slate-400"
-                            }`}
-                          >
-                            {formatDayFull(v.trip.tripDate)}
-                          </span>
-                        </span>
-                      </td>
-                      <td className={`${vehicleTdClass} font-semibold text-slate-700`}>
-                        {v.trip.supervisorName || "—"}
-                      </td>
-                      <td className={`${vehicleTdClass} tabular-nums`}>
-                        {v.supervisorMobile || "—"}
-                      </td>
-                      <td className={`${vehicleTdClass} font-bold tabular-nums text-slate-800`}>
-                        {v.trip.capacity}
-                      </td>
-                      <td className={vehicleTdClass}>
-                        <span className="flex min-w-[104px] items-center gap-2">
-                          <span
-                            className={`w-8 flex-shrink-0 text-right font-bold tabular-nums ${
-                              v.over > 0 ? "text-rose-700" : "text-emerald-700"
-                            }`}
-                          >
-                            {v.loaded}
-                          </span>
-                          <span className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                            <span
-                              className={`block h-full rounded-full transition-[width] duration-300 ease-out motion-reduce:transition-none ${
-                                v.over > 0 ? TONE_BAR.rose : TONE_BAR.emerald
-                              }`}
-                              style={{ width: `${v.percent}%` }}
-                            />
-                          </span>
-                          <span
-                            className={`w-9 flex-shrink-0 text-right text-[11px] font-bold tabular-nums ${
-                              v.over > 0 ? "text-rose-600" : "text-slate-500"
-                            }`}
-                          >
-                            {v.percent}%
-                          </span>
-                        </span>
-                      </td>
-                      <td
-                        className={`${vehicleTdClass} font-bold tabular-nums ${
-                          v.available === 0 ? "text-amber-700" : "text-slate-800"
-                        }`}
-                      >
-                        {v.available}
-                      </td>
-                      <td className={`${vehicleTdClass} text-right`}>
-                        <span className="inline-flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setLoadedShopsTripId(v.trip.tripId)}
-                            // Always available: the list has a proper empty
-                            // state, and "confirm nothing is loaded yet" is a
-                            // real question to ask of a truck.
-                            title={`${to("orders.view_loaded_shops")} — ${
-                              v.trip.vehicleNo || v.trip.tripNo
-                            }`}
-                            className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2.5 text-[11.5px] font-bold text-slate-600 outline-none transition-colors hover:bg-slate-50 hover:text-slate-800 focus-visible:ring-2 focus-visible:ring-emerald-500/40"
-                          >
-                            <ListChecks size={14} aria-hidden />
-                            {to("orders.view_loaded_shops")}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => toggleExpand(v.trip.tripId)}
-                            aria-expanded={v.expanded}
-                            aria-label={`${to("orders.assign_shops")} — ${
-                              v.trip.vehicleNo || v.trip.tripNo
-                            }`}
-                            className={`inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 text-[11.5px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${
-                              v.expanded
-                                ? "border-emerald-300 bg-emerald-100 text-emerald-800"
-                                : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                            }`}
-                          >
-                            <ChevronDown
-                              size={13}
-                              className={`transition-transform motion-reduce:transition-none ${
-                                v.expanded ? "rotate-180" : ""
-                              }`}
-                              aria-hidden
-                            />
-                            {v.expanded ? to("orders.close_assign") : to("orders.assign_shops")}
-                          </button>
-                        </span>
-                      </td>
-                    </tr>
-                    {v.expanded && (
-                      <tr>
-                        {/* `w-0 min-w-full` keeps this full-width cell from
-                            contributing to the table's intrinsic width: the
-                            shop table inside is far wider and would otherwise
-                            stretch the vehicle row and push its action column
-                            off the card. The panel scrolls on its own. */}
-                        <td colSpan={VEHICLE_COLUMNS} className="p-0">
-                          <div className="w-0 min-w-full">{renderAssignmentPanel(v.trip.tripDate)}</div>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {vehicleRows.length > 0 && selectedTripId == null && (
-          <p className="border-t border-slate-100 px-4 py-2.5 text-[11px] font-semibold text-slate-400">
-            {to("orders.expand_to_assign")}
-          </p>
-        )}
-
-        {vehicleRows.some((v) => v.over > 0) && (
-          <div className="border-t border-rose-100 bg-rose-50/70 px-4 py-2">
-            {vehicleRows
-              .filter((v) => v.over > 0)
-              .map((v) => (
-                <p
-                  key={v.trip.tripId}
-                  className="flex items-center gap-1.5 text-[11px] font-bold text-rose-700"
-                >
-                  <AlertTriangle size={12} aria-hidden />
-                  {`${v.trip.vehicleNo || v.trip.tripNo} — ${to("orders.kpi_trip_over", {
-                    value: v.over,
-                  })}`}
-                </p>
-              ))}
-          </div>
-        )}
-      </div>
-
-      <PendingDeleteNotification items={pendingItems} onCancel={cancelDelete} />
-
-      {/* Every shop carrying boxes on ONE trip — re-read from the server for
-          the WHOLE trip, not filtered from the visible page. */}
-      {loadedShopsVehicle && (
-        <OrdersLoadedShopsDialog
-          tripId={loadedShopsVehicle.tripId}
-          vehicleNo={loadedShopsVehicle.vehicleNo}
-          tripNo={loadedShopsVehicle.tripNo}
-          shopDirectory={shopDirectory}
-          // Unsaved edits only ever concern the trip they were typed into.
-          dirty={(draftsByTrip.get(loadedShopsVehicle.tripId)?.size ?? 0) > 0}
-          onClose={() => setLoadedShopsTripId(null)}
-          t={to}
-        />
       )}
     </div>
   );
 }
+
+export default React.memo(OrdersAssignmentTab);

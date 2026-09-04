@@ -281,7 +281,7 @@ export async function generateOrdersPdf({
   const seqBody: (string | number)[][] = listedRows.map((b, index) => [
     b.serialNo || index + 1,
     b.shopName,
-    b.city || "—",
+    b.village || "—",
     b.mobile || "—",
     b.orderedBirds > 0 ? count(b.orderedBirds) : "—",
     b.deliveredBirds > 0 ? count(b.deliveredBirds) : "—",
@@ -314,7 +314,7 @@ export async function generateOrdersPdf({
     [
       "Seq",
       ordersTranslate("orders.col_shop_name", language),
-      ordersTranslate("orders.col_city", language),
+      ordersTranslate("orders.col_village", language),
       ordersTranslate("orders.shop_mobile", language),
       ordersTranslate("orders.ordered_birds", language),
       ordersTranslate("orders.delivered_birds", language),
@@ -342,7 +342,7 @@ export async function generateOrdersPdf({
     const notListedBody: (string | number)[][] = notListedRows.map((b, index) => [
       index + 1,
       b.shopName,
-      b.city || "—",
+      b.village || "—",
       b.mobile || "—",
       count(b.deliveredBirds),
       count(b.deliveredBoxes),
@@ -353,7 +353,7 @@ export async function generateOrdersPdf({
       [
         "Seq",
         ordersTranslate("orders.col_shop_name", language),
-        ordersTranslate("orders.col_city", language),
+        ordersTranslate("orders.col_village", language),
         ordersTranslate("orders.shop_mobile", language),
         ordersTranslate("orders.delivered_birds", language),
         ordersTranslate("orders.delivered_boxes", language),

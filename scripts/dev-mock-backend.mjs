@@ -9,6 +9,11 @@
 //
 //   npm run mock:backend        # serves sample JSON on http://127.0.0.1:4000
 //
+// Served today: /api/health, /api/masters/{shops,employees,vehicles},
+// /api/trips (+ /api/trips/:id and POST /api/trips/:id/steps/deliveries for the
+// Orders Collection / Assignment / Delivery Tracking page) and the
+// /api/operations/collection-entry/* report endpoints.
+//
 // For REAL data, run the actual ERP backend on port 4000 instead — no config
 // change needed (the Vite dev proxy targets 127.0.0.1:4000).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -142,6 +147,237 @@ function buildReport(query) {
   };
 }
 
+// ── Sample Orders data: collection containers + vehicle trips ────────────────
+// The Orders page (Order Collection / Order Assignment / Delivery Tracking)
+// reads ONLY the existing /api/trips contract — there is no /api/orders
+// endpoint in this frontend:
+//   • ONE vehicle-less "container" trip per operational day holds that day's
+//     collected order as `[ORDER]` plan rows (boxNo = ordered boxes);
+//   • Order Assignment copies those rows onto a vehicle trip as
+//     `[ORDER] O:<containerTripNo>`;
+//   • Step 4 delivery rows (autoCaptureTime) are the delivery-progress truth.
+// The store below is in-memory, so Save Progress / Finish actions persist for
+// the lifetime of this stub server (restart = back to the seeded state).
+
+const VEHICLES = [
+  { id: 1, vehicleNo: 1, vehicleNumber: "TS 09 AB 1234", vehicleType: "Truck", noOfBoxes: 120, birdCapacity: 1200, capacityKg: 3000, status: "Active" },
+  { id: 2, vehicleNo: 2, vehicleNumber: "TS 09 CD 5678", vehicleType: "Truck", noOfBoxes: 80, birdCapacity: 800, capacityKg: 2000, status: "Active" },
+  { id: 3, vehicleNo: 3, vehicleNumber: "TS 09 EF 9012", vehicleType: "Lorry", noOfBoxes: 100, birdCapacity: 1000, capacityKg: 2500, status: "Active" },
+].map((v) => ({
+  trackingId: "",
+  fastagBank: "",
+  engineNumber: "",
+  chassisNumber: "",
+  insuranceExpiry: "",
+  permitExpiry: "",
+  fitnessExpiry: "",
+  rcDate: "",
+  ...v,
+}));
+
+const VEHICLE_BY_ID = new Map(VEHICLES.map((v) => [v.id, v]));
+
+/** One Orders plan row (`[ORDER]` marker, boxNo = boxes). */
+function planRow(serialNo, shopId, boxes, birds, over = {}) {
+  const shop = SHOPS.find((s) => s.id === shopId) ?? { shopName: `Shop ${shopId}` };
+  const weight = Number((birds * 1.5).toFixed(2));
+  return {
+    id: serialNo,
+    clientKey: `mock-row-${shopId}-${serialNo}`,
+    serialNo,
+    shopId,
+    shopName: shop.shopName,
+    birdTypeId: null,
+    birdType: "",
+    birds,
+    weight,
+    mortality: 0,
+    mortKg: 0,
+    rate: null,
+    amount: 0,
+    remarks: "[ORDER]",
+    deliveryMode: "box",
+    boxNo: boxes,
+    selectedBoxIds: [],
+    farmBirds: birds,
+    farmWeight: weight,
+    autoCaptureTime: null,
+    ...over,
+  };
+}
+
+function baseTrip(over) {
+  return {
+    status: "Draft",
+    startTime: "",
+    vehicleId: 0,
+    vehicleNo: "",
+    driverId: 0,
+    driverName: "",
+    supervisorId: 0,
+    supervisorName: "",
+    helpers: [],
+    loaders: [],
+    startStepSubmitted: false,
+    farmStepSubmitted: false,
+    pickupStepSubmitted: false,
+    deliveryStepSubmitted: false,
+    endStepSubmitted: false,
+    expensesStepSubmitted: false,
+    remarks: "",
+    avgBirdWeight: 1.5,
+    deliveries: [],
+    deleted: false,
+    _mock: true,
+    ...over,
+  };
+}
+
+/** Seed the Orders scenario: yesterday fully assigned + tracked, today open. */
+function buildTrips() {
+  const now = new Date();
+  const today = iso(now);
+  const yesterday = iso(addDays(now, -1));
+  const stamp = (d) => d.replaceAll("-", "");
+  const ordToday = `ORD-${stamp(today)}-01`;
+  const ordYest = `ORD-${stamp(yesterday)}-01`;
+  const ref = (tripNo) => `[ORDER] O:${tripNo}`;
+
+  return [
+    // ── TODAY: collection container still being filled (Tab 1 working sheet) ──
+    baseTrip({
+      id: 9001,
+      tripNo: ordToday,
+      tripDate: today,
+      deliveries: [planRow(1, 1, 40, 400), planRow(2, 2, 25, 250)],
+    }),
+    // ── YESTERDAY: container finished (Tab 2 source, Tab 1 locked history) ───
+    baseTrip({
+      id: 9002,
+      tripNo: ordYest,
+      tripDate: yesterday,
+      startStepSubmitted: true,
+      deliveries: [
+        planRow(1, 1, 50, 500),
+        planRow(2, 2, 30, 300),
+        planRow(3, 3, 20, 200),
+        planRow(4, 4, 15, 150),
+      ],
+    }),
+    // ── Vehicle 1: shops 1 + 2 assigned, shop 1 already delivered ────────────
+    baseTrip({
+      id: 9101,
+      tripNo: `TRP-${stamp(yesterday)}-01`,
+      tripDate: yesterday,
+      status: "Pending",
+      vehicleId: 1,
+      vehicleNo: VEHICLE_BY_ID.get(1).vehicleNumber,
+      driverName: "Imran S",
+      supervisorName: "Ravi Kumar",
+      startStepSubmitted: true,
+      farmStepSubmitted: true,
+      pickupStepSubmitted: true,
+      deliveryStepSubmitted: true,
+      deliveries: [
+        planRow(1, 1, 50, 500, {
+          remarks: ref(ordYest),
+          autoCaptureTime: `${yesterday}T09:15:00`,
+        }),
+        planRow(2, 2, 30, 300, { remarks: ref(ordYest) }),
+      ],
+    }),
+    // ── Vehicle 2: shops 3 + 4 assigned and fully delivered (Completed) ──────
+    baseTrip({
+      id: 9102,
+      tripNo: `TRP-${stamp(yesterday)}-02`,
+      tripDate: yesterday,
+      status: "Completed",
+      vehicleId: 2,
+      vehicleNo: VEHICLE_BY_ID.get(2).vehicleNumber,
+      driverName: "Kiran P",
+      supervisorName: "Srinivas G",
+      startStepSubmitted: true,
+      farmStepSubmitted: true,
+      pickupStepSubmitted: true,
+      deliveryStepSubmitted: true,
+      endStepSubmitted: true,
+      deliveries: [
+        planRow(1, 3, 20, 200, {
+          remarks: ref(ordYest),
+          autoCaptureTime: `${yesterday}T10:40:00`,
+        }),
+        planRow(2, 4, 15, 150, {
+          remarks: ref(ordYest),
+          autoCaptureTime: `${yesterday}T11:25:00`,
+        }),
+      ],
+    }),
+    // ── Vehicle 3: Step 2 done, nothing delivered → free for assignment ──────
+    baseTrip({
+      id: 9103,
+      tripNo: `TRP-${stamp(today)}-01`,
+      tripDate: today,
+      vehicleId: 3,
+      vehicleNo: VEHICLE_BY_ID.get(3).vehicleNumber,
+      driverName: "Imran S",
+      supervisorName: "Mohan Rao",
+      startStepSubmitted: true,
+      farmStepSubmitted: true,
+    }),
+  ];
+}
+
+const TRIPS = buildTrips();
+let nextTripId = 9200;
+
+/** Persist a Step-4-shaped deliveries payload onto a trip (creates a container
+ *  when id is 0 — the Orders Collection "Save Progress" first write). */
+function applyDeliveriesPayload(tripId, body) {
+  let trip = TRIPS.find((t) => t.id === Number(tripId));
+  if (!trip) {
+    const now = new Date();
+    trip = baseTrip({
+      id: nextTripId++,
+      tripNo: String(body.tripNo ?? `ORD-${iso(now).replaceAll("-", "")}-01`),
+      tripDate: iso(now),
+    });
+    TRIPS.push(trip);
+  }
+  const rows = Array.isArray(body.deliveries) ? body.deliveries : [];
+  trip.deliveries = rows.map((row, index) => ({
+    mortality: 0,
+    mortKg: 0,
+    amount: 0,
+    deliveryMode: "box",
+    autoCaptureTime: null,
+    ...row,
+    id: index + 1,
+    serialNo: Number(row.serialNo) || index + 1,
+    boxNo: Number(row.boxNo) || 0,
+    selectedBoxIds: Array.isArray(row.selectedBoxIds) ? row.selectedBoxIds : [],
+  }));
+  if (body.startStepSubmitted === true) trip.startStepSubmitted = true;
+  if (body.mode === "submit") trip.deliveryStepSubmitted = true;
+  if (typeof body.remarks === "string") trip.remarks = body.remarks;
+  return trip;
+}
+
+function readJsonBody(req) {
+  return new Promise((resolve) => {
+    let raw = "";
+    req.on("data", (chunk) => {
+      raw += chunk;
+    });
+    req.on("end", () => {
+      try {
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch {
+        resolve({});
+      }
+    });
+  });
+}
+
 // ── HTTP server ──────────────────────────────────────────────────────────────
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
@@ -150,7 +386,27 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify(body));
   };
 
-  if (req.method !== "GET" || !url.pathname.startsWith("/api/")) {
+  if (!url.pathname.startsWith("/api/")) {
+    return send(404, { error: "not_found", mock: true });
+  }
+
+  // Orders persistence: POST /api/trips/:id/steps/deliveries
+  // (id 0 = create the day's collection container; mode save | submit)
+  const stepMatch = url.pathname.match(/^\/api\/trips\/(\d+)\/steps\/deliveries$/);
+  if (stepMatch && req.method === "POST") {
+    readJsonBody(req).then((body) => send(200, applyDeliveriesPayload(stepMatch[1], body)));
+    return;
+  }
+
+  const singleTrip = url.pathname.match(/^\/api\/trips\/(\d+)$/);
+  if (singleTrip && req.method === "GET") {
+    const trip = TRIPS.find((t) => t.id === Number(singleTrip[1]));
+    return trip
+      ? send(200, trip)
+      : send(404, { error: "trip_not_found", id: Number(singleTrip[1]), mock: true });
+  }
+
+  if (req.method !== "GET") {
     return send(404, { error: "not_found", mock: true });
   }
 
@@ -159,8 +415,13 @@ const server = http.createServer((req, res) => {
       return send(200, { status: "ok", mock: true });
     case "/api/masters/shops":
       return send(200, SHOPS.map((s) => ({ phoneNumber: "", email: "", address: "", paperRate: 0, associationType: "", openingBalance: 0, currentBalance: 0, secondaryPhoneNumber: "", latitude: null, longitude: null, ...s, _mock: true })));
+    case "/api/masters/vehicles":
+      return send(200, VEHICLES.map((v) => ({ ...v, _mock: true })));
     case "/api/masters/employees":
       return send(200, EMPLOYEES.map((e) => ({ ...e, _mock: true })));
+    case "/api/trips":
+      return send(200, TRIPS);
+
     case "/api/operations/collection-entry/week-bounds": {
       const today = new Date();
       const day = (today.getDay() + 6) % 7;
