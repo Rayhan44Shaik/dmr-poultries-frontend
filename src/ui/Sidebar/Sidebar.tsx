@@ -14,16 +14,6 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   mobileOpen: boolean;
   onCloseMobile: () => void;
-  /**
-   * DEV preview only: render the sidebar as a FLOATING overlay panel instead
-   * of a docked column, so page layouts can be checked at full width.
-   * Production builds keep the docked sidebar.
-   */
-  floating?: boolean;
-  /** DEV preview only: whether the floating panel is currently open. */
-  floatingOpen?: boolean;
-  /** DEV preview only: close the floating panel (backdrop / Esc / X / nav). */
-  onCloseFloating?: () => void;
 }
 
 function isChildActive(child: NavChild, pathname: string, search: string): boolean {
@@ -32,36 +22,28 @@ function isChildActive(child: NavChild, pathname: string, search: string): boole
   return current === childUrl;
 }
 
-export default function Sidebar({
-  mobileOpen,
-  onCloseMobile,
-  floating = false,
-  floatingOpen = false,
-  onCloseFloating,
-}: SidebarProps) {
+export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
   const location = useLocation();
   const pathname = location.pathname;
   const search = location.search;
   const { t } = useI18n();
 
-  // Close the mobile drawer / floating panel on route change.
+  // Close the mobile drawer on route change.
   useEffect(() => {
     onCloseMobile();
-    onCloseFloating?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, search]);
 
-  // Close the mobile drawer / floating panel on Escape.
+  // Close the mobile drawer on Escape.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         onCloseMobile();
-        onCloseFloating?.();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCloseMobile, onCloseFloating]);
+  }, [onCloseMobile]);
 
   const navContent = (
     <nav className="flex-1 overflow-y-auto px-3 py-4 scrollbar-none">
@@ -137,38 +119,11 @@ export default function Sidebar({
 
   return (
     <>
-      {floating ? (
-        /* DEV preview — floating overlay panel. It is out of flow, so while it
-           is closed the page uses the FULL window width. */
-        floatingOpen ? (
-          <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
-            <div
-              className="absolute inset-0 bg-slate-900/30 backdrop-blur-[1px] animate-fade-in"
-              onClick={onCloseFloating}
-            />
-            <aside className="absolute inset-y-3 left-3 flex w-[264px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-pop animate-scale-in dark:border-slate-800 dark:bg-slate-900">
-              <div className="relative shrink-0">
-                {brandHeader}
-                <button
-                  type="button"
-                  onClick={onCloseFloating}
-                  aria-label={t("header.closeMenu")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              {navContent}
-            </aside>
-          </div>
-        ) : null
-      ) : (
-        /* Desktop sidebar (docked) */
-        <aside className="relative z-30 hidden h-screen w-[264px] shrink-0 flex-col border-r border-slate-200/80 bg-white lg:flex dark:border-slate-800 dark:bg-slate-900">
-          {brandHeader}
-          {navContent}
-        </aside>
-      )}
+      {/* Desktop sidebar — permanently docked on the left, always visible */}
+      <aside className="relative z-30 hidden h-screen w-[264px] shrink-0 flex-col border-r border-slate-200/80 bg-white lg:flex dark:border-slate-800 dark:bg-slate-900">
+        {brandHeader}
+        {navContent}
+      </aside>
 
       {/* Mobile drawer */}
       {mobileOpen && (

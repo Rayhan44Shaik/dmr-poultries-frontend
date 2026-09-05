@@ -1,9 +1,8 @@
 // src/layouts/DashboardLayout/DashboardLayout.tsx
-// Application shell: collapsible sidebar + header + command palette.
+// Application shell: docked sidebar + header + command palette.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-import { PanelLeft } from "lucide-react";
 import Sidebar from "../../ui/Sidebar/Sidebar";
 import Header from "../../ui/Header/Header";
 import CommandPalette from "../../ui/CommandPalette/CommandPalette";
@@ -13,14 +12,6 @@ type DashboardLayoutProps = {
 };
 
 const COLLAPSED_KEY = "dmr_sidebar_collapsed";
-
-/**
- * Dev preview only: the sidebar floats (overlay) and starts CLOSED, so page
- * layouts — the wide Orders tables in particular — can be checked at the full
- * window width. Production builds keep the docked sidebar and never render the
- * toggle pill.
- */
-const FLOATING_SIDEBAR = import.meta.env.DEV;
 
 function DashboardLayout({ children }: DashboardLayoutProps) {
   const location = useLocation();
@@ -35,8 +26,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
   });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
-  // Floating (dev preview) panel — closed by default for full-width checks.
-  const [floatingOpen, setFloatingOpen] = useState(false);
 
   const toggleCollapse = () => {
     setCollapsed((prev) => {
@@ -61,28 +50,11 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
         onToggleCollapse={toggleCollapse}
         mobileOpen={mobileOpen}
         onCloseMobile={() => setMobileOpen(false)}
-        floating={FLOATING_SIDEBAR}
-        floatingOpen={floatingOpen}
-        onCloseFloating={() => setFloatingOpen(false)}
       />
-
-      {/* Dev preview only: reopen the floating sidebar (docked one is gone). */}
-      {FLOATING_SIDEBAR && !floatingOpen && (
-        <button
-          type="button"
-          onClick={() => setFloatingOpen(true)}
-          title="Open floating sidebar (dev preview)"
-          aria-label="Open floating sidebar (dev preview)"
-          className="fixed left-3 top-[4.75rem] z-40 inline-flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-white/95 px-3 py-1.5 text-[11px] font-bold text-slate-600 shadow-pop backdrop-blur transition-colors hover:bg-white hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-300 dark:hover:text-white"
-        >
-          <PanelLeft size={13} />
-          Menu
-        </button>
-      )}
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Header
-          onMenuClick={() => (FLOATING_SIDEBAR ? setFloatingOpen(true) : setMobileOpen(true))}
+          onMenuClick={() => setMobileOpen(true)}
           onOpenCommand={() => setCommandOpen(true)}
         />
 
