@@ -886,6 +886,10 @@ export async function prepareHenCutout(
     );
   }
 
+  // Mirror horizontally so the hen (drawn on the right) faces the
+  // centred DMR POULTRIES name rather than the page edge.
+  croppedContext.translate(cropWidth, 0);
+  croppedContext.scale(-1, 1);
   croppedContext.drawImage(
     canvas,
     minX,

@@ -31,15 +31,12 @@ import {
   ChevronsUp,
   GripVertical,
   Loader2,
-  Lock,
   RefreshCw,
   Save,
-  Send,
   X,
 } from "lucide-react";
 import type { Trip } from "../../../../shared/trip";
 import {
-  opsPrimaryButtonClass,
   opsSecondaryButtonClass,
   opsSectionTitleClass,
   opsTableCardClass,
@@ -56,7 +53,6 @@ import {
   collectionTotals,
   farmCityOf,
   formatCount,
-  formatDayFull,
   isCapturedRow,
   moveInSequence,
   orderRowsOnTrip,
@@ -67,7 +63,6 @@ import {
 } from "../ordersUtils";
 import {
   findDayOverAssignments,
-  finishAssignment,
   saveAssignment,
   sendOrdersWhatsApp,
   shopMobileOf,
@@ -92,12 +87,11 @@ import {
 } from "../ordersTableStyles";
 import {
   ORDERS_NO_SPINNER,
-  OrdersDateControl,
   OrdersEmptyState,
   OrdersDropdown,
+  OrdersMultiSelect,
   OrdersIconButton,
   OrdersSearchInput,
-  OrdersStatusBadge,
   OrdersTableSkeleton,
   WhatsAppIcon,
   onOrdersNumberWheel,
@@ -206,15 +200,14 @@ type Props = {
 function OrdersAssignmentTab({
   loading,
   day,
-  today,
-  onDaySelect,
+  today: _today,
+  onDaySelect: _onDaySelect,
   collection,
   eligibleVehicles,
   dayVehicleViews,
   shopDirectory,
   supervisorDirectory,
   onChanged,
-  onFinished,
   onRefresh,
   refreshing,
 }: Props) {
@@ -229,11 +222,7 @@ function OrdersAssignmentTab({
   const sortMode: "pending" | "az" | "za" | "vehicle_trip" = "pending";
 
   if (loading) return <OrdersTableSkeleton rows={4} />;
-  const isPast = day < today;
 
-  // ONE card with the SAME toolbar / table visual language as Order
-  // Collection: [ Search ][ Date ] … [↻ Refresh].
-  // Refresh is ALWAYS the last control, far right.
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
       <div className="px-5 py-2.5 border-b border-slate-200 bg-slate-50/60 flex items-center gap-3 flex-wrap">
@@ -243,13 +232,6 @@ function OrdersAssignmentTab({
           placeholder={to("orders.search_assignment")}
           className="w-full sm:w-64"
         />
-        <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} hideDayChip />
-        {isPast ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-            <Lock size={11} />
-            {to("orders.closed_day")}
-          </span>
-        ) : null}
         <span className="ml-auto text-[11px] font-semibold text-slate-400 whitespace-nowrap">
           {to("orders.pool_summary", {
             collected: collection?.totalShops ?? 0,
@@ -266,16 +248,7 @@ function OrdersAssignmentTab({
         </OrdersIconButton>
       </div>
 
-      {isPast ? (
-        dayVehicleViews.length === 0 ? (
-          <OrdersEmptyState
-            title={to("orders.no_collection_day", { day: formatDayFull(day) })}
-            hint={to("orders.read_only_note")}
-          />
-        ) : (
-          <PastAssignmentsTable views={dayVehicleViews} t={to} q={q} />
-        )
-      ) : !collection ? (
+      {!collection ? (
         <OrdersEmptyState
           title={to("orders.assignment_empty")}
           hint={to("orders.select_order")}
@@ -291,89 +264,8 @@ function OrdersAssignmentTab({
           q={q}
           sortMode={sortMode}
           onChanged={onChanged}
-          onFinished={onFinished}
         />
       )}
-    </div>
-  );
-}
-
-// ─── Past-day assignments (compact read-only table — one row per vehicle) ──
-
-function PastAssignmentsTable({
-  views,
-  t,
-  q,
-}: {
-  views: DayVehicleView[];
-  t: (key: string, params?: Record<string, string | number>) => string;
-  /** Lower-cased search (trip / vehicle / supervisor / shop). */
-  q: string;
-}) {
-  const filtered = useMemo(() => {
-    if (!q) return views;
-    return views.filter((view) => {
-      const haystack = [
-        view.trip.tripNo,
-        view.trip.vehicleNo,
-        view.trip.supervisorName,
-        view.trip.driverName,
-        ...view.rows.map((r) => r.shopName),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [views, q]);
-  return (
-    <div className="overflow-x-auto">
-      <table className={`w-full ${ORDERS_TABLE_FONT_CLASS}`}>
-        <thead>
-          <tr className={opsTableHeadRowClass}>
-            <th className={opsTableThClass}>{t("orders.col_trip_no")}</th>
-              <th className={opsTableThClass}>{t("orders.col_vehicle_no")}</th>
-              <th className={opsTableThClass}>{t("orders.driver")}</th>
-              <th className={`${opsTableThClass} w-28 text-right`}>{t("orders.col_shops")}</th>
-              <th className={`${opsTableThClass} w-24 text-right`}>{t("orders.col_boxes")}</th>
-              <th className={`${opsTableThClass} w-32`}>{t("orders.col_status")}</th>
-            </tr>
-          </thead>
-          <tbody className={opsTableDivideClass}>
-            {filtered.map((view, index) => (
-              <tr key={view.trip.id} className={ordersTableZebraRow(index)}>
-                <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
-                  {view.trip.tripNo}
-                </td>
-                <td className={opsTableTdClass}>{view.trip.vehicleNo || "—"}</td>
-                <td className={opsTableTdClass}>{view.trip.driverName || "—"}</td>
-                <td className={`${opsTableTdClass} text-right text-slate-600`}>
-                  {view.deliveredShops}/{view.shops}
-                </td>
-                <td className={`${opsTableTdClass} text-right font-medium text-slate-700`}>
-                  {view.boxes}
-                </td>
-                <td className={opsTableTdClass}>
-                  <OrdersStatusBadge
-                    status={view.allDelivered ? "Completed" : view.status}
-                    label={
-                      view.allDelivered
-                        ? t("orders.status_completed")
-                        : t(`orders.status_${view.status.toLowerCase().replace(/\s+/g, "_")}` as string)
-                    }
-                  />
-                </td>
-              </tr>
-          ))}
-          {filtered.length === 0 && (
-            <tr>
-              <td colSpan={6} className="px-4 py-8">
-                <OrdersEmptyState title={t("orders.no_search_results")} />
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
     </div>
   );
 }
@@ -389,21 +281,17 @@ function AssignmentEditor({
   q,
   sortMode,
   onChanged,
-  onFinished,
 }: {
   day: string;
   collection: OrdersDayCollection;
   eligibleVehicles: OrdersEligibleVehicle[];
   shopDirectory: ShopDirectory;
   supervisorDirectory: SupervisorDirectory;
-  /** Lower-cased search (shop / village / vehicle / trip). */
   q: string;
-  /** Table-level sort (Pending First / A→Z / Z→A / Vehicle · Trip). */
   sortMode: "pending" | "az" | "za" | "vehicle_trip";
   onChanged: () => void;
-  onFinished: (vehicleTrip: Trip) => void;
 }) {
-  const { to, language } = useOrdersI18n();
+  const { to } = useOrdersI18n();
   const { showNotification } = useSafeNotification();
   const orderTrip = collection.trip;
 
@@ -443,7 +331,6 @@ function AssignmentEditor({
     selectionSnapshot(vehicleTripId, selected) !== savedSnapshot;
 
   const [saving, setSaving] = useState(false);
-  const [finishing, setFinishing] = useState(false);
   const [waBusy, setWaBusy] = useState(false);
   const [waProgress, setWaProgress] = useState<string | null>(null);
   const [conflictChecking, setConflictChecking] = useState(false);
@@ -453,7 +340,7 @@ function AssignmentEditor({
     available: number;
     requested: number;
   }>(null);
-  const busy = saving || finishing || conflictChecking;
+  const busy = saving || conflictChecking;
 
   const selectedIds = useMemo(
     () => new Set(selected.map((r) => r.shopId)),
@@ -539,7 +426,7 @@ function AssignmentEditor({
   }, []);
 
   const supervisorMobile = vehicle
-    ? supervisorDirectory.get(vehicle.trip.supervisorName?.trim().toLowerCase() ?? "") ?? ""
+    ? supervisorMobileOf(vehicle.trip, supervisorDirectory)
     : "";
 
   // ── Capacity math (boxes are the priority figure; hard block) ────────────
@@ -589,12 +476,26 @@ function AssignmentEditor({
 
   // The vehicle list is split in two so the operator sees at a glance which
   // trucks are still WAITING for shops and which ones already carry them.
-  const [pendingVehicles, assignedVehicles] = useMemo(
-    () => [
-      eligibleVehicles.filter((v) => savedShopsOn(v.trip.tripNo) === 0),
-      eligibleVehicles.filter((v) => savedShopsOn(v.trip.tripNo) > 0),
-    ],
-    [eligibleVehicles, savedShopsOn]
+  const vehicleMatches = useCallback(
+    (v: OrdersEligibleVehicle): boolean => {
+      if (!q) return true;
+      const hay = [
+        v.trip.vehicleNo,
+        v.trip.tripNo,
+        v.trip.supervisorName,
+        v.trip.driverName,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    },
+    [q]
+  );
+
+  const pendingVehicles = useMemo(
+    () => eligibleVehicles.filter((v) => vehicleMatches(v)),
+    [eligibleVehicles, vehicleMatches]
   );
 
   const savedOnVehicle = useMemo(
@@ -690,38 +591,35 @@ function AssignmentEditor({
     } finally {
       setSaving(false);
     }
-  }, [busy, vehicle, checkCapacity, selected, assertFitsBalance, orderTrip.tripNo, showNotification, to, onChanged]);
+  }, [busy, vehicle, checkCapacity, selected, assertFitsBalance, orderTrip.tripNo, showNotification, to, onChanged, vehicleTripId]);
 
-  // ── Finish Assignment (validated) ────────────────────────────────────────
   const handleFinish = useCallback(async () => {
     if (busy || !vehicle) return;
-    const unassigned = selected.filter((r) => r.assigned < 1);
-    // An empty selection is allowed when earlier partial saves already put
-    // shops on this vehicle — those rows are dispatched as they stand.
-    if ((selected.length === 0 && savedOnVehicle === 0) || unassigned.length > 0) {
-      showNotification(to("orders.finish_assignment_invalid"), "info");
+    if (!checkCapacity()) return;
+    const rows =
+      selected.length > 0
+        ? toOrderShopRows(selected)
+        : (orderRowsOnTrip(vehicle.trip, orderTrip.tripNo).filter((r) => !isCapturedRow(r)) as unknown as OrderShopRow[]);
+    if (rows.length === 0) {
+      showNotification(to("orders.selection_empty"), "info");
       return;
     }
-    if (!checkCapacity()) return;
-    if (!(await assertFitsBalance())) return;
-    setFinishing(true);
+    if (selected.length > 0 && !(await assertFitsBalance())) return;
+    setSaving(true);
     try {
-      const vehicleTrip = await finishAssignment(
-        vehicle.trip,
-        selected.length > 0
-          ? [{ orderTripNo: orderTrip.tripNo, rows: toOrderShopRows(selected) }]
-          : []
-      );
+      const trip = await finishAssignment(vehicle.trip, [
+        { orderTripNo: orderTrip.tripNo, rows },
+      ]);
       showNotification(to("orders.assignment_finished"), "success");
-      onFinished(vehicleTrip);
+      onFinished(trip);
     } catch {
       showNotification(to("orders.refresh_failed"), "error");
     } finally {
-      setFinishing(false);
+      setSaving(false);
     }
-  }, [busy, vehicle, selected, savedOnVehicle, checkCapacity, assertFitsBalance, orderTrip.tripNo, showNotification, to, onFinished]);
+  }, [busy, vehicle, checkCapacity, selected, assertFitsBalance, orderTrip.tripNo, showNotification, to, onFinished]);
 
-  // ── WhatsApp: CONFIRM FIRST — the card opens a check popup (message text +
+  // ── Review & Submit: CONFIRM FIRST — the card opens a check popup (message text +
   //    branded assignment sheet PDF); nothing goes out until "Confirm & Send".
   const [waPopupOpen, setWaPopupOpen] = useState(false);
 
@@ -763,6 +661,10 @@ function AssignmentEditor({
   const handleWhatsAppConfirm = useCallback(
     async (orderedShopIds?: number[]): Promise<OrdersWhatsAppResult | null> => {
       if (waBusy || !vehicle) return null;
+      if (!supervisorMobile.trim()) {
+        showNotification(to("orders.whatsapp_failed", { message: "Supervisor mobile missing" }), "error");
+        return null;
+      }
       let trip = vehicle.trip;
       let payload: OrderShopRow[] | null = null;
       if (orderedShopIds && orderedShopIds.length > 0) {
@@ -815,15 +717,17 @@ function AssignmentEditor({
           supervisorMobile,
           (sent, total, shop) => setWaProgress(shop || `${sent}/${total}`)
         );
-        if (result.sent > 0 && result.failed === 0) {
-          showNotification(to("orders.whatsapp_done", { sent: result.sent, total: result.sent }), "success");
+        if (result.enabled && result.sent > 0 && result.failed === 0) {
+          // Success UI lives on the confirm popup — never toast success here.
         } else if (result.sent > 0) {
           showNotification(to("orders.whatsapp_partial", { sent: result.sent, failed: result.failed }), "info");
         } else {
           const message =
-            result.message && result.message.includes("not configured")
+            !result.enabled || (result.message && result.message.includes("not configured"))
               ? to("orders.whatsapp_not_configured")
-              : to("orders.whatsapp_failed", { message: result.message ?? "—" });
+              : result.message === "no_rows"
+                ? to("orders.whatsapp_no_rows")
+                : to("orders.whatsapp_failed", { message: result.message ?? "—" });
           showNotification(message, "error");
         }
         return result;
@@ -872,17 +776,20 @@ function AssignmentEditor({
   const [poolFilter, setPoolFilter] = useState<
     "all" | "pending" | "assigned" | "this_vehicle"
   >("pending");
+  const [cityFilters, setCityFilters] = useState<string[]>([]);
   const pq = poolQuery.trim().toLowerCase();
-  const poolFilterOptions = useMemo(
-    () => [
-      { value: "all", label: to("orders.pool_filter_all") },
-      { value: "pending", label: to("orders.pool_filter_pending") },
-      { value: "assigned", label: to("orders.pool_filter_assigned") },
-      { value: "this_vehicle", label: to("orders.pool_filter_this_vehicle") },
-    ],
-    [to]
-  );
   const thisTripNo = vehicle?.trip.tripNo ?? "";
+  const cityOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const row of collection.rows) {
+      const city = villageOf(row.shopId, row.shopName, shopDirectory).trim();
+      if (city) names.add(city);
+    }
+    return [...names]
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({ value: name, label: name }));
+  }, [collection.rows, shopDirectory]);
+  const cityFilterSet = useMemo(() => new Set(cityFilters), [cityFilters]);
   const filteredPool = useMemo(() => {
     const list: PoolRow[] = [];
     collection.rows.forEach((row, i) => {
@@ -913,9 +820,11 @@ function AssignmentEditor({
       if (poolFilter === "pending" && item.kind === "assigned") return;
       if (poolFilter === "assigned" && item.kind !== "assigned") return;
       if (poolFilter === "this_vehicle" && !item.onThisVehicle) return;
+      const city = villageOf(row.shopId, row.shopName, shopDirectory);
+      if (cityFilterSet.size > 0 && !cityFilterSet.has(city)) return;
       if (q || pq) {
         const hay =
-          `${row.shopName} ${villageOf(row.shopId, row.shopName, shopDirectory)} ${parts.map((p) => `${p.vehicleNo} ${p.tripNo}`).join(" ")}`.toLowerCase();
+          `${row.shopName} ${city} ${parts.map((p) => `${p.vehicleNo} ${p.tripNo}`).join(" ")}`.toLowerCase();
         if (q && !hay.includes(q)) return;
         if (pq && !hay.includes(pq)) return;
       }
@@ -947,10 +856,10 @@ function AssignmentEditor({
       );
     }
     return list;
-  }, [collection, q, pq, poolFilter, thisTripNo, shopDirectory, sortMode]);
+  }, [collection, q, pq, poolFilter, cityFilterSet, thisTripNo, shopDirectory, sortMode]);
 
   const [availablePage, setAvailablePage] = useState(1);
-  const availableKey = `${q}|${pq}|${poolFilter}|${sortMode}|${filteredPool.length}`;
+  const availableKey = `${q}|${pq}|${poolFilter}|${cityFilters.join(",")}|${sortMode}|${filteredPool.length}`;
   const [lastAvailableKey, setLastAvailableKey] = useState(availableKey);
   if (lastAvailableKey !== availableKey) {
     setLastAvailableKey(availableKey);
@@ -969,13 +878,6 @@ function AssignmentEditor({
   );
 
   // ── Delivery state of a selected shop from persisted day data ───────────
-  // Pending (not assigned anywhere yet) / Assigned / Delivered (Step 4).
-  const deliveryStatusOf = (shopId: number): "pending" | "assigned" | "delivered" => {
-    const a = collection.shops.get(shopId);
-    if (!a) return "pending";
-    return a.delivered ? "delivered" : "assigned";
-  };
-
   // ── Render — VEHICLE-FIRST: the trucks that finished Step 2 are listed
   //     with their trip / vehicle / supervisor / farm / capacity facts, and a
   //     › arrow opens that vehicle's shop-assignment panel. ─────────────────
@@ -989,37 +891,21 @@ function AssignmentEditor({
           <div className={opsTableHeaderBarClass}>
             <span className={opsSectionTitleClass}>{to("orders.vehicles_ready")}</span>
             <span className="text-[11px] font-semibold text-slate-400">
-              {to("orders.vehicles_count", {
-                pending: pendingVehicles.length,
-                saved: assignedVehicles.length,
-              })}
+              {pendingVehicles.length}
             </span>
           </div>
           {eligibleVehicles.length === 0 ? (
             <div className="px-4 py-5">
               <OrdersEmptyState title={to("orders.no_eligible_vehicles")} />
             </div>
+          ) : pendingVehicles.length === 0 ? (
+            <div className="px-4 py-5">
+              <OrdersEmptyState title={to("orders.no_search_results")} />
+            </div>
           ) : (
             <div className="max-h-[calc(100vh-190px)] overflow-y-auto">
-              {(
-                [
-                  ["pending", pendingVehicles, to("orders.vehicles_waiting")],
-                  ["assigned", assignedVehicles, to("orders.vehicle_list_assigned")],
-                ] as const
-              ).map(([bucket, list, label]) =>
-                list.length === 0 ? null : (
-                  <div key={bucket}>
-                    <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-y border-slate-100 bg-slate-50/95 px-3.5 py-2">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                        {label}
-                      </span>
-                      <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                        {list.length}
-                      </span>
-                    </div>
                     <ul className="divide-y divide-slate-100">
-                      {list.map((v) => {
-                        const mobile = supervisorMobileOf(v.trip, supervisorDirectory);
+                      {pendingVehicles.map((v) => {
                         const city = farmCityOf(v.trip);
                         const shops = savedShopsOn(v.trip.tripNo);
                         const selectedCard = vehicleTripId === v.trip.id;
@@ -1027,16 +913,7 @@ function AssignmentEditor({
                           <li key={v.trip.id}>
                             <button
                               type="button"
-                              onClick={() => {
-                                // The pool filter follows the truck: a vehicle
-                                // that already carries shops opens on its
-                                // ASSIGNED shops; an empty one opens on the
-                                // PENDING pool, ready for new work.
-                                setVehicleTripId(v.trip.id);
-                                setPoolFilter(
-                                  savedShopsOn(v.trip.tripNo) > 0 ? "this_vehicle" : "pending"
-                                );
-                              }}
+                              onClick={() => setVehicleTripId(v.trip.id)}
                               aria-label={`${to("orders.assign_shops")} — ${v.trip.vehicleNo || "—"} · ${v.trip.tripNo}`}
                               aria-current={selectedCard ? "true" : undefined}
                               className={`w-full border-l-[3px] px-3.5 py-3 text-left transition-colors ${
@@ -1046,7 +923,7 @@ function AssignmentEditor({
                               }`}
                             >
                               <span className="flex items-center justify-between gap-2">
-                                <span className="truncate text-sm font-bold text-slate-800">
+                                <span className="truncate text-xs font-semibold text-slate-800">
                                   {v.trip.vehicleNo || "—"}
                                 </span>
                                 <span className="shrink-0 text-[11px] font-semibold text-slate-400">
@@ -1074,9 +951,6 @@ function AssignmentEditor({
                         );
                       })}
                     </ul>
-                  </div>
-                )
-              )}
             </div>
           )}
         </div>
@@ -1090,9 +964,9 @@ function AssignmentEditor({
         {/* ASSIGNMENT PANEL — the chosen truck: its facts on top, the shop
             pool and the delivery sequence in the body, and Save / WhatsApp /
             Submit in the footer. */}
-        {vehicle && (
+        {(
         <div
-          aria-label={`${to("orders.assign_shops")} — ${vehicle.trip.vehicleNo || vehicle.trip.tripNo}`}
+          aria-label={`${to("orders.assign_shops")} — ${vehicle?.trip.vehicleNo || vehicle?.trip.tripNo || ""}`}
           className={opsTableCardClass}
         >
           <div className="flex w-full flex-col overflow-hidden">
@@ -1103,7 +977,7 @@ function AssignmentEditor({
                   <PackageCheck size={17} />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="truncate text-sm font-extrabold text-slate-800">
+                  <h3 className="truncate text-sm font-bold text-slate-800">
                     {to("orders.assign_shops")}
                   </h3>
                 </div>
@@ -1116,26 +990,6 @@ function AssignmentEditor({
               >
                 <X size={17} />
               </button>
-            </div>
-
-            {/* ── The truck's facts, all in one strip ── */}
-            <div className="grid grid-cols-2 gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-2.5 sm:grid-cols-4 lg:grid-cols-7">
-              {[
-                [to("orders.col_trip_no"), vehicle.trip.tripNo || "—"],
-                [to("orders.vehicle_no"), vehicle.trip.vehicleNo || "—"],
-                [to("orders.supervisor"), vehicle.trip.supervisorName || "—"],
-                [to("orders.supervisor_mobile"), supervisorMobileOf(vehicle.trip, supervisorDirectory) || "—"],
-                [to("orders.farm_city"), farmCityOf(vehicle.trip)],
-                [to("orders.vehicle_box_capacity"), formatCount(capacity)],
-                [to("orders.col_available"), formatCount(available)],
-              ].map(([label, value]) => (
-                <div key={label} className="min-w-0 rounded-lg border border-slate-200/80 bg-white px-2 py-1.5">
-                  <p className="text-[9px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
-                  <p className="truncate text-[11px] font-bold text-slate-800" title={String(value)}>
-                    {value}
-                  </p>
-                </div>
-              ))}
             </div>
 
             {/* ── Body: shop pool + delivery sequence ── */}
@@ -1154,14 +1008,21 @@ function AssignmentEditor({
           placeholder={to("orders.search_pool")}
           className="w-full sm:w-60"
         />
-        <OrdersDropdown
-          value={poolFilter}
-          onChange={(v) =>
-            setPoolFilter(v as "all" | "pending" | "assigned" | "this_vehicle")
-          }
-          options={poolFilterOptions}
-          ariaLabel={to("orders.filter_shops")}
-          widthClass="w-48"
+        <OrdersMultiSelect
+          values={cityFilters}
+          onChange={setCityFilters}
+          options={cityOptions}
+          ariaLabel={to("orders.filter_city")}
+          placeholder={to("orders.filter_city_all")}
+          widthClass="w-56"
+        />
+        <OrdersMultiSelect
+          values={cityFilters}
+          onChange={setCityFilters}
+          options={cityOptions}
+          ariaLabel={to("orders.filter_city")}
+          placeholder={to("orders.filter_city_all")}
+          widthClass="w-56"
         />
         <span className="ml-auto text-[11px] font-semibold text-slate-400 whitespace-nowrap">
           {to("orders.pool_showing", {
@@ -1175,9 +1036,9 @@ function AssignmentEditor({
         <div className="px-4 py-5">
           <OrdersEmptyState
             title={
-              q || pq
+              pq
                 ? to("orders.no_search_results")
-                : poolFilter !== "all"
+                : poolFilter !== "all" || cityFilters.length > 0
                   ? to("orders.no_filter_results")
                   : to("orders.pool_summary", {
                       collected: collection.totalShops,
@@ -1200,8 +1061,6 @@ function AssignmentEditor({
                   <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_birds")}</th>
                   <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.ordered_boxes")}</th>
                   <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.weight")}</th>
-                  <th className={`${opsTableThClass} w-40`}>{to("orders.vehicle_trip")}</th>
-                  <th className={`${opsTableThClass} w-28`}>{to("orders.col_status")}</th>
                 </tr>
               </thead>
               <tbody className={opsTableDivideClass}>
@@ -1209,7 +1068,7 @@ function AssignmentEditor({
                   const checked = selectedIds.has(row.shopId);
                   const isLockedRow = row.kind === "assigned";
                   // Two-tone rows; a checked row's emerald state colour wins.
-                  const tone = checked && !isLockedRow ? "bg-emerald-50/50" : ordersZebraTone(index);
+                           const tone = checked && !isLockedRow ? "bg-emerald-50/50" : ordersZebraTone(index);
                   return (
                     <tr
                       key={row.shopId}
@@ -1255,50 +1114,6 @@ function AssignmentEditor({
                         {avgBirdWeight
                           ? `${weightForBirds(Number(row.birds) || 0, avgBirdWeight).toFixed(2)} kg`
                           : "—"}
-                      </td>
-                      <td className={`${opsTableTdClass} whitespace-nowrap`}>
-                        {row.parts.length > 0 ? (
-                          <span
-                            className="text-slate-600"
-                            title={row.parts
-                              .map((p) => `${p.vehicleNo || "—"} · ${p.tripNo} (${formatCount(p.boxes)})`)
-                              .join(", ")}
-                          >
-                            {row.parts[0].vehicleNo || "—"}
-                            {row.parts[0].tripNo ? ` · ${row.parts[0].tripNo}` : ""}
-                            {row.parts.length > 1 && (
-                              <span className="ml-1 text-slate-400">+{row.parts.length - 1}</span>
-                            )}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
-                      </td>
-                      <td className={opsTableTdClass}>
-                        {row.kind === "assigned" ? (
-                          // The shop's order is fully placed on a vehicle (or
-                          // delivered) — show the vehicle it belongs to.
-                          row.delivered ? (
-                            <OrdersStatusBadge status="Delivered" label={to("orders.status_delivered")} />
-                          ) : (
-                            <OrdersStatusBadge status="Assigned" label={to("orders.col_assigned")} />
-                          )
-                        ) : row.kind === "partial" ? (
-                          // SPLIT ORDER: some boxes are on other trucks — only
-                          // the balance is still assignable.
-                          <OrdersStatusBadge
-                            status="Part Assigned"
-                            label={`${to("orders.status_part_assigned")} · ${to("orders.part_assign_left", { boxes: row.remainingBoxes })}`}
-                          />
-                        ) : (
-                          // Waiting for a vehicle — NOT assignable-yet-saved;
-                          // ticking it keeps this "Pending for Assign" state
-                          // until Save Progress / Finish persists it.
-                          <OrdersStatusBadge
-                            status="Pending for Assign"
-                            label={to("orders.status_pending_assign")}
-                          />
-                        )}
                       </td>
                     </tr>
                   );
@@ -1363,7 +1178,7 @@ function AssignmentEditor({
             </span>
             {/* The vehicle comes from the › row above — no second selector. */}
             <span className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-[11px] font-bold text-emerald-700">
-              {vehicle.trip.tripNo} · {vehicle.trip.vehicleNo || "—"}
+              {vehicle ? `${vehicle.trip.tripNo} · ${vehicle.trip.vehicleNo || "—"}` : "—"}
             </span>
           </div>
 
@@ -1408,14 +1223,12 @@ function AssignmentEditor({
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_boxes")}</th>
                       <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.assigned_boxes")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.weight")}</th>
-                      <th className={`${opsTableThClass} w-28`}>{to("orders.col_delivery_status")}</th>
                       <th className={`${opsTableThClass} w-12`} />
                     </tr>
                   </thead>
                   <tbody className={opsTableDivideClass}>
                     {selected.map((row, index) => {
-                      const ds = deliveryStatusOf(row.shopId);
-                      const lifted = dragKey === row.clientKey;
+                                      const lifted = dragKey === row.clientKey;
                       const isDropTarget =
                         dropIndex === index && !!dragKey && !lifted;
                       return (
@@ -1536,7 +1349,7 @@ function AssignmentEditor({
                                 aria-label={`${to("orders.assigned_boxes")} — ${row.shopName}`}
                                 onChange={(e) => setAssigned(row.clientKey, e.target.value)}
                                 onWheel={onOrdersNumberWheel}
-                                className={`${ORDERS_NO_SPINNER} h-8 w-24 rounded-lg border px-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 ${
+                                className={`${ORDERS_NO_SPINNER} h-8 w-24 rounded-lg border px-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 ${
                                   row.assigned === 0
                                     ? "border-amber-300 bg-amber-50/60 text-amber-800"
                                     : "border-emerald-300/70 bg-emerald-50/50 text-emerald-900"
@@ -1566,15 +1379,6 @@ function AssignmentEditor({
                             {avgBirdWeight
                               ? `${weightForBirds(assignedBirdsFor(row), avgBirdWeight).toFixed(2)} kg`
                               : "—"}
-                          </td>
-                          <td className={opsTableTdClass}>
-                            {ds === "delivered" ? (
-                              <OrdersStatusBadge status="Delivered" label={to("orders.status_delivered")} />
-                            ) : ds === "assigned" ? (
-                              <OrdersStatusBadge status="Assigned" label={to("orders.status_assigned")} />
-                            ) : (
-                              <OrdersStatusBadge status="Pending for Assign" label={to("orders.status_pending_assign")} />
-                            )}
                           </td>
                           <td className={opsTableTdClass}>
                             <button
@@ -1645,19 +1449,6 @@ function AssignmentEditor({
               )}
               {saving ? to("orders.saving") : to("orders.save_progress")}
             </button>
-            <button
-              type="button"
-              onClick={() => void handleFinish()}
-              disabled={busy || !vehicle || (selected.length === 0 && savedOnVehicle === 0)}
-              className={opsPrimaryButtonClass}
-            >
-              {finishing || conflictChecking ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Send size={14} />
-              )}
-              {finishing ? to("orders.submitting") : to("orders.finish_assignment")}
-            </button>
           </div>
         </div>
           </div>
@@ -1721,7 +1512,6 @@ function AssignmentEditor({
           rows={waSheetRows}
           capacity={capacity}
           alreadyAssignedOther={alreadyAssignedOther}
-          language={language}
           t={to}
           sending={waBusy}
           sendProgress={waProgress}
@@ -1731,6 +1521,7 @@ function AssignmentEditor({
             setWaProgress(null);
           }}
           onConfirmSend={handleWhatsAppConfirm}
+          onConfirmSubmit={handleFinish}
         />
       )}
     </div>

@@ -68,10 +68,42 @@ import { OrdersErrorState, OrdersTableSkeleton } from "../components/OrdersCommo
 
 type TabKey = "collection" | "assignment" | "tracking";
 
-const TAB_DEFS: Array<{ key: TabKey; labelKey: string; icon: React.ReactNode }> = [
-  { key: "collection", labelKey: "orders.tab_collection", icon: <ClipboardList size={13} /> },
-  { key: "assignment", labelKey: "orders.tab_assignment", icon: <PackageCheck size={13} /> },
-  { key: "tracking", labelKey: "orders.tab_tracking", icon: <Route size={13} /> },
+const TAB_DEFS: Array<{
+  key: TabKey;
+  labelKey: string;
+  icon: React.ReactNode;
+  idle: string;
+  active: string;
+  iconIdle: string;
+  iconActive: string;
+}> = [
+  {
+    key: "collection",
+    labelKey: "orders.tab_collection",
+    icon: <ClipboardList size={13} />,
+    idle: "text-slate-500 hover:text-sky-700",
+    active: "bg-sky-50 shadow-sm text-sky-800 border border-sky-200",
+    iconIdle: "text-sky-500",
+    iconActive: "text-sky-600",
+  },
+  {
+    key: "assignment",
+    labelKey: "orders.tab_assignment",
+    icon: <PackageCheck size={13} />,
+    idle: "text-slate-500 hover:text-emerald-700",
+    active: "bg-emerald-50 shadow-sm text-emerald-800 border border-emerald-200",
+    iconIdle: "text-emerald-500",
+    iconActive: "text-emerald-600",
+  },
+  {
+    key: "tracking",
+    labelKey: "orders.tab_tracking",
+    icon: <Route size={13} />,
+    idle: "text-slate-500 hover:text-violet-700",
+    active: "bg-violet-50 shadow-sm text-violet-800 border border-violet-200",
+    iconIdle: "text-violet-500",
+    iconActive: "text-violet-600",
+  },
 ];
 
 /** Sample mode never touches the network — the shop list is the bundled master. */
@@ -349,12 +381,10 @@ const OrdersPage: React.FC = () => {
               type="button"
               onClick={() => setActiveTab(tab.key)}
               className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] md:text-xs font-bold transition-colors ${
-                active
-                  ? "bg-white shadow-sm text-emerald-700 border border-slate-200"
-                  : "text-slate-500 hover:text-slate-700"
+                active ? tab.active : tab.idle
               }`}
             >
-              <span className={active ? "text-emerald-500" : "text-slate-400"}>{tab.icon}</span>
+              <span className={active ? tab.iconActive : tab.iconIdle}>{tab.icon}</span>
               {to(tab.labelKey)}
             </button>
           );
@@ -403,14 +433,14 @@ const OrdersPage: React.FC = () => {
           )}
           {activeTab === "assignment" && (
             <OrdersAssignmentTab
-              key={`assignment|${day}`}
+              key={`assignment|${today}`}
               loading={false}
-              day={day}
+              day={today}
               today={today}
-              onDaySelect={setSelectedDay}
-              collection={dayCollection}
+              onDaySelect={() => {}}
+              collection={today ? data.collectionsByDay[today] ?? null : null}
               eligibleVehicles={data.eligibleVehicles}
-              dayVehicleViews={day ? data.dayVehicleViews[day] ?? [] : []}
+              dayVehicleViews={today ? data.dayVehicleViews[today] ?? [] : []}
               shopDirectory={shopDirectory}
               supervisorDirectory={supervisorDirectory}
               onChanged={() => void handleAssignmentChanged()}

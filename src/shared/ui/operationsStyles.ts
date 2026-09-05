@@ -51,7 +51,7 @@ export const opsTableHeadRowClass = "bg-slate-50/80";
 export const opsTableThClass =
   "px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap";
 
-export const opsTableTdClass = "px-4 py-3 text-sm text-slate-700 whitespace-nowrap";
+export const opsTableTdClass = "px-4 py-3 text-xs text-slate-700 whitespace-nowrap";
 
 export const opsTableRowClass = "hover:bg-slate-50/70 transition-colors";
 

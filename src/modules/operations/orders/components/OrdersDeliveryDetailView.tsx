@@ -184,7 +184,7 @@ function ShopDeliveryCapture({
         onChange={(e) => onValue(e.target.value)}
         onWheel={onOrdersNumberWheel}
         aria-label={`${to("orders.delivered_boxes")} — ${row.shopName}`}
-        className={`${ORDERS_NO_SPINNER} h-8 w-20 rounded-lg border border-slate-200 px-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
+        className={`${ORDERS_NO_SPINNER} h-8 w-20 rounded-lg border border-slate-200 px-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
       />
       <button
         type="button"

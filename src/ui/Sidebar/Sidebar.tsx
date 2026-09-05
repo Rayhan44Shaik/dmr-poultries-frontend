@@ -5,7 +5,7 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { X } from "lucide-react";
-import { NAV_SECTIONS, type NavChild } from "../../routes/navigation";
+import { NAV_SECTIONS, NAV_TONE_CLASS, type NavChild } from "../../routes/navigation";
 import { useI18n } from "../../i18n";
 import BrandMark from "../BrandMark";
 
@@ -79,6 +79,7 @@ export default function Sidebar({
                 const Icon = child.icon ?? SectionIcon;
                 const active = isChildActive(child, pathname, search);
                 const label = child.labelKey ? t(child.labelKey) : child.label;
+                const tone = NAV_TONE_CLASS[child.tone ?? "slate"];
 
                 return child.soon ? (
                   <li key={child.label}>
@@ -86,7 +87,7 @@ export default function Sidebar({
                       className="group relative flex w-full cursor-default items-center gap-2.5 rounded-lg py-2 pl-3.5 pr-3 text-[13.5px] text-slate-400 dark:text-slate-600"
                       title={child.soon ? `${label} — ${t("sidebar.comingSoon")}` : label}
                     >
-                      <Icon size={17} strokeWidth={2} className="shrink-0" />
+                      <Icon size={17} strokeWidth={2} className={`shrink-0 ${tone.icon}`} />
                       <span className="flex-1 truncate text-left">{label}</span>
                       <span className="rounded-full bg-slate-100 px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wide text-slate-400 dark:bg-slate-800 dark:text-slate-500">
                         {t("sidebar.comingSoon")}
@@ -100,22 +101,18 @@ export default function Sidebar({
                       aria-current={active ? "page" : undefined}
                       className={`group relative flex items-center gap-2.5 rounded-lg py-2 pl-3.5 pr-3 text-[13.5px] transition-colors duration-150 ${
                         active
-                          ? "bg-brand-50 font-semibold text-brand-800 dark:bg-brand-500/10 dark:text-brand-300"
+                          ? `${tone.row} font-semibold ${tone.text}`
                           : "font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/70 dark:hover:text-slate-200"
                       }`}
                     >
                       {/* Active accent bar */}
                       {active && (
-                        <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-600 dark:bg-brand-400" />
+                        <span className={`absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full ${tone.bar}`} />
                       )}
                       <Icon
                         size={17}
                         strokeWidth={2}
-                        className={`shrink-0 ${
-                          active
-                            ? "text-brand-700 dark:text-brand-300"
-                            : "text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300"
-                        }`}
+                        className={`shrink-0 ${active ? tone.iconActive : tone.icon}`}
                       />
                       <span className="flex-1 truncate text-left">{label}</span>
                     </Link>
@@ -132,14 +129,9 @@ export default function Sidebar({
   const brandHeader = (
     <div className="flex h-16 shrink-0 items-center gap-3 border-b border-slate-200/80 px-5 dark:border-slate-800">
       <BrandMark />
-      <div className="min-w-0">
-        <h1 className="truncate text-[15px] font-bold leading-tight tracking-tight text-slate-900 dark:text-white">
-          DMR Poultries
-        </h1>
-        <p className="truncate text-[11px] font-medium text-slate-400 dark:text-slate-500">
-          {t("sidebar.erpSystem")}
-        </p>
-      </div>
+      <h1 className="min-w-0 truncate text-[15px] font-bold leading-tight tracking-tight text-slate-900 dark:text-white">
+        DMR Poultries
+      </h1>
     </div>
   );
 

@@ -19,6 +19,11 @@ import {
 } from "../../../../utils/drawDmrPoultryHeader";
 import type { AssignmentSheetRow } from "../ordersUtils";
 import { ordersTranslate } from "../i18n/ordersI18n";
+import {
+  addUnicodeText,
+  ensureTeluguWebFont,
+  hasTelugu,
+} from "./pdfUnicodeText";
 
 type RGB = [number, number, number];
 
@@ -89,6 +94,10 @@ export async function generateAssignmentSheetPdf({
   const t = (key: string, params?: Record<string, string | number>) =>
     ordersTranslate(key, language, params);
 
+  if (language === "te") {
+    await ensureTeluguWebFont();
+  }
+
   const doc = createDmrPoultryPdf("portrait");
   doc.setProperties({
     title: `${trip.tripNo || "Trip"} — DMR POULTRIES`,
@@ -132,15 +141,32 @@ export async function generateAssignmentSheetPdf({
     ensureSpace(14);
     doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]);
     doc.roundedRect(margin, y, contentWidth, 7.5, 1.2, 1.2, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9.5);
-    doc.setTextColor(255, 255, 255);
-    doc.text(label, margin + 3, y + 5.1);
-    if (sub) {
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7.5);
-      doc.setTextColor(215, 222, 230);
-      doc.text(sub, pageWidth - margin - 3, y + 5.1, { align: "right" });
+    if (hasTelugu(label) || (sub && hasTelugu(sub))) {
+      addUnicodeText(doc, label, margin + 3, y + 5.1, {
+        fontSizeMm: 3.4,
+        color: "#ffffff",
+        bold: true,
+        maxWidthMm: contentWidth * 0.62,
+      });
+      if (sub) {
+        addUnicodeText(doc, sub, pageWidth - margin - 3, y + 5.1, {
+          fontSizeMm: 2.7,
+          color: "#d7dee6",
+          align: "right",
+          maxWidthMm: contentWidth * 0.35,
+        });
+      }
+    } else {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text(label, margin + 3, y + 5.1);
+      if (sub) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(215, 222, 230);
+        doc.text(sub, pageWidth - margin - 3, y + 5.1, { align: "right" });
+      }
     }
     y += 10.5;
   };
@@ -154,6 +180,7 @@ export async function generateAssignmentSheetPdf({
     }
     const labelCol = contentWidth * 0.24;
     const valueCol = (contentWidth - labelCol * 2) / 2;
+    const overlays = new Map<string, string>();
     autoTable(doc, {
       body: pairs,
       startY: y,
@@ -166,6 +193,31 @@ export async function generateAssignmentSheetPdf({
         3: { cellWidth: valueCol },
       },
       margin: { left: margin, right: margin, top: 12, bottom: 12 },
+      // Helvetica cannot encode Telugu — blank the cell first, then paint
+      // a canvas overlay. Drawing Telugu through jsPDF throws and kills the PDF.
+      didParseCell: (data) => {
+        const raw = String(data.cell.text?.join(" ") ?? "");
+        if (!hasTelugu(raw)) return;
+        (data.cell as { _te?: string })._te = raw;
+        data.cell.text = [""];
+      },
+      didDrawCell: (data) => {
+        const raw = (data.cell as { _te?: string })._te;
+        if (!raw) return;
+        addUnicodeText(
+          doc,
+          raw,
+          data.cell.x + 1.6,
+          data.cell.y + data.cell.height / 2,
+          {
+            fontSizeMm: 2.9,
+            color: data.column.index % 2 === 0 ? "rgb(90,100,115)" : "rgb(30,41,59)",
+            bold: data.column.index % 2 === 0,
+            maxWidthMm: data.cell.width - 3,
+            baseline: "middle",
+          }
+        );
+      },
     });
     y = lastTableY(y) + 5;
   };
@@ -177,7 +229,7 @@ export async function generateAssignmentSheetPdf({
   y = drawPreparedDmrPoultryHeader(doc, { margin, top: 8 }, assets) + 3;
 
   // ─── TRIP DETAILS ────────────────────────────────────────────────────
-  drawSectionBand("TRIP DETAILS");
+  drawSectionBand(t("orders.trip_details"));
   kvGrid([
     [t("orders.col_trip_no"), fmt(trip.tripNo)],
     [t("orders.col_date"), fmt(trip.tripDate)],
@@ -230,10 +282,11 @@ export async function generateAssignmentSheetPdf({
   const COL_BOXES = 16;
   const COL_BIRDS = 18;
   const COL_SHOP = contentWidth - COL_SEQ - COL_CITY - COL_MOBILE - COL_BOXES - COL_BIRDS;
+  const shopOverlays = new Map<string, string>();
   autoTable(doc, {
     head: [
       [
-        "Seq",
+        t("orders.pdf_seq"),
         t("orders.col_shop_name"),
         t("orders.city"),
         t("orders.col_mobile"),
@@ -281,6 +334,29 @@ export async function generateAssignmentSheetPdf({
       if (data.section === "body" && data.row.index % 2 === 1) {
         data.cell.styles.fillColor = ALT_ROW;
       }
+      const raw = String(data.cell.raw ?? data.cell.text?.join(" ") ?? "");
+      if (!hasTelugu(raw)) return;
+      shopOverlays.set(`${data.section}:${data.row.index}:${data.column.index}`, raw);
+      data.cell.text = [""];
+    },
+    didDrawCell: (data) => {
+      const raw = shopOverlays.get(`${data.section}:${data.row.index}:${data.column.index}`);
+      if (!raw) return;
+      const white = data.section === "head";
+      addUnicodeText(
+        doc,
+        raw,
+        data.column.index === 1 ? data.cell.x + 1.6 : data.cell.x + data.cell.width / 2,
+        data.cell.y + data.cell.height / 2,
+        {
+          fontSizeMm: 2.7,
+          color: white ? "#ffffff" : "rgb(30,41,59)",
+          bold: white || data.column.index === 4,
+          align: data.column.index === 1 ? "left" : "center",
+          maxWidthMm: data.cell.width - 2,
+          baseline: "middle",
+        }
+      );
     },
   });
   y = lastTableY(y) + 5;
@@ -312,11 +388,27 @@ export async function generateAssignmentSheetPdf({
     doc.setDrawColor(GRID_LINE[0], GRID_LINE[1], GRID_LINE[2]);
     doc.setLineWidth(0.2);
     doc.line(margin, h - 9, w - margin, h - 9);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-    doc.text(`Page ${p} of ${pageCount}`, margin, h - 5.5);
-    doc.text(`Generated on ${generatedStr}`, w - margin, h - 5.5, { align: "right" });
+    const pageLabel = t("orders.pdf_page", { p, n: pageCount });
+    const generatedLabel = t("orders.pdf_generated", { when: generatedStr });
+    if (hasTelugu(pageLabel) || hasTelugu(generatedLabel)) {
+      addUnicodeText(doc, pageLabel, margin, h - 5.5, {
+        fontSizeMm: 2.6,
+        color: "rgb(90,100,115)",
+        maxWidthMm: 50,
+      });
+      addUnicodeText(doc, generatedLabel, w - margin, h - 5.5, {
+        fontSizeMm: 2.6,
+        color: "rgb(90,100,115)",
+        align: "right",
+        maxWidthMm: 80,
+      });
+    } else {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+      doc.text(pageLabel, margin, h - 5.5);
+      doc.text(generatedLabel, w - margin, h - 5.5, { align: "right" });
+    }
   }
 
   const safeTripNo = String(trip.tripNo || "Trip").replace(/[^a-zA-Z0-9_-]+/g, "_");

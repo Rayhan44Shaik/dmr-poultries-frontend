@@ -741,49 +741,107 @@ export type OrdersWhatsAppResult = {
   message?: string;
 };
 
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? "");
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(new Error("Unable to read PDF bytes."));
+    reader.readAsDataURL(blob);
+  });
+}
+
 /**
- * Sends the order/assignment to the supervisor through the EXISTING WhatsApp
- * service (per-delivery PDF endpoint) — same mechanism Step 4 / Trip View use.
- * Sequential, so progress stays visible and one failure never stops the rest.
+ * Order Assignment Review & Submit — ONE WhatsApp to the vehicle SUPERVISOR
+ * mobile only. Shop-owner numbers are never used as the recipient.
  */
+export function isOrdersWhatsAppConfigured(): boolean {
+  return import.meta.env.VITE_WHATSAPP_BACKEND_ENABLED === "true";
+}
+
 export async function sendOrdersWhatsApp(
   trip: Trip,
   supervisorMobile: string,
   onProgress?: (sent: number, total: number, shopName: string) => void
 ): Promise<OrdersWhatsAppResult> {
-  const rows = rowsInSequence(trip).filter((r) => r.shopId > 0);
-  if (rows.length === 0) {
-    return { enabled: true, sent: 0, failed: 0, skipped: 0, message: "no_rows" };
+  if (!isOrdersWhatsAppConfigured()) {
+    return {
+      enabled: false,
+      sent: 0,
+      failed: 1,
+      skipped: 0,
+      message: "WhatsApp integration is not configured yet.",
+    };
   }
 
-  const result: OrdersWhatsAppResult = { enabled: true, sent: 0, failed: 0, skipped: 0 };
-  // Loaded lazily: the WhatsApp/PDF chain pulls heavy deps (jspdf, image
-  // assets) which the assignment logic — and its unit tests — never needs.
-  const { sendDeliveryWhatsApp } = await import(
-    "../vehicle-trips/services/deliveryWhatsAppService"
-  );
-  let sent = 0;
-  for (const row of rows) {
-    onProgress?.(sent, rows.length, row.shopName || "Shop");
-    const outcome = await sendDeliveryWhatsApp({
-      trip,
-      delivery: { ...row, autoCaptureTime: row.autoCaptureTime } as ShopDelivery,
-      shopWhatsApp: supervisorMobile || null,
-    }).catch((error: unknown) => ({
-      success: false,
-      status: "failed" as const,
-      message: error instanceof Error ? error.message : undefined,
-    }));
-    if (outcome.success) {
-      result.sent += 1;
-      sent += 1;
-    } else {
-      result.failed += 1;
-      if (!result.message) result.message = outcome.message;
-    }
+  const recipient = String(supervisorMobile || "").trim();
+  if (!recipient) {
+    return {
+      enabled: true,
+      sent: 0,
+      failed: 1,
+      skipped: 0,
+      message: "Supervisor mobile is missing — nothing sent to shop owners.",
+    };
   }
-  onProgress?.(sent, rows.length, "");
-  return result;
+
+  const rows = rowsInSequence(trip).filter((r) => r.shopId > 0);
+  if (rows.length === 0) {
+    return { enabled: true, sent: 0, failed: 1, skipped: 0, message: "no_rows" };
+  }
+
+  onProgress?.(0, 1, trip.supervisorName || "Supervisor");
+
+  try {
+    const { generateAssignmentSheetPdf } = await import("./pdf/generateAssignmentSheetPdf");
+    const orderTripNo =
+      rows.map((r) => parseOrderRef(r.remarks)).find((ref) => Boolean(ref)) || trip.tripNo;
+    const built = await generateAssignmentSheetPdf({
+      trip,
+      supervisorMobile: recipient,
+      orderTripNo,
+      orderDate: trip.tripDate,
+      rows: rows.map((r, i) => ({
+        serialNo: i + 1,
+        shopId: r.shopId,
+        shopName: r.shopName || "Shop",
+        village: String((r as { village?: string }).village ?? ""),
+        mobile: "",
+        boxes: rowBoxes(r),
+        birds: num(r.birds),
+      })),
+      capacity: 0,
+      alreadyAssignedOther: 0,
+      mode: "preview",
+    });
+    const pdfBase64 = await blobToBase64(built.blob);
+    URL.revokeObjectURL(built.url);
+    await apiPost(
+      `/trips/${trip.id}/whatsapp`,
+      {
+        recipient,
+        supervisorMobile: recipient,
+        shopWhatsApp: recipient,
+        message: `DMR Poultries assignment for ${trip.tripNo} · ${trip.vehicleNo || ""}`.trim(),
+        pdfBase64,
+        fileName: built.fileName,
+      },
+      { timeout: 60_000 }
+    );
+    onProgress?.(1, 1, "");
+    return { enabled: true, sent: 1, failed: 0, skipped: 0 };
+  } catch (error: unknown) {
+    return {
+      enabled: true,
+      sent: 0,
+      failed: 1,
+      skipped: 0,
+      message: error instanceof Error ? error.message : "send failed",
+    };
+  }
 }
 
 // ─── Client-side page slice (the pattern used across the existing Ops pages) ─
