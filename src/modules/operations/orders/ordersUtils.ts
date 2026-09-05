@@ -936,6 +936,7 @@ export type AssignmentSheetInput = {
   orderTripNo: string;
   orderDate: string;
   rows: AssignmentSheetRow[];
+  language?: "en" | "te";
 };
 
 /**
@@ -948,6 +949,19 @@ export function buildAssignmentWhatsAppMessage(input: AssignmentSheetInput): str
   const d = (value: string) => (value && value.trim() ? value.trim() : "—");
   const totalBoxes = input.rows.reduce((s, r) => s + r.boxes, 0);
   const totalBirds = input.rows.reduce((s, r) => s + r.birds, 0);
+  if (input.language === "te") {
+    return [
+      "*డీఎంఆర్ పౌల్ట్రీస్ — షాప్ అసైన్‌మెంట్*",
+      "",
+      `ట్రిప్: ${d(input.tripNo)} · వాహనం: ${d(input.vehicleNo)}`,
+      `సూపర్‌వైజర్: ${d(input.supervisorName)}${input.supervisorMobile ? ` (${input.supervisorMobile})` : ""}`,
+      `డ్రైవర్: ${d(input.driverName)}`,
+      `ఆర్డర్: ${d(input.orderTripNo)} · తేదీ: ${d(input.orderDate || input.tripDate)}`,
+      `షాప్‌లు: ${input.rows.length} · బాక్స్‌లు: ${totalBoxes} · పక్షులు: ${totalBirds}`,
+      "",
+      "📄 షాప్ డెలివరీ క్రమం PDF లో చూడండి.",
+    ].join("\n");
+  }
   const lines = [
     "*DMR POULTRIES — Shop Assignment*",
     "",

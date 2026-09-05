@@ -34,12 +34,10 @@ import {
   Lock,
   RefreshCw,
   Save,
-  Send,
   X,
 } from "lucide-react";
 import type { Trip } from "../../../../shared/trip";
 import {
-  opsPrimaryButtonClass,
   opsSecondaryButtonClass,
   opsSectionTitleClass,
   opsTableCardClass,
@@ -67,7 +65,6 @@ import {
 } from "../ordersUtils";
 import {
   findDayOverAssignments,
-  finishAssignment,
   saveAssignment,
   sendOrdersWhatsApp,
   shopMobileOf,
@@ -95,6 +92,7 @@ import {
   OrdersDateControl,
   OrdersEmptyState,
   OrdersDropdown,
+  OrdersMultiSelect,
   OrdersIconButton,
   OrdersSearchInput,
   OrdersStatusBadge,
@@ -214,7 +212,6 @@ function OrdersAssignmentTab({
   shopDirectory,
   supervisorDirectory,
   onChanged,
-  onFinished,
   onRefresh,
   refreshing,
 }: Props) {
@@ -291,7 +288,6 @@ function OrdersAssignmentTab({
           q={q}
           sortMode={sortMode}
           onChanged={onChanged}
-          onFinished={onFinished}
         />
       )}
     </div>
@@ -389,7 +385,6 @@ function AssignmentEditor({
   q,
   sortMode,
   onChanged,
-  onFinished,
 }: {
   day: string;
   collection: OrdersDayCollection;
@@ -401,9 +396,8 @@ function AssignmentEditor({
   /** Table-level sort (Pending First / A→Z / Z→A / Vehicle · Trip). */
   sortMode: "pending" | "az" | "za" | "vehicle_trip";
   onChanged: () => void;
-  onFinished: (vehicleTrip: Trip) => void;
 }) {
-  const { to, language } = useOrdersI18n();
+  const { to } = useOrdersI18n();
   const { showNotification } = useSafeNotification();
   const orderTrip = collection.trip;
 
@@ -443,7 +437,6 @@ function AssignmentEditor({
     selectionSnapshot(vehicleTripId, selected) !== savedSnapshot;
 
   const [saving, setSaving] = useState(false);
-  const [finishing, setFinishing] = useState(false);
   const [waBusy, setWaBusy] = useState(false);
   const [waProgress, setWaProgress] = useState<string | null>(null);
   const [conflictChecking, setConflictChecking] = useState(false);
@@ -453,7 +446,7 @@ function AssignmentEditor({
     available: number;
     requested: number;
   }>(null);
-  const busy = saving || finishing || conflictChecking;
+  const busy = saving || conflictChecking;
 
   const selectedIds = useMemo(
     () => new Set(selected.map((r) => r.shopId)),
@@ -692,36 +685,7 @@ function AssignmentEditor({
     }
   }, [busy, vehicle, checkCapacity, selected, assertFitsBalance, orderTrip.tripNo, showNotification, to, onChanged]);
 
-  // ── Finish Assignment (validated) ────────────────────────────────────────
-  const handleFinish = useCallback(async () => {
-    if (busy || !vehicle) return;
-    const unassigned = selected.filter((r) => r.assigned < 1);
-    // An empty selection is allowed when earlier partial saves already put
-    // shops on this vehicle — those rows are dispatched as they stand.
-    if ((selected.length === 0 && savedOnVehicle === 0) || unassigned.length > 0) {
-      showNotification(to("orders.finish_assignment_invalid"), "info");
-      return;
-    }
-    if (!checkCapacity()) return;
-    if (!(await assertFitsBalance())) return;
-    setFinishing(true);
-    try {
-      const vehicleTrip = await finishAssignment(
-        vehicle.trip,
-        selected.length > 0
-          ? [{ orderTripNo: orderTrip.tripNo, rows: toOrderShopRows(selected) }]
-          : []
-      );
-      showNotification(to("orders.assignment_finished"), "success");
-      onFinished(vehicleTrip);
-    } catch {
-      showNotification(to("orders.refresh_failed"), "error");
-    } finally {
-      setFinishing(false);
-    }
-  }, [busy, vehicle, selected, savedOnVehicle, checkCapacity, assertFitsBalance, orderTrip.tripNo, showNotification, to, onFinished]);
-
-  // ── WhatsApp: CONFIRM FIRST — the card opens a check popup (message text +
+  // ── Review & Submit: CONFIRM FIRST — the card opens a check popup (message text +
   //    branded assignment sheet PDF); nothing goes out until "Confirm & Send".
   const [waPopupOpen, setWaPopupOpen] = useState(false);
 
@@ -872,6 +836,7 @@ function AssignmentEditor({
   const [poolFilter, setPoolFilter] = useState<
     "all" | "pending" | "assigned" | "this_vehicle"
   >("pending");
+  const [cityFilters, setCityFilters] = useState<string[]>([]);
   const pq = poolQuery.trim().toLowerCase();
   const poolFilterOptions = useMemo(
     () => [
@@ -883,6 +848,17 @@ function AssignmentEditor({
     [to]
   );
   const thisTripNo = vehicle?.trip.tripNo ?? "";
+  const cityOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const row of collection.rows) {
+      const city = villageOf(row.shopId, row.shopName, shopDirectory).trim();
+      if (city) names.add(city);
+    }
+    return [...names]
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({ value: name, label: name }));
+  }, [collection.rows, shopDirectory]);
+  const cityFilterSet = useMemo(() => new Set(cityFilters), [cityFilters]);
   const filteredPool = useMemo(() => {
     const list: PoolRow[] = [];
     collection.rows.forEach((row, i) => {
@@ -913,9 +889,11 @@ function AssignmentEditor({
       if (poolFilter === "pending" && item.kind === "assigned") return;
       if (poolFilter === "assigned" && item.kind !== "assigned") return;
       if (poolFilter === "this_vehicle" && !item.onThisVehicle) return;
+      const city = villageOf(row.shopId, row.shopName, shopDirectory);
+      if (cityFilterSet.size > 0 && !cityFilterSet.has(city)) return;
       if (q || pq) {
         const hay =
-          `${row.shopName} ${villageOf(row.shopId, row.shopName, shopDirectory)} ${parts.map((p) => `${p.vehicleNo} ${p.tripNo}`).join(" ")}`.toLowerCase();
+          `${row.shopName} ${city} ${parts.map((p) => `${p.vehicleNo} ${p.tripNo}`).join(" ")}`.toLowerCase();
         if (q && !hay.includes(q)) return;
         if (pq && !hay.includes(pq)) return;
       }
@@ -947,10 +925,10 @@ function AssignmentEditor({
       );
     }
     return list;
-  }, [collection, q, pq, poolFilter, thisTripNo, shopDirectory, sortMode]);
+  }, [collection, q, pq, poolFilter, cityFilterSet, thisTripNo, shopDirectory, sortMode]);
 
   const [availablePage, setAvailablePage] = useState(1);
-  const availableKey = `${q}|${pq}|${poolFilter}|${sortMode}|${filteredPool.length}`;
+  const availableKey = `${q}|${pq}|${poolFilter}|${cityFilters.join(",")}|${sortMode}|${filteredPool.length}`;
   const [lastAvailableKey, setLastAvailableKey] = useState(availableKey);
   if (lastAvailableKey !== availableKey) {
     setLastAvailableKey(availableKey);
@@ -1046,7 +1024,7 @@ function AssignmentEditor({
                               }`}
                             >
                               <span className="flex items-center justify-between gap-2">
-                                <span className="truncate text-sm font-bold text-slate-800">
+                                <span className="truncate text-xs font-semibold text-slate-800">
                                   {v.trip.vehicleNo || "—"}
                                 </span>
                                 <span className="shrink-0 text-[11px] font-semibold text-slate-400">
@@ -1103,7 +1081,7 @@ function AssignmentEditor({
                   <PackageCheck size={17} />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="truncate text-sm font-extrabold text-slate-800">
+                  <h3 className="truncate text-sm font-bold text-slate-800">
                     {to("orders.assign_shops")}
                   </h3>
                 </div>
@@ -1163,6 +1141,14 @@ function AssignmentEditor({
           ariaLabel={to("orders.filter_shops")}
           widthClass="w-48"
         />
+        <OrdersMultiSelect
+          values={cityFilters}
+          onChange={setCityFilters}
+          options={cityOptions}
+          ariaLabel={to("orders.filter_city")}
+          placeholder={to("orders.filter_city_all")}
+          widthClass="w-56"
+        />
         <span className="ml-auto text-[11px] font-semibold text-slate-400 whitespace-nowrap">
           {to("orders.pool_showing", {
             shown: filteredPool.length,
@@ -1177,7 +1163,7 @@ function AssignmentEditor({
             title={
               q || pq
                 ? to("orders.no_search_results")
-                : poolFilter !== "all"
+                : poolFilter !== "all" || cityFilters.length > 0
                   ? to("orders.no_filter_results")
                   : to("orders.pool_summary", {
                       collected: collection.totalShops,
@@ -1209,7 +1195,7 @@ function AssignmentEditor({
                   const checked = selectedIds.has(row.shopId);
                   const isLockedRow = row.kind === "assigned";
                   // Two-tone rows; a checked row's emerald state colour wins.
-                  const tone = checked && !isLockedRow ? "bg-emerald-50/50" : ordersZebraTone(index);
+                           const tone = checked && !isLockedRow ? "bg-emerald-50/50" : ordersZebraTone(index);
                   return (
                     <tr
                       key={row.shopId}
@@ -1536,7 +1522,7 @@ function AssignmentEditor({
                                 aria-label={`${to("orders.assigned_boxes")} — ${row.shopName}`}
                                 onChange={(e) => setAssigned(row.clientKey, e.target.value)}
                                 onWheel={onOrdersNumberWheel}
-                                className={`${ORDERS_NO_SPINNER} h-8 w-24 rounded-lg border px-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 ${
+                                className={`${ORDERS_NO_SPINNER} h-8 w-24 rounded-lg border px-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 ${
                                   row.assigned === 0
                                     ? "border-amber-300 bg-amber-50/60 text-amber-800"
                                     : "border-emerald-300/70 bg-emerald-50/50 text-emerald-900"
@@ -1645,19 +1631,6 @@ function AssignmentEditor({
               )}
               {saving ? to("orders.saving") : to("orders.save_progress")}
             </button>
-            <button
-              type="button"
-              onClick={() => void handleFinish()}
-              disabled={busy || !vehicle || (selected.length === 0 && savedOnVehicle === 0)}
-              className={opsPrimaryButtonClass}
-            >
-              {finishing || conflictChecking ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Send size={14} />
-              )}
-              {finishing ? to("orders.submitting") : to("orders.finish_assignment")}
-            </button>
           </div>
         </div>
           </div>
@@ -1721,7 +1694,6 @@ function AssignmentEditor({
           rows={waSheetRows}
           capacity={capacity}
           alreadyAssignedOther={alreadyAssignedOther}
-          language={language}
           t={to}
           sending={waBusy}
           sendProgress={waProgress}

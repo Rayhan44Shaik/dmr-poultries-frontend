@@ -477,4 +477,125 @@ export function OrdersDropdown({
   );
 }
 
+// ─── Compact multi-select (cities: Vijayawada, Guntur, Hyderabad…) ─────────
+
+export function OrdersMultiSelect({
+  values,
+  onChange,
+  options,
+  ariaLabel,
+  placeholder,
+  className = "",
+  widthClass = "w-56",
+}: {
+  values: string[];
+  onChange: (next: string[]) => void;
+  options: Array<{ value: string; label: string }>;
+  ariaLabel: string;
+  placeholder: string;
+  className?: string;
+  widthClass?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
+  const selected = new Set(values);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [open]);
+
+  const toggle = (v: string) => {
+    if (selected.has(v)) onChange(values.filter((x) => x !== v));
+    else onChange([...values, v]);
+  };
+
+  const summary =
+    values.length === 0
+      ? placeholder
+      : values.length <= 2
+        ? values.join(", ")
+        : `${values.slice(0, 2).join(", ")} +${values.length - 2}`;
+
+  return (
+    <div ref={rootRef} className={`relative inline-block ${className}`}>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listboxId : undefined}
+        aria-label={ariaLabel}
+        onClick={() => setOpen((o) => !o)}
+        className={`h-9 ${widthClass} inline-flex items-center justify-between gap-2 rounded-lg border bg-white pl-3 pr-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${
+          values.length > 0
+            ? "border-emerald-300 text-emerald-800 bg-emerald-50/50"
+            : "border-slate-200 text-slate-600"
+        }`}
+      >
+        <span className="truncate text-left">{summary}</span>
+        <ChevronDown
+          size={13}
+          className={`flex-shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+          aria-hidden
+        />
+      </button>
+      {open && (
+        <ul
+          id={listboxId}
+          role="listbox"
+          aria-multiselectable
+          aria-label={ariaLabel}
+          className={`absolute right-0 z-30 mt-1 max-h-64 min-w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg ${widthClass}`}
+        >
+          {options.length === 0 ? (
+            <li className="px-3 py-2 text-xs font-semibold text-slate-400">—</li>
+          ) : (
+            options.map((o) => {
+              const on = selected.has(o.value);
+              return (
+                <li key={o.value} role="option" aria-selected={on}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(o.value)}
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold transition-colors ${
+                      on ? "bg-emerald-50 text-emerald-800" : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span
+                      className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded border ${
+                        on ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 bg-white"
+                      }`}
+                    >
+                      {on ? <Check size={10} /> : null}
+                    </span>
+                    <span className="truncate">{o.label}</span>
+                  </button>
+                </li>
+              );
+            })
+          )}
+          {values.length > 0 && (
+            <li className="border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => onChange([])}
+                className="w-full px-3 py-2 text-left text-[11px] font-bold text-slate-500 hover:bg-slate-50"
+              >
+                {placeholder}
+              </button>
+            </li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export type { OrdersT };

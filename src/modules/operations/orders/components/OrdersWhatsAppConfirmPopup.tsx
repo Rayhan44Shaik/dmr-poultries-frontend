@@ -58,7 +58,6 @@ type Props = {
   rows: AssignmentSheetRow[];
   capacity: number;
   alreadyAssignedOther: number;
-  language: "en" | "te";
   t: OrdersT;
   /** Send + persistence in flight (drives the button spinners). */
   sending: boolean;
@@ -78,7 +77,6 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
   rows,
   capacity,
   alreadyAssignedOther,
-  language,
   t,
   sending,
   sendProgress,
@@ -88,6 +86,8 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
   const [result, setResult] = useState<AssignmentSheetPdfResult | null>(null);
   const [buildError, setBuildError] = useState("");
   const [sentResult, setSentResult] = useState<OrdersWhatsAppResult | null>(null);
+  // Review & Submit only — independent of the app language. English by default.
+  const [sheetLang, setSheetLang] = useState<"en" | "te">("en");
 
   // ── The delivery sequence lives HERE so ↑↓ works inside the popup.
   //    Stored as a PERMUTATION of the parent rows (null = parent order) —
@@ -140,8 +140,9 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
         orderTripNo,
         orderDate,
         rows: numberedRows,
+        language: sheetLang,
       }),
-    [trip, supervisorMobile, orderTripNo, orderDate, numberedRows]
+    [trip, supervisorMobile, orderTripNo, orderDate, numberedRows, sheetLang]
   );
 
   // ── Sheets: built once per sequence — the frame, the download and the
@@ -151,6 +152,8 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
   useEffect(() => {
     let alive = true;
     let url: string | null = null;
+    setResult(null);
+    setBuildError("");
     generateAssignmentSheetPdf({
       trip,
       supervisorMobile,
@@ -159,7 +162,7 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
       rows: numberedRows,
       capacity,
       alreadyAssignedOther,
-      language,
+      language: sheetLang,
       mode: "preview",
     })
       .then((built) => {
@@ -171,7 +174,8 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
         setResult(built);
         setBuildError("");
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("Assignment sheet PDF failed", err);
         if (alive) setBuildError(t("orders.pdf_failed"));
       });
     return () => {
@@ -179,7 +183,7 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
       if (url) URL.revokeObjectURL(url);
     };
     // The sheet depends on WHO/WHAT/ORDER, not on the blob bookkeeping.
-  }, [trip, supervisorMobile, orderTripNo, orderDate, numberedRows, capacity, alreadyAssignedOther, language, t]);
+  }, [trip, supervisorMobile, orderTripNo, orderDate, numberedRows, capacity, alreadyAssignedOther, sheetLang, t]);
 
   // "Building" = no result yet and no failure (derived, no extra state).
   const building = result === null && !buildError;
@@ -236,15 +240,49 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={sending}
-            aria-label={t("orders.close")}
-            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
-          >
-            <X size={17} />
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <div
+              role="group"
+              aria-label="Message and PDF language"
+              className="relative flex rounded-full bg-slate-100 p-0.5 text-[11px] font-extrabold"
+            >
+              <span
+                aria-hidden
+                className={`pointer-events-none absolute inset-y-0.5 w-[calc(50%-2px)] rounded-full bg-emerald-600 shadow-sm transition-transform duration-200 ${
+                  sheetLang === "te" ? "translate-x-[calc(100%+2px)]" : "translate-x-0.5"
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => setSheetLang("en")}
+                disabled={sending}
+                className={`relative z-10 min-w-[4.5rem] rounded-full px-3 py-1.5 transition ${
+                  sheetLang === "en" ? "text-white" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                English
+              </button>
+              <button
+                type="button"
+                onClick={() => setSheetLang("te")}
+                disabled={sending}
+                className={`relative z-10 min-w-[4.5rem] rounded-full px-3 py-1.5 transition ${
+                  sheetLang === "te" ? "text-white" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                తెలుగు
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={sending}
+              aria-label={t("orders.close")}
+              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
+            >
+              <X size={17} />
+            </button>
+          </div>
         </div>
 
         <div className="flex min-h-0 flex-1">
