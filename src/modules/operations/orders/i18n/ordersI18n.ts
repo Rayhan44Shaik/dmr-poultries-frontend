@@ -278,8 +278,15 @@ const EN: Record<string, string> = {
   "orders.pdf_generated": "Generated on {when}",
   "orders.wa_message_preview": "Message preview (exactly what will be sent)",
   "orders.wa_send_note":
-    "Sends this assignment to the supervisor on WhatsApp, one message per shop with its delivery PDF.",
+    "Sends this assignment to the vehicle supervisor WhatsApp number only — shop owners are not messaged from this page.",
   "orders.wa_confirm_send": "Confirm & Send",
+  "orders.wa_sent_to": "WhatsApp message sent successfully to {name} ({mobile}).",
+  "orders.wa_sent_ok_title": "WhatsApp notification sent successfully",
+  "orders.wa_sent_ok_body":
+    "The assignment message was sent. Order assignment will be submitted and this window will close in {time} unless you cancel.",
+  "orders.wa_auto_submit_in": "Submitting assignment and closing in {time}",
+  "orders.wa_auto_submitting": "Submitting assignment…",
+  "orders.wa_cancel_auto": "Cancel",
   "orders.wa_send_to": "Send to",
   "orders.assignment_sheet_title": "Shop Assignment Sheet",
   "orders.assignment_details": "ASSIGNMENT DETAILS",
@@ -653,6 +660,13 @@ const TE: Record<string, string> = {
   "orders.wa_send_note":
     "ఈ కేటాయింపును సూపర్‌వైజర్‌కు వాట్సాప్‌లో పంపుతుంది — ప్రతి షాప్‌కు ఒక సందేశం, దాని డెలివరీ PDFతో.",
   "orders.wa_confirm_send": "నిర్ధారించి పంపండి",
+  "orders.wa_sent_to": "WhatsApp సందేశం {name} ({mobile})కు విజయవంతంగా పంపబడింది.",
+  "orders.wa_sent_ok_title": "WhatsApp నోటిఫికేషన్ విజయవంతంగా పంపబడింది",
+  "orders.wa_sent_ok_body":
+    "అసైన్‌మెంట్ సందేశం పంపబడింది. మీరు రద్దు చేయకపోతే {time}లో ఆర్డర్ అసైన్‌మెంట్ సబ్మిట్ అవుతుంది మరియు ఈ విండో మూసివేయబడుతుంది.",
+  "orders.wa_auto_submit_in": "అసైన్‌మెంట్ సబ్మిట్ అయి {time}లో మూసివేయబడుతుంది",
+  "orders.wa_auto_submitting": "అసైన్‌మెంట్ సబ్మిట్ అవుతోంది…",
+  "orders.wa_cancel_auto": "రద్దు చేయండి",
   "orders.wa_send_to": "పంపాల్సిన నంబర్",
   "orders.assignment_sheet_title": "షాప్ అసైన్‌మెంట్ షీట్",
   "orders.assignment_details": "కేటాయింపు వివరాలు",

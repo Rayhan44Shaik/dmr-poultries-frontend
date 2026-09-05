@@ -1,51 +1,90 @@
 // src/ui/BrandMark.tsx
-//
-// ─── ASSET SWITCH ──────────────────────────────────────────────────────────
-// RIGHT NOW: uses the black-background JPG you already have. The black is
-// cancelled at render time with `mix-blend-mode: screen` over the dark tile,
-// so nothing looks like a black box and the build resolves with zero new files.
-import henUrl from "../assets/dmr-hen.jpg";
-const HEN_HAS_ALPHA: boolean = false;
+// Hen photo on a clean light badge. The source JPG has a black studio
+// background — that is stripped once per session so the bird sits on the
+// sidebar/login tile without a dark box.
 
-// AFTER you run scripts/remove-black-bg.(mjs|py), delete the two lines above
-// and uncomment these two. Nothing else in the file changes.
-// import henUrl from "../assets/dmr-hen.png";
-// const HEN_HAS_ALPHA: boolean = true;
-// ───────────────────────────────────────────────────────────────────────────
+import { useEffect, useState } from "react";
+import henUrl from "../assets/dmr-hen.jpg";
 
 export type BrandMarkSize = "xs" | "sm" | "md" | "lg" | "xl";
 export type BrandMarkVariant = "tile" | "plain";
-/** Breathing room between the hen and the tile edge. */
 export type BrandMarkInset = "tight" | "normal" | "roomy";
 
 export interface BrandMarkProps {
   size?: BrandMarkSize;
   variant?: BrandMarkVariant;
   inset?: BrandMarkInset;
-  /** Accessible name. Omit when a text logo sits next to it (decorative). */
   label?: string;
   className?: string;
 }
 
 const SIZES: Record<BrandMarkSize, { box: string; px: number }> = {
-  xs: { box: "h-6 w-6   rounded-md",     px: 24 },
-  sm: { box: "h-8 w-8   rounded-lg",     px: 32 },
-  md: { box: "h-9 w-9   rounded-[10px]", px: 36 },
-  lg: { box: "h-11 w-11 rounded-xl",     px: 44 },
-  xl: { box: "h-14 w-14 rounded-2xl",    px: 56 },
+  xs: { box: "h-6 w-6 rounded-md", px: 24 },
+  sm: { box: "h-8 w-8 rounded-lg", px: 32 },
+  md: { box: "h-9 w-9 rounded-[10px]", px: 36 },
+  lg: { box: "h-11 w-11 rounded-xl", px: 44 },
+  xl: { box: "h-14 w-14 rounded-2xl", px: 56 },
 };
 
-// Fraction of the tile reserved as padding on each side. 0.09 keeps the comb
-// and tail clear of the rounded corners at every size.
 const INSETS: Record<BrandMarkInset, number> = {
-  tight: 0.045,
-  normal: 0.09,
-  roomy: 0.14,
+  tight: 0.04,
+  normal: 0.08,
+  roomy: 0.12,
 };
 
 const TILE =
-  "bg-gradient-to-br from-[#1B3A3A] to-[#0E2222] " +
-  "ring-1 ring-inset ring-white/10 shadow-sm";
+  "bg-gradient-to-b from-white to-slate-50 " +
+  "ring-1 ring-inset ring-slate-200/90 " +
+  "shadow-[0_1px_2px_rgba(15,23,42,0.06)] " +
+  "dark:from-slate-800 dark:to-slate-900 dark:ring-slate-700";
+
+let cutoutPromise: Promise<string> | null = null;
+
+function cutoutHen(): Promise<string> {
+  if (cutoutPromise) return cutoutPromise;
+  cutoutPromise = new Promise((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => {
+      try {
+        const width = image.naturalWidth || image.width;
+        const height = image.naturalHeight || image.height;
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) {
+          reject(new Error("canvas"));
+          return;
+        }
+        ctx.drawImage(image, 0, 0);
+        const data = ctx.getImageData(0, 0, width, height);
+        const px = data.data;
+        for (let i = 0; i < px.length; i += 4) {
+          const r = px[i];
+          const g = px[i + 1];
+          const b = px[i + 2];
+          const luma = r * 0.2126 + g * 0.7152 + b * 0.0722;
+          if (luma < 28) {
+            px[i + 3] = 0;
+          } else if (luma < 48) {
+            px[i + 3] = Math.round(((luma - 28) / 20) * 255);
+          }
+        }
+        ctx.putImageData(data, 0, 0);
+        resolve(canvas.toDataURL("image/png"));
+      } catch (err) {
+        reject(err);
+      }
+    };
+    image.onerror = () => reject(new Error("hen"));
+    image.src = henUrl;
+  });
+  cutoutPromise.catch(() => {
+    cutoutPromise = null;
+  });
+  return cutoutPromise;
+}
 
 export default function BrandMark({
   size = "md",
@@ -56,19 +95,26 @@ export default function BrandMark({
 }: BrandMarkProps) {
   const s = SIZES[size];
   const decorative = !label;
-
-  // A non-alpha asset can only be shown on the tile (that's what kills the black).
-  const blend = !HEN_HAS_ALPHA;
-  const isTile = (blend ? "tile" : variant) === "tile";
-
-  // Padding applies in blend mode too — black JPG margin screens to the exact
-  // tile colour, so there is no visible seam, just breathing room.
+  const isTile = variant === "tile";
   const pad = isTile ? Math.max(1, Math.round(s.px * INSETS[inset])) : 0;
+  const [src, setSrc] = useState(henUrl);
+
+  useEffect(() => {
+    let alive = true;
+    void cutoutHen()
+      .then((url) => {
+        if (alive) setSrc(url);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   return (
     <div
       className={[
-        "relative shrink-0 select-none overflow-hidden isolate",
+        "relative shrink-0 select-none overflow-hidden",
         "flex items-center justify-center",
         s.box,
         isTile ? TILE : "",
@@ -82,7 +128,7 @@ export default function BrandMark({
       aria-hidden={decorative || undefined}
     >
       <img
-        src={henUrl}
+        src={src}
         width={s.px - pad * 2}
         height={s.px - pad * 2}
         alt=""
@@ -90,12 +136,7 @@ export default function BrandMark({
         draggable={false}
         loading="eager"
         decoding="async"
-        className={[
-          "h-full w-full object-contain",
-          blend ? "mix-blend-screen" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
+        className="h-full w-full object-contain object-center"
       />
     </div>
   );
