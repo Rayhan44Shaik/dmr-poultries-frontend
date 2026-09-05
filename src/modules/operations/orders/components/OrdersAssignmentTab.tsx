@@ -26,14 +26,19 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
+  CheckCheck,
   PackageCheck,
   ChevronsDown,
   ChevronsUp,
+  Clock,
   GripVertical,
+  LayoutGrid,
   Loader2,
   RefreshCw,
   Save,
+  Truck,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import type { Trip } from "../../../../shared/trip";
 import {
@@ -63,6 +68,7 @@ import {
 } from "../ordersUtils";
 import {
   findDayOverAssignments,
+  finishAssignment,
   saveAssignment,
   sendOrdersWhatsApp,
   shopMobileOf,
@@ -208,6 +214,7 @@ function OrdersAssignmentTab({
   shopDirectory,
   supervisorDirectory,
   onChanged,
+  onFinished,
   onRefresh,
   refreshing,
 }: Props) {
@@ -264,6 +271,7 @@ function OrdersAssignmentTab({
           q={q}
           sortMode={sortMode}
           onChanged={onChanged}
+          onFinished={onFinished}
         />
       )}
     </div>
@@ -281,6 +289,7 @@ function AssignmentEditor({
   q,
   sortMode,
   onChanged,
+  onFinished,
 }: {
   day: string;
   collection: OrdersDayCollection;
@@ -290,6 +299,8 @@ function AssignmentEditor({
   q: string;
   sortMode: "pending" | "az" | "za" | "vehicle_trip";
   onChanged: () => void;
+  /** Assignment finished — page moves to Tab 3. */
+  onFinished: (vehicleTrip: Trip) => void;
 }) {
   const { to } = useOrdersI18n();
   const { showNotification } = useSafeNotification();
@@ -582,8 +593,12 @@ function AssignmentEditor({
       await saveAssignment(vehicle.trip, [
         { orderTripNo: orderTrip.tripNo, rows: toOrderShopRows(selected) },
       ]);
-      setSavedSnapshot(selectionSnapshot(vehicleTripId, []));
-      setSelected([]);
+      // INCREMENTAL ASSIGNMENT: keep the just-saved shops selected so the
+      // operator can tick MORE shops and save again (1 saved + 4 new = all 5
+      // on the truck). The save REPLACES this order's rows on the vehicle,
+      // so re-saving the kept rows is idempotent — and the fresh-data
+      // balance guard above still blocks any over-assignment.
+      setSavedSnapshot(selectionSnapshot(vehicleTripId, selected));
       showNotification(to("orders.assignment_saved"), "success");
       onChanged();
     } catch {
@@ -667,6 +682,9 @@ function AssignmentEditor({
       }
       let trip = vehicle.trip;
       let payload: OrderShopRow[] | null = null;
+      // When the popup re-ordered the live selection, keep that sequence in
+      // state too (see below) so the kept selection matches what was saved.
+      let reorderedSelection: SelectedRow[] | null = null;
       if (orderedShopIds && orderedShopIds.length > 0) {
         if (selected.length > 0) {
           // Live selection: same rows, re-ordered to the popup's sequence.
@@ -676,6 +694,7 @@ function AssignmentEditor({
             return row ? [row] : [];
           });
           payload = toOrderShopRows(reordered);
+          reorderedSelection = reordered;
         } else {
           // Re-send of saved rows: re-number the persisted rows, no other
           // field changes — the order becomes the new saved sequence.
@@ -701,8 +720,12 @@ function AssignmentEditor({
               rows: payload ?? toOrderShopRows(selected),
             },
           ]);
-          setSavedSnapshot(selectionSnapshot(vehicleTripId, []));
-          setSelected([]);
+          // Keep the saved shops selected for incremental assignment (same
+          // as Save Progress above) — never wipe the operator's work here.
+          if (reorderedSelection) setSelected(reorderedSelection);
+          setSavedSnapshot(
+            selectionSnapshot(vehicleTripId, reorderedSelection ?? selected)
+          );
           onChanged();
         } catch {
           showNotification(to("orders.refresh_failed"), "error");
@@ -790,6 +813,30 @@ function AssignmentEditor({
       .map((name) => ({ value: name, label: name }));
   }, [collection.rows, shopDirectory]);
   const cityFilterSet = useMemo(() => new Set(cityFilters), [cityFilters]);
+  // ── Status counts for the segmented filter (same kind rules as
+  //     filteredPool below: "pending" = still needs a vehicle, i.e. pending
+  //     + partial-balance rows; "assigned" = fully placed).
+  const poolCounts = useMemo(() => {
+    const counts = { all: collection.rows.length, pending: 0, assigned: 0, thisVehicle: 0 };
+    for (const row of collection.rows) {
+      const a = collection.shops.get(row.shopId);
+      const parts = a?.parts ?? [];
+      const partsTotal = a?.assignedBoxesTotal ?? 0;
+      const orderedBoxes = Math.max(1, Number(row.boxNo) || 0);
+      const boxesOnThisVehicle = parts
+        .filter((p) => p.tripNo === thisTripNo)
+        .reduce((sum, p) => sum + p.boxes, 0);
+      const onThisVehicle =
+        boxesOnThisVehicle > 0 || parts.some((p) => p.tripNo === thisTripNo);
+      const remainingBoxes = Math.max(0, orderedBoxes - partsTotal);
+      const kind =
+        parts.length === 0 ? "pending" : remainingBoxes > 0 && !onThisVehicle ? "partial" : "assigned";
+      if (kind === "assigned") counts.assigned += 1;
+      else counts.pending += 1;
+      if (onThisVehicle) counts.thisVehicle += 1;
+    }
+    return counts;
+  }, [collection, thisTripNo]);
   const filteredPool = useMemo(() => {
     const list: PoolRow[] = [];
     collection.rows.forEach((row, i) => {
@@ -995,42 +1042,98 @@ function AssignmentEditor({
             {/* ── Body: shop pool + delivery sequence ── */}
             <div className="min-h-0">
       {/* 1 — Day pool: pending + assigned collected shops (select
-          pending shops one by one; assigned rows are visible, locked) */}
-      <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/70 flex items-center gap-2.5 flex-wrap">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-          {to("orders.collected_shops")}
-        </span>
-        {/* ~100 shops a day: search the pool + refine it without losing the
-            shops already ticked. */}
-        <OrdersSearchInput
-          value={poolQuery}
-          onChange={setPoolQuery}
-          placeholder={to("orders.search_pool")}
-          className="w-full sm:w-60"
-        />
-        <OrdersMultiSelect
-          values={cityFilters}
-          onChange={setCityFilters}
-          options={cityOptions}
-          ariaLabel={to("orders.filter_city")}
-          placeholder={to("orders.filter_city_all")}
-          widthClass="w-56"
-        />
-        <OrdersMultiSelect
-          values={cityFilters}
-          onChange={setCityFilters}
-          options={cityOptions}
-          ariaLabel={to("orders.filter_city")}
-          placeholder={to("orders.filter_city_all")}
-          widthClass="w-56"
-        />
-        <span className="ml-auto text-[11px] font-semibold text-slate-400 whitespace-nowrap">
-          {to("orders.pool_showing", {
-            shown: filteredPool.length,
-            total: collection.totalShops,
-            selected: selected.length,
-          })}
-        </span>
+          pending shops one by one; assigned rows are visible, locked).
+          Sticky toolbar so search + filters stay in reach on ~100-shop days. */}
+      <div className="sticky top-0 z-20 border-b border-slate-200/80 bg-slate-50/95 backdrop-blur">
+        {/* Filter controls: search + status + city, with live summary pills.
+            Narrows the table only — ticked shops stay selected. */}
+        <div className="flex items-center gap-2 px-4 py-3 flex-wrap">
+          <div
+            role="group"
+            aria-label={to("orders.filter_status")}
+            className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-xl border border-slate-200 bg-slate-100/90 p-1"
+          >
+            {(
+              [
+                { value: "all", labelKey: "orders.pool_filter_all", count: poolCounts.all, icon: LayoutGrid },
+                { value: "pending", labelKey: "orders.pool_filter_pending", count: poolCounts.pending, icon: Clock },
+                { value: "assigned", labelKey: "orders.pool_filter_assigned", count: poolCounts.assigned, icon: CheckCheck },
+                {
+                  value: "this_vehicle",
+                  labelKey: "orders.pool_filter_this_vehicle",
+                  count: poolCounts.thisVehicle,
+                  icon: Truck,
+                  needsVehicle: true,
+                },
+              ] as Array<{
+                value: "all" | "pending" | "assigned" | "this_vehicle";
+                labelKey: string;
+                count: number;
+                icon: LucideIcon;
+                needsVehicle?: boolean;
+              }>
+            ).map((opt) => {
+              const active = poolFilter === opt.value;
+              const disabled = opt.needsVehicle === true && !vehicle;
+              const Icon = opt.icon;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setPoolFilter(opt.value)}
+                  disabled={disabled}
+                  aria-pressed={active}
+                  title={disabled ? to("orders.select_vehicle") : to(opt.labelKey)}
+                  className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-bold whitespace-nowrap transition-all ${
+                    active
+                      ? "bg-white text-emerald-700 shadow-sm ring-1 ring-slate-900/5"
+                      : "text-slate-500 hover:bg-white/70 hover:text-slate-700"
+                  } disabled:cursor-not-allowed disabled:opacity-40`}
+                >
+                  <Icon size={13} aria-hidden className={active ? "text-emerald-600" : "text-slate-400"} />
+                  {to(opt.labelKey)}
+                  <span
+                    className={`rounded-md px-1.5 py-px text-[10px] font-bold tabular-nums ${
+                      active ? "bg-emerald-100 text-emerald-700" : "bg-slate-200/70 text-slate-500"
+                    }`}
+                  >
+                    {opt.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {/* Search sits beside the city filter — both refine the pool. */}
+          <OrdersSearchInput
+            value={poolQuery}
+            onChange={setPoolQuery}
+            placeholder={to("orders.search_pool")}
+            className="w-full sm:w-52 sm:flex-1 lg:w-60 lg:flex-none"
+          />
+          <OrdersMultiSelect
+            values={cityFilters}
+            onChange={setCityFilters}
+            options={cityOptions}
+            ariaLabel={to("orders.filter_city")}
+            placeholder={to("orders.filter_city_all")}
+            widthClass="w-48"
+          />
+          <div className="ml-auto flex items-center gap-2 flex-wrap">
+            {selected.length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
+                <CheckCheck size={12} aria-hidden />
+                {to("orders.selected_shops")}: {selected.length}
+              </span>
+            )}
+            <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+              {to("orders.pool_showing", {
+                shown: filteredPool.length,
+                total: collection.totalShops,
+                selected: selected.length,
+              })}
+            </span>
+          </div>
+        </div>
       </div>
       {filteredPool.length === 0 ? (
         <div className="px-4 py-5">
