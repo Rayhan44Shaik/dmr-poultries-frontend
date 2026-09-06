@@ -93,32 +93,6 @@ export function hasOrderRows(trip: Trip): boolean {
 }
 
 /**
- * A collection container: NO vehicle (vehicleId 0/empty), Orders plan rows,
- * not deleted. startStepSubmitted = "collection finished (collected)".
- */
-export function isOrderContainer(trip: Trip): boolean {
-  return (
-    trip.deleted !== true &&
-    (trip.vehicleId == null || trip.vehicleId === 0) &&
-    !trip.vehicleNo &&
-    hasOrderRows(trip)
-  );
-}
-
-/**
- * Container whose collection was finished via Finish Collection.
- * Assignment does NOT require this — Save Progress is enough for Tab 2.
- */
-export function isCollectedOrder(trip: Trip): boolean {
-  return isOrderContainer(trip) && trip.startStepSubmitted === true;
-}
-
-/** Container still being collected → the single Tab 1 working collection. */
-export function isActiveCollection(trip: Trip): boolean {
-  return isOrderContainer(trip) && trip.startStepSubmitted !== true;
-}
-
-/**
  * A vehicle trip eligible for order assignment: Step 2 (farm) submitted,
  * Step 4 (deliveries) NOT submitted, vehicle set.
  *
@@ -131,8 +105,8 @@ export function isActiveCollection(trip: Trip): boolean {
 export function isEligibleVehicleTrip(trip: Trip): boolean {
   return (
     trip.deleted !== true &&
-    trip.farmStepSubmitted === true &&
-    trip.deliveryStepSubmitted !== true &&
+    (trip.startStepSubmitted === true || trip.farmStepSubmitted === true) &&
+    !(trip.assignmentSubmitted ?? trip.deliveryStepSubmitted) && trip.status !== "Completed" && !trip.endStepSubmitted &&
     (trip.vehicleId != null && trip.vehicleId > 0)
   );
 }
@@ -157,21 +131,9 @@ export function hasOrderTag(trip: Trip): boolean {
 export function isTrackingTrip(trip: Trip): boolean {
   return (
     trip.deleted !== true &&
-    trip.deliveryStepSubmitted === true &&
-    (hasOrderRows(trip) || hasOrderTag(trip))
+    ((trip.assignmentSubmitted ?? trip.deliveryStepSubmitted) === true || trip.deliveries.some(isCapturedRow)) &&
+    (hasOrderRows(trip) || hasOrderTag(trip) || trip.deliveries.some(isCapturedRow))
   );
-}
-
-/** Next collection container tripNo for today (ORD-YYYYMMDD-NN). */
-export function nextOrderTripNo(allTrips: Trip[], now = new Date()): string {
-  const date = localToday(now);
-  const stamp = date.replace(/-/g, "");
-  let max = 0;
-  for (const t of allTrips) {
-    const m = String(t.tripNo ?? "").match(/^ORD-(\d{8})-(\d+)$/);
-    if (m && m[1] === stamp) max = Math.max(max, num(m[2]));
-  }
-  return `ORD-${stamp}-${String(max + 1).padStart(2, "0")}`;
 }
 
 /** One-week operational window (project date convention: tripDate). */
@@ -284,7 +246,7 @@ export function computeOrdersProgress(
 
   for (const [shopId, row] of planByShop) {
     const ordered = originalQuantities?.get(shopId);
-    totalBoxes += ordered ? ordered.boxes : rowBoxes(row);
+    totalBoxes += ordered ? (ordered.assignedBoxes ?? ordered.boxes) : (row.assignedBoxes ?? rowBoxes(row));
     totalWeight += ordered ? ordered.weight : num(row.farmWeight ?? row.weight);
     totalBirds += ordered ? ordered.birds : num(row.farmBirds ?? row.birds);
   }
@@ -317,7 +279,7 @@ export function computeOrdersProgress(
   let partDeliveredShops = 0;
   for (const [shopId, row] of planByShop) {
     const ordered = originalQuantities?.get(shopId);
-    const orderedBoxes = ordered ? ordered.boxes : rowBoxes(row);
+    const orderedBoxes = ordered ? (ordered.assignedBoxes ?? ordered.boxes) : (row.assignedBoxes ?? rowBoxes(row));
     const orderedBirds = ordered ? ordered.birds : num(row.farmBirds ?? row.birds);
     const orderedWeight = ordered ? ordered.weight : num(row.farmWeight ?? row.weight);
     const got = capturedByShop.get(shopId);
@@ -860,15 +822,14 @@ export function buildShopBreakdown(
           .sort()[0] ?? null
       : null;
     const ordered = originalQuantities?.get(shopId);
-    const orderedBoxes = ordered
-      ? ordered.boxes
-      : num(plan.boxNo ?? plan.selectedBoxIds?.length);
-    const orderedBirds = ordered ? ordered.birds : num(plan.farmBirds ?? plan.birds);
+    const additional = !originalShopIds.has(shopId);
+    const orderedBoxes = additional ? 0 : ordered ? ordered.boxes : num(plan.boxNo ?? plan.selectedBoxIds?.length);
+    const assignedBoxes = additional ? 0 : ordered?.assignedBoxes ?? plan.assignedBoxes ?? num(plan.boxNo ?? plan.selectedBoxIds?.length);
+    const orderedBirds = additional ? 0 : ordered ? ordered.birds : num(plan.farmBirds ?? plan.birds);
     const deliveredBoxes = captured.reduce((s, r) => s + deliveredRowBoxes(r), 0);
     const deliveredBirds = captured.reduce((s, r) => s + num(r.birds), 0);
     // NOT LISTED = Step 4 delivered a shop that was never in the original
     // order (no plan row for it). Shown, flagged — never discarded.
-    const additional = originalShopIds.size > 0 && !originalShopIds.has(shopId);
     // Difference vs the ORIGINAL order:
     //  - not listed  → no original order, difference is "—" (0 here)
     //  - not delivered → delivered 0 vs ordered n → −n (visible shortfall)
@@ -893,8 +854,8 @@ export function buildShopBreakdown(
       serialNo: num(acc.first.serialNo ?? acc.first.id),
       ordered: !additional,
       orderedBoxes,
-      tripBoxes: num(plan.boxNo ?? plan.selectedBoxIds?.length),
-      orderedWeight: ordered ? ordered.weight : num(plan.farmWeight ?? plan.weight),
+      tripBoxes: assignedBoxes,
+      orderedWeight: additional ? 0 : ordered ? ordered.weight : num(plan.farmWeight ?? plan.weight),
       orderedBirds,
       deliveredBoxes,
       deliveredWeight: Number(
@@ -908,19 +869,8 @@ export function buildShopBreakdown(
       additional,
       status,
       collectedBoxes: additional ? 0 : orderedBoxes,
-      assignedBoxes: additional
-        ? 0
-        : num(plan.boxNo ?? plan.selectedBoxIds?.length) > 0
-          ? num(plan.boxNo ?? plan.selectedBoxIds?.length)
-          : orderedBoxes,
-      pendingBoxes: additional
-        ? 0
-        : Math.max(
-            0,
-            (num(plan.boxNo ?? plan.selectedBoxIds?.length) > 0
-              ? num(plan.boxNo ?? plan.selectedBoxIds?.length)
-              : orderedBoxes) - deliveredBoxes
-          ),
+      assignedBoxes,
+      pendingBoxes: Math.max(0, assignedBoxes - deliveredBoxes),
     });
   }
   return out.sort((a, b) => a.serialNo - b.serialNo);

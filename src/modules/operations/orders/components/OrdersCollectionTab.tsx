@@ -26,7 +26,7 @@
 //   Finish Collection  → same call + startStepSubmitted (final validation)
 // Refreshing the page always reproduces the saved collection.
 
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Lock, RefreshCw, Save, Send, Trash2, X } from "lucide-react";
 import type { Shop } from "../../../masters/shops/types/shop";
 import type { Trip } from "../../../../shared/trip";
@@ -179,8 +179,6 @@ type Props = {
   onDaySelect: (day: string) => void;
   /** The selected day's persisted collection (null = nothing collected yet). */
   collection: OrdersDayCollection | null;
-  /** Trip number reserved for a brand-new collection today. */
-  nextTripNo: string;
   /** Persisted snapshot changed (save) — page refreshes its data. */
   onSaved: (trip: Trip) => void;
   /** Collection finished — page refreshes its data. */
@@ -218,7 +216,6 @@ function CollectionEntries({
   today,
   onDaySelect,
   collection,
-  nextTripNo,
   onSaved,
   onFinished,
   onRefresh,
@@ -233,7 +230,7 @@ function CollectionEntries({
   const isPast = day < today;
   const isLocked =
     isAutoClosed || Boolean(collection?.finished) || Boolean(collection?.fullyAssigned);
-  const isEditable = !isLocked;
+  const isEditable = !isLocked && Boolean(collection?.trip.id) && collection?.trip.status === "Draft";
 
   // ── Entries (local editing state, seeded from the day's collection) ──
   const initial = useMemo(
@@ -252,9 +249,10 @@ function CollectionEntries({
   );
 
   // ── Container identity (one container per day — reuse or create today) ──
-  const containerRef = useRef<{ id: number | null; tripNo: string | null }>({
+  const containerRef = useRef<{ id: number | null; tripNo: string | null; version?: number }>({
     id: collection?.trip.id ?? null,
-    tripNo: collection?.trip.tripNo ?? (day === today && nextTripNo ? nextTripNo : null),
+    tripNo: collection?.trip.tripNo ?? null,
+    version: collection?.trip.version,
   });
 
   // ── Busy flags (double-submit protection) ────────────────────────────────
@@ -262,6 +260,12 @@ function CollectionEntries({
   const [finishing, setFinishing] = useState(false);
   const persistLockRef = useRef(false);
   const busy = saving || finishing;
+  useEffect(() => {
+    if (!collection || isDirty || busy || collection.trip.version === containerRef.current.version) return;
+    const fresh=buildInitial(shops,collection);
+    setEntries(fresh.map); setSavedSnapshot(fresh.snapshot);
+    containerRef.current={id:collection.trip.id,tripNo:collection.trip.tripNo,version:collection.trip.version};
+  },[collection,shops,isDirty,busy]);
 
   const entered = useMemo(
     () => Array.from(entries.values()).filter((r) => r.birds > 0 || r.boxes > 0),
@@ -308,15 +312,15 @@ function CollectionEntries({
           const updated = await saveCollection(
             containerRef.current.id,
             containerRef.current.tripNo,
-            remaining
+            remaining, containerRef.current.version
           );
-          containerRef.current = { id: updated.id, tripNo: updated.tripNo };
+          containerRef.current = { id: updated.id, tripNo: updated.tripNo, version: updated.version };
           const fresh = new Map(entries);
           const kept = fresh.get(shopId);
           if (kept) fresh.set(shopId, { ...kept, id: 0, birds: 0, boxes: 0 });
           setEntries(fresh);
           setSavedSnapshot(entrySnapshot(Array.from(fresh.values())));
-          onSaved(updated);
+          await onSaved(updated);
           showNotification(to("orders.entry_cleared", { shop: row.shopName }), "success");
         } catch (error) {
           showNotification(handleApiError(error), "error");
@@ -361,9 +365,9 @@ function CollectionEntries({
       const updated = await saveCollection(
         containerRef.current.id,
         containerRef.current.tripNo,
-        rows
+        rows, containerRef.current.version
       );
-      containerRef.current = { id: updated.id, tripNo: updated.tripNo };
+      containerRef.current = { id: updated.id, tripNo: updated.tripNo, version: updated.version };
       // Authoritative values come from the API response — never a stale
       // pre-setState snapshot, never an independent optimistic total.
       const persisted = toEditorRows(updated);
@@ -379,7 +383,7 @@ function CollectionEntries({
       }
       setEntries(next);
       setSavedSnapshot(entrySnapshot(Array.from(next.values())));
-      onSaved(updated);
+      await onSaved(updated);
       showNotification(to("orders.collection_saved"), "success");
     } catch (error) {
       showNotification(handleApiError(error), "error");
@@ -421,9 +425,9 @@ function CollectionEntries({
         containerRef.current.tripNo,
         toOrderShopRows(all)
       );
-      containerRef.current = { id: updated.id, tripNo: updated.tripNo };
+      containerRef.current = { id: updated.id, tripNo: updated.tripNo, version: updated.version };
       showNotification(to("orders.collection_finished"), "success");
-      onFinished(updated);
+      await onFinished(updated);
     } catch (error) {
       showNotification(handleApiError(error), "error");
     } finally {

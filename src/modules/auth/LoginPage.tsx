@@ -46,7 +46,6 @@ export default function LoginPage() {
           <BrandMark size="md" />
           <div>
             <h1 className="text-lg font-bold tracking-tight text-white">DMR Poultries</h1>
-            <p className="text-xs font-medium text-emerald-300/80">ERP Management System</p>
           </div>
         </div>
 
@@ -84,7 +83,6 @@ export default function LoginPage() {
             <BrandMark size="md" />
             <div>
               <h1 className="text-lg font-bold tracking-tight text-slate-900">DMR Poultries</h1>
-              <p className="text-xs font-medium text-slate-400">ERP Management System</p>
             </div>
           </div>
 

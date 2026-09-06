@@ -29,17 +29,15 @@
 // vehicle-trip endpoint Step 1–5 uses, so Step 4 delivery records, PDF
 // and WhatsApp work unchanged.
 
-import React, { useCallback, useEffect, useState } from "react";
-import { ClipboardList, DatabaseZap, PackageCheck, Route } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ClipboardList, PackageCheck, Route } from "lucide-react";
 import { useI18n } from "../../../../i18n";
-import { useShops } from "../../../masters/shops/hooks/useShops";
+import { loadShops } from "../../../masters/shops/services/shopService";
 import type { Shop } from "../../../masters/shops/types/shop";
+import { useSearchParams } from "react-router-dom";
+import { subscribeTripChanges } from "../../../../shared/trip/tripSync";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import type { Trip } from "../../../../shared/trip";
-import {
-  ORDERS_SAMPLE_DATA_ENABLED,
-  sampleShopRecords,
-} from "../sampleOrdersData";
 import {
   fetchOrdersData,
   loadShopDirectory,
@@ -65,7 +63,7 @@ import OrdersAssignmentTab from "../components/OrdersAssignmentTab";
 import OrdersCollectionTab from "../components/OrdersCollectionTab";
 import OrdersDeliveryTrackingTab from "../components/OrdersDeliveryTrackingTab";
 import OrdersDeliveryDetailView from "../components/OrdersDeliveryDetailView";
-import { OrdersErrorState, OrdersTableSkeleton } from "../components/OrdersCommon";
+import { OrdersDropdown, OrdersEmptyState, OrdersErrorState, OrdersTableSkeleton } from "../components/OrdersCommon";
 
 type TabKey = "collection" | "assignment" | "tracking";
 
@@ -107,20 +105,16 @@ const TAB_DEFS: Array<{
   },
 ];
 
-/** Sample mode never touches the network — the shop list is the bundled master. */
-function useSampleShops(): { shops: Shop[]; loading: boolean } {
-  return { shops: sampleShopRecords(), loading: false };
-}
-
-// The flag is a module constant, so exactly one of these two hooks is ever
-// mounted for the life of the app — the hook order stays stable.
-const useOrdersShopSource = ORDERS_SAMPLE_DATA_ENABLED ? useSampleShops : useShops;
-
 const OrdersPage: React.FC = () => {
   const { language } = useI18n();
   const { to } = useOrdersI18n();
   const { showNotification } = useSafeNotification();
-  const { shops, loading: shopsLoading } = useOrdersShopSource();
+  const [shops, setShops] = useState<Shop[]>([]);
+  const shopsLoading = false;
+  const shopsError = null;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedTripId = Number(searchParams.get("tripId")) || null;
+  const loadId = useRef(0);
 
   const [data, setData] = useState<OrdersFetch | null>(null);
   const [loading, setLoading] = useState(true);
@@ -144,85 +138,29 @@ const OrdersPage: React.FC = () => {
     : today;
 
   const load = useCallback(async () => {
+    const request = ++loadId.current;
     try {
-      const next = await fetchOrdersData();
-      setData(next);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load orders");
-    } finally {
-      setLoading(false);
-    }
+      const [next,realShops,supDir] = await Promise.all([fetchOrdersData(),loadShops(),loadSupervisorDirectory()]);
+      const shopDir=await loadShopDirectory(realShops);
+      if (request !== loadId.current) return;
+      setData(next); setShops(realShops); setShopDirectory(shopDir); setSupervisorDirectory(supDir); setError(null);
+    } catch(e) {
+      if (request === loadId.current) setError(e instanceof Error ? e.message : "Failed to load orders");
+    } finally { if (request === loadId.current) setLoading(false); }
   }, []);
-
-  // Initial load. The retry button and post-mutation refreshes use `load`;
-  // the first fetch is inlined here so the effect only sets state from
-  // async callbacks (no synchronous setState in the effect body).
   useEffect(() => {
-    let cancelled = false;
-    void fetchOrdersData().then(
-      (next) => {
-        if (cancelled) return;
-        setData(next);
-        setError(null);
-      },
-      (e: unknown) => {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Failed to load orders");
-      }
-    ).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
-    void (async () => {
-      try {
-        const [shopDir, supDir] = await Promise.all([
-          loadShopDirectory(),
-          loadSupervisorDirectory(),
-        ]);
-        if (!cancelled) {
-          setShopDirectory(shopDir);
-          setSupervisorDirectory(supDir);
-        }
-      } catch {
-        // Non-fatal: village / supervisor-mobile columns fall back to "—".
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Light frontend revalidation while Delivery Tracking is open: refetch on
-  // window focus / tab visibility. No polling, no extra backend contract.
-  useEffect(() => {
-    if (activeTab !== "tracking") return;
-    let inFlight = false;
+    void load();
+    let scheduled = false;
     const refresh = () => {
-      if (inFlight) return;
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-      inFlight = true;
-      void fetchOrdersData()
-        .then((next) => {
-          setData(next);
-          setError(null);
-        })
-        .catch(() => {
-          /* keep the last good snapshot — this is a silent revalidate */
-        })
-        .finally(() => {
-          inFlight = false;
-        });
+      if (scheduled || document.visibilityState === 'hidden') return;
+      scheduled = true;
+      queueMicrotask(() => { scheduled = false; void load(); });
     };
-    const onVis = () => {
-      if (document.visibilityState === "visible") refresh();
-    };
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", onVis);
-    return () => {
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", onVis);
-    };
-  }, [activeTab]);
+    const unsubscribe=subscribeTripChanges(refresh);
+    window.addEventListener('focus',refresh);
+    document.addEventListener('visibilitychange',refresh);
+    return () => { loadId.current++; unsubscribe(); window.removeEventListener('focus',refresh); document.removeEventListener('visibilitychange',refresh); };
+  },[load]);
 
   const mobileOf = useCallback(
     (trip: Trip) => supervisorMobileOf(trip, supervisorDirectory),
@@ -277,10 +215,14 @@ const OrdersPage: React.FC = () => {
 
   // ── Row-level operations (PDF / WhatsApp) ──────────────────────────────
   const handlePdf = useCallback(
-    async (ot: OrdersTrip) => {
+    async (snapshot: OrdersTrip) => {
       if (pdfBusyId != null) return;
-      setPdfBusyId(ot.trip.id);
+      setPdfBusyId(snapshot.trip.id);
       try {
+        const fresh=await fetchOrdersData();
+        const ot=fresh.tracking.find(t=>t.trip.id===snapshot.trip.id);
+        if (!ot) throw new Error("Trip is no longer available. Refresh Delivery Tracking.");
+        setData(fresh);
         await generateOrdersPdf({
           trip: ot.trip,
           supervisorMobile: mobileOf(ot.trip),
@@ -421,7 +363,15 @@ const OrdersPage: React.FC = () => {
   const viewing: OrdersTrip | null =
     (viewingId != null && data?.tracking.find((t) => t.trip.id === viewingId)) || null;
 
-  const dayCollection = data && day ? data.collectionsByDay[day] ?? null : null;
+  const selectedTrip = data?.trips.find(t => t.id === selectedTripId) ?? null;
+  const tripDay = selectedTrip?.tripDate ?? day;
+  const dayCollection = selectedTrip ? data?.collectionsByTripId[selectedTrip.id] ?? null : null;
+  const selectTrip = (value: string) => {
+    const id = Number(value);
+    const found = data?.trips.find(t => t.id === id);
+    if (found) setSelectedDay(found.tripDate);
+    setSearchParams(previous => { const next=new URLSearchParams(previous); if (found) next.set('tripId',String(found.id)); else next.delete('tripId'); return next; });
+  };
 
   return (
     <div className="space-y-4">
@@ -446,61 +396,64 @@ const OrdersPage: React.FC = () => {
           );
         })}
 
-        {/* Honest marker while the page runs on bundled sample data (no
-            backend). Save / Finish actions work against the in-memory store. */}
-        {ORDERS_SAMPLE_DATA_ENABLED && (
-          <span
-            title={to("orders.sample_hint")}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] md:text-[11px] font-bold text-amber-700"
-          >
-            <DatabaseZap size={12} />
-            {to("orders.sample_badge")}
-          </span>
-        )}
+
       </div>
 
+      {data && activeTab !== "tracking" && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <OrdersDropdown ariaLabel="Orders trip" value={selectedTripId ? String(selectedTripId) : ""}
+            onChange={selectTrip} widthClass="w-80" options={[
+              {value:"",label:"Select Trip Entry trip"},
+              ...data.trips.map(trip=>({value:String(trip.id),label:`${trip.tripNo} · ${trip.vehicleNo} · ${trip.tripDate}`}))
+            ]} />
+        </div>
+      )}
+      {(error || shopsError) && data && <OrdersErrorState title={to("orders.error_title")} message={error || shopsError || ""}
+        onRetry={()=>{void load();}} retryLabel={to("orders.retry")} />}
       {loading ? (
         <OrdersTableSkeleton rows={5} />
-      ) : error ? (
+      ) : (error || shopsError) && !data ? (
         <OrdersErrorState
           title={to("orders.error_title")}
-          message={error}
+          message={error || shopsError || ""}
           onRetry={() => void load()}
           retryLabel={to("orders.retry")}
         />
       ) : data ? (
         <>
-          {activeTab === "collection" && (
+          {activeTab !== "tracking" && !selectedTrip && <OrdersEmptyState
+            title={data.trips.length ? "Select a Trip Entry trip" : "No trips available"}
+            hint="Create or open the real trip in Trip Entry, then select its trip number above." />}
+          {activeTab === "collection" && selectedTrip && (
             <OrdersCollectionTab
-              key={`collection|${day}`}
+              key={`collection|${selectedTrip.id}`}
               shops={shops}
               shopsLoading={shopsLoading}
               shopDirectory={shopDirectory}
-              day={day}
+              day={tripDay}
               today={today}
-              onDaySelect={setSelectedDay}
+              onDaySelect={(value)=>{setSelectedDay(value); if(value!==tripDay) selectTrip("");}}
               collection={dayCollection}
-              nextTripNo={data.nextTripNo}
-              onSaved={() => void handleCollectionSaved()}
-              onFinished={() => void handleCollectionFinished()}
+              onSaved={handleCollectionSaved}
+              onFinished={handleCollectionFinished}
               onRefresh={() => void handleRefresh("collection")}
               refreshing={refreshing === "collection"}
             />
           )}
-          {activeTab === "assignment" && (
+          {activeTab === "assignment" && selectedTrip && (
             <OrdersAssignmentTab
-              key={`assignment|${today}`}
+              key={`assignment|${selectedTrip.id}`}
               loading={false}
-              day={today}
+              day={tripDay}
               today={today}
               onDaySelect={() => {}}
-              collection={today ? data.collectionsByDay[today] ?? null : null}
-              eligibleVehicles={data.eligibleVehicles}
-              dayVehicleViews={today ? data.dayVehicleViews[today] ?? [] : []}
+              collection={dayCollection?.rows.length ? dayCollection : null}
+              eligibleVehicles={data.eligibleVehicles.filter(v=>v.trip.id===selectedTrip.id)}
+              dayVehicleViews={(data.dayVehicleViews[tripDay] ?? []).filter(v=>v.trip.id===selectedTrip.id)}
               shopDirectory={shopDirectory}
               supervisorDirectory={supervisorDirectory}
-              onChanged={() => void handleAssignmentChanged()}
-              onFinished={() => void handleAssignmentFinished()}
+              onChanged={handleAssignmentChanged}
+              onFinished={handleAssignmentFinished}
               onRefresh={() => void handleRefresh("assignment")}
               refreshing={refreshing === "assignment"}
             />
@@ -514,7 +467,7 @@ const OrdersPage: React.FC = () => {
               supervisorDirectory={supervisorDirectory}
               pdfBusyId={pdfBusyId}
               onPdf={(ot) => void handlePdf(ot)}
-              onView={(ot) => setViewingId(ot.trip.id)}
+              onView={(ot) => { void load().then(()=>setViewingId(ot.trip.id)); }}
               onRefresh={() => void handleRefresh("tracking")}
               refreshing={refreshing === "tracking"}
             />

@@ -71,20 +71,18 @@ export function pendingBoxesFromRows(
 
 /** Assigned shops still awaiting a captured Step 4 delivery. */
 export function pendingShopsFromRows(rows: ShopDelivery[]): number {
-  const assigned = new Set<number>();
-  const captured = new Set<number>();
+  const assigned = new Map<number, number | null>();
+  const delivered = new Map<number, number>();
   for (const row of rows) {
-    const shopId = Number(row.shopId);
-    if (!Number.isFinite(shopId) || shopId <= 0) continue;
-    if (String(row.remarks ?? "").trim().startsWith("[ORDER]")) assigned.add(shopId);
-    const extra = row as ShopDelivery & { deliveredAt?: string; deliveryTime?: string };
-    if (row.autoCaptureTime || extra.deliveredAt || extra.deliveryTime) captured.add(shopId);
+    const id=Number(row.shopId);
+    if (!(id>0)) continue;
+    if (String(row.remarks??"").startsWith("[ORDER]")) assigned.set(id,row.assignedBoxes ?? assigned.get(id) ?? null);
+    if (row.autoCaptureTime || (row as ShopDelivery & {deliveredAt?:string}).deliveredAt) {
+      delivered.set(id,(delivered.get(id)??0)+(row.selectedBoxIds?.length || Number(row.boxNo)||0));
+    }
   }
-  if (assigned.size === 0) return 0;
-  let pending = 0;
-  for (const id of assigned) {
-    if (!captured.has(id)) pending += 1;
-  }
+  let pending=0;
+  for (const [id,boxes] of assigned) if (boxes==null ? !delivered.has(id) : (delivered.get(id)??0)<boxes) pending++;
   return pending;
 }
 

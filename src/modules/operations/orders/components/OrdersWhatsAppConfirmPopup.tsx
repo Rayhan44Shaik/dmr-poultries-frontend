@@ -226,6 +226,8 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
     try {
       await onConfirmSubmit();
       onClose();
+    } catch {
+      submittedRef.current = false;
     } finally {
       setSubmitting(false);
     }

@@ -140,9 +140,6 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
                   <h1 className="truncate text-[15px] font-bold leading-tight tracking-tight text-slate-900 dark:text-white">
                     DMR Poultries
                   </h1>
-                  <p className="truncate text-[11px] font-medium text-slate-400 dark:text-slate-500">
-                    {t("sidebar.erpSystem")}
-                  </p>
                 </div>
               </div>
               <button

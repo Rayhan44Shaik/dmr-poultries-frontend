@@ -1,3 +1,4 @@
+import { subscribeTripChanges } from "../../../../shared/trip/tripSync";
 // src/modules/operations/vehicle-trips/hooks/useTrips.ts
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -39,16 +40,25 @@ export default function useTrips(
 
   const includeDeleted = Boolean(options?.includeDeleted);
 
+  const refreshId = useRef(0);
   const refreshTrips = useCallback(async () => {
+    const request = ++refreshId.current;
     try {
-      setTrips(await listTrips({ includeDeleted }));
+      const next = await listTrips({ includeDeleted });
+      if (request === refreshId.current) setTrips(next);
+      return true;
     } catch {
       notifyRef.current?.(translate("ops.trip.unable_load_trips"), "error");
+      return false;
     }
   }, [includeDeleted]);
 
   useEffect(() => {
     void refreshTrips();
+    const unsubscribe = subscribeTripChanges(() => { void refreshTrips(); });
+    const onFocus = () => { void refreshTrips(); };
+    window.addEventListener('focus', onFocus);
+    return () => { refreshId.current++; unsubscribe(); window.removeEventListener('focus', onFocus); };
   }, [refreshTrips]);
 
   const resetFilters = () => {

@@ -10,25 +10,8 @@
 //   3. DELIVERY TRACKING  (Step 4 delivery rows are the source of truth;
 //                          ordered-vs-delivered report with differences)
 //
-// Persistence (existing endpoints only, no backend changes):
-//   - A "collection" is a lightweight trip record with NO vehicle and a
-//     machine-readable tripNo (ORD-YYYYMMDD-NN). Its delivery-plan rows are
-//     the collected shops, persisted through the existing Step 4 contract
-//     (POST /trips/:id/steps/deliveries). ONE container per operational day.
-//   - "COLLECTED/finished" = the container trip's startStepSubmitted flag.
-//   - Assignment writes the collection's rows (with an order reference
-//     marker) onto the chosen vehicle trip; finishing sets
-//     deliveryStepSubmitted (existing contract). The container is NEVER
-//     deleted — it remains the day's collection record, so the collection
-//     table can always show trip number / vehicle / sequence / status.
-//   - Rows written by the Orders module carry the marker `[ORDER]` in
-//     `remarks` (+ ` O:<orderTripNo>` reference) so the original order can
-//     be told apart from shops added later in Step 4.
-//   - The shop balance is DERIVED from this persisted data on every load:
-//     a shop may be carried by several vehicles for the day (partial
-//     assignment), but the boxes summed over all its vehicles may NEVER
-//     exceed the collected boxes — the remaining balance is what another
-//     vehicle can take.
+// Persistence uses collection/assignment rows attached to the existing trip.id.
+// The URL and API trip ID are authoritative; the trip number is display text only.
 
 import type { ShopDelivery, Trip } from "../../../shared/trip";
 
@@ -157,7 +140,7 @@ export type OrdersTrip = {
  */
 export type ShopOrderQuantities = Map<
   number,
-  { boxes: number; birds: number; weight: number }
+  { boxes: number; birds: number; weight: number; assignedBoxes?: number }
 >;
 
 /**
@@ -273,10 +256,9 @@ export type OrdersFetch = {
   today: string;
   /** 7-day scroller window: [today-6 … today] (no future days). */
   days: string[];
-  /** Persisted collections, keyed by operational day (YYYY-MM-DD). */
-  collectionsByDay: Record<string, OrdersDayCollection>;
-  /** Next machine-readable trip number for a NEW collection today. */
-  nextTripNo: string;
+  /** Real Trip Entry records and collections keyed only by their backend ID. */
+  trips: Trip[];
+  collectionsByTripId: Record<number, OrdersDayCollection>;
   /** Vehicle trips eligible for assignment (Tab 2 vehicle select). */
   eligibleVehicles: OrdersEligibleVehicle[];
   /** Order-assigned trips with delivery tracking (Tab 3, week window). */

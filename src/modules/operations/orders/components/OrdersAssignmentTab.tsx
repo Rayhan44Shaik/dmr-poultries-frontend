@@ -308,7 +308,7 @@ function AssignmentEditor({
   // ── Day pool split: available vs already assigned (persisted facts) ──────
   const pool = useMemo(() => {
     const available: OrderShopRow[] = [];
-    const assigned: Array<{ row: OrderShopRow; tripNo: string; vehicleNo: string; delivered: boolean }> = [];
+    const assigned: Array<{ row: OrderShopRow; tripId: number; tripNo: string; vehicleNo: string; delivered: boolean }> = [];
     for (const row of collection.rows) {
       const a = collection.shops.get(row.shopId);
       if (!a) {
@@ -316,6 +316,7 @@ function AssignmentEditor({
       } else {
         assigned.push({
           row,
+          tripId: orderTrip.id,
           tripNo: a.tripNo,
           vehicleNo: a.vehicleNo,
           delivered: a.delivered,
@@ -351,7 +352,18 @@ function AssignmentEditor({
     requested: number;
   }>(null);
   const persistLockRef = useRef(false);
-  const busy = saving || conflictChecking || waBusy;
+  const readOnly = orderTrip.assignmentSubmitted === true || orderTrip.status !== "Draft";
+  const busy = saving || conflictChecking || waBusy || readOnly;
+  const selectionSource = useRef<{id:number;version?:number}|null>(null);
+  useEffect(()=>{
+    if (!vehicle || (selectionSource.current?.id===vehicle.trip.id && (isDirty || saving || waBusy || selectionSource.current.version===vehicle.trip.version))) return;
+    const loaded: SelectedRow[]=(vehicle.trip.orderAssignments??[]).map(a=>{const source=collection.rows.find(r=>r.shopId===a.shopId);return {
+      clientKey:a.clientKey||`order:${a.id}`,shopId:a.shopId,shopName:a.shopName,village:villageOf(a.shopId,a.shopName,shopDirectory),
+      orderedBirds:Number(source?.birds)||0,orderedBoxes:Number(source?.boxNo)||0,assignedElsewhere:0,assigned:Number(a.boxNo)||0,
+    };});
+    setSelected(loaded);setSavedSnapshot(selectionSnapshot(vehicleTripId,loaded));
+    selectionSource.current={id:vehicle.trip.id,version:vehicle.trip.version};
+  },[vehicle,vehicleTripId,collection.rows,shopDirectory,isDirty,saving,waBusy]);
 
   const selectedIds = useMemo(
     () => new Set(selected.map((r) => r.shopId)),
@@ -448,7 +460,7 @@ function AssignmentEditor({
   // code subtracted the collection's TOTAL assigned boxes, which breaks
   // once an order is split over several vehicles.)
   const ownOrderBoxes = useMemo(
-    () => (vehicle ? planShareBoxes(orderRowsOnTrip(vehicle.trip, orderTrip.tripNo)) : 0),
+    () => (vehicle ? planShareBoxes(orderRowsOnTrip(vehicle.trip, String(orderTrip.id))) : 0),
     [vehicle, orderTrip.tripNo]
   );
   const alreadyAssignedOther = vehicle
@@ -470,19 +482,19 @@ function AssignmentEditor({
 
   /** Shops already saved on a truck — shown in the vehicle list. A shop
       split over two vehicles counts once for EACH of them. */
-  const savedShopsByTripNo = useMemo(() => {
-    const counts = new Map<string, number>();
+  const savedShopsByTripId = useMemo(() => {
+    const counts = new Map<number, number>();
     for (const a of collection.shops.values()) {
       if (!a) continue;
       for (const p of a.parts ?? []) {
-        counts.set(p.tripNo, (counts.get(p.tripNo) ?? 0) + 1);
+        counts.set(p.tripId, (counts.get(p.tripId) ?? 0) + 1);
       }
     }
     return counts;
   }, [collection]);
   const savedShopsOn = useCallback(
-    (tripNo: string): number => savedShopsByTripNo.get(tripNo) ?? 0,
-    [savedShopsByTripNo]
+    (tripId: number): number => savedShopsByTripId.get(tripId) ?? 0,
+    [savedShopsByTripId]
   );
 
   // The vehicle list is split in two so the operator sees at a glance which
@@ -512,7 +524,7 @@ function AssignmentEditor({
   const savedOnVehicle = useMemo(
     () =>
       vehicle
-        ? pool.assigned.filter((a) => a.tripNo === vehicle.trip.tripNo && !a.delivered).length
+        ? pool.assigned.filter((a) => a.tripId === vehicle.trip.id && !a.delivered).length
         : 0,
     [pool.assigned, vehicle]
   );
@@ -539,12 +551,15 @@ function AssignmentEditor({
   // even if this screen has stale data.
   const assertFitsBalance = useCallback(async (): Promise<boolean> => {
     if (!vehicle || selected.length === 0) return true;
+    if (selectionSource.current?.version !== vehicle.trip.version) {
+      showNotification("Assignment changed on the backend. Reopen this trip before saving.","error"); return false;
+    }
     setConflictChecking(true);
     try {
       const issues = await findDayOverAssignments(
         day,
         selected.map((r) => ({ shopId: r.shopId, shopName: r.shopName, boxes: r.assigned })),
-        vehicle.trip.tripNo
+        vehicle.trip.id
       );
       if (issues.length > 0) {
         // Auto-correct the selection to the fresh remaining balance and make
@@ -567,7 +582,7 @@ function AssignmentEditor({
           }),
           "error"
         );
-        onChanged();
+        await onChanged();
         return false;
       }
       return true;
@@ -591,9 +606,10 @@ function AssignmentEditor({
     persistLockRef.current = true;
     setSaving(true);
     try {
-      await saveAssignment(vehicle.trip, [
-        { orderTripNo: orderTrip.tripNo, rows: toOrderShopRows(selected) },
+      const saved = await saveAssignment(vehicle.trip, [
+        { orderTripId: orderTrip.id, rows: toOrderShopRows(selected) },
       ]);
+      selectionSource.current = {id:saved.id,version:saved.version};
       // INCREMENTAL ASSIGNMENT: keep the just-saved shops selected so the
       // operator can tick MORE shops and save again (1 saved + 4 new = all 5
       // on the truck). The save REPLACES this order's rows on the vehicle,
@@ -601,7 +617,7 @@ function AssignmentEditor({
       // balance guard above still blocks any over-assignment.
       setSavedSnapshot(selectionSnapshot(vehicleTripId, selected));
       showNotification(to("orders.assignment_saved"), "success");
-      onChanged();
+      await onChanged();
     } catch {
       showNotification(to("orders.refresh_failed"), "error");
     } finally {
@@ -616,7 +632,7 @@ function AssignmentEditor({
     const rows =
       selected.length > 0
         ? toOrderShopRows(selected)
-        : (orderRowsOnTrip(vehicle.trip, orderTrip.tripNo).filter((r) => !isCapturedRow(r)) as unknown as OrderShopRow[]);
+        : (orderRowsOnTrip(vehicle.trip, String(orderTrip.id)).filter((r) => !isCapturedRow(r)) as unknown as OrderShopRow[]);
     if (rows.length === 0) {
       showNotification(to("orders.selection_empty"), "info");
       return;
@@ -626,14 +642,16 @@ function AssignmentEditor({
     setSaving(true);
     try {
       const trip = await finishAssignment(vehicle.trip, [
-        { orderTripNo: orderTrip.tripNo, rows: uniqueShopRows(rows) },
+        { orderTripId: orderTrip.id, rows: uniqueShopRows(rows) },
       ]);
       showNotification(to("orders.assignment_finished"), "success");
-      onFinished(trip);
-    } catch {
+      await onFinished(trip);
+    } catch (error) {
       persistLockRef.current = false;
-      showNotification(to("orders.refresh_failed"), "error");
+      showNotification(error instanceof Error ? error.message : to("orders.refresh_failed"), "error");
+      throw error;
     } finally {
+      persistLockRef.current = false;
       setSaving(false);
     }
   }, [busy, vehicle, checkCapacity, selected, assertFitsBalance, orderTrip.tripNo, showNotification, to, onFinished]);
@@ -660,7 +678,7 @@ function AssignmentEditor({
           birds: assignedBirdsFor(r),
         }));
     }
-    return orderRowsOnTrip(vehicle.trip, orderTrip.tripNo)
+    return orderRowsOnTrip(vehicle.trip, String(orderTrip.id))
       .filter((r) => !isCapturedRow(r))
       .map((r, i) => ({
         serialNo: i + 1,
@@ -703,7 +721,7 @@ function AssignmentEditor({
         } else {
           // Re-send of saved rows: re-number the persisted rows, no other
           // field changes — the order becomes the new saved sequence.
-          const saved = orderRowsOnTrip(vehicle.trip, orderTrip.tripNo).filter(
+          const saved = orderRowsOnTrip(vehicle.trip, String(orderTrip.id)).filter(
             (r) => !isCapturedRow(r)
           );
           const byShop = new Map(saved.map((r) => [r.shopId, r]));
@@ -724,17 +742,18 @@ function AssignmentEditor({
         try {
           trip = await saveAssignment(vehicle.trip, [
             {
-              orderTripNo: orderTrip.tripNo,
+              orderTripId: orderTrip.id,
               rows: uniqueShopRows(payload ?? toOrderShopRows(selected)),
             },
           ]);
+          selectionSource.current = {id:trip.id,version:trip.version};
           // Keep the saved shops selected for incremental assignment (same
           // as Save Progress above) — never wipe the operator's work here.
           if (reorderedSelection) setSelected(reorderedSelection);
           setSavedSnapshot(
             selectionSnapshot(vehicleTripId, reorderedSelection ?? selected)
           );
-          onChanged();
+          await onChanged();
         } catch {
           persistLockRef.current = false;
           showNotification(to("orders.refresh_failed"), "error");
@@ -810,7 +829,7 @@ function AssignmentEditor({
   >("pending");
   const [cityFilters, setCityFilters] = useState<string[]>([]);
   const pq = poolQuery.trim().toLowerCase();
-  const thisTripNo = vehicle?.trip.tripNo ?? "";
+  const thisTripId = vehicle?.trip.id ?? 0;
   const cityOptions = useMemo(() => {
     const names = new Set<string>();
     for (const row of collection.rows) {
@@ -833,10 +852,10 @@ function AssignmentEditor({
       const partsTotal = a?.assignedBoxesTotal ?? 0;
       const orderedBoxes = Math.max(1, Number(row.boxNo) || 0);
       const boxesOnThisVehicle = parts
-        .filter((p) => p.tripNo === thisTripNo)
+        .filter((p) => p.tripId === thisTripId)
         .reduce((sum, p) => sum + p.boxes, 0);
       const onThisVehicle =
-        boxesOnThisVehicle > 0 || parts.some((p) => p.tripNo === thisTripNo);
+        boxesOnThisVehicle > 0 || parts.some((p) => p.tripId === thisTripId);
       const remainingBoxes = Math.max(0, orderedBoxes - partsTotal);
       const kind =
         parts.length === 0 ? "pending" : remainingBoxes > 0 && !onThisVehicle ? "partial" : "assigned";
@@ -845,7 +864,7 @@ function AssignmentEditor({
       if (onThisVehicle) counts.thisVehicle += 1;
     }
     return counts;
-  }, [collection, thisTripNo]);
+  }, [collection, thisTripId]);
   const filteredPool = useMemo(() => {
     const list: PoolRow[] = [];
     collection.rows.forEach((row, i) => {
@@ -854,9 +873,9 @@ function AssignmentEditor({
       const partsTotal = a?.assignedBoxesTotal ?? 0;
       const orderedBoxes = Math.max(1, Number(row.boxNo) || 0);
       const boxesOnThisVehicle = parts
-        .filter((p) => p.tripNo === thisTripNo)
+        .filter((p) => p.tripId === thisTripId)
         .reduce((sum, p) => sum + p.boxes, 0);
-      const onThisVehicle = boxesOnThisVehicle > 0 || parts.some((p) => p.tripNo === thisTripNo);
+      const onThisVehicle = boxesOnThisVehicle > 0 || parts.some((p) => p.tripId === thisTripId);
       const remainingBoxes = Math.max(0, orderedBoxes - partsTotal);
       const kind: PoolRow["kind"] =
         parts.length === 0 ? "pending" : remainingBoxes > 0 && !onThisVehicle ? "partial" : "assigned";
@@ -912,7 +931,7 @@ function AssignmentEditor({
       );
     }
     return list;
-  }, [collection, q, pq, poolFilter, cityFilterSet, thisTripNo, shopDirectory, sortMode]);
+  }, [collection, q, pq, poolFilter, cityFilterSet, thisTripId, shopDirectory, sortMode]);
 
   const [availablePage, setAvailablePage] = useState(1);
   const availableKey = `${q}|${pq}|${poolFilter}|${cityFilters.join(",")}|${sortMode}|${filteredPool.length}`;
@@ -963,7 +982,7 @@ function AssignmentEditor({
                     <ul className="divide-y divide-slate-100">
                       {pendingVehicles.map((v) => {
                         const city = farmCityOf(v.trip);
-                        const shops = savedShopsOn(v.trip.tripNo);
+                        const shops = savedShopsOn(v.trip.id);
                         const selectedCard = vehicleTripId === v.trip.id;
                         return (
                           <li key={v.trip.id}>
@@ -1178,7 +1197,7 @@ function AssignmentEditor({
               <tbody className={opsTableDivideClass}>
                 {pageAvailable.map((row, index) => {
                   const checked = selectedIds.has(row.shopId);
-                  const isLockedRow = row.kind === "assigned";
+                  const isLockedRow = readOnly || row.kind === "assigned";
                   // Two-tone rows; a checked row's emerald state colour wins.
                            const tone = checked && !isLockedRow ? "bg-emerald-50/50" : ordersZebraTone(index);
                   return (
@@ -1540,7 +1559,7 @@ function AssignmentEditor({
             <button
               type="button"
               onClick={() => setWaPopupOpen(true)}
-              disabled={waBusy || !vehicle || waSheetRows.length === 0}
+              disabled={busy || !vehicle || waSheetRows.length === 0}
               title={to("orders.wa_check_title")}
               aria-label={to("orders.whatsapp")}
               className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600/40 bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"

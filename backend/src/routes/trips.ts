@@ -1,8 +1,21 @@
 import { Router } from "express";
 import { asyncHandler, AppError } from "../middleware/errorHandler.js";
+import { availableTripResources, changeStatus, persistDiesel } from "../services/tripWorkflowService.js";
+import { sendAssignmentWhatsApp } from "../services/ordersWhatsAppService.js";
 import { tripsService } from "../services/tripsService.js";
 
 export const tripsRouter = Router();
+tripsRouter.param('id',(req,_res,next,value)=>{
+  if (!Number.isInteger(Number(value)) || Number(value)<=0) return next(new AppError(400,'A positive backend trip ID is required'));
+  next();
+});
+tripsRouter.get('/available-resources',asyncHandler(async(req,res)=>{res.json(await availableTripResources(Number(req.query.tripId)||0));}));
+tripsRouter.put('/:id/deliveries',asyncHandler(async(req,res)=>{res.json(await tripsService.saveWizardStep(Number(req.params.id),'deliveries',req.body,'save'));}));
+tripsRouter.patch('/:id/status',asyncHandler(async(req,res)=>{res.json(await changeStatus(Number(req.params.id),req.body.status,req.body.approvedBy));}));
+tripsRouter.post('/:id/diesel',asyncHandler(async(req,res)=>{res.json(await persistDiesel(Number(req.params.id),req.body));}));
+tripsRouter.patch('/:id/diesel/:entryId',asyncHandler(async(req,res)=>{res.json(await persistDiesel(Number(req.params.id),req.body,Number(req.params.entryId)));}));
+tripsRouter.delete('/:id/diesel/:entryId',asyncHandler(async(req,res)=>{res.json(await persistDiesel(Number(req.params.id),null,Number(req.params.entryId),true));}));
+tripsRouter.post('/:id/whatsapp',asyncHandler(async(req,res)=>{res.json(await sendAssignmentWhatsApp(Number(req.params.id),req.body));}));
 
 tripsRouter.get(
   "/",
@@ -30,7 +43,7 @@ tripsRouter.get(
 tripsRouter.post(
   "/steps/start",
   asyncHandler(async (req, res) => {
-    res.status(201).json(await tripsService.createSubmittedStartStep(req.body));
+    res.status(201).json(await tripsService.createSubmittedStartStep({...req.body,requestKey:req.get("Idempotency-Key") || undefined}));
   })
 );
 
@@ -49,9 +62,6 @@ tripsRouter.post(
       throw new AppError(400, "Invalid step. Use start|farm|pickup|deliveries|expenses");
     }
     const mode = req.body?.mode === "save" ? "save" : "submit";
-    if (step === "start" && mode === "submit") {
-      throw new AppError(410, "New Step 1 submissions use POST /api/trips/steps/start");
-    }
     res.json(
       await tripsService.saveWizardStep(
         Number(req.params.id),

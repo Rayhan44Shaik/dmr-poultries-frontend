@@ -24,7 +24,7 @@ type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void
 
 export function useTripEntry(
   showNotification?: NotificationFn,
-  onTripsChanged?: () => void
+  onTripsChanged?: () => void | Promise<boolean>
 ) {
   const notifyRef = useRef(showNotification);
   notifyRef.current = showNotification;
@@ -46,6 +46,7 @@ export function useTripEntry(
   const onStep1SuccessRef = useRef<((trip: Trip) => void) | null>(null);
   /** Same-tick double-click guard — React `headerLoading` is one render too late. */
   const startSubmitLockRef = useRef(false);
+  const startRequestKey = useRef<string | null>(null);
   const onStep2SuccessRef = useRef<((trip: Trip) => void) | null>(null);
   const onStep3SuccessRef = useRef<((trip: Trip) => void) | null>(null);
   const onStep4SuccessRef = useRef<((trip: Trip) => void) | null>(null);
@@ -151,15 +152,15 @@ export function useTripEntry(
     startSubmitLockRef.current = true;
     setHeaderLoading(true);
     try {
-      const submitted = await submitStep1({
-        ...merged,
-      });
+      startRequestKey.current ??= crypto.randomUUID();
+      const submitted = await submitStep1({ ...merged }, startRequestKey.current);
 
       // First submit closes the wizard (parent success callback). Do not park
       // the saved trip in the working copy — that would flash a submitted
       // form before Create New Trip. Recent is refreshed via onTripsChanged.
       // Working fields stay as typed until the success callback resets them.
-      onTripsChangedRef.current?.();
+      if (await onTripsChangedRef.current?.() === false) return false;
+      startRequestKey.current = null;
       onStep1SuccessRef.current?.(submitted);
       return true;
     } catch (error) {

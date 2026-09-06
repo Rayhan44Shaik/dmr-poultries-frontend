@@ -1,3 +1,4 @@
+import { getTripRevision } from "../../../../shared/trip/tripSync";
 /**
  * Trip Entry wizard — PostgreSQL via shared Axios helpers.
  * Step 1: POST /trips/steps/start
@@ -146,7 +147,7 @@ export function uniqueTripsById(trips: Trip[]): Trip[] {
   const out: Trip[] = [];
   for (const trip of trips) {
     const id = Number(trip.id);
-    if (!Number.isFinite(id) || seen.has(id)) continue;
+    if (!Number.isInteger(id) || id <= 0 || seen.has(id)) continue;
     seen.add(id);
     out.push(trip);
   }
@@ -446,6 +447,7 @@ function sanitizePerBoxData(value: unknown): Array<{ boxNo: number; birds?: numb
 export function toStep4Payload(trip: Partial<Trip> & { deliveries?: Trip["deliveries"] }): Record<string, unknown> {
   const rows = Array.isArray(trip.deliveries) ? trip.deliveries : [];
   return {
+    ...(trip.version != null ? { expectedVersion: trip.version } : {}),
     deliveries: rows.map((d) => {
       const birds = numOrNull(d.birds) ?? 0;
       const weight = numOrNull(d.weight) ?? 0;
@@ -463,6 +465,7 @@ export function toStep4Payload(trip: Partial<Trip> & { deliveries?: Trip["delive
       return {
         id: d.id && d.id < 1e12 ? d.id : undefined,
         clientKey: d.clientKey || undefined,
+        ...(d.autoCaptureTime ? { capture: true } : {}),
         shopId,
         shopName: d.shopName || "",
         birdTypeId,
@@ -501,6 +504,7 @@ export async function loadTripById(id: number): Promise<Trip> {
  * is the single source of truth — never fall back to stale localStorage
  * data that could override PostgreSQL (Trip List must reflect the same
  * updated trip deliveries/summaries as Shop Sales). */
+const tripListRequests = new Map<string, Promise<Trip[]>>();
 export async function listTrips(options?: {
   includeDeleted?: boolean;
   /** Hydrate every trip with its full deliveries / boxes / diesel rows
@@ -512,10 +516,16 @@ export async function listTrips(options?: {
   const params: Record<string, string> = {};
   if (options?.includeDeleted) params.includeDeleted = "true";
   if (options?.full) params.full = "true";
-  const { data } = await apiGet<ApiTripRecord[]>(TRIPS_PATH, {
-    params: Object.keys(params).length ? params : undefined,
-  });
-  return uniqueTripsById(data.map((trip) => mapApiTripToTrip(trip)));
+  const key = `${getTripRevision()}:${JSON.stringify(params)}`;
+  const current = tripListRequests.get(key);
+  if (current) return current;
+  const request = apiGet<ApiTripRecord[]>(TRIPS_PATH, { params: Object.keys(params).length ? params : undefined })
+    .then(({data}) => {
+      if (!Array.isArray(data)) throw new Error("Invalid trip-list response");
+      return uniqueTripsById(data.map(trip => mapApiTripToTrip(trip)));
+    });
+  tripListRequests.set(key, request);
+  try { return await request; } finally { if (tripListRequests.get(key) === request) tripListRequests.delete(key); }
 }
 
 /** GET /api/operations/trip-list — completed/approved, non-deleted trips only. */
@@ -585,13 +595,13 @@ export async function listCompletedTrips(filters: TripListFilters = {}): Promise
 }
 
 /** Single final Step 1 submission. No draft is created or updated before this request. */
-export async function submitStep1(trip: Partial<Trip>): Promise<Trip> {
+export async function submitStep1(trip: Partial<Trip>, requestKey?: string): Promise<Trip> {
   const payload = {
     ...toStep1Payload(trip),
     startStepSubmitted: true,
     status: "Draft" as TripStatus,
   };
-  const { data } = await apiPost<ApiTripRecord>(`${TRIPS_PATH}/steps/start`, payload);
+  const { data } = await apiPost<ApiTripRecord>(`${TRIPS_PATH}/steps/start`, payload, requestKey ? { headers: { "Idempotency-Key": requestKey } } : undefined);
   return mapApiTripToTrip(data, trip as Trip);
 }
 

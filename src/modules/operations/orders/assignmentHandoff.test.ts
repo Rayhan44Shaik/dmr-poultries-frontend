@@ -1,174 +1,64 @@
-// src/modules/operations/orders/assignmentHandoff.test.ts
-// Assignment → Tracking → Step 4 submit:
-//   - Save Progress does not open Delivery Tracking
-//   - Finish Assignment is the tracking gate
-//   - duplicate shops collapse on write
-//   - Tracking View Submit never sets Trip Entry `status = Completed`
-//     and never overwrites `order:` remarks
-// Run: npm run test:mobile
-import test from "node:test";
-import assert from "node:assert/strict";
-import { createEmptyTrip, type ShopDelivery, type Trip } from "../../../shared/trip";
-import { resetSampleTrips, sampleTrips } from "./sampleOrdersData";
-import {
-  fetchOrdersData,
-  finishAssignment,
-  saveAssignment,
-  saveCollection,
-  submitShopDeliveries,
-} from "./ordersService";
-import {
-  buildOrdersTrip,
-  computeOrdersProgress,
-  isTrackingTrip,
-  partitionTrackingTrips,
-  uniqueShopRows,
-} from "./ordersUtils";
-import { ORDER_PLAN_REMARKS, type OrderShopRow } from "./types";
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { finishAssignment, saveAssignment, fetchOrdersData, submitShopDeliveries } from './ordersService';
+import { buildOrdersTrip, partitionTrackingTrips, buildShopBreakdown } from './ordersUtils';
+import { pendingShopsFromRows } from '../vehicle-trips/components/Step_4/remainingBoxes';
+import { calculateDeliveryMetrics } from '../../../shared/trip/calculations';
+import { installOrdersApi, row, trip } from '../../../../tests/fixtures/ordersApi';
 
-const ORDER_TRIP_NO = "ORD-ASSIGN-01";
-const SHOP_A = 88001;
-const SHOP_B = 88002;
-
-let clientKey = 0;
-
-function collectionRow(shopId: number, boxes: number, serialNo = 1): OrderShopRow {
-  return {
-    id: 0,
-    clientKey: `ck-${++clientKey}`,
-    serialNo,
-    boxNo: boxes,
-    shopId,
-    shopName: `Shop ${shopId}`,
-    birdTypeId: 0,
-    birdType: "",
-    birds: boxes * 10,
-    weight: 0,
-    mortality: 0,
-    mortKg: 0,
-    rate: null,
-    amount: 0,
-    remarks: ORDER_PLAN_REMARKS,
-    deliveryMode: "box",
-    selectedBoxIds: [],
-  };
-}
-
-function assignedRow(shopId: number, boxes: number, serialNo = 1): OrderShopRow {
-  return { ...collectionRow(shopId, boxes, serialNo), remarks: ORDER_PLAN_REMARKS };
-}
-
-function vehicleTrip(id: number, tripNo: string): Trip {
-  return createEmptyTrip({
-    id,
-    tripNo,
-    vehicleId: id,
-    vehicleNo: `TS07-${id}`,
-    tripDate: new Date().toISOString().slice(0, 10),
-    farmStepSubmitted: true,
-    deliveryStepSubmitted: false,
-    status: "Pending",
-  });
-}
-
-async function seedAssignment(): Promise<{ day: string; vehicle: Trip }> {
-  resetSampleTrips();
-  const container = await saveCollection(null, ORDER_TRIP_NO, [
-    collectionRow(SHOP_A, 10, 1),
-    collectionRow(SHOP_B, 8, 2),
-  ]);
-  const vehicle = vehicleTrip(8201, "TRP-ASSIGN-A");
-  sampleTrips().push(vehicle);
-  return { day: container.tripDate, vehicle };
-}
-
-test("uniqueShopRows on assignment writes keeps first shop, drops later duplicates", () => {
-  const rows = uniqueShopRows([
-    assignedRow(SHOP_A, 10, 1),
-    assignedRow(SHOP_A, 99, 2),
-    assignedRow(SHOP_B, 8, 3),
-  ]);
-  assert.equal(rows.length, 2);
-  assert.equal(rows[0].shopId, SHOP_A);
-  assert.equal(rows[0].boxNo, 10);
-  assert.equal(rows[1].shopId, SHOP_B);
+test('assignment save persists without submitting Trip Entry Step 4',async()=>{
+  const source={...trip(),ordersCollection:[row(1)]};const api=installOrdersApi([source]);
+  try {
+    const saved=await saveAssignment(source,[{orderTripId:123,rows:[row(1)]}]);
+    assert.equal(saved.deliveryStepSubmitted,false);assert.equal(saved.assignmentSubmitted,false);
+    assert.equal((await fetchOrdersData()).tracking.length,0);
+  } finally {api.restore();}
 });
-
-test("Save Assignment (no Finish) does not appear in Delivery Tracking", async () => {
-  const { vehicle } = await seedAssignment();
-  await saveAssignment(vehicle, [
-    { orderTripNo: ORDER_TRIP_NO, rows: [assignedRow(SHOP_A, 10), assignedRow(SHOP_B, 8)] },
-  ]);
-  const data = await fetchOrdersData();
-  const saved = data.eligibleVehicles.find((v) => v.trip.id === vehicle.id);
-  assert.ok(saved, "saved (unfinished) assignment stays on the eligible-vehicle list");
-  assert.equal(isTrackingTrip(saved!.trip), false);
-  assert.equal(
-    data.tracking.some((ot) => ot.trip.id === vehicle.id),
-    false,
-    "Save Progress must never open a tracking row"
-  );
+test('assignment submit rejects until WhatsApp confirms, and never submits Step 4',async()=>{
+  const source={...trip(),ordersCollection:[row(1)]};const api=installOrdersApi([source]);
+  try {
+    await assert.rejects(finishAssignment(source,[{orderTripId:123,rows:[row(1)]}]));
+    api.control.whatsapp=true; // Test-only provider receipt; never a production bypass.
+    const saved=await finishAssignment(source,[{orderTripId:123,rows:[row(1)]}]);
+    assert.equal(saved.assignmentSubmitted,true);assert.equal(saved.deliveryStepSubmitted,false);assert.equal(saved.status,'Draft');
+    assert.equal((await fetchOrdersData()).tracking[0].trip.id,123);
+  } finally {api.restore();}
 });
-
-test("Finish Assignment opens Delivery Tracking as Pending — never Completed", async () => {
-  const { vehicle } = await seedAssignment();
-  const finished = await finishAssignment(vehicle, [
-    { orderTripNo: ORDER_TRIP_NO, rows: [assignedRow(SHOP_A, 10), assignedRow(SHOP_B, 8)] },
-  ]);
-  assert.equal(finished.deliveryStepSubmitted, true);
-  assert.ok(String(finished.remarks).includes(`order:${ORDER_TRIP_NO}`));
-  assert.notEqual(finished.status, "Completed");
-  assert.equal(isTrackingTrip(finished), true);
-
-  const data = await fetchOrdersData();
-  const ot = data.tracking.find((row) => row.trip.id === vehicle.id);
-  assert.ok(ot, "Finish Assignment is the tracking gate");
-  const { pending, completed } = partitionTrackingTrips([ot!]);
-  assert.equal(pending.length, 1);
-  assert.equal(completed.length, 0);
-  assert.equal(ot!.progress?.status, "Assigned");
+test('tracking save cannot complete or submit the real trip',async()=>{
+  const source={...trip(),assignmentSubmitted:true,deliveries:[{...row(1),remarks:'[ORDER] O:123',autoCaptureTime:'2026-09-06T10:00:00Z'}]};
+  const api=installOrdersApi([source]);
+  try {
+    const saved=await submitShopDeliveries(source);
+    assert.equal(saved.status,'Draft');assert.equal(saved.deliveryStepSubmitted,false);
+    const post=api.calls.find(c=>c.method==='post')!;
+    assert.equal(post.body.mode,'save');assert.equal(post.body.status,undefined);
+    assert.equal(post.body.deliveries instanceof Array,true);
+  } finally {api.restore();}
 });
-
-test("duplicate shops on Finish Assignment collapse to one row per shop", async () => {
-  const { vehicle } = await seedAssignment();
-  await finishAssignment(vehicle, [
-    {
-      orderTripNo: ORDER_TRIP_NO,
-      rows: [assignedRow(SHOP_A, 10, 1), assignedRow(SHOP_A, 99, 2), assignedRow(SHOP_B, 8, 3)],
-    },
-  ]);
-  const data = await fetchOrdersData();
-  const ot = data.tracking.find((row) => row.trip.id === vehicle.id);
-  assert.ok(ot);
-  const shops = (ot!.trip.deliveries ?? []).filter((r) => r.shopId === SHOP_A);
-  assert.equal(shops.length, 1, "one shop, one assignment row");
-  assert.equal(shops[0].boxNo, 10, "first occurrence wins");
+test('lifecycle partition follows backend status, not 100% delivered shops',()=>{
+  const delivered={...row(1),remarks:'[ORDER] O:123',autoCaptureTime:'2026-09-06T10:00:00Z'};
+  const draft=buildOrdersTrip({...trip(123),assignmentSubmitted:true,deliveries:[delivered]});
+  const pending=buildOrdersTrip({...draft.trip,id:124,status:'Pending',endStepSubmitted:true});
+  const completed=buildOrdersTrip({...draft.trip,id:125,status:'Completed',endStepSubmitted:true});
+  const result=partitionTrackingTrips([draft,pending,completed]);
+  assert.deepEqual(result.pending.map(t=>t.trip.id),[123,124]);
+  assert.deepEqual(result.completed.map(t=>t.trip.id),[125]);
 });
-
-test("submitShopDeliveries persists captures only — does not complete the trip or drop order: tags", async () => {
-  const { vehicle } = await seedAssignment();
-  const finished = await finishAssignment(vehicle, [
-    { orderTripNo: ORDER_TRIP_NO, rows: [assignedRow(SHOP_A, 10), assignedRow(SHOP_B, 8)] },
-  ]);
-  const captured: ShopDelivery[] = (finished.deliveries ?? []).map((row, i) => ({
-    ...row,
-    autoCaptureTime: `2026-09-06T09:0${i}:00.000Z`,
-  }));
-  finished.deliveries = captured;
-
-  const submitted = await submitShopDeliveries(finished);
-  assert.notEqual(submitted.status, "Completed", "Trip Entry Step 5 owns Completed");
-  assert.ok(
-    String(submitted.remarks).includes(`order:${ORDER_TRIP_NO}`),
-    "order: remarks must survive Tracking View Submit"
-  );
-  assert.equal(submitted.deliveryStepSubmitted, true);
-
-  const progress = computeOrdersProgress(submitted);
-  assert.equal(progress.deliveryState, "complete");
-  assert.notEqual(progress.status, "Completed");
-
-  const { pending, completed } = partitionTrackingTrips([buildOrdersTrip(submitted)]);
-  assert.equal(pending.length, 1);
-  assert.equal(completed.length, 0);
+test('remaining shop count uses stable assigned boxes, including partial deliveries',()=>{
+  const plan={...row(1,10),assignedBoxes:10};
+  assert.equal(pendingShopsFromRows([plan]),1);
+  const partial={...row(1,4),assignedBoxes:10,autoCaptureTime:'2026-09-06T10:00:00Z'};
+  assert.equal(pendingShopsFromRows([plan,partial]),1);
+  assert.equal(pendingShopsFromRows([plan,partial,{...partial,id:99,boxNo:6}]),0);
+});
+test('assignment plans never inflate Trip Entry actual delivered totals',()=>{
+  const source=trip();const plan=row(1,10);
+  assert.equal(calculateDeliveryMetrics(source,[plan]).totalBirdsDelivered,0);
+  assert.equal(calculateDeliveryMetrics(source,[{...plan,autoCaptureTime:'2026-09-06T10:00:00Z'}]).totalBirdsDelivered,100);
+});
+test('unassigned deliveries remain visible without invented collected or assigned boxes',()=>{
+  const actual={...row(9,4),remarks:'',autoCaptureTime:'2026-09-06T10:00:00Z'};
+  const view=buildShopBreakdown([actual],new Set(),()=>'',new Map());
+  assert.equal(view.length,1);assert.equal(view[0].additional,true);
+  assert.equal(view[0].deliveredBoxes,4);assert.equal(view[0].collectedBoxes,0);assert.equal(view[0].assignedBoxes,0);
 });

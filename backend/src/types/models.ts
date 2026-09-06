@@ -94,6 +94,11 @@ export interface BoxDetail {
 }
 
 export interface ShopDelivery {
+  capture?: boolean;
+  clientKey?: string;
+  orderRowId?: number | null;
+  orderTripId?: number;
+  assignedBoxes?: number | null;
   id: number;
   serialNo?: number | null;
   boxNo?: number | null;
@@ -117,6 +122,9 @@ export interface ShopDelivery {
 }
 
 export interface DieselEntry {
+  id?: number; clientKey?: string; amount?: number;
+  submitted?: boolean; submittedAt?: string | null;
+  gpsLat?: number | null; gpsLon?: number | null; gpsAccuracy?: number | null; gpsCapturedAt?: string | null;
   rowIndex: number;
   litres?: number | null;
   rate?: number | null;
@@ -128,6 +136,11 @@ export interface DieselEntry {
 }
 
 export interface Trip {
+  ordersHash?: string;
+  version?: number; collectionFinished?: boolean; assignmentSubmitted?: boolean;
+  ordersCollection?: ShopDelivery[]; orderAssignments?: ShopDelivery[];
+  farmBirdTypeId?: number | null; farmBirdType?: string;
+  farmGpsLat?: number | null; farmGpsLon?: number | null; farmGpsAccuracy?: number | null; farmGpsTime?: string | null;
   id: number;
   tripNo: string;
   tripDate: string;
