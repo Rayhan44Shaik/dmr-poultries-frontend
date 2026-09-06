@@ -84,12 +84,13 @@ export const summaryService = {
    * Compute Metrics for Trips & Collections
    */
   computeMetrics(trips: Trip[], collections: Collection[]): WeeklyMetrics {
-    let birds = 0, weight = 0, mortality = 0, sales = 0;
+    let birds = 0, weight = 0, mortality = 0, weightLoss = 0, sales = 0;
     
     trips.forEach(trip => {
       birds += trip.totalBirds || 0;
       weight += trip.totalWeight || 0;
       mortality += trip.totalMortality || 0;
+      weightLoss += (trip as any).weightLoss || 0;
       
       // Sales: sum of deliveries weight * rate
       (trip.deliveries || []).forEach(d => {
@@ -106,6 +107,7 @@ export const summaryService = {
       birds,
       weight,
       mortality,
+      weightLoss,
       sales,
       collection,
       pending: Math.max(0, pending),

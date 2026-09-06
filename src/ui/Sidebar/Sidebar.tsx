@@ -110,8 +110,8 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
 
   const brandHeader = (
     <div className="flex h-16 shrink-0 items-center gap-3 border-b border-slate-200/80 px-5 dark:border-slate-800">
-      <BrandMark />
-      <h1 className="min-w-0 truncate text-[15px] font-bold leading-tight tracking-tight text-slate-900 dark:text-white">
+      <BrandMark size="lg" variant="plain" />
+      <h1 className="min-w-0 truncate text-[16px] font-extrabold leading-tight tracking-tight text-slate-900 dark:text-white">
         DMR Poultries
       </h1>
     </div>
@@ -135,15 +135,10 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
           <aside className="absolute inset-y-0 left-0 flex w-[280px] flex-col border-r border-slate-200 bg-white shadow-pop animate-scale-in dark:border-slate-800 dark:bg-slate-900">
             <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200/80 px-5 dark:border-slate-800">
               <div className="flex items-center gap-3">
-                <BrandMark />
-                <div className="min-w-0">
-                  <h1 className="truncate text-[15px] font-bold leading-tight tracking-tight text-slate-900 dark:text-white">
-                    DMR Poultries
-                  </h1>
-                  <p className="truncate text-[11px] font-medium text-slate-400 dark:text-slate-500">
-                    {t("sidebar.erpSystem")}
-                  </p>
-                </div>
+                <BrandMark size="lg" variant="plain" />
+                <h1 className="truncate text-[15px] font-bold leading-tight tracking-tight text-slate-900 dark:text-white">
+                  DMR Poultries
+                </h1>
               </div>
               <button
                 type="button"

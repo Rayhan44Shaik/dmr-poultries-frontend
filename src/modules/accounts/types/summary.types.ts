@@ -10,6 +10,7 @@ export interface WeeklyMetrics {
   birds: number;
   weight: number;
   mortality: number;
+  weightLoss: number;
   sales: number;
   collection: number;
   pending: number;

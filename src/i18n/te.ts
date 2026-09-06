@@ -12,7 +12,7 @@ export default {
   // Navigation items
   'nav.dashboard': 'డ్యాష్‌బోర్డ్',
   'nav.shops': 'షాపులు',
-  'nav.farms': 'ఫారాలు / పౌల్ట్రీ ఫారాలు',
+  'nav.farms': 'ఫారాలు',
   'nav.vehicles_master': 'వాహనాలు',
   'nav.employees': 'ఉద్యోగులు',
   'nav.banks': 'బ్యాంకులు',
@@ -26,7 +26,8 @@ export default {
   'nav.shopSalesEntry': 'షాప్ అమ్మకాల నమోదు',
   'nav.collectionEntry': 'కలెక్షన్ నమోదు',
   'nav.pendingCollections': 'పెండింగ్ కలెక్షన్లు',
-  'nav.mortalityEntry': 'మరణాల నమోదు',
+  'nav.mortalityEntry': 'బరువు నష్టం / మరణాలు',
+  'nav.weightLossMortality': 'బరువు నష్టం / మరణాలు',
   'nav.fuelExpenses': 'ఇంధన ఖర్చులు',
   'nav.maintenanceEntry': 'మెయింటెనెన్స్ నమోదు',
   'nav.maintenanceHistory': 'మెయింటెనెన్స్ చరిత్ర',

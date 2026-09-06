@@ -12,7 +12,7 @@ export default {
   // Navigation items
   'nav.dashboard': 'Dashboard',
   'nav.shops': 'Shops',
-  'nav.farms': 'Farms / Poultry Farms',
+  'nav.farms': 'Farms',
   'nav.vehicles_master': 'Vehicles',
   'nav.employees': 'Employees',
   'nav.banks': 'Banks',
@@ -26,7 +26,8 @@ export default {
   'nav.shopSalesEntry': 'Shop Sales Entry',
   'nav.collectionEntry': 'Collection Entry',
   'nav.pendingCollections': 'Pending Collections',
-  'nav.mortalityEntry': 'Mortality Entry',
+  'nav.mortalityEntry': 'Weight Loss / Mortality',
+  'nav.weightLossMortality': 'Weight Loss / Mortality',
   'nav.fuelExpenses': 'Fuel Expenses',
   'nav.maintenanceEntry': 'Maintenance Entry',
   'nav.maintenanceHistory': 'Maintenance History',

@@ -43,11 +43,8 @@ export default function LoginPage() {
           }}
         />
         <div className="relative flex items-center gap-3">
-          <BrandMark size="md" />
-          <div>
-            <h1 className="text-lg font-bold tracking-tight text-white">DMR Poultries</h1>
-            <p className="text-xs font-medium text-emerald-300/80">ERP Management System</p>
-          </div>
+          <BrandMark size="lg" variant="plain" />
+          <h1 className="text-lg font-bold tracking-tight text-white">DMR Poultries</h1>
         </div>
 
         <div className="relative">
@@ -81,11 +78,8 @@ export default function LoginPage() {
       <div className="flex flex-1 items-center justify-center p-6">
         <div className="w-full max-w-[400px] animate-fade-in-up">
           <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <BrandMark size="md" />
-            <div>
-              <h1 className="text-lg font-bold tracking-tight text-slate-900">DMR Poultries</h1>
-              <p className="text-xs font-medium text-slate-400">ERP Management System</p>
-            </div>
+            <BrandMark size="lg" variant="plain" />
+            <h1 className="text-lg font-bold tracking-tight text-slate-900">DMR Poultries</h1>
           </div>
 
           <div className="rounded-xl border border-slate-200/80 bg-white p-7 shadow-card-lg">
