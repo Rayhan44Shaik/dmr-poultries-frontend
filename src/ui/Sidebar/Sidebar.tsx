@@ -45,6 +45,34 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onCloseMobile]);
 
+  // Auto-scroll active nav item into view (e.g., Reports → Shop Ledger)
+  // so the user sees directly where they are without manual scroll.
+  useEffect(() => {
+    // Run after paint so the <a aria-current="page"> exists
+    const raf = requestAnimationFrame(() => {
+      // Small timeout for mobile drawer animation
+      window.setTimeout(() => {
+        const activeLinks = document.querySelectorAll('nav a[aria-current="page"]');
+        activeLinks.forEach((el) => {
+          try {
+            (el as HTMLElement).scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+            // Ensure the nav container also scrolls if the link is in overflow
+            const nav = el.closest("nav");
+            if (nav) {
+              // Nudge to center slightly for better visibility near edges
+              const rect = (el as HTMLElement).getBoundingClientRect();
+              const navRect = nav.getBoundingClientRect();
+              if (rect.top < navRect.top + 12 || rect.bottom > navRect.bottom - 12) {
+                (el as HTMLElement).scrollIntoView({ block: "center", behavior: "smooth" });
+              }
+            }
+          } catch {}
+        });
+      }, 50);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [pathname, search, mobileOpen]);
+
   const navContent = (
     <nav className="flex-1 overflow-y-auto px-3 py-4 scrollbar-none">
       {NAV_SECTIONS.map((section) => {
