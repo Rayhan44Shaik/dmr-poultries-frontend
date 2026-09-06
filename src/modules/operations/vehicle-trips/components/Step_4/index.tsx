@@ -16,7 +16,7 @@ import { useShopDeliveryForm, EMPTY_DELIVERY_FORM } from "./useShopDeliveryForm"
 import ShopDeliveryForm from "./ShopDeliveryForm";
 import ShopDeliveryCard from "./ShopDeliveryCard";
 import { generateShopPDF } from "../../utils/generateShopPDF";
-import { pendingBoxesFromRows } from "./remainingBoxes";
+import { assignedShopIdsFromRows, pendingBoxesFromRows, pendingShopsFromRows } from "./remainingBoxes";
 import { computeDeliveryKpiTotals } from "./deliveryKpis";
 import type { DeliveriesBalanceError } from "../../../../../shared/trip/validation";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
@@ -277,6 +277,8 @@ export default function UnLoadingTable({
     () => pendingBoxesFromRows(safeBoxDetails, safeRows),
     [safeRows, safeBoxDetails]
   );
+  const pendingShops = useMemo(() => pendingShopsFromRows(safeRows), [safeRows]);
+  const assignedShopIds = useMemo(() => assignedShopIdsFromRows(safeRows), [safeRows]);
 
   // ─── Balance Error Panel visibility (shown after a blocked submit) ──
   const [showBalanceError, setShowBalanceError] = useState<boolean>(balanceErrorShown);
@@ -824,7 +826,9 @@ export default function UnLoadingTable({
       return shopNameMatch || birdTypeMatch || remarksMatch;
     });
 
-    return [...filtered].sort((a, b) => b.id - a.id);
+    return [...filtered].sort(
+      (a, b) => (Number(a.serialNo) || 0) - (Number(b.serialNo) || 0) || Number(a.id) - Number(b.id)
+    );
   }, [safeRows, searchTerm]);
 
   const totalPages = useMemo<number>(() => Math.ceil(displayRows.length / itemsPerPage), [displayRows.length]);
@@ -934,6 +938,8 @@ export default function UnLoadingTable({
             title={t("ops.trip.download_pending_boxes_pdf")}
           >
             <Package size={15} className="text-emerald-600" />
+            <span>{t("ops.trip.shops")} ({pendingShops})</span>
+            <span className="text-emerald-400">·</span>
             <span>{t("ops.trip.boxes")} ({pendingBoxes.length})</span>
           </button>
 
@@ -1067,6 +1073,9 @@ export default function UnLoadingTable({
                     key={row.id}
                     row={row as any}
                     readOnly={readOnly}
+                    unassigned={
+                      assignedShopIds.size > 0 && !assignedShopIds.has(Number(row.shopId))
+                    }
                     onEdit={(selectedRow) => {
                       if (onEditShop) {
                         onEditShop(selectedRow.id);

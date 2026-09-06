@@ -14,7 +14,7 @@ const EN: Record<string, string> = {
 
   // ── Tab 1 · Order Collection ──────────────────────────────────────────
   "orders.collection_hint":
-    "Enter No. of Birds and No. of Boxes for each shop. The vehicle is assigned only after the collection is finished.",
+    "Enter No. of Birds and No. of Boxes for each shop. Save Progress makes shops available for Order Assignment — Finish Collection is optional.",
   "orders.collection_resume": "Resuming saved collection {orderNo}",
   "orders.no_active_shops": "No active shops available in Shop Master",
   "orders.col_sno": "S.No",
@@ -49,7 +49,7 @@ const EN: Record<string, string> = {
 
   // ── Tab 2 · Order Assignment ──────────────────────────────────────────
   "orders.assignment_empty":
-    "No collected orders awaiting assignment. Finish a collection in Order Collection first.",
+    "No collected orders awaiting assignment. Save a collection in Order Collection first.",
   "orders.col_order_no": "Order No",
   "orders.col_date": "Date",
   "orders.col_shops": "Shops",
@@ -280,6 +280,8 @@ const EN: Record<string, string> = {
   "orders.wa_send_note":
     "Sends this assignment to the vehicle supervisor WhatsApp number only — shop owners are not messaged from this page.",
   "orders.wa_confirm_send": "Confirm & Send",
+  "orders.wa_retry": "Retry",
+  "orders.submit_order_assignment": "Submit Order Assignment",
   "orders.wa_sent_to": "WhatsApp message sent successfully to {name} ({mobile}).",
   "orders.wa_sent_ok_title": "WhatsApp notification sent successfully",
   "orders.wa_sent_ok_body":
@@ -315,7 +317,7 @@ const EN: Record<string, string> = {
     "orders.no_filter_results": "No shops match this filter",
     "orders.search_collection": "Search shop, city, trip, vehicle, status…",
     "orders.search_assignment": "Search shop, city, trip, vehicle, supervisor…",
-    "orders.search_tracking": "Search shop, city, trip, vehicle, supervisor, status…",
+    "orders.search_tracking": "Search trip, vehicle, supervisor, mobile, driver, shop no, shop, city…",
     "orders.filter_status": "Status",
     "orders.filter_difference": "Difference",
     "orders.all": "All",
@@ -384,9 +386,27 @@ const EN: Record<string, string> = {
   "orders.listed_shops": "Listed Shops",
   "orders.not_listed_shops": "Not Listed Shops",
   "orders.box_difference": "Box Difference",
-  "orders.pdf_report_title": "SHOP DELIVERY REPORT",
+  "orders.pdf_report_title": "DELIVERY REPORT",
   "orders.pdf_order_no": "Order No",
   "orders.pdf_totals": "TOTALS",
+  "orders.assignment_incomplete": "Assignment incomplete",
+  "orders.assignment_details_unavailable": "Assignment details unavailable",
+  "orders.assignment_incomplete_warning": "Assignment details unavailable",
+  "orders.collected_boxes": "Collected Boxes",
+  "orders.delivery_summary": "DELIVERY SUMMARY",
+  "orders.showing_range": "Showing {from}–{to} of {total}",
+  "orders.view_pdf": "View PDF",
+  "orders.col_shop_no": "Shop No",
+  "orders.filter_trip_status": "Trip Status",
+  "orders.filter_delivery_status": "Delivery Status",
+  "orders.clear_filters": "Clear filters",
+  "orders.delivery_pending": "Pending",
+  "orders.delivery_in_progress": "In Progress",
+  "orders.delivery_partial": "Part Delivered",
+  "orders.trip_status_pending": "Pending",
+  "orders.summary_delivered": "Delivered",
+  "orders.summary_pending": "Pending",
+  "orders.summary_part": "Part Delivered",
 };
 
 const TE: Record<string, string> = {
@@ -397,7 +417,7 @@ const TE: Record<string, string> = {
 
   // Tab 1
   "orders.collection_hint":
-    "ప్రతి షాప్‌కు పక్షుల సంఖ్య మరియు బాక్స్‌ల సంఖ్య నమోదు చేయండి. సేకరణ పూర్తి అయిన తర్వాత మాత్రమే వాహనం అసైన్ చేయబడుతుంది.",
+    "ప్రతి షాప్‌కు పక్షుల సంఖ్య మరియు బాక్స్‌ల సంఖ్య నమోదు చేయండి. Save Progress అయితే ఆర్డర్ అసైన్‌మెంట్‌కు షాప్‌లు అందుబాటులో ఉంటాయి — Finish Collection ఐచ్ఛికం.",
   "orders.collection_resume": "సేవ్ చేసిన సేకరణ {orderNo} కొనసాగించబడుతోంది",
   "orders.no_active_shops": "షాప్ మాస్టర్‌లో యాక్టివ్ షాప్‌లు లేవు",
   "orders.col_sno": "సం.సం",
@@ -432,7 +452,7 @@ const TE: Record<string, string> = {
 
   // Tab 2
   "orders.assignment_empty":
-    "అసైన్‌మెంట్‌కు காతూంటూ ఉన్న సేకరించిన ఆర్డర్లు లేవు. ముందు ఆర్డర్ సేకరణ పూర్తి చేయండి.",
+    "అసైన్‌మెంట్‌కు వేచి ఉన్న సేకరించిన ఆర్డర్లు లేవు. ముందు ఆర్డర్ సేకరణను సేవ్ చేయండి.",
   "orders.col_order_no": "ఆర్డర్ నంబర్",
   "orders.col_date": "తేదీ",
   "orders.col_shops": "షాప్‌లు",
@@ -660,6 +680,8 @@ const TE: Record<string, string> = {
   "orders.wa_send_note":
     "ఈ కేటాయింపును సూపర్‌వైజర్‌కు వాట్సాప్‌లో పంపుతుంది — ప్రతి షాప్‌కు ఒక సందేశం, దాని డెలివరీ PDFతో.",
   "orders.wa_confirm_send": "నిర్ధారించి పంపండి",
+  "orders.wa_retry": "మళ్లీ ప్రయత్నించండి",
+  "orders.submit_order_assignment": "ఆర్డర్ అసైన్‌మెంట్ సబ్మిట్ చేయండి",
   "orders.wa_sent_to": "WhatsApp సందేశం {name} ({mobile})కు విజయవంతంగా పంపబడింది.",
   "orders.wa_sent_ok_title": "WhatsApp నోటిఫికేషన్ విజయవంతంగా పంపబడింది",
   "orders.wa_sent_ok_body":
@@ -695,7 +717,7 @@ const TE: Record<string, string> = {
   "orders.no_filter_results": "ఈ ఫిల్టర్‌కు సరిపోయే షాప్‌లు లేవు",
   "orders.search_collection": "షాప్, సిటీ, ట్రిప్, వాహనం, స్థితి వెతకండి…",
   "orders.search_assignment": "షాప్, సిటీ, ట్రిప్, వాహనం, సూపర్‌వైజర్ వెతకండి…",
-  "orders.search_tracking": "షాప్, సిటీ, ట్రిప్, వాహనం, సూపర్‌వైజర్, స్థితి వెతకండి…",
+  "orders.search_tracking": "ట్రిప్, వాహనం, సూపర్‌వైజర్, మొబైల్, డ్రైవర్, షాప్ నంబర్, షాప్, సిటీ వెతకండి…",
   "orders.filter_status": "స్థితి",
   "orders.filter_difference": "వ్యత్యాసం",
   "orders.all": "అన్నీ",
@@ -764,9 +786,27 @@ const TE: Record<string, string> = {
   "orders.listed_shops": "లిస్టెడ్ షాప్‌లు",
   "orders.not_listed_shops": "పట్టికలో లేని షాప్‌లు",
   "orders.box_difference": "బాక్స్ తేడా",
-  "orders.pdf_report_title": "షాప్ డెలివరీ రిపోర్ట్",
+  "orders.pdf_report_title": "డెలివరీ రిపోర్ట్",
   "orders.pdf_order_no": "ఆర్డర్ నంబర్",
   "orders.pdf_totals": "మొత్తాలు",
+  "orders.assignment_incomplete": "అసైన్‌మెంట్ అసంపూర్ణం",
+  "orders.assignment_details_unavailable": "అసైన్‌మెంట్ వివరాలు అందుబాటులో లేవు",
+  "orders.assignment_incomplete_warning": "అసైన్‌మెంట్ వివరాలు అందుబాటులో లేవు",
+  "orders.collected_boxes": "సేకరించిన బాక్స్‌లు",
+  "orders.delivery_summary": "డెలివరీ సారాంశం",
+  "orders.showing_range": "{total}లో {from}–{to} చూపబడుతున్నాయి",
+  "orders.view_pdf": "PDF చూడండి",
+  "orders.col_shop_no": "షాప్ నంబర్",
+  "orders.filter_trip_status": "ట్రిప్ స్థితి",
+  "orders.filter_delivery_status": "డెలివరీ స్థితి",
+  "orders.clear_filters": "ఫిల్టర్లు క్లియర్ చేయండి",
+  "orders.delivery_pending": "పెండింగ్",
+  "orders.delivery_in_progress": "ప్రాసెస్‌లో",
+  "orders.delivery_partial": "పాక్షిక డెలివరీ",
+  "orders.trip_status_pending": "పెండింగ్",
+  "orders.summary_delivered": "డెలివర్డ్",
+  "orders.summary_pending": "పెండింగ్",
+  "orders.summary_part": "పాక్షిక డెలివరీ",
 };
 
 export type OrdersT = (key: string, params?: Record<string, string | number>) => string;

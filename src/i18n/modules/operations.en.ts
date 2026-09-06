@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   // ----- Collections module -----
   'ops.collection.add_notes': 'Add notes',
   'ops.collection.after_approval': 'After approval',
@@ -535,6 +535,7 @@
   'ops.trip.whatsapp': 'WhatsApp',
   'ops.trip.approved_by': 'Approved by',
   'ops.trip.shops': 'Shops',
+  'ops.trip.assignment_details_unavailable': 'Assignment details unavailable',
   'ops.trip.sending': 'Sending…',
   'ops.trip.shop_deliveries_count': '{count} shop deliveries',
   'ops.trip.shop_saved': 'Shop delivery saved.',
@@ -560,7 +561,7 @@
   'ops.trip.step2_label': 'Farm Details',
   'ops.trip.step3_label': 'Pickup Details',
   'ops.trip.step4_label': 'Delivery Details',
-  'ops.trip.step1_submitted': 'Step 1 saved. You can continue with Farm Details.',
+  'ops.trip.step1_submitted': 'Step 1 saved. Resume from Recent Trips to continue, or create a new trip.',
   'ops.trip.step5_label': 'Expenses / End Details',
   'ops.trip.step2_submitted': 'Step 2 saved. You can continue with pickup.',
   'ops.trip.step3_submitted': 'Step 3 saved. You can continue with deliveries.',

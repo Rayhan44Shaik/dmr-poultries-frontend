@@ -12,6 +12,7 @@ import {
   isOrderPlanRemarks,
   parseOrderRef,
   type OrderShopRow,
+  type OrdersDeliveryState,
   type OrdersEligibleVehicle,
   type OrdersProgress,
   type OrdersTrip,
@@ -48,6 +49,19 @@ export function rowsInSequence(trip: Trip): ShopDelivery[] {
     if (sa !== sb) return sa - sb;
     return num(a.id) - num(b.id);
   });
+}
+
+/** First occurrence of each shopId wins — Collection / Assignment never show duplicate shops. */
+export function uniqueShopRows<T extends { shopId?: number | null }>(rows: T[]): T[] {
+  const seen = new Set<number>();
+  const out: T[] = [];
+  for (const row of rows) {
+    const shopId = num(row.shopId);
+    if (!shopId || seen.has(shopId)) continue;
+    seen.add(shopId);
+    out.push(row);
+  }
+  return out;
 }
 
 /** Boxes carried by one delivery row (plan rows store the box count). */
@@ -91,7 +105,10 @@ export function isOrderContainer(trip: Trip): boolean {
   );
 }
 
-/** Container whose collection is finished → shows in Tab 2. */
+/**
+ * Container whose collection was finished via Finish Collection.
+ * Assignment does NOT require this — Save Progress is enough for Tab 2.
+ */
 export function isCollectedOrder(trip: Trip): boolean {
   return isOrderContainer(trip) && trip.startStepSubmitted === true;
 }
@@ -120,12 +137,28 @@ export function isEligibleVehicleTrip(trip: Trip): boolean {
   );
 }
 
-/** A trip with an assigned order whose delivery progress is tracked (Tab 3). */
+/**
+ * True when Finish Assignment tagged the trip remarks with `order:<tripNo>`.
+ * Survives a lost `[ORDER]` plan-row list so the trip still appears in
+ * Delivery Tracking (with `assignmentIncomplete`) instead of vanishing.
+ */
+export function hasOrderTag(trip: Trip): boolean {
+  return String(trip.remarks ?? "")
+    .split("|")
+    .some((tag) => tag.trim().startsWith("order:"));
+}
+
+/**
+ * A trip with an assigned order whose delivery progress is tracked (Tab 3).
+ * Requires Finish Assignment (`deliveryStepSubmitted`) — never a premature
+ * row — plus either the `[ORDER]` plan rows or the `order:` remarks tag
+ * (so a missing shop list still shows, never hides).
+ */
 export function isTrackingTrip(trip: Trip): boolean {
   return (
     trip.deleted !== true &&
     trip.deliveryStepSubmitted === true &&
-    hasOrderRows(trip)
+    (hasOrderRows(trip) || hasOrderTag(trip))
   );
 }
 
@@ -247,6 +280,7 @@ export function computeOrdersProgress(
     }
     if (isCapturedRow(row)) capturedShopIds.add(shopId);
   }
+  void capturedShopIds;
 
   for (const [shopId, row] of planByShop) {
     const ordered = originalQuantities?.get(shopId);
@@ -309,13 +343,65 @@ export function computeOrdersProgress(
     }
   }
 
-  let deliveredShops = 0;
-  for (const shopId of originalShopIds) {
-    if (capturedShopIds.has(shopId)) deliveredShops += 1;
+  // Count captured rows even when the [ORDER] marker was lost, so a
+  // tracking trip with assignmentIncomplete still has honest delivered totals.
+  if (planByShop.size === 0) {
+    capturedByShop.clear();
+    deliveredBoxes = 0;
+    deliveredBirds = 0;
+    deliveredWeight = 0;
+    for (const row of rows) {
+      if (!isCapturedRow(row)) continue;
+      const shopId = num(row.shopId);
+      if (!shopId) continue;
+      const acc = capturedByShop.get(shopId) ?? { boxes: 0, birds: 0, weight: 0 };
+      acc.boxes += deliveredRowBoxes(row);
+      acc.birds += num(row.birds);
+      acc.weight += num(row.weight);
+      capturedByShop.set(shopId, acc);
+    }
+    for (const acc of capturedByShop.values()) {
+      deliveredBoxes += acc.boxes;
+      deliveredBirds += acc.birds;
+      deliveredWeight += acc.weight;
+    }
+    if (totalBoxes === 0) {
+      for (const shopId of originalShopIds) {
+        const ordered = originalQuantities?.get(shopId);
+        const got = capturedByShop.get(shopId);
+        totalBoxes += ordered ? ordered.boxes : (got?.boxes ?? 0);
+        totalWeight += ordered ? ordered.weight : (got?.weight ?? 0);
+        totalBirds += ordered ? ordered.birds : (got?.birds ?? 0);
+      }
+    }
+    for (const shopId of originalShopIds) {
+      const ordered = originalQuantities?.get(shopId);
+      const orderedBoxes = ordered ? ordered.boxes : (capturedByShop.get(shopId)?.boxes ?? 0);
+      const orderedBirds = ordered ? ordered.birds : (capturedByShop.get(shopId)?.birds ?? 0);
+      const orderedWeight = ordered ? ordered.weight : (capturedByShop.get(shopId)?.weight ?? 0);
+      const got = capturedByShop.get(shopId);
+      pendingBoxes += Math.max(0, orderedBoxes - (got?.boxes ?? 0));
+      pendingBirds += Math.max(0, orderedBirds - (got?.birds ?? 0));
+      pendingWeight += Math.max(0, orderedWeight - (got?.weight ?? 0));
+      if (got && got.boxes > 0 && orderedBoxes > 0 && got.boxes < orderedBoxes) {
+        partDeliveredShops += 1;
+      }
+    }
   }
 
   const totalShops = originalShopIds.size;
-  const pendingShops = Math.max(0, totalShops - deliveredShops);
+  // Fully delivered shops only — a partial (15 of 21) is NOT "Delivered".
+  let fullyDeliveredShops = 0;
+  for (const shopId of originalShopIds) {
+    const ordered = originalQuantities?.get(shopId);
+    const plan = planByShop.get(shopId);
+    const orderedBoxes = ordered ? ordered.boxes : plan ? rowBoxes(plan) : 0;
+    const gotBoxes = capturedByShop.get(shopId)?.boxes ?? 0;
+    if (orderedBoxes > 0 && gotBoxes >= orderedBoxes) fullyDeliveredShops += 1;
+    else if (orderedBoxes === 0 && gotBoxes > 0 && planByShop.size === 0) fullyDeliveredShops += 1;
+  }
+  const deliveredShopsCount = fullyDeliveredShops;
+  const pendingShops = Math.max(0, totalShops - deliveredShopsCount - partDeliveredShops);
 
   // ── AUTHORITATIVE completion (CRITICAL RULE #4 / #5) ─────────────────
   // A trip is "Completed" ONLY when the existing Trip Entry lifecycle says
@@ -324,15 +410,26 @@ export function computeOrdersProgress(
   // Delivery percentage, 100% boxes, all shops delivered or a Step 4
   // submission ALONE are NEVER sufficient — Orders keeps no independent
   // completion state.
-  const tripCompleted = trip.status === "Completed" && trip.deleted !== true;
+  const tripCompleted = isLifecycleCompleted(trip);
 
   let status: OrdersProgress["status"];
   if (tripCompleted) {
     status = "Completed";
-  } else if (deliveredShops === 0) {
+  } else if (deliveredShopsCount === 0 && partDeliveredShops === 0) {
     status = "Assigned";
   } else {
     status = "In Progress";
+  }
+
+  let deliveryState: OrdersDeliveryState;
+  if (totalShops > 0 && pendingShops === 0 && partDeliveredShops === 0 && pendingBoxes === 0) {
+    deliveryState = "complete";
+  } else if (partDeliveredShops > 0) {
+    deliveryState = "partial";
+  } else if (deliveredShopsCount > 0) {
+    deliveryState = "in_progress";
+  } else {
+    deliveryState = "pending";
   }
 
   return {
@@ -340,7 +437,7 @@ export function computeOrdersProgress(
     totalBoxes,
     totalWeight: Number(totalWeight.toFixed(2)),
     totalBirds,
-    deliveredShops,
+    deliveredShops: deliveredShopsCount,
     pendingShops,
     partDeliveredShops,
     pendingBoxes,
@@ -351,7 +448,90 @@ export function computeOrdersProgress(
     deliveredWeight: Number(deliveredWeight.toFixed(2)),
     additionalShopCount,
     status,
+    deliveryState,
   };
+}
+
+/** Trip Entry lifecycle — the only thing that moves a trip between tables. */
+export function isLifecycleCompleted(trip: Trip): boolean {
+  return trip.status === "Completed" && trip.deleted !== true;
+}
+
+/**
+ * Split tracking trips into the two Delivery Tracking tables.
+ * Dedupes by trip.id so a refetch can never append the same trip twice,
+ * and a trip can never sit in both tables at once.
+ */
+export function partitionTrackingTrips(trips: OrdersTrip[]): {
+  pending: OrdersTrip[];
+  completed: OrdersTrip[];
+} {
+  const pending: OrdersTrip[] = [];
+  const completed: OrdersTrip[] = [];
+  const seen = new Set<number>();
+  for (const ot of trips) {
+    const id = ot.trip.id;
+    if (!Number.isFinite(id) || seen.has(id)) continue;
+    seen.add(id);
+    if (isLifecycleCompleted(ot.trip)) completed.push(ot);
+    else pending.push(ot);
+  }
+  return { pending, completed };
+}
+
+/** Delivered-shops percentage for the progress bar (0–100). */
+export function deliveryProgressPct(progress: OrdersProgress | null | undefined): number {
+  if (!progress || progress.totalShops <= 0) return 0;
+  return Math.round((progress.deliveredShops / progress.totalShops) * 100);
+}
+
+/** Compact YYYY-MM-DD → DD/MM/YYYY (tracking Date column). */
+export function formatDayShort(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const [y, m, d] = String(iso).slice(0, 10).split("-");
+  return d && m && y ? `${d}/${m}/${y}` : iso;
+}
+
+/** Visible page range for "Showing X–Y of Z" (1-based, empty → 0–0). */
+export function pageRange(
+  total: number,
+  page: number,
+  pageSize: number
+): { from: number; to: number } {
+  if (total <= 0) return { from: 0, to: 0 };
+  const from = (Math.max(1, page) - 1) * pageSize + 1;
+  return { from, to: Math.min(from + pageSize - 1, total) };
+}
+
+/**
+ * Client-side search haystack for one tracking trip. Includes trip / vehicle /
+ * supervisor / driver / shop name / shop number / village — never invents
+ * values. Empty pieces are skipped so they cannot match unrelated queries.
+ */
+export function trackingSearchHaystack(
+  ot: OrdersTrip,
+  extras: {
+    supervisorMobile?: string;
+    shopNumberOf?: (shopId: number) => string;
+    villageOf?: (shopId: number, shopName: string) => string;
+  } = {}
+): string {
+  const { trip, progress } = ot;
+  const parts: string[] = [
+    trip.tripNo,
+    trip.vehicleNo,
+    trip.supervisorName,
+    trip.driverName,
+    extras.supervisorMobile ?? "",
+    progress?.status ?? "",
+    progress?.deliveryState ?? "",
+  ];
+  for (const d of Array.isArray(trip.deliveries) ? trip.deliveries : []) {
+    parts.push(d.shopName || "");
+    if (extras.villageOf) parts.push(extras.villageOf(num(d.shopId), d.shopName || ""));
+    if (extras.shopNumberOf) parts.push(extras.shopNumberOf(num(d.shopId)));
+  }
+  return parts.filter(Boolean).join(" ").toLowerCase();
 }
 
 export function buildOrdersTrip(trip: Trip, originalQuantities?: ShopOrderQuantities): OrdersTrip {
@@ -370,8 +550,16 @@ export function buildOrdersTrip(trip: Trip, originalQuantities?: ShopOrderQuanti
       if (shopId && !originalShopIds.has(shopId)) additionalShopIds.add(shopId);
     }
   }
-  const progress = isTrackingTrip(trip) ? computeOrdersProgress(trip, originalQuantities) : null;
-  return { trip, progress, originalShopIds, additionalShopIds, originalQuantities };
+  const tracking = isTrackingTrip(trip);
+  const progress = tracking ? computeOrdersProgress(trip, originalQuantities) : null;
+  return {
+    trip,
+    progress,
+    originalShopIds,
+    additionalShopIds,
+    originalQuantities,
+    assignmentIncomplete: tracking && !hasOrderRows(trip),
+  };
 }
 
 // ─── Collection editor: boxes + quantities ──────────────────────────────────
@@ -581,6 +769,8 @@ export type ShopDeliveryBreakdown = {
   shopId: number;
   shopName: string;
   village: string;
+  /** Shop Master number ("" when the master has none). */
+  shopNumber: string;
   /** Shop Mobile — Shop Master only ("" when the master has none). */
   mobile: string;
   /** Sequence of the first row for this shop. */
@@ -610,6 +800,15 @@ export type ShopDeliveryBreakdown = {
   additional: boolean;
   /** Delivered · Delivered with Difference · Not Delivered · Not Listed. */
   status: ShopDeliveryBreakdownStatus;
+  /**
+   * Boxes this vehicle collected for the shop (assignment share). Falls back
+   * to orderedBoxes when the plan row has no tripBoxes. Always 0 for not-listed.
+   */
+  collectedBoxes: number;
+  /** Boxes assigned to THIS vehicle (plan share). 0 for not-listed. */
+  assignedBoxes: number;
+  /** Boxes still open on this vehicle: max(0, assigned − delivered). */
+  pendingBoxes: number;
 };
 
 /** Merges the persisted rows per shop into the detail-view columns.
@@ -623,7 +822,8 @@ export function buildShopBreakdown(
   originalShopIds: Set<number>,
   villageOf: (shopId: number, shopName: string) => string,
   originalQuantities?: ShopOrderQuantities,
-  mobileOf?: (shopId: number) => string
+  mobileOf?: (shopId: number) => string,
+  shopNumberOf?: (shopId: number) => string
 ): ShopDeliveryBreakdown[] {
   type Acc = {
     first: ShopDelivery;
@@ -688,6 +888,7 @@ export function buildShopBreakdown(
       shopId,
       shopName: acc.first.shopName || "—",
       village: villageOf(shopId, acc.first.shopName || ""),
+      shopNumber: shopNumberOf ? shopNumberOf(shopId) : "",
       mobile: mobileOf ? mobileOf(shopId) : "",
       serialNo: num(acc.first.serialNo ?? acc.first.id),
       ordered: !additional,
@@ -706,6 +907,20 @@ export function buildShopBreakdown(
       delivered,
       additional,
       status,
+      collectedBoxes: additional ? 0 : orderedBoxes,
+      assignedBoxes: additional
+        ? 0
+        : num(plan.boxNo ?? plan.selectedBoxIds?.length) > 0
+          ? num(plan.boxNo ?? plan.selectedBoxIds?.length)
+          : orderedBoxes,
+      pendingBoxes: additional
+        ? 0
+        : Math.max(
+            0,
+            (num(plan.boxNo ?? plan.selectedBoxIds?.length) > 0
+              ? num(plan.boxNo ?? plan.selectedBoxIds?.length)
+              : orderedBoxes) - deliveredBoxes
+          ),
     });
   }
   return out.sort((a, b) => a.serialNo - b.serialNo);
@@ -724,6 +939,97 @@ export function shopRemainingBoxes(row: {
 }): number {
   const basis = num(row.tripBoxes) > 0 ? num(row.tripBoxes) : num(row.orderedBoxes);
   return Math.max(0, basis - num(row.deliveredBoxes));
+}
+
+/** Boxes this shop ordered in collection (0 for not-listed). */
+export function shopCollectedBoxes(row: {
+  additional?: boolean;
+  collectedBoxes?: number;
+  orderedBoxes: number;
+}): number {
+  if (row.additional) return 0;
+  const collected = num(row.collectedBoxes);
+  return collected > 0 ? collected : num(row.orderedBoxes);
+}
+
+/** Boxes this vehicle was assigned for the shop. */
+export function shopAssignedBoxes(row: {
+  additional?: boolean;
+  assignedBoxes?: number;
+  tripBoxes?: number;
+  orderedBoxes: number;
+}): number {
+  if (row.additional) return 0;
+  const assigned = num(row.assignedBoxes);
+  if (assigned > 0) return assigned;
+  return num(row.tripBoxes) > 0 ? num(row.tripBoxes) : num(row.orderedBoxes);
+}
+
+/** Shop-row status label keys shared by View and PDF. */
+export function shopDeliveryStatusI18nKey(status: ShopDeliveryBreakdownStatus): string {
+  switch (status) {
+    case "delivered":
+    case "delivered_with_diff":
+      return "orders.status_delivered";
+    case "part_delivered":
+      return "orders.status_part_delivered";
+    case "not_listed":
+      return "orders.status_not_listed";
+    default:
+      return "orders.status_pending";
+  }
+}
+
+/**
+ * Compact delivery-report numbers shared by the View modal and the PDF so
+ * both surfaces render the same collected / delivered / pending dataset.
+ * Box / bird / weight figures come from the shop breakdown (never invented);
+ * shop counts prefer the trip progress already shown on the tracking table.
+ */
+export type DeliveryReportSummary = {
+  totalShops: number;
+  deliveredShops: number;
+  pendingShops: number;
+  partDeliveredShops: number;
+  collectedBoxes: number;
+  assignedBoxes: number;
+  deliveredBoxes: number;
+  pendingBoxes: number;
+  deliveredBirds: number;
+  deliveredWeight: number;
+};
+
+export function buildDeliveryReportSummary(
+  progress: OrdersProgress | null | undefined,
+  shops: ShopDeliveryBreakdown[]
+): DeliveryReportSummary {
+  const listed = shops.filter((s) => s.ordered);
+  const collectedBoxes = listed.reduce((sum, r) => sum + shopCollectedBoxes(r), 0);
+  const assignedBoxes = listed.reduce((sum, r) => sum + shopAssignedBoxes(r), 0);
+  const pendingBoxes = listed.reduce((sum, r) => sum + shopRemainingBoxes(r), 0);
+  const deliveredBoxes = shops.reduce((sum, r) => sum + r.deliveredBoxes, 0);
+  const deliveredBirds = shops.reduce((sum, r) => sum + r.deliveredBirds, 0);
+  const deliveredWeight = Number(
+    shops.reduce((sum, r) => sum + r.deliveredWeight, 0).toFixed(2)
+  );
+  return {
+    totalShops: progress?.totalShops ?? listed.length,
+    deliveredShops:
+      progress?.deliveredShops ??
+      listed.filter((s) => s.status === "delivered" || s.status === "delivered_with_diff")
+        .length,
+    pendingShops:
+      progress?.pendingShops ?? listed.filter((s) => s.status === "not_delivered").length,
+    partDeliveredShops:
+      progress?.partDeliveredShops ??
+      listed.filter((s) => s.status === "part_delivered").length,
+    collectedBoxes,
+    assignedBoxes,
+    deliveredBoxes,
+    pendingBoxes,
+    deliveredBirds,
+    deliveredWeight,
+  };
 }
 
 /**
@@ -824,6 +1130,7 @@ export function filterShopBreakdown(
   return rows.filter((row) => {
     const haystack = [
       row.shopName,
+      row.shopNumber,
       row.village,
       row.status === "not_listed" ? labels.notListed : labels.ordered,
       row.status === "delivered"

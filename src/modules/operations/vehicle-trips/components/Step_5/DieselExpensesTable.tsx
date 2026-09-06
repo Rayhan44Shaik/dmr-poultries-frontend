@@ -347,6 +347,7 @@ export default function DieselExpensesTable({
   };
 
   const handleRowSubmit = async (num: number) => {
+    if (busyRow !== null) return;
     const useDraft = editingRow === num;
     if (!rowReady(num, useDraft)) {
       notifyUser(t("ops.trip.fill_mandatory_diesel", { row: num }), "error");
@@ -609,7 +610,18 @@ export default function DieselExpensesTable({
                             {imageNameVal}
                           </a>
                           {!locked && (
-                            <button type="button" onClick={() => applyBatchUpdates({ [`dieselImage${num}`]: "", [`dieselImageName${num}`]: "" })} className="text-slate-400 hover:text-red-600">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isEditingThisRow) {
+                                  setDraftField(`dieselImage${num}`, "");
+                                  setDraftField(`dieselImageName${num}`, "");
+                                } else {
+                                  applyBatchUpdates({ [`dieselImage${num}`]: "", [`dieselImageName${num}`]: "" });
+                                }
+                              }}
+                              className="text-slate-400 hover:text-red-600"
+                            >
                               <X size={14} />
                             </button>
                           )}

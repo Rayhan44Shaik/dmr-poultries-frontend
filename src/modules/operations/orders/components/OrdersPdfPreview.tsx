@@ -177,15 +177,13 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
   };
 
   const statusLabel = (status: ShopDeliveryBreakdown["status"]): string =>
-    status === "delivered"
+    status === "delivered" || status === "delivered_with_diff"
       ? ordersTranslate("orders.status_delivered")
-      : status === "delivered_with_diff"
-        ? ordersTranslate("orders.status_delivered_diff")
-        : status === "part_delivered"
-          ? ordersTranslate("orders.status_part_delivered")
-          : status === "not_delivered"
-            ? ordersTranslate("orders.status_not_delivered")
-            : ordersTranslate("orders.not_listed_deliveries");
+      : status === "part_delivered"
+        ? ordersTranslate("orders.status_part_delivered")
+        : status === "not_delivered"
+          ? ordersTranslate("orders.status_pending")
+          : ordersTranslate("orders.not_listed_deliveries");
 
   const Fact = ({ label, value }: { label: string; value: string | number }) => (
     <div className="min-w-0 rounded-lg border border-slate-200/80 bg-slate-50/80 px-2 py-1.5">
@@ -270,7 +268,7 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
                   value={`${deliveredShops}/${totalShops}`}
                 />
                 <Fact label={ordersTranslate("orders.status_part_delivered")} value={partial} />
-                <Fact label={ordersTranslate("orders.status_not_delivered")} value={pending} />
+                <Fact label={ordersTranslate("orders.status_pending")} value={pending} />
                 <Fact label={ordersTranslate("orders.status_delivered")} value={delivered} />
                 <Fact
                   label={ordersTranslate("orders.delivered_boxes")}

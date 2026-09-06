@@ -11,6 +11,7 @@ import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 import { getNextIncompleteTripStep, isTripWizardComplete, TRIP_STEP_LABELS, isValidTripStatusTransition, getValidNextStatuses, type TripStatus } from "../../../../shared/trip";
 import { useI18n } from "../../../../i18n";
+import { uniqueTripsById } from "../services/tripHeaderApiService";
 
 interface Props {
   trips?: Trip[];
@@ -33,7 +34,7 @@ function TripRecentTable({
   onStatusChange,
 }: Props) {
   const { t } = useI18n();
-  const safeTrips = Array.isArray(trips) ? trips : [];
+  const safeTrips = uniqueTripsById(Array.isArray(trips) ? trips : []);
 
   /** Translate, but never surface a raw i18n key: returns "" when the key is missing. */
   const tSafe = (key: string, params?: Record<string, string | number>) => {

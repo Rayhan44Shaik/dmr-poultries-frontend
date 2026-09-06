@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   // ----- Collections module -----
   'ops.collection.add_notes': 'గమనికలు జోడించండి',
   'ops.collection.after_approval': 'ఆమోదం తర్వాత',
@@ -535,6 +535,7 @@
   'ops.trip.shop_saved': 'షాప్ డెలివరీ సేవ్ చేయబడింది.',
   'ops.trip.shop_view': 'షాప్ వీక్షణ',
   'ops.trip.shops': 'షాపులు',
+  'ops.trip.assignment_details_unavailable': 'అసైన్‌మెంట్ వివరాలు అందుబాటులో లేవు',
   'ops.trip.shops_available': 'అందుబాటులో ఉన్న షాపులు',
   'ops.trip.source_farm': 'మూల ఫారం',
   'ops.trip.start_meter': 'ప్రారంభ మీటర్',
@@ -550,7 +551,7 @@
   'ops.trip.step3_label': 'పికప్ వివరాలు',
   'ops.trip.step4_label': 'డెలివరీ వివరాలు',
   'ops.trip.step5_label': 'ఖర్చులు / చివరి వివరాలు',
-  'ops.trip.step1_submitted': 'దశ 1 సేవ్ చేయబడింది. ఫారం వివరాలతో కొనసాగవచ్చు.',
+  'ops.trip.step1_submitted': 'దశ 1 సేవ్ చేయబడింది. Recent Trips నుండి కొనసాగించండి లేదా కొత్త ట్రిప్ సృష్టించండి.',
   'ops.trip.step2_submitted': 'దశ 2 సేవ్ చేయబడింది. పికప్‌తో కొనసాగవచ్చు.',
   'ops.trip.step3_submitted': 'దశ 3 సేవ్ చేయబడింది. డెలివరీలతో కొనసాగవచ్చు.',
   'ops.trip.step4_submitted': 'దశ 4 సేవ్ చేయబడింది. ఖర్చులతో కొనసాగవచ్చు.',

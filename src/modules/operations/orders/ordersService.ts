@@ -24,6 +24,7 @@ import {
   listTrips,
   mapApiTripToTrip,
   toStep4Payload,
+  uniqueTripsById,
 } from "../vehicle-trips/services/tripHeaderApiService";
 import { loadShops } from "../../masters/shops/services/shopService";
 import { loadVehicles } from "../../masters/vehicles/services/vehicleService";
@@ -47,6 +48,7 @@ import {
   rowBoxes,
   rowsInSequence,
   toEligibleVehicle,
+  uniqueShopRows,
 } from "./ordersUtils";
 import {
   isOrderPlanRemarks,
@@ -92,14 +94,16 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
   let trips: Trip[];
   let vehicleList: Array<{ id: number; noOfBoxes?: number }>;
   if (ORDERS_SAMPLE_DATA_ENABLED) {
-    trips = sampleTrips();
+    trips = uniqueTripsById(sampleTrips());
     vehicleList = sampleVehicleCapacities();
   } else {
     const [liveTrips, vehicles] = await Promise.all([
-      listTrips(),
+      // Orders classifies collection/assignment from persisted delivery rows.
+      // The summary list omits them — always hydrate with full=true.
+      listTrips({ full: true }),
       loadVehicles().catch(() => [] as Vehicle[]),
     ]);
-    trips = liveTrips;
+    trips = uniqueTripsById(liveTrips);
     vehicleList = vehicles.map((v) => ({ id: v.id, noOfBoxes: v.noOfBoxes }));
   }
 
@@ -141,6 +145,18 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
         break;
       }
     }
+    // Lost `[ORDER]` rows still carry `order:<tripNo>` on the trip remarks.
+    if (!base) {
+      for (const tag of String(t.remarks ?? "").split("|")) {
+        const trimmed = tag.trim();
+        if (!trimmed.startsWith("order:")) continue;
+        const ref = trimmed.slice("order:".length).trim();
+        if (ref && containerQuantitiesByNo.has(ref)) {
+          base = containerQuantitiesByNo.get(ref);
+          break;
+        }
+      }
+    }
     const overrides = tripShareOverrides.get(t.id);
     if (!overrides) return base;
     // Merge: unshared shops keep the container's authoritative quantities;
@@ -156,16 +172,23 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
     statusCache.get(t.id) ?? computeOrdersProgress(t, quantitiesForTrip(t)).status;
 
   const collectionsByDay: Record<string, OrdersDayCollection> = {};
+  const seenContainerIds = new Set<number>();
   for (const container of containers) {
     const day = container.tripDate;
     if (!day) continue;
-    const rows = rowsInSequence(container).map((row) => ({
-      ...row,
-      clientKey:
-        typeof (row as OrderShopRow).clientKey === "string"
-          ? (row as OrderShopRow).clientKey!
-          : `id-${row.id}`,
-    })) as OrderShopRow[];
+    if (seenContainerIds.has(container.id)) continue;
+    seenContainerIds.add(container.id);
+    // One container per operational day: a second container for the same day
+    // replaces (never merges) so Trip A shops cannot leak into Trip B.
+    const rows = uniqueShopRows(
+      rowsInSequence(container).map((row) => ({
+        ...row,
+        clientKey:
+          typeof (row as OrderShopRow).clientKey === "string"
+            ? (row as OrderShopRow).clientKey!
+            : `id-${row.id}`,
+      })) as OrderShopRow[]
+    );
 
     // Where each collected shop ended up (persisted vehicle-trip rows) —
     // one bucket PER VEHICLE TRIP, because a shop's order can be SPLIT over
@@ -483,7 +506,7 @@ function normalizeBirdType(deliveries: ShopDelivery[]): ShopDelivery[] {
 function buildAssignmentDeliveries(vehicleTrip: Trip, groups: AssignmentGroup[]): ShopDelivery[] {
   let deliveries = rowsInSequence(vehicleTrip);
   for (const group of groups) {
-    const withRef = group.rows.map((row) => ({
+    const withRef = uniqueShopRows(group.rows).map((row) => ({
       ...row,
       remarks: orderRowRemarks(group.orderTripNo),
     }));
@@ -590,15 +613,15 @@ export async function saveShopDeliveries(vehicleTrip: Trip): Promise<Trip> {
  */
 export async function submitShopDeliveries(vehicleTrip: Trip): Promise<Trip> {
   const rows = rowsInSequence(vehicleTrip);
+  // Persist Step 4 captures only. Trip lifecycle (`status = Completed`) is
+  // Trip Entry Step 5 — Orders must never invent a second completion flag,
+  // and must never overwrite `order:` remarks used by Delivery Tracking.
   if (ORDERS_SAMPLE_DATA_ENABLED) {
-    return applySampleDeliveries(vehicleTrip.id, rows, {
-      status: "Completed",
-      submittedAtTimestamp: new Date().toISOString(),
-    });
+    return applySampleDeliveries(vehicleTrip.id, rows);
   }
   const { data } = await apiPost<RawTrip>(
     `/trips/${vehicleTrip.id}/steps/deliveries`,
-    { ...toStep4Payload({ deliveries: rows } as unknown as Partial<Trip>), mode: "submit", remarks: "[ORDER] delivery submitted" }
+    { ...toStep4Payload({ deliveries: rows } as unknown as Partial<Trip>), mode: "save" }
   );
   return mapApiTripToTrip(data, vehicleTrip);
 }
@@ -671,7 +694,7 @@ export async function findDayOverAssignments(
  */
 export type ShopDirectory = Map<
   number,
-  { shopName: string; village: string; mobile: string }
+  { shopName: string; village: string; mobile: string; shopNumber: string }
 >;
 export type SupervisorDirectory = Map<string, string>; // name (lower) -> mobile
 
@@ -680,7 +703,12 @@ export async function loadShopDirectory(): Promise<ShopDirectory> {
     return new Map(
       SAMPLE_SHOPS.map((shop) => [
         shop.id,
-        { shopName: shop.shopName, village: shop.village, mobile: shop.mobile },
+        {
+          shopName: shop.shopName,
+          village: shop.village,
+          mobile: shop.mobile,
+          shopNumber: `SHP-${String(shop.shopNo).padStart(3, "0")}`,
+        },
       ])
     );
   }
@@ -693,6 +721,7 @@ export async function loadShopDirectory(): Promise<ShopDirectory> {
       // own "village" wording for the column but reads the master's field.
       village: shop.city,
       mobile: (shop.phoneNumber ?? "").trim(),
+      shopNumber: (shop.shopNumber || (shop.shopNo ? String(shop.shopNo) : "")).trim(),
     });
   }
   return dir;
@@ -729,6 +758,14 @@ export function shopMobileOf(
   directory: ShopDirectory
 ): string {
   return directory.get(shopId)?.mobile ?? "";
+}
+
+/** Shop number from the Shop Master only ("" when the master has none). */
+export function shopNumberOf(
+  shopId: number,
+  directory: ShopDirectory
+): string {
+  return directory.get(shopId)?.shopNumber ?? "";
 }
 
 // ─── WhatsApp — existing per-delivery mechanism, order-level usage ──────────

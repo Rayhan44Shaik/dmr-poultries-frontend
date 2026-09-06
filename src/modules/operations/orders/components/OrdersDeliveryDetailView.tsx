@@ -29,17 +29,22 @@ import {
   opsTableThClass,
 } from "../../../../shared/ui/operationsStyles";
 import TripPagination from "../../vehicle-trips/components/TripPagination";
+import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import {
+  buildDeliveryReportSummary,
   buildShopBreakdown,
   filterShopBreakdown,
   formatCount,
   formatDeliveredAtLabel,
+  pageRange,
   rowsInSequence,
+  shopDeliveryStatusI18nKey,
   shopRemainingBoxes,
   type ShopDeliveryBreakdown,
 } from "../ordersUtils";
 import {
   shopMobileOf,
+  shopNumberOf,
   villageOf,
   type OrdersWhatsAppResult,
   type ShopDirectory,
@@ -53,7 +58,6 @@ import {
   OrdersIconButton,
   OrdersSearchInput,
   OrdersStatusBadge,
-  WhatsAppIcon,
   onOrdersNumberWheel,
 } from "./OrdersCommon";
 
@@ -114,25 +118,25 @@ function WeightDiffCell({ value, show }: { value: number; show: boolean }) {
 
 /** Delivery Status cell for the report. */
 function DeliveryStatusCell({ row, to }: { row: ShopDeliveryBreakdown; to: OrdersT }) {
+  const label = to(shopDeliveryStatusI18nKey(row.status));
   switch (row.status) {
     case "delivered":
-      return <OrdersStatusBadge status="Delivered" label={to("orders.status_delivered")} />;
+    case "delivered_with_diff":
+      return <OrdersStatusBadge status="Delivered" label={label} />;
     case "part_delivered":
       return (
         <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-700 whitespace-nowrap">
-          {to("orders.status_part_delivered")}
+          {label}
         </span>
       );
-    case "delivered_with_diff":
-      return <OrdersStatusBadge status="Delivered with Difference" label={to("orders.status_delivered_diff")} />;
-    case "not_delivered":
-      return <OrdersStatusBadge status="Not Delivered" label={to("orders.status_not_delivered")} />;
     case "not_listed":
       return (
         <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-700 whitespace-nowrap">
-          {to("orders.status_not_listed")}
+          {label}
         </span>
       );
+    default:
+      return <OrdersStatusBadge status="Pending" label={label} />;
   }
 }
 
@@ -209,7 +213,7 @@ function OrdersDeliveryDetailView({
   shopDirectory,
   supervisorMobile,
   pdfBusy,
-  whatsappBusy,
+  whatsappBusy: _whatsappBusy,
   onClose,
   onWhatsApp,
   onRecordDelivery,
@@ -235,7 +239,8 @@ function OrdersDeliveryDetailView({
         originalShopIds,
         (shopId, shopName) => villageOf(shopId, shopName, shopDirectory),
         orderTrip.originalQuantities,
-        (shopId) => shopMobileOf(shopId, shopDirectory)
+        (shopId) => shopMobileOf(shopId, shopDirectory),
+        (shopId) => shopNumberOf(shopId, shopDirectory)
       ),
     [trip, originalShopIds, shopDirectory, orderTrip.originalQuantities]
   );
@@ -246,7 +251,7 @@ function OrdersDeliveryDetailView({
       { value: "delivered", label: to("orders.status_delivered") },
       { value: "part_delivered", label: to("orders.status_part_delivered") },
       { value: "delivered_with_diff", label: to("orders.status_delivered_diff") },
-      { value: "not_delivered", label: to("orders.status_not_delivered") },
+      { value: "not_delivered", label: to("orders.status_pending") },
       { value: "not_listed", label: to("orders.status_not_listed") },
     ],
     [to]
@@ -283,7 +288,7 @@ function OrdersDeliveryDetailView({
           delivered: to("orders.status_delivered"),
           partDelivered: to("orders.status_part_delivered"),
           deliveredWithDiff: to("orders.status_delivered_diff"),
-          notDelivered: to("orders.status_not_delivered"),
+          notDelivered: to("orders.status_pending"),
         },
         trip.tripNo,
         trip.vehicleNo ?? ""
@@ -358,6 +363,8 @@ function OrdersDeliveryDetailView({
 
   const notListedCount = breakdown.filter((b) => b.status === "not_listed").length;
   const notDeliveredCount = breakdown.filter((b) => b.status === "not_delivered").length;
+  const report = buildDeliveryReportSummary(progress, breakdown);
+  const shopPage = pageRange(listedRows.length, safePage, PAGE_SIZE);
 
   const status = progress?.status ?? "Assigned";
   const statusLabel =
@@ -368,21 +375,12 @@ function OrdersDeliveryDetailView({
         : to("orders.status_assigned");
 
   const details: Array<[string, string]> = [
+    [to("orders.col_trip_no"), trip.tripNo || "—"],
     [to("orders.col_date"), trip.tripDate || "—"],
     [to("orders.col_vehicle_no"), trip.vehicleNo || "—"],
-    [
-      to("orders.farm_address"),
-      `${trip.sourceFarm || "—"}${trip.farmAddress ? ` · ${trip.farmAddress}` : ""}`,
-    ],
-    [to("orders.bird_type"), trip.birdType || "—"],
     [to("orders.supervisor"), trip.supervisorName || "—"],
-    [to("orders.driver"), trip.driverName || "—"],
     [to("orders.supervisor_mobile"), supervisorMobile || "—"],
-    [
-      to("orders.avg_bird_weight"),
-      trip.avgBirdWeight ? `${Number(trip.avgBirdWeight).toFixed(2)} KG` : "—",
-    ],
-    [to("orders.col_completed_at"), formatDeliveredAtLabel(trip.submittedAtTimestamp)],
+    [to("orders.driver"), trip.driverName || "—"],
   ];
 
   return (
@@ -396,7 +394,10 @@ function OrdersDeliveryDetailView({
               duplicated Orders/Tracking/Assignment page headers. */}
           <div className="px-5 py-3.5 border-b border-slate-200 bg-white flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-              <h2 className="text-lg font-bold text-slate-900 leading-tight">{trip.tripNo}</h2>
+              <h2 className="text-lg font-bold text-slate-900 leading-tight">
+                {to("orders.pdf_report_title")}
+              </h2>
+              <span className="text-sm font-semibold text-emerald-700">{trip.tripNo}</span>
               <OrdersStatusBadge status={status} label={statusLabel} />
               {notListedCount > 0 && (
                 <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
@@ -410,14 +411,6 @@ function OrdersDeliveryDetailView({
               <OrdersIconButton label={to("orders.pdf_check_title")} onClick={() => setPdfOpen(true)} busy={pdfBusy}>
                 <FileText size={15} />
               </OrdersIconButton>
-              <OrdersIconButton
-                label={to("orders.whatsapp")}
-                onClick={onWhatsApp}
-                busy={whatsappBusy}
-                tone="emerald"
-              >
-                <WhatsAppIcon size={15} />
-              </OrdersIconButton>
               <button
                 type="button"
                 onClick={onClose}
@@ -430,6 +423,12 @@ function OrdersDeliveryDetailView({
           </div>
 
           <div className="p-3 md:p-4 space-y-3 md:space-y-4">
+            {orderTrip.assignmentIncomplete && (
+              <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-xs font-semibold text-orange-800">
+                {to("orders.assignment_incomplete_warning")}
+              </div>
+            )}
+
             {/* Trip details (read-only — existing Trip Entry data) */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="px-4 py-2.5 border-b border-slate-200 bg-slate-50/60">
@@ -451,6 +450,42 @@ function OrdersDeliveryDetailView({
               </div>
             </div>
 
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-slate-200 bg-slate-50/60">
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  {to("orders.delivery_summary")}
+                </h3>
+              </div>
+              <div className="px-4 py-3">
+                <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3">
+                  {(
+                    [
+                      [
+                        to("orders.col_delivered"),
+                        to("orders.delivered_of", {
+                          x: report.deliveredShops,
+                          y: report.totalShops,
+                        }),
+                      ],
+                      [to("orders.collected_boxes"), formatCount(report.collectedBoxes)],
+                      [to("orders.col_assigned_boxes"), formatCount(report.assignedBoxes)],
+                      [to("orders.delivered_boxes"), formatCount(report.deliveredBoxes)],
+                      [to("orders.pending_boxes"), formatCount(report.pendingBoxes)],
+                      [to("orders.delivered_birds"), formatCount(report.deliveredBirds)],
+                      [to("orders.delivered_weight"), report.deliveredWeight.toFixed(2)],
+                      [to("orders.col_pending"), formatCount(report.pendingShops)],
+                      [to("orders.status_part_delivered"), formatCount(report.partDeliveredShops)],
+                    ] as Array<[string, string]>
+                  ).map(([label, value]) => (
+                    <div key={label} className="min-w-0">
+                      <dt className="text-[11px] font-semibold text-slate-400">{label}</dt>
+                      <dd className="text-sm font-semibold text-slate-800">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            </div>
+
             {/* Shop delivery report — combines the original order with the
                 ACTUAL Step 4 deliveries (authoritative). */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -458,8 +493,8 @@ function OrdersDeliveryDetailView({
                 <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                   {to("orders.shop_delivery_details")}
                   {notDeliveredCount > 0 && (
-                    <span className="ml-2 font-semibold text-rose-500 normal-case">
-                      {to("orders.status_not_delivered")}: {notDeliveredCount}
+                    <span className="ml-2 font-semibold text-amber-600 normal-case">
+                      {to("orders.status_pending")}: {notDeliveredCount}
                     </span>
                   )}
                 </h3>
@@ -481,21 +516,21 @@ function OrdersDeliveryDetailView({
                 </div>
               </div>
               <div className={`${opsTableCardClass} overflow-x-auto`}>
-                <table className="w-full min-w-[1620px] text-xs md:text-sm">
+                <table className="w-full min-w-[1280px] text-xs md:text-sm">
                   <thead>
                     <tr className={opsTableHeadRowClass}>
                       <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
+                      <th className={`${opsTableThClass} w-24`}>{to("orders.col_shop_no")}</th>
                       <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
                       <th className={opsTableThClass}>{to("orders.col_village")}</th>
-                      <th className={`${opsTableThClass} w-32`}>{to("orders.shop_mobile")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_birds")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_boxes")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_birds")}</th>
+                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.collected_boxes")}</th>
+                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_assigned_boxes")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_boxes")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_weight")}</th>
+                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.pending_boxes")}</th>
+                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_birds")}</th>
+                      <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.delivered_weight")}</th>
                       <th className={`${opsTableThClass} w-40`}>{to("orders.delivery_time")}</th>
-                      <th className={`${opsTableThClass} w-20 text-right`}>{to("orders.col_difference")}</th>
-                      <th className={`${opsTableThClass} w-40`}>{to("orders.col_delivery_status")}</th>
+                      <th className={`${opsTableThClass} w-36`}>{to("orders.col_delivery_status")}</th>
                       {/* Shop-level capture: the order is on this row, the
                           delivery is entered here (partial allowed). */}
                       <th className={`${opsTableThClass} w-64`}>{to("orders.record_delivery")}</th>
@@ -514,47 +549,47 @@ function OrdersDeliveryDetailView({
                       </tr>
                     )}
                     {pageRows.map((row, index) => {
-                      // Difference is only meaningful once a Step 4 capture
-                      // exists (part / delivered / delivered-with-diff rows).
-                      const showDiff =
-                        row.status === "delivered" ||
-                        row.status === "part_delivered" ||
-                        row.status === "delivered_with_diff";
                       const remaining = shopRemainingBoxes(row);
                       return (
                         <tr key={row.shopId} className="align-middle transition-colors">
                           <td className={opsTableTdClass}>
                             <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[12px] font-bold bg-emerald-50 text-emerald-700">
-                              {startIndex + index + 1}
+                              {row.serialNo || startIndex + index + 1}
                             </span>
+                          </td>
+                          <td className={`${opsTableTdClass} text-slate-600`}>
+                            {row.shopNumber || "—"}
                           </td>
                           <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
                             {row.shopName || "—"}
                           </td>
                           <td className={opsTableTdClass}>{row.village || "—"}</td>
-                          <td className={`${opsTableTdClass} text-slate-600 whitespace-nowrap`}>
-                            {row.mobile || "—"}
-                          </td>
-                          <td className={`${opsTableTdClass} text-right font-semibold`}>
-                            {row.orderedBirds > 0 ? formatCount(row.orderedBirds) : "—"}
-                          </td>
                           <td className={`${opsTableTdClass} text-right font-bold text-emerald-800`}>
-                            {row.orderedBoxes > 0 ? formatCount(row.orderedBoxes) : "—"}
+                            {row.collectedBoxes > 0 ? formatCount(row.collectedBoxes) : "—"}
                           </td>
-                          <td className={`${opsTableTdClass} text-right font-semibold`}>
-                            {row.deliveredBirds > 0 ? formatCount(row.deliveredBirds) : "—"}
+                          <td className={`${opsTableTdClass} text-right font-semibold text-slate-800`}>
+                            {row.assignedBoxes > 0 ? formatCount(row.assignedBoxes) : "—"}
                           </td>
                           <td className={`${opsTableTdClass} text-right font-semibold`}>
                             {row.deliveredBoxes > 0 ? formatCount(row.deliveredBoxes) : "—"}
+                          </td>
+                          <td className={`${opsTableTdClass} text-right`}>
+                            {row.pendingBoxes > 0 ? (
+                              <span className="font-semibold text-amber-600">
+                                {formatCount(row.pendingBoxes)}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300">0</span>
+                            )}
+                          </td>
+                          <td className={`${opsTableTdClass} text-right font-semibold`}>
+                            {row.deliveredBirds > 0 ? formatCount(row.deliveredBirds) : "—"}
                           </td>
                           <td className={`${opsTableTdClass} text-right font-semibold`}>
                             {row.deliveredWeight > 0 ? row.deliveredWeight.toFixed(2) : "—"}
                           </td>
                           <td className={`${opsTableTdClass} text-slate-500 whitespace-nowrap`}>
                             {formatDeliveredAtLabel(row.deliveredAt)}
-                          </td>
-                          <td className={`${opsTableTdClass} text-right`}>
-                            <DiffCell value={row.boxDifference} show={showDiff} />
                           </td>
                           <td className={opsTableTdClass}>
                             <DeliveryStatusCell row={row} to={to} />
@@ -583,14 +618,23 @@ function OrdersDeliveryDetailView({
                 </table>
               </div>
 
-              {/* Global pagination (existing component) */}
-              {listedRows.length > PAGE_SIZE && (
-                <div className="px-4 py-2.5 border-t border-slate-100">
-                  <TripPagination
-                    currentPage={safePage}
-                    totalPages={totalPages}
-                    onPageChange={setPage}
-                  />
+              {listedRows.length > 0 && (
+                <div className="w-full flex items-center justify-between flex-wrap gap-1.5 px-4 py-3 bg-white border-t border-slate-100">
+                  <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+                    {to("orders.showing_range", {
+                      from: shopPage.from,
+                      to: shopPage.to,
+                      total: listedRows.length,
+                    })}
+                  </span>
+                  {shouldShowPagination(listedRows.length) ? (
+                    <TripPagination
+                      currentPage={safePage}
+                      totalPages={totalPages}
+                      onPageChange={setPage}
+                      hidePageInfo
+                    />
+                  ) : null}
                 </div>
               )}
 

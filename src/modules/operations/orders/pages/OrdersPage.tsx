@@ -49,6 +49,7 @@ import {
   submitShopDeliveries,
   sendOrdersWhatsApp,
   shopMobileOf,
+  shopNumberOf,
   supervisorMobileOf,
   villageOf,
   type OrdersWhatsAppResult,
@@ -191,6 +192,38 @@ const OrdersPage: React.FC = () => {
     };
   }, []);
 
+  // Light frontend revalidation while Delivery Tracking is open: refetch on
+  // window focus / tab visibility. No polling, no extra backend contract.
+  useEffect(() => {
+    if (activeTab !== "tracking") return;
+    let inFlight = false;
+    const refresh = () => {
+      if (inFlight) return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      inFlight = true;
+      void fetchOrdersData()
+        .then((next) => {
+          setData(next);
+          setError(null);
+        })
+        .catch(() => {
+          /* keep the last good snapshot — this is a silent revalidate */
+        })
+        .finally(() => {
+          inFlight = false;
+        });
+    };
+    const onVis = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [activeTab]);
+
   const mobileOf = useCallback(
     (trip: Trip) => supervisorMobileOf(trip, supervisorDirectory),
     [supervisorDirectory]
@@ -257,7 +290,8 @@ const OrdersPage: React.FC = () => {
             ot.originalShopIds,
             (shopId, shopName) => villageOf(shopId, shopName, shopDirectory),
             ot.originalQuantities,
-            (shopId) => shopMobileOf(shopId, shopDirectory)
+            (shopId) => shopMobileOf(shopId, shopDirectory),
+            (shopId) => shopNumberOf(shopId, shopDirectory)
           ),
           language,
         });
@@ -312,7 +346,15 @@ const OrdersPage: React.FC = () => {
   const handleRecordDelivery = useCallback(
     async (ot: OrdersTrip, shop: ShopDeliveryBreakdown, boxes: number) => {
       try {
-        await recordShopDelivery(ot.trip, { shopId: shop.shopId, boxes });
+        // Refetch before write so a stale modal snapshot cannot duplicate a capture.
+        const fresh = await fetchOrdersData();
+        const current = fresh.tracking.find((t) => t.trip.id === ot.trip.id);
+        if (!current) {
+          showNotification(to("orders.refresh_failed"), "error");
+          return;
+        }
+        setData(fresh);
+        await recordShopDelivery(current.trip, { shopId: shop.shopId, boxes });
         await load();
         showNotification(
           to("orders.delivery_saved_partial", { shop: shop.shopName || "—", boxes }),
@@ -332,7 +374,14 @@ const OrdersPage: React.FC = () => {
   const handleSaveProgress = useCallback(
     async (ot: OrdersTrip): Promise<string | null> => {
       try {
-        await saveShopDeliveries(ot.trip);
+        const fresh = await fetchOrdersData();
+        const current = fresh.tracking.find((t) => t.trip.id === ot.trip.id);
+        if (!current) {
+          showNotification(to("orders.refresh_failed"), "error");
+          return to("orders.refresh_failed");
+        }
+        setData(fresh);
+        await saveShopDeliveries(current.trip);
         await load();
         showNotification(to("orders.pdf_saved_ok"), "success");
         return null;
@@ -348,7 +397,14 @@ const OrdersPage: React.FC = () => {
   const handleSubmitTrip = useCallback(
     async (ot: OrdersTrip): Promise<string | null> => {
       try {
-        await submitShopDeliveries(ot.trip);
+        const fresh = await fetchOrdersData();
+        const current = fresh.tracking.find((t) => t.trip.id === ot.trip.id);
+        if (!current) {
+          showNotification(to("orders.refresh_failed"), "error");
+          return to("orders.refresh_failed");
+        }
+        setData(fresh);
+        await submitShopDeliveries(current.trip);
         await load();
         showNotification(to("orders.pdf_submitted_ok"), "success");
         return null;
@@ -453,14 +509,11 @@ const OrdersPage: React.FC = () => {
             <OrdersDeliveryTrackingTab
               trips={data.tracking}
               loading={false}
-              day={day}
               today={today}
-              onDaySelect={setSelectedDay}
               shopDirectory={shopDirectory}
+              supervisorDirectory={supervisorDirectory}
               pdfBusyId={pdfBusyId}
-              whatsappBusyId={whatsappBusyId}
               onPdf={(ot) => void handlePdf(ot)}
-              onWhatsApp={(ot) => void handleWhatsApp(ot)}
               onView={(ot) => setViewingId(ot.trip.id)}
               onRefresh={() => void handleRefresh("tracking")}
               refreshing={refreshing === "tracking"}

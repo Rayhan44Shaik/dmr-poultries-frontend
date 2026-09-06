@@ -122,15 +122,35 @@ function normalizeStatus(value: unknown): TripStatus {
   return isTripStatus(status) ? status : "Draft";
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** Local calendar YYYY-MM-DD — never UTC `toISOString()`, which rolls a day early in IST. */
+function localYmd(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
 function normalizeDate(value: unknown): string {
   if (!value) return "";
   const raw = String(value);
   if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
   const parsed = new Date(raw);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString().slice(0, 10);
-  }
+  if (!Number.isNaN(parsed.getTime())) return localYmd(parsed);
   return raw;
+}
+
+/** First occurrence of each trip.id wins — Recent / Orders never append duplicates. */
+export function uniqueTripsById(trips: Trip[]): Trip[] {
+  const seen = new Set<number>();
+  const out: Trip[] = [];
+  for (const trip of trips) {
+    const id = Number(trip.id);
+    if (!Number.isFinite(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(trip);
+  }
+  return out;
 }
 
 /** Map backend trip JSON onto the frontend Trip model. */
@@ -495,7 +515,7 @@ export async function listTrips(options?: {
   const { data } = await apiGet<ApiTripRecord[]>(TRIPS_PATH, {
     params: Object.keys(params).length ? params : undefined,
   });
-  return data.map((trip) => mapApiTripToTrip(trip));
+  return uniqueTripsById(data.map((trip) => mapApiTripToTrip(trip)));
 }
 
 /** GET /api/operations/trip-list — completed/approved, non-deleted trips only. */

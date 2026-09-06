@@ -599,6 +599,7 @@ function StepStart({
   const loadedTripIdRef = useRef(tripId);
   const formRef = useRef(form);
   formRef.current = form;
+  const submitLockRef = useRef(false);
 
   // Opening-meter reference: the vehicle's latest recorded reading. Used for
   // field-level validation only — the backend remains the authority on submit.
@@ -795,6 +796,7 @@ function StepStart({
     : "ops.trip.submit_start_details";
 
   const handleSubmit = useCallback(async () => {
+    if (submitLockRef.current || isSubmitting || headerLoading) return;
     const patch = formToTripPatch(formRef.current);
     const candidate = {
       ...loadSnapshot,
@@ -809,7 +811,9 @@ function StepStart({
       return;
     }
 
+    submitLockRef.current = true;
     setShowErrors(false);
+    setNotice(null);
     setIsSubmitting(true);
     updateTrip(patch);
     // Editing an already-submitted Step 1 must re-submit via the existing-trip
@@ -817,18 +821,25 @@ function StepStart({
     // backend re-validates changed resources/meters. saveStartProgress is save
     // mode and would strip start_step_submitted — only used for a NEW trip's
     // manual "Save Progress" button, never for editing a submitted Step 1.
-    const success =
-      tripId > 0 && startStepSubmitted
+    try {
+      const isUpdate = tripId > 0 && startStepSubmitted;
+      const success = isUpdate
         ? updateStartStep
           ? await updateStartStep(patch)
           : await submitStartStep(patch)
         : await submitStartStep(patch);
-    if (success) {
-      setIsLocalEditing(false);
-      setNotice({ type: "success", message: t("ops.trip.step1_submitted") });
+      if (success) {
+        setIsLocalEditing(false);
+        // First submit: parent toasts and unmounts to Create New Trip.
+        if (isUpdate) {
+          setNotice({ type: "success", message: t("ops.trip.step1_submitted") });
+        }
+      }
+    } finally {
+      submitLockRef.current = false;
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
-  }, [loadSnapshot, submitStartStep, updateStartStep, startStepSubmitted, tripId, updateTrip, t]);
+  }, [loadSnapshot, submitStartStep, updateStartStep, startStepSubmitted, tripId, updateTrip, t, isSubmitting, headerLoading]);
 
   if (startStepSubmitted && !editable && !isLocalEditing) {
     return (
