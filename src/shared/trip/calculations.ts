@@ -21,6 +21,7 @@ export function calculateTripKPIs(
 }
 
 export function calculateTotals(rows: ShopDelivery[], avgWeight = 0) {
+  rows = rows.filter(r=>!String(r.remarks??"").startsWith("[ORDER]") || Boolean(r.autoCaptureTime));
   const totalShops = rows.length;
   const totalBirds = rows.reduce((sum, row) => sum + Number(row.birds || 0), 0);
   const totalWeight = rows.reduce((sum, row) => sum + Number(row.weight || 0), 0);
@@ -72,6 +73,7 @@ export function calculateDeliveryMetrics(
   trip: Pick<Trip, "totalBirds" | "dcWeight" | "avgWeight">,
   deliveries: ShopDelivery[]
 ) {
+  deliveries = deliveries.filter(r=>!String(r.remarks??"").startsWith("[ORDER]") || Boolean(r.autoCaptureTime));
   const totalBirdsDelivered = deliveries.reduce(
     (sum, row) => sum + Number(row.birds || 0),
     0
@@ -114,6 +116,7 @@ export function applyDeliveryMetrics(trip: Trip, deliveries: ShopDelivery[]): Tr
 }
 
 export function calculateDeliveryDisplayTotals(trip: Trip, deliveries: ShopDelivery[]) {
+  deliveries = deliveries.filter(r=>!String(r.remarks??"").startsWith("[ORDER]") || Boolean(r.autoCaptureTime));
   if (!deliveries.length) {
     return {
       totalBirds: trip.totalBirdsDelivered || 0,

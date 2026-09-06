@@ -34,7 +34,7 @@ app.use(errorHandler);
 
 async function start() {
   await pool.query("SELECT 1");
-  app.listen(env.port, () => {
+  app.listen(env.port, "0.0.0.0", () => {
     console.log(`DMR backend listening on http://localhost:${env.port}`);
     console.log(`PostgreSQL: ${env.databaseUrl.replace(/:[^:@]+@/, ":***@")}`);
   });

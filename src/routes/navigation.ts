@@ -35,7 +35,8 @@ import {
   Store,
   Tractor,
   Car,
-  Bird,
+  Egg,
+  TrendingDown,
   UserCheck,
   Settings,
   Database,
@@ -185,11 +186,11 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: Database,
     children: [
       { label: "Shops", labelKey: "nav.shops", path: "/masters?tab=shops", icon: Store, tone: "teal", keywords: "shops master stores" },
-      { label: "Farms / Poultry Farms", labelKey: "nav.farms", path: "/masters?tab=farms", icon: Tractor, tone: "lime", keywords: "farms poultry farms" },
+      { label: "Farms", labelKey: "nav.farms", path: "/masters?tab=farms", icon: Tractor, tone: "lime", keywords: "farms poultry farms" },
       { label: "Vehicles", labelKey: "nav.vehicles_master", path: "/masters?tab=vehicles", icon: Car, tone: "amber", keywords: "vehicles master trucks" },
       { label: "Employees", labelKey: "nav.employees", path: "/masters?tab=employees", icon: Users, tone: "violet", keywords: "employees master staff" },
       { label: "Banks", labelKey: "nav.banks", path: "/masters?tab=banks", icon: Landmark, tone: "indigo", keywords: "banks master accounts" },
-      { label: "Bird Types", labelKey: "nav.birdTypes", path: "/masters?tab=birdTypes", icon: Bird, tone: "rose", keywords: "bird types breed master" },
+      { label: "Bird Types", labelKey: "nav.birdTypes", path: "/masters?tab=birdTypes", icon: Egg, tone: "sky", keywords: "bird types breed master" },
       { label: "Market Rates", labelKey: "nav.marketRates", path: "/accounts?tab=market-rate", icon: TrendingUp, tone: "emerald", keywords: "market rate weight price" },
 
       //{ label: "Routes", path: "/masters?tab=shops", icon: Package, soon: true, keywords: "routes master" },
@@ -212,7 +213,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Collection Entry", labelKey: "nav.collectionEntry", path: "/operations?tab=collection", icon: CreditCard, tone: "teal", keywords: "collection payment cash" },
       { label: "Pending Collections", labelKey: "nav.pendingCollections", path: "/operations?tab=pending-collections", icon: Clock3, tone: "orange", keywords: "pending overdue outstanding collection" },
       
-      { label: "Mortality Entry", labelKey: "nav.mortalityEntry", path: "/operations?tab=mortality", icon: Bird, tone: "rose", keywords: "mortality death birds" },
+      { label: "Weight Loss / Mortality", labelKey: "nav.mortalityEntry", titleKey: "page_title.mortality", path: "/operations?tab=mortality", icon: TrendingDown, tone: "orange", keywords: "weight loss shrinkage mortality death birds" },
       { label: "Fuel Expenses", labelKey: "nav.fuelExpenses", path: "/operations?tab=fuel-expenses", icon: Fuel, tone: "amber", keywords: "fuel diesel expenses bills" },
       { label: "Orders", path: "/operations?tab=orders", icon: ClipboardList, tone: "emerald", keywords: "orders shop order collection delivery sequence pending completed" },
     ],

@@ -1,3 +1,4 @@
+import { publishTripChange } from "../shared/trip/tripSync";
 import axios, {
   type AxiosInstance,
   type AxiosResponse,
@@ -60,6 +61,8 @@ apiClient.interceptors.response.use(
       );
     }
 
+    if (response.config.method && !['get','head','options'].includes(response.config.method.toLowerCase()) &&
+        /^\/trips(?:\/|$)/.test(response.config.url ?? '')) publishTripChange();
     return response;
   },
   (error) => Promise.reject(toApiError(error))

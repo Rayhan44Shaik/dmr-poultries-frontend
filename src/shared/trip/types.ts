@@ -12,6 +12,9 @@ export interface MarketRateReference {
 }
 
 export interface ShopDelivery {
+  orderTripId?: number;
+  orderRowId?: number;
+  assignedBoxes?: number;
   id: number;
   serialNo?: number;
   boxNo: number;
@@ -57,6 +60,11 @@ export interface PerBoxDelivery {
  * Transport-only values remain optional so existing API adapters stay compatible.
  */
 export interface Trip {
+  ordersCollection?: ShopDelivery[];
+  orderAssignments?: ShopDelivery[];
+  collectionFinished?: boolean;
+  assignmentSubmitted?: boolean;
+  ordersHash?: string;
   id: number;
   tripNo: string;
   tripDate: string;

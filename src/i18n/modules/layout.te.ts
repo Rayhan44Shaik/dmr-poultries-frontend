@@ -16,7 +16,6 @@
   'header.currentLanguage': 'ప్రస్తుత భాష',
 
   // Sidebar
-  'sidebar.erpSystem': 'ERP మేనేజ్‌మెంట్ సిస్టమ్',
   'sidebar.comingSoon': 'త్వరలో',
 
   // Command palette

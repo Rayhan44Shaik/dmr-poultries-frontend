@@ -1,51 +1,7 @@
-// src/modules/operations/orders/sampleOrdersData.ts
-//
-// OFFLINE SAMPLE DATA for the Orders module — ~100 trips of scenario data.
-//
-// The Orders page normally reads the existing /api/trips contract. In this
-// checkout there is no backend to reach from a browser preview (no PostgreSQL,
-// and no .env to point VITE_API_BASE_URL at the dev proxy), so the module can
-// run entirely on the bundled sample data below instead:
-//
-//   • NO network request is made — not even a failing one;
-//   • the sample rows are plain `Trip` / `ShopDelivery` records, so EVERY
-//     business rule still runs on them unchanged (container classification,
-//     capacity limits, same-shop/same-day uniqueness, delivery progress,
-//     one-week tracking window). Nothing here re-implements Orders logic;
-//   • saves mutate the in-memory store, so Save Progress / Finish Collection /
-//     Save Assignment / Finish Assignment / Submit all work for the session (a
-//     browser refresh re-seeds the scenario).
-//
-// WHAT IS IN THE SCENARIO (all of it deterministic — no randomness, so a
-// refresh always shows the same numbers):
-//
-//   120 shops · 20 vehicles · 12 supervisors · 12 drivers
-//   7 operational days (the tracking window) → 7 collection containers +
-//   93 vehicle trips = 100 trips.
-//
-//     Tab 1 Order Collection — one container per day with 20…60 collected
-//       shops; today's is still open (the working sheet), past days are
-//       finished, and day −5 is left unfinished so the D+2 00:00 clock shows
-//       the CLOSED chip beside the summary.
-//     Tab 2 Order Assignment — today's 14 trucks have Step 2 done and Step 4
-//       open, so all are assignable. 5 of them already carry a PARTIAL
-//       assignment (1…3 shops saved) — the rest are empty, and ~26 of today's
-//       36 shops are still pending, which is what the default
-//       "Pending (not assigned)" filter and the shop search are for.
-//     Tab 3 Delivery Tracking — every past day's trucks, in all three states:
-//       Completed (every shop in), In Progress (some shops delivered, one
-//       PART DELIVERED with a visible balance, the rest NOT DELIVERED) and
-//       Assigned (nothing delivered yet) — so the PDF popup can be checked on
-//       each, including a multi-page report of 20+ shops.
-//
-// Flip ORDERS_SAMPLE_DATA_ENABLED back to `false` to return to the live API —
-// no other change is needed.
+// Test fixtures only. Never import from application/runtime code.
+import { createEmptyTrip, type ShopDelivery, type Trip } from "../../src/shared/trip";
+import type { Shop } from "../../src/modules/masters/shops/types/shop";
 
-import { createEmptyTrip, type ShopDelivery, type Trip } from "../../../shared/trip";
-import type { Shop } from "../../masters/shops/types/shop";
-
-/** Master switch: `true` = run the Orders page on bundled sample data. */
-export const ORDERS_SAMPLE_DATA_ENABLED = true;
 
 // ─── Sample masters ──────────────────────────────────────────────────────────
 

@@ -16,7 +16,6 @@
   'header.currentLanguage': 'Current language',
 
   // Sidebar
-  'sidebar.erpSystem': 'ERP Management System',
   'sidebar.comingSoon': 'Soon',
 
   // Command palette
