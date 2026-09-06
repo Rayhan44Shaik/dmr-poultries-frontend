@@ -24,6 +24,7 @@ import {
   listTrips,
   mapApiTripToTrip,
   toStep4Payload,
+  uniqueTripsById,
 } from "../vehicle-trips/services/tripHeaderApiService";
 import { loadShops } from "../../masters/shops/services/shopService";
 import { loadVehicles } from "../../masters/vehicles/services/vehicleService";
@@ -47,6 +48,7 @@ import {
   rowBoxes,
   rowsInSequence,
   toEligibleVehicle,
+  uniqueShopRows,
 } from "./ordersUtils";
 import {
   isOrderPlanRemarks,
@@ -92,14 +94,16 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
   let trips: Trip[];
   let vehicleList: Array<{ id: number; noOfBoxes?: number }>;
   if (ORDERS_SAMPLE_DATA_ENABLED) {
-    trips = sampleTrips();
+    trips = uniqueTripsById(sampleTrips());
     vehicleList = sampleVehicleCapacities();
   } else {
     const [liveTrips, vehicles] = await Promise.all([
-      listTrips(),
+      // Orders classifies collection/assignment from persisted delivery rows.
+      // The summary list omits them — always hydrate with full=true.
+      listTrips({ full: true }),
       loadVehicles().catch(() => [] as Vehicle[]),
     ]);
-    trips = liveTrips;
+    trips = uniqueTripsById(liveTrips);
     vehicleList = vehicles.map((v) => ({ id: v.id, noOfBoxes: v.noOfBoxes }));
   }
 
@@ -168,16 +172,23 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
     statusCache.get(t.id) ?? computeOrdersProgress(t, quantitiesForTrip(t)).status;
 
   const collectionsByDay: Record<string, OrdersDayCollection> = {};
+  const seenContainerIds = new Set<number>();
   for (const container of containers) {
     const day = container.tripDate;
     if (!day) continue;
-    const rows = rowsInSequence(container).map((row) => ({
-      ...row,
-      clientKey:
-        typeof (row as OrderShopRow).clientKey === "string"
-          ? (row as OrderShopRow).clientKey!
-          : `id-${row.id}`,
-    })) as OrderShopRow[];
+    if (seenContainerIds.has(container.id)) continue;
+    seenContainerIds.add(container.id);
+    // One container per operational day: a second container for the same day
+    // replaces (never merges) so Trip A shops cannot leak into Trip B.
+    const rows = uniqueShopRows(
+      rowsInSequence(container).map((row) => ({
+        ...row,
+        clientKey:
+          typeof (row as OrderShopRow).clientKey === "string"
+            ? (row as OrderShopRow).clientKey!
+            : `id-${row.id}`,
+      })) as OrderShopRow[]
+    );
 
     // Where each collected shop ended up (persisted vehicle-trip rows) —
     // one bucket PER VEHICLE TRIP, because a shop's order can be SPLIT over

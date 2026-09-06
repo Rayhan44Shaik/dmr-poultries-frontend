@@ -51,6 +51,19 @@ export function rowsInSequence(trip: Trip): ShopDelivery[] {
   });
 }
 
+/** First occurrence of each shopId wins — Collection / Assignment never show duplicate shops. */
+export function uniqueShopRows<T extends { shopId?: number | null }>(rows: T[]): T[] {
+  const seen = new Set<number>();
+  const out: T[] = [];
+  for (const row of rows) {
+    const shopId = num(row.shopId);
+    if (!shopId || seen.has(shopId)) continue;
+    seen.add(shopId);
+    out.push(row);
+  }
+  return out;
+}
+
 /** Boxes carried by one delivery row (plan rows store the box count). */
 export function rowBoxes(row: ShopDelivery): number {
   return Math.max(0, num(row.boxNo ?? row.selectedBoxIds?.length));
@@ -92,7 +105,10 @@ export function isOrderContainer(trip: Trip): boolean {
   );
 }
 
-/** Container whose collection is finished → shows in Tab 2. */
+/**
+ * Container whose collection was finished via Finish Collection.
+ * Assignment does NOT require this — Save Progress is enough for Tab 2.
+ */
 export function isCollectedOrder(trip: Trip): boolean {
   return isOrderContainer(trip) && trip.startStepSubmitted === true;
 }

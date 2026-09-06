@@ -44,6 +44,8 @@ export function useTripEntry(
 
   const onTripIdAssignedRef = useRef<((id: number) => void) | null>(null);
   const onStep1SuccessRef = useRef<((trip: Trip) => void) | null>(null);
+  /** Same-tick double-click guard — React `headerLoading` is one render too late. */
+  const startSubmitLockRef = useRef(false);
   const onStep2SuccessRef = useRef<((trip: Trip) => void) | null>(null);
   const onStep3SuccessRef = useRef<((trip: Trip) => void) | null>(null);
   const onStep4SuccessRef = useRef<((trip: Trip) => void) | null>(null);
@@ -136,6 +138,7 @@ export function useTripEntry(
   };
 
   const submitStartStep = async (data: Partial<Trip> = {}): Promise<boolean> => {
+    if (startSubmitLockRef.current) return false;
     const merged = {
       ...tripRef.current,
       ...data,
@@ -145,19 +148,25 @@ export function useTripEntry(
       return false;
     }
 
+    startSubmitLockRef.current = true;
     setHeaderLoading(true);
     try {
       const submitted = await submitStep1({
         ...merged,
       });
 
-      applySavedTrip(submitted);
+      // First submit closes the wizard (parent success callback). Do not park
+      // the saved trip in the working copy — that would flash a submitted
+      // form before Create New Trip. Recent is refreshed via onTripsChanged.
+      // Working fields stay as typed until the success callback resets them.
+      onTripsChangedRef.current?.();
       onStep1SuccessRef.current?.(submitted);
       return true;
     } catch (error) {
       notifyRef.current?.(handleApiError(error), "error");
       return false;
     } finally {
+      startSubmitLockRef.current = false;
       setHeaderLoading(false);
     }
   };
@@ -167,6 +176,7 @@ export function useTripEntry(
    * step STAYS submitted and the backend re-validates changed resources/meters
    * (self-excluded) — never a save-mode call that would strip start_step_submitted. */
   const updateStartStep = async (data: Partial<Trip> = {}): Promise<boolean> => {
+    if (startSubmitLockRef.current) return false;
     const current = { ...tripRef.current, ...data };
     if (!current.id) {
       notifyRef.current?.(translate("ops.trip.trip_id_missing_start"), "error");
@@ -178,6 +188,7 @@ export function useTripEntry(
       return false;
     }
 
+    startSubmitLockRef.current = true;
     setHeaderLoading(true);
     try {
       const submitted = await submitTripStep(current.id, "start", {
@@ -190,6 +201,7 @@ export function useTripEntry(
       notifyRef.current?.(handleApiError(error), "error");
       return false;
     } finally {
+      startSubmitLockRef.current = false;
       setHeaderLoading(false);
     }
   };

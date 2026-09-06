@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mapApiTripToTrip, toStep1Payload } from "./tripHeaderApiService";
+import { mapApiTripToTrip, toStep1Payload, uniqueTripsById } from "./tripHeaderApiService";
 import { createEmptyTrip } from "../../../../shared/trip";
 
 test("toStep1Payload keeps explicit 0 and sends empty as null, without startTime or tripNo", () => {
@@ -47,4 +47,14 @@ test("mapApiTripToTrip preserves null KM/Advance instead of coercing to 0", () =
   assert.equal(mapped.openingMeter, null);
   assert.equal(mapped.advanceAmount, null);
   assert.equal(mapped.startStepSubmitted, true);
+});
+
+test("uniqueTripsById replaces duplicates by id instead of appending", () => {
+  const first = mapApiTripToTrip({ id: 7, tripNo: "TR-1", tripDate: "2026-09-06" });
+  const second = mapApiTripToTrip({ id: 7, tripNo: "TR-1-DUP", tripDate: "2026-09-06" });
+  const other = mapApiTripToTrip({ id: 8, tripNo: "TR-2", tripDate: "2026-09-06" });
+  const out = uniqueTripsById([first, second, other]);
+  assert.equal(out.length, 2);
+  assert.equal(out[0].tripNo, "TR-1");
+  assert.equal(out[1].id, 8);
 });

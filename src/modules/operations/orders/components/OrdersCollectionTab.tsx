@@ -51,6 +51,7 @@ import {
   rowBoxes,
   weightForBirds,
 } from "../ordersUtils";
+import { handleApiError } from "../../../../api";
 import {
   finishCollection,
   saveCollection,
@@ -259,6 +260,7 @@ function CollectionEntries({
   // ── Busy flags (double-submit protection) ────────────────────────────────
   const [saving, setSaving] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const persistLockRef = useRef(false);
   const busy = saving || finishing;
 
   const entered = useMemo(
@@ -288,6 +290,7 @@ function CollectionEntries({
   // ── Clear a row (persisted rows re-save without it; 10s undo) ─────────────
   const doClear = useCallback(
     async (shopId: number) => {
+      if (persistLockRef.current) return;
       const row = entries.get(shopId);
       if (!row) return;
       const wasPersisted = row.id > 0;
@@ -300,19 +303,26 @@ function CollectionEntries({
           showNotification(to("orders.add_at_least_one_shop"), "info");
           return;
         }
-        const updated = await saveCollection(
-          containerRef.current.id,
-          containerRef.current.tripNo,
-          remaining
-        );
-        containerRef.current = { id: updated.id, tripNo: updated.tripNo };
-        const fresh = new Map(entries);
-        const kept = fresh.get(shopId);
-        if (kept) fresh.set(shopId, { ...kept, id: 0, birds: 0, boxes: 0 });
-        setEntries(fresh);
-        setSavedSnapshot(entrySnapshot(Array.from(fresh.values())));
-        onSaved(updated);
-        showNotification(to("orders.entry_cleared", { shop: row.shopName }), "success");
+        persistLockRef.current = true;
+        try {
+          const updated = await saveCollection(
+            containerRef.current.id,
+            containerRef.current.tripNo,
+            remaining
+          );
+          containerRef.current = { id: updated.id, tripNo: updated.tripNo };
+          const fresh = new Map(entries);
+          const kept = fresh.get(shopId);
+          if (kept) fresh.set(shopId, { ...kept, id: 0, birds: 0, boxes: 0 });
+          setEntries(fresh);
+          setSavedSnapshot(entrySnapshot(Array.from(fresh.values())));
+          onSaved(updated);
+          showNotification(to("orders.entry_cleared", { shop: row.shopName }), "success");
+        } catch (error) {
+          showNotification(handleApiError(error), "error");
+        } finally {
+          persistLockRef.current = false;
+        }
       } else {
         const next = new Map(entries);
         next.set(shopId, { ...row, id: 0, birds: 0, boxes: 0 });
@@ -339,12 +349,13 @@ function CollectionEntries({
 
   // ── Save Progress (no final validation) ───────────────────────────────────
   const handleSave = useCallback(async () => {
-    if (busy || !isEditable) return;
+    if (persistLockRef.current || busy || !isEditable) return;
     const rows = toOrderShopRows(Array.from(entries.values()));
     if (rows.length === 0) {
       showNotification(to("orders.add_at_least_one_shop"), "info");
       return;
     }
+    persistLockRef.current = true;
     setSaving(true);
     try {
       const updated = await saveCollection(
@@ -353,27 +364,27 @@ function CollectionEntries({
         rows
       );
       containerRef.current = { id: updated.id, tripNo: updated.tripNo };
-      // Sync persisted row ids + snapshot from the response.
+      // Authoritative values come from the API response — never a stale
+      // pre-setState snapshot, never an independent optimistic total.
       const persisted = toEditorRows(updated);
-      setEntries((prev) => {
-        const next = new Map(prev);
-        for (const [shopId, row] of next) {
-          const match = persisted.find((p) => p.shopId === shopId);
-          next.set(shopId, {
-            ...row,
-            id: match?.id ?? 0,
-            birds: Number(match?.birds) || 0,
-            boxes: match ? rowBoxes(match) : 0,
-          });
-        }
-        return next;
-      });
-      setSavedSnapshot(entrySnapshot(Array.from(entries.values())));
+      const next = new Map(entries);
+      for (const [shopId, row] of next) {
+        const match = persisted.find((p) => p.shopId === shopId);
+        next.set(shopId, {
+          ...row,
+          id: match?.id ?? 0,
+          birds: Number(match?.birds) || 0,
+          boxes: match ? rowBoxes(match) : 0,
+        });
+      }
+      setEntries(next);
+      setSavedSnapshot(entrySnapshot(Array.from(next.values())));
       onSaved(updated);
       showNotification(to("orders.collection_saved"), "success");
-    } catch {
-      showNotification(to("orders.refresh_failed"), "error");
+    } catch (error) {
+      showNotification(handleApiError(error), "error");
     } finally {
+      persistLockRef.current = false;
       setSaving(false);
     }
   }, [busy, isEditable, entries, onSaved, showNotification, to]);
@@ -382,7 +393,7 @@ function CollectionEntries({
   // Boxes are MANDATORY per shop; birds are OPTIONAL (weight stays
   // pending until the delivery step).
   const handleFinish = useCallback(async () => {
-    if (busy || !isEditable) return;
+    if (persistLockRef.current || busy || !isEditable) return;
     const all = Array.from(entries.values());
     const enteredRows = all.filter((r) => r.birds > 0 || r.boxes > 0);
     if (enteredRows.length === 0) {
@@ -402,6 +413,7 @@ function CollectionEntries({
       );
       return;
     }
+    persistLockRef.current = true;
     setFinishing(true);
     try {
       const updated = await finishCollection(
@@ -412,9 +424,10 @@ function CollectionEntries({
       containerRef.current = { id: updated.id, tripNo: updated.tripNo };
       showNotification(to("orders.collection_finished"), "success");
       onFinished(updated);
-    } catch {
-      showNotification(to("orders.refresh_failed"), "error");
+    } catch (error) {
+      showNotification(handleApiError(error), "error");
     } finally {
+      persistLockRef.current = false;
       setFinishing(false);
     }
   }, [busy, isEditable, entries, onFinished, showNotification, to]);
