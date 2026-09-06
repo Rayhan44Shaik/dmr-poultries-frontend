@@ -468,6 +468,7 @@ function OrdersDeliveryDetailView({
                         }),
                       ],
                       [to("orders.collected_boxes"), formatCount(report.collectedBoxes)],
+                      [to("orders.col_assigned_boxes"), formatCount(report.assignedBoxes)],
                       [to("orders.delivered_boxes"), formatCount(report.deliveredBoxes)],
                       [to("orders.pending_boxes"), formatCount(report.pendingBoxes)],
                       [to("orders.delivered_birds"), formatCount(report.deliveredBirds)],
@@ -523,6 +524,7 @@ function OrdersDeliveryDetailView({
                       <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
                       <th className={opsTableThClass}>{to("orders.col_village")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.collected_boxes")}</th>
+                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_assigned_boxes")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_boxes")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.pending_boxes")}</th>
                       <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_birds")}</th>
@@ -537,7 +539,7 @@ function OrdersDeliveryDetailView({
                   <tbody className={opsTableDivideClass}>
                     {pageRows.length === 0 && (
                       <tr>
-                        <td className={opsTableTdClass} colSpan={12}>
+                        <td className={opsTableTdClass} colSpan={13}>
                           <span className="text-slate-400 text-sm py-4 block text-center">
                             {query || statusFilter !== "all"
                               ? to("orders.no_results")
@@ -564,6 +566,9 @@ function OrdersDeliveryDetailView({
                           <td className={opsTableTdClass}>{row.village || "—"}</td>
                           <td className={`${opsTableTdClass} text-right font-bold text-emerald-800`}>
                             {row.collectedBoxes > 0 ? formatCount(row.collectedBoxes) : "—"}
+                          </td>
+                          <td className={`${opsTableTdClass} text-right font-semibold text-slate-800`}>
+                            {row.assignedBoxes > 0 ? formatCount(row.assignedBoxes) : "—"}
                           </td>
                           <td className={`${opsTableTdClass} text-right font-semibold`}>
                             {row.deliveredBoxes > 0 ? formatCount(row.deliveredBoxes) : "—"}

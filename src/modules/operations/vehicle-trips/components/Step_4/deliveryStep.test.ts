@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { computeDeliveryKpiTotals } from "./deliveryKpis";
-import { computeRemainingBoxes, pendingBoxesFromRows } from "./remainingBoxes";
+import { computeRemainingBoxes, pendingBoxesFromRows, pendingShopsFromRows } from "./remainingBoxes";
 import {
   computeValidationErrors,
   validationIsValid,
@@ -96,6 +96,20 @@ test("remaining boxes: weight-mode per-box data consumes exact split", () => {
   assert.deepEqual(pending.map((b) => b.boxNo), [1, 2]);
   assert.equal(pending[0].birds, 18);
   assert.equal(pending[1].birds, 11);
+});
+
+test("pending shops: assigned [ORDER] shops without capture stay pending", () => {
+  const rows = [
+    row({ shopId: 1, remarks: "[ORDER] O:ORD-1", serialNo: 1 }),
+    row({ shopId: 2, remarks: "[ORDER] O:ORD-1", serialNo: 2, autoCaptureTime: "10:00" }),
+    row({ shopId: 3, remarks: "", serialNo: 3, autoCaptureTime: "11:00" }),
+  ];
+  assert.equal(pendingShopsFromRows(rows), 1);
+});
+
+test("pending shops: no assignment plan → 0 pending shops", () => {
+  const rows = [row({ shopId: 1, remarks: "", autoCaptureTime: "10:00" })];
+  assert.equal(pendingShopsFromRows(rows), 0);
 });
 
 test("remaining boxes: editing row is excluded from consumption", () => {

@@ -789,7 +789,9 @@ export type ShopDeliveryBreakdown = {
    * to orderedBoxes when the plan row has no tripBoxes. Always 0 for not-listed.
    */
   collectedBoxes: number;
-  /** Boxes still open on this vehicle: max(0, collected − delivered). */
+  /** Boxes assigned to THIS vehicle (plan share). 0 for not-listed. */
+  assignedBoxes: number;
+  /** Boxes still open on this vehicle: max(0, assigned − delivered). */
   pendingBoxes: number;
 };
 
@@ -889,7 +891,8 @@ export function buildShopBreakdown(
       delivered,
       additional,
       status,
-      collectedBoxes: additional
+      collectedBoxes: additional ? 0 : orderedBoxes,
+      assignedBoxes: additional
         ? 0
         : num(plan.boxNo ?? plan.selectedBoxIds?.length) > 0
           ? num(plan.boxNo ?? plan.selectedBoxIds?.length)
@@ -922,13 +925,27 @@ export function shopRemainingBoxes(row: {
   return Math.max(0, basis - num(row.deliveredBoxes));
 }
 
-/** Boxes this vehicle collected for the shop (assignment share). */
+/** Boxes this shop ordered in collection (0 for not-listed). */
 export function shopCollectedBoxes(row: {
   additional?: boolean;
+  collectedBoxes?: number;
+  orderedBoxes: number;
+}): number {
+  if (row.additional) return 0;
+  const collected = num(row.collectedBoxes);
+  return collected > 0 ? collected : num(row.orderedBoxes);
+}
+
+/** Boxes this vehicle was assigned for the shop. */
+export function shopAssignedBoxes(row: {
+  additional?: boolean;
+  assignedBoxes?: number;
   tripBoxes?: number;
   orderedBoxes: number;
 }): number {
   if (row.additional) return 0;
+  const assigned = num(row.assignedBoxes);
+  if (assigned > 0) return assigned;
   return num(row.tripBoxes) > 0 ? num(row.tripBoxes) : num(row.orderedBoxes);
 }
 
@@ -959,6 +976,7 @@ export type DeliveryReportSummary = {
   pendingShops: number;
   partDeliveredShops: number;
   collectedBoxes: number;
+  assignedBoxes: number;
   deliveredBoxes: number;
   pendingBoxes: number;
   deliveredBirds: number;
@@ -971,6 +989,7 @@ export function buildDeliveryReportSummary(
 ): DeliveryReportSummary {
   const listed = shops.filter((s) => s.ordered);
   const collectedBoxes = listed.reduce((sum, r) => sum + shopCollectedBoxes(r), 0);
+  const assignedBoxes = listed.reduce((sum, r) => sum + shopAssignedBoxes(r), 0);
   const pendingBoxes = listed.reduce((sum, r) => sum + shopRemainingBoxes(r), 0);
   const deliveredBoxes = shops.reduce((sum, r) => sum + r.deliveredBoxes, 0);
   const deliveredBirds = shops.reduce((sum, r) => sum + r.deliveredBirds, 0);
@@ -989,6 +1008,7 @@ export function buildDeliveryReportSummary(
       progress?.partDeliveredShops ??
       listed.filter((s) => s.status === "part_delivered").length,
     collectedBoxes,
+    assignedBoxes,
     deliveredBoxes,
     pendingBoxes,
     deliveredBirds,

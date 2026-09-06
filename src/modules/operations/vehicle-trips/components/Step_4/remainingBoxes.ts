@@ -69,6 +69,36 @@ export function pendingBoxesFromRows(
     .filter((b) => b.birds > 0 || b.weight > 0);
 }
 
+/** Assigned shops still awaiting a captured Step 4 delivery. */
+export function pendingShopsFromRows(rows: ShopDelivery[]): number {
+  const assigned = new Set<number>();
+  const captured = new Set<number>();
+  for (const row of rows) {
+    const shopId = Number(row.shopId);
+    if (!Number.isFinite(shopId) || shopId <= 0) continue;
+    if (String(row.remarks ?? "").trim().startsWith("[ORDER]")) assigned.add(shopId);
+    const extra = row as ShopDelivery & { deliveredAt?: string; deliveryTime?: string };
+    if (row.autoCaptureTime || extra.deliveredAt || extra.deliveryTime) captured.add(shopId);
+  }
+  if (assigned.size === 0) return 0;
+  let pending = 0;
+  for (const id of assigned) {
+    if (!captured.has(id)) pending += 1;
+  }
+  return pending;
+}
+
+/** Shop ids present on the assignment plan (`[ORDER]` rows). */
+export function assignedShopIdsFromRows(rows: ShopDelivery[]): Set<number> {
+  const ids = new Set<number>();
+  for (const row of rows) {
+    const shopId = Number(row.shopId);
+    if (!Number.isFinite(shopId) || shopId <= 0) continue;
+    if (String(row.remarks ?? "").trim().startsWith("[ORDER]")) ids.add(shopId);
+  }
+  return ids;
+}
+
 /** Remaining map keyed by boxNo (mirrors `pendingBoxesFromRows` shape). */
 export function remainingBoxesByNumber(
   boxDetails: BoxDetail[],

@@ -164,15 +164,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     }
   }, [location.search, loadTripFromApi, trip.id]);
 
-  // After Step 1 success: stay on the trip and advance to Step 2.
-  useEffect(() => {
-    registerStep1SuccessCallback(() => {
-      showNotification(t("ops.trip.step1_submitted"), "success");
-      // Trip ID is now in URL via registerTripIdCallback.
-      // Stay on the form and let maxAllowedStep advance to Step 2.
-    });
-  }, [registerStep1SuccessCallback, showNotification]);
-
   useEffect(() => {
     registerStep2SuccessCallback(() => {
       showNotification(t("ops.trip.step2_submitted"), "success");
@@ -322,6 +313,16 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setTrip((prev) => ({ ...prev, tripDate: getTripEntryDate() }));
     clearTripIdFromUrl();
   }, [clearTrip, clearTripIdFromUrl, setIsEditing, setTrip]);
+
+  // After first Step 1 submit: toast, reset the wizard to Create New Trip,
+  // and let Recent Trips pick up the saved trip (onTripsChanged). Resume
+  // from Recent to continue Farm / Pickup / Delivery / Diesel.
+  useEffect(() => {
+    registerStep1SuccessCallback(() => {
+      showNotification(t("ops.trip.step1_submitted"), "success");
+      clearForm();
+    });
+  }, [registerStep1SuccessCallback, showNotification, t, clearForm]);
 
   /**
    * Bottom "Cancel" on any step = DISCARD unsaved local edits only.

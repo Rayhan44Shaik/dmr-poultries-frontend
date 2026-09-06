@@ -290,6 +290,7 @@ export async function generateOrdersPdf({
     ["Pending Shops", count(summary.pendingShops)],
     ["Part Delivered Shops", count(summary.partDeliveredShops)],
     ["Collected Boxes", count(summary.collectedBoxes)],
+    ["Assigned Boxes", count(summary.assignedBoxes)],
     ["Delivered Boxes", count(summary.deliveredBoxes)],
     ["Pending Boxes", count(summary.pendingBoxes)],
     ["Delivered Birds", count(summary.deliveredBirds)],
@@ -314,6 +315,7 @@ export async function generateOrdersPdf({
     b.shopName,
     b.village || "—",
     b.collectedBoxes > 0 ? count(b.collectedBoxes) : "—",
+    b.assignedBoxes > 0 ? count(b.assignedBoxes) : "—",
     b.deliveredBoxes > 0 ? count(b.deliveredBoxes) : "—",
     b.pendingBoxes > 0 ? count(b.pendingBoxes) : "0",
     b.deliveredBirds > 0 ? count(b.deliveredBirds) : "—",
@@ -326,7 +328,7 @@ export async function generateOrdersPdf({
       "—",
       "—",
       ordersTranslate("orders.no_saved_collection", language),
-      ...Array.from({ length: 8 }, () => "—"),
+      ...Array.from({ length: 9 }, () => "—"),
     ]);
   }
 
@@ -342,6 +344,7 @@ export async function generateOrdersPdf({
       ordersTranslate("orders.col_shop_name", language),
       ordersTranslate("orders.col_village", language),
       ordersTranslate("orders.collected_boxes", language),
+      ordersTranslate("orders.col_assigned_boxes", language),
       ordersTranslate("orders.delivered_boxes", language),
       ordersTranslate("orders.pending_boxes", language),
       ordersTranslate("orders.delivered_birds", language),
@@ -351,7 +354,7 @@ export async function generateOrdersPdf({
     ],
     seqBody,
     {
-      widths: [8, 16, 32, 20, 16, 16, 16, 16, 20, 18, null],
+      widths: [8, 14, 26, 18, 14, 14, 14, 14, 14, 16, 16, null],
     }
   );
 
@@ -421,6 +424,7 @@ export async function generateOrdersPdf({
       [ordersTranslate("orders.ordered_birds", language), count(orderedBirds)],
       [ordersTranslate("orders.delivered_birds", language), count(deliveredBirds)],
       [ordersTranslate("orders.ordered_boxes", language), count(orderedBoxes)],
+      [ordersTranslate("orders.col_assigned_boxes", language), count(summary.assignedBoxes)],
       [ordersTranslate("orders.delivered_boxes", language), count(deliveredBoxes)],
       [ordersTranslate("orders.pending_boxes", language), count(pendingBoxes)],
       [ordersTranslate("orders.box_difference", language), diffStr(deliveredBoxes - orderedBoxes)],

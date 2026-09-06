@@ -75,15 +75,6 @@ function wasWhatsAppSent(r: OrdersWhatsAppResult | null): boolean {
   return Boolean(r?.enabled && r.sent > 0 && r.failed === 0);
 }
 
-const AUTO_SUBMIT_MS = 10 * 1000;
-
-function formatCountdown(ms: number): string {
-  const total = Math.max(0, Math.ceil(ms / 1000));
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
 const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
   trip,
   supervisorMobile,
@@ -103,8 +94,6 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
   const [buildError, setBuildError] = useState("");
   const [sentResult, setSentResult] = useState<OrdersWhatsAppResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [deadline, setDeadline] = useState<number | null>(null);
-  const [remainMs, setRemainMs] = useState(AUTO_SUBMIT_MS);
   const submittedRef = useRef(false);
   // Review & Submit only — independent of the app language. English by default.
   const [sheetLang, setSheetLang] = useState<"en" | "te">("en");
@@ -209,58 +198,37 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
   const building = result === null && !buildError;
 
   const sendOk = wasWhatsAppSent(sentResult);
-  const waitingAutoSubmit = deadline != null && sendOk;
+  const sendFailed = Boolean(sentResult) && !sendOk;
   const busy = sending || submitting;
 
   useEffect(() => {
-    if (!wasWhatsAppSent(sentResult)) return;
-    setDeadline(Date.now() + AUTO_SUBMIT_MS);
-  }, [sentResult]);
-
-  useEffect(() => {
-    if (deadline == null || !sendOk) return;
-    const tick = () => {
-      const left = deadline - Date.now();
-      setRemainMs(left);
-      if (left > 0 || submittedRef.current) return;
-      submittedRef.current = true;
-      setSubmitting(true);
-      void onConfirmSubmit()
-        .then(() => onClose())
-        .finally(() => setSubmitting(false));
-    };
-    tick();
-    const id = window.setInterval(tick, 250);
-    return () => window.clearInterval(id);
-  }, [deadline, sendOk, onConfirmSubmit, onClose]);
-
-  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy && !waitingAutoSubmit) onClose();
+      if (e.key === "Escape" && !busy) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, busy, waitingAutoSubmit]);
+  }, [onClose, busy]);
 
   const totalBoxes = orderedRows.reduce((s, r) => s + r.boxes, 0);
 
   const handleSend = async () => {
-    // Persist the new sequence too when the operator re-ordered here, so the
-    // actual WhatsApp send matches the previewed one.
+    if (busy || sendOk) return;
     const outcome = await onConfirmSend(
       orderChanged ? orderedRows.map((r) => r.shopId) : undefined
     );
-    if (outcome && outcome.failed === 0 && outcome.sent > 0) {
-      setSentResult(outcome);
-    } else if (outcome) {
-      setSentResult(outcome);
-    }
+    if (outcome) setSentResult(outcome);
   };
 
-  const cancelAutoSubmit = () => {
+  const handleSubmitAssignment = async () => {
+    if (!sendOk || submitting || submittedRef.current) return;
     submittedRef.current = true;
-    setDeadline(null);
-    setRemainMs(AUTO_SUBMIT_MS);
+    setSubmitting(true);
+    try {
+      await onConfirmSubmit();
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleDownload = () => {
@@ -330,7 +298,7 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
             <button
               type="button"
               onClick={onClose}
-              disabled={busy || waitingAutoSubmit}
+              disabled={busy}
               aria-label={t("orders.close")}
               className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
             >
@@ -486,7 +454,7 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
             <button
               type="button"
               onClick={onClose}
-              disabled={busy || waitingAutoSubmit}
+              disabled={busy}
               className="h-9 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
             >
               {t("orders.close")}
@@ -503,7 +471,7 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
             <button
               type="button"
               onClick={() => void handleSend()}
-              disabled={busy || waitingAutoSubmit || orderedRows.length === 0 || sendOk}
+              disabled={busy || orderedRows.length === 0 || sendOk}
               className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {sending ? (
@@ -513,52 +481,24 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
               ) : (
                 <Send size={14} />
               )}
-              {t("orders.wa_confirm_send")}
+              {sendFailed ? t("orders.wa_retry") : t("orders.wa_confirm_send")}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSubmitAssignment()}
+              disabled={!sendOk || busy}
+              className="flex h-9 items-center gap-1.5 rounded-lg bg-slate-900 px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submitting ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <CheckCircle2 size={14} />
+              )}
+              {submitting ? t("orders.wa_auto_submitting") : t("orders.submit_order_assignment")}
             </button>
           </div>
         </div>
       </div>
-
-      {waitingAutoSubmit ? (
-        <div className="absolute inset-0 z-[70] flex items-center justify-center bg-slate-900/50 p-4">
-          <div
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="wa-sent-ok-title"
-            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"
-          >
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-600" size={22} />
-              <div className="min-w-0">
-                <h4 id="wa-sent-ok-title" className="text-sm font-extrabold text-slate-800">
-                  {t("orders.wa_sent_ok_title")}
-                </h4>
-                <p className="mt-1.5 text-[13px] font-medium leading-relaxed text-slate-600">
-                  {t("orders.wa_sent_to", {
-                    name: trip.supervisorName || "—",
-                    mobile: supervisorMobile || "—",
-                  })}
-                </p>
-                <p className="mt-1.5 text-[13px] font-semibold text-emerald-800">
-                  {submitting
-                    ? t("orders.wa_auto_submitting")
-                    : t("orders.wa_sent_ok_body", { time: formatCountdown(remainMs) })}
-                </p>
-              </div>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={cancelAutoSubmit}
-                disabled={submitting}
-                className="h-9 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
-              >
-                {t("orders.wa_cancel_auto")}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 };

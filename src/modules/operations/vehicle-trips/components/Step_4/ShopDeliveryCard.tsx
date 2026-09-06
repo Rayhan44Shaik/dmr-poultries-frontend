@@ -12,6 +12,8 @@ interface Props {
   supervisorPhone?: string;
   vehicleNo?: string;
   tripDate?: string;
+  /** Delivered outside the assignment plan — keep visible, never invent qty. */
+  unassigned?: boolean;
 }
 
 export default function ShopDeliveryCard({
@@ -19,6 +21,7 @@ export default function ShopDeliveryCard({
   readOnly,
   onEdit,
   onPDF,
+  unassigned = false,
 }: Props) {
   const { t } = useI18n();
   const isWeightMode = row.deliveryMode === "weight";
@@ -32,7 +35,11 @@ export default function ShopDeliveryCard({
   };
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between gap-2.5">
+    <div className={`rounded-2xl p-3.5 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between gap-2.5 ${
+      unassigned
+        ? "bg-orange-50/80 border border-orange-200"
+        : "bg-white border border-slate-200/80"
+    }`}>
       <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-2">
         <div className="flex items-center gap-2 overflow-hidden">
           <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200/50">
@@ -155,6 +162,12 @@ export default function ShopDeliveryCard({
           </div>
         </div>
       )}
+
+      {unassigned ? (
+        <p className="rounded-lg border border-orange-200 bg-orange-100/80 px-2 py-1 text-[11px] font-semibold text-orange-800">
+          {t("ops.trip.assignment_details_unavailable")}
+        </p>
+      ) : null}
 
       {row.remarks ? (
         <p className="text-[11px] text-slate-500 px-1">

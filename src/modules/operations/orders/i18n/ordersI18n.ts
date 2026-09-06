@@ -14,7 +14,7 @@ const EN: Record<string, string> = {
 
   // ── Tab 1 · Order Collection ──────────────────────────────────────────
   "orders.collection_hint":
-    "Enter No. of Birds and No. of Boxes for each shop. The vehicle is assigned only after the collection is finished.",
+    "Enter No. of Birds and No. of Boxes for each shop. Save Progress makes shops available for Order Assignment — Finish Collection is optional.",
   "orders.collection_resume": "Resuming saved collection {orderNo}",
   "orders.no_active_shops": "No active shops available in Shop Master",
   "orders.col_sno": "S.No",
@@ -49,7 +49,7 @@ const EN: Record<string, string> = {
 
   // ── Tab 2 · Order Assignment ──────────────────────────────────────────
   "orders.assignment_empty":
-    "No collected orders awaiting assignment. Finish a collection in Order Collection first.",
+    "No collected orders awaiting assignment. Save a collection in Order Collection first.",
   "orders.col_order_no": "Order No",
   "orders.col_date": "Date",
   "orders.col_shops": "Shops",
@@ -280,6 +280,8 @@ const EN: Record<string, string> = {
   "orders.wa_send_note":
     "Sends this assignment to the vehicle supervisor WhatsApp number only — shop owners are not messaged from this page.",
   "orders.wa_confirm_send": "Confirm & Send",
+  "orders.wa_retry": "Retry",
+  "orders.submit_order_assignment": "Submit Order Assignment",
   "orders.wa_sent_to": "WhatsApp message sent successfully to {name} ({mobile}).",
   "orders.wa_sent_ok_title": "WhatsApp notification sent successfully",
   "orders.wa_sent_ok_body":
@@ -415,7 +417,7 @@ const TE: Record<string, string> = {
 
   // Tab 1
   "orders.collection_hint":
-    "ప్రతి షాప్‌కు పక్షుల సంఖ్య మరియు బాక్స్‌ల సంఖ్య నమోదు చేయండి. సేకరణ పూర్తి అయిన తర్వాత మాత్రమే వాహనం అసైన్ చేయబడుతుంది.",
+    "ప్రతి షాప్‌కు పక్షుల సంఖ్య మరియు బాక్స్‌ల సంఖ్య నమోదు చేయండి. Save Progress అయితే ఆర్డర్ అసైన్‌మెంట్‌కు షాప్‌లు అందుబాటులో ఉంటాయి — Finish Collection ఐచ్ఛికం.",
   "orders.collection_resume": "సేవ్ చేసిన సేకరణ {orderNo} కొనసాగించబడుతోంది",
   "orders.no_active_shops": "షాప్ మాస్టర్‌లో యాక్టివ్ షాప్‌లు లేవు",
   "orders.col_sno": "సం.సం",
@@ -450,7 +452,7 @@ const TE: Record<string, string> = {
 
   // Tab 2
   "orders.assignment_empty":
-    "అసైన్‌మెంట్‌కు காతూంటూ ఉన్న సేకరించిన ఆర్డర్లు లేవు. ముందు ఆర్డర్ సేకరణ పూర్తి చేయండి.",
+    "అసైన్‌మెంట్‌కు వేచి ఉన్న సేకరించిన ఆర్డర్లు లేవు. ముందు ఆర్డర్ సేకరణను సేవ్ చేయండి.",
   "orders.col_order_no": "ఆర్డర్ నంబర్",
   "orders.col_date": "తేదీ",
   "orders.col_shops": "షాప్‌లు",
@@ -678,6 +680,8 @@ const TE: Record<string, string> = {
   "orders.wa_send_note":
     "ఈ కేటాయింపును సూపర్‌వైజర్‌కు వాట్సాప్‌లో పంపుతుంది — ప్రతి షాప్‌కు ఒక సందేశం, దాని డెలివరీ PDFతో.",
   "orders.wa_confirm_send": "నిర్ధారించి పంపండి",
+  "orders.wa_retry": "మళ్లీ ప్రయత్నించండి",
+  "orders.submit_order_assignment": "ఆర్డర్ అసైన్‌మెంట్ సబ్మిట్ చేయండి",
   "orders.wa_sent_to": "WhatsApp సందేశం {name} ({mobile})కు విజయవంతంగా పంపబడింది.",
   "orders.wa_sent_ok_title": "WhatsApp నోటిఫికేషన్ విజయవంతంగా పంపబడింది",
   "orders.wa_sent_ok_body":

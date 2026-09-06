@@ -206,6 +206,7 @@ test("View/PDF shop breakdown keeps assignment sequence and shows undelivered sh
   assert.equal(shops[1].status, "part_delivered");
   assert.equal(shops[2].status, "not_delivered");
   assert.equal(shops[2].collectedBoxes, 8);
+  assert.equal(shops[2].assignedBoxes, 8);
   assert.equal(shops[2].pendingBoxes, 8);
   assert.equal(shops[1].pendingBoxes, 7);
   assert.equal(shopCollectedBoxes(shops[0]), 10);
@@ -240,6 +241,7 @@ test("View and PDF share the same collected/delivered/pending summary", () => {
   assert.equal(summary.partDeliveredShops, 1);
   assert.equal(summary.pendingShops, 1);
   assert.equal(summary.collectedBoxes, 39);
+  assert.equal(summary.assignedBoxes, 39);
   assert.equal(summary.deliveredBoxes, 25);
   assert.equal(summary.pendingBoxes, 14);
   assert.equal(summary.deliveredBirds, 250);
