@@ -34,11 +34,8 @@ export default function MobileLogin() {
       <section className="w-full max-w-sm overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-card-lg">
         <div className="bg-gradient-to-br from-emerald-800 via-emerald-900 to-emerald-950 px-6 py-7 text-white">
           <div className="flex items-center gap-3">
-            <BrandMark size="lg" />
-            <div>
-              <h1 className="text-lg font-extrabold tracking-tight">DMR Poultries</h1>
-              <p className="text-xs font-medium text-emerald-200/80">Supervisor Trip Entry</p>
-            </div>
+            <BrandMark size="lg" variant="plain" />
+            <h1 className="text-lg font-extrabold tracking-tight">DMR Poultries</h1>
           </div>
           <div className="mt-6 flex items-start gap-3 rounded-2xl bg-white/10 p-3.5 ring-1 ring-inset ring-white/10">
             <ShieldCheck size={19} className="mt-0.5 shrink-0 text-emerald-300" />

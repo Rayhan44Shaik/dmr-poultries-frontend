@@ -34,12 +34,14 @@ import {
   Wallet,
   Store,
   Tractor,
+  Warehouse,
   Car,
   Bird,
   UserCheck,
   Settings,
   Database,
-  DollarSign
+  DollarSign,
+  Scale,
 } from "lucide-react";
 
 /** Accent used by the sidebar icon + active row for this item. */
@@ -185,11 +187,11 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: Database,
     children: [
       { label: "Shops", labelKey: "nav.shops", path: "/masters?tab=shops", icon: Store, tone: "teal", keywords: "shops master stores" },
-      { label: "Farms / Poultry Farms", labelKey: "nav.farms", path: "/masters?tab=farms", icon: Tractor, tone: "lime", keywords: "farms poultry farms" },
+      { label: "Farms", labelKey: "nav.farms", path: "/masters?tab=farms", icon: Warehouse, tone: "lime", keywords: "farms" },
       { label: "Vehicles", labelKey: "nav.vehicles_master", path: "/masters?tab=vehicles", icon: Car, tone: "amber", keywords: "vehicles master trucks" },
       { label: "Employees", labelKey: "nav.employees", path: "/masters?tab=employees", icon: Users, tone: "violet", keywords: "employees master staff" },
       { label: "Banks", labelKey: "nav.banks", path: "/masters?tab=banks", icon: Landmark, tone: "indigo", keywords: "banks master accounts" },
-      { label: "Bird Types", labelKey: "nav.birdTypes", path: "/masters?tab=birdTypes", icon: Bird, tone: "rose", keywords: "bird types breed master" },
+      { label: "Bird Types", labelKey: "nav.birdTypes", path: "/masters?tab=birdTypes", icon: Bird, tone: "amber", keywords: "bird types breed poultry" },
       { label: "Market Rates", labelKey: "nav.marketRates", path: "/accounts?tab=market-rate", icon: TrendingUp, tone: "emerald", keywords: "market rate weight price" },
 
       //{ label: "Routes", path: "/masters?tab=shops", icon: Package, soon: true, keywords: "routes master" },
@@ -201,18 +203,18 @@ export const NAV_SECTIONS: NavSection[] = [
     labelKey: "nav.operations",
     icon: PackageOpen,
     children: [
-      { label: "Daily Operation Report", labelKey: "nav.dailyOperationReport", path: "/operations?tab=overview", icon: ClipboardList, tone: "sky", keywords: "daily report operations overview" },
+      { label: "Operation Dashboard", labelKey: "nav.dailyOperationReport", path: "/operations?tab=overview", icon: ClipboardList, tone: "sky", keywords: "daily report operations overview" },
 
-      { label: "Vehicle Delivery Entry", labelKey: "nav.vehicleDeliveryEntry", path: "/operations?tab=trip-entry", icon: PackageCheck, tone: "emerald", keywords: "delivery trip shop weight" },
-      { label: "Vehicle Trip History", labelKey: "nav.vehicleTripHistory", path: "/operations?tab=trip-list", icon: History, tone: "cyan", keywords: "trips history list completed" },
+      { label: "Trip Entry", labelKey: "nav.vehicleDeliveryEntry", path: "/operations?tab=trip-entry", icon: PackageCheck, tone: "emerald", keywords: "delivery trip shop weight" },
+      { label: "Trip List", labelKey: "nav.vehicleTripHistory", path: "/operations?tab=trip-list", icon: History, tone: "cyan", keywords: "trips history list completed" },
       
-      { label: "Rate Entry", labelKey: "nav.rateEntry", path: "/operations?tab=rate-entry", icon: DollarSign, tone: "amber", keywords: "sales shop invoice rate" },
-      { label: "Shop Sales Entry", labelKey: "nav.shopSalesEntry", path: "/operations?tab=shop-sales", icon: ShoppingBag, tone: "indigo", keywords: "sales shop invoice rate" },
+      { label: "Rate Entry", labelKey: "nav.rateEntry", path: "/operations?tab=rate-entry", icon: IndianRupee, tone: "amber", keywords: "sales shop invoice rate" },
+      { label: "Shop Sales", labelKey: "nav.shopSalesEntry", path: "/operations?tab=shop-sales", icon: ShoppingBag, tone: "indigo", keywords: "sales shop invoice rate" },
       
       { label: "Collection Entry", labelKey: "nav.collectionEntry", path: "/operations?tab=collection", icon: CreditCard, tone: "teal", keywords: "collection payment cash" },
       { label: "Pending Collections", labelKey: "nav.pendingCollections", path: "/operations?tab=pending-collections", icon: Clock3, tone: "orange", keywords: "pending overdue outstanding collection" },
       
-      { label: "Mortality Entry", labelKey: "nav.mortalityEntry", path: "/operations?tab=mortality", icon: Bird, tone: "rose", keywords: "mortality death birds" },
+      { label: "Weight Loss / Mortality", labelKey: "nav.weightLossMortality", path: "/operations?tab=mortality", icon: Scale, tone: "rose", keywords: "weight loss mortality death birds" },
       { label: "Fuel Expenses", labelKey: "nav.fuelExpenses", path: "/operations?tab=fuel-expenses", icon: Fuel, tone: "amber", keywords: "fuel diesel expenses bills" },
       { label: "Orders", path: "/operations?tab=orders", icon: ClipboardList, tone: "emerald", keywords: "orders shop order collection delivery sequence pending completed" },
     ],
@@ -226,7 +228,7 @@ export const NAV_SECTIONS: NavSection[] = [
       // DEFERRED / FUTURE: Fleet Overview (Dashboard) — files preserved, not in active nav
       //{ label: "Fleet Overview", path: "/fleet?tab=dashboard", icon: Gauge, keywords: "fleet vehicles overview status" },
       { label: "Maintenance Entry", labelKey: "nav.maintenanceEntry", path: "/fleet?tab=entry", icon: Wrench, tone: "orange", keywords: "maintenance service garage" },
-      { label: "Maintenance History", labelKey: "nav.maintenanceHistory", path: "/fleet?tab=history", icon: History, tone: "cyan", keywords: "maintenance history records" },
+      { label: "Maintenance List", labelKey: "nav.maintenanceHistory", path: "/fleet?tab=history", icon: History, tone: "cyan", keywords: "maintenance history records" },
 
       { label: "Permits & Documents", labelKey: "nav.permitsDocuments", path: "/fleet?tab=permits", icon: FileSpreadsheet, tone: "indigo", keywords: "permits insurance fitness documents" },
       

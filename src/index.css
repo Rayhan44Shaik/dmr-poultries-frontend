@@ -86,11 +86,14 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    background: #f8fafc;
+    scrollbar-gutter: stable;
   }
 
   body {
-    @apply bg-slate-100/80 font-sans text-slate-900 antialiased;
+    @apply bg-[#f8fafc] font-sans text-slate-900 antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    background: #f8fafc;
   }
 
   .dark body {
@@ -113,20 +116,37 @@
     border-radius: 2px;
   }
 
-  /* Fast, subtle button interaction — GPU-friendly (transform only).
-     No layout-affecting properties are animated, so there is no reflow or jump. */
+  /* Soft, fast button interaction — GPU-friendly, no reflow or jump.
+     Very subtle lift, high smoothing, preserves stability. */
   button {
     transition:
-      transform 120ms ease,
-      box-shadow 120ms ease;
+      transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 140ms cubic-bezier(0.16, 1, 0.3, 1),
+      background-color 140ms ease,
+      color 140ms ease,
+      opacity 140ms ease;
+    will-change: transform;
+    backface-visibility: hidden;
   }
 
-  button:hover:not(:disabled) {
-    transform: translateY(-1px) scale(1.01);
+  /* Only interactive buttons lift — links/cards are untouched */
+  button:hover:not(:disabled):not([aria-disabled="true"]) {
+    transform: translateY(-0.5px);
   }
 
   button:active:not(:disabled) {
-    transform: translateY(0) scale(0.98);
+    transform: translateY(0) scale(0.99);
+    transition-duration: 90ms;
+  }
+
+  /* Respect reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    button,
+    button:hover:not(:disabled),
+    button:active:not(:disabled) {
+      transition: none;
+      transform: none;
+    }
   }
 
   /* Refined scrollbars */

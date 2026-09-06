@@ -250,7 +250,7 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
         {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-3">
           <div className="flex min-w-0 items-center gap-2.5">
-            <BrandMark size="sm" inset="tight" />
+            <BrandMark size="sm" variant="plain" />
             <div className="min-w-0">
               <h3 className="truncate text-sm font-extrabold text-slate-800">
                 {t("orders.wa_check_title")}

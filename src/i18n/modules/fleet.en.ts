@@ -166,7 +166,7 @@
   'fleet.timeline.maintenance': 'Maintenance',
   'fleet.timeline.mechanic': 'Mechanic: {mechanic}',
   'fleet.timeline.next_target': 'Next Target: {km} KM',
-  'fleet.timeline.no_approved_history': 'No Approved Maintenance History',
+  'fleet.timeline.no_approved_history': 'No Approved Maintenance List',
   'fleet.timeline.no_approved_hint': 'No maintenance records have been approved yet.',
   'fleet.timeline.no_records': 'No maintenance records found',
   'fleet.timeline.no_records_hint': 'Try changing the maintenance type, vehicle, or search criteria.',

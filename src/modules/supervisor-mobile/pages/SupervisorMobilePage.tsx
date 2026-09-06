@@ -704,7 +704,7 @@ function SupervisorTripWorkspace({ supervisor }: { supervisor: MobileSupervisorP
                 <ArrowLeft size={18} />
               </button>
             ) : (
-              <BrandMark size="md" />
+              <BrandMark size="md" variant="plain" />
             )}
             <div className="min-w-0">
               <p className="truncate text-sm font-extrabold tracking-tight">

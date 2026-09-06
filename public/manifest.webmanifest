@@ -1,12 +1,12 @@
 {
-  "name": "DMR Poultries Supervisor Trip Entry",
-  "short_name": "DMR Trips",
-  "description": "Supervisor mobile Trip Entry for Steps 1–5.",
-  "start_url": "/mobile/trips",
+  "name": "DMR Poultries",
+  "short_name": "DMR",
+  "description": "DMR Poultries — poultry logistics, operations, accounts, fleet and staff management.",
+  "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f1f5f9",
-  "theme_color": "#022c22",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "orientation": "portrait-primary",
   "icons": [
     {

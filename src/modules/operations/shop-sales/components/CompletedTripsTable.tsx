@@ -1,4 +1,4 @@
-import { DollarSign, Pencil, Lock, Hash, Calendar, Truck, UserCog, Warehouse, ShoppingBag, Bird, Scale, Settings } from "lucide-react";
+import { IndianRupee, Pencil, Lock, Hash, Calendar, Truck, UserCog, Warehouse, ShoppingBag, Bird, Scale, Settings } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 
@@ -112,7 +112,7 @@ export default function CompletedTripsTable({ trips, onEnterRate, onModifyRate, 
                           onClick={() => onEnterRate(trip)}
                           className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-xs font-semibold transition-all shadow-sm active:scale-95"
                         >
-                          <DollarSign size={14} />
+                          <IndianRupee size={14} />
                           Enter Rates
                         </button>
                       ) : canModify ? (

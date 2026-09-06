@@ -45,6 +45,55 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onCloseMobile]);
 
+  // Auto-scroll active nav item into view (e.g., Reports → Shop Ledger)
+  // so opening Shop Ledger directly shows its nav entry without manual scroll.
+  useEffect(() => {
+    const doScroll = () => {
+      const activeLinks = document.querySelectorAll('nav a[aria-current="page"]');
+      if (activeLinks.length === 0) return;
+      activeLinks.forEach((el) => {
+        const nav = el.closest("nav") as HTMLElement | null;
+        if (!nav) return;
+        // Skip hidden navs (desktop hidden on mobile, drawer hidden on desktop)
+        if (nav.clientHeight === 0 || (nav as HTMLElement).offsetParent === null) {
+          // For hidden via display:none, clientHeight is 0; for lg:hidden etc, check computed
+          const style = window.getComputedStyle(nav);
+          if (style.display === "none" || style.visibility === "hidden") return;
+        }
+        try {
+          const navRect = nav.getBoundingClientRect();
+          const elRect = (el as HTMLElement).getBoundingClientRect();
+          const navHeight = nav.clientHeight;
+          const isVisible = elRect.top >= navRect.top && elRect.bottom <= navRect.bottom;
+          const elCenterDelta = elRect.top - navRect.top - navHeight / 2 + elRect.height / 2;
+          if (!isVisible || Math.abs(elCenterDelta) > 80) {
+            nav.scrollTo({ top: nav.scrollTop + elCenterDelta, behavior: "smooth" });
+          }
+          // Subtle flash to draw eye to the active Shop Ledger row
+          (el as HTMLElement).animate?.(
+            [{ boxShadow: "0 0 0 0 rgba(16,185,129,0)" }, { boxShadow: "0 0 0 4px rgba(16,185,129,0.18)" }, { boxShadow: "0 0 0 0 rgba(16,185,129,0)" }],
+            { duration: 900, easing: "ease-out" }
+          );
+        } catch {
+          // Fallback
+          try { (el as HTMLElement).scrollIntoView({ block: "center", behavior: "smooth" }); } catch {}
+        }
+      });
+    };
+    // Multiple attempts to cover paint + drawer animation + fonts
+    const raf = requestAnimationFrame(() => {
+      doScroll();
+      const t1 = window.setTimeout(doScroll, 120);
+      const t2 = window.setTimeout(doScroll, 350);
+      const t3 = window.setTimeout(doScroll, 700);
+      (doScroll as any)._t1 = t1; (doScroll as any)._t2 = t2; (doScroll as any)._t3 = t3;
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      try { window.clearTimeout((doScroll as any)._t1); window.clearTimeout((doScroll as any)._t2); window.clearTimeout((doScroll as any)._t3); } catch {}
+    };
+  }, [pathname, search, mobileOpen]);
+
   const navContent = (
     <nav className="flex-1 overflow-y-auto px-3 py-4 scrollbar-none">
       {NAV_SECTIONS.map((section) => {
@@ -110,8 +159,8 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
 
   const brandHeader = (
     <div className="flex h-16 shrink-0 items-center gap-3 border-b border-slate-200/80 px-5 dark:border-slate-800">
-      <BrandMark />
-      <h1 className="min-w-0 truncate text-[15px] font-bold leading-tight tracking-tight text-slate-900 dark:text-white">
+      <BrandMark size="lg" variant="plain" />
+      <h1 className="min-w-0 truncate text-[16px] font-extrabold leading-tight tracking-tight text-slate-900 dark:text-white">
         DMR Poultries
       </h1>
     </div>
@@ -135,15 +184,10 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
           <aside className="absolute inset-y-0 left-0 flex w-[280px] flex-col border-r border-slate-200 bg-white shadow-pop animate-scale-in dark:border-slate-800 dark:bg-slate-900">
             <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200/80 px-5 dark:border-slate-800">
               <div className="flex items-center gap-3">
-                <BrandMark />
-                <div className="min-w-0">
-                  <h1 className="truncate text-[15px] font-bold leading-tight tracking-tight text-slate-900 dark:text-white">
-                    DMR Poultries
-                  </h1>
-                  <p className="truncate text-[11px] font-medium text-slate-400 dark:text-slate-500">
-                    {t("sidebar.erpSystem")}
-                  </p>
-                </div>
+                <BrandMark size="lg" variant="plain" />
+                <h1 className="truncate text-[15px] font-bold leading-tight tracking-tight text-slate-900 dark:text-white">
+                  DMR Poultries
+                </h1>
               </div>
               <button
                 type="button"
