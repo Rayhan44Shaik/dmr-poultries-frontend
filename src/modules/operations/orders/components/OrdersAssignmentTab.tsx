@@ -21,7 +21,7 @@
 // Capacity is a HARD BLOCK with the exact numbers (Capacity / Already
 // Assigned / Available / Requested). No invalid state is ever saved.
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowDown,
@@ -63,6 +63,7 @@ import {
   orderRowsOnTrip,
   planShareBoxes,
   rowBoxes,
+  uniqueShopRows,
   weightForBirds,
   type AssignmentSheetRow,
 } from "../ordersUtils";
@@ -143,9 +144,7 @@ function assignedBirdsFor(row: SelectedRow): number {
 }
 
 function toOrderShopRows(rows: SelectedRow[]): OrderShopRow[] {
-  return rows
-    .filter((r) => r.assigned > 0)
-    .map((r, i) => {
+  return uniqueShopRows(rows.filter((r) => r.assigned > 0)).map((r, i) => {
       const birds = assignedBirdsFor(r);
       return {
         id: 0,
@@ -351,7 +350,8 @@ function AssignmentEditor({
     available: number;
     requested: number;
   }>(null);
-  const busy = saving || conflictChecking;
+  const persistLockRef = useRef(false);
+  const busy = saving || conflictChecking || waBusy;
 
   const selectedIds = useMemo(
     () => new Set(selected.map((r) => r.shopId)),
@@ -581,13 +581,14 @@ function AssignmentEditor({
 
   // ── Save Progress (partial persists, no final validation) ────────────────
   const handleSave = useCallback(async () => {
-    if (busy || !vehicle) return;
+    if (persistLockRef.current || busy || !vehicle) return;
     if (!checkCapacity()) return;
     if (selected.length === 0) {
       showNotification(to("orders.selection_empty"), "info");
       return;
     }
     if (!(await assertFitsBalance())) return;
+    persistLockRef.current = true;
     setSaving(true);
     try {
       await saveAssignment(vehicle.trip, [
@@ -604,12 +605,13 @@ function AssignmentEditor({
     } catch {
       showNotification(to("orders.refresh_failed"), "error");
     } finally {
+      persistLockRef.current = false;
       setSaving(false);
     }
   }, [busy, vehicle, checkCapacity, selected, assertFitsBalance, orderTrip.tripNo, showNotification, to, onChanged, vehicleTripId]);
 
   const handleFinish = useCallback(async () => {
-    if (busy || !vehicle) return;
+    if (persistLockRef.current || busy || !vehicle) return;
     if (!checkCapacity()) return;
     const rows =
       selected.length > 0
@@ -620,14 +622,16 @@ function AssignmentEditor({
       return;
     }
     if (selected.length > 0 && !(await assertFitsBalance())) return;
+    persistLockRef.current = true;
     setSaving(true);
     try {
       const trip = await finishAssignment(vehicle.trip, [
-        { orderTripNo: orderTrip.tripNo, rows },
+        { orderTripNo: orderTrip.tripNo, rows: uniqueShopRows(rows) },
       ]);
       showNotification(to("orders.assignment_finished"), "success");
       onFinished(trip);
     } catch {
+      persistLockRef.current = false;
       showNotification(to("orders.refresh_failed"), "error");
     } finally {
       setSaving(false);
@@ -675,11 +679,12 @@ function AssignmentEditor({
   // saved data, the sheet and the actual send never disagree.
   const handleWhatsAppConfirm = useCallback(
     async (orderedShopIds?: number[]): Promise<OrdersWhatsAppResult | null> => {
-      if (waBusy || !vehicle) return null;
+      if (persistLockRef.current || waBusy || !vehicle) return null;
       if (!supervisorMobile.trim()) {
         showNotification(to("orders.whatsapp_failed", { message: "Supervisor mobile missing" }), "error");
         return null;
       }
+      persistLockRef.current = true;
       let trip = vehicle.trip;
       let payload: OrderShopRow[] | null = null;
       // When the popup re-ordered the live selection, keep that sequence in
@@ -712,12 +717,15 @@ function AssignmentEditor({
         }
       }
       if (isDirty || payload) {
-        if (!(await assertFitsBalance())) return null;
+        if (!(await assertFitsBalance())) {
+          persistLockRef.current = false;
+          return null;
+        }
         try {
           trip = await saveAssignment(vehicle.trip, [
             {
               orderTripNo: orderTrip.tripNo,
-              rows: payload ?? toOrderShopRows(selected),
+              rows: uniqueShopRows(payload ?? toOrderShopRows(selected)),
             },
           ]);
           // Keep the saved shops selected for incremental assignment (same
@@ -728,6 +736,7 @@ function AssignmentEditor({
           );
           onChanged();
         } catch {
+          persistLockRef.current = false;
           showNotification(to("orders.refresh_failed"), "error");
           return null;
         }
@@ -758,7 +767,7 @@ function AssignmentEditor({
         showNotification(to("orders.whatsapp_failed", { message: "network" }), "error");
         return null;
       } finally {
-        // Sending finished — the popup's result block takes over the display.
+        persistLockRef.current = false;
         setWaBusy(false);
       }
     },

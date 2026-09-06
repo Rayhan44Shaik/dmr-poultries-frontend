@@ -506,7 +506,7 @@ function normalizeBirdType(deliveries: ShopDelivery[]): ShopDelivery[] {
 function buildAssignmentDeliveries(vehicleTrip: Trip, groups: AssignmentGroup[]): ShopDelivery[] {
   let deliveries = rowsInSequence(vehicleTrip);
   for (const group of groups) {
-    const withRef = group.rows.map((row) => ({
+    const withRef = uniqueShopRows(group.rows).map((row) => ({
       ...row,
       remarks: orderRowRemarks(group.orderTripNo),
     }));
@@ -613,15 +613,15 @@ export async function saveShopDeliveries(vehicleTrip: Trip): Promise<Trip> {
  */
 export async function submitShopDeliveries(vehicleTrip: Trip): Promise<Trip> {
   const rows = rowsInSequence(vehicleTrip);
+  // Persist Step 4 captures only. Trip lifecycle (`status = Completed`) is
+  // Trip Entry Step 5 — Orders must never invent a second completion flag,
+  // and must never overwrite `order:` remarks used by Delivery Tracking.
   if (ORDERS_SAMPLE_DATA_ENABLED) {
-    return applySampleDeliveries(vehicleTrip.id, rows, {
-      status: "Completed",
-      submittedAtTimestamp: new Date().toISOString(),
-    });
+    return applySampleDeliveries(vehicleTrip.id, rows);
   }
   const { data } = await apiPost<RawTrip>(
     `/trips/${vehicleTrip.id}/steps/deliveries`,
-    { ...toStep4Payload({ deliveries: rows } as unknown as Partial<Trip>), mode: "submit", remarks: "[ORDER] delivery submitted" }
+    { ...toStep4Payload({ deliveries: rows } as unknown as Partial<Trip>), mode: "save" }
   );
   return mapApiTripToTrip(data, vehicleTrip);
 }
