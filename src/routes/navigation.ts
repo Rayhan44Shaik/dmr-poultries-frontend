@@ -34,6 +34,7 @@ import {
   Wallet,
   Store,
   Tractor,
+  Warehouse,
   Car,
   Bird,
   UserCheck,
@@ -186,7 +187,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: Database,
     children: [
       { label: "Shops", labelKey: "nav.shops", path: "/masters?tab=shops", icon: Store, tone: "teal", keywords: "shops master stores" },
-      { label: "Farms", labelKey: "nav.farms", path: "/masters?tab=farms", icon: Tractor, tone: "lime", keywords: "farms" },
+      { label: "Farms", labelKey: "nav.farms", path: "/masters?tab=farms", icon: Warehouse, tone: "lime", keywords: "farms" },
       { label: "Vehicles", labelKey: "nav.vehicles_master", path: "/masters?tab=vehicles", icon: Car, tone: "amber", keywords: "vehicles master trucks" },
       { label: "Employees", labelKey: "nav.employees", path: "/masters?tab=employees", icon: Users, tone: "violet", keywords: "employees master staff" },
       { label: "Banks", labelKey: "nav.banks", path: "/masters?tab=banks", icon: Landmark, tone: "indigo", keywords: "banks master accounts" },
@@ -202,13 +203,13 @@ export const NAV_SECTIONS: NavSection[] = [
     labelKey: "nav.operations",
     icon: PackageOpen,
     children: [
-      { label: "Daily Operation Report", labelKey: "nav.dailyOperationReport", path: "/operations?tab=overview", icon: ClipboardList, tone: "sky", keywords: "daily report operations overview" },
+      { label: "Operation Dashboard", labelKey: "nav.dailyOperationReport", path: "/operations?tab=overview", icon: ClipboardList, tone: "sky", keywords: "daily report operations overview" },
 
-      { label: "Vehicle Delivery Entry", labelKey: "nav.vehicleDeliveryEntry", path: "/operations?tab=trip-entry", icon: PackageCheck, tone: "emerald", keywords: "delivery trip shop weight" },
-      { label: "Vehicle Trip History", labelKey: "nav.vehicleTripHistory", path: "/operations?tab=trip-list", icon: History, tone: "cyan", keywords: "trips history list completed" },
+      { label: "Trip Entry", labelKey: "nav.vehicleDeliveryEntry", path: "/operations?tab=trip-entry", icon: PackageCheck, tone: "emerald", keywords: "delivery trip shop weight" },
+      { label: "Trip List", labelKey: "nav.vehicleTripHistory", path: "/operations?tab=trip-list", icon: History, tone: "cyan", keywords: "trips history list completed" },
       
       { label: "Rate Entry", labelKey: "nav.rateEntry", path: "/operations?tab=rate-entry", icon: DollarSign, tone: "amber", keywords: "sales shop invoice rate" },
-      { label: "Shop Sales Entry", labelKey: "nav.shopSalesEntry", path: "/operations?tab=shop-sales", icon: ShoppingBag, tone: "indigo", keywords: "sales shop invoice rate" },
+      { label: "Shop Sales", labelKey: "nav.shopSalesEntry", path: "/operations?tab=shop-sales", icon: ShoppingBag, tone: "indigo", keywords: "sales shop invoice rate" },
       
       { label: "Collection Entry", labelKey: "nav.collectionEntry", path: "/operations?tab=collection", icon: CreditCard, tone: "teal", keywords: "collection payment cash" },
       { label: "Pending Collections", labelKey: "nav.pendingCollections", path: "/operations?tab=pending-collections", icon: Clock3, tone: "orange", keywords: "pending overdue outstanding collection" },
@@ -227,7 +228,7 @@ export const NAV_SECTIONS: NavSection[] = [
       // DEFERRED / FUTURE: Fleet Overview (Dashboard) — files preserved, not in active nav
       //{ label: "Fleet Overview", path: "/fleet?tab=dashboard", icon: Gauge, keywords: "fleet vehicles overview status" },
       { label: "Maintenance Entry", labelKey: "nav.maintenanceEntry", path: "/fleet?tab=entry", icon: Wrench, tone: "orange", keywords: "maintenance service garage" },
-      { label: "Maintenance History", labelKey: "nav.maintenanceHistory", path: "/fleet?tab=history", icon: History, tone: "cyan", keywords: "maintenance history records" },
+      { label: "Maintenance List", labelKey: "nav.maintenanceHistory", path: "/fleet?tab=history", icon: History, tone: "cyan", keywords: "maintenance history records" },
 
       { label: "Permits & Documents", labelKey: "nav.permitsDocuments", path: "/fleet?tab=permits", icon: FileSpreadsheet, tone: "indigo", keywords: "permits insurance fitness documents" },
       

@@ -166,7 +166,7 @@
   'fleet.timeline.maintenance': 'మెయింటెనెన్స్',
   'fleet.timeline.mechanic': 'మెకానిక్: {mechanic}',
   'fleet.timeline.next_target': 'తదుపరి లక్ష్యం: {km} కి.మీ',
-  'fleet.timeline.no_approved_history': 'ఆమోదించిన మెయింటెనెన్స్ చరిత్ర లేదు',
+  'fleet.timeline.no_approved_history': 'ఆమోదించిన మెయింటెనెన్స్ జాబితా లేదు',
   'fleet.timeline.no_approved_hint': 'ఇంకా మెయింటెనెన్స్ రికార్డులు ఏవీ ఆమోదించబడలేదు.',
   'fleet.timeline.no_records': 'మెయింటెనెన్స్ రికార్డులు ఏవీ కనుగొనబడలేదు',
   'fleet.timeline.no_records_hint': 'మెయింటెనెన్స్ రకం, వాహనం లేదా శోధన ప్రమాణాలను మార్చడానికి ప్రయత్నించండి.',
