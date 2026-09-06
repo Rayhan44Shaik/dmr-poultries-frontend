@@ -46,31 +46,52 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
   }, [onCloseMobile]);
 
   // Auto-scroll active nav item into view (e.g., Reports → Shop Ledger)
-  // so the user sees directly where they are without manual scroll.
+  // so opening Shop Ledger directly shows its nav entry without manual scroll.
   useEffect(() => {
-    // Run after paint so the <a aria-current="page"> exists
+    const doScroll = () => {
+      const activeLinks = document.querySelectorAll('nav a[aria-current="page"]');
+      if (activeLinks.length === 0) return;
+      activeLinks.forEach((el) => {
+        const nav = el.closest("nav") as HTMLElement | null;
+        if (!nav) return;
+        // Skip hidden navs (desktop hidden on mobile, drawer hidden on desktop)
+        if (nav.clientHeight === 0 || (nav as HTMLElement).offsetParent === null) {
+          // For hidden via display:none, clientHeight is 0; for lg:hidden etc, check computed
+          const style = window.getComputedStyle(nav);
+          if (style.display === "none" || style.visibility === "hidden") return;
+        }
+        try {
+          const navRect = nav.getBoundingClientRect();
+          const elRect = (el as HTMLElement).getBoundingClientRect();
+          const navHeight = nav.clientHeight;
+          const isVisible = elRect.top >= navRect.top && elRect.bottom <= navRect.bottom;
+          const elCenterDelta = elRect.top - navRect.top - navHeight / 2 + elRect.height / 2;
+          if (!isVisible || Math.abs(elCenterDelta) > 80) {
+            nav.scrollTo({ top: nav.scrollTop + elCenterDelta, behavior: "smooth" });
+          }
+          // Subtle flash to draw eye to the active Shop Ledger row
+          (el as HTMLElement).animate?.(
+            [{ boxShadow: "0 0 0 0 rgba(16,185,129,0)" }, { boxShadow: "0 0 0 4px rgba(16,185,129,0.18)" }, { boxShadow: "0 0 0 0 rgba(16,185,129,0)" }],
+            { duration: 900, easing: "ease-out" }
+          );
+        } catch {
+          // Fallback
+          try { (el as HTMLElement).scrollIntoView({ block: "center", behavior: "smooth" }); } catch {}
+        }
+      });
+    };
+    // Multiple attempts to cover paint + drawer animation + fonts
     const raf = requestAnimationFrame(() => {
-      // Small timeout for mobile drawer animation
-      window.setTimeout(() => {
-        const activeLinks = document.querySelectorAll('nav a[aria-current="page"]');
-        activeLinks.forEach((el) => {
-          try {
-            (el as HTMLElement).scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
-            // Ensure the nav container also scrolls if the link is in overflow
-            const nav = el.closest("nav");
-            if (nav) {
-              // Nudge to center slightly for better visibility near edges
-              const rect = (el as HTMLElement).getBoundingClientRect();
-              const navRect = nav.getBoundingClientRect();
-              if (rect.top < navRect.top + 12 || rect.bottom > navRect.bottom - 12) {
-                (el as HTMLElement).scrollIntoView({ block: "center", behavior: "smooth" });
-              }
-            }
-          } catch {}
-        });
-      }, 50);
+      doScroll();
+      const t1 = window.setTimeout(doScroll, 120);
+      const t2 = window.setTimeout(doScroll, 350);
+      const t3 = window.setTimeout(doScroll, 700);
+      (doScroll as any)._t1 = t1; (doScroll as any)._t2 = t2; (doScroll as any)._t3 = t3;
     });
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      try { window.clearTimeout((doScroll as any)._t1); window.clearTimeout((doScroll as any)._t2); window.clearTimeout((doScroll as any)._t3); } catch {}
+    };
   }, [pathname, search, mobileOpen]);
 
   const navContent = (
