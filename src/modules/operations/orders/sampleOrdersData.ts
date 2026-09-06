@@ -498,7 +498,6 @@ function buildSampleTrips(): Trip[] {
       // Past days are tracking trips: an empty truck would carry no order rows.
       if (truck.shops.length === 0 && spec.kind !== "today") return;
 
-      const vehicle = vehicleById(truck.vehicleId);
       const supervisor = SAMPLE_SUPERVISORS[(dayIndex + vIndex) % SAMPLE_SUPERVISORS.length];
       const driver = SAMPLE_DRIVERS[(dayIndex * 2 + vIndex) % SAMPLE_DRIVERS.length];
       const seq = vIndex + 1;
@@ -579,11 +578,48 @@ function buildSampleTrips(): Trip[] {
           deliveryStepSubmitted: true,
           endStepSubmitted: completed,
           submittedAtTimestamp: completed ? `${day}T19:30:00` : undefined,
+          remarks: `order:${orderNo}`,
           deliveries: rows,
         })
       );
     });
   });
+
+  // Data-quality fixture: tracking trip whose `[ORDER]` assignment list is
+  // missing. Still shown (never hidden) with a light-orange warning.
+  {
+    const day = localDay(-1);
+    const orderNo = `ORD-${stamp(day)}-01`;
+    const shop = SAMPLE_SHOPS[0];
+    trips.push(
+      deliveryTrip((tripId += 1), day, 99, 1, SAMPLE_DRIVERS[0], SAMPLE_SUPERVISORS[0].name, {
+        status: "Pending",
+        deliveryStepSubmitted: true,
+        remarks: `order:${orderNo}`,
+        deliveries: [
+          {
+            id: 1,
+            serialNo: 1,
+            shopId: shop.id,
+            shopName: shop.shopName,
+            birdTypeId: 0,
+            birdType: "",
+            birds: 40,
+            weight: 60,
+            mortality: 0,
+            mortKg: 0,
+            rate: null,
+            amount: 0,
+            remarks: "",
+            deliveryMode: "box",
+            boxNo: 4,
+            selectedBoxIds: [],
+            autoCaptureTime: deliveredAt(day, 0),
+          },
+        ],
+      })
+    );
+  }
 
   return trips;
 }

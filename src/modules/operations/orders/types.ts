@@ -56,6 +56,13 @@ export type OrdersTab = "collection" | "assignment" | "tracking";
 export type OrdersTrackingStatus = "Assigned" | "In Progress" | "Completed";
 
 /**
+ * Shop-delivery progress independent of Trip Entry lifecycle.
+ * Trip status (Pending / Completed) decides which Delivery Tracking table
+ * a trip sits in; this field is the shop-delivery bar (4 / 6 Delivered).
+ */
+export type OrdersDeliveryState = "pending" | "in_progress" | "partial" | "complete";
+
+/**
  * One shop row inside the collection / assignment editors. Mirrors the
  * persisted ShopDelivery shape (what gets sent to the backend) plus editor
  * concerns (clientKey for stable local identity before the row has an id).
@@ -77,9 +84,13 @@ export type OrdersProgress = {
   totalWeight: number;
   /** Birds planned for the original shops. */
   totalBirds: number;
-  /** Original shops that already have a Step 4 capture. */
+  /**
+   * Original shops that are FULLY delivered (captured boxes ≥ ordered).
+   * A partial capture (15 of 21) does not count — that shop is
+   * `partDeliveredShops`, not delivered.
+   */
   deliveredShops: number;
-  /** Original shops still pending. */
+  /** Original shops with zero capture (excludes part-delivered). */
   pendingShops: number;
   /** Original boxes with a Step 4 capture. */
   deliveredBoxes: number;
@@ -103,8 +114,17 @@ export type OrdersProgress = {
   pendingWeight: number;
   /** Shops present in Step 4 data but NOT part of the original order. */
   additionalShopCount: number;
-  /** Assigned = 0 delivered · In Progress = partial · Completed = all or trip ended. */
+  /**
+   * Trip-lifecycle label derived from Trip Entry `status` (Completed vs not).
+   * Never invented from 100% delivery — a fully-delivered trip still reads
+   * Assigned / In Progress until Trip Entry marks it Completed.
+   */
   status: OrdersTrackingStatus;
+  /**
+   * Shop-delivery bar, independent of Trip Entry. A COMPLETED trip can
+   * still be `partial` (4 / 6 delivered); an open trip can be `complete`.
+   */
+  deliveryState: OrdersDeliveryState;
 };
 
 /** One trip enriched with everything the Orders page renders. */
@@ -122,6 +142,12 @@ export type OrdersTrip = {
    * the row no longer carries the ordered box count after a delivery).
    */
   originalQuantities?: ShopOrderQuantities;
+  /**
+   * True when the trip is in Delivery Tracking but the original Order
+   * Assignment shop list (the `[ORDER]` plan rows) is missing. The trip
+   * MUST still appear — light-orange data-quality warning, never hidden.
+   */
+  assignmentIncomplete: boolean;
 };
 
 /**

@@ -79,8 +79,8 @@ export async function generateOrdersPdf({
 }: OrdersPdfInput): Promise<OrdersPdfResult> {
   const doc = createDmrPoultryPdf("portrait");
   doc.setProperties({
-    title: `${trip.tripNo || "Trip"} — Shop Delivery Report`,
-    subject: "DMR POULTRIES shop delivery report",
+    title: `${trip.tripNo || "Trip"} — Delivery Report`,
+    subject: "DMR POULTRIES delivery report",
     author: "DMR POULTRIES",
     creator: "DMR POULTRIES",
   });
@@ -326,6 +326,7 @@ export async function generateOrdersPdf({
   const listedRows = breakdown.filter((b) => b.ordered);
   const seqBody: (string | number)[][] = listedRows.map((b, index) => [
     b.serialNo || index + 1,
+    b.shopNumber || "—",
     b.shopName,
     b.village || "—",
     b.mobile || "—",
@@ -345,6 +346,7 @@ export async function generateOrdersPdf({
   if (seqBody.length === 0) {
     seqBody.push([
       "—",
+      "—",
       ordersTranslate("orders.no_saved_collection", language),
       ...Array.from({ length: 11 }, () => "—"),
     ]);
@@ -358,6 +360,7 @@ export async function generateOrdersPdf({
   simpleTable(
     [
       "Seq",
+      ordersTranslate("orders.col_shop_no", language),
       ordersTranslate("orders.col_shop_name", language),
       ordersTranslate("orders.col_village", language),
       ordersTranslate("orders.hdr_mobile", language),
@@ -376,7 +379,7 @@ export async function generateOrdersPdf({
       // Room for real shop names (a 45-shop vehicle must not turn into a
       // wall of two-line rows), the pending-box column, and a one-line
       // delivery time.
-      widths: [8, 30, 15, 15, 10, 10, 10, 10, 10, 11, 10, 17, null],
+      widths: [8, 14, 26, 14, 14, 10, 10, 10, 10, 10, 10, 10, 16, null],
     }
   );
 
@@ -485,7 +488,7 @@ export async function generateOrdersPdf({
   }
 
   const safeTripNo = String(trip.tripNo || "Trip").replace(/[^a-zA-Z0-9_-]+/g, "_");
-  const fileName = `${safeTripNo}_ShopDeliveryReport.pdf`;
+  const fileName = `${safeTripNo}_DeliveryReport.pdf`;
   if (mode === "download") doc.save(fileName);
   const blob = doc.output("blob") as Blob;
   return { fileName, blob, url: URL.createObjectURL(blob), pages: pageCount };

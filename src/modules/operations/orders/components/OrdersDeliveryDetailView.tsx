@@ -40,6 +40,7 @@ import {
 } from "../ordersUtils";
 import {
   shopMobileOf,
+  shopNumberOf,
   villageOf,
   type OrdersWhatsAppResult,
   type ShopDirectory,
@@ -235,7 +236,8 @@ function OrdersDeliveryDetailView({
         originalShopIds,
         (shopId, shopName) => villageOf(shopId, shopName, shopDirectory),
         orderTrip.originalQuantities,
-        (shopId) => shopMobileOf(shopId, shopDirectory)
+        (shopId) => shopMobileOf(shopId, shopDirectory),
+        (shopId) => shopNumberOf(shopId, shopDirectory)
       ),
     [trip, originalShopIds, shopDirectory, orderTrip.originalQuantities]
   );
@@ -430,6 +432,12 @@ function OrdersDeliveryDetailView({
           </div>
 
           <div className="p-3 md:p-4 space-y-3 md:space-y-4">
+            {orderTrip.assignmentIncomplete && (
+              <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-xs font-semibold text-orange-800">
+                {to("orders.assignment_incomplete_warning")}
+              </div>
+            )}
+
             {/* Trip details (read-only — existing Trip Entry data) */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="px-4 py-2.5 border-b border-slate-200 bg-slate-50/60">
@@ -450,6 +458,30 @@ function OrdersDeliveryDetailView({
                 </dl>
               </div>
             </div>
+
+            {progress && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                {(
+                  [
+                    [to("orders.col_total_shops"), formatCount(progress.totalShops)],
+                    [to("orders.summary_delivered"), formatCount(progress.deliveredShops)],
+                    [to("orders.summary_pending"), formatCount(progress.pendingShops)],
+                    [to("orders.summary_part"), formatCount(progress.partDeliveredShops)],
+                    [to("orders.pending_boxes"), formatCount(progress.pendingBoxes)],
+                  ] as Array<[string, string]>
+                ).map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm"
+                  >
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      {label}
+                    </div>
+                    <div className="mt-0.5 text-sm font-bold text-slate-800">{value}</div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Shop delivery report — combines the original order with the
                 ACTUAL Step 4 deliveries (authoritative). */}
@@ -485,6 +517,7 @@ function OrdersDeliveryDetailView({
                   <thead>
                     <tr className={opsTableHeadRowClass}>
                       <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
+                      <th className={`${opsTableThClass} w-24`}>{to("orders.col_shop_no")}</th>
                       <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
                       <th className={opsTableThClass}>{to("orders.col_village")}</th>
                       <th className={`${opsTableThClass} w-32`}>{to("orders.shop_mobile")}</th>
@@ -504,7 +537,7 @@ function OrdersDeliveryDetailView({
                   <tbody className={opsTableDivideClass}>
                     {pageRows.length === 0 && (
                       <tr>
-                        <td className={opsTableTdClass} colSpan={13}>
+                        <td className={opsTableTdClass} colSpan={14}>
                           <span className="text-slate-400 text-sm py-4 block text-center">
                             {query || statusFilter !== "all"
                               ? to("orders.no_results")
@@ -525,8 +558,11 @@ function OrdersDeliveryDetailView({
                         <tr key={row.shopId} className="align-middle transition-colors">
                           <td className={opsTableTdClass}>
                             <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[12px] font-bold bg-emerald-50 text-emerald-700">
-                              {startIndex + index + 1}
+                              {row.serialNo || startIndex + index + 1}
                             </span>
+                          </td>
+                          <td className={`${opsTableTdClass} text-slate-600`}>
+                            {row.shopNumber || "—"}
                           </td>
                           <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
                             {row.shopName || "—"}

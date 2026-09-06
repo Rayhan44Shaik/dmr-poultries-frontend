@@ -141,6 +141,18 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
         break;
       }
     }
+    // Lost `[ORDER]` rows still carry `order:<tripNo>` on the trip remarks.
+    if (!base) {
+      for (const tag of String(t.remarks ?? "").split("|")) {
+        const trimmed = tag.trim();
+        if (!trimmed.startsWith("order:")) continue;
+        const ref = trimmed.slice("order:".length).trim();
+        if (ref && containerQuantitiesByNo.has(ref)) {
+          base = containerQuantitiesByNo.get(ref);
+          break;
+        }
+      }
+    }
     const overrides = tripShareOverrides.get(t.id);
     if (!overrides) return base;
     // Merge: unshared shops keep the container's authoritative quantities;
@@ -671,7 +683,7 @@ export async function findDayOverAssignments(
  */
 export type ShopDirectory = Map<
   number,
-  { shopName: string; village: string; mobile: string }
+  { shopName: string; village: string; mobile: string; shopNumber: string }
 >;
 export type SupervisorDirectory = Map<string, string>; // name (lower) -> mobile
 
@@ -680,7 +692,12 @@ export async function loadShopDirectory(): Promise<ShopDirectory> {
     return new Map(
       SAMPLE_SHOPS.map((shop) => [
         shop.id,
-        { shopName: shop.shopName, village: shop.village, mobile: shop.mobile },
+        {
+          shopName: shop.shopName,
+          village: shop.village,
+          mobile: shop.mobile,
+          shopNumber: `SHP-${String(shop.shopNo).padStart(3, "0")}`,
+        },
       ])
     );
   }
@@ -693,6 +710,7 @@ export async function loadShopDirectory(): Promise<ShopDirectory> {
       // own "village" wording for the column but reads the master's field.
       village: shop.city,
       mobile: (shop.phoneNumber ?? "").trim(),
+      shopNumber: (shop.shopNumber || (shop.shopNo ? String(shop.shopNo) : "")).trim(),
     });
   }
   return dir;
@@ -729,6 +747,14 @@ export function shopMobileOf(
   directory: ShopDirectory
 ): string {
   return directory.get(shopId)?.mobile ?? "";
+}
+
+/** Shop number from the Shop Master only ("" when the master has none). */
+export function shopNumberOf(
+  shopId: number,
+  directory: ShopDirectory
+): string {
+  return directory.get(shopId)?.shopNumber ?? "";
 }
 
 // ─── WhatsApp — existing per-delivery mechanism, order-level usage ──────────

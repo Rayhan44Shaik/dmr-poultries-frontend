@@ -49,6 +49,7 @@ import {
   submitShopDeliveries,
   sendOrdersWhatsApp,
   shopMobileOf,
+  shopNumberOf,
   supervisorMobileOf,
   villageOf,
   type OrdersWhatsAppResult,
@@ -257,7 +258,8 @@ const OrdersPage: React.FC = () => {
             ot.originalShopIds,
             (shopId, shopName) => villageOf(shopId, shopName, shopDirectory),
             ot.originalQuantities,
-            (shopId) => shopMobileOf(shopId, shopDirectory)
+            (shopId) => shopMobileOf(shopId, shopDirectory),
+            (shopId) => shopNumberOf(shopId, shopDirectory)
           ),
           language,
         });
@@ -312,7 +314,15 @@ const OrdersPage: React.FC = () => {
   const handleRecordDelivery = useCallback(
     async (ot: OrdersTrip, shop: ShopDeliveryBreakdown, boxes: number) => {
       try {
-        await recordShopDelivery(ot.trip, { shopId: shop.shopId, boxes });
+        // Refetch before write so a stale modal snapshot cannot duplicate a capture.
+        const fresh = await fetchOrdersData();
+        const current = fresh.tracking.find((t) => t.trip.id === ot.trip.id);
+        if (!current) {
+          showNotification(to("orders.refresh_failed"), "error");
+          return;
+        }
+        setData(fresh);
+        await recordShopDelivery(current.trip, { shopId: shop.shopId, boxes });
         await load();
         showNotification(
           to("orders.delivery_saved_partial", { shop: shop.shopName || "—", boxes }),
@@ -453,14 +463,11 @@ const OrdersPage: React.FC = () => {
             <OrdersDeliveryTrackingTab
               trips={data.tracking}
               loading={false}
-              day={day}
               today={today}
-              onDaySelect={setSelectedDay}
               shopDirectory={shopDirectory}
+              supervisorDirectory={supervisorDirectory}
               pdfBusyId={pdfBusyId}
-              whatsappBusyId={whatsappBusyId}
               onPdf={(ot) => void handlePdf(ot)}
-              onWhatsApp={(ot) => void handleWhatsApp(ot)}
               onView={(ot) => setViewingId(ot.trip.id)}
               onRefresh={() => void handleRefresh("tracking")}
               refreshing={refreshing === "tracking"}

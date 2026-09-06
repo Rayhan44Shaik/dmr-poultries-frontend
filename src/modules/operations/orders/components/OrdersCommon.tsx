@@ -46,7 +46,7 @@ export function onOrdersNumberWheel(event: React.WheelEvent<HTMLInputElement>): 
 
 const STATUS_TONES: Record<string, string> = {
   Assigned: "bg-slate-100 text-slate-600 border-slate-200",
-  "In Progress": "bg-amber-50 text-amber-700 border-amber-200",
+  "In Progress": "bg-sky-50 text-sky-700 border-sky-200",
   Completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
   Delivered: "bg-emerald-50 text-emerald-700 border-emerald-200",
   Pending: "bg-amber-50 text-amber-700 border-amber-200",
@@ -100,16 +100,20 @@ export function OrdersTableSkeleton({ rows = 6 }: { rows?: number }) {
 export function OrdersEmptyState({
   title,
   hint,
+  compact = false,
 }: {
   title: string;
   hint?: string;
+  compact?: boolean;
 }) {
   return (
-    <div className={opsEmptyStateClass}>
-      <div className="flex flex-col items-center justify-center gap-2">
-        <div className="h-14 w-14 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
-          <Inbox className="h-6 w-6" />
-        </div>
+    <div className={compact ? "px-4 py-4 text-center text-sm font-medium text-slate-500" : opsEmptyStateClass}>
+      <div className="flex flex-col items-center justify-center gap-1.5">
+        {compact ? null : (
+          <div className="h-14 w-14 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
+            <Inbox className="h-6 w-6" />
+          </div>
+        )}
         <p className="font-medium text-slate-600">{title}</p>
         {hint && <p className="text-xs text-slate-400 max-w-md">{hint}</p>}
       </div>
@@ -189,6 +193,45 @@ export function OrdersIconButton({
       className={`inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border bg-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${tones[tone]} ${className}`}
     >
       {busy ? <RefreshCw size={14} className="animate-spin" /> : children}
+    </button>
+  );
+}
+
+/** Labeled action (View) — icon + text, same chrome as icon buttons. */
+export function OrdersLabelButton({
+  label,
+  onClick,
+  disabled,
+  busy,
+  children,
+  tone = "emerald",
+  className = "",
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  busy?: boolean;
+  children: React.ReactNode;
+  tone?: "slate" | "emerald" | "rose" | "sky";
+  className?: string;
+}) {
+  const tones: Record<string, string> = {
+    slate: "border-slate-200/80 text-slate-600 hover:bg-slate-50 hover:text-slate-800",
+    emerald: "border-emerald-200 text-emerald-700 hover:bg-emerald-50",
+    rose: "border-rose-200 text-rose-600 hover:bg-rose-50",
+    sky: "border-sky-200 text-sky-700 hover:bg-sky-50",
+  };
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+      disabled={disabled || busy}
+      className={`inline-flex h-8 flex-shrink-0 items-center gap-1 rounded-lg border bg-white px-2.5 text-[11px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${tones[tone]} ${className}`}
+    >
+      {busy ? <RefreshCw size={13} className="animate-spin" /> : children}
+      {label}
     </button>
   );
 }
