@@ -208,7 +208,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Trip Entry", labelKey: "nav.vehicleDeliveryEntry", path: "/operations?tab=trip-entry", icon: PackageCheck, tone: "emerald", keywords: "delivery trip shop weight" },
       { label: "Trip List", labelKey: "nav.vehicleTripHistory", path: "/operations?tab=trip-list", icon: History, tone: "cyan", keywords: "trips history list completed" },
       
-      { label: "Rate Entry", labelKey: "nav.rateEntry", path: "/operations?tab=rate-entry", icon: DollarSign, tone: "amber", keywords: "sales shop invoice rate" },
+      { label: "Rate Entry", labelKey: "nav.rateEntry", path: "/operations?tab=rate-entry", icon: IndianRupee, tone: "amber", keywords: "sales shop invoice rate" },
       { label: "Shop Sales", labelKey: "nav.shopSalesEntry", path: "/operations?tab=shop-sales", icon: ShoppingBag, tone: "indigo", keywords: "sales shop invoice rate" },
       
       { label: "Collection Entry", labelKey: "nav.collectionEntry", path: "/operations?tab=collection", icon: CreditCard, tone: "teal", keywords: "collection payment cash" },

@@ -1,6 +1,6 @@
 // src/modules/accounts/components/payment-book/PaymentViewModal.tsx
 
-import { X, Calendar, User, Hash, Tag, CreditCard, DollarSign, MessageSquare, CheckCircle, Clock, AlertCircle, Truck, FileText } from 'lucide-react';
+import { X, Calendar, User, Hash, Tag, CreditCard, IndianRupee, MessageSquare, CheckCircle, Clock, AlertCircle, Truck, FileText } from 'lucide-react';
 import type { Payment } from '../../types/payment.types';
 import { FarmPaymentService } from '../../services/FarmPaymentService';
 
@@ -158,7 +158,7 @@ export function PaymentViewModal({ isOpen, payment, onClose }: PaymentViewModalP
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <DollarSign size={16} className="text-slate-400" />
+              <IndianRupee size={16} className="text-slate-400" />
               <div>
                 <p className="text-xs text-slate-500">Status</p>
                 <p className={`text-sm font-semibold ${payment.status === 'Paid' ? 'text-emerald-600' : payment.status === 'Approved' ? 'text-blue-600' : 'text-amber-600'}`}>
