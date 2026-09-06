@@ -19,9 +19,11 @@ import {
 } from "../../../../utils/drawDmrPoultryHeader";
 import type { OrdersProgress } from "../types";
 import {
+  buildDeliveryReportSummary,
   formatDeliveredAtLabel,
   orderDateOfRef,
   orderRefsOnTrip,
+  shopDeliveryStatusI18nKey,
   type ShopDeliveryBreakdown,
 } from "../ordersUtils";
 import { ordersTranslate } from "../i18n/ordersI18n";
@@ -277,33 +279,21 @@ export async function generateOrdersPdf({
     ["Completed At", formatDeliveredAtLabel(trip.submittedAtTimestamp)],
   ]);
 
-  // ─── ORDER SUMMARY ───────────────────────────────────────────────────
-  drawSectionBand("ORDER DETAILS");
+  // ─── DELIVERY SUMMARY (same dataset as the View modal) ───────────────
+  const summary = buildDeliveryReportSummary(progress, breakdown);
+  drawSectionBand("DELIVERY SUMMARY");
   kvGrid([
     ["Order No", orderNoLabel],
     ["Order Date", orderDateLabel],
-    ["Order Shops", count(breakdown.filter((b) => b.ordered).length)],
-    ["Order Boxes", count(breakdown.reduce((s, b) => s + b.orderedBoxes, 0))],
-    ["Order Birds", count(breakdown.reduce((s, b) => s + b.orderedBirds, 0))],
-    ["Order Weight", kg(breakdown.reduce((s, b) => s + b.orderedWeight, 0))],
-    ["Total Shops", count(progress?.totalShops ?? 0)],
-    ["Total Boxes", count(progress?.totalBoxes ?? 0)],
-    ["Total Weight", kg(progress?.totalWeight ?? 0)],
-    ["Total Birds", count(progress?.totalBirds ?? 0)],
-    ["Delivered", `${progress?.deliveredShops ?? 0} / ${progress?.totalShops ?? 0}`],
-    ["Pending Shops", count(progress?.pendingShops ?? 0)],
-    [
-      "Pending Boxes",
-      count(
-        breakdown
-          .filter((b) => b.ordered)
-          .reduce((sum, b) => sum + Math.max(0, b.orderedBoxes - b.deliveredBoxes), 0)
-      ),
-    ],
-    [
-      "Part Delivered Shops",
-      count(breakdown.filter((b) => b.status === "part_delivered").length),
-    ],
+    ["Total Shops", count(summary.totalShops)],
+    ["Delivered", `${summary.deliveredShops} / ${summary.totalShops}`],
+    ["Pending Shops", count(summary.pendingShops)],
+    ["Part Delivered Shops", count(summary.partDeliveredShops)],
+    ["Collected Boxes", count(summary.collectedBoxes)],
+    ["Delivered Boxes", count(summary.deliveredBoxes)],
+    ["Pending Boxes", count(summary.pendingBoxes)],
+    ["Delivered Birds", count(summary.deliveredBirds)],
+    ["Delivered Weight", kg(summary.deliveredWeight)],
     ["Additional Shops", count(progress?.additionalShopCount ?? 0)],
     ["Status", fmt(progress?.status ?? "")],
   ]);
@@ -316,39 +306,27 @@ export async function generateOrdersPdf({
   const diffStr = (value: number): string =>
     value === 0 ? "0" : value > 0 ? `+${value}` : `−${Math.abs(value)}`;
   const statusStr = (b: ShopDeliveryBreakdown): string =>
-    b.status === "delivered_with_diff"
-      ? ordersTranslate("orders.status_delivered_diff", language)
-      : b.status === "part_delivered"
-        ? ordersTranslate("orders.status_part_delivered", language)
-        : b.status === "not_delivered"
-          ? ordersTranslate("orders.status_not_delivered", language)
-          : ordersTranslate("orders.status_delivered", language);
+    ordersTranslate(shopDeliveryStatusI18nKey(b.status), language);
   const listedRows = breakdown.filter((b) => b.ordered);
   const seqBody: (string | number)[][] = listedRows.map((b, index) => [
     b.serialNo || index + 1,
     b.shopNumber || "—",
     b.shopName,
     b.village || "—",
-    b.mobile || "—",
-    b.orderedBirds > 0 ? count(b.orderedBirds) : "—",
-    b.deliveredBirds > 0 ? count(b.deliveredBirds) : "—",
-    diffStr(b.birdDifference),
-    b.orderedBoxes > 0 ? count(b.orderedBoxes) : "—",
+    b.collectedBoxes > 0 ? count(b.collectedBoxes) : "—",
     b.deliveredBoxes > 0 ? count(b.deliveredBoxes) : "—",
-    // PART DELIVERY: 25 ordered, 10 delivered → 15 box pending.
-    Math.max(0, b.orderedBoxes - b.deliveredBoxes) > 0
-      ? count(Math.max(0, b.orderedBoxes - b.deliveredBoxes))
-      : "0",
-    diffStr(b.boxDifference),
-    statusStr(b),
+    b.pendingBoxes > 0 ? count(b.pendingBoxes) : "0",
+    b.deliveredBirds > 0 ? count(b.deliveredBirds) : "—",
+    b.deliveredWeight > 0 ? kg(b.deliveredWeight) : "—",
     formatDeliveredAtLabel(b.deliveredAt, true),
+    statusStr(b),
   ]);
   if (seqBody.length === 0) {
     seqBody.push([
       "—",
       "—",
       ordersTranslate("orders.no_saved_collection", language),
-      ...Array.from({ length: 11 }, () => "—"),
+      ...Array.from({ length: 8 }, () => "—"),
     ]);
   }
 
@@ -363,23 +341,17 @@ export async function generateOrdersPdf({
       ordersTranslate("orders.col_shop_no", language),
       ordersTranslate("orders.col_shop_name", language),
       ordersTranslate("orders.col_village", language),
-      ordersTranslate("orders.hdr_mobile", language),
-      ordersTranslate("orders.hdr_ord_birds", language),
-      ordersTranslate("orders.hdr_del_birds", language),
-      ordersTranslate("orders.hdr_diff_birds", language),
-      ordersTranslate("orders.hdr_ord_boxes", language),
-      ordersTranslate("orders.hdr_del_boxes", language),
+      ordersTranslate("orders.collected_boxes", language),
+      ordersTranslate("orders.delivered_boxes", language),
       ordersTranslate("orders.pending_boxes", language),
-      ordersTranslate("orders.hdr_diff_boxes", language),
-      ordersTranslate("orders.hdr_status", language),
+      ordersTranslate("orders.delivered_birds", language),
+      ordersTranslate("orders.delivered_weight", language),
       ordersTranslate("orders.hdr_delivered_at", language),
+      ordersTranslate("orders.hdr_status", language),
     ],
     seqBody,
     {
-      // Room for real shop names (a 45-shop vehicle must not turn into a
-      // wall of two-line rows), the pending-box column, and a one-line
-      // delivery time.
-      widths: [8, 14, 26, 14, 14, 10, 10, 10, 10, 10, 10, 10, 16, null],
+      widths: [8, 16, 32, 20, 16, 16, 16, 16, 20, 18, null],
     }
   );
 
@@ -432,14 +404,11 @@ export async function generateOrdersPdf({
       rows.reduce((s, b) => s + key(b), 0);
     const orderedBirds = sum(orderedRows, (b) => b.orderedBirds);
     const deliveredBirds = sum(breakdown, (b) => b.deliveredBirds);
-    const orderedBoxes = sum(orderedRows, (b) => b.orderedBoxes);
-    const deliveredBoxes = sum(breakdown, (b) => b.deliveredBoxes);
+    const orderedBoxes = sum(orderedRows, (b) => b.collectedBoxes || b.orderedBoxes);
+    const deliveredBoxes = summary.deliveredBoxes;
     // Pending is measured per ORDERED shop, never as a difference of totals —
     // a not-listed delivery would otherwise hide a real balance.
-    const pendingBoxes = orderedRows.reduce(
-      (acc, b) => acc + Math.max(0, b.orderedBoxes - b.deliveredBoxes),
-      0
-    );
+    const pendingBoxes = summary.pendingBoxes;
     const totalWeight = sum(orderedRows, (b) => b.orderedWeight);
     const deliveredWeight = sum(breakdown, (b) => b.deliveredWeight);
 

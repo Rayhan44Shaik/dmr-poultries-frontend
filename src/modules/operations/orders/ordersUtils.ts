@@ -784,6 +784,13 @@ export type ShopDeliveryBreakdown = {
   additional: boolean;
   /** Delivered · Delivered with Difference · Not Delivered · Not Listed. */
   status: ShopDeliveryBreakdownStatus;
+  /**
+   * Boxes this vehicle collected for the shop (assignment share). Falls back
+   * to orderedBoxes when the plan row has no tripBoxes. Always 0 for not-listed.
+   */
+  collectedBoxes: number;
+  /** Boxes still open on this vehicle: max(0, collected − delivered). */
+  pendingBoxes: number;
 };
 
 /** Merges the persisted rows per shop into the detail-view columns.
@@ -882,6 +889,19 @@ export function buildShopBreakdown(
       delivered,
       additional,
       status,
+      collectedBoxes: additional
+        ? 0
+        : num(plan.boxNo ?? plan.selectedBoxIds?.length) > 0
+          ? num(plan.boxNo ?? plan.selectedBoxIds?.length)
+          : orderedBoxes,
+      pendingBoxes: additional
+        ? 0
+        : Math.max(
+            0,
+            (num(plan.boxNo ?? plan.selectedBoxIds?.length) > 0
+              ? num(plan.boxNo ?? plan.selectedBoxIds?.length)
+              : orderedBoxes) - deliveredBoxes
+          ),
     });
   }
   return out.sort((a, b) => a.serialNo - b.serialNo);
@@ -900,6 +920,80 @@ export function shopRemainingBoxes(row: {
 }): number {
   const basis = num(row.tripBoxes) > 0 ? num(row.tripBoxes) : num(row.orderedBoxes);
   return Math.max(0, basis - num(row.deliveredBoxes));
+}
+
+/** Boxes this vehicle collected for the shop (assignment share). */
+export function shopCollectedBoxes(row: {
+  additional?: boolean;
+  tripBoxes?: number;
+  orderedBoxes: number;
+}): number {
+  if (row.additional) return 0;
+  return num(row.tripBoxes) > 0 ? num(row.tripBoxes) : num(row.orderedBoxes);
+}
+
+/** Shop-row status label keys shared by View and PDF. */
+export function shopDeliveryStatusI18nKey(status: ShopDeliveryBreakdownStatus): string {
+  switch (status) {
+    case "delivered":
+    case "delivered_with_diff":
+      return "orders.status_delivered";
+    case "part_delivered":
+      return "orders.status_part_delivered";
+    case "not_listed":
+      return "orders.status_not_listed";
+    default:
+      return "orders.status_pending";
+  }
+}
+
+/**
+ * Compact delivery-report numbers shared by the View modal and the PDF so
+ * both surfaces render the same collected / delivered / pending dataset.
+ * Box / bird / weight figures come from the shop breakdown (never invented);
+ * shop counts prefer the trip progress already shown on the tracking table.
+ */
+export type DeliveryReportSummary = {
+  totalShops: number;
+  deliveredShops: number;
+  pendingShops: number;
+  partDeliveredShops: number;
+  collectedBoxes: number;
+  deliveredBoxes: number;
+  pendingBoxes: number;
+  deliveredBirds: number;
+  deliveredWeight: number;
+};
+
+export function buildDeliveryReportSummary(
+  progress: OrdersProgress | null | undefined,
+  shops: ShopDeliveryBreakdown[]
+): DeliveryReportSummary {
+  const listed = shops.filter((s) => s.ordered);
+  const collectedBoxes = listed.reduce((sum, r) => sum + shopCollectedBoxes(r), 0);
+  const pendingBoxes = listed.reduce((sum, r) => sum + shopRemainingBoxes(r), 0);
+  const deliveredBoxes = shops.reduce((sum, r) => sum + r.deliveredBoxes, 0);
+  const deliveredBirds = shops.reduce((sum, r) => sum + r.deliveredBirds, 0);
+  const deliveredWeight = Number(
+    shops.reduce((sum, r) => sum + r.deliveredWeight, 0).toFixed(2)
+  );
+  return {
+    totalShops: progress?.totalShops ?? listed.length,
+    deliveredShops:
+      progress?.deliveredShops ??
+      listed.filter((s) => s.status === "delivered" || s.status === "delivered_with_diff")
+        .length,
+    pendingShops:
+      progress?.pendingShops ?? listed.filter((s) => s.status === "not_delivered").length,
+    partDeliveredShops:
+      progress?.partDeliveredShops ??
+      listed.filter((s) => s.status === "part_delivered").length,
+    collectedBoxes,
+    deliveredBoxes,
+    pendingBoxes,
+    deliveredBirds,
+    deliveredWeight,
+  };
 }
 
 /**

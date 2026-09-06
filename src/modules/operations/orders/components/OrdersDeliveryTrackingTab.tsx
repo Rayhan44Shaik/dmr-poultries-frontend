@@ -594,13 +594,18 @@ function OrdersDeliveryTrackingTab({
 
       {/* ── TABLE 2 — COMPLETED (lifecycle-completed trips) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-            {to("orders.tracking_completed_title")}
-          </h3>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400">
-              <CalendarRange size={12} aria-hidden />
+        <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/60 space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+              {to("orders.tracking_completed_title")}
+            </h3>
+            <span className="text-[11px] font-semibold text-slate-400">
+              {to("orders.trips_count", { x: completedFiltered.length })}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
+              <CalendarRange size={13} aria-hidden />
               {to("orders.from_date")}
             </span>
             <DatePicker
@@ -620,7 +625,7 @@ function OrdersDeliveryTrackingTab({
             <span className="text-[11px] font-semibold text-slate-400" aria-hidden>
               →
             </span>
-            <span className="text-[11px] font-semibold text-slate-400">
+            <span className="text-[11px] font-semibold text-slate-500">
               {to("orders.to_date")}
             </span>
             <DatePicker
@@ -637,9 +642,6 @@ function OrdersDeliveryTrackingTab({
               className="w-44"
               data-testid="orders-completed-to"
             />
-            <span className="text-[11px] font-semibold text-slate-400">
-              {to("orders.trips_count", { x: completed.length })}
-            </span>
           </div>
         </div>
         {completedFiltered.length === 0 ? (

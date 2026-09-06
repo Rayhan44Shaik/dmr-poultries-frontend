@@ -10,15 +10,21 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createEmptyTrip, type ShopDelivery, type Trip } from "../../../shared/trip";
 import {
+  buildDeliveryReportSummary,
   buildOrdersTrip,
+  buildShopBreakdown,
   computeOrdersProgress,
   deliveryProgressPct,
   isTrackingTrip,
   pageRange,
   partitionTrackingTrips,
+  rowsInSequence,
+  shopCollectedBoxes,
+  shopDeliveryStatusI18nKey,
   trackingSearchHaystack,
 } from "./ordersUtils";
 import { orderRowRemarks } from "./types";
+import { ordersTranslate } from "./i18n/ordersI18n";
 
 const ORDER = "ORD-20260904-01";
 
@@ -155,4 +161,98 @@ test("pageRange is 1-based and empty-safe", () => {
   assert.deepEqual(pageRange(0, 1, 10), { from: 0, to: 0 });
   assert.deepEqual(pageRange(25, 1, 10), { from: 1, to: 10 });
   assert.deepEqual(pageRange(25, 3, 10), { from: 21, to: 25 });
+});
+
+test("search haystack includes trip, vehicle, supervisor, mobile, driver, shop no, name, village", () => {
+  const ot = buildOrdersTrip(
+    tripOf({
+      tripNo: "TRP-20260904-01",
+      vehicleNo: "AP16AB1234",
+      supervisorName: "Ravi Kumar",
+      driverName: "Suresh",
+      deliveries: [plan(7, 4)],
+    })
+  );
+  const hay = trackingSearchHaystack(ot, {
+    supervisorMobile: "9000000001",
+    shopNumberOf: () => "SHP-007",
+    villageOf: () => "Vijayawada",
+  });
+  assert.ok(hay.includes("trp-20260904-01"));
+  assert.ok(hay.includes("ap16ab1234"));
+  assert.ok(hay.includes("ravi kumar"));
+  assert.ok(hay.includes("9000000001"));
+  assert.ok(hay.includes("suresh"));
+  assert.ok(hay.includes("shp-007"));
+  assert.ok(hay.includes("shop 7"));
+  assert.ok(hay.includes("vijayawada"));
+});
+
+test("View/PDF shop breakdown keeps assignment sequence and shows undelivered shops", () => {
+  const rows = [
+    plan(3, 8, { serialNo: 3, shopName: "C Shop" }),
+    plan(1, 10, { serialNo: 1, shopName: "A Shop" }),
+    plan(2, 12, { serialNo: 2, shopName: "B Shop" }),
+    captured(1, 10),
+    captured(2, 5),
+  ];
+  const shops = buildShopBreakdown(rows, new Set([1, 2, 3]), () => "Vijayawada");
+  assert.deepEqual(
+    shops.map((s) => s.shopId),
+    [1, 2, 3],
+    "assignment serialNo order, never delivery-time order"
+  );
+  assert.equal(shops[0].status, "delivered");
+  assert.equal(shops[1].status, "part_delivered");
+  assert.equal(shops[2].status, "not_delivered");
+  assert.equal(shops[2].collectedBoxes, 8);
+  assert.equal(shops[2].pendingBoxes, 8);
+  assert.equal(shops[1].pendingBoxes, 7);
+  assert.equal(shopCollectedBoxes(shops[0]), 10);
+});
+
+test("assignmentIncomplete shows Step 4 captures only — no invented shops", () => {
+  const lost = tripOf({
+    deliveries: [captured(1, 4)].map((r) => ({ ...r, remarks: "" })),
+  });
+  const ot = buildOrdersTrip(lost);
+  assert.equal(ot.assignmentIncomplete, true);
+  const shops = buildShopBreakdown(rowsInSequence(lost), ot.originalShopIds, () => "");
+  assert.equal(shops.length, 1);
+  assert.equal(shops[0].shopId, 1);
+  assert.equal(shops[0].deliveredBoxes, 4);
+});
+
+test("View and PDF share the same collected/delivered/pending summary", () => {
+  const rows = [
+    plan(1, 21),
+    captured(1, 15),
+    plan(2, 10),
+    captured(2, 10),
+    plan(3, 8),
+  ];
+  const trip = tripOf({ deliveries: rows });
+  const ot = buildOrdersTrip(trip);
+  const shops = buildShopBreakdown(rowsInSequence(trip), ot.originalShopIds, () => "V");
+  const summary = buildDeliveryReportSummary(ot.progress, shops);
+  assert.equal(summary.totalShops, 3);
+  assert.equal(summary.deliveredShops, 1);
+  assert.equal(summary.partDeliveredShops, 1);
+  assert.equal(summary.pendingShops, 1);
+  assert.equal(summary.collectedBoxes, 39);
+  assert.equal(summary.deliveredBoxes, 25);
+  assert.equal(summary.pendingBoxes, 14);
+  assert.equal(summary.deliveredBirds, 250);
+});
+
+test("shop status labels are Pending / Part Delivered / Delivered", () => {
+  assert.equal(shopDeliveryStatusI18nKey("not_delivered"), "orders.status_pending");
+  assert.equal(shopDeliveryStatusI18nKey("part_delivered"), "orders.status_part_delivered");
+  assert.equal(shopDeliveryStatusI18nKey("delivered"), "orders.status_delivered");
+  assert.equal(shopDeliveryStatusI18nKey("delivered_with_diff"), "orders.status_delivered");
+  assert.equal(
+    ordersTranslate("orders.assignment_details_unavailable"),
+    "Assignment details unavailable"
+  );
+  assert.equal(ordersTranslate("orders.pdf_report_title"), "DELIVERY REPORT");
 });
