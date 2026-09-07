@@ -16,9 +16,10 @@ import {
   type DutyPlannerValidation,
   type DutyPlannerWeek,
 } from '../services/dutyPlannerService';
+import { buildSampleDutyWeek, localDeleteAssignment, localUpsertAssignment } from '../services/staffSampleData';
 import type { Employee, DutyAssignment, DutyPlannerFilters } from '../types/staffDashboard';
 
-const DEFAULT_ROLES = ['Supervisor', 'Driver', 'Helper'];
+const DEFAULT_ROLES = ['Supervisor', 'Driver', 'Helper', 'Loader'];
 
 export function isDateLocked(dateStr: string): boolean {
   const targetDate = new Date(dateStr);
@@ -80,6 +81,9 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
   });
   const [validation, setValidation] = useState<DutyPlannerValidation>({ ok: true, problems: [] });
   const [error, setError] = useState<string | null>(null);
+  // Non-null while the page is showing the local sample roster (backend
+  // unavailable). Edits then apply in-memory instead of hitting the API.
+  const [sampleWeek, setSampleWeek] = useState<DutyPlannerWeek | null>(null);
 
   const [selectedCell, setSelectedCell] = useState<{ employeeId: number; date: string } | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -108,12 +112,18 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         const week = await getDutyPlannerWeek(filters.weekStart);
         if (cancelled) return;
         applyWeek(week);
+        setSampleWeek(null);
         setError(null);
-      } catch (err) {
+      } catch {
         if (cancelled) return;
-        const message = handleApiError(err);
-        setError(message);
-        showNotification?.(message, 'error');
+        // Backend unavailable — fall back to the local sample roster so the
+        // Staff page stays usable for review. Real data resumes automatically
+        // as soon as the staff API responds again.
+        const week = buildSampleDutyWeek(filters.weekStart);
+        applyWeek(week);
+        setSampleWeek(week);
+        setError(null);
+        showNotification?.('Backend unavailable — showing sample staff data.', 'info');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -162,8 +172,17 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
 
       const isSaturday = new Date(date).getDay() === 6;
       if (isSaturday && (dutyType === 'Rest' || dutyType === 'WeeklyOff')) {
-        showNotification?.('Saturday is compulsory duty. Rest and Weekly Off cannot be assigned.', 'error');
+        showNotification?.('Saturday is compulsory duty. Leave and Weekly Off cannot be assigned.', 'error');
         return false;
+      }
+
+      // Sample mode: apply the change in-memory (the backend is down).
+      if (sampleWeek) {
+        const next = localUpsertAssignment(sampleWeek, employeeId, date, dutyType);
+        applyWeek(next);
+        setSampleWeek(next);
+        showNotification?.('Duty updated (sample data).', 'success');
+        return true;
       }
 
       setSaving(true);
@@ -188,7 +207,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         setSaving(false);
       }
     },
-    [getAssignment, applyWeek, showNotification, canEditWeek, weekStatus]
+    [getAssignment, applyWeek, showNotification, canEditWeek, weekStatus, sampleWeek]
   );
 
   const deleteAssignment = useCallback(
@@ -208,6 +227,15 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         return false;
       }
 
+      // Sample mode: remove in-memory (the backend is down).
+      if (sampleWeek) {
+        const next = localDeleteAssignment(sampleWeek, existing.id);
+        applyWeek(next);
+        setSampleWeek(next);
+        showNotification?.('Duty removed (sample data).', 'success');
+        return true;
+      }
+
       setSaving(true);
       setError(null);
       try {
@@ -224,7 +252,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         setSaving(false);
       }
     },
-    [getAssignment, applyWeek, showNotification, canEditWeek, weekStatus]
+    [getAssignment, applyWeek, showNotification, canEditWeek, weekStatus, sampleWeek]
   );
 
   const autoAssignAll = useCallback(async (): Promise<{ ok: boolean; plan?: AutoPlan; message?: string }> => {
@@ -290,6 +318,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
     loading,
     saving,
     error,
+    usingSampleData: sampleWeek !== null,
     filters,
     setFilters,
     getAssignment,

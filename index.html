@@ -25,9 +25,52 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
+    <style>
+      /* Static splash: visible instantly, replaced when React mounts. */
+      #app-splash {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+        color: #475569;
+      }
+      #app-splash .splash-spinner {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 3px solid #d1fae5;
+        border-top-color: #059669;
+        animation: splash-spin 0.8s linear infinite;
+      }
+      #app-splash .splash-title {
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        color: #0f172a;
+      }
+      #app-splash .splash-sub {
+        font-size: 12px;
+        color: #94a3b8;
+      }
+      @keyframes splash-spin {
+        to { transform: rotate(360deg); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #app-splash .splash-spinner { animation-duration: 2s; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="app-splash" aria-busy="true">
+        <div class="splash-spinner" aria-hidden="true"></div>
+        <div class="splash-title">DMR Poultries</div>
+        <div class="splash-sub">Loading…</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

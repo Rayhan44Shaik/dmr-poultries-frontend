@@ -18,6 +18,7 @@ function DutyPlannerPage() {
     weekDays,
     loading,
     saving,
+    usingSampleData,
     filters,
     setFilters,
     getAssignment,
@@ -171,6 +172,14 @@ function DutyPlannerPage() {
           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusClasses}`}>
             {statusLabel}
           </span>
+          {usingSampleData && (
+            <span
+              className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-200"
+              title="Backend unavailable — showing local sample data (edits are kept in memory only)"
+            >
+              Sample data
+            </span>
+          )}
           {!canEditWeek && weekStatus !== 'Open' && (
             <span className="text-xs text-slate-400 hidden sm:inline">read-only</span>
           )}

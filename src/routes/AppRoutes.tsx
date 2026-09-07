@@ -1,60 +1,65 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
-import DashboardLayout from "../layouts/DashboardLayout/DashboardLayout";
 import { useI18n } from "../i18n";
 
-// Auth
+// Auth — eager: the "/" route must paint as fast as possible.
 import LoginPage from "../modules/auth/LoginPage";
 
-// Dashboard
-import DashboardPage from "../modules/dashboard/DashboardPage";
+/* ------------------------------------------------------------------ */
+/* Route-level code splitting                                          */
+/* Every page other than the login screen is a separate chunk, so the  */
+/* first paint (login) loads a tiny module graph and heavy pages are   */
+/* fetched only when they are actually navigated to. The dashboard     */
+/* shell (sidebar/header) is also deferred: it is part of the lazy     */
+/* route chunk, so the login page never pulls in the app shell or any  */
+/* module-level API side effects.                                      */
+/* ------------------------------------------------------------------ */
+type PageModule = { default: React.ComponentType };
 
-// Masters Module
-import MastersPage from "../modules/masters/pages/MastersPage";
-import ShopsPage from "../modules/masters/shops/pages/ShopsPage";
-import FarmsPage from "../modules/masters/farms/pages/FarmsPage";
-import VehiclesPage from "../modules/masters/vehicles/pages/VehiclesPage";
-import EmployeesPage from "../modules/masters/employees/pages/EmployeesPage";
-import BanksPage from "../modules/masters/banks/pages/BanksPage";
-import BirdTypesPage from "../modules/masters/bird-types/pages/BirdTypesPage";
-
-// Operations Module
-import OperationsPages from "../modules/operations/pages/OperationsPages";
-
-// Accounts Module
-import AccountsPage from "../modules/accounts/pages/AccountsPage";
-
-// Fleet Module — lazy so Dashboard/Operations/etc. do not evaluate Fleet tab graphs.
-const FleetPages = React.lazy(() => import("../modules/fleet-operations/pages/FleetPages"));
-
-function FleetFallback() {
-  const { t } = useI18n();
-  return (
-    <div className="w-full px-4 pb-8 pt-6 sm:px-6 lg:px-8" aria-busy="true" aria-label={t("loading.fleet")}>
-      <div className="mx-auto w-full max-w-[1480px] space-y-4">
-        <div className="h-14 animate-pulse rounded-2xl bg-white border border-slate-200" />
-        <div className="h-64 animate-pulse rounded-2xl bg-white border border-slate-200" />
-      </div>
-    </div>
-  );
+/**
+ * Build a lazy loader that resolves both the shared dashboard shell and
+ * the page it hosts, so neither is imported until the route matches.
+ */
+function lazyShell(page: () => Promise<PageModule>) {
+  return () =>
+    Promise.all([
+      import("../layouts/DashboardLayout/DashboardLayout"),
+      page(),
+    ]).then(([{ default: Shell }, { default: Page }]) => ({
+      default: function ShellPage() {
+        return (
+          <Shell>
+            <Page />
+          </Shell>
+        );
+      },
+    }));
 }
 
-// Staff, Reports
-import StaffPages from "../modules/staff/pages/StaffPages";
-import ReportsDashboardPage from "../modules/reports/pages/ReportsDashboardPage";
+// Lazy components are created once at module level (stable identity).
+const pages = {
+  dashboard: React.lazy(lazyShell(() => import("../modules/dashboard/DashboardPage"))),
+  masters: React.lazy(lazyShell(() => import("../modules/masters/pages/MastersPage"))),
+  mastersShops: React.lazy(lazyShell(() => import("../modules/masters/shops/pages/ShopsPage"))),
+  mastersFarms: React.lazy(lazyShell(() => import("../modules/masters/farms/pages/FarmsPage"))),
+  mastersVehicles: React.lazy(lazyShell(() => import("../modules/masters/vehicles/pages/VehiclesPage"))),
+  mastersEmployees: React.lazy(lazyShell(() => import("../modules/masters/employees/pages/EmployeesPage"))),
+  mastersBanks: React.lazy(lazyShell(() => import("../modules/masters/banks/pages/BanksPage"))),
+  mastersBirdTypes: React.lazy(lazyShell(() => import("../modules/masters/bird-types/pages/BirdTypesPage"))),
+  operations: React.lazy(lazyShell(() => import("../modules/operations/pages/OperationsPages"))),
+  accounts: React.lazy(lazyShell(() => import("../modules/accounts/pages/AccountsPage"))),
+  fleet: React.lazy(lazyShell(() => import("../modules/fleet-operations/pages/FleetPages"))),
+  staff: React.lazy(lazyShell(() => import("../modules/staff/pages/StaffPages"))),
+  reports: React.lazy(lazyShell(() => import("../modules/reports/pages/ReportsDashboardPage"))),
+  settings: React.lazy(lazyShell(() => import("../modules/settings/pages/SettingsPage"))),
+  supervisorMobile: React.lazy(() => import("../modules/supervisor-mobile/pages/SupervisorMobilePage")),
+};
 
-// Settings Module (Standalone page without separate layout)
-import SettingsPage from "../modules/settings/pages/SettingsPage";
-
-const SupervisorMobilePage = React.lazy(
-  () => import("../modules/supervisor-mobile/pages/SupervisorMobilePage")
-);
-
-function MobileFallback() {
+function PageLoading() {
   const { t } = useI18n();
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-slate-100 text-sm font-semibold text-slate-500">
-      {t("loading.mobile")}
+    <div className="flex h-dvh items-center justify-center bg-slate-100 text-sm font-semibold text-slate-500" aria-busy="true">
+      {t("common.loading")}
     </div>
   );
 }
@@ -86,63 +91,197 @@ function AppRoutes() {
       {/* ============ SUPERVISOR MOBILE — Trip Entry Steps 1–5 only ============ */}
       <Route
         path="/mobile"
-        element={<React.Suspense fallback={<MobileFallback />}><SupervisorMobilePage /></React.Suspense>}
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.supervisorMobile />
+          </Suspense>
+        }
       />
       <Route
         path="/mobile/trips"
-        element={<React.Suspense fallback={<MobileFallback />}><SupervisorMobilePage /></React.Suspense>}
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.supervisorMobile />
+          </Suspense>
+        }
       />
 
       {/* ============ DASHBOARD ============ */}
-      <Route path="/dashboard" element={<DashboardLayout><DashboardPage /></DashboardLayout>} />
+      <Route
+        path="/dashboard"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.dashboard />
+          </Suspense>
+        }
+      />
 
       {/* ============ MASTERS ============ */}
-      <Route path="/masters" element={<DashboardLayout><MastersPage /></DashboardLayout>} />
-      <Route path="/masters/shops" element={<DashboardLayout><ShopsPage /></DashboardLayout>} />
-      <Route path="/masters/farms" element={<DashboardLayout><FarmsPage /></DashboardLayout>} />
-      <Route path="/masters/vehicles" element={<DashboardLayout><VehiclesPage /></DashboardLayout>} />
-      <Route path="/masters/employees" element={<DashboardLayout><EmployeesPage /></DashboardLayout>} />
-      <Route path="/masters/banks" element={<DashboardLayout><BanksPage /></DashboardLayout>} />
-      <Route path="/masters/bird-types" element={<DashboardLayout><BirdTypesPage /></DashboardLayout>} />
+      <Route
+        path="/masters"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.masters />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/masters/shops"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.mastersShops />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/masters/farms"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.mastersFarms />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/masters/vehicles"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.mastersVehicles />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/masters/employees"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.mastersEmployees />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/masters/banks"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.mastersBanks />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/masters/bird-types"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.mastersBirdTypes />
+          </Suspense>
+        }
+      />
 
       {/* ============ OPERATIONS ============ */}
-      <Route path="/operations" element={<DashboardLayout><OperationsPages /></DashboardLayout>} />
-      <Route path="/operations/*" element={<DashboardLayout><OperationsPages /></DashboardLayout>} />
+      <Route
+        path="/operations"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.operations />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/operations/*"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.operations />
+          </Suspense>
+        }
+      />
 
       {/* ============ ACCOUNTS ============ */}
-      <Route path="/accounts" element={<DashboardLayout><AccountsPage /></DashboardLayout>} />
-      <Route path="/accounts/*" element={<DashboardLayout><AccountsPage /></DashboardLayout>} />
+      <Route
+        path="/accounts"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.accounts />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/accounts/*"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.accounts />
+          </Suspense>
+        }
+      />
 
       {/* ============ FLEET ============ */}
-      <Route path="/fleet" element={<DashboardLayout><React.Suspense fallback={<FleetFallback />}><FleetPages /></React.Suspense></DashboardLayout>} />
-      <Route path="/fleet/*" element={<DashboardLayout><React.Suspense fallback={<FleetFallback />}><FleetPages /></React.Suspense></DashboardLayout>} />
+      <Route
+        path="/fleet"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.fleet />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/fleet/*"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.fleet />
+          </Suspense>
+        }
+      />
 
       {/* ============ STAFF ============ */}
-      <Route path="/staff" element={<DashboardLayout><StaffPages /></DashboardLayout>} />
-      <Route path="/staff/*" element={<DashboardLayout><StaffPages /></DashboardLayout>} />
+      <Route
+        path="/staff"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.staff />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/staff/*"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.staff />
+          </Suspense>
+        }
+      />
 
       {/* ============ REPORTS ============ */}
-      <Route path="/reports" element={<DashboardLayout><ReportsDashboardPage /></DashboardLayout>} />
-      <Route path="/reports/*" element={<DashboardLayout><ReportsDashboardPage /></DashboardLayout>} />
+      <Route
+        path="/reports"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.reports />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/reports/*"
+        element={
+          <Suspense fallback={<PageLoading />}>
+            <pages.reports />
+          </Suspense>
+        }
+      />
 
       {/* ===============================================
           🚀 SETTINGS - SINGLE PAGE ROUTE
           =============================================== */}
-      <Route 
-        path="/settings" 
+      <Route
+        path="/settings"
         element={
-          <DashboardLayout>
-            <SettingsPage />
-          </DashboardLayout>
-        } 
+          <Suspense fallback={<PageLoading />}>
+            <pages.settings />
+          </Suspense>
+        }
       />
-      <Route 
-        path="/settings/*" 
+      <Route
+        path="/settings/*"
         element={
-          <DashboardLayout>
-            <SettingsPage />
-          </DashboardLayout>
-        } 
+          <Suspense fallback={<PageLoading />}>
+            <pages.settings />
+          </Suspense>
+        }
       />
 
       {/* ============ 404 - Not Found ============ */}

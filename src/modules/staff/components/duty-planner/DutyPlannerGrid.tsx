@@ -20,9 +20,16 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
 
   const getShiftStyle = (dutyType: string) => {
     const config = shiftConfigs.find(s => s.type === dutyType);
-    if (!config) return { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-300' };
-    return { bg: config.bgColor, text: config.textColor, border: config.borderColor };
-  };
+    if (config) return { bg: config.bgColor, text: config.textColor, border: config.borderColor };
+    // Custom "Other" types have no config — violet; empty cells stay grey.
+    if (dutyType) return { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200' };
+    return { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-300' };
+  }
+
+  // Show the friendly label (Duty / Leave / Weekly Off …); custom "Other"
+  // types have no config and are displayed exactly as typed.
+  const getShiftLabel = (dutyType: string) =>
+    shiftConfigs.find(s => s.type === dutyType)?.label || dutyType;;
 
   const getDayLabel = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -113,7 +120,9 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
                         }
                         style={{ minWidth: '90px' }}
                       >
-                        {dutyType || (
+                        {dutyType ? (
+                          getShiftLabel(dutyType)
+                        ) : (
                           <span className="text-slate-300">—</span>
                         )}
                       </button>

@@ -80,7 +80,8 @@ export interface DutyAssignment {
   employeeName: string;
   department: string;
   role: string;
-  dutyType: 'Driver' | 'Delivery' | 'Rest' | 'Repair' | 'Office' | 'OfficeDuty' | 'Collection' | 'WeeklyOff';
+  /** Known shift types, or any custom free-text type entered via "Other". */
+  dutyType: 'Driver' | 'Delivery' | 'Rest' | 'Repair' | 'Office' | 'OfficeDuty' | 'Collection' | 'WeeklyOff' | (string & {});
   date: string; // YYYY-MM-DD
   vehicleId?: number;
   vehicleNo?: string;

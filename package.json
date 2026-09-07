@@ -25,7 +25,8 @@
     "test:fleet": "tsx --test src/modules/fleet-operations/activeFleetScope.test.ts src/modules/fleet-operations/services/fleetSessionCache.test.ts",
     "test:collections": "tsx --test src/modules/operations/collections/services/collectionService.contract.test.ts src/modules/operations/collections/services/collectionBalance.ui.test.ts",
     "test:e2e": "playwright test",
-    "mock:backend": "node scripts/dev-mock-backend.mjs"
+    "mock:backend": "node scripts/dev-mock-backend.mjs",
+    "smoke": "node scripts/ssr-smoke.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",

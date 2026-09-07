@@ -124,6 +124,7 @@ function SalaryRegisterPage() {
     refreshing,
     saving,
     error,
+    usingSampleData,
     refresh,
     markPaidBulk,
     markUnpaidBulk,
@@ -358,6 +359,14 @@ function SalaryRegisterPage() {
               <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${monthStatus.tone}`}>
                 {monthStatus.label === "Closed" || monthStatus.label === "Paid" ? <Lock size={11} /> : null}
                 {monthStatus.label}
+              </span>
+            )}
+            {usingSampleData && (
+              <span
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border bg-amber-50 text-amber-700 border-amber-200"
+                title="Backend unavailable — showing local sample data (attendance derived from sample duty assignments)"
+              >
+                Sample data
               </span>
             )}
           </div>

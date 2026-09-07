@@ -17,6 +17,7 @@ import {
   ClipboardList,
   BarChart3,
   ReceiptIndianRupee,
+  IndianRupee,
   BookOpen,
   Sprout,
   Fuel,
@@ -33,14 +34,12 @@ import {
   CalendarDays,
   Wallet,
   Store,
-  Tractor,
   Warehouse,
   Car,
   Bird,
   UserCheck,
   Settings,
   Database,
-  DollarSign,
   Scale,
 } from "lucide-react";
 

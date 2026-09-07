@@ -1,8 +1,8 @@
 // src/modules/staff/components/duty-planner/ShiftPicker.tsx
 
-import { memo } from 'react';
-import { Trash2, X } from 'lucide-react';
-import { getShiftConfigs } from '../../services/staffService';
+import { memo, useState } from 'react';
+import { PenLine, Trash2, X } from 'lucide-react';
+import { getShiftConfigsForRole } from '../../services/staffService';
 
 interface ShiftPickerProps {
   isOpen: boolean;
@@ -16,15 +16,30 @@ interface ShiftPickerProps {
 }
 
 function ShiftPicker({ isOpen, onClose, onSelect, onRemove, currentDuty, date, employeeName, employeeRole }: ShiftPickerProps) {
+  const [otherOpen, setOtherOpen] = useState(false);
+  const [otherText, setOtherText] = useState('');
+
   if (!isOpen) return null;
 
-  const shifts = getShiftConfigs();
+  // Role-aware options:
+  //   Supervisor → Duty, Office, Leave, Weekly Off
+  //   Driver/Helper/Loader → Duty, Repair, Office, Leave, Weekly Off
+  //   other roles → full list. "Other" (free text) is available to all.
+  const shifts = getShiftConfigsForRole(employeeRole);
   const dateObj = new Date(date);
   const isSaturday = dateObj.getDay() === 6;
 
-  const formattedDate = !isNaN(dateObj.getTime()) 
-    ? dateObj.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' }) 
+  const formattedDate = !isNaN(dateObj.getTime())
+    ? dateObj.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })
     : date;
+
+  const submitOther = () => {
+    const value = otherText.trim();
+    if (!value) return;
+    onSelect(value);
+    setOtherOpen(false);
+    setOtherText('');
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -62,10 +77,52 @@ function ShiftPicker({ isOpen, onClose, onSelect, onRemove, currentDuty, date, e
               </button>
             );
           })}
+
+          {/* Other — free-text duty type, available for every role.
+              Highlighted when the cell currently holds a custom (non-listed) type. */}
+          {(() => {
+            const isCustom = Boolean(currentDuty) && !shifts.some((s) => s.type === currentDuty);
+            return (
+              <button
+                onClick={() => setOtherOpen((v) => !v)}
+                className={`py-2.5 px-3 rounded-xl border text-sm font-semibold transition hover:shadow-md active:scale-95 flex items-center justify-center gap-1.5 ${
+                  isCustom
+                    ? 'ring-2 ring-blue-500 ring-offset-2 bg-violet-100 text-violet-700 border-violet-300'
+                    : 'bg-violet-50 text-violet-700 border-violet-200'
+                }`}
+              >
+                <PenLine size={14} />
+                Other
+              </button>
+            );
+          })()}
         </div>
 
+        {otherOpen && (
+          <div className="mt-3 space-y-2">
+            <input
+              type="text"
+              value={otherText}
+              onChange={(e) => setOtherText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitOther();
+              }}
+              placeholder="Type a custom duty (e.g. Farm Visit)"
+              autoFocus
+              className="w-full rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20"
+            />
+            <button
+              onClick={submitOther}
+              disabled={!otherText.trim()}
+              className="w-full py-2 rounded-xl bg-violet-600 text-white text-sm font-semibold transition hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Set as Duty
+            </button>
+          </div>
+        )}
+
         <div className="mt-4 text-xs text-slate-400 text-center">
-          {isSaturday && <span className="text-rose-500 font-medium">Saturday: Compulsory duty (cannot be Rest or Weekly Off)</span>}
+          {isSaturday && <span className="text-rose-500 font-medium">Saturday: Compulsory duty (cannot be Leave or Weekly Off)</span>}
         </div>
 
         {currentDuty && onRemove && (
