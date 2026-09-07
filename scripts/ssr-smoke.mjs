@@ -146,6 +146,20 @@ try {
   if (!supOk || !drvOk || !hlpOk || !ldrOk || !otherOk)
     failed.push({ name: "role-options", err: new Error(`role options wrong: sup=[${sup}] drv=[${drv}] hlp=[${hlp}] ldr=[${ldr}] other=[${otherRole}]`) });
 
+  // Colour swap: core crew roles → Weekly Off = purple, Off = rose.
+  // All other roles → Weekly Off stays rose.
+  const supCfg = getShiftConfigsForRole("Supervisor");
+  const coreWo = supCfg.find((s) => s.type === "WeeklyOff");
+  const coreOff = supCfg.find((s) => s.type === "Off");
+  const otherWo = getShiftConfigsForRole("Accountant").find((s) => s.type === "WeeklyOff");
+  const swapOk =
+    Boolean(coreWo && coreOff && otherWo) &&
+    coreWo.bgColor === "bg-purple-100" &&
+    coreOff.bgColor === "bg-rose-100" &&
+    otherWo.bgColor === "bg-rose-100";
+  console.log(`     colour swap  core WeeklyOff=[${coreWo?.bgColor}] core Off=[${coreOff?.bgColor}] other WeeklyOff=[${otherWo?.bgColor}]`);
+  if (!swapOk) failed.push({ name: "colour-swap", err: new Error("weekly off / off colour swap wrong") });
+
   // No trip-specific states: the grid must never show Trip Start / On Trip.
   const noTripStates = !html.includes("Trip Start") && !html.includes("On Trip");
   console.log(`     no trip states in grid: ${noTripStates}`);

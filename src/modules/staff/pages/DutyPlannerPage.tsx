@@ -6,7 +6,7 @@ import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import DutyPlannerFilters from '../components/duty-planner/DutyPlannerFilters';
 import DutyPlannerGrid from '../components/duty-planner/DutyPlannerGrid';
 import ShiftPicker from '../components/duty-planner/ShiftPicker';
-import { getShiftConfigs } from '../services/staffService';
+import { getShiftConfigsForRole } from '../services/staffService';
 import type { SampleMonthDuties } from '../services/staffSampleData';
 import { CheckCircle2, ChevronLeft, ChevronRight, AlertCircle, CalendarDays } from 'lucide-react';
 import type { DutyPlannerFilters as DutyPlannerFiltersType, DutyAssignment, Employee } from '../types/staffDashboard';
@@ -350,7 +350,7 @@ function DutyPlannerPage() {
                           <div className="text-[10px] text-slate-400">{emp.role}</div>
                         </td>
                         {cells.map((c) => {
-                          const cfg = c.dutyType ? getShiftConfigs().find((s) => s.type === c.dutyType) : undefined;
+                          const cfg = c.dutyType ? getShiftConfigsForRole(emp.role).find((s) => s.type === c.dutyType) : undefined;
                           const cls = cfg
                             ? `${cfg.bgColor} ${cfg.borderColor}`
                             : c.dutyType
@@ -374,7 +374,7 @@ function DutyPlannerPage() {
                           {off > 0 && (
                             <>
                               {' · '}
-                              <span className="font-semibold text-purple-700">{off}d</span> off
+                              <span className="font-semibold text-rose-700">{off}d</span> off
                             </>
                           )}
                           {wo > 0 && (
@@ -391,7 +391,7 @@ function DutyPlannerPage() {
               </table>
               {/* Legend */}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-100 px-4 py-3 text-[11px] text-slate-500">
-                {getShiftConfigs()
+                {getShiftConfigsForRole('Driver')
                   .filter((s) => !['Driver', 'OfficeDuty', 'Collection'].includes(s.type))
                   .map((s) => (
                     <span key={s.type} className="inline-flex items-center gap-1.5">
@@ -405,6 +405,7 @@ function DutyPlannerPage() {
                 </span>
                 <span className="text-slate-400">
                   An assigned duty overrides an approved leave; leave days with no duty show as Leave.
+                  Weekly Off stays rose for other roles.
                 </span>
               </div>
             </>

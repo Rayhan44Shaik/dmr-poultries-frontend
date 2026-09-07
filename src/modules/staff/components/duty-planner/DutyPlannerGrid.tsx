@@ -1,7 +1,7 @@
 // src/modules/staff/components/duty-planner/DutyPlannerGrid.tsx
 
 import { memo } from 'react';
-import { getShiftConfigs } from '../../services/staffService';
+import { getShiftConfigs, getShiftConfigsForRole } from '../../services/staffService';
 import { isDateLocked } from '../../hooks/useDutyPlanner';
 import type { DutyAssignment, Employee } from '../../types/staffDashboard';
 
@@ -21,8 +21,11 @@ interface DutyPlannerGridProps {
 function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, loading, weekLocked = false, isOnLeave }: DutyPlannerGridProps) {
   const shiftConfigs = getShiftConfigs();
 
-  const getShiftStyle = (dutyType: string) => {
-    const config = shiftConfigs.find(s => s.type === dutyType);
+  const getShiftStyle = (dutyType: string, role?: string) => {
+    // Core crew roles (Supervisor/Driver/Helper/Loader) use the Weekly Off ↔
+    // Off colour swap; everyone else gets the base colours.
+    const configs = role ? getShiftConfigsForRole(role) : shiftConfigs;
+    const config = configs.find(s => s.type === dutyType);
     if (config) return { bg: config.bgColor, text: config.textColor, border: config.borderColor };
     // Custom "Other" types have no config — violet; empty cells stay grey.
     if (dutyType) return { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200' };
@@ -94,7 +97,7 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
                   // an explicitly assigned duty always overrides the leave.
                   const leaveFilled = !assignment && !!isOnLeave?.(emp.id, day);
                   const dutyType = assignment?.dutyType || (leaveFilled ? 'Rest' : '');
-                  const { bg, text, border } = getShiftStyle(dutyType);
+                  const { bg, text, border } = getShiftStyle(dutyType, emp.role);
                   const locked = weekLocked || isDateLocked(day);
 
                   return (

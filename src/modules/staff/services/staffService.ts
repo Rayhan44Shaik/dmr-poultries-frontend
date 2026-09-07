@@ -353,12 +353,23 @@ const ROLE_SHIFT_TYPES: Record<string, ShiftConfig['type'][]> = {
 export function getShiftConfigsForRole(role?: string): ShiftConfig[] {
   const all = getShiftConfigs();
   if (!role) return all;
-  const wanted = ROLE_SHIFT_TYPES[role.trim()];
+  const key = role.trim();
+  const wanted = ROLE_SHIFT_TYPES[key];
   if (!wanted) return all.filter((s) => s.type === 'WeeklyOff');
   // Order the picker exactly as the role list declares it.
-  return wanted
+  const picked = wanted
     .map((t) => all.find((s) => s.type === t))
     .filter((s): s is ShiftConfig => Boolean(s));
+  // Colour swap for the core crew roles: Weekly Off ↔ Off exchange colours
+  // (Weekly Off → soft purple, Off → rose). Every other role keeps Weekly
+  // Off in its original rose colour.
+  return picked.map((s) => {
+    if (s.type === 'WeeklyOff')
+      return { ...s, bgColor: 'bg-purple-100', textColor: 'text-purple-700', borderColor: 'border-purple-300' };
+    if (s.type === 'Off')
+      return { ...s, bgColor: 'bg-rose-100', textColor: 'text-rose-700', borderColor: 'border-rose-300' };
+    return s;
+  });
 }
 
 // ============================================================
