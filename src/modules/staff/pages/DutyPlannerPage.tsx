@@ -9,7 +9,7 @@ import DutyPlannerReportTable from '../components/duty-planner/DutyPlannerReport
 import { DatePicker } from '../../../components/common/DatePicker';
 import ShiftPicker from '../components/duty-planner/ShiftPicker';
 import { filterDutyEmployees, formatDutyDate, getDutyRangeError, todayStr, type DutyReportData, type DutyReportRange } from '../services/dutyReport';
-import { CheckCircle2, ChevronLeft, ChevronRight, AlertCircle, CalendarDays, FileSpreadsheet, LoaderCircle, RefreshCw, LockKeyhole } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, AlertCircle, CalendarDays, LoaderCircle, RefreshCw, LockKeyhole } from 'lucide-react';
 import type { DutyPlannerFilters as DutyPlannerFiltersType, DutyAssignment } from '../types/staffDashboard';
 
 function DutyPlannerPage() {
@@ -167,7 +167,10 @@ function DutyPlannerPage() {
     () => filterDutyEmployees(reportData?.employees ?? [], filters.role, searchQuery),
     [reportData, filters.role, searchQuery],
   );
-  const canDownloadExcel = !!reportData && reportEmployees.length > 0 && !saving && !exporting;
+  // Export exactly the rows shown in the active table. The range report can
+  // contain historical employees that are not part of the editable week roster.
+  const tableEmployees = view === 'week' ? filteredEmployees : reportEmployees;
+  const canDownloadExcel = !!reportData && tableEmployees.length > 0 && !saving && !exporting;
 
   const handleDownloadExcel = async () => {
     if (!canDownloadExcel || !reportData) return;
@@ -176,7 +179,7 @@ function DutyPlannerPage() {
       const { downloadDutyExcel } = await import('../services/dutyReportExcel');
       await downloadDutyExcel({
         data: reportData,
-        employees: reportEmployees,
+        employees: tableEmployees,
         asOf: today,
         filterLabel: `Roles: ${filters.role.length ? filters.role.join(', ') : 'All'}${searchQuery.trim() ? ` | Employee search: ${searchQuery.trim()}` : ''}`,
       });
@@ -229,132 +232,7 @@ function DutyPlannerPage() {
 
   return (
     <div className="w-full space-y-4 bg-slate-50/30 min-h-screen pb-8">
-      {/* Toolbar - Week / Month / Custom range views */}
-      <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        {view === 'week' ? (
-          <div className="flex items-center gap-3 flex-wrap">
-            <button
-              onClick={() => moveWeek(-1)}
-              className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
-              title="Previous Week"
-              aria-label="Previous week"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <button
-              onClick={() => resetFilters()}
-              className="h-9 px-3 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition"
-              title="Current Week"
-            >
-              Current Week
-            </button>
-            <button
-              onClick={() => moveWeek(1)}
-              className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
-              title="Next Week"
-              aria-label="Next week"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        ) : view === 'month' ? (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={prevMonth}
-              className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
-              title="Previous Month"
-              aria-label="Previous month"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800 whitespace-nowrap">
-              <CalendarDays size={16} className="text-slate-400" />
-              {monthLabel}
-            </span>
-            <button
-              onClick={nextMonth}
-              className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
-              title="Next Month"
-              aria-label="Next month"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        ) : (
-          <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800">
-            <CalendarDays size={16} className="text-slate-400" /> Custom date range
-          </span>
-        )}
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Period view toggle */}
-          <div className="flex rounded-lg border border-slate-200 overflow-hidden text-xs font-semibold">
-            <button
-              onClick={() => setView('week')}
-              aria-pressed={view === 'week'}
-              className={`px-3 py-1.5 transition ${view === 'week' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
-            >
-              Week
-            </button>
-            <button
-              onClick={() => setView('month')}
-              aria-pressed={view === 'month'}
-              className={`px-3 py-1.5 transition ${view === 'month' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
-            >
-              Month
-            </button>
-            <button
-              onClick={() => setView('custom')}
-              aria-pressed={view === 'custom'}
-              className={`px-3 py-1.5 transition ${view === 'custom' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
-            >
-              Custom range
-            </button>
-          </div>
-          {view === 'week' ? (
-            <>
-              <span className="text-sm font-semibold text-slate-800 whitespace-nowrap">
-                Week: {formatWeekRange(weekStart)}
-              </span>
-              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusClasses}`}>
-                {statusLabel}
-              </span>
-              {usingSampleData && (
-                <span
-                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-200"
-                  title="Backend unavailable — showing local sample data (edits are kept in memory only)"
-                >
-                  Sample data
-                </span>
-              )}
-              {!canEditWeek && weekStatus !== 'Open' && (
-                <span className="text-xs text-slate-400 hidden sm:inline">read-only</span>
-              )}
-            </>
-          ) : (
-            usingSampleData && (
-              <span
-                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-200"
-                title="Backend unavailable — showing local sample data"
-              >
-                Sample data
-              </span>
-            )
-          )}
-        </div>
-      </div>
-
-      {/* Previous week must be closed before this week takes entries */}
-      {view === 'week' && !loading && !prevWeekClosed && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-2.5 text-amber-800">
-          <LockKeyhole size={15} className="shrink-0" />
-          <p className="text-xs font-medium leading-relaxed">
-            Previous week {prevWeekStart ? `(${formatWeekRange(prevWeekStart)}) ` : ''}is not closed yet.
-            Submit it first — this week will then be open for entries and submission.
-          </p>
-        </div>
-      )}
-
-      {/* Filter Bar - Clean and compact */}
+      {/* One filter panel controls both the table and its Excel download. */}
       <DutyPlannerFilters
         role={filters.role}
         roles={[...new Set([...allRoles, ...(reportData?.employees ?? []).map((employee) => employee.role)])]}
@@ -364,11 +242,130 @@ function DutyPlannerPage() {
           setFilters((f: DutyPlannerFiltersType) => ({ ...f, role: val }))
         }
         onReset={handleReset}
-      />
-
-      {view === 'custom' && (
-        <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap items-end gap-3">
+        onDownloadExcel={() => { void handleDownloadExcel(); }}
+        canDownloadExcel={canDownloadExcel}
+        exporting={exporting}
+        downloadTitle={rangeError || reportError || (saving
+          ? 'Wait for duty changes to finish saving.'
+          : reportData
+            ? `Download the displayed table: ${formatDutyDate(fromDate)} – ${formatDutyDate(toDate)}, ${tableEmployees.length} employees. Counts through ${asOfLabel}; future duties are marked Planned.`
+            : 'Wait for the table data to finish loading.')}
+        navigation={(
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {view === 'week' ? (
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={() => moveWeek(-1)}
+                  className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+                  title="Previous Week"
+                  aria-label="Previous week"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <button
+                  onClick={() => resetFilters()}
+                  className="h-9 px-3 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition"
+                  title="Current Week"
+                >
+                  Current Week
+                </button>
+                <button
+                  onClick={() => moveWeek(1)}
+                  className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+                  title="Next Week"
+                  aria-label="Next week"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            ) : view === 'month' ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={prevMonth}
+                  className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+                  title="Previous Month"
+                  aria-label="Previous month"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800 whitespace-nowrap">
+                  <CalendarDays size={16} className="text-slate-400" />
+                  {monthLabel}
+                </span>
+                <button
+                  onClick={nextMonth}
+                  className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+                  title="Next Month"
+                  aria-label="Next month"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            ) : (
+              <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <CalendarDays size={16} className="text-slate-400" /> Custom date range
+              </span>
+            )}
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Period view toggle */}
+              <div className="flex rounded-lg border border-slate-200 overflow-hidden text-xs font-semibold">
+                <button
+                  onClick={() => setView('week')}
+                  aria-pressed={view === 'week'}
+                  className={`px-3 py-1.5 transition ${view === 'week' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                >
+                  Week
+                </button>
+                <button
+                  onClick={() => setView('month')}
+                  aria-pressed={view === 'month'}
+                  className={`px-3 py-1.5 transition ${view === 'month' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                >
+                  Month
+                </button>
+                <button
+                  onClick={() => setView('custom')}
+                  aria-pressed={view === 'custom'}
+                  className={`px-3 py-1.5 transition ${view === 'custom' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                >
+                  Custom range
+                </button>
+              </div>
+              {view === 'week' ? (
+                <>
+                  <span className="text-xs font-semibold text-slate-800 sm:text-sm">
+                    Week: {formatWeekRange(weekStart)}
+                  </span>
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusClasses}`}>
+                    {statusLabel}
+                  </span>
+                  {usingSampleData && (
+                    <span
+                      className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-200"
+                      title="Backend unavailable — showing local sample data (edits are kept in memory only)"
+                    >
+                      Sample data
+                    </span>
+                  )}
+                  {!canEditWeek && weekStatus !== 'Open' && (
+                    <span className="text-xs text-slate-400 hidden sm:inline">read-only</span>
+                  )}
+                </>
+              ) : (
+                usingSampleData && (
+                  <span
+                    className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-200"
+                    title="Backend unavailable — showing local sample data"
+                  >
+                    Sample data
+                  </span>
+                )
+              )}
+            </div>
+          </div>
+        )}
+        dateRangeControls={view === 'custom' ? (
+          <>
             <DatePicker
               id="duty-report-from"
               label="From date"
@@ -388,52 +385,40 @@ function DutyPlannerPage() {
               required
             />
             <p className="pb-2 text-xs text-slate-500">Both dates are included. Ranges can cross months and years.</p>
-          </div>
-          {rangeError && <p role="alert" className="mt-3 text-xs font-medium text-rose-600">{rangeError}</p>}
-        </div>
-      )}
-
-      <section aria-label="Duty Planner Excel report" className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0 space-y-1">
-            <h2 className="text-sm font-semibold text-slate-800">Duty Planner report</h2>
-            <p className="text-xs text-slate-600">
-              {rangeError ? 'Select a valid date range to export.' : `${formatDutyDate(fromDate)} – ${formatDutyDate(toDate)}`}
-              {reportData && ` · ${reportData.days.length} days · ${reportEmployees.length} employees`}
-            </p>
-            <p className="text-xs text-slate-500">Excel: employees in rows, dates across columns, Duty Count last, and grand totals. Includes a Daily Details sheet.</p>
-          </div>
-          <button
-            onClick={() => { void handleDownloadExcel(); }}
-            disabled={!canDownloadExcel}
-            aria-busy={exporting}
-            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {exporting ? <LoaderCircle size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
-            {exporting ? 'Preparing Excel…' : 'Download Excel'}
-          </button>
-        </div>
-        {reportError ? (
-          <div role="alert" className="mt-3 flex flex-wrap items-center gap-2 text-xs text-rose-600">
+          </>
+        ) : null}
+        feedback={rangeError ? (
+          <p role="alert" className="text-xs font-medium text-rose-600">{rangeError}</p>
+        ) : reportError ? (
+          <div role="alert" className="flex flex-wrap items-center gap-2 text-xs text-rose-600">
             <AlertCircle size={14} /> Could not load the full report. {reportError} Export is unavailable until it loads successfully.
             <button onClick={() => setRefreshKey((key) => key + 1)} className="inline-flex items-center gap-1 rounded-md border border-rose-200 px-2 py-1 font-semibold hover:bg-rose-50">
               <RefreshCw size={12} /> Retry report
             </button>
           </div>
-        ) : !rangeError && !reportData ? (
-          <p role="status" className="mt-3 flex items-center gap-1.5 text-xs text-slate-500"><LoaderCircle size={13} className="animate-spin" /> Loading report duties…</p>
-        ) : reportData && reportEmployees.length === 0 ? (
-          <p role="status" className="mt-3 text-xs text-amber-700">No employees match the selected filters. Change the role or employee search to export.</p>
-        ) : (
-          <p className="mt-3 text-[11px] text-slate-500">Counts through {asOfLabel}. Future assignments are marked Planned and excluded from counts. Export follows the selected role and employee filters.</p>
-        )}
-      </section>
+        ) : !reportData ? (
+          <p role="status" className="flex items-center gap-1.5 text-xs text-slate-500"><LoaderCircle size={13} className="animate-spin" /> Loading table data…</p>
+        ) : tableEmployees.length === 0 ? (
+          <p role="status" className="text-xs text-amber-700">No employees match the selected filters. Change the role or employee search to export.</p>
+        ) : null}
+      />
+
+      {/* Previous week must be closed before this week takes entries */}
+      {view === 'week' && !loading && !prevWeekClosed && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-2.5 text-amber-800">
+          <LockKeyhole size={15} className="shrink-0" />
+          <p className="text-xs font-medium leading-relaxed">
+            Previous week {prevWeekStart ? `(${formatWeekRange(prevWeekStart)}) ` : ''}is not closed yet.
+            Submit it first — this week will then be open for entries and submission.
+          </p>
+        </div>
+      )}
 
       {/* Week remains editable; month/custom ranges are read-only reports. */}
       {view === 'week' ? (
         <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden">
           <DutyPlannerGrid
-            employees={filteredEmployees}
+            employees={tableEmployees}
             weekDays={weekDays}
             getAssignment={getAssignment}
             onCellClick={handleCellClick}
@@ -443,7 +428,7 @@ function DutyPlannerPage() {
           />
         </div>
       ) : reportData ? (
-        <DutyPlannerReportTable data={reportData} employees={reportEmployees} asOf={today} />
+        <DutyPlannerReportTable data={reportData} employees={tableEmployees} asOf={today} />
       ) : (
         <div className="rounded-xl border border-slate-200/90 bg-white p-12 text-center text-sm text-slate-500">
           {rangeError ? 'Choose a valid date range to view duties.' : reportError ? 'The report could not be loaded. Use Retry report above.' : 'Loading duty report…'}

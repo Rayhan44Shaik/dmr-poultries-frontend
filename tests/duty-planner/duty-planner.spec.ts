@@ -1,11 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
 import ExcelJS from 'exceljs';
-import { TEST_LEAVES, TEST_TODAY, testLeave, testWeek } from './fixtures';
+import { TEST_LEAVES, TEST_TODAY, testAssignment, testLeave, testWeek } from './fixtures';
 
 const pageErrors = new WeakMap<Page, string[]>();
 const downloadButton = (page: Page) => page.getByRole('button', { name: 'Download Excel', exact: true });
 const matrix = (page: Page) => page.getByRole('table', { name: 'Duty Planner date matrix' });
-const reportPanel = (page: Page) => page.getByRole('region', { name: 'Duty Planner Excel report' });
+const filterBar = (page: Page) => page.getByRole('region', { name: 'Duty Planner filters' });
+const weekTable = (page: Page) => page.getByRole('table', { name: 'Duty Planner week table' });
 
 async function setCustomRange(page: Page, from: string, to: string) {
   await page.getByRole('button', { name: 'Custom range', exact: true }).click();
@@ -59,6 +60,24 @@ test.afterEach(async ({ page }) => {
   expect(pageErrors.get(page) ?? []).toEqual([]);
 });
 
+test('period, role, search and Excel actions share one filter panel with Download beside Reset', async ({ page }) => {
+  const filters = filterBar(page);
+  await expect(filters).toHaveCount(1);
+  await expect(filters.getByRole('button', { name: 'Week', exact: true })).toBeVisible();
+  await expect(filters.getByRole('button', { name: 'Filter employee roles' })).toBeVisible();
+  await expect(filters.getByRole('textbox', { name: 'Search employees' })).toBeVisible();
+  const actions = filters.getByRole('group', { name: 'Duty Planner actions' });
+  await expect(actions.getByRole('button')).toHaveText(['Reset', 'Download Excel']);
+  await expect(page.getByRole('region', { name: 'Duty Planner Excel report' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Duty Planner report', exact: true })).toHaveCount(0);
+  await expect(page.getByText('Excel: employees in rows, dates across columns, Duty Count last, and grand totals. Includes a Daily Details sheet.')).toHaveCount(0);
+
+  await filters.getByRole('button', { name: 'Custom range', exact: true }).click();
+  await expect(filters.getByLabel('From date')).toBeVisible();
+  await expect(filters.getByLabel('To date')).toBeVisible();
+  await expect(filters.getByRole('button', { name: 'Download Excel', exact: true })).toBeEnabled();
+});
+
 test('monthly PDF is replaced by a styled Excel with date columns and matching counts', async ({ page }) => {
   await expect(page.getByRole('button', { name: /PDF/i })).toHaveCount(0);
   await page.getByRole('button', { name: 'Month', exact: true }).click();
@@ -87,7 +106,8 @@ test('monthly PDF is replaced by a styled Excel with date columns and matching c
 test('cross-year custom ranges export exactly both boundaries and only matching employees', async ({ page }) => {
   await setCustomRange(page, '30/12/2025', '03/01/2026');
   await expect(matrix(page).getByRole('columnheader')).toHaveCount(11);
-  await expect(reportPanel(page)).toContainText('30 Dec 2025 – 03 Jan 2026');
+  await expect(filterBar(page).getByLabel('From date')).toHaveValue('30/12/2025');
+  await expect(filterBar(page).getByLabel('To date')).toHaveValue('03/01/2026');
   await page.getByPlaceholder('Search employee name...').fill('  rAvI  ');
   await expect(matrix(page).locator('tbody tr')).toHaveCount(1);
   await expect(matrix(page).locator('tbody tr').getByRole('cell').last()).toHaveText('2');
@@ -119,7 +139,7 @@ test('missing/reversed ranges and empty employee filters cannot export stale dat
   await expect(downloadButton(page)).toBeEnabled();
   await page.getByPlaceholder('Search employee name...').fill('no such employee');
   await expect(downloadButton(page)).toBeDisabled();
-  await expect(reportPanel(page)).toContainText('No employees match');
+  await expect(filterBar(page)).toContainText('No employees match');
   await page.getByPlaceholder('Search employee name...').fill('');
   await expect(downloadButton(page)).toBeEnabled();
 });
@@ -136,6 +156,64 @@ test('week exports use that week, keep planned duties visible and exclude them f
   expect(sheet.getCell('P9').value).toBe(1);
   expect(sheet.getCell('P10').value).toBe(0);
   expect(sheet.getCell('P11').result).toBe(2);
+});
+
+test('Excel uses the visible table rows and role filters, not a larger hidden report roster', async ({ page }) => {
+  await page.route('**/api/staff/duty-planner?*', async (route) => {
+    const monday = new URL(route.request().url()).searchParams.get('weekStart')!;
+    const week = testWeek(monday);
+    // Historical duties can belong to someone no longer on the editable week
+    // roster. They appear in the monthly report, but not in the weekly table.
+    week.assignments.push({ ...testAssignment(1, monday, 'Delivery'), id: `former-${monday}`, employeeId: 99, employeeName: 'Former Driver' });
+    await route.fulfill({ json: week });
+  });
+  await page.reload();
+  await expect(downloadButton(page)).toBeEnabled();
+  const filters = filterBar(page);
+  await filters.getByRole('button', { name: 'Filter employee roles' }).click();
+  for (const role of ['Supervisor', 'Helper', 'Loader']) {
+    await filters.getByRole('checkbox', { name: role, exact: true }).uncheck();
+  }
+  await filters.getByRole('button', { name: 'Filter employee roles' }).click();
+  await expect(weekTable(page).locator('tbody tr')).toHaveCount(1);
+  await expect(weekTable(page)).not.toContainText('Former Driver');
+  const visibleNames = await weekTable(page).locator('tbody tr td:first-child span:first-child').allTextContents();
+  const weekly = (await downloadWorkbook(page)).workbook.getWorksheet('Duty Planner')!;
+  expect([weekly.getCell('B8').value]).toEqual(visibleNames);
+  expect(weekly.getCell('A9').value).toBe('GRAND TOTAL / DAILY DUTY');
+  expect(weekly.getCell('P9').result).toBe(1);
+
+  await filters.getByRole('button', { name: 'Month', exact: true }).click();
+  await expect(matrix(page).locator('tbody tr')).toHaveCount(2);
+  await expect(matrix(page)).toContainText('Former Driver');
+  const monthlyNames = await matrix(page).locator('tbody th[scope="row"] > div:first-child').allTextContents();
+  const monthly = (await downloadWorkbook(page)).workbook.getWorksheet('Duty Planner')!;
+  expect([monthly.getCell('B8').value, monthly.getCell('B9').value]).toEqual(monthlyNames);
+  expect(monthly.getCell('A10').value).toBe('GRAND TOTAL / DAILY DUTY');
+  expect(monthly.getCell(10, monthly.columnCount).result).toBe(5);
+});
+
+test('Download beside Reset exports the latest saved duty shown in the table', async ({ page }) => {
+  await page.route('**/api/staff/duty-planner/*', async (route) => {
+    if (route.request().method() !== 'PUT') { await route.fallback(); return; }
+    const input = route.request().postDataJSON() as { employeeId: number; date: string; dutyType: string };
+    const week = testWeek(TEST_TODAY);
+    week.assignments = week.assignments.map((assignment) => assignment.employeeId === input.employeeId && assignment.date === input.date
+      ? { ...assignment, dutyType: input.dutyType } : assignment);
+    await route.fulfill({ json: week });
+  });
+  const ravi = weekTable(page).locator('tbody tr').filter({ hasText: 'Ravi Kumar' });
+  await ravi.getByRole('button', { name: 'Duty', exact: true }).click();
+  const picker = page.locator('div.fixed').filter({ has: page.getByText('Select duty for', { exact: true }) });
+  await picker.getByRole('button', { name: 'Leave', exact: true }).click();
+  await page.getByRole('button', { name: 'Close notification' }).click();
+  await expect(ravi.getByRole('button').first()).toHaveText('Leave');
+  const { workbook } = await downloadWorkbook(page);
+  const sheet = workbook.getWorksheet('Duty Planner')!;
+  expect(sheet.getCell('E8').value).toBe('Leave');
+  expect(sheet.getCell('L8').value).toBe(1);
+  expect(sheet.getCell('P8').value).toBe(0);
+  expect(sheet.getCell('P11').result).toBe(1);
 });
 
 test('approved leave in the week grid and in Excel uses the same live records', async ({ page }) => {
@@ -166,13 +244,14 @@ test('a failed range never exports partial data, and retry reloads the requested
   });
   await page.getByRole('button', { name: 'Next month', exact: true }).click();
   await expect(downloadButton(page)).toBeDisabled();
-  await expect(reportPanel(page)).toContainText('Could not load the full report.');
+  await expect(filterBar(page)).toContainText('Could not load the full report.');
   await expect(matrix(page)).toHaveCount(0);
   await page.getByRole('button', { name: 'Close notification' }).click();
   fail = false;
   await page.getByRole('button', { name: 'Retry report' }).click();
   await expect(matrix(page)).toBeVisible();
-  await expect(reportPanel(page)).toContainText('01 Oct 2026 – 31 Oct 2026');
+  await expect(filterBar(page)).toContainText('October 2026');
+  await expect(matrix(page).getByRole('columnheader').nth(1)).toContainText('01 Oct 2026');
   const { workbook, filename } = await downloadWorkbook(page);
   expect(filename).toBe('Duty-Planner-2026-10-01-to-2026-10-31.xlsx');
   const sheet = workbook.getWorksheet('Duty Planner')!;
@@ -195,7 +274,7 @@ test('a late response from a previous month cannot overwrite the newly selected 
   await heldRequest;
   await expect(downloadButton(page)).toBeDisabled();
   await page.getByRole('button', { name: 'Next month', exact: true }).click();
-  await expect(reportPanel(page)).toContainText('01 Nov 2026 – 30 Nov 2026');
+  await expect(filterBar(page)).toContainText('November 2026');
   await expect(matrix(page)).toBeVisible();
   const lateResponse = page.waitForResponse((response) => response.url().includes('weekStart=2026-10-05'));
   release();
@@ -222,6 +301,16 @@ test('custom range controls and Excel action remain usable on a phone-sized scre
   await downloadButton(page).scrollIntoViewIfNeeded();
   await expect(downloadButton(page)).toBeVisible();
   await expect(downloadButton(page)).toBeEnabled();
-  const sizes = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }));
-  expect(sizes.content).toBeLessThanOrEqual(sizes.viewport);
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    const actions = filterBar(page).getByRole('group', { name: 'Duty Planner actions' });
+    const reset = await actions.getByRole('button', { name: 'Reset', exact: true }).boundingBox();
+    const download = await actions.getByRole('button', { name: 'Download Excel', exact: true }).boundingBox();
+    expect(reset).not.toBeNull();
+    expect(download).not.toBeNull();
+    expect(Math.abs(reset!.y - download!.y)).toBeLessThan(2);
+    expect(download!.x).toBeGreaterThanOrEqual(reset!.x + reset!.width);
+    const sizes = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }));
+    expect(sizes.content).toBeLessThanOrEqual(sizes.viewport);
+  }
 });

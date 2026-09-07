@@ -1,37 +1,46 @@
 // src/modules/staff/components/duty-planner/DutyPlannerFilters.tsx
 
-import { memo, useState, useRef, useEffect } from 'react';
-import { ChevronDown, RotateCcw, Filter, X, Search } from 'lucide-react';
+import { memo, useState, useRef, useEffect, useId, type ReactNode } from 'react';
+import { ChevronDown, RotateCcw, Filter, X, Search, FileSpreadsheet, LoaderCircle } from 'lucide-react';
 
 interface DutyPlannerFiltersProps {
   role: string[];
   roles: string[];
-  searchQuery?: string;
-  onSearchChange?: (val: string) => void;
+  searchQuery: string;
+  onSearchChange: (val: string) => void;
   onRoleChange: (val: string[]) => void;
   onReset: () => void;
+  onDownloadExcel: () => void;
+  canDownloadExcel: boolean;
+  exporting: boolean;
+  downloadTitle: string;
+  navigation?: ReactNode;
+  dateRangeControls?: ReactNode;
+  feedback?: ReactNode;
 }
 
 function DutyPlannerFilters({
   role,
   roles,
-  searchQuery = '',
+  searchQuery,
   onSearchChange,
   onRoleChange,
   onReset,
+  onDownloadExcel,
+  canDownloadExcel,
+  exporting,
+  downloadTitle,
+  navigation,
+  dateRangeControls,
+  feedback,
 }: DutyPlannerFiltersProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [searchValue, setSearchValue] = useState(searchQuery || '');
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Sync searchValue with searchQuery prop
-  useEffect(() => {
-    setSearchValue(searchQuery || '');
-  }, [searchQuery]);
+  const roleControlId = useId();
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
       }
     };
@@ -39,109 +48,105 @@ function DutyPlannerFilters({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const toggleRole = (roleValue: string) => {
-    if (role.includes(roleValue)) {
-      onRoleChange(role.filter(r => r !== roleValue));
-    } else {
-      onRoleChange([...role, roleValue]);
-    }
-  };
-
-  const removeRole = (roleValue: string) => {
-    onRoleChange(role.filter(r => r !== roleValue));
-  };
-
-  const handleSearchInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setSearchValue(val);
-    if (onSearchChange) {
-      onSearchChange(val);
-    }
+  const toggleRole = (value: string) => {
+    onRoleChange(role.includes(value) ? role.filter((r) => r !== value) : [...role, value]);
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-1 w-full">
-          {/* Role Filter */}
-          <div className="relative flex items-center gap-2" ref={dropdownRef}>
-            <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider hidden sm:block">Role</label>
-            <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="h-10 px-4 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 focus:ring-2 focus:ring-green-200 outline-none bg-white flex items-center gap-2 hover:bg-slate-50 transition shadow-sm min-w-[160px] justify-between"
-            >
-              <span className="flex items-center gap-1.5">
-                <Filter size={16} className="text-slate-400" />
-                {role.length === 0 ? 'All Roles' : `${role.length} selected`}
-              </span>
-              <ChevronDown size={16} className="text-slate-400" />
-            </button>
+    <section aria-label="Duty Planner filters" className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm">
+      {navigation && <div className="mb-3 border-b border-slate-100 pb-3">{navigation}</div>}
 
-            {isDropdownOpen && (
-              <div className="absolute top-[calc(100%+8px)] left-0 w-56 bg-white border border-slate-200 rounded-lg shadow-xl z-20 max-h-60 overflow-auto">
-                <div className="p-1.5">
-                  {roles.map((r) => (
-                    <label key={r} className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-md cursor-pointer transition">
-                      <input
-                        type="checkbox"
-                        checked={role.includes(r)}
-                        onChange={() => toggleRole(r)}
-                        className="rounded border-slate-300 text-green-600 focus:ring-green-500 h-4 w-4"
-                      />
-                      <span className="text-sm text-slate-700">{r}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Selected Role Chips */}
-          {role.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              {role.map((r) => (
-                <span
-                  key={r}
-                  className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1 bg-green-50 border border-green-200 text-green-700 text-sm font-medium rounded-full"
-                >
-                  {r}
-                  <button
-                    onClick={() => removeRole(r)}
-                    className="hover:bg-green-200 hover:text-green-900 rounded-full p-0.5 transition focus:outline-none"
-                  >
-                    <X size={14} />
-                  </button>
-                </span>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex items-center gap-2" ref={dropdownRef}>
+          <label htmlFor={roleControlId} className="hidden text-[11px] font-semibold uppercase tracking-wider text-slate-400 sm:block">Role</label>
+          <button
+            id={roleControlId}
+            type="button"
+            aria-label="Filter employee roles"
+            aria-expanded={isDropdownOpen}
+            aria-controls={`${roleControlId}-options`}
+            onClick={() => setIsDropdownOpen((open) => !open)}
+            className="flex h-10 min-w-[160px] items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm outline-none transition hover:bg-slate-50 focus:ring-2 focus:ring-green-200"
+          >
+            <span className="flex items-center gap-1.5">
+              <Filter size={16} className="text-slate-400" />
+              {role.length === 0 ? 'All Roles' : `${role.length} selected`}
+            </span>
+            <ChevronDown size={16} className="text-slate-400" />
+          </button>
+          {isDropdownOpen && (
+            <div id={`${roleControlId}-options`} className="absolute left-0 top-[calc(100%+8px)] z-30 max-h-60 w-56 overflow-auto rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
+              {roles.map((value) => (
+                <label key={value} className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 transition hover:bg-slate-50">
+                  <input
+                    type="checkbox"
+                    checked={role.includes(value)}
+                    onChange={() => toggleRole(value)}
+                    className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
+                  />
+                  <span className="text-sm text-slate-700">{value}</span>
+                </label>
               ))}
             </div>
           )}
+        </div>
 
-          {/* Search */}
-          <div className="relative flex-1 max-w-sm sm:max-w-xs">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search employee name..."
-              value={searchValue}
-              onChange={handleSearchInput}
-              className="h-10 w-full pl-10 pr-4 rounded-lg border border-slate-200 text-sm focus:border-green-500 focus:ring-2 focus:ring-green-200 outline-none transition bg-white shadow-sm"
-            />
+        {role.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {role.map((value) => (
+              <span key={value} className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 py-1 pl-3 pr-2 text-sm font-medium text-green-700">
+                {value}
+                <button
+                  type="button"
+                  aria-label={`Remove ${value} role filter`}
+                  onClick={() => onRoleChange(role.filter((r) => r !== value))}
+                  className="rounded-full p-0.5 transition hover:bg-green-200 hover:text-green-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <X size={14} />
+                </button>
+              </span>
+            ))}
           </div>
+        )}
 
-          {/* Reset */}
+        <div className="relative w-full min-w-0 sm:w-auto sm:min-w-[180px] sm:max-w-xs sm:flex-1">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            aria-label="Search employees"
+            placeholder="Search employee name..."
+            value={searchQuery}
+            onChange={(event) => onSearchChange(event.target.value)}
+            className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-200"
+          />
+        </div>
+
+        {/* Keep these actions together, even when the filter row wraps. */}
+        <div role="group" aria-label="Duty Planner actions" className="flex shrink-0 items-center gap-2 sm:ml-auto">
           <button
-            onClick={() => {
-              setSearchValue('');
-              onReset();
-            }}
-            className="h-10 px-4 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition flex items-center gap-2 bg-white shadow-sm"
+            type="button"
+            onClick={onReset}
+            className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
           >
-            <RotateCcw size={16} />
-            <span className="hidden sm:inline">Reset</span>
+            <RotateCcw size={16} /> Reset
+          </button>
+          <button
+            type="button"
+            onClick={onDownloadExcel}
+            disabled={!canDownloadExcel || exporting}
+            aria-busy={exporting}
+            title={downloadTitle}
+            className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-emerald-600 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {exporting ? <LoaderCircle size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
+            {exporting ? 'Preparing Excel…' : 'Download Excel'}
           </button>
         </div>
       </div>
-    </div>
+
+      {dateRangeControls && <div className="mt-3 flex flex-wrap items-end gap-3 border-t border-slate-100 pt-3">{dateRangeControls}</div>}
+      {feedback && <div className="mt-3">{feedback}</div>}
+    </section>
   );
 }
 

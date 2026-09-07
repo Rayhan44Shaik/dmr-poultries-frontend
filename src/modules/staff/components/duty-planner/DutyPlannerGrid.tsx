@@ -6,7 +6,7 @@ import { isDateLocked } from '../../hooks/useDutyPlanner';
 import type { DutyAssignment, Employee } from '../../types/staffDashboard';
 
 interface DutyPlannerGridProps {
-  employees: Employee[];
+  employees: Pick<Employee, 'id' | 'employeeName' | 'role'>[];
   weekDays: string[];
   getAssignment: (employeeId: number, date: string) => DutyAssignment | undefined;
   onCellClick: (employeeId: number, date: string) => void;
@@ -64,7 +64,7 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200" style={{ minWidth: '100%' }}>
+        <table aria-label="Duty Planner week table" className="min-w-full divide-y divide-slate-200" style={{ minWidth: '100%' }}>
           <thead className="bg-slate-50 sticky top-0 z-10">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50 z-20 w-48 min-w-[180px] border-r border-slate-200">

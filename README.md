@@ -12,8 +12,10 @@ npm run dev
 ### Duty Planner Excel reports
 
 In **Staff → Duty Planner**, select **Week**, **Month**, or **Custom range**, then
-click **Download Excel**. Custom ranges include both dates and can cross months
-and years. Role and employee-name filters apply to the exported rows.
+click **Download Excel** beside **Reset** in the same filter bar. The period
+controls, role/name filters and custom dates are all in this one panel. Excel
+uses the rows and dates shown in the active table, including the applied role
+and name filters. Custom ranges include both dates and can cross months and years.
 
 - **Duty Planner** sheet: employee identity on the left, dates across columns,
   leave/off/weekly-off/no-entry counts, **Duty Count** last, and grand totals.
