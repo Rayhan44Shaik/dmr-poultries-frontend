@@ -106,6 +106,14 @@ const SAMPLE_CUSTOM_DUTY: { employeeId: number; dayIndex: number; dutyType: stri
   dutyType: "Farm Visit",
 };
 
+/** One-off "Off" days (a separate day off — not the regular Weekly Off),
+ *  swapped in for a Rest day so the purple Off style is visible in the demo. */
+const SAMPLE_OFF_DAYS: { employeeId: number; dayIndex: number }[] = [
+  { employeeId: 3, dayIndex: 4 }, // Ravi Teja (Driver) — Friday
+  { employeeId: 9, dayIndex: 2 }, // Ramesh Chandra (Helper) — Wednesday
+  { employeeId: 14, dayIndex: 2 }, // Manoj Kumar (Loader) — Wednesday
+];
+
 function buildAssignments(week: { date: string }[]): DutyPlannerWeek["assignments"] {
   const assignments: DutyPlannerWeek["assignments"] = [];
   SAMPLE_EMPLOYEES.forEach((emp) => {
@@ -113,6 +121,9 @@ function buildAssignments(week: { date: string }[]): DutyPlannerWeek["assignment
       let dutyType: string = dutyForRole(emp.role, dayIndex, emp.id);
       if (emp.id === SAMPLE_CUSTOM_DUTY.employeeId && dayIndex === SAMPLE_CUSTOM_DUTY.dayIndex) {
         dutyType = SAMPLE_CUSTOM_DUTY.dutyType;
+      }
+      if (SAMPLE_OFF_DAYS.some((o) => o.employeeId === emp.id && o.dayIndex === dayIndex)) {
+        dutyType = "Off";
       }
       assignments.push({
         id: `sample-${emp.id}-${dayIndex}`,
@@ -229,7 +240,7 @@ function attendanceFrom(week: DutyPlannerWeek, employeeId: number, leaves: Leave
   let weeklyOff = 0;
   mine.forEach((a) => {
     if (a.dutyType === "Rest") leave += 1;
-    else if (a.dutyType === "WeeklyOff") weeklyOff += 1;
+    else if (a.dutyType === "WeeklyOff" || a.dutyType === "Off") weeklyOff += 1;
     else present += 1; // Duty / Office / Repair / Collection / custom "Other"
   });
   // Approved leave on a day with no assigned duty.

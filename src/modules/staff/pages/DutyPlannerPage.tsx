@@ -8,7 +8,7 @@ import DutyPlannerGrid from '../components/duty-planner/DutyPlannerGrid';
 import ShiftPicker from '../components/duty-planner/ShiftPicker';
 import { getShiftConfigs } from '../services/staffService';
 import type { SampleMonthDuties } from '../services/staffSampleData';
-import { CheckCircle2, ChevronLeft, ChevronRight, AlertCircle, CalendarDays, PlaneTakeoff } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, AlertCircle, CalendarDays } from 'lucide-react';
 import type { DutyPlannerFilters as DutyPlannerFiltersType, DutyAssignment, Employee } from '../types/staffDashboard';
 
 function DutyPlannerPage() {
@@ -36,7 +36,6 @@ function DutyPlannerPage() {
     weekStatus,
     canEditWeek,
     unassignedCount,
-    leaves,
     isOnApprovedLeave,
     getMonthDuties,
     validation,
@@ -93,13 +92,7 @@ function DutyPlannerPage() {
   const nextMonth = () =>
     setMonthCursor(({ y, m }) => (m === 11 ? { y: y + 1, m: 0 } : { y, m: m + 1 }));
 
-  // APPROVED leaves overlapping the shown week (with their employee).
-  const weekLeaves = useMemo(() => {
-    const first = weekDays[0];
-    const last = weekDays[weekDays.length - 1];
-    if (!first || !last) return [];
-    return leaves.filter((l) => l.status === 'Approved' && l.toDate >= first && l.fromDate <= last);
-  }, [leaves, weekDays]);
+
 
   const handleCellClick = useCallback((employeeId: number, date: string) => {
     if (isDateLocked(date)) {
@@ -302,41 +295,6 @@ function DutyPlannerPage() {
         onReset={handleReset}
       />
 
-      {/* Approved leaves this week — approved only, with the employee */}
-      {view === 'week' && (
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <PlaneTakeoff size={14} className="text-slate-400" />
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Approved leaves this week
-            </span>
-          </div>
-          {weekLeaves.length === 0 ? (
-            <p className="text-xs text-slate-400">No approved leaves this week.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {weekLeaves.map((l) => (
-                <span
-                  key={l.id}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs"
-                  title={`${l.type} leave${l.reason ? ` — ${l.reason}` : ''} (approved${l.approvedBy ? ` by ${l.approvedBy}` : ''})`}
-                >
-                  <span className="font-semibold text-slate-700">{l.employeeName}</span>
-                  <span className="text-slate-400">
-                    {new Date(l.fromDate + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                    {l.toDate !== l.fromDate &&
-                      ` – ${new Date(l.toDate + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`}
-                  </span>
-                  <span className="rounded-full bg-slate-200 px-1.5 py-px text-[10px] font-semibold text-slate-500">
-                    {l.days}d
-                  </span>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Duty Calendar - Main focus (week) / monthly analysis (month) */}
       {view === 'week' ? (
         <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden">
@@ -379,9 +337,12 @@ function DutyPlannerPage() {
                   {filteredEmployees.map((emp) => {
                     const cells = monthData.byEmployee[emp.id];
                     if (!cells) return null;
-                    const work = cells.filter((c) => c.dutyType && c.dutyType !== 'Rest' && c.dutyType !== 'WeeklyOff').length;
+                    const work = cells.filter(
+                      (c) => c.dutyType && c.dutyType !== 'Rest' && c.dutyType !== 'WeeklyOff' && c.dutyType !== 'Off'
+                    ).length;
                     const leave = cells.filter((c) => c.dutyType === 'Rest').length;
-                    const off = cells.filter((c) => c.dutyType === 'WeeklyOff').length;
+                    const off = cells.filter((c) => c.dutyType === 'Off').length;
+                    const wo = cells.filter((c) => c.dutyType === 'WeeklyOff').length;
                     return (
                       <tr key={emp.id} className="hover:bg-slate-50/50">
                         <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r border-slate-200 whitespace-nowrap">
@@ -413,7 +374,13 @@ function DutyPlannerPage() {
                           {off > 0 && (
                             <>
                               {' · '}
-                              <span className="font-semibold text-slate-700">{off}d</span> off
+                              <span className="font-semibold text-purple-700">{off}d</span> off
+                            </>
+                          )}
+                          {wo > 0 && (
+                            <>
+                              {' · '}
+                              <span className="font-semibold text-slate-700">{wo}d</span> weekly off
                             </>
                           )}
                         </td>

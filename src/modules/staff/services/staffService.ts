@@ -329,30 +329,32 @@ export function getShiftConfigs(): ShiftConfig[] {
     { type: 'OfficeDuty', label: 'Office Duty', bgColor: 'bg-indigo-50', textColor: 'text-indigo-600', borderColor: 'border-indigo-200' },
     { type: 'Collection', label: 'Collection', bgColor: 'bg-teal-100', textColor: 'text-teal-700', borderColor: 'border-teal-300' },
     { type: 'WeeklyOff', label: 'Weekly Off', bgColor: 'bg-rose-100', textColor: 'text-rose-700', borderColor: 'border-rose-300' },
+    { type: 'Off', label: 'Off', bgColor: 'bg-purple-100', textColor: 'text-purple-700', borderColor: 'border-purple-300' },
   ];
 }
 
 /**
  * Which shift types are offered in the picker, per employee role.
- * - Supervisor: Duty, Office, Leave, Weekly Off
- * - Driver / Helper / Loader: Duty, Repair, Office, Leave, Weekly Off
+ * - Supervisor: Duty, Office, Leave, Weekly Off, Off
+ * - Driver / Helper / Loader: Duty, Repair, Office, Leave, Weekly Off, Off
  *   (a delivery trip that runs into the next day is simply Duty on each
  *    day the driver is out — 1 or 2 days; no separate trip states)
- * - Any other/unknown role: the full list
+ *   "Off" is a one-off day off — separate from the regular Weekly Off.
+ * - Any other/unknown role: Weekly Off only.
  * ("Other" — free text — is added by the picker itself, for every role.)
  */
 const ROLE_SHIFT_TYPES: Record<string, ShiftConfig['type'][]> = {
-  Supervisor: ['Delivery', 'Office', 'Rest', 'WeeklyOff'],
-  Driver: ['Delivery', 'Repair', 'Office', 'Rest', 'WeeklyOff'],
-  Helper: ['Delivery', 'Repair', 'Office', 'Rest', 'WeeklyOff'],
-  Loader: ['Delivery', 'Repair', 'Office', 'Rest', 'WeeklyOff'],
+  Supervisor: ['Delivery', 'Office', 'Rest', 'WeeklyOff', 'Off'],
+  Driver: ['Delivery', 'Repair', 'Office', 'Rest', 'WeeklyOff', 'Off'],
+  Helper: ['Delivery', 'Repair', 'Office', 'Rest', 'WeeklyOff', 'Off'],
+  Loader: ['Delivery', 'Repair', 'Office', 'Rest', 'WeeklyOff', 'Off'],
 };
 
 export function getShiftConfigsForRole(role?: string): ShiftConfig[] {
   const all = getShiftConfigs();
   if (!role) return all;
   const wanted = ROLE_SHIFT_TYPES[role.trim()];
-  if (!wanted) return all;
+  if (!wanted) return all.filter((s) => s.type === 'WeeklyOff');
   // Order the picker exactly as the role list declares it.
   return wanted
     .map((t) => all.find((s) => s.type === t))

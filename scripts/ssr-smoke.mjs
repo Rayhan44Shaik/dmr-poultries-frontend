@@ -136,12 +136,15 @@ try {
   console.log(`     picker options  Driver:     [${drv}]`);
   console.log(`     picker options  Helper:     [${hlp}]`);
   console.log(`     picker options  Loader:     [${ldr}]`);
-  const crewOptions = "Duty,Repair,Office,Leave,Weekly Off";
-  const supOk = sup === "Duty,Office,Leave,Weekly Off";
+  const otherRole = getShiftConfigsForRole("Accountant").map((s) => s.label).join(",");
+  const crewOptions = "Duty,Repair,Office,Leave,Weekly Off,Off";
+  const supOk = sup === "Duty,Office,Leave,Weekly Off,Off";
   const drvOk = drv === crewOptions;
   const hlpOk = hlp === crewOptions;
   const ldrOk = ldr === crewOptions;
-  if (!supOk || !drvOk || !hlpOk || !ldrOk) failed.push({ name: "role-options", err: new Error(`role options wrong: sup=[${sup}] drv=[${drv}] hlp=[${hlp}] ldr=[${ldr}]`) });
+  const otherOk = otherRole === "Weekly Off";
+  if (!supOk || !drvOk || !hlpOk || !ldrOk || !otherOk)
+    failed.push({ name: "role-options", err: new Error(`role options wrong: sup=[${sup}] drv=[${drv}] hlp=[${hlp}] ldr=[${ldr}] other=[${otherRole}]`) });
 
   // No trip-specific states: the grid must never show Trip Start / On Trip.
   const noTripStates = !html.includes("Trip Start") && !html.includes("On Trip");
@@ -165,15 +168,17 @@ try {
   const month = buildSampleMonthDuties(nowD.getFullYear(), nowD.getMonth());
   const expectedDays = new Date(nowD.getFullYear(), nowD.getMonth() + 1, 0).getDate();
   const karthikCells = month.byEmployee[1] || [];
+  const raviCells = month.byEmployee[3] || [];
+  const raviOff = raviCells.filter((c) => c.dutyType === "Off").length;
   const monthOk =
     month.days.length === expectedDays &&
     Object.keys(month.byEmployee).length === 14 &&
     karthikCells.length === expectedDays &&
     karthikCells.every((c) => c.dutyType !== null);
-  const karthikWork = karthikCells.filter((c) => c.dutyType && c.dutyType !== "Rest" && c.dutyType !== "WeeklyOff").length;
+  const karthikWork = karthikCells.filter((c) => c.dutyType && c.dutyType !== "Rest" && c.dutyType !== "WeeklyOff" && c.dutyType !== "Off").length;
   const karthikLeave = karthikCells.filter((c) => c.dutyType === "Rest").length;
-  console.log(`     month duties: ${month.days.length} days × ${Object.keys(month.byEmployee).length} employees  (Karthik: ${karthikWork}d duty, ${karthikLeave}d leave)`);
-  if (!monthOk) failed.push({ name: "month-duties", err: new Error("month duties matrix wrong") });
+  console.log(`     month duties: ${month.days.length} days × ${Object.keys(month.byEmployee).length} employees  (Karthik: ${karthikWork}d duty, ${karthikLeave}d leave; Ravi: ${raviOff}d off)`);
+  if (!monthOk || raviOff < 1) failed.push({ name: "month-duties", err: new Error(`month duties matrix wrong (raviOff=${raviOff})`) });
 
   // Grid shows friendly labels ("Duty"/"Leave") and NOT the raw types
   // ("Delivery"/"Rest"); custom "Other" types render as typed.

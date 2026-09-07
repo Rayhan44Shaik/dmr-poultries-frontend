@@ -22,9 +22,9 @@ function ShiftPicker({ isOpen, onClose, onSelect, onRemove, currentDuty, date, e
   if (!isOpen) return null;
 
   // Role-aware options:
-  //   Supervisor → Duty, Office, Leave, Weekly Off
-  //   Driver/Helper/Loader → Duty, Repair, Office, Leave, Weekly Off
-  //   other roles → full list. "Other" (free text) is available to all.
+  //   Supervisor → Duty, Office, Leave, Weekly Off, Off
+  //   Driver/Helper/Loader → Duty, Repair, Office, Leave, Weekly Off, Off
+  //   other roles → Weekly Off. "Other" (free text) is available to all.
   const shifts = getShiftConfigsForRole(employeeRole);
   const dateObj = new Date(date);
 
