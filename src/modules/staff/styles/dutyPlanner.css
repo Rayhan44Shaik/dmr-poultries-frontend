@@ -1,0 +1,24 @@
+@import '@fontsource/noto-sans-telugu/telugu-400.css';
+@import '@fontsource/noto-sans-telugu/telugu-500.css';
+@import '@fontsource/noto-sans-telugu/telugu-600.css';
+@import '@fontsource/noto-sans-telugu/telugu-700.css';
+
+.duty-planner-page:lang(te) {
+  font-family: 'Noto Sans Telugu', system-ui, sans-serif;
+  line-height: 1.65;
+}
+.duty-planner-page:lang(te) button,
+.duty-planner-page:lang(te) input,
+.duty-planner-page:lang(te) select {
+  font-family: inherit;
+  letter-spacing: normal;
+}
+/* Keep the shared header/breadcrumb readable on this Telugu page too, without
+   changing typography on Salary Register or other routes. */
+body:has(.duty-planner-page:lang(te)) {
+  font-family: 'Noto Sans Telugu', system-ui, sans-serif;
+  --font-sans: 'Noto Sans Telugu', system-ui, sans-serif;
+}
+body:has(.duty-planner-page:lang(te)) :is(button, input, select, textarea) {
+  font-family: inherit;
+}

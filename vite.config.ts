@@ -20,6 +20,7 @@ const OPTIMIZE_DEPS = [
   'uuid',
   'file-saver',
   'xlsx',
+  'exceljs',
   'jspdf',
   'jspdf-autotable',
   'react-date-range',

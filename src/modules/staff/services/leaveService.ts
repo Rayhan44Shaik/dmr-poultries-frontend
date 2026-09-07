@@ -17,6 +17,8 @@ import type {
   LeaveRequest,
 } from "../types/staffDashboard";
 
+import { notifyStaffLeavesChanged } from "./staffEvents";
+
 const LEAVE_PATH = "/staff/leaves";
 
 // ---------------------------------------------------------------------------
@@ -119,6 +121,7 @@ export async function createLeave(input: {
   reason?: string;
 }): Promise<LeaveRequest> {
   const { data } = await apiPost<Record<string, unknown>>(LEAVE_PATH, input);
+  notifyStaffLeavesChanged();
   return mapLeave(data);
 }
 
@@ -132,12 +135,14 @@ export async function updateLeaveStatus(
     `${LEAVE_PATH}/${id}/status`,
     { status, ...(opts.approvedBy ? { approvedBy: opts.approvedBy } : {}), ...(opts.rejectionReason ? { rejectionReason: opts.rejectionReason } : {}) }
   );
+  notifyStaffLeavesChanged();
   return mapLeave(data);
 }
 
 /** DELETE /api/staff/leaves/:id — only Pending leave can be deleted. */
 export async function deleteLeave(id: string): Promise<{ id: string; deleted: boolean }> {
   const { data } = await apiDelete<Record<string, unknown>>(`${LEAVE_PATH}/${id}`);
+  notifyStaffLeavesChanged();
   return { id: str(data.id), deleted: Boolean(data.deleted) };
 }
 
