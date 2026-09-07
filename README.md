@@ -11,9 +11,10 @@ npm run dev
 
 ### Duty Planner Excel reports
 
-In **Staff → Duty Planner**, select **Week**, **Month**, or **Custom range**, then
-click **Download Excel** beside **Reset** in the same filter bar. The period
-controls, role/name filters and custom dates are all in this one panel. Excel
+In **Staff → Duty Planner**, select **Weekly**, **Monthly**, or **Custom range**, then
+click **Download Excel** beside **Reset** in the same filter bar. The compact desktop filter has two rows: roles above their selected chips on
+the left; period/date controls above search and actions on the right. Custom
+dates replace the period navigator in-place, without a third filter row. Excel
 uses the rows and dates shown in the active table, including the applied role
 and name filters. Custom ranges include both dates and can cross months and years.
 

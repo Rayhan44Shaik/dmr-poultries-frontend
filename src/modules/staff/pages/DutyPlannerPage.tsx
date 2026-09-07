@@ -3,13 +3,12 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useDutyPlanner, isDateLocked } from '../hooks/useDutyPlanner';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
-import DutyPlannerFilters from '../components/duty-planner/DutyPlannerFilters';
+import DutyPlannerFilters, { type DutyPlannerView } from '../components/duty-planner/DutyPlannerFilters';
 import DutyPlannerGrid from '../components/duty-planner/DutyPlannerGrid';
 import DutyPlannerReportTable from '../components/duty-planner/DutyPlannerReportTable';
-import { DatePicker } from '../../../components/common/DatePicker';
 import ShiftPicker from '../components/duty-planner/ShiftPicker';
 import { filterDutyEmployees, formatDutyDate, getDutyRangeError, todayStr, type DutyReportData, type DutyReportRange } from '../services/dutyReport';
-import { CheckCircle2, ChevronLeft, ChevronRight, AlertCircle, CalendarDays, LoaderCircle, RefreshCw, LockKeyhole } from 'lucide-react';
+import { CheckCircle2, AlertCircle, LoaderCircle, RefreshCw, LockKeyhole } from 'lucide-react';
 import type { DutyPlannerFilters as DutyPlannerFiltersType, DutyAssignment } from '../types/staffDashboard';
 
 function DutyPlannerPage() {
@@ -33,7 +32,6 @@ function DutyPlannerPage() {
     showPicker,
     setShowPicker,
     allRoles,
-    weekStart,
     weekStatus,
     canEditWeek,
     unassignedCount,
@@ -48,7 +46,7 @@ function DutyPlannerPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   /* ----- Week / Month / Custom-range views ----- */
-  const [view, setView] = useState<'week' | 'month' | 'custom'>('week');
+  const [view, setView] = useState<DutyPlannerView>('week');
   const [monthCursor, setMonthCursor] = useState(() => {
     const d = new Date();
     return { y: d.getFullYear(), m: d.getMonth() };
@@ -222,12 +220,18 @@ function DutyPlannerPage() {
             ? 'bg-blue-50 text-blue-700 border-blue-200'
             : 'bg-emerald-50 text-emerald-700 border-emerald-200';
 
-  const formatWeekRange = (start: string) => {
+  const formatWeekRange = (start: string, compact = false) => {
     if (!start) return '';
-    const startDate = new Date(start);
-    const endDate = new Date(start);
-    endDate.setDate(endDate.getDate() + 6);
-    return `${startDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} – ${endDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+    const startDate = new Date(`${start}T00:00:00Z`);
+    const endDate = new Date(startDate);
+    endDate.setUTCDate(endDate.getUTCDate() + 6);
+    const sameYear = startDate.getUTCFullYear() === endDate.getUTCFullYear();
+    const sameMonth = sameYear && startDate.getUTCMonth() === endDate.getUTCMonth();
+    const startLabel = compact ? startDate.toLocaleDateString('en-IN', {
+      day: '2-digit', month: sameMonth ? undefined : 'short',
+      year: sameYear ? undefined : 'numeric', timeZone: 'UTC',
+    }) : formatDutyDate(start);
+    return `${startLabel} – ${formatDutyDate(endDate.toISOString().slice(0, 10))}`;
   };
 
   return (
@@ -250,143 +254,35 @@ function DutyPlannerPage() {
           : reportData
             ? `Download the displayed table: ${formatDutyDate(fromDate)} – ${formatDutyDate(toDate)}, ${tableEmployees.length} employees. Counts through ${asOfLabel}; future duties are marked Planned.`
             : 'Wait for the table data to finish loading.')}
-        navigation={(
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {view === 'week' ? (
-              <div className="flex items-center gap-3 flex-wrap">
-                <button
-                  onClick={() => moveWeek(-1)}
-                  className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
-                  title="Previous Week"
-                  aria-label="Previous week"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <button
-                  onClick={() => resetFilters()}
-                  className="h-9 px-3 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition"
-                  title="Current Week"
-                >
-                  Current Week
-                </button>
-                <button
-                  onClick={() => moveWeek(1)}
-                  className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
-                  title="Next Week"
-                  aria-label="Next week"
-                >
-                  <ChevronRight size={18} />
-                </button>
-              </div>
-            ) : view === 'month' ? (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={prevMonth}
-                  className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
-                  title="Previous Month"
-                  aria-label="Previous month"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800 whitespace-nowrap">
-                  <CalendarDays size={16} className="text-slate-400" />
-                  {monthLabel}
-                </span>
-                <button
-                  onClick={nextMonth}
-                  className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
-                  title="Next Month"
-                  aria-label="Next month"
-                >
-                  <ChevronRight size={18} />
-                </button>
-              </div>
-            ) : (
-              <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800">
-                <CalendarDays size={16} className="text-slate-400" /> Custom date range
+        view={view}
+        onViewChange={setView}
+        periodLabel={view === 'month' ? monthLabel : formatWeekRange(filters.weekStart, true)}
+        periodTitle={view === 'month' ? monthLabel : formatWeekRange(filters.weekStart)}
+        onPreviousPeriod={view === 'month' ? prevMonth : () => moveWeek(-1)}
+        onNextPeriod={view === 'month' ? nextMonth : () => moveWeek(1)}
+        onCurrentPeriod={view === 'week' ? resetFilters : undefined}
+        customRange={customRange}
+        onCustomRangeChange={setCustomRange}
+        periodMeta={(
+          <>
+            {view === 'week' && (
+              <span
+                title={`${statusLabel}${!canEditWeek ? ' (read-only)' : ''}`}
+                className={`inline-flex h-5 items-center whitespace-nowrap rounded-full border px-2 text-[10px] font-semibold ${statusClasses}`}
+              >
+                {gatedByPrevWeek ? 'Locked' : statusLabel}
               </span>
             )}
-            <div className="flex items-center gap-3 flex-wrap">
-              {/* Period view toggle */}
-              <div className="flex rounded-lg border border-slate-200 overflow-hidden text-xs font-semibold">
-                <button
-                  onClick={() => setView('week')}
-                  aria-pressed={view === 'week'}
-                  className={`px-3 py-1.5 transition ${view === 'week' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
-                >
-                  Week
-                </button>
-                <button
-                  onClick={() => setView('month')}
-                  aria-pressed={view === 'month'}
-                  className={`px-3 py-1.5 transition ${view === 'month' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
-                >
-                  Month
-                </button>
-                <button
-                  onClick={() => setView('custom')}
-                  aria-pressed={view === 'custom'}
-                  className={`px-3 py-1.5 transition ${view === 'custom' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
-                >
-                  Custom range
-                </button>
-              </div>
-              {view === 'week' ? (
-                <>
-                  <span className="text-xs font-semibold text-slate-800 sm:text-sm">
-                    Week: {formatWeekRange(weekStart)}
-                  </span>
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusClasses}`}>
-                    {statusLabel}
-                  </span>
-                  {usingSampleData && (
-                    <span
-                      className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-200"
-                      title="Backend unavailable — showing local sample data (edits are kept in memory only)"
-                    >
-                      Sample data
-                    </span>
-                  )}
-                  {!canEditWeek && weekStatus !== 'Open' && (
-                    <span className="text-xs text-slate-400 hidden sm:inline">read-only</span>
-                  )}
-                </>
-              ) : (
-                usingSampleData && (
-                  <span
-                    className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-200"
-                    title="Backend unavailable — showing local sample data"
-                  >
-                    Sample data
-                  </span>
-                )
-              )}
-            </div>
-          </div>
-        )}
-        dateRangeControls={view === 'custom' ? (
-          <>
-            <DatePicker
-              id="duty-report-from"
-              label="From date"
-              value={customRange.fromDate}
-              onChange={(date) => setCustomRange((current) => ({ ...current, fromDate: date }))}
-              minDate="1900-01-01"
-              className="w-full sm:w-[200px]"
-              required
-            />
-            <DatePicker
-              id="duty-report-to"
-              label="To date"
-              value={customRange.toDate}
-              onChange={(date) => setCustomRange((current) => ({ ...current, toDate: date }))}
-              minDate="1900-01-01"
-              className="w-full sm:w-[200px]"
-              required
-            />
-            <p className="pb-2 text-xs text-slate-500">Both dates are included. Ranges can cross months and years.</p>
+            {usingSampleData && (
+              <span
+                title="Backend unavailable — showing local sample data (edits are kept in memory only)"
+                className="inline-flex h-5 items-center whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2 text-[10px] font-semibold text-amber-700"
+              >
+                Sample data
+              </span>
+            )}
           </>
-        ) : null}
+        )}
         feedback={rangeError ? (
           <p role="alert" className="text-xs font-medium text-rose-600">{rangeError}</p>
         ) : reportError ? (
