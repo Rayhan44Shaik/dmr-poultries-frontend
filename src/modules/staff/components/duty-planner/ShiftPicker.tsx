@@ -7,11 +7,7 @@ import { getShiftConfigsForRole } from '../../services/staffService';
 interface ShiftPickerProps {
   isOpen: boolean;
   onClose: () => void;
-  /**
-   * Apply a duty type. `nextDayDutyType` is only set when the user
-   * confirmed the two-day trip flow (Trip Start → also On Trip next day).
-   */
-  onSelect: (dutyType: string, nextDayDutyType?: string) => void;
+  onSelect: (dutyType: string) => void;
   onRemove?: () => void;
   currentDuty?: string;
   date: string;
@@ -22,21 +18,6 @@ interface ShiftPickerProps {
 function ShiftPicker({ isOpen, onClose, onSelect, onRemove, currentDuty, date, employeeName, employeeRole }: ShiftPickerProps) {
   const [otherOpen, setOtherOpen] = useState(false);
   const [otherText, setOtherText] = useState('');
-  // "Trip Start" first asks whether to also mark the next day as On Trip.
-  const [confirmTrip, setConfirmTrip] = useState(false);
-
-  // Reset the transient panels whenever the picker transitions to closed
-  // (render-phase state adjustment — the picker can stay mounted after an
-  // X/outside-click close and must reopen clean for the next cell).
-  const [prevOpen, setPrevOpen] = useState(isOpen);
-  if (isOpen !== prevOpen) {
-    setPrevOpen(isOpen);
-    if (!isOpen) {
-      setOtherOpen(false);
-      setOtherText('');
-      setConfirmTrip(false);
-    }
-  }
 
   if (!isOpen) return null;
 
@@ -59,13 +40,6 @@ function ShiftPicker({ isOpen, onClose, onSelect, onRemove, currentDuty, date, e
     setOtherOpen(false);
     setOtherText('');
   };
-
-  // Weekday name of the following day (for the two-day trip question).
-  const nextDateObj = new Date(date);
-  nextDateObj.setDate(nextDateObj.getDate() + 1);
-  const nextDayName = !isNaN(nextDateObj.getTime())
-    ? nextDateObj.toLocaleDateString('en-IN', { weekday: 'long' })
-    : 'next day';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -101,12 +75,6 @@ function ShiftPicker({ isOpen, onClose, onSelect, onRemove, currentDuty, date, e
                 key={shift.type}
                 onClick={() => {
                   if (disabled) return;
-                  // Two-day trips: ask about the return day first.
-                  if (shift.type === 'TripStart') {
-                    setOtherOpen(false);
-                    setConfirmTrip(true);
-                    return;
-                  }
                   onSelect(shift.type);
                 }}
                 disabled={disabled}
@@ -141,31 +109,6 @@ function ShiftPicker({ isOpen, onClose, onSelect, onRemove, currentDuty, date, e
             );
           })()}
         </div>
-
-        {confirmTrip && (
-          <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50/60 p-3">
-            <p className="text-xs font-bold text-sky-900">Trips usually return the next day</p>
-            <p className="mt-1 text-xs leading-relaxed text-sky-800">
-              Leaves today (~12 PM) and comes back around 9 AM–4 PM.
-              Also mark <span className="font-semibold">{nextDayName}</span> as{' '}
-              <span className="font-semibold">On Trip</span>?
-            </p>
-            <div className="mt-2.5 flex gap-2">
-              <button
-                onClick={() => onSelect('TripStart', 'OnTrip')}
-                className="flex-1 rounded-lg bg-sky-600 px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-700"
-              >
-                Yes, mark both days
-              </button>
-              <button
-                onClick={() => onSelect('TripStart')}
-                className="flex-1 rounded-lg border border-sky-200 bg-white px-2 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
-              >
-                Just today
-              </button>
-            </div>
-          </div>
-        )}
 
         {otherOpen && (
           <div className="mt-3 space-y-2">

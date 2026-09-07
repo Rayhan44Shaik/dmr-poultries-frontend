@@ -60,21 +60,36 @@ const SAMPLE_EMPLOYEES: Employee[] = [
 ];
 
 /**
- * Deterministic weekly schedules. Vehicle crews work in two-day trips:
- * the trip starts from the office on the "Trip Start" day (~12 PM) and
- * the driver returns on the "On Trip" day (9 AM–4 PM, varies). Both days
- * are working days. Index 5 is Saturday (compulsory duty) — never
- * Rest / WeeklyOff.
+ * Deterministic weekly schedules. A delivery trip lasts one day (or up to
+ * ~24 hours, spilling into the next), so the days a crew member is out
+ * simply show as consecutive "Duty" days — one or two. After a trip the
+ * person gets a holiday or two (Rest), depending on orders and vehicle
+ * availability. Each role has a few variants; the employee id picks one
+ * so the grid doesn't look cloned. Index 5 is Saturday (compulsory
+ * duty) — never Rest / WeeklyOff.
  */
-const SAMPLE_SCHEDULE: Record<string, string[]> = {
-  Supervisor: ["Delivery", "Office",  "Rest",   "Delivery", "Office",  "Delivery", "Rest"],
-  Driver:     ["TripStart","OnTrip",  "Rest",   "TripStart","OnTrip",  "TripStart","OnTrip"],
-  Helper:     ["TripStart","OnTrip",  "Office", "TripStart","OnTrip",  "Office",   "Rest"],
-  Loader:     ["TripStart","OnTrip",  "Repair", "Office",   "TripStart","OnTrip",  "Rest"],
+const SAMPLE_SCHEDULES: Record<string, string[][]> = {
+  Supervisor: [
+    ["Delivery", "Office", "Rest", "Delivery", "Office", "Delivery", "Rest"],
+  ],
+  Driver: [
+    ["Delivery", "Delivery", "Rest", "Delivery", "Rest",   "Delivery", "Rest"],
+    ["Delivery", "Rest",   "Delivery", "Delivery", "Rest", "Delivery", "Rest"],
+    ["Rest",     "Delivery", "Delivery", "Rest",   "Delivery", "Delivery", "Rest"],
+  ],
+  Helper: [
+    ["Office",   "Delivery", "Rest", "Delivery", "Office", "Delivery", "Rest"],
+    ["Delivery", "Office",   "Rest", "Office",   "Delivery", "Delivery", "Rest"],
+  ],
+  Loader: [
+    ["Delivery", "Delivery", "Rest", "Office",   "Delivery", "Delivery", "Rest"],
+    ["Office",   "Delivery", "Rest", "Delivery", "Repair",   "Delivery", "Rest"],
+  ],
 };
 
-function dutyForRole(role: string, dayIndex: number): string {
-  const row = SAMPLE_SCHEDULE[role] ?? SAMPLE_SCHEDULE.Helper;
+function dutyForRole(role: string, dayIndex: number, employeeId: number): string {
+  const variants = SAMPLE_SCHEDULES[role] ?? SAMPLE_SCHEDULES.Helper;
+  const row = variants[employeeId % variants.length];
   // Saturday (index 5) is compulsory duty — never Leave / WeeklyOff.
   if (dayIndex === 5 && (row[dayIndex] === "Rest" || row[dayIndex] === "WeeklyOff")) {
     return "Delivery";
@@ -100,7 +115,7 @@ function buildAssignments(week: { date: string }[]): DutyPlannerWeek["assignment
   const assignments: DutyPlannerWeek["assignments"] = [];
   SAMPLE_EMPLOYEES.forEach((emp) => {
     week.forEach((day, dayIndex) => {
-      let dutyType: string = dutyForRole(emp.role, dayIndex);
+      let dutyType: string = dutyForRole(emp.role, dayIndex, emp.id);
       if (emp.id === SAMPLE_CUSTOM_DUTY.employeeId && dayIndex === SAMPLE_CUSTOM_DUTY.dayIndex) {
         dutyType = SAMPLE_CUSTOM_DUTY.dutyType;
       }
@@ -218,7 +233,7 @@ function attendanceFrom(week: DutyPlannerWeek, employeeId: number) {
   mine.forEach((a) => {
     if (a.dutyType === "Rest") leave += 1;
     else if (a.dutyType === "WeeklyOff") weeklyOff += 1;
-    else present += 1; // Duty / Trip Start / On Trip / Office / Repair / Collection / custom "Other"
+    else present += 1; // Duty / Office / Repair / Collection / custom "Other"
   });
   return {
     workingDays: mine.length,

@@ -127,7 +127,7 @@ try {
   if (!ok) failed.push({ name: "staff-grid-sample", err: new Error(`${namesShown}/${week.employees.length} employee names rendered`) });
 
   // Role-aware shift options (Supervisor: Duty/Office/Leave/WeeklyOff;
-  // Driver/Helper/Loader: Trip Start/On Trip first, then Duty/Repair/Office/Leave/WeeklyOff).
+  // Driver/Helper/Loader: Duty/Repair/Office/Leave/WeeklyOff).
   const sup = getShiftConfigsForRole("Supervisor").map((s) => s.label).join(",");
   const drv = getShiftConfigsForRole("Driver").map((s) => s.label).join(",");
   const hlp = getShiftConfigsForRole("Helper").map((s) => s.label).join(",");
@@ -136,20 +136,17 @@ try {
   console.log(`     picker options  Driver:     [${drv}]`);
   console.log(`     picker options  Helper:     [${hlp}]`);
   console.log(`     picker options  Loader:     [${ldr}]`);
-  const crewOptions = "Trip Start,On Trip,Duty,Repair,Office,Leave,Weekly Off";
+  const crewOptions = "Duty,Repair,Office,Leave,Weekly Off";
   const supOk = sup === "Duty,Office,Leave,Weekly Off";
   const drvOk = drv === crewOptions;
   const hlpOk = hlp === crewOptions;
   const ldrOk = ldr === crewOptions;
   if (!supOk || !drvOk || !hlpOk || !ldrOk) failed.push({ name: "role-options", err: new Error(`role options wrong: sup=[${sup}] drv=[${drv}] hlp=[${hlp}] ldr=[${ldr}]`) });
 
-  // Two-day trip pairing in the sample: vehicle crews start the trip one
-  // day and are On Trip the next (e.g. Suresh Kumar, Driver, Mon→Tue).
-  const sureshMon = week.assignments.find((a) => a.employeeId === 2 && a.date === week.days[0].date);
-  const sureshTue = week.assignments.find((a) => a.employeeId === 2 && a.date === week.days[1].date);
-  const tripOk = sureshMon?.dutyType === "TripStart" && sureshTue?.dutyType === "OnTrip" && html.includes("Trip Start") && html.includes("On Trip");
-  console.log(`     trip pair (Driver Mon→Tue): ${sureshMon?.dutyType} → ${sureshTue?.dutyType}  grid labels=${html.includes("Trip Start") && html.includes("On Trip")}`);
-  if (!tripOk) failed.push({ name: "trip-pair", err: new Error("sample trip pair missing") });
+  // No trip-specific states: the grid must never show Trip Start / On Trip.
+  const noTripStates = !html.includes("Trip Start") && !html.includes("On Trip");
+  console.log(`     no trip states in grid: ${noTripStates}`);
+  if (!noTripStates) failed.push({ name: "no-trip-states", err: new Error("grid shows trip states") });
 
   // Grid shows friendly labels ("Duty"/"Leave") and NOT the raw types
   // ("Delivery"/"Rest"); custom "Other" types render as typed.
