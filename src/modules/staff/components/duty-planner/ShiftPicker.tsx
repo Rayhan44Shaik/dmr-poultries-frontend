@@ -1,8 +1,8 @@
 // src/modules/staff/components/duty-planner/ShiftPicker.tsx
 
-import { memo } from 'react';
-import { Trash2, X } from 'lucide-react';
-import { getShiftConfigs } from '../../services/staffService';
+import { memo, useState } from 'react';
+import { PenLine, Trash2, X } from 'lucide-react';
+import { getShiftConfigsForRole } from '../../services/staffService';
 
 interface ShiftPickerProps {
   isOpen: boolean;
@@ -16,57 +16,111 @@ interface ShiftPickerProps {
 }
 
 function ShiftPicker({ isOpen, onClose, onSelect, onRemove, currentDuty, date, employeeName, employeeRole }: ShiftPickerProps) {
+  const [otherOpen, setOtherOpen] = useState(false);
+  const [otherText, setOtherText] = useState('');
+
   if (!isOpen) return null;
 
-  const shifts = getShiftConfigs();
+  // Role-aware options:
+  //   Supervisor → Duty, Office, Leave, Weekly Off, Off
+  //   Driver/Helper/Loader → Duty, Repair, Office, Leave, Weekly Off, Off
+  //   other roles → Weekly Off. "Other" (free text) is available to all.
+  const shifts = getShiftConfigsForRole(employeeRole);
   const dateObj = new Date(date);
-  const isSaturday = dateObj.getDay() === 6;
 
-  const formattedDate = !isNaN(dateObj.getTime()) 
-    ? dateObj.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' }) 
+  const formattedDate = !isNaN(dateObj.getTime())
+    ? dateObj.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })
     : date;
+
+  const submitOther = () => {
+    const value = otherText.trim();
+    if (!value) return;
+    onSelect(value);
+    setOtherOpen(false);
+    setOtherText('');
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 animate-fadeIn border border-slate-100">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-base font-bold text-slate-800">
-            Select Duty for <span className="text-green-600 font-normal">{employeeName || 'Employee'}{employeeRole ? ` (${employeeRole})` : ''}</span>
-          </h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg transition shrink-0 ml-2">
-            <X size={18} className="text-slate-500" />
-          </button>
+      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-5 animate-fadeIn border border-slate-100">
+        {/* Header — always a single, tidy line: small label + name + role chip */}
+        <div className="mb-4">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.09em] text-slate-400">
+                Select duty for
+              </p>
+              <h3 className="mt-0.5 flex items-center gap-2 text-[15px] font-bold leading-snug text-slate-900">
+                <span className="truncate">{employeeName || 'Employee'}</span>
+                {employeeRole && (
+                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-[3px] text-[10.5px] font-semibold text-slate-500">
+                    {employeeRole}
+                  </span>
+                )}
+              </h3>
+            </div>
+            <button onClick={onClose} className="-mr-1 -mt-1 shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close">
+              <X size={17} />
+            </button>
+          </div>
+          <p className="mt-1.5 truncate text-xs font-medium text-slate-400">{formattedDate}</p>
         </div>
-
-        <p className="text-xs font-medium text-slate-400 mb-4">{formattedDate}</p>
 
         <div className="grid grid-cols-2 gap-2">
-          {shifts.map((shift) => {
-            const disabled = isSaturday && (shift.type === 'Rest' || shift.type === 'WeeklyOff');
+          {shifts.map((shift) => (
+            <button
+              key={shift.type}
+              onClick={() => onSelect(shift.type)}
+              className={`py-2.5 px-3 rounded-xl border text-sm font-semibold transition hover:shadow-md active:scale-95 ${
+                currentDuty === shift.type ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+              } ${shift.bgColor} ${shift.textColor} ${shift.borderColor}`}
+            >
+              {shift.label}
+            </button>
+          ))}
+
+          {/* Other — free-text duty type, available for every role.
+              Highlighted when the cell currently holds a custom (non-listed) type. */}
+          {(() => {
+            const isCustom = Boolean(currentDuty) && !shifts.some((s) => s.type === currentDuty);
             return (
               <button
-                key={shift.type}
-                onClick={() => {
-                  if (disabled) return;
-                  onSelect(shift.type);
-                }}
-                disabled={disabled}
-                className={`py-2.5 px-3 rounded-xl border text-sm font-semibold transition hover:shadow-md active:scale-95 ${
-                  currentDuty === shift.type ? 'ring-2 ring-blue-500 ring-offset-2' : ''
-                } ${shift.bgColor} ${shift.textColor} ${shift.borderColor} ${
-                  disabled ? 'opacity-40 cursor-not-allowed' : ''
+                onClick={() => setOtherOpen((v) => !v)}
+                className={`py-2.5 px-3 rounded-xl border text-sm font-semibold transition hover:shadow-md active:scale-95 flex items-center justify-center gap-1.5 ${
+                  isCustom
+                    ? 'ring-2 ring-blue-500 ring-offset-2 bg-violet-100 text-violet-700 border-violet-300'
+                    : 'bg-violet-50 text-violet-700 border-violet-200'
                 }`}
               >
-                {shift.label}
-                {disabled && <span className="block text-[10px] text-rose-500 font-normal">(Saturday)</span>}
+                <PenLine size={14} />
+                Other
               </button>
             );
-          })}
+          })()}
         </div>
 
-        <div className="mt-4 text-xs text-slate-400 text-center">
-          {isSaturday && <span className="text-rose-500 font-medium">Saturday: Compulsory duty (cannot be Rest or Weekly Off)</span>}
-        </div>
+        {otherOpen && (
+          <div className="mt-3 space-y-2">
+            <input
+              type="text"
+              value={otherText}
+              onChange={(e) => setOtherText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitOther();
+              }}
+              placeholder="Type a custom duty (e.g. Farm Visit)"
+              autoFocus
+              className="w-full rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20"
+            />
+            <button
+              onClick={submitOther}
+              disabled={!otherText.trim()}
+              className="w-full py-2 rounded-xl bg-violet-600 text-white text-sm font-semibold transition hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Set as Duty
+            </button>
+          </div>
+        )}
 
         {currentDuty && onRemove && (
           <div className="mt-4 pt-3 border-t border-slate-100">
