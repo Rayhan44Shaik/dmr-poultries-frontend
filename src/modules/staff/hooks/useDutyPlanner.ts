@@ -16,7 +16,7 @@ import {
   type DutyPlannerValidation,
   type DutyPlannerWeek,
 } from '../services/dutyPlannerService';
-import { buildSampleDutyWeek, buildSampleLeaves, buildSampleMonthDuties, localDeleteAssignment, localUpsertAssignment, type SampleMonthDuties } from '../services/staffSampleData';
+import { buildSampleDutyWeek, buildSampleLeaves, buildSampleMonthDuties, localDeleteAssignment, localUpsertAssignment, markSampleWeekClosed, type SampleMonthDuties } from '../services/staffSampleData';
 import { loadLeaveRequests } from '../services/staffService';
 import type { Employee, DutyAssignment, DutyPlannerFilters, LeaveRequest } from '../types/staffDashboard';
 
@@ -40,6 +40,14 @@ export function isDateLocked(dateStr: string): boolean {
   currentWeekMonday.setHours(0, 0, 0, 0);
 
   return targetWeekMonday.getTime() < currentWeekMonday.getTime();
+}
+
+/** ISO date of the Monday that starts the week before `weekStart`. */
+function prevWeekMondayISO(weekStart: string): string {
+  const d = new Date(weekStart + 'T00:00:00');
+  d.setDate(d.getDate() - 7);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 export function useDutyPlanner(showNotification?: (msg: string, type: 'success' | 'error' | 'info') => void) {
@@ -82,6 +90,10 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
   });
   const [validation, setValidation] = useState<DutyPlannerValidation>({ ok: true, problems: [] });
   const [error, setError] = useState<string | null>(null);
+  // The week BEFORE the loaded one — the current week only accepts entries
+  // after that previous week has been closed (Submitted/Locked/Closed).
+  const [prevWeekStatus, setPrevWeekStatus] = useState<string | null>(null);
+  const [prevWeekStart, setPrevWeekStart] = useState('');
   // Non-null while the page is showing the local sample roster (backend
   // unavailable). Edits then apply in-memory instead of hitting the API.
   const [sampleWeek, setSampleWeek] = useState<DutyPlannerWeek | null>(null);
@@ -99,9 +111,16 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
     notifyRef.current = showNotification;
   }, [showNotification]);
 
-  /** Week cannot be edited when the backend locks or submits it. */
+  /** True once the previous week has been closed (submitted/locked). */
+  const prevWeekClosed =
+    prevWeekStatus === 'Submitted' || prevWeekStatus === 'Locked' || prevWeekStatus === 'Closed';
+
+  /**
+   * A week can only take entries after the previous week is closed, and the
+   * backend must not have locked/submitted the week itself.
+   */
   const canEditWeek =
-    weekStatus === 'Open' || weekStatus === 'Draft' || weekStatus === '';
+    (weekStatus === 'Open' || weekStatus === 'Draft' || weekStatus === '') && prevWeekClosed;
 
   const applyWeek = useCallback((week: DutyPlannerWeek) => {
     setWeekStart(week.weekStart);
@@ -119,12 +138,18 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const prevMonday = prevWeekMondayISO(filters.weekStart);
       try {
-        const week = await getDutyPlannerWeek(filters.weekStart);
+        const [week, prev] = await Promise.all([
+          getDutyPlannerWeek(filters.weekStart),
+          getDutyPlannerWeek(prevMonday).catch(() => null),
+        ]);
         if (cancelled) return;
         applyWeek(week);
         setSampleWeek(null);
         setLeaves(loadLeaveRequests());
+        setPrevWeekStatus(prev ? prev.status : null);
+        setPrevWeekStart(prev ? prev.weekStart : prevMonday);
         setError(null);
       } catch {
         if (cancelled) return;
@@ -132,9 +157,12 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         // Staff page stays usable for review. Real data resumes automatically
         // as soon as the staff API responds again.
         const week = buildSampleDutyWeek(filters.weekStart);
+        const prev = buildSampleDutyWeek(prevMonday);
         applyWeek(week);
         setSampleWeek(week);
         setLeaves(buildSampleLeaves(filters.weekStart));
+        setPrevWeekStatus(prev.status);
+        setPrevWeekStart(prev.weekStart);
         setError(null);
         notifyRef.current?.('Backend unavailable — showing sample staff data.', 'info');
       } finally {
@@ -370,6 +398,14 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
       showNotification?.('This week is locked.', 'error');
       return false;
     }
+    // A week can only be closed after the previous week is closed.
+    if (!prevWeekClosed) {
+      showNotification?.(
+        'Close the previous week first — submit it before this week can be submitted.',
+        'error'
+      );
+      return false;
+    }
     // The week is only submittable once every employee has a duty on every day.
     if (unassignedCount > 0) {
       showNotification?.(
@@ -378,6 +414,16 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
       );
       return false;
     }
+    // Sample mode: close the week in-memory (the backend is down).
+    if (sampleWeek) {
+      const closed: DutyPlannerWeek = { ...sampleWeek, status: 'Submitted' };
+      markSampleWeekClosed(weekStart);
+      applyWeek(closed);
+      setSampleWeek(closed);
+      showNotification?.('Week closed (sample data).', 'success');
+      return true;
+    }
+
     setSaving(true);
     setError(null);
     try {
@@ -393,11 +439,14 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
     } finally {
       setSaving(false);
     }
-  }, [weekStatus, weekStart, unassignedCount, applyWeek, showNotification]);
+  }, [weekStatus, weekStart, unassignedCount, prevWeekClosed, sampleWeek, applyWeek, showNotification]);
 
   return {
     employees,
     assignments,
+    prevWeekStatus,
+    prevWeekStart,
+    prevWeekClosed,
     weekDays,
     unassignedCount,
     leaves,

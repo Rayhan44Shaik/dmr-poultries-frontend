@@ -7,8 +7,9 @@ import DutyPlannerFilters from '../components/duty-planner/DutyPlannerFilters';
 import DutyPlannerGrid from '../components/duty-planner/DutyPlannerGrid';
 import ShiftPicker from '../components/duty-planner/ShiftPicker';
 import { getShiftConfigsForRole } from '../services/staffService';
+import { downloadMonthDutiesPdf, todayStr, isFutureDate } from '../services/dutyReportPdf';
 import type { SampleMonthDuties } from '../services/staffSampleData';
-import { CheckCircle2, ChevronLeft, ChevronRight, AlertCircle, CalendarDays } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, AlertCircle, CalendarDays, FileDown, LockKeyhole } from 'lucide-react';
 import type { DutyPlannerFilters as DutyPlannerFiltersType, DutyAssignment, Employee } from '../types/staffDashboard';
 
 function DutyPlannerPage() {
@@ -38,6 +39,8 @@ function DutyPlannerPage() {
     unassignedCount,
     isOnApprovedLeave,
     getMonthDuties,
+    prevWeekClosed,
+    prevWeekStart,
     validation,
     submitCurrentWeek,
   } = useDutyPlanner(showNotification);
@@ -82,6 +85,8 @@ function DutyPlannerPage() {
   }, [view, monthCursor, getMonthDuties]);
 
   const monthStale = !monthData || monthData.year !== monthCursor.y || monthData.month !== monthCursor.m;
+  const today = todayStr();
+  const asOfLabel = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
   const monthLabel = new Date(monthCursor.y, monthCursor.m, 1).toLocaleDateString('en-IN', {
     month: 'long',
@@ -154,23 +159,31 @@ function DutyPlannerPage() {
     return employees.find((e) => String(e.id) === String(selectedCell.employeeId)) || null;
   }, [selectedCell, employees]);
 
+  // This week is locked until the previous week is closed.
+  const gatedByPrevWeek =
+    !loading && !prevWeekClosed && (weekStatus === 'Open' || weekStatus === 'Draft' || weekStatus === '');
+
   const statusLabel =
-    weekStatus === 'Closed'
-      ? 'Closed'
-      : weekStatus === 'Locked'
-        ? 'Locked'
-        : weekStatus === 'Submitted'
-          ? 'Submitted'
-          : weekStatus || 'Open';
+    gatedByPrevWeek
+      ? 'Locked — close previous week'
+      : weekStatus === 'Closed'
+        ? 'Closed'
+        : weekStatus === 'Locked'
+          ? 'Locked'
+          : weekStatus === 'Submitted'
+            ? 'Submitted'
+            : weekStatus || 'Open';
 
   const statusClasses =
-    weekStatus === 'Closed'
-      ? 'bg-slate-100 text-slate-600 border-slate-200'
-      : weekStatus === 'Locked'
+    gatedByPrevWeek
+      ? 'bg-amber-50 text-amber-700 border-amber-200'
+      : weekStatus === 'Closed'
         ? 'bg-slate-100 text-slate-600 border-slate-200'
-        : weekStatus === 'Submitted'
-          ? 'bg-blue-50 text-blue-700 border-blue-200'
-          : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        : weekStatus === 'Locked'
+          ? 'bg-slate-100 text-slate-600 border-slate-200'
+          : weekStatus === 'Submitted'
+            ? 'bg-blue-50 text-blue-700 border-blue-200'
+            : 'bg-emerald-50 text-emerald-700 border-emerald-200';
 
   const formatWeekRange = (start: string) => {
     if (!start) return '';
@@ -283,6 +296,17 @@ function DutyPlannerPage() {
         </div>
       </div>
 
+      {/* Previous week must be closed before this week takes entries */}
+      {view === 'week' && !loading && !prevWeekClosed && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-2.5 text-amber-800">
+          <LockKeyhole size={15} className="shrink-0" />
+          <p className="text-xs font-medium leading-relaxed">
+            Previous week {prevWeekStart ? `(${formatWeekRange(prevWeekStart)}) ` : ''}is not closed yet.
+            Submit it first — this week will then be open for entries and submission.
+          </p>
+        </div>
+      )}
+
       {/* Filter Bar - Clean and compact */}
       <DutyPlannerFilters
         role={filters.role}
@@ -316,6 +340,19 @@ function DutyPlannerPage() {
             <div className="p-12 text-center text-sm text-slate-400">Loading month…</div>
           ) : (
             <>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+                <span className="text-xs text-slate-500">
+                  {monthLabel} · <span className="font-semibold text-slate-700">as of {asOfLabel}</span>
+                  {' — '}days after this are not yet completed (shown blank, not counted)
+                </span>
+                <button
+                  onClick={() => downloadMonthDutiesPdf({ data: monthData, employees: filteredEmployees })}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                >
+                  <FileDown size={14} />
+                  Download PDF
+                </button>
+              </div>
               <table className="text-xs w-full">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/70">
@@ -337,12 +374,15 @@ function DutyPlannerPage() {
                   {filteredEmployees.map((emp) => {
                     const cells = monthData.byEmployee[emp.id];
                     if (!cells) return null;
-                    const work = cells.filter(
+                    // Counts cover COMPLETED days only — days after today are
+                    // not yet completed and are never counted.
+                    const done = cells.filter((c) => c.date <= today);
+                    const work = done.filter(
                       (c) => c.dutyType && c.dutyType !== 'Rest' && c.dutyType !== 'WeeklyOff' && c.dutyType !== 'Off'
                     ).length;
-                    const leave = cells.filter((c) => c.dutyType === 'Rest').length;
-                    const off = cells.filter((c) => c.dutyType === 'Off').length;
-                    const wo = cells.filter((c) => c.dutyType === 'WeeklyOff').length;
+                    const leave = done.filter((c) => c.dutyType === 'Rest').length;
+                    const off = done.filter((c) => c.dutyType === 'Off').length;
+                    const wo = done.filter((c) => c.dutyType === 'WeeklyOff').length;
                     return (
                       <tr key={emp.id} className="hover:bg-slate-50/50">
                         <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r border-slate-200 whitespace-nowrap">
@@ -351,16 +391,19 @@ function DutyPlannerPage() {
                         </td>
                         {cells.map((c) => {
                           const cfg = c.dutyType ? getShiftConfigsForRole(emp.role).find((s) => s.type === c.dutyType) : undefined;
+                          const future = isFutureDate(c.date);
                           const cls = cfg
                             ? `${cfg.bgColor} ${cfg.borderColor}`
                             : c.dutyType
                               ? 'bg-violet-50 border-violet-200'
-                              : 'bg-slate-50 border-slate-100';
+                              : future
+                                ? 'border-dashed border-slate-200 bg-transparent'
+                                : 'bg-white border-slate-100';
                           return (
                             <td key={c.date} className="px-0.5 py-1">
                               <div
                                 title={`${emp.employeeName} — ${c.date}: ${
-                                  cfg ? cfg.label : c.dutyType ?? 'No duty'
+                                  cfg ? cfg.label : c.dutyType ?? (future ? 'Not yet completed' : 'No duty yet')
                                 }${c.isLeave ? ' (approved leave)' : ''}`}
                                 className={`h-6 rounded border ${cls}`}
                               />
@@ -403,9 +446,13 @@ function DutyPlannerPage() {
                   <span className="h-3 w-5 rounded border bg-violet-50 border-violet-200" />
                   Other
                 </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-3 w-5 rounded border border-dashed border-slate-300 bg-transparent" />
+                  Not yet completed
+                </span>
                 <span className="text-slate-400">
                   An assigned duty overrides an approved leave; leave days with no duty show as Leave.
-                  Weekly Off stays rose for other roles.
+                  Weekly Off stays rose for other roles. Counts cover completed days only.
                 </span>
               </div>
             </>
@@ -420,9 +467,11 @@ function DutyPlannerPage() {
           onClick={handleSubmitWeek}
           disabled={!canEditWeek || loading || saving || unassignedCount > 0}
           title={
-            unassignedCount > 0
-              ? `Assign duties for all days first — ${unassignedCount} day(s) still empty`
-              : 'Submit this week'
+            !prevWeekClosed
+              ? 'Close the previous week first — submit it, then this week can be submitted'
+              : unassignedCount > 0
+                ? `Assign duties for all days first — ${unassignedCount} day(s) still empty`
+                : 'Submit this week'
           }
           className="h-10 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >

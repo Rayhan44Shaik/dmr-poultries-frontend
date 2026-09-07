@@ -27,9 +27,10 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
     const configs = role ? getShiftConfigsForRole(role) : shiftConfigs;
     const config = configs.find(s => s.type === dutyType);
     if (config) return { bg: config.bgColor, text: config.textColor, border: config.borderColor };
-    // Custom "Other" types have no config — violet; empty cells stay grey.
+    // Custom "Other" types have no config — violet.
     if (dutyType) return { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200' };
-    return { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-300' };
+    // No duty assigned yet — a clean, truly blank cell (no placeholder).
+    return { bg: 'bg-white', text: 'text-transparent', border: 'border-slate-100' };
   }
 
   // Show the friendly label (Duty / Leave / Weekly Off …); custom "Other"
@@ -119,11 +120,7 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
                         }
                         style={{ minWidth: '90px' }}
                       >
-                        {dutyType ? (
-                          getShiftLabel(dutyType)
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
+                        {dutyType ? getShiftLabel(dutyType) : null}
                       </button>
                     </td>
                   );

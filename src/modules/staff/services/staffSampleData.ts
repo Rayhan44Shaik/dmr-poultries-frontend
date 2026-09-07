@@ -164,12 +164,35 @@ function refreshSaturday(week: DutyPlannerWeek): DutyPlannerWeek {
  * Build a full `DutyPlannerWeek` (employees + one week of assignments)
  * from a sample roster, for the week that contains `weekStart`.
  */
+/** Sample weeks closed via "Submit Week" this session (in-memory only). */
+const SAMPLE_CLOSED_WEEKS = new Set<string>();
+
+export function markSampleWeekClosed(weekStart: string): void {
+  SAMPLE_CLOSED_WEEKS.add(weekStart);
+}
+
+/** Monday (ISO) of the current week. */
+function currentWeekMondayISO(): string {
+  const d = new Date();
+  const day = d.getDay();
+  d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
+  d.setHours(0, 0, 0, 0);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export function buildSampleDutyWeek(weekStart: string): DutyPlannerWeek {
   const days = weekDays(weekStart);
   const base: DutyPlannerWeek = {
     weekStart: days[0].date,
     weekEnd: days[days.length - 1].date,
-    status: "Open",
+    // Past sample weeks are already closed (as are weeks the user closed via
+    // "Submit Week" this session); the current/future week is Open. This
+    // keeps the "close the previous week first" rule demonstrable.
+    status:
+      SAMPLE_CLOSED_WEEKS.has(days[0].date) || days[0].date < currentWeekMondayISO()
+        ? "Submitted"
+        : "Open",
     allRoles: Array.from(new Set(SAMPLE_EMPLOYEES.map((e) => e.role))),
     days,
     employees: [...SAMPLE_EMPLOYEES],

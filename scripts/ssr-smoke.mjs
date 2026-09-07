@@ -166,7 +166,7 @@ try {
   if (!noTripStates) failed.push({ name: "no-trip-states", err: new Error("grid shows trip states") });
 
   // Sample leaves: only APPROVED leaves are used (the pending one is not).
-  const { buildSampleLeaves, buildSampleMonthDuties } =
+  const { buildSampleLeaves, buildSampleMonthDuties, SAMPLE_EMPLOYEE_LIST } =
     await server.ssrLoadModule("/src/modules/staff/services/staffSampleData.ts");
   const sampleLeaves = buildSampleLeaves(week.days[0].date);
   const approvedLeaves = sampleLeaves.filter((l) => l.status === "Approved");
@@ -193,6 +193,19 @@ try {
   const karthikLeave = karthikCells.filter((c) => c.dutyType === "Rest").length;
   console.log(`     month duties: ${month.days.length} days × ${Object.keys(month.byEmployee).length} employees  (Karthik: ${karthikWork}d duty, ${karthikLeave}d leave; Ravi: ${raviOff}d off)`);
   if (!monthOk || raviOff < 1) failed.push({ name: "month-duties", err: new Error(`month duties matrix wrong (raviOff=${raviOff})`) });
+
+  // PDF report: generate a real PDF from the month data.
+  const { buildMonthDutiesPdf, todayStr } = await server.ssrLoadModule(
+    "/src/modules/staff/services/dutyReportPdf.ts"
+  );
+  const pdfDoc = buildMonthDutiesPdf({ data: month, employees: SAMPLE_EMPLOYEE_LIST });
+  const pdfBytes = Buffer.from(pdfDoc.output("arraybuffer"));
+  const today = todayStr();
+  const futureDays = month.days.filter((d) => d.date > today).length;
+  const pdfOk =
+    Boolean(pdfBytes && pdfBytes.length > 8000 && pdfBytes.subarray(0, 5).toString("latin1") === "%PDF-");
+  console.log(`     pdf report: ${pdfOk ? "valid PDF" : "FAILED"} ${pdfBytes?.length ?? 0} bytes  (${futureDays} future day(s) shown blank, not counted)`);
+  if (!pdfOk) failed.push({ name: "pdf-report", err: new Error("pdf generation failed") });
 
   // Grid shows friendly labels ("Duty"/"Leave") and NOT the raw types
   // ("Delivery"/"Rest"); custom "Other" types render as typed.
