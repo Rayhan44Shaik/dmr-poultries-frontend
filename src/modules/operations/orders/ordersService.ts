@@ -64,14 +64,7 @@ import {
   type OrdersTrip,
   type ShopOrderQuantities,
 } from "./types";
-import {
-  ORDERS_SAMPLE_DATA_ENABLED,
-  SAMPLE_SHOPS,
-  applySampleDeliveries,
-  sampleSupervisorDirectory,
-  sampleTrips,
-  sampleVehicleCapacities,
-} from "./sampleOrdersData";
+
 
 type RawTrip = Record<string, unknown>;
 
@@ -93,19 +86,14 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
   // rule (containers, capacity, uniqueness, progress) still applies.
   let trips: Trip[];
   let vehicleList: Array<{ id: number; noOfBoxes?: number }>;
-  if (ORDERS_SAMPLE_DATA_ENABLED) {
-    trips = uniqueTripsById(sampleTrips());
-    vehicleList = sampleVehicleCapacities();
-  } else {
-    const [liveTrips, vehicles] = await Promise.all([
-      // Orders classifies collection/assignment from persisted delivery rows.
-      // The summary list omits them — always hydrate with full=true.
-      listTrips({ full: true }),
-      loadVehicles().catch(() => [] as Vehicle[]),
-    ]);
-    trips = uniqueTripsById(liveTrips);
-    vehicleList = vehicles.map((v) => ({ id: v.id, noOfBoxes: v.noOfBoxes }));
-  }
+  const [liveTrips, vehicles] = await Promise.all([
+    // Orders classifies collection/assignment from persisted delivery rows.
+    // The summary list omits them — always hydrate with full=true.
+    listTrips({ full: true }),
+    loadVehicles().catch(() => [] as Vehicle[]),
+  ]);
+  trips = uniqueTripsById(liveTrips);
+  vehicleList = vehicles.map((v) => ({ id: v.id, noOfBoxes: v.noOfBoxes }));
 
   const today = localToday();
   const days = Array.from({ length: 7 }, (_, i) => addLocalDays(today, i - 6));
@@ -410,9 +398,6 @@ export async function saveCollection(
   tripNo: string | null,
   rows: OrderShopRow[]
 ): Promise<Trip> {
-  if (ORDERS_SAMPLE_DATA_ENABLED) {
-    return applySampleDeliveries(containerId, rows, {}, tripNo ?? undefined);
-  }
   const body: Record<string, unknown> = {
     ...toOrderPayload(rows),
     mode: "save",
@@ -429,14 +414,6 @@ export async function finishCollection(
   tripNo: string | null,
   rows: OrderShopRow[]
 ): Promise<Trip> {
-  if (ORDERS_SAMPLE_DATA_ENABLED) {
-    return applySampleDeliveries(
-      containerId,
-      rows,
-      { startStepSubmitted: true },
-      tripNo ?? undefined
-    );
-  }
   const body: Record<string, unknown> = {
     ...toOrderPayload(rows),
     mode: "save",
@@ -521,9 +498,6 @@ export async function saveAssignment(
   groups: AssignmentGroup[]
 ): Promise<Trip> {
   const deliveries = buildAssignmentDeliveries(vehicleTrip, groups);
-  if (ORDERS_SAMPLE_DATA_ENABLED) {
-    return applySampleDeliveries(vehicleTrip.id, deliveries);
-  }
   const { data } = await apiPost<RawTrip>(
     `/trips/${vehicleTrip.id}/steps/deliveries`,
     { ...toStep4Payload({ deliveries } as unknown as Partial<Trip>), mode: "save" }
@@ -547,12 +521,6 @@ export async function finishAssignment(
   for (const group of groups) {
     const tag = `order:${group.orderTripNo}`;
     if (!remarks.includes(tag)) remarks = remarks ? `${remarks} | ${tag}` : tag;
-  }
-  if (ORDERS_SAMPLE_DATA_ENABLED) {
-    return applySampleDeliveries(vehicleTrip.id, deliveries, {
-      deliveryStepSubmitted: true,
-      remarks,
-    });
   }
   const { data } = await apiPost<RawTrip>(
     `/trips/${vehicleTrip.id}/steps/deliveries`,
@@ -579,9 +547,6 @@ export async function recordShopDelivery(
   const plan = rows.find((r) => num(r.shopId) === num(entry.shopId)) ?? null;
   const captured = buildShopDeliveryRow(vehicleTrip, plan, entry);
   const deliveries = normalizeBirdType([...rows, captured]);
-  if (ORDERS_SAMPLE_DATA_ENABLED) {
-    return applySampleDeliveries(vehicleTrip.id, deliveries);
-  }
   const { data } = await apiPost<RawTrip>(
     `/trips/${vehicleTrip.id}/steps/deliveries`,
     { ...toStep4Payload({ deliveries } as unknown as Partial<Trip>), mode: "save" }
@@ -596,9 +561,6 @@ export async function recordShopDelivery(
  */
 export async function saveShopDeliveries(vehicleTrip: Trip): Promise<Trip> {
   const rows = rowsInSequence(vehicleTrip);
-  if (ORDERS_SAMPLE_DATA_ENABLED) {
-    return applySampleDeliveries(vehicleTrip.id, rows);
-  }
   const { data } = await apiPost<RawTrip>(
     `/trips/${vehicleTrip.id}/steps/deliveries`,
     { ...toStep4Payload({ deliveries: rows } as unknown as Partial<Trip>), mode: "save" }
@@ -616,9 +578,6 @@ export async function submitShopDeliveries(vehicleTrip: Trip): Promise<Trip> {
   // Persist Step 4 captures only. Trip lifecycle (`status = Completed`) is
   // Trip Entry Step 5 — Orders must never invent a second completion flag,
   // and must never overwrite `order:` remarks used by Delivery Tracking.
-  if (ORDERS_SAMPLE_DATA_ENABLED) {
-    return applySampleDeliveries(vehicleTrip.id, rows);
-  }
   const { data } = await apiPost<RawTrip>(
     `/trips/${vehicleTrip.id}/steps/deliveries`,
     { ...toStep4Payload({ deliveries: rows } as unknown as Partial<Trip>), mode: "save" }
@@ -699,19 +658,6 @@ export type ShopDirectory = Map<
 export type SupervisorDirectory = Map<string, string>; // name (lower) -> mobile
 
 export async function loadShopDirectory(): Promise<ShopDirectory> {
-  if (ORDERS_SAMPLE_DATA_ENABLED) {
-    return new Map(
-      SAMPLE_SHOPS.map((shop) => [
-        shop.id,
-        {
-          shopName: shop.shopName,
-          village: shop.village,
-          mobile: shop.mobile,
-          shopNumber: `SHP-${String(shop.shopNo).padStart(3, "0")}`,
-        },
-      ])
-    );
-  }
   const shops = await loadShops().catch(() => []);
   const dir: ShopDirectory = new Map();
   for (const shop of shops) {
@@ -728,7 +674,6 @@ export async function loadShopDirectory(): Promise<ShopDirectory> {
 }
 
 export async function loadSupervisorDirectory(): Promise<SupervisorDirectory> {
-  if (ORDERS_SAMPLE_DATA_ENABLED) return sampleSupervisorDirectory();
   const employees = await loadEmployees().catch(() => []);
   const dir: SupervisorDirectory = new Map();
   for (const emp of employees) {
