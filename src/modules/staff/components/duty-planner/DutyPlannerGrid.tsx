@@ -13,9 +13,12 @@ interface DutyPlannerGridProps {
   loading: boolean;
   /** True when the backend locks the whole week (Submitted/Locked). */
   weekLocked?: boolean;
+  /** True when the employee has an APPROVED leave on the date. An approved
+   *  leave fills an empty cell as "Leave"; an assigned duty overrides it. */
+  isOnLeave?: (employeeId: number, date: string) => boolean;
 }
 
-function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, loading, weekLocked = false }: DutyPlannerGridProps) {
+function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, loading, weekLocked = false, isOnLeave }: DutyPlannerGridProps) {
   const shiftConfigs = getShiftConfigs();
 
   const getShiftStyle = (dutyType: string) => {
@@ -87,7 +90,10 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
                 </td>
                 {weekDays.map((day, idx) => {
                   const assignment = getAssignment(emp.id, day);
-                  const dutyType = assignment?.dutyType || '';
+                  // An approved leave shows as "Leave" in an empty cell;
+                  // an explicitly assigned duty always overrides the leave.
+                  const leaveFilled = !assignment && !!isOnLeave?.(emp.id, day);
+                  const dutyType = assignment?.dutyType || (leaveFilled ? 'Rest' : '');
                   const { bg, text, border } = getShiftStyle(dutyType);
                   const locked = weekLocked || isDateLocked(day);
 
@@ -101,7 +107,13 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
                             ? 'bg-slate-100 text-slate-400 border-slate-200 opacity-75 cursor-not-allowed'
                             : `${bg} ${text} ${border} hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`
                         }`}
-                        title={locked ? 'Past week locked (cannot edit)' : ''}
+                        title={
+                          locked
+                            ? 'Past week locked (cannot edit)'
+                            : leaveFilled
+                              ? 'Approved leave'
+                              : ''
+                        }
                         style={{ minWidth: '90px' }}
                       >
                         {dutyType ? (

@@ -148,6 +148,33 @@ try {
   console.log(`     no trip states in grid: ${noTripStates}`);
   if (!noTripStates) failed.push({ name: "no-trip-states", err: new Error("grid shows trip states") });
 
+  // Sample leaves: only APPROVED leaves are used (the pending one is not).
+  const { buildSampleLeaves, buildSampleMonthDuties } =
+    await server.ssrLoadModule("/src/modules/staff/services/staffSampleData.ts");
+  const sampleLeaves = buildSampleLeaves(week.days[0].date);
+  const approvedLeaves = sampleLeaves.filter((l) => l.status === "Approved");
+  const leavesOk =
+    approvedLeaves.length >= 3 &&
+    approvedLeaves.every((l) => Boolean(l.employeeName)) &&
+    sampleLeaves.some((l) => l.status === "Pending" && l.employeeId === 7);
+  console.log(`     sample leaves: ${sampleLeaves.length} total, ${approvedLeaves.length} approved (each with employee)`);
+  if (!leavesOk) failed.push({ name: "sample-leaves", err: new Error("sample leaves wrong") });
+
+  // Monthly duties (future-analysis view): every day × every employee.
+  const nowD = new Date();
+  const month = buildSampleMonthDuties(nowD.getFullYear(), nowD.getMonth());
+  const expectedDays = new Date(nowD.getFullYear(), nowD.getMonth() + 1, 0).getDate();
+  const karthikCells = month.byEmployee[1] || [];
+  const monthOk =
+    month.days.length === expectedDays &&
+    Object.keys(month.byEmployee).length === 14 &&
+    karthikCells.length === expectedDays &&
+    karthikCells.every((c) => c.dutyType !== null);
+  const karthikWork = karthikCells.filter((c) => c.dutyType && c.dutyType !== "Rest" && c.dutyType !== "WeeklyOff").length;
+  const karthikLeave = karthikCells.filter((c) => c.dutyType === "Rest").length;
+  console.log(`     month duties: ${month.days.length} days × ${Object.keys(month.byEmployee).length} employees  (Karthik: ${karthikWork}d duty, ${karthikLeave}d leave)`);
+  if (!monthOk) failed.push({ name: "month-duties", err: new Error("month duties matrix wrong") });
+
   // Grid shows friendly labels ("Duty"/"Leave") and NOT the raw types
   // ("Delivery"/"Rest"); custom "Other" types render as typed.
   const labelsOk = /Duty/.test(html) && !/Delivery/.test(html);

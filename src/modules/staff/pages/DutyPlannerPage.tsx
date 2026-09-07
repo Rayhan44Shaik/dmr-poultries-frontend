@@ -1,12 +1,14 @@
 // src/modules/staff/pages/DutyPlannerPage.tsx
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useDutyPlanner, isDateLocked } from '../hooks/useDutyPlanner';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import DutyPlannerFilters from '../components/duty-planner/DutyPlannerFilters';
 import DutyPlannerGrid from '../components/duty-planner/DutyPlannerGrid';
 import ShiftPicker from '../components/duty-planner/ShiftPicker';
-import { CheckCircle2, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { getShiftConfigs } from '../services/staffService';
+import type { SampleMonthDuties } from '../services/staffSampleData';
+import { CheckCircle2, ChevronLeft, ChevronRight, AlertCircle, CalendarDays, PlaneTakeoff } from 'lucide-react';
 import type { DutyPlannerFilters as DutyPlannerFiltersType, DutyAssignment, Employee } from '../types/staffDashboard';
 
 function DutyPlannerPage() {
@@ -34,11 +36,70 @@ function DutyPlannerPage() {
     weekStatus,
     canEditWeek,
     unassignedCount,
+    leaves,
+    isOnApprovedLeave,
+    getMonthDuties,
     validation,
     submitCurrentWeek,
   } = useDutyPlanner(showNotification);
 
   const [searchQuery, setSearchQuery] = useState('');
+
+  /* ----- Week / Month view ----- */
+  const [view, setView] = useState<'week' | 'month'>('week');
+  const [monthCursor, setMonthCursor] = useState(() => {
+    const d = new Date();
+    return { y: d.getFullYear(), m: d.getMonth() };
+  });
+  const [monthData, setMonthData] = useState<SampleMonthDuties | null>(null);
+  const [monthError, setMonthError] = useState(false);
+
+  // Keep the latest notify in a ref so the fetch effect never re-runs on render.
+  const notifyRef = useRef(showNotification);
+  useEffect(() => {
+    notifyRef.current = showNotification;
+  });
+
+  useEffect(() => {
+    if (view !== 'month') return;
+    let cancelled = false;
+    void getMonthDuties(monthCursor.y, monthCursor.m)
+      .then((data) => {
+        if (!cancelled) {
+          setMonthError(false);
+          setMonthData(data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMonthError(true);
+          setMonthData(null);
+          notifyRef.current('Could not load month duties.', 'error');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [view, monthCursor, getMonthDuties]);
+
+  const monthStale = !monthData || monthData.year !== monthCursor.y || monthData.month !== monthCursor.m;
+
+  const monthLabel = new Date(monthCursor.y, monthCursor.m, 1).toLocaleDateString('en-IN', {
+    month: 'long',
+    year: 'numeric',
+  });
+  const prevMonth = () =>
+    setMonthCursor(({ y, m }) => (m === 0 ? { y: y - 1, m: 11 } : { y, m: m - 1 }));
+  const nextMonth = () =>
+    setMonthCursor(({ y, m }) => (m === 11 ? { y: y + 1, m: 0 } : { y, m: m + 1 }));
+
+  // APPROVED leaves overlapping the shown week (with their employee).
+  const weekLeaves = useMemo(() => {
+    const first = weekDays[0];
+    const last = weekDays[weekDays.length - 1];
+    if (!first || !last) return [];
+    return leaves.filter((l) => l.status === 'Approved' && l.toDate >= first && l.fromDate <= last);
+  }, [leaves, weekDays]);
 
   const handleCellClick = useCallback((employeeId: number, date: string) => {
     if (isDateLocked(date)) {
@@ -128,50 +189,103 @@ function DutyPlannerPage() {
 
   return (
     <div className="w-full space-y-4 bg-slate-50/30 min-h-screen pb-8">
-      {/* Weekly Toolbar - Single compact control */}
+      {/* Toolbar - Week / Month views */}
       <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <button
-            onClick={() => moveWeek(-1)}
-            className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
-            title="Previous Week"
-            aria-label="Previous week"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <button
-            onClick={() => resetFilters()}
-            className="h-9 px-3 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition"
-            title="Current Week"
-          >
-            Current Week
-          </button>
-          <button
-            onClick={() => moveWeek(1)}
-            className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
-            title="Next Week"
-            aria-label="Next week"
-          >
-            <ChevronRight size={18} />
-          </button>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-sm font-semibold text-slate-800 whitespace-nowrap">
-            Week: {formatWeekRange(weekStart)}
-          </span>
-          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusClasses}`}>
-            {statusLabel}
-          </span>
-          {usingSampleData && (
-            <span
-              className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-200"
-              title="Backend unavailable — showing local sample data (edits are kept in memory only)"
+        {view === 'week' ? (
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => moveWeek(-1)}
+              className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+              title="Previous Week"
+              aria-label="Previous week"
             >
-              Sample data
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              onClick={() => resetFilters()}
+              className="h-9 px-3 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition"
+              title="Current Week"
+            >
+              Current Week
+            </button>
+            <button
+              onClick={() => moveWeek(1)}
+              className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+              title="Next Week"
+              aria-label="Next week"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={prevMonth}
+              className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+              title="Previous Month"
+              aria-label="Previous month"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800 whitespace-nowrap">
+              <CalendarDays size={16} className="text-slate-400" />
+              {monthLabel}
             </span>
-          )}
-          {!canEditWeek && weekStatus !== 'Open' && (
-            <span className="text-xs text-slate-400 hidden sm:inline">read-only</span>
+            <button
+              onClick={nextMonth}
+              className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+              title="Next Month"
+              aria-label="Next month"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Week / Month view toggle */}
+          <div className="flex rounded-lg border border-slate-200 overflow-hidden text-xs font-semibold">
+            <button
+              onClick={() => setView('week')}
+              className={`px-3 py-1.5 transition ${view === 'week' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            >
+              Week
+            </button>
+            <button
+              onClick={() => setView('month')}
+              className={`px-3 py-1.5 transition ${view === 'month' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            >
+              Month
+            </button>
+          </div>
+          {view === 'week' ? (
+            <>
+              <span className="text-sm font-semibold text-slate-800 whitespace-nowrap">
+                Week: {formatWeekRange(weekStart)}
+              </span>
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusClasses}`}>
+                {statusLabel}
+              </span>
+              {usingSampleData && (
+                <span
+                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-200"
+                  title="Backend unavailable — showing local sample data (edits are kept in memory only)"
+                >
+                  Sample data
+                </span>
+              )}
+              {!canEditWeek && weekStatus !== 'Open' && (
+                <span className="text-xs text-slate-400 hidden sm:inline">read-only</span>
+              )}
+            </>
+          ) : (
+            usingSampleData && (
+              <span
+                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-200"
+                title="Backend unavailable — showing local sample data"
+              >
+                Sample data
+              </span>
+            )
           )}
         </div>
       </div>
@@ -188,19 +302,151 @@ function DutyPlannerPage() {
         onReset={handleReset}
       />
 
-      {/* Duty Calendar - Main focus */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden">
-        <DutyPlannerGrid
-          employees={filteredEmployees}
-          weekDays={weekDays}
-          getAssignment={getAssignment}
-          onCellClick={handleCellClick}
-          loading={loading}
-          weekLocked={!canEditWeek}
-        />
-      </div>
+      {/* Approved leaves this week — approved only, with the employee */}
+      {view === 'week' && (
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <PlaneTakeoff size={14} className="text-slate-400" />
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Approved leaves this week
+            </span>
+          </div>
+          {weekLeaves.length === 0 ? (
+            <p className="text-xs text-slate-400">No approved leaves this week.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {weekLeaves.map((l) => (
+                <span
+                  key={l.id}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs"
+                  title={`${l.type} leave${l.reason ? ` — ${l.reason}` : ''} (approved${l.approvedBy ? ` by ${l.approvedBy}` : ''})`}
+                >
+                  <span className="font-semibold text-slate-700">{l.employeeName}</span>
+                  <span className="text-slate-400">
+                    {new Date(l.fromDate + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                    {l.toDate !== l.fromDate &&
+                      ` – ${new Date(l.toDate + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`}
+                  </span>
+                  <span className="rounded-full bg-slate-200 px-1.5 py-px text-[10px] font-semibold text-slate-500">
+                    {l.days}d
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* Week Actions - Compact row */}
+      {/* Duty Calendar - Main focus (week) / monthly analysis (month) */}
+      {view === 'week' ? (
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden">
+          <DutyPlannerGrid
+            employees={filteredEmployees}
+            weekDays={weekDays}
+            getAssignment={getAssignment}
+            onCellClick={handleCellClick}
+            loading={loading}
+            weekLocked={!canEditWeek}
+            isOnLeave={isOnApprovedLeave}
+          />
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-x-auto">
+          {monthError ? (
+            <div className="p-12 text-center text-sm text-rose-600">Could not load month duties.</div>
+          ) : monthStale ? (
+            <div className="p-12 text-center text-sm text-slate-400">Loading month…</div>
+          ) : (
+            <>
+              <table className="text-xs w-full">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/70">
+                    <th className="sticky left-0 z-10 bg-slate-50 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 min-w-[150px]">
+                      Employee
+                    </th>
+                    {monthData.days.map((d) => (
+                      <th key={d.date} className="px-0.5 py-2 text-center min-w-[30px]">
+                        <div className="text-[9px] font-medium text-slate-400">{d.weekday}</div>
+                        <div className="text-[11px] font-semibold text-slate-600">{d.dayNum}</div>
+                      </th>
+                    ))}
+                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 min-w-[110px]">
+                      Summary
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredEmployees.map((emp) => {
+                    const cells = monthData.byEmployee[emp.id];
+                    if (!cells) return null;
+                    const work = cells.filter((c) => c.dutyType && c.dutyType !== 'Rest' && c.dutyType !== 'WeeklyOff').length;
+                    const leave = cells.filter((c) => c.dutyType === 'Rest').length;
+                    const off = cells.filter((c) => c.dutyType === 'WeeklyOff').length;
+                    return (
+                      <tr key={emp.id} className="hover:bg-slate-50/50">
+                        <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r border-slate-200 whitespace-nowrap">
+                          <div className="font-semibold text-slate-800 truncate max-w-[160px]">{emp.employeeName}</div>
+                          <div className="text-[10px] text-slate-400">{emp.role}</div>
+                        </td>
+                        {cells.map((c) => {
+                          const cfg = c.dutyType ? getShiftConfigs().find((s) => s.type === c.dutyType) : undefined;
+                          const cls = cfg
+                            ? `${cfg.bgColor} ${cfg.borderColor}`
+                            : c.dutyType
+                              ? 'bg-violet-50 border-violet-200'
+                              : 'bg-slate-50 border-slate-100';
+                          return (
+                            <td key={c.date} className="px-0.5 py-1">
+                              <div
+                                title={`${emp.employeeName} — ${c.date}: ${
+                                  cfg ? cfg.label : c.dutyType ?? 'No duty'
+                                }${c.isLeave ? ' (approved leave)' : ''}`}
+                                className={`h-6 rounded border ${cls}`}
+                              />
+                            </td>
+                          );
+                        })}
+                        <td className="px-4 py-2 text-[10.5px] text-slate-500 whitespace-nowrap">
+                          <span className="font-semibold text-slate-700">{work}d</span> duty
+                          {' · '}
+                          <span className="font-semibold text-slate-700">{leave}d</span> leave
+                          {off > 0 && (
+                            <>
+                              {' · '}
+                              <span className="font-semibold text-slate-700">{off}d</span> off
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {/* Legend */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-100 px-4 py-3 text-[11px] text-slate-500">
+                {getShiftConfigs()
+                  .filter((s) => !['Driver', 'OfficeDuty', 'Collection'].includes(s.type))
+                  .map((s) => (
+                    <span key={s.type} className="inline-flex items-center gap-1.5">
+                      <span className={`h-3 w-5 rounded border ${s.bgColor} ${s.borderColor}`} />
+                      {s.label}
+                    </span>
+                  ))}
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-3 w-5 rounded border bg-violet-50 border-violet-200" />
+                  Other
+                </span>
+                <span className="text-slate-400">
+                  An assigned duty overrides an approved leave; leave days with no duty show as Leave.
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Week Actions - Compact row (week view only) */}
+      {view === 'week' && (
       <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <button
           onClick={handleSubmitWeek}
@@ -238,9 +484,10 @@ function DutyPlannerPage() {
           )}
         </div>
       </div>
+      )}
 
-      {/* Validation issues - only shown when relevant */}
-      {!validation.ok && validation.problems.length > 0 && (
+      {/* Validation issues - week view only */}
+      {view === 'week' && !validation.ok && validation.problems.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm space-y-3">
           {!validation.ok && validation.problems.length > 0 && (
             <div className="bg-rose-50/80 border border-rose-200/80 rounded-lg p-2.5 text-xs text-rose-700">
@@ -262,7 +509,10 @@ function DutyPlannerPage() {
           onClose={handleClosePicker}
           onSelect={handleSelectShift}
           onRemove={getAssignment(selectedCell.employeeId, selectedCell.date)?.id ? handleRemoveDuty : undefined}
-          currentDuty={getAssignment(selectedCell.employeeId, selectedCell.date)?.dutyType}
+          currentDuty={
+            getAssignment(selectedCell.employeeId, selectedCell.date)?.dutyType ??
+            (isOnApprovedLeave(selectedCell.employeeId, selectedCell.date) ? 'Rest' : undefined)
+          }
           date={selectedCell.date}
           employeeName={selectedEmployee ? selectedEmployee.employeeName : ''}
           employeeRole={selectedEmployee ? selectedEmployee.role : ''}

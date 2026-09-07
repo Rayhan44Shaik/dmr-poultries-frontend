@@ -11,7 +11,7 @@
 // the real API returns.
 // ------------------------------------------------------------
 
-import type { Employee, SalaryRecord } from "../types/staffDashboard";
+import type { Employee, SalaryRecord, LeaveRequest } from "../types/staffDashboard";
 import type { DutyPlannerWeek } from "./dutyPlannerService";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -218,9 +218,12 @@ export function localDeleteAssignment(week: DutyPlannerWeek, id: string): DutyPl
    between the Duty Planner and the salary register).
 ================================================================== */
 
-/** Attendance counts for one employee from a duty week. */
-function attendanceFrom(week: DutyPlannerWeek, employeeId: number) {
+/** Attendance counts for one employee from a duty week. Approved-leave
+ *  days without any assignment count as leave days. */
+function attendanceFrom(week: DutyPlannerWeek, employeeId: number, leaves: LeaveRequest[] = []) {
   const mine = week.assignments.filter((a) => a.employeeId === employeeId);
+  const assignedDates = new Set(mine.map((a) => a.date));
+  const weekDateSet = new Set(week.days.map((d) => d.date));
   let present = 0;
   let leave = 0;
   let weeklyOff = 0;
@@ -229,6 +232,13 @@ function attendanceFrom(week: DutyPlannerWeek, employeeId: number) {
     else if (a.dutyType === "WeeklyOff") weeklyOff += 1;
     else present += 1; // Duty / Office / Repair / Collection / custom "Other"
   });
+  // Approved leave on a day with no assigned duty.
+  for (const lv of leaves) {
+    if (lv.status !== "Approved" || lv.employeeId !== employeeId) continue;
+    for (const ds of leaveDateRange(lv.fromDate, lv.toDate)) {
+      if (weekDateSet.has(ds) && !assignedDates.has(ds)) leave += 1;
+    }
+  }
   return {
     workingDays: mine.length,
     presentDays: present,
@@ -239,9 +249,10 @@ function attendanceFrom(week: DutyPlannerWeek, employeeId: number) {
 
 export function buildSampleSalaryRecords(month: string, weekStart?: string): SalaryRecord[] {
   const week = buildSampleDutyWeek(weekStart ?? toDateStr(mondayOf(new Date())));
+  const weekLeaves = buildSampleLeaves(week.weekStart);
   const now = new Date().toISOString();
   return SAMPLE_EMPLOYEES.map((emp, i) => {
-    const att = attendanceFrom(week, emp.id);
+    const att = attendanceFrom(week, emp.id, weekLeaves);
     const basicSalary = emp.salary;
     const overtime = emp.role === "Driver" ? 1200 : 0;
     const incentives = emp.role === "Supervisor" ? 2000 : 0;
@@ -312,3 +323,106 @@ export function buildSampleSalaryRecords(month: string, weekStart?: string): Sal
 }
 
 export const SAMPLE_EMPLOYEE_LIST = SAMPLE_EMPLOYEES;
+
+/* ==================================================================
+   SAMPLE LEAVES — deterministic per week. Only APPROVED leaves are
+   shown/used anywhere; the Pending one proves the filter works.
+================================================================== */
+
+function leaveDateRange(fromDate: string, toDate: string): string[] {
+  const dates: string[] = [];
+  const t = new Date(fromDate + "T00:00:00");
+  const end = new Date(toDate + "T00:00:00");
+  while (t <= end) {
+    dates.push(toDateStr(t));
+    t.setDate(t.getDate() + 1);
+  }
+  return dates;
+}
+
+/** Sample leave requests for the week containing `weekStart`. */
+export function buildSampleLeaves(weekStart: string): LeaveRequest[] {
+  const days = weekDays(weekStart);
+  const d = (i: number) => days[i].date;
+  const now = new Date().toISOString();
+  return [
+    { id: `sample-leave-4-${d(2)}`, employeeId: 4, employeeName: "Mohan Das", type: "Casual", fromDate: d(2), toDate: d(2), days: 1, status: "Approved", reason: "Personal work", createdAt: now, approvedBy: "Owner", approvedAt: now },
+    { id: `sample-leave-5-${d(1)}`, employeeId: 5, employeeName: "Prakash Naidu", type: "Sick", fromDate: d(1), toDate: d(2), days: 2, status: "Approved", reason: "Fever", createdAt: now, approvedBy: "Owner", approvedAt: now },
+    { id: `sample-leave-12-${d(4)}`, employeeId: 12, employeeName: "Sandeep Kumar", type: "Casual", fromDate: d(4), toDate: d(4), days: 1, status: "Approved", reason: "Family function", createdAt: now, approvedBy: "Owner", approvedAt: now },
+    { id: `sample-leave-13-${d(4)}`, employeeId: 13, employeeName: "Abdul Kareem", type: "Annual", fromDate: d(4), toDate: d(4), days: 1, status: "Approved", reason: "Out of town", createdAt: now, approvedBy: "Owner", approvedAt: now },
+    // Pending — must NOT appear in the planner or count anywhere.
+    { id: `sample-leave-7-${d(0)}`, employeeId: 7, employeeName: "Vijay Babu", type: "Casual", fromDate: d(0), toDate: d(0), days: 1, status: "Pending", reason: "Personal work", createdAt: now },
+  ];
+}
+
+/* ==================================================================
+   MONTHLY DUTIES — "future analysis" view: every day of a month for
+   every employee (same deterministic weekly pattern as the planner).
+   A day shows its assigned duty; an APPROVED leave shows as Leave
+   when nothing is assigned (an assigned duty always overrides the
+   leave).
+================================================================== */
+
+export interface SampleMonthDutyCell {
+  date: string;
+  /** Effective display type: assignment, or "Rest" when on approved
+   *  leave with no assignment, or null when nothing. */
+  dutyType: string | null;
+  /** True when the employee has an approved leave on this date
+   *  (even when an assigned duty overrides it). */
+  isLeave: boolean;
+}
+
+export interface SampleMonthDuties {
+  year: number;
+  /** 0-based month index. */
+  month: number;
+  days: { date: string; weekday: string; dayNum: number }[];
+  byEmployee: Record<number, SampleMonthDutyCell[]>;
+}
+
+export function buildSampleMonthDuties(year: number, month: number): SampleMonthDuties {
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const days: { date: string; weekday: string; dayNum: number }[] = [];
+  for (let dayNum = 1; dayNum <= lastDay; dayNum++) {
+    const dt = new Date(year, month, dayNum);
+    days.push({ date: toDateStr(dt), weekday: dt.toLocaleDateString("en-IN", { weekday: "short" }), dayNum });
+  }
+
+  // Every Monday whose week touches this month.
+  const first = new Date(year, month, 1);
+  first.setDate(first.getDate() - first.getDay() + (first.getDay() === 0 ? -6 : 1));
+  first.setHours(0, 0, 0, 0);
+  const last = new Date(year, month, lastDay);
+  const mondays: string[] = [];
+  for (const m = new Date(first); m <= last; m.setDate(m.getDate() + 7)) {
+    mondays.push(toDateStr(new Date(m)));
+  }
+
+  const assign = new Map<string, string>(); // `${empId}|${date}` -> dutyType
+  const leaveDates = new Map<number, Set<string>>();
+  for (const mon of mondays) {
+    for (const a of buildSampleDutyWeek(mon).assignments) {
+      assign.set(`${a.employeeId}|${a.date}`, a.dutyType);
+    }
+    for (const lv of buildSampleLeaves(mon)) {
+      if (lv.status !== "Approved") continue;
+      let set = leaveDates.get(lv.employeeId);
+      if (!set) {
+        set = new Set<string>();
+        leaveDates.set(lv.employeeId, set);
+      }
+      for (const ds of leaveDateRange(lv.fromDate, lv.toDate)) set.add(ds);
+    }
+  }
+
+  const byEmployee: Record<number, SampleMonthDutyCell[]> = {};
+  for (const emp of SAMPLE_EMPLOYEES) {
+    byEmployee[emp.id] = days.map(({ date }) => {
+      const duty = assign.get(`${emp.id}|${date}`) ?? null;
+      const isLeave = leaveDates.get(emp.id)?.has(date) ?? false;
+      return { date, dutyType: duty ?? (isLeave ? "Rest" : null), isLeave };
+    });
+  }
+  return { year, month, days, byEmployee };
+}
