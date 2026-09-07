@@ -1,6 +1,7 @@
 // src/ui/Sidebar/Sidebar.tsx
-// Premium application sidebar: permanently expanded, active states,
-// mobile drawer, planned-module pills.
+// Small floating navigation popup: opens via the header menu button (all
+// viewports) as a compact dropdown below it, and closes when the user
+// clicks outside the popup, presses Escape, or navigates to another route.
 
 import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -10,10 +11,8 @@ import { useI18n } from "../../i18n";
 import BrandMark from "../BrandMark";
 
 interface SidebarProps {
-  collapsed: boolean;
-  onToggleCollapse: () => void;
-  mobileOpen: boolean;
-  onCloseMobile: () => void;
+  open: boolean;
+  onClose: () => void;
 }
 
 function isChildActive(child: NavChild, pathname: string, search: string): boolean {
@@ -22,41 +21,42 @@ function isChildActive(child: NavChild, pathname: string, search: string): boole
   return current === childUrl;
 }
 
-export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
+export default function Sidebar({ open, onClose }: SidebarProps) {
   const location = useLocation();
   const pathname = location.pathname;
   const search = location.search;
   const { t } = useI18n();
 
-  // Close the mobile drawer on route change.
+  // Close the popup on route change.
   useEffect(() => {
-    onCloseMobile();
+    onClose();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, search]);
 
-  // Close the mobile drawer on Escape.
+  // Close the popup on Escape.
   useEffect(() => {
+    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onCloseMobile();
+        onClose();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCloseMobile]);
+  }, [open, onClose]);
 
   // Auto-scroll active nav item into view (e.g., Reports → Shop Ledger)
   // so opening Shop Ledger directly shows its nav entry without manual scroll.
   useEffect(() => {
+    if (!open) return;
     const doScroll = () => {
       const activeLinks = document.querySelectorAll('nav a[aria-current="page"]');
       if (activeLinks.length === 0) return;
       activeLinks.forEach((el) => {
         const nav = el.closest("nav") as HTMLElement | null;
         if (!nav) return;
-        // Skip hidden navs (desktop hidden on mobile, drawer hidden on desktop)
+        // Skip hidden navs
         if (nav.clientHeight === 0 || (nav as HTMLElement).offsetParent === null) {
-          // For hidden via display:none, clientHeight is 0; for lg:hidden etc, check computed
           const style = window.getComputedStyle(nav);
           if (style.display === "none" || style.visibility === "hidden") return;
         }
@@ -69,33 +69,39 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
           if (!isVisible || Math.abs(elCenterDelta) > 80) {
             nav.scrollTo({ top: nav.scrollTop + elCenterDelta, behavior: "smooth" });
           }
-          // Subtle flash to draw eye to the active Shop Ledger row
+          // Subtle flash to draw eye to the active row
           (el as HTMLElement).animate?.(
             [{ boxShadow: "0 0 0 0 rgba(16,185,129,0)" }, { boxShadow: "0 0 0 4px rgba(16,185,129,0.18)" }, { boxShadow: "0 0 0 0 rgba(16,185,129,0)" }],
             { duration: 900, easing: "ease-out" }
           );
         } catch {
-          // Fallback
-          try { (el as HTMLElement).scrollIntoView({ block: "center", behavior: "smooth" }); } catch {}
+          try { (el as HTMLElement).scrollIntoView({ block: "center", behavior: "smooth" }); } catch { /* non-fatal */ }
         }
       });
     };
-    // Multiple attempts to cover paint + drawer animation + fonts
+    // Multiple attempts to cover paint + popup animation + fonts
     const raf = requestAnimationFrame(() => {
       doScroll();
       const t1 = window.setTimeout(doScroll, 120);
       const t2 = window.setTimeout(doScroll, 350);
       const t3 = window.setTimeout(doScroll, 700);
-      (doScroll as any)._t1 = t1; (doScroll as any)._t2 = t2; (doScroll as any)._t3 = t3;
+      (doScroll as { _t1?: number; _t2?: number; _t3?: number })._t1 = t1;
+      (doScroll as { _t1?: number; _t2?: number; _t3?: number })._t2 = t2;
+      (doScroll as { _t1?: number; _t2?: number; _t3?: number })._t3 = t3;
     });
     return () => {
       cancelAnimationFrame(raf);
-      try { window.clearTimeout((doScroll as any)._t1); window.clearTimeout((doScroll as any)._t2); window.clearTimeout((doScroll as any)._t3); } catch {}
+      try {
+        const refs = doScroll as { _t1?: number; _t2?: number; _t3?: number };
+        window.clearTimeout(refs._t1);
+        window.clearTimeout(refs._t2);
+        window.clearTimeout(refs._t3);
+      } catch { /* non-fatal */ }
     };
-  }, [pathname, search, mobileOpen]);
+  }, [open, pathname, search]);
 
   const navContent = (
-    <nav className="flex-1 overflow-y-auto px-3 py-4 scrollbar-none">
+    <nav className="max-h-[min(60vh,460px)] overflow-y-auto px-3 py-4 scrollbar-none">
       {NAV_SECTIONS.map((section) => {
         const SectionIcon = section.icon;
         return (
@@ -143,8 +149,7 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
                       <Icon
                         size={17}
                         strokeWidth={2}
-                        className={`shrink-0 ${active ? tone.iconActive : tone.icon}`}
-                      />
+                        className={`shrink-0 ${active ? tone.iconActive : tone.icon}`} />
                       <span className="flex-1 truncate text-left">{label}</span>
                     </Link>
                   </li>
@@ -157,51 +162,40 @@ export default function Sidebar({ mobileOpen, onCloseMobile }: SidebarProps) {
     </nav>
   );
 
-  const brandHeader = (
-    <div className="flex h-16 shrink-0 items-center gap-3 border-b border-slate-200/80 px-5 dark:border-slate-800">
-      <BrandMark size="lg" variant="plain" />
-      <h1 className="min-w-0 truncate text-[16px] font-extrabold leading-tight tracking-tight text-slate-900 dark:text-white">
-        DMR Poultries
-      </h1>
-    </div>
-  );
+  if (!open) return null;
 
   return (
     <>
-      {/* Desktop sidebar — permanently docked on the left, always visible */}
-      <aside className="relative z-30 hidden h-screen w-[264px] shrink-0 flex-col border-r border-slate-200/80 bg-white lg:flex dark:border-slate-800 dark:bg-slate-900">
-        {brandHeader}
-        {navContent}
-      </aside>
+      {/* Invisible click-catcher: clicking anywhere outside the popup closes it. */}
+      <div className="fixed inset-0 z-40" onClick={onClose} aria-hidden="true" />
 
-      {/* Mobile drawer */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
-          <div
-            className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px] animate-fade-in"
-            onClick={onCloseMobile}
-          />
-          <aside className="absolute inset-y-0 left-0 flex w-[280px] flex-col border-r border-slate-200 bg-white shadow-pop animate-scale-in dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200/80 px-5 dark:border-slate-800">
-              <div className="flex items-center gap-3">
-                <BrandMark size="lg" variant="plain" />
-                <h1 className="truncate text-[15px] font-bold leading-tight tracking-tight text-slate-900 dark:text-white">
-                  DMR Poultries
-                </h1>
-              </div>
-              <button
-                type="button"
-                onClick={onCloseMobile}
-                className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                aria-label={t("header.closeMenu")}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            {navContent}
-          </aside>
+      {/* Small navigation popup — anchored just below the menu button. */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed left-3 top-[72px] z-50 w-[300px] max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-pop animate-slide-down dark:border-slate-800 dark:bg-slate-900 sm:left-4"
+      >
+        {/* Compact brand row */}
+        <div className="flex h-12 shrink-0 items-center justify-between border-b border-slate-200/80 pl-4 pr-1.5 dark:border-slate-800">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <BrandMark size="xs" variant="plain" />
+            <span className="truncate text-[13px] font-bold tracking-tight text-slate-900 dark:text-white">
+              DMR Poultries
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            aria-label={t("header.closeMenu")}
+          >
+            <X size={16} />
+          </button>
         </div>
-      )}
+
+        {/* Scrollable nav (capped height keeps the popup small) */}
+        {navContent}
+      </div>
     </>
   );
 }

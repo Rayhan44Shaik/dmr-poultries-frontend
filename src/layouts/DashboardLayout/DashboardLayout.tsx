@@ -1,5 +1,6 @@
 // src/layouts/DashboardLayout/DashboardLayout.tsx
-// Application shell: docked sidebar + header + command palette.
+// Application shell: floating navigation popup (open via the menu button,
+// close by clicking outside or Escape) + header + command palette.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
@@ -11,32 +12,14 @@ type DashboardLayoutProps = {
   children: ReactNode;
 };
 
-const COLLAPSED_KEY = "dmr_sidebar_collapsed";
-
 function DashboardLayout({ children }: DashboardLayoutProps) {
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
 
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(COLLAPSED_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
-  const [mobileOpen, setMobileOpen] = useState(false);
+  // The navigation popup is closed by default; the header menu button
+  // opens it. Clicking outside the popup (or pressing Escape) closes it.
+  const [navOpen, setNavOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
-
-  const toggleCollapse = () => {
-    setCollapsed((prev) => {
-      try {
-        localStorage.setItem(COLLAPSED_KEY, prev ? "0" : "1");
-      } catch {
-        /* ignore storage errors */
-      }
-      return !prev;
-    });
-  };
 
   // Scroll the content area back to the top on navigation.
   useEffect(() => {
@@ -44,17 +27,11 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [location.pathname, location.search]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-100/80 dark:bg-slate-950">
-      <Sidebar
-        collapsed={collapsed}
-        onToggleCollapse={toggleCollapse}
-        mobileOpen={mobileOpen}
-        onCloseMobile={() => setMobileOpen(false)}
-      />
-
-      <div className="flex min-w-0 flex-1 flex-col">
+    <div className="h-screen overflow-hidden bg-slate-100/80 dark:bg-slate-950">
+      <div className="flex h-full min-w-0 flex-col">
         <Header
-          onMenuClick={() => setMobileOpen(true)}
+          onMenuClick={() => setNavOpen(true)}
+          menuOpen={navOpen}
           onOpenCommand={() => setCommandOpen(true)}
         />
 
@@ -68,6 +45,8 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
         onOpen={() => setCommandOpen(true)}
         onClose={() => setCommandOpen(false)}
       />
+
+      <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
     </div>
   );
 }

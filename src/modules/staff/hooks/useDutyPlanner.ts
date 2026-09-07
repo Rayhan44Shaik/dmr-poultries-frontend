@@ -2,7 +2,7 @@
 // PostgreSQL-backed duty planner hook. All persistent data flows through
 // the existing staff duty API; localStorage is not used.
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   autoAssignApply,
   autoAssignPreview,
@@ -16,9 +16,11 @@ import {
   type DutyPlannerValidation,
   type DutyPlannerWeek,
 } from '../services/dutyPlannerService';
-import type { Employee, DutyAssignment, DutyPlannerFilters } from '../types/staffDashboard';
+import { buildSampleDutyWeek, buildSampleLeaves, buildSampleMonthDuties, localDeleteAssignment, localUpsertAssignment, markSampleWeekClosed, type SampleMonthDuties } from '../services/staffSampleData';
+import { loadLeaveRequests } from '../services/staffService';
+import type { Employee, DutyAssignment, DutyPlannerFilters, LeaveRequest } from '../types/staffDashboard';
 
-const DEFAULT_ROLES = ['Supervisor', 'Driver', 'Helper'];
+const DEFAULT_ROLES = ['Supervisor', 'Driver', 'Helper', 'Loader'];
 
 export function isDateLocked(dateStr: string): boolean {
   const targetDate = new Date(dateStr);
@@ -38,6 +40,14 @@ export function isDateLocked(dateStr: string): boolean {
   currentWeekMonday.setHours(0, 0, 0, 0);
 
   return targetWeekMonday.getTime() < currentWeekMonday.getTime();
+}
+
+/** ISO date of the Monday that starts the week before `weekStart`. */
+function prevWeekMondayISO(weekStart: string): string {
+  const d = new Date(weekStart + 'T00:00:00');
+  d.setDate(d.getDate() - 7);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 export function useDutyPlanner(showNotification?: (msg: string, type: 'success' | 'error' | 'info') => void) {
@@ -80,13 +90,37 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
   });
   const [validation, setValidation] = useState<DutyPlannerValidation>({ ok: true, problems: [] });
   const [error, setError] = useState<string | null>(null);
+  // The week BEFORE the loaded one — the current week only accepts entries
+  // after that previous week has been closed (Submitted/Locked/Closed).
+  const [prevWeekStatus, setPrevWeekStatus] = useState<string | null>(null);
+  const [prevWeekStart, setPrevWeekStart] = useState('');
+  // Non-null while the page is showing the local sample roster (backend
+  // unavailable). Edits then apply in-memory instead of hitting the API.
+  const [sampleWeek, setSampleWeek] = useState<DutyPlannerWeek | null>(null);
+  // Leave requests (sample-generated in sample mode, the staff leave
+  // store otherwise). Only APPROVED leaves affect the planner.
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
 
   const [selectedCell, setSelectedCell] = useState<{ employeeId: number; date: string } | null>(null);
   const [showPicker, setShowPicker] = useState(false);
 
-  /** Week cannot be edited when the backend locks or submits it. */
+  // Latest notification callback without making it a load-effect dependency
+  // (a new callback identity must never reset the loaded week).
+  const notifyRef = useRef<typeof showNotification>(showNotification);
+  useEffect(() => {
+    notifyRef.current = showNotification;
+  }, [showNotification]);
+
+  /** True once the previous week has been closed (submitted/locked). */
+  const prevWeekClosed =
+    prevWeekStatus === 'Submitted' || prevWeekStatus === 'Locked' || prevWeekStatus === 'Closed';
+
+  /**
+   * A week can only take entries after the previous week is closed, and the
+   * backend must not have locked/submitted the week itself.
+   */
   const canEditWeek =
-    weekStatus === 'Open' || weekStatus === 'Draft' || weekStatus === '';
+    (weekStatus === 'Open' || weekStatus === 'Draft' || weekStatus === '') && prevWeekClosed;
 
   const applyWeek = useCallback((week: DutyPlannerWeek) => {
     setWeekStart(week.weekStart);
@@ -104,16 +138,33 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const prevMonday = prevWeekMondayISO(filters.weekStart);
       try {
-        const week = await getDutyPlannerWeek(filters.weekStart);
+        const [week, prev] = await Promise.all([
+          getDutyPlannerWeek(filters.weekStart),
+          getDutyPlannerWeek(prevMonday).catch(() => null),
+        ]);
         if (cancelled) return;
         applyWeek(week);
+        setSampleWeek(null);
+        setLeaves(loadLeaveRequests());
+        setPrevWeekStatus(prev ? prev.status : null);
+        setPrevWeekStart(prev ? prev.weekStart : prevMonday);
         setError(null);
-      } catch (err) {
+      } catch {
         if (cancelled) return;
-        const message = handleApiError(err);
-        setError(message);
-        showNotification?.(message, 'error');
+        // Backend unavailable — fall back to the local sample roster so the
+        // Staff page stays usable for review. Real data resumes automatically
+        // as soon as the staff API responds again.
+        const week = buildSampleDutyWeek(filters.weekStart);
+        const prev = buildSampleDutyWeek(prevMonday);
+        applyWeek(week);
+        setSampleWeek(week);
+        setLeaves(buildSampleLeaves(filters.weekStart));
+        setPrevWeekStatus(prev.status);
+        setPrevWeekStart(prev.weekStart);
+        setError(null);
+        notifyRef.current?.('Backend unavailable — showing sample staff data.', 'info');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -121,7 +172,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
     return () => {
       cancelled = true;
     };
-  }, [filters.weekStart, applyWeek, showNotification]);
+  }, [filters.weekStart, applyWeek]);
 
   const moveWeek = useCallback((direction: -1 | 1) => {
     setFilters((prev) => {
@@ -149,6 +200,75 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
     [assignments]
   );
 
+  // True when the employee has an APPROVED leave covering the date.
+  // (Pending/Rejected leaves are ignored everywhere.)
+  const isOnApprovedLeave = useCallback(
+    (employeeId: number, date: string): boolean =>
+      leaves.some(
+        (l) => l.status === 'Approved' && l.employeeId === employeeId && l.fromDate <= date && l.toDate >= date
+      ),
+    [leaves]
+  );
+
+  // Number of (employee × day) cells in this week that still have no duty
+  // AND no approved leave. The week can only be submitted when this is 0.
+  const unassignedCount = useMemo(() => {
+    let count = 0;
+    for (const emp of employees) {
+      for (const day of weekDays) {
+        const hasDuty = assignments.some((a) => a.employeeId === emp.id && a.date === day);
+        if (!hasDuty && !isOnApprovedLeave(emp.id, day)) count += 1;
+      }
+    }
+    return count;
+  }, [employees, weekDays, assignments, isOnApprovedLeave]);
+
+  /**
+   * Monthly duty matrix for future analysis: every day of the month for
+   * every employee. Sample mode uses the deterministic sample weeks;
+   * real mode fetches each week of the month from the API.
+   */
+  const getMonthDuties = useCallback(
+    async (year: number, month: number): Promise<SampleMonthDuties> => {
+      if (sampleWeek) {
+        return buildSampleMonthDuties(year, month);
+      }
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const first = new Date(year, month, 1);
+      first.setDate(first.getDate() - first.getDay() + (first.getDay() === 0 ? -6 : 1));
+      first.setHours(0, 0, 0, 0);
+      const last = new Date(year, month, lastDay);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const mondays: string[] = [];
+      for (const m = new Date(first); m <= last; m.setDate(m.getDate() + 7)) {
+        mondays.push(`${m.getFullYear()}-${pad(m.getMonth() + 1)}-${pad(m.getDate())}`);
+      }
+      const weeks = await Promise.all(mondays.map((m) => getDutyPlannerWeek(m)));
+      const assign = new Map<string, string>();
+      weeks.forEach((w) =>
+        w.assignments.forEach((a) => assign.set(`${a.employeeId}|${a.date}`, a.dutyType))
+      );
+      const days = Array.from({ length: lastDay }, (_, i) => {
+        const dt = new Date(year, month, i + 1);
+        return {
+          date: `${year}-${pad(month + 1)}-${pad(i + 1)}`,
+          weekday: dt.toLocaleDateString('en-IN', { weekday: 'short' }),
+          dayNum: i + 1,
+        };
+      });
+      const byEmployee: SampleMonthDuties['byEmployee'] = {};
+      for (const emp of employees) {
+        byEmployee[emp.id] = days.map(({ date }) => {
+          const duty = assign.get(`${emp.id}|${date}`) ?? null;
+          const isLeave = isOnApprovedLeave(emp.id, date);
+          return { date, dutyType: duty ?? (isLeave ? 'Rest' : null), isLeave };
+        });
+      }
+      return { year, month, days, byEmployee };
+    },
+    [sampleWeek, employees, isOnApprovedLeave]
+  );
+
   const updateAssignment = useCallback(
     async (employeeId: number, date: string, dutyType: DutyAssignment['dutyType']): Promise<boolean> => {
       if (isDateLocked(date)) {
@@ -160,10 +280,13 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         return false;
       }
 
-      const isSaturday = new Date(date).getDay() === 6;
-      if (isSaturday && (dutyType === 'Rest' || dutyType === 'WeeklyOff')) {
-        showNotification?.('Saturday is compulsory duty. Rest and Weekly Off cannot be assigned.', 'error');
-        return false;
+      // Sample mode: apply the change in-memory (the backend is down).
+      if (sampleWeek) {
+        const next = localUpsertAssignment(sampleWeek, employeeId, date, dutyType);
+        applyWeek(next);
+        setSampleWeek(next);
+        showNotification?.('Duty updated (sample data).', 'success');
+        return true;
       }
 
       setSaving(true);
@@ -188,7 +311,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         setSaving(false);
       }
     },
-    [getAssignment, applyWeek, showNotification, canEditWeek, weekStatus]
+    [getAssignment, applyWeek, showNotification, canEditWeek, weekStatus, sampleWeek]
   );
 
   const deleteAssignment = useCallback(
@@ -208,6 +331,15 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         return false;
       }
 
+      // Sample mode: remove in-memory (the backend is down).
+      if (sampleWeek) {
+        const next = localDeleteAssignment(sampleWeek, existing.id);
+        applyWeek(next);
+        setSampleWeek(next);
+        showNotification?.('Duty removed (sample data).', 'success');
+        return true;
+      }
+
       setSaving(true);
       setError(null);
       try {
@@ -224,7 +356,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         setSaving(false);
       }
     },
-    [getAssignment, applyWeek, showNotification, canEditWeek, weekStatus]
+    [getAssignment, applyWeek, showNotification, canEditWeek, weekStatus, sampleWeek]
   );
 
   const autoAssignAll = useCallback(async (): Promise<{ ok: boolean; plan?: AutoPlan; message?: string }> => {
@@ -266,6 +398,32 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
       showNotification?.('This week is locked.', 'error');
       return false;
     }
+    // A week can only be closed after the previous week is closed.
+    if (!prevWeekClosed) {
+      showNotification?.(
+        'Close the previous week first — submit it before this week can be submitted.',
+        'error'
+      );
+      return false;
+    }
+    // The week is only submittable once every employee has a duty on every day.
+    if (unassignedCount > 0) {
+      showNotification?.(
+        `Cannot submit — ${unassignedCount} day${unassignedCount === 1 ? '' : 's'} still have no duty assigned. Assign every day for every employee first.`,
+        'error'
+      );
+      return false;
+    }
+    // Sample mode: close the week in-memory (the backend is down).
+    if (sampleWeek) {
+      const closed: DutyPlannerWeek = { ...sampleWeek, status: 'Submitted' };
+      markSampleWeekClosed(weekStart);
+      applyWeek(closed);
+      setSampleWeek(closed);
+      showNotification?.('Week closed (sample data).', 'success');
+      return true;
+    }
+
     setSaving(true);
     setError(null);
     try {
@@ -281,15 +439,23 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
     } finally {
       setSaving(false);
     }
-  }, [weekStatus, weekStart, applyWeek, showNotification]);
+  }, [weekStatus, weekStart, unassignedCount, prevWeekClosed, sampleWeek, applyWeek, showNotification]);
 
   return {
     employees,
     assignments,
+    prevWeekStatus,
+    prevWeekStart,
+    prevWeekClosed,
     weekDays,
+    unassignedCount,
+    leaves,
+    isOnApprovedLeave,
+    getMonthDuties,
     loading,
     saving,
     error,
+    usingSampleData: sampleWeek !== null,
     filters,
     setFilters,
     getAssignment,

@@ -39,6 +39,8 @@ import { formatINR, formatRelativeTime } from "../../utils/format";
 
 interface HeaderProps {
   onMenuClick: () => void;
+  /** True while the navigation popup is open (highlights the menu button). */
+  menuOpen?: boolean;
   onOpenCommand: () => void;
 }
 
@@ -136,7 +138,7 @@ function IconButton({
 /* ------------------------------------------------------------------ */
 /*  Header                                                             */
 /* ------------------------------------------------------------------ */
-function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
+function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
@@ -249,12 +251,17 @@ function Header({ onMenuClick, onOpenCommand }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200/80 bg-white/85 px-4 backdrop-blur-md sm:gap-3 sm:px-6 dark:border-slate-800 dark:bg-slate-900/85">
-      {/* Mobile menu */}
+      {/* Menu (all viewports) — opens the small navigation popup */}
       <button
         type="button"
         onClick={onMenuClick}
-        className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 lg:hidden dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
+          menuOpen
+            ? "bg-slate-200/80 text-slate-900 dark:bg-slate-700/80 dark:text-white"
+            : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+        }`}
         aria-label={t("header.openMenu")}
+        aria-expanded={menuOpen}
       >
         <Menu size={20} />
       </button>

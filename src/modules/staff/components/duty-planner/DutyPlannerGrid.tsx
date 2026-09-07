@@ -1,7 +1,7 @@
 // src/modules/staff/components/duty-planner/DutyPlannerGrid.tsx
 
 import { memo } from 'react';
-import { getShiftConfigs } from '../../services/staffService';
+import { getShiftConfigs, getShiftConfigsForRole } from '../../services/staffService';
 import { isDateLocked } from '../../hooks/useDutyPlanner';
 import type { DutyAssignment, Employee } from '../../types/staffDashboard';
 
@@ -13,23 +13,36 @@ interface DutyPlannerGridProps {
   loading: boolean;
   /** True when the backend locks the whole week (Submitted/Locked). */
   weekLocked?: boolean;
+  /** True when the employee has an APPROVED leave on the date. An approved
+   *  leave fills an empty cell as "Leave"; an assigned duty overrides it. */
+  isOnLeave?: (employeeId: number, date: string) => boolean;
 }
 
-function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, loading, weekLocked = false }: DutyPlannerGridProps) {
+function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, loading, weekLocked = false, isOnLeave }: DutyPlannerGridProps) {
   const shiftConfigs = getShiftConfigs();
 
-  const getShiftStyle = (dutyType: string) => {
-    const config = shiftConfigs.find(s => s.type === dutyType);
-    if (!config) return { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-300' };
-    return { bg: config.bgColor, text: config.textColor, border: config.borderColor };
-  };
+  const getShiftStyle = (dutyType: string, role?: string) => {
+    // Core crew roles (Supervisor/Driver/Helper/Loader) use the Weekly Off ↔
+    // Off colour swap; everyone else gets the base colours.
+    const configs = role ? getShiftConfigsForRole(role) : shiftConfigs;
+    const config = configs.find(s => s.type === dutyType);
+    if (config) return { bg: config.bgColor, text: config.textColor, border: config.borderColor };
+    // Custom "Other" types have no config — violet.
+    if (dutyType) return { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200' };
+    // No duty assigned yet — a clean, truly blank cell (no placeholder).
+    return { bg: 'bg-white', text: 'text-transparent', border: 'border-slate-100' };
+  }
+
+  // Show the friendly label (Duty / Leave / Weekly Off …); custom "Other"
+  // types have no config and are displayed exactly as typed.
+  const getShiftLabel = (dutyType: string) =>
+    shiftConfigs.find(s => s.type === dutyType)?.label || dutyType;;
 
   const getDayLabel = (dateStr: string) => {
     const date = new Date(dateStr);
     const dayName = date.toLocaleDateString('en-IN', { weekday: 'short' });
     const dayNum = date.toLocaleDateString('en-IN', { day: '2-digit' });
-    const isSaturday = date.getDay() === 6;
-    return { dayName, dayNum, isSaturday };
+    return { dayName, dayNum };
   };
 
   if (loading) {
@@ -58,17 +71,12 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
                 Employee
               </th>
               {weekDays.map((day, idx) => {
-                const { dayName, dayNum, isSaturday } = getDayLabel(day);
+                const { dayName, dayNum } = getDayLabel(day);
                 return (
                   <th key={idx} className="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider min-w-[100px] max-w-[140px] relative">
                     <div className="flex flex-col items-center gap-0.5">
                       <span className="font-medium">{dayName}</span>
                       <span className="text-sm font-semibold text-slate-700">{dayNum}</span>
-                      {isSaturday && (
-                        <span className="text-[10px] font-medium text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
-                          COMPULSORY
-                        </span>
-                      )}
                     </div>
                   </th>
                 );
@@ -86,11 +94,12 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
                 </td>
                 {weekDays.map((day, idx) => {
                   const assignment = getAssignment(emp.id, day);
-                  const dutyType = assignment?.dutyType || '';
-                  const { bg, text, border } = getShiftStyle(dutyType);
-                  const isSaturday = new Date(day).getDay() === 6;
+                  // An approved leave shows as "Leave" in an empty cell;
+                  // an explicitly assigned duty always overrides the leave.
+                  const leaveFilled = !assignment && !!isOnLeave?.(emp.id, day);
+                  const dutyType = assignment?.dutyType || (leaveFilled ? 'Rest' : '');
+                  const { bg, text, border } = getShiftStyle(dutyType, emp.role);
                   const locked = weekLocked || isDateLocked(day);
-                  const isRestOrWeeklyOff = dutyType === 'Rest' || dutyType === 'WeeklyOff';
 
                   return (
                     <td key={idx} className="px-1.5 py-1.5 text-center min-w-[100px] max-w-[140px]">
@@ -100,22 +109,18 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
                         className={`w-full h-10 min-h-[40px] rounded-lg text-xs font-medium border transition-all duration-150 ${
                           locked
                             ? 'bg-slate-100 text-slate-400 border-slate-200 opacity-75 cursor-not-allowed'
-                            : isSaturday && isRestOrWeeklyOff
-                              ? 'bg-slate-100 text-slate-400 border-slate-200 line-through opacity-50 cursor-not-allowed'
-                              : `${bg} ${text} ${border} hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`
+                            : `${bg} ${text} ${border} hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`
                         }`}
                         title={
                           locked
                             ? 'Past week locked (cannot edit)'
-                            : isSaturday
-                              ? 'Saturday – compulsory duty (Rest/Weekly Off not allowed)'
+                            : leaveFilled
+                              ? 'Approved leave'
                               : ''
                         }
                         style={{ minWidth: '90px' }}
                       >
-                        {dutyType || (
-                          <span className="text-slate-300">—</span>
-                        )}
+                        {dutyType ? getShiftLabel(dutyType) : null}
                       </button>
                     </td>
                   );

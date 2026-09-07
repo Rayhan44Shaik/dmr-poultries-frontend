@@ -80,7 +80,8 @@ export interface DutyAssignment {
   employeeName: string;
   department: string;
   role: string;
-  dutyType: 'Driver' | 'Delivery' | 'Rest' | 'Repair' | 'Office' | 'OfficeDuty' | 'Collection' | 'WeeklyOff';
+  /** Known shift types, or any custom free-text type entered via "Other". */
+  dutyType: 'Driver' | 'Delivery' | 'Rest' | 'Repair' | 'Office' | 'OfficeDuty' | 'Collection' | 'WeeklyOff' | 'Off' | (string & {});
   date: string; // YYYY-MM-DD
   vehicleId?: number;
   vehicleNo?: string;
@@ -92,7 +93,7 @@ export interface DutyPlannerFilters {
   weekStart: string;       // Monday date
 }
 export interface ShiftConfig {
-  type: 'Driver' | 'Delivery' | 'Rest' | 'Repair' | 'Office' | 'OfficeDuty' | 'Collection' | 'WeeklyOff';
+  type: 'Driver' | 'Delivery' | 'Rest' | 'Repair' | 'Office' | 'OfficeDuty' | 'Collection' | 'WeeklyOff' | 'Off';
   label: string;
   bgColor: string;
   textColor: string;

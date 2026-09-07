@@ -11,6 +11,7 @@ import {
   listSalaries,
   handleApiError,
 } from "../services/salaryService";
+import { buildSampleSalaryRecords } from "../services/staffSampleData";
 import type { SalaryRecord } from "../types/staffDashboard";
 
 export interface SalaryRegisterTotals {
@@ -30,6 +31,8 @@ export function useSalaryRegister(month: string, department: string = "") {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'All' | 'Pending' | 'Submitted' | 'Paid'>('All');
+  // True while showing the local sample register (backend unavailable).
+  const [usingSampleData, setUsingSampleData] = useState(false);
 
   const requestSeq = useRef(0);
   const initialLoaded = useRef(false);
@@ -40,9 +43,18 @@ export function useSalaryRegister(month: string, department: string = "") {
     (async () => {
       try {
         const data = await listSalaries(month, department || undefined);
-        if (!cancelled) setRecords(data);
-      } catch (err) {
-        if (!cancelled) setError(handleApiError(err));
+        if (cancelled) return;
+        setRecords(data);
+        setUsingSampleData(false);
+        setError(null);
+      } catch {
+        if (cancelled) return;
+        // Backend unavailable — show the local sample register so the page
+        // stays usable for review (Attendance Summary is derived from the
+        // sample duty assignments). Real data resumes when the API responds.
+        setRecords(buildSampleSalaryRecords(month));
+        setUsingSampleData(true);
+        setError(null);
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -62,9 +74,15 @@ export function useSalaryRegister(month: string, department: string = "") {
     setError(null);
     try {
       const data = await listSalaries(month, department || undefined);
-      if (seq === requestSeq.current) setRecords(data);
-    } catch (err) {
-      if (seq === requestSeq.current) setError(handleApiError(err));
+      if (seq === requestSeq.current) {
+        setRecords(data);
+        setUsingSampleData(false);
+      }
+    } catch {
+      if (seq === requestSeq.current) {
+        setRecords(buildSampleSalaryRecords(month));
+        setUsingSampleData(true);
+      }
     } finally {
       if (seq === requestSeq.current) setRefreshing(false);
     }
@@ -151,6 +169,7 @@ export function useSalaryRegister(month: string, department: string = "") {
     refreshing,
     saving,
     error,
+    usingSampleData,
     refresh,
     markPaidBulk,
     markUnpaidBulk,
