@@ -2,7 +2,7 @@
 // PostgreSQL-backed duty planner hook. All persistent data flows through
 // the existing staff duty API; localStorage is not used.
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   autoAssignApply,
   autoAssignPreview,
@@ -88,6 +88,13 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
   const [selectedCell, setSelectedCell] = useState<{ employeeId: number; date: string } | null>(null);
   const [showPicker, setShowPicker] = useState(false);
 
+  // Latest notification callback without making it a load-effect dependency
+  // (a new callback identity must never reset the loaded week).
+  const notifyRef = useRef<typeof showNotification>(showNotification);
+  useEffect(() => {
+    notifyRef.current = showNotification;
+  }, [showNotification]);
+
   /** Week cannot be edited when the backend locks or submits it. */
   const canEditWeek =
     weekStatus === 'Open' || weekStatus === 'Draft' || weekStatus === '';
@@ -123,7 +130,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         applyWeek(week);
         setSampleWeek(week);
         setError(null);
-        showNotification?.('Backend unavailable — showing sample staff data.', 'info');
+        notifyRef.current?.('Backend unavailable — showing sample staff data.', 'info');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -131,7 +138,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
     return () => {
       cancelled = true;
     };
-  }, [filters.weekStart, applyWeek, showNotification]);
+  }, [filters.weekStart, applyWeek]);
 
   const moveWeek = useCallback((direction: -1 | 1) => {
     setFilters((prev) => {
@@ -158,6 +165,20 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
     },
     [assignments]
   );
+
+  // Number of (employee × day) cells in this week that still have no duty.
+  // The week can only be submitted when this is 0.
+  const unassignedCount = useMemo(() => {
+    let count = 0;
+    for (const emp of employees) {
+      for (const day of weekDays) {
+        if (!assignments.some((a) => a.employeeId === emp.id && a.date === day)) {
+          count += 1;
+        }
+      }
+    }
+    return count;
+  }, [employees, weekDays, assignments]);
 
   const updateAssignment = useCallback(
     async (employeeId: number, date: string, dutyType: DutyAssignment['dutyType']): Promise<boolean> => {
@@ -288,6 +309,14 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
       showNotification?.('This week is locked.', 'error');
       return false;
     }
+    // The week is only submittable once every employee has a duty on every day.
+    if (unassignedCount > 0) {
+      showNotification?.(
+        `Cannot submit — ${unassignedCount} day${unassignedCount === 1 ? '' : 's'} still have no duty assigned. Assign every day for every employee first.`,
+        'error'
+      );
+      return false;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -303,12 +332,13 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
     } finally {
       setSaving(false);
     }
-  }, [weekStatus, weekStart, applyWeek, showNotification]);
+  }, [weekStatus, weekStart, unassignedCount, applyWeek, showNotification]);
 
   return {
     employees,
     assignments,
     weekDays,
+    unassignedCount,
     loading,
     saving,
     error,

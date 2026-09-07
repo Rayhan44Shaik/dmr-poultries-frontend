@@ -6,9 +6,8 @@ import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import DutyPlannerFilters from '../components/duty-planner/DutyPlannerFilters';
 import DutyPlannerGrid from '../components/duty-planner/DutyPlannerGrid';
 import ShiftPicker from '../components/duty-planner/ShiftPicker';
-import { CheckCircle2, Sparkles, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import type { DutyPlannerFilters as DutyPlannerFiltersType, DutyAssignment, Employee } from '../types/staffDashboard';
-import type { AutoPlan } from '../services/dutyPlannerService';
 
 function DutyPlannerPage() {
   const { showNotification } = useSafeNotification();
@@ -34,13 +33,12 @@ function DutyPlannerPage() {
     weekStart,
     weekStatus,
     canEditWeek,
+    unassignedCount,
     validation,
-    autoAssignAll,
     submitCurrentWeek,
   } = useDutyPlanner(showNotification);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [lastAutoPlan, setLastAutoPlan] = useState<AutoPlan | null>(null);
 
   const handleCellClick = useCallback((employeeId: number, date: string) => {
     if (isDateLocked(date)) {
@@ -74,13 +72,6 @@ function DutyPlannerPage() {
       }
     });
   }, [selectedCell, deleteAssignment, setSelectedCell, setShowPicker]);
-
-  const handleAutoAssign = useCallback(() => {
-    void autoAssignAll().then((res) => {
-      if (res.plan) setLastAutoPlan(res.plan);
-      if (res.ok) setLastAutoPlan(res.plan ?? null);
-    });
-  }, [autoAssignAll]);
 
   const handleSubmitWeek = useCallback(() => {
     void submitCurrentWeek();
@@ -211,32 +202,36 @@ function DutyPlannerPage() {
 
       {/* Week Actions - Compact row */}
       <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <button
-            onClick={handleAutoAssign}
-            disabled={!canEditWeek || loading || saving}
-            className="h-10 px-4 rounded-lg border border-orange-200 bg-orange-50 text-orange-700 text-sm font-medium hover:bg-orange-100 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Sparkles size={15} />
-            Auto Assign
-          </button>
-          <button
-            onClick={handleSubmitWeek}
-            disabled={!canEditWeek || loading || saving}
-            className="h-10 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <CheckCircle2 size={15} />
-            Submit Week
-          </button>
-        </div>
+        <button
+          onClick={handleSubmitWeek}
+          disabled={!canEditWeek || loading || saving || unassignedCount > 0}
+          title={
+            unassignedCount > 0
+              ? `Assign duties for all days first — ${unassignedCount} day(s) still empty`
+              : 'Submit this week'
+          }
+          className="h-10 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <CheckCircle2 size={15} />
+          Submit Week
+        </button>
         <div className="flex items-center gap-2 text-xs text-slate-500">
-          {validation.ok ? (
-            <span className="flex items-center gap-1.5 text-emerald-600">
-              <CheckCircle2 size={12} />
-              All checks passed
+          {unassignedCount > 0 ? (
+            <span
+              className="flex items-center gap-1.5 text-amber-600"
+              title="Every employee needs a duty on every day before the week can be submitted"
+            >
+              <AlertCircle size={12} />
+              {unassignedCount} of {employees.length * weekDays.length} day(s) without duty — assign all to submit
             </span>
           ) : (
-            <span className="flex items-center gap-1.5 text-rose-600">
+            <span className="flex items-center gap-1.5 text-emerald-600">
+              <CheckCircle2 size={12} />
+              All duties assigned — ready to submit
+            </span>
+          )}
+          {!validation.ok && (
+            <span className="flex items-center gap-1.5 text-rose-600 ml-2 border-l border-slate-200 pl-2">
               <AlertCircle size={12} />
               {validation.problems.length} issue(s)
             </span>
@@ -244,25 +239,9 @@ function DutyPlannerPage() {
         </div>
       </div>
 
-      {/* Auto Assign Preview / Conflicts / Validation - Collapsible, only when relevant */}
-      {(lastAutoPlan || !validation.ok) && (
+      {/* Validation issues - only shown when relevant */}
+      {!validation.ok && validation.problems.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm space-y-3">
-          {lastAutoPlan && (
-            <div className="bg-slate-50/60 border border-slate-200 rounded-lg p-3">
-              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Auto Assign Preview</div>
-              <div className="text-sm text-slate-700">
-                {lastAutoPlan.employeesAffected} employee(s) · Delivery {lastAutoPlan.delivery} · Repair {lastAutoPlan.repair} · Office {lastAutoPlan.office} · Collection {lastAutoPlan.collection}
-              </div>
-              {lastAutoPlan.conflicts.length > 0 && (
-                <ul className="mt-2 list-disc list-inside space-y-0.5 text-xs text-rose-600">
-                  {lastAutoPlan.conflicts.map((c, i) => (
-                    <li key={i}>{c}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-
           {!validation.ok && validation.problems.length > 0 && (
             <div className="bg-rose-50/80 border border-rose-200/80 rounded-lg p-2.5 text-xs text-rose-700">
               <strong className="font-semibold">Validation issues:</strong>
