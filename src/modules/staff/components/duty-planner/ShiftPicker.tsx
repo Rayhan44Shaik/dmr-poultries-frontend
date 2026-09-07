@@ -43,17 +43,29 @@ function ShiftPicker({ isOpen, onClose, onSelect, onRemove, currentDuty, date, e
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 animate-fadeIn border border-slate-100">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-base font-bold text-slate-800">
-            Select Duty for <span className="text-green-600 font-normal">{employeeName || 'Employee'}{employeeRole ? ` (${employeeRole})` : ''}</span>
-          </h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg transition shrink-0 ml-2">
-            <X size={18} className="text-slate-500" />
-          </button>
+      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-5 animate-fadeIn border border-slate-100">
+        {/* Header — always a single, tidy line: small label + name + role chip */}
+        <div className="mb-4">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.09em] text-slate-400">
+                Select duty for
+              </p>
+              <h3 className="mt-0.5 flex items-center gap-2 text-[15px] font-bold leading-snug text-slate-900">
+                <span className="truncate">{employeeName || 'Employee'}</span>
+                {employeeRole && (
+                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-[3px] text-[10.5px] font-semibold text-slate-500">
+                    {employeeRole}
+                  </span>
+                )}
+              </h3>
+            </div>
+            <button onClick={onClose} className="-mr-1 -mt-1 shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close">
+              <X size={17} />
+            </button>
+          </div>
+          <p className="mt-1.5 truncate text-xs font-medium text-slate-400">{formattedDate}</p>
         </div>
-
-        <p className="text-xs font-medium text-slate-400 mb-4">{formattedDate}</p>
 
         <div className="grid grid-cols-2 gap-2">
           {shifts.map((shift) => {
