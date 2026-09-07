@@ -56,15 +56,32 @@ function DutyPlannerPage() {
     setShowPicker(true);
   }, [canEditWeek, weekStatus, setSelectedCell, setShowPicker, showNotification]);
 
-  const handleSelectShift = useCallback((dutyType: string) => {
+  const handleSelectShift = useCallback((dutyType: string, nextDayDutyType?: string) => {
     if (!selectedCell) return;
-    void updateAssignment(selectedCell.employeeId, selectedCell.date, dutyType as DutyAssignment['dutyType']).then((success) => {
-      if (success) {
+    void (async () => {
+      // Two-day trip flow: mark the return day silently, then a single
+      // toast for the second assignment covers both days.
+      const ok1 = await updateAssignment(
+        selectedCell.employeeId,
+        selectedCell.date,
+        dutyType as DutyAssignment['dutyType'],
+        { silent: Boolean(nextDayDutyType) }
+      );
+      if (!ok1) return;
+      let ok2 = true;
+      if (nextDayDutyType) {
+        const idx = weekDays.findIndex((d) => d === selectedCell.date);
+        const nextDay = weekDays[idx + 1]; // string[] of ISO dates, Monday-anchored
+        if (nextDay) {
+          ok2 = await updateAssignment(selectedCell.employeeId, nextDay, nextDayDutyType as DutyAssignment['dutyType']);
+        }
+      }
+      if (ok1 && ok2) {
         setShowPicker(false);
         setSelectedCell(null);
       }
-    });
-  }, [selectedCell, updateAssignment, setSelectedCell, setShowPicker]);
+    })();
+  }, [selectedCell, updateAssignment, weekDays, setSelectedCell, setShowPicker]);
 
   const handleRemoveDuty = useCallback(() => {
     if (!selectedCell) return;

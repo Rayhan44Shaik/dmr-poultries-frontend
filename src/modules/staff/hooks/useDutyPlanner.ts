@@ -160,7 +160,12 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
   );
 
   const updateAssignment = useCallback(
-    async (employeeId: number, date: string, dutyType: DutyAssignment['dutyType']): Promise<boolean> => {
+    async (
+      employeeId: number,
+      date: string,
+      dutyType: DutyAssignment['dutyType'],
+      opts?: { silent?: boolean }
+    ): Promise<boolean> => {
       if (isDateLocked(date)) {
         showNotification?.('Cannot edit duties for previous completed weeks.', 'error');
         return false;
@@ -181,7 +186,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         const next = localUpsertAssignment(sampleWeek, employeeId, date, dutyType);
         applyWeek(next);
         setSampleWeek(next);
-        showNotification?.('Duty updated (sample data).', 'success');
+        if (!opts?.silent) showNotification?.('Duty updated (sample data).', 'success');
         return true;
       }
 
@@ -196,7 +201,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
           date,
         });
         applyWeek(week);
-        showNotification?.('Duty assignment updated successfully', 'success');
+        if (!opts?.silent) showNotification?.('Duty assignment updated successfully', 'success');
         return true;
       } catch (err) {
         const message = handleApiError(err);

@@ -323,6 +323,11 @@ export function getShiftConfigs(): ShiftConfig[] {
   return [
     { type: 'Driver', label: 'Driver', bgColor: 'bg-blue-100', textColor: 'text-blue-700', borderColor: 'border-blue-300' },
     { type: 'Delivery', label: 'Duty', bgColor: 'bg-green-100', textColor: 'text-green-700', borderColor: 'border-green-300' },
+    // Two-day trips (vehicle crew): the trip leaves the office on the
+    // "Trip Start" day (~12 PM) and the driver returns on the "On Trip"
+    // day (usually 9 AM–4 PM, varies). Both days count as working days.
+    { type: 'TripStart', label: 'Trip Start', bgColor: 'bg-sky-100', textColor: 'text-sky-800', borderColor: 'border-sky-300' },
+    { type: 'OnTrip', label: 'On Trip', bgColor: 'bg-sky-50', textColor: 'text-sky-600', borderColor: 'border-sky-200' },
     { type: 'Rest', label: 'Leave', bgColor: 'bg-slate-100', textColor: 'text-slate-600', borderColor: 'border-slate-300' },
     { type: 'Repair', label: 'Repair', bgColor: 'bg-amber-100', textColor: 'text-amber-700', borderColor: 'border-amber-300' },
     { type: 'Office', label: 'Office', bgColor: 'bg-indigo-100', textColor: 'text-indigo-700', borderColor: 'border-indigo-300' },
@@ -335,15 +340,16 @@ export function getShiftConfigs(): ShiftConfig[] {
 /**
  * Which shift types are offered in the picker, per employee role.
  * - Supervisor: Duty, Office, Leave, Weekly Off
- * - Driver / Helper / Loader: Duty, Repair, Office, Leave, Weekly Off
+ * - Driver / Helper / Loader: Trip Start, On Trip, Duty, Repair, Office,
+ *   Leave, Weekly Off (trips run ~12 PM out → next-day return)
  * - Any other/unknown role: the full list
  * ("Other" — free text — is added by the picker itself, for every role.)
  */
 const ROLE_SHIFT_TYPES: Record<string, ShiftConfig['type'][]> = {
   Supervisor: ['Delivery', 'Office', 'Rest', 'WeeklyOff'],
-  Driver: ['Delivery', 'Repair', 'Office', 'Rest', 'WeeklyOff'],
-  Helper: ['Delivery', 'Repair', 'Office', 'Rest', 'WeeklyOff'],
-  Loader: ['Delivery', 'Repair', 'Office', 'Rest', 'WeeklyOff'],
+  Driver: ['TripStart', 'OnTrip', 'Delivery', 'Repair', 'Office', 'Rest', 'WeeklyOff'],
+  Helper: ['TripStart', 'OnTrip', 'Delivery', 'Repair', 'Office', 'Rest', 'WeeklyOff'],
+  Loader: ['TripStart', 'OnTrip', 'Delivery', 'Repair', 'Office', 'Rest', 'WeeklyOff'],
 };
 
 export function getShiftConfigsForRole(role?: string): ShiftConfig[] {

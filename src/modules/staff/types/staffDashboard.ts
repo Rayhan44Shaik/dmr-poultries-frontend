@@ -93,7 +93,9 @@ export interface DutyPlannerFilters {
   weekStart: string;       // Monday date
 }
 export interface ShiftConfig {
-  type: 'Driver' | 'Delivery' | 'Rest' | 'Repair' | 'Office' | 'OfficeDuty' | 'Collection' | 'WeeklyOff';
+  // `string & {}` keeps autocomplete for the known types while allowing
+  // extra duty types (TripStart / OnTrip / custom "Other" values).
+  type: 'Driver' | 'Delivery' | 'TripStart' | 'OnTrip' | 'Rest' | 'Repair' | 'Office' | 'OfficeDuty' | 'Collection' | 'WeeklyOff' | (string & {});
   label: string;
   bgColor: string;
   textColor: string;

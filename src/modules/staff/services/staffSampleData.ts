@@ -60,17 +60,17 @@ const SAMPLE_EMPLOYEES: Employee[] = [
 ];
 
 /**
- * Deterministic rotating schedules. Types match exactly what each role's
- * shift picker offers:
- *   Supervisor → Duty (Delivery), Office, Leave (Rest), Weekly Off
- *   Driver/Helper/Loader → Duty (Delivery), Repair, Office, Leave (Rest), Weekly Off
- * Index 5 is Saturday (compulsory duty) — never Rest / WeeklyOff.
+ * Deterministic weekly schedules. Vehicle crews work in two-day trips:
+ * the trip starts from the office on the "Trip Start" day (~12 PM) and
+ * the driver returns on the "On Trip" day (9 AM–4 PM, varies). Both days
+ * are working days. Index 5 is Saturday (compulsory duty) — never
+ * Rest / WeeklyOff.
  */
 const SAMPLE_SCHEDULE: Record<string, string[]> = {
-  Supervisor: ["Delivery", "Office", "Rest", "Delivery", "Office", "Delivery", "Rest"],
-  Driver:     ["Delivery", "Delivery", "Rest", "Delivery", "Repair", "Delivery", "WeeklyOff"],
-  Helper:     ["Office", "Delivery", "Rest", "Delivery", "Office", "Delivery", "Rest"],
-  Loader:     ["Delivery", "Office", "Rest", "Delivery", "Delivery", "Delivery", "WeeklyOff"],
+  Supervisor: ["Delivery", "Office",  "Rest",   "Delivery", "Office",  "Delivery", "Rest"],
+  Driver:     ["TripStart","OnTrip",  "Rest",   "TripStart","OnTrip",  "TripStart","OnTrip"],
+  Helper:     ["TripStart","OnTrip",  "Office", "TripStart","OnTrip",  "Office",   "Rest"],
+  Loader:     ["TripStart","OnTrip",  "Repair", "Office",   "TripStart","OnTrip",  "Rest"],
 };
 
 function dutyForRole(role: string, dayIndex: number): string {
@@ -218,7 +218,7 @@ function attendanceFrom(week: DutyPlannerWeek, employeeId: number) {
   mine.forEach((a) => {
     if (a.dutyType === "Rest") leave += 1;
     else if (a.dutyType === "WeeklyOff") weeklyOff += 1;
-    else present += 1; // Duty / Office / Repair / Collection / custom "Other"
+    else present += 1; // Duty / Trip Start / On Trip / Office / Repair / Collection / custom "Other"
   });
   return {
     workingDays: mine.length,
