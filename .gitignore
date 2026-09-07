@@ -44,3 +44,5 @@ vite.config.d.ts
 /blob-report/
 /playwright/.cache/
 Duty-Report-*.pdf
+
+Duty-Planner-*.xlsx

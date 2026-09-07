@@ -16,7 +16,9 @@ import {
   type DutyPlannerValidation,
   type DutyPlannerWeek,
 } from '../services/dutyPlannerService';
-import { buildSampleDutyWeek, buildSampleLeaves, buildSampleMonthDuties, localDeleteAssignment, localUpsertAssignment, markSampleWeekClosed, type SampleMonthDuties } from '../services/staffSampleData';
+import { buildSampleDutyWeek, buildSampleLeaves, localDeleteAssignment, localUpsertAssignment, markSampleWeekClosed } from '../services/staffSampleData';
+import { getDutyReportWeekStarts, loadDutyReportLeaves, loadDutyReportRange, type DutyReportRange } from '../services/dutyReport';
+import { listLeaves } from '../services/leaveService';
 import { loadLeaveRequests } from '../services/staffService';
 import type { Employee, DutyAssignment, DutyPlannerFilters, LeaveRequest } from '../types/staffDashboard';
 
@@ -138,6 +140,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setLoading(true);
       const prevMonday = prevWeekMondayISO(filters.weekStart);
       try {
         const [week, prev] = await Promise.all([
@@ -223,50 +226,27 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
     return count;
   }, [employees, weekDays, assignments, isOnApprovedLeave]);
 
-  /**
-   * Monthly duty matrix for future analysis: every day of the month for
-   * every employee. Sample mode uses the deterministic sample weeks;
-   * real mode fetches each week of the month from the API.
-   */
-  const getMonthDuties = useCallback(
-    async (year: number, month: number): Promise<SampleMonthDuties> => {
-      if (sampleWeek) {
-        return buildSampleMonthDuties(year, month);
-      }
-      const lastDay = new Date(year, month + 1, 0).getDate();
-      const first = new Date(year, month, 1);
-      first.setDate(first.getDate() - first.getDay() + (first.getDay() === 0 ? -6 : 1));
-      first.setHours(0, 0, 0, 0);
-      const last = new Date(year, month, lastDay);
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const mondays: string[] = [];
-      for (const m = new Date(first); m <= last; m.setDate(m.getDate() + 7)) {
-        mondays.push(`${m.getFullYear()}-${pad(m.getMonth() + 1)}-${pad(m.getDate())}`);
-      }
-      const weeks = await Promise.all(mondays.map((m) => getDutyPlannerWeek(m)));
-      const assign = new Map<string, string>();
-      weeks.forEach((w) =>
-        w.assignments.forEach((a) => assign.set(`${a.employeeId}|${a.date}`, a.dutyType))
-      );
-      const days = Array.from({ length: lastDay }, (_, i) => {
-        const dt = new Date(year, month, i + 1);
-        return {
-          date: `${year}-${pad(month + 1)}-${pad(i + 1)}`,
-          weekday: dt.toLocaleDateString('en-IN', { weekday: 'short' }),
-          dayNum: i + 1,
-        };
-      });
-      const byEmployee: SampleMonthDuties['byEmployee'] = {};
-      for (const emp of employees) {
-        byEmployee[emp.id] = days.map(({ date }) => {
-          const duty = assign.get(`${emp.id}|${date}`) ?? null;
-          const isLeave = isOnApprovedLeave(emp.id, date);
-          return { date, dutyType: duty ?? (isLeave ? 'Rest' : null), isLeave };
-        });
-      }
-      return { year, month, days, byEmployee };
-    },
-    [sampleWeek, employees, isOnApprovedLeave]
+  /** Week, month or custom-range reports use the same authoritative data.
+   * Sample mode is explicit and preserves edits to the currently loaded week.
+   * A failed live report is never padded with sample data. */
+  const getRangeDuties = useCallback(
+    (range: DutyReportRange, signal?: AbortSignal) => loadDutyReportRange(range, {
+      usingSampleData: sampleWeek !== null,
+      loadWeek: async (monday) => {
+        if (monday === weekStart) return { weekStart, employees, assignments };
+        return sampleWeek ? buildSampleDutyWeek(monday) : getDutyPlannerWeek(monday);
+      },
+      loadLeaves: async () => {
+        if (sampleWeek) return getDutyReportWeekStarts(range).flatMap(buildSampleLeaves);
+        const approvedLeaves = await loadDutyReportLeaves(range, listLeaves, signal);
+        signal?.throwIfAborted();
+        // Keep the editable week in sync with the same approved-leave source
+        // as its export. A partial range must not erase other days' leaves.
+        if (range.fromDate <= weekStart && range.toDate >= weekEnd) setLeaves(approvedLeaves);
+        return approvedLeaves;
+      },
+    }, signal),
+    [sampleWeek, weekStart, weekEnd, employees, assignments],
   );
 
   const updateAssignment = useCallback(
@@ -451,7 +431,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
     unassignedCount,
     leaves,
     isOnApprovedLeave,
-    getMonthDuties,
+    getRangeDuties,
     loading,
     saving,
     error,

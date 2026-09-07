@@ -26,13 +26,16 @@
     "test:collections": "tsx --test src/modules/operations/collections/services/collectionService.contract.test.ts src/modules/operations/collections/services/collectionBalance.ui.test.ts",
     "test:e2e": "playwright test",
     "mock:backend": "node scripts/dev-mock-backend.mjs",
-    "smoke": "node scripts/ssr-smoke.mjs"
+    "smoke": "node scripts/ssr-smoke.mjs",
+    "test:duty-planner": "tsx --test src/modules/staff/services/dutyReport.test.ts src/modules/staff/services/dutyReportExcel.test.ts",
+    "test:e2e:duty-planner": "playwright test --config tests/duty-planner/playwright.config.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
     "@types/react-date-range": "^1.4.10",
     "axios": "^1.19.0",
     "date-fns": "^4.4.0",
+    "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",

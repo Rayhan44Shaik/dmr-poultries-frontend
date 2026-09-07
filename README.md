@@ -9,6 +9,29 @@ npm install
 npm run dev
 ```
 
+### Duty Planner Excel reports
+
+In **Staff → Duty Planner**, select **Week**, **Month**, or **Custom range**, then
+click **Download Excel**. Custom ranges include both dates and can cross months
+and years. Role and employee-name filters apply to the exported rows.
+
+- **Duty Planner** sheet: employee identity on the left, dates across columns,
+  leave/off/weekly-off/no-entry counts, **Duty Count** last, and grand totals.
+- **Daily Details** sheet: full duty text, source duty type, date, vehicle,
+  approved-leave overlap, planned/recorded status, and numeric duty counts.
+- Counts include dates through the displayed **as-of** date, excluding future
+  plans, leave, off and weekly off from Duty Count. An assignment overrides leave.
+- Sample-mode workbooks are explicitly labelled **SAMPLE**. Other pages' PDF
+  exports are unchanged.
+
+Focused checks (browser tests mock the staff API; no database is needed):
+
+```bash
+npm run test:duty-planner
+npx playwright install chromium
+npm run test:e2e:duty-planner
+```
+
 ## Backend (PostgreSQL — Masters + Trip Steps 1–5 + Staff)
 
 See [`backend/README.md`](./backend/README.md).

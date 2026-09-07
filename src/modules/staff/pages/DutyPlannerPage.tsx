@@ -5,12 +5,12 @@ import { useDutyPlanner, isDateLocked } from '../hooks/useDutyPlanner';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import DutyPlannerFilters from '../components/duty-planner/DutyPlannerFilters';
 import DutyPlannerGrid from '../components/duty-planner/DutyPlannerGrid';
+import DutyPlannerReportTable from '../components/duty-planner/DutyPlannerReportTable';
+import { DatePicker } from '../../../components/common/DatePicker';
 import ShiftPicker from '../components/duty-planner/ShiftPicker';
-import { getShiftConfigsForRole } from '../services/staffService';
-import { downloadMonthDutiesPdf, todayStr, isFutureDate } from '../services/dutyReportPdf';
-import type { SampleMonthDuties } from '../services/staffSampleData';
-import { CheckCircle2, ChevronLeft, ChevronRight, AlertCircle, CalendarDays, FileDown, LockKeyhole } from 'lucide-react';
-import type { DutyPlannerFilters as DutyPlannerFiltersType, DutyAssignment, Employee } from '../types/staffDashboard';
+import { filterDutyEmployees, formatDutyDate, getDutyRangeError, todayStr, type DutyReportData, type DutyReportRange } from '../services/dutyReport';
+import { CheckCircle2, ChevronLeft, ChevronRight, AlertCircle, CalendarDays, FileSpreadsheet, LoaderCircle, RefreshCw, LockKeyhole } from 'lucide-react';
+import type { DutyPlannerFilters as DutyPlannerFiltersType, DutyAssignment } from '../types/staffDashboard';
 
 function DutyPlannerPage() {
   const { showNotification } = useSafeNotification();
@@ -38,7 +38,7 @@ function DutyPlannerPage() {
     canEditWeek,
     unassignedCount,
     isOnApprovedLeave,
-    getMonthDuties,
+    getRangeDuties,
     prevWeekClosed,
     prevWeekStart,
     validation,
@@ -47,57 +47,70 @@ function DutyPlannerPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
 
-  /* ----- Week / Month view ----- */
-  const [view, setView] = useState<'week' | 'month'>('week');
+  /* ----- Week / Month / Custom-range views ----- */
+  const [view, setView] = useState<'week' | 'month' | 'custom'>('week');
   const [monthCursor, setMonthCursor] = useState(() => {
     const d = new Date();
     return { y: d.getFullYear(), m: d.getMonth() };
   });
-  const [monthData, setMonthData] = useState<SampleMonthDuties | null>(null);
-  const [monthError, setMonthError] = useState(false);
+  const [customRange, setCustomRange] = useState<DutyReportRange>(() => ({
+    fromDate: `${todayStr().slice(0, 7)}-01`, toDate: todayStr(),
+  }));
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [reportState, setReportState] = useState<{
+    key: string;
+    loader: typeof getRangeDuties;
+    data: DutyReportData | null;
+    error: string | null;
+  } | null>(null);
 
-  // Keep the latest notify in a ref so the fetch effect never re-runs on render.
+  const range = useMemo<DutyReportRange>(() => {
+    if (view === 'custom') return customRange;
+    if (view === 'month') return {
+      fromDate: new Date(Date.UTC(monthCursor.y, monthCursor.m, 1)).toISOString().slice(0, 10),
+      toDate: new Date(Date.UTC(monthCursor.y, monthCursor.m + 1, 0)).toISOString().slice(0, 10),
+    };
+    const end = new Date(`${filters.weekStart}T00:00:00Z`);
+    end.setUTCDate(end.getUTCDate() + 6);
+    return { fromDate: filters.weekStart, toDate: end.toISOString().slice(0, 10) };
+  }, [view, customRange, monthCursor, filters.weekStart]);
+  const { fromDate, toDate } = range;
+  const rangeError = getDutyRangeError(range);
+  const reportKey = `${fromDate}:${toDate}:${refreshKey}`;
+
+  // A prior range, source or retry must never remain exportable while a new
+  // report loads. Cancellation also protects rapid month/date changes.
   const notifyRef = useRef(showNotification);
+  useEffect(() => { notifyRef.current = showNotification; });
   useEffect(() => {
-    notifyRef.current = showNotification;
-  });
-
-  useEffect(() => {
-    if (view !== 'month') return;
+    if (loading || rangeError) return;
     let cancelled = false;
-    void getMonthDuties(monthCursor.y, monthCursor.m)
+    const controller = new AbortController();
+    void getRangeDuties({ fromDate, toDate }, controller.signal)
       .then((data) => {
-        if (!cancelled) {
-          setMonthError(false);
-          setMonthData(data);
-        }
+        if (!cancelled) setReportState({ key: reportKey, loader: getRangeDuties, data, error: null });
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (!cancelled) {
-          setMonthError(true);
-          setMonthData(null);
-          notifyRef.current('Could not load month duties.', 'error');
+          const message = error instanceof Error ? error.message : 'Could not load duty report.';
+          setReportState({ key: reportKey, loader: getRangeDuties, data: null, error: message });
+          notifyRef.current('Could not load the duty report. Please retry before exporting.', 'error');
         }
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [view, monthCursor, getMonthDuties]);
+    return () => { cancelled = true; controller.abort(); };
+  }, [fromDate, toDate, reportKey, rangeError, getRangeDuties, loading]);
 
-  const monthStale = !monthData || monthData.year !== monthCursor.y || monthData.month !== monthCursor.m;
+  const reportCurrent = !loading && !rangeError && reportState?.key === reportKey && reportState?.loader === getRangeDuties;
+  const reportData = reportCurrent ? reportState.data : null;
+  const reportError = reportCurrent ? reportState.error : null;
   const today = todayStr();
-  const asOfLabel = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-
+  const asOfLabel = formatDutyDate(today);
   const monthLabel = new Date(monthCursor.y, monthCursor.m, 1).toLocaleDateString('en-IN', {
-    month: 'long',
-    year: 'numeric',
+    month: 'long', year: 'numeric',
   });
-  const prevMonth = () =>
-    setMonthCursor(({ y, m }) => (m === 0 ? { y: y - 1, m: 11 } : { y, m: m - 1 }));
-  const nextMonth = () =>
-    setMonthCursor(({ y, m }) => (m === 11 ? { y: y + 1, m: 0 } : { y, m: m + 1 }));
-
-
+  const prevMonth = () => setMonthCursor(({ y, m }) => (m === 0 ? { y: y - 1, m: 11 } : { y, m: m - 1 }));
+  const nextMonth = () => setMonthCursor(({ y, m }) => (m === 11 ? { y: y + 1, m: 0 } : { y, m: m + 1 }));
 
   const handleCellClick = useCallback((employeeId: number, date: string) => {
     if (isDateLocked(date)) {
@@ -146,13 +159,34 @@ function DutyPlannerPage() {
     setSearchQuery('');
   }, [resetFilters]);
 
-  const filteredEmployees = useMemo(() => {
-    if (!searchQuery.trim()) return employees;
-    const lowerQuery = searchQuery.toLowerCase();
-    return employees.filter((emp: Employee) =>
-      (emp.employeeName || '').toLowerCase().includes(lowerQuery)
-    );
-  }, [employees, searchQuery]);
+  const filteredEmployees = useMemo(
+    () => filterDutyEmployees(employees, filters.role, searchQuery),
+    [employees, filters.role, searchQuery],
+  );
+  const reportEmployees = useMemo(
+    () => filterDutyEmployees(reportData?.employees ?? [], filters.role, searchQuery),
+    [reportData, filters.role, searchQuery],
+  );
+  const canDownloadExcel = !!reportData && reportEmployees.length > 0 && !saving && !exporting;
+
+  const handleDownloadExcel = async () => {
+    if (!canDownloadExcel || !reportData) return;
+    setExporting(true);
+    try {
+      const { downloadDutyExcel } = await import('../services/dutyReportExcel');
+      await downloadDutyExcel({
+        data: reportData,
+        employees: reportEmployees,
+        asOf: today,
+        filterLabel: `Roles: ${filters.role.length ? filters.role.join(', ') : 'All'}${searchQuery.trim() ? ` | Employee search: ${searchQuery.trim()}` : ''}`,
+      });
+      showNotification('Duty Planner Excel downloaded successfully.', 'success');
+    } catch (error) {
+      showNotification(error instanceof Error ? error.message : 'Could not export Duty Planner to Excel. Please retry.', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const selectedEmployee = useMemo(() => {
     if (!selectedCell) return null;
@@ -195,7 +229,7 @@ function DutyPlannerPage() {
 
   return (
     <div className="w-full space-y-4 bg-slate-50/30 min-h-screen pb-8">
-      {/* Toolbar - Week / Month views */}
+      {/* Toolbar - Week / Month / Custom range views */}
       <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         {view === 'week' ? (
           <div className="flex items-center gap-3 flex-wrap">
@@ -223,7 +257,7 @@ function DutyPlannerPage() {
               <ChevronRight size={18} />
             </button>
           </div>
-        ) : (
+        ) : view === 'month' ? (
           <div className="flex items-center gap-2">
             <button
               onClick={prevMonth}
@@ -246,21 +280,34 @@ function DutyPlannerPage() {
               <ChevronRight size={18} />
             </button>
           </div>
+        ) : (
+          <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800">
+            <CalendarDays size={16} className="text-slate-400" /> Custom date range
+          </span>
         )}
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Week / Month view toggle */}
+          {/* Period view toggle */}
           <div className="flex rounded-lg border border-slate-200 overflow-hidden text-xs font-semibold">
             <button
               onClick={() => setView('week')}
+              aria-pressed={view === 'week'}
               className={`px-3 py-1.5 transition ${view === 'week' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
             >
               Week
             </button>
             <button
               onClick={() => setView('month')}
+              aria-pressed={view === 'month'}
               className={`px-3 py-1.5 transition ${view === 'month' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
             >
               Month
+            </button>
+            <button
+              onClick={() => setView('custom')}
+              aria-pressed={view === 'custom'}
+              className={`px-3 py-1.5 transition ${view === 'custom' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            >
+              Custom range
             </button>
           </div>
           {view === 'week' ? (
@@ -310,7 +357,7 @@ function DutyPlannerPage() {
       {/* Filter Bar - Clean and compact */}
       <DutyPlannerFilters
         role={filters.role}
-        roles={allRoles}
+        roles={[...new Set([...allRoles, ...(reportData?.employees ?? []).map((employee) => employee.role)])]}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onRoleChange={(val) =>
@@ -319,7 +366,70 @@ function DutyPlannerPage() {
         onReset={handleReset}
       />
 
-      {/* Duty Calendar - Main focus (week) / monthly analysis (month) */}
+      {view === 'custom' && (
+        <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-end gap-3">
+            <DatePicker
+              id="duty-report-from"
+              label="From date"
+              value={customRange.fromDate}
+              onChange={(date) => setCustomRange((current) => ({ ...current, fromDate: date }))}
+              minDate="1900-01-01"
+              className="w-full sm:w-[200px]"
+              required
+            />
+            <DatePicker
+              id="duty-report-to"
+              label="To date"
+              value={customRange.toDate}
+              onChange={(date) => setCustomRange((current) => ({ ...current, toDate: date }))}
+              minDate="1900-01-01"
+              className="w-full sm:w-[200px]"
+              required
+            />
+            <p className="pb-2 text-xs text-slate-500">Both dates are included. Ranges can cross months and years.</p>
+          </div>
+          {rangeError && <p role="alert" className="mt-3 text-xs font-medium text-rose-600">{rangeError}</p>}
+        </div>
+      )}
+
+      <section aria-label="Duty Planner Excel report" className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <h2 className="text-sm font-semibold text-slate-800">Duty Planner report</h2>
+            <p className="text-xs text-slate-600">
+              {rangeError ? 'Select a valid date range to export.' : `${formatDutyDate(fromDate)} – ${formatDutyDate(toDate)}`}
+              {reportData && ` · ${reportData.days.length} days · ${reportEmployees.length} employees`}
+            </p>
+            <p className="text-xs text-slate-500">Excel: employees in rows, dates across columns, Duty Count last, and grand totals. Includes a Daily Details sheet.</p>
+          </div>
+          <button
+            onClick={() => { void handleDownloadExcel(); }}
+            disabled={!canDownloadExcel}
+            aria-busy={exporting}
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {exporting ? <LoaderCircle size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
+            {exporting ? 'Preparing Excel…' : 'Download Excel'}
+          </button>
+        </div>
+        {reportError ? (
+          <div role="alert" className="mt-3 flex flex-wrap items-center gap-2 text-xs text-rose-600">
+            <AlertCircle size={14} /> Could not load the full report. {reportError} Export is unavailable until it loads successfully.
+            <button onClick={() => setRefreshKey((key) => key + 1)} className="inline-flex items-center gap-1 rounded-md border border-rose-200 px-2 py-1 font-semibold hover:bg-rose-50">
+              <RefreshCw size={12} /> Retry report
+            </button>
+          </div>
+        ) : !rangeError && !reportData ? (
+          <p role="status" className="mt-3 flex items-center gap-1.5 text-xs text-slate-500"><LoaderCircle size={13} className="animate-spin" /> Loading report duties…</p>
+        ) : reportData && reportEmployees.length === 0 ? (
+          <p role="status" className="mt-3 text-xs text-amber-700">No employees match the selected filters. Change the role or employee search to export.</p>
+        ) : (
+          <p className="mt-3 text-[11px] text-slate-500">Counts through {asOfLabel}. Future assignments are marked Planned and excluded from counts. Export follows the selected role and employee filters.</p>
+        )}
+      </section>
+
+      {/* Week remains editable; month/custom ranges are read-only reports. */}
       {view === 'week' ? (
         <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden">
           <DutyPlannerGrid
@@ -332,131 +442,11 @@ function DutyPlannerPage() {
             isOnLeave={isOnApprovedLeave}
           />
         </div>
+      ) : reportData ? (
+        <DutyPlannerReportTable data={reportData} employees={reportEmployees} asOf={today} />
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-x-auto">
-          {monthError ? (
-            <div className="p-12 text-center text-sm text-rose-600">Could not load month duties.</div>
-          ) : monthStale ? (
-            <div className="p-12 text-center text-sm text-slate-400">Loading month…</div>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-                <span className="text-xs text-slate-500">
-                  {monthLabel} · <span className="font-semibold text-slate-700">as of {asOfLabel}</span>
-                  {' — '}days after this are not yet completed (shown blank, not counted)
-                </span>
-                <button
-                  onClick={() => downloadMonthDutiesPdf({ data: monthData, employees: filteredEmployees })}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-                >
-                  <FileDown size={14} />
-                  Download PDF
-                </button>
-              </div>
-              <table className="text-xs w-full">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/70">
-                    <th className="sticky left-0 z-10 bg-slate-50 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 min-w-[150px]">
-                      Employee
-                    </th>
-                    {monthData.days.map((d) => (
-                      <th key={d.date} className="px-0.5 py-2 text-center min-w-[30px]">
-                        <div className="text-[9px] font-medium text-slate-400">{d.weekday}</div>
-                        <div className="text-[11px] font-semibold text-slate-600">{d.dayNum}</div>
-                      </th>
-                    ))}
-                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 min-w-[110px]">
-                      Summary
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredEmployees.map((emp) => {
-                    const cells = monthData.byEmployee[emp.id];
-                    if (!cells) return null;
-                    // Counts cover COMPLETED days only — days after today are
-                    // not yet completed and are never counted.
-                    const done = cells.filter((c) => c.date <= today);
-                    const work = done.filter(
-                      (c) => c.dutyType && c.dutyType !== 'Rest' && c.dutyType !== 'WeeklyOff' && c.dutyType !== 'Off'
-                    ).length;
-                    const leave = done.filter((c) => c.dutyType === 'Rest').length;
-                    const off = done.filter((c) => c.dutyType === 'Off').length;
-                    const wo = done.filter((c) => c.dutyType === 'WeeklyOff').length;
-                    return (
-                      <tr key={emp.id} className="hover:bg-slate-50/50">
-                        <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r border-slate-200 whitespace-nowrap">
-                          <div className="font-semibold text-slate-800 truncate max-w-[160px]">{emp.employeeName}</div>
-                          <div className="text-[10px] text-slate-400">{emp.role}</div>
-                        </td>
-                        {cells.map((c) => {
-                          const cfg = c.dutyType ? getShiftConfigsForRole(emp.role).find((s) => s.type === c.dutyType) : undefined;
-                          const future = isFutureDate(c.date);
-                          const cls = cfg
-                            ? `${cfg.bgColor} ${cfg.borderColor}`
-                            : c.dutyType
-                              ? 'bg-violet-50 border-violet-200'
-                              : future
-                                ? 'border-dashed border-slate-200 bg-transparent'
-                                : 'bg-white border-slate-100';
-                          return (
-                            <td key={c.date} className="px-0.5 py-1">
-                              <div
-                                title={`${emp.employeeName} — ${c.date}: ${
-                                  cfg ? cfg.label : c.dutyType ?? (future ? 'Not yet completed' : 'No duty yet')
-                                }${c.isLeave ? ' (approved leave)' : ''}`}
-                                className={`h-6 rounded border ${cls}`}
-                              />
-                            </td>
-                          );
-                        })}
-                        <td className="px-4 py-2 text-[10.5px] text-slate-500 whitespace-nowrap">
-                          <span className="font-semibold text-slate-700">{work}d</span> duty
-                          {' · '}
-                          <span className="font-semibold text-slate-700">{leave}d</span> leave
-                          {off > 0 && (
-                            <>
-                              {' · '}
-                              <span className="font-semibold text-rose-700">{off}d</span> off
-                            </>
-                          )}
-                          {wo > 0 && (
-                            <>
-                              {' · '}
-                              <span className="font-semibold text-slate-700">{wo}d</span> weekly off
-                            </>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {/* Legend */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-100 px-4 py-3 text-[11px] text-slate-500">
-                {getShiftConfigsForRole('Driver')
-                  .filter((s) => !['Driver', 'OfficeDuty', 'Collection'].includes(s.type))
-                  .map((s) => (
-                    <span key={s.type} className="inline-flex items-center gap-1.5">
-                      <span className={`h-3 w-5 rounded border ${s.bgColor} ${s.borderColor}`} />
-                      {s.label}
-                    </span>
-                  ))}
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="h-3 w-5 rounded border bg-violet-50 border-violet-200" />
-                  Other
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="h-3 w-5 rounded border border-dashed border-slate-300 bg-transparent" />
-                  Not yet completed
-                </span>
-                <span className="text-slate-400">
-                  An assigned duty overrides an approved leave; leave days with no duty show as Leave.
-                  Weekly Off stays rose for other roles. Counts cover completed days only.
-                </span>
-              </div>
-            </>
-          )}
+        <div className="rounded-xl border border-slate-200/90 bg-white p-12 text-center text-sm text-slate-500">
+          {rangeError ? 'Choose a valid date range to view duties.' : reportError ? 'The report could not be loaded. Use Retry report above.' : 'Loading duty report…'}
         </div>
       )}
 
