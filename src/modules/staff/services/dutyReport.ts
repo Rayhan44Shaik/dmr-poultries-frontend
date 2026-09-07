@@ -2,21 +2,22 @@
 // export use the same cells and counting rules; no PDF-specific abbreviations.
 import type { DutyAssignment, Employee, LeaveListFilters, LeaveListResult, LeaveRequest } from '../types/staffDashboard';
 import type { DutyPlannerWeek } from './dutyPlannerService';
+import { resolveDutyCell, type DutyEmployeeIdentity } from './dutyRules';
+import { dutyLocale, dutyText, type DutyLanguage, type DutyTextKey } from '../i18n/dutyPlannerCopy';
 
 export interface DutyReportRange {
   fromDate: string;
   toDate: string;
 }
 
-export type DutyReportEmployee = Pick<Employee, 'id' | 'employeeName' | 'role' | 'department'> & {
-  employeeNo?: number;
-};
+export type DutyReportEmployee = DutyEmployeeIdentity;
 
 export interface DutyReportCell {
   date: string;
-  /** An explicit assignment takes precedence over an approved leave. */
+  /** Approved leave always takes precedence over saved or automatic duties. */
   dutyType: string | null;
   assignedDutyType: string | null;
+  automatic?: boolean;
   isLeave: boolean;
   vehicleNo: string;
 }
@@ -63,14 +64,14 @@ function dateValue(date: string): number {
   return Number.isFinite(value) && new Date(value).toISOString().slice(0, 10) === date ? value : NaN;
 }
 
-export function getDutyRangeError({ fromDate, toDate }: DutyReportRange): string | null {
-  if (!fromDate || !toDate) return 'Select both a from date and a to date.';
+export function getDutyRangeError({ fromDate, toDate }: DutyReportRange, language: DutyLanguage = 'en'): string | null {
+  if (!fromDate || !toDate) return dutyText(language, 'missingDates');
   const from = dateValue(fromDate);
   const to = dateValue(toDate);
-  if (!Number.isFinite(from) || !Number.isFinite(to)) return 'Enter valid dates on or after 01 Jan 1900.';
-  if (from > to) return 'The to date must be on or after the from date.';
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return dutyText(language, 'invalidDates');
+  if (from > to) return dutyText(language, 'reversedDates');
   if ((to - from) / DAY_MS + 1 > MAX_DUTY_REPORT_DAYS) {
-    return 'This range exceeds the Excel column limit. Please choose a shorter range.';
+    return dutyText(language, 'rangeTooLong');
   }
   return null;
 }
@@ -99,19 +100,27 @@ export function getDutyReportWeekStarts(range: DutyReportRange): string[] {
   return mondays;
 }
 
-export function formatDutyDate(date: string): string {
-  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-IN', {
+export function formatDutyDate(date: string, language: DutyLanguage = 'en'): string {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString(dutyLocale(language), {
     day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC',
   });
 }
 
-export function getDutyLabel(dutyType: string | null): string {
-  const labels: Record<string, string> = {
-    Delivery: 'Duty', Driver: 'Driver', Rest: 'Leave', Repair: 'Repair',
-    Office: 'Office', OfficeDuty: 'Office Duty', Collection: 'Collection',
-    WeeklyOff: 'Weekly Off', Off: 'Off',
+export function formatDutyWeekday(date: string, language: DutyLanguage = 'en'): string {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString(dutyLocale(language), { weekday: 'short', timeZone: 'UTC' });
+}
+
+export function getDutyLabel(dutyType: string | null, language: DutyLanguage = 'en'): string {
+  const keys: Record<string, DutyTextKey> = {
+    Delivery: 'duty', Driver: 'driver', Rest: 'leave', Repair: 'repair',
+    Office: 'office', OfficeDuty: 'officeDuty', Collection: 'collection', WeeklyOff: 'weeklyOff', Off: 'off',
   };
-  return dutyType ? (Object.prototype.hasOwnProperty.call(labels, dutyType) ? labels[dutyType] : dutyType) : 'No Entry';
+  if (!dutyType) return dutyText(language, 'noEntry');
+  return Object.prototype.hasOwnProperty.call(keys, dutyType) ? dutyText(language, keys[dutyType]) : dutyType;
+}
+
+export function getDutyCountLabel(key: typeof DUTY_COUNT_COLUMNS[number]['key'], language: DutyLanguage = 'en'): string {
+  return dutyText(language, key === 'duty' ? 'dutyCount' : key);
 }
 
 export function getDutyCountKey(cell: DutyReportCell, asOf: string): keyof DutyCounts {
@@ -163,7 +172,16 @@ export function buildDutyReport(
   const days = getDutyReportDays(range);
   const employees = new Map<number, DutyReportEmployee>();
   const assignments = new Map<string, DutyAssignment>();
+  const rosters = new Map<string, Map<number, DutyReportEmployee>>();
   for (const week of weeks) {
+    // Defaults use the employee's role/status for that week, not a later
+    // promotion or roster change elsewhere in a multi-week report.
+    const roster = new Map(week.employees.map((employee) => [employee.id, employee]));
+    const cursor = new Date(`${week.weekStart}T00:00:00Z`);
+    for (let day = 0; day < 7; day += 1) {
+      rosters.set(cursor.toISOString().slice(0, 10), roster);
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
     for (const employee of week.employees) employees.set(employee.id, employee);
     for (const assignment of week.assignments) {
       if (assignment.date < range.fromDate || assignment.date > range.toDate) continue;
@@ -180,7 +198,7 @@ export function buildDutyReport(
   }
   const approvedByEmployee = new Map<number, LeaveRequest[]>();
   for (const leave of leaves) {
-    if (leave.status !== 'Approved' || leave.toDate < range.fromDate || leave.fromDate > range.toDate) continue;
+    if (leave.status !== 'Approved' || leave.toDate.slice(0, 10) < range.fromDate || leave.fromDate.slice(0, 10) > range.toDate) continue;
     const approved = approvedByEmployee.get(leave.employeeId) ?? [];
     approved.push(leave);
     approvedByEmployee.set(leave.employeeId, approved);
@@ -189,9 +207,10 @@ export function buildDutyReport(
   for (const employee of employees.values()) {
     byEmployee[employee.id] = days.map(({ date }) => {
       const assignment = assignments.get(`${employee.id}|${date}`);
-      const isLeave = (approvedByEmployee.get(employee.id) ?? []).some((leave) => leave.fromDate <= date && leave.toDate >= date);
-      const assignedDutyType = assignment?.dutyType || null;
-      return { date, dutyType: assignedDutyType ?? (isLeave ? 'Rest' : null), assignedDutyType, isLeave, vehicleNo: assignment?.vehicleNo ?? '' };
+      const isLeave = (approvedByEmployee.get(employee.id) ?? []).some((leave) => leave.fromDate.slice(0, 10) <= date && leave.toDate.slice(0, 10) >= date);
+      const roster = rosters.get(date);
+      const dutyEmployee: DutyReportEmployee = roster ? roster.get(employee.id) ?? { ...employee, status: 'Inactive' } : employee;
+      return resolveDutyCell(dutyEmployee, date, assignment, isLeave);
     });
   }
   return { ...range, days, employees: [...employees.values()], byEmployee, usingSampleData };

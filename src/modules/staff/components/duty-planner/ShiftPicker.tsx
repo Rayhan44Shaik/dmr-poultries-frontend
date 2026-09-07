@@ -1,10 +1,12 @@
-// src/modules/staff/components/duty-planner/ShiftPicker.tsx
-
-import { memo, useState } from 'react';
+import { memo, useId, useState } from 'react';
 import { PenLine, Trash2, X } from 'lucide-react';
 import { getShiftConfigsForRole } from '../../services/staffService';
+import { getCoreDutyRole, getDutyPickerTypes, isManualDutyRole } from '../../services/dutyRules';
+import { getDutyLabel, formatDutyDate, formatDutyWeekday } from '../../services/dutyReport';
+import { useDutyPlannerText } from '../../hooks/useDutyPlannerText';
+import { dutyDisplayValue } from '../../i18n/dutyPlannerCopy';
 
-interface ShiftPickerProps {
+interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (dutyType: string) => void;
@@ -13,129 +15,47 @@ interface ShiftPickerProps {
   date: string;
   employeeName?: string;
   employeeRole?: string;
+  employeeDepartment?: string;
 }
-
-function ShiftPicker({ isOpen, onClose, onSelect, onRemove, currentDuty, date, employeeName, employeeRole }: ShiftPickerProps) {
+function ShiftPicker({ isOpen, onClose, onSelect, onRemove, currentDuty, date, employeeName, employeeRole = '', employeeDepartment = '' }: Props) {
+  const { language, t } = useDutyPlannerText();
   const [otherOpen, setOtherOpen] = useState(false);
   const [otherText, setOtherText] = useState('');
-
+  const titleId = useId();
   if (!isOpen) return null;
-
-  // Role-aware options:
-  //   Supervisor → Duty, Office, Leave, Weekly Off, Off
-  //   Driver/Helper/Loader → Duty, Repair, Office, Leave, Weekly Off, Off
-  //   other roles → Weekly Off. "Other" (free text) is available to all.
-  const shifts = getShiftConfigsForRole(employeeRole);
-  const dateObj = new Date(date);
-
-  const formattedDate = !isNaN(dateObj.getTime())
-    ? dateObj.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })
-    : date;
-
-  const submitOther = () => {
-    const value = otherText.trim();
-    if (!value) return;
-    onSelect(value);
-    setOtherOpen(false);
-    setOtherText('');
-  };
-
+  const types = getDutyPickerTypes({ role: employeeRole, department: employeeDepartment });
+  const configs = getShiftConfigsForRole(getCoreDutyRole(employeeRole) ?? undefined);
+  const submitOther = () => { if (otherText.trim()) onSelect(otherText.trim()); };
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-5 animate-fadeIn border border-slate-100">
-        {/* Header — always a single, tidy line: small label + name + role chip */}
+    <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-slate-100 bg-white p-5 shadow-xl">
         <div className="mb-4">
-          <div className="flex items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-[10.5px] font-semibold uppercase tracking-[0.09em] text-slate-400">
-                Select duty for
-              </p>
-              <h3 className="mt-0.5 flex items-center gap-2 text-[15px] font-bold leading-snug text-slate-900">
-                <span className="truncate">{employeeName || 'Employee'}</span>
-                {employeeRole && (
-                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-[3px] text-[10.5px] font-semibold text-slate-500">
-                    {employeeRole}
-                  </span>
-                )}
-              </h3>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium text-slate-400">{t('selectDuty')}</p>
+              <h3 id={titleId} className="mt-1 text-[15px] font-semibold text-slate-900">{employeeName || t('employee')}</h3>
+              <p className="mt-0.5 text-xs text-slate-500">{dutyDisplayValue(employeeRole, language)}</p>
             </div>
-            <button onClick={onClose} className="-mr-1 -mt-1 shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close">
-              <X size={17} />
-            </button>
+            <button type="button" onClick={onClose} aria-label={t('close')} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X size={18} /></button>
           </div>
-          <p className="mt-1.5 truncate text-xs font-medium text-slate-400">{formattedDate}</p>
+          <p className="mt-2 text-xs text-slate-500">{formatDutyWeekday(date, language)} · {formatDutyDate(date, language)}</p>
         </div>
-
         <div className="grid grid-cols-2 gap-2">
-          {shifts.map((shift) => (
-            <button
-              key={shift.type}
-              onClick={() => onSelect(shift.type)}
-              className={`py-2.5 px-3 rounded-xl border text-sm font-semibold transition hover:shadow-md active:scale-95 ${
-                currentDuty === shift.type ? 'ring-2 ring-blue-500 ring-offset-2' : ''
-              } ${shift.bgColor} ${shift.textColor} ${shift.borderColor}`}
-            >
-              {shift.label}
-            </button>
-          ))}
-
-          {/* Other — free-text duty type, available for every role.
-              Highlighted when the cell currently holds a custom (non-listed) type. */}
-          {(() => {
-            const isCustom = Boolean(currentDuty) && !shifts.some((s) => s.type === currentDuty);
-            return (
-              <button
-                onClick={() => setOtherOpen((v) => !v)}
-                className={`py-2.5 px-3 rounded-xl border text-sm font-semibold transition hover:shadow-md active:scale-95 flex items-center justify-center gap-1.5 ${
-                  isCustom
-                    ? 'ring-2 ring-blue-500 ring-offset-2 bg-violet-100 text-violet-700 border-violet-300'
-                    : 'bg-violet-50 text-violet-700 border-violet-200'
-                }`}
-              >
-                <PenLine size={14} />
-                Other
-              </button>
-            );
-          })()}
+          {types.map((type) => {
+            const style = configs.find((config) => config.type === type);
+            return <button key={type} type="button" onClick={() => onSelect(type)} className={`min-h-10 rounded-xl border px-3 py-2 text-sm font-semibold ${style?.bgColor ?? 'bg-violet-50'} ${style?.borderColor ?? 'border-violet-200'} ${style?.textColor ?? 'text-violet-700'} ${currentDuty === type ? 'ring-2 ring-emerald-500 ring-offset-2' : ''}`}>{getDutyLabel(type, language)}</button>;
+          })}
+          <button type="button" onClick={() => setOtherOpen((open) => !open)} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700"><PenLine size={14} />{t('other')}</button>
         </div>
-
-        {otherOpen && (
-          <div className="mt-3 space-y-2">
-            <input
-              type="text"
-              value={otherText}
-              onChange={(e) => setOtherText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') submitOther();
-              }}
-              placeholder="Type a custom duty (e.g. Farm Visit)"
-              autoFocus
-              className="w-full rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20"
-            />
-            <button
-              onClick={submitOther}
-              disabled={!otherText.trim()}
-              className="w-full py-2 rounded-xl bg-violet-600 text-white text-sm font-semibold transition hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Set as Duty
-            </button>
-          </div>
-        )}
-
-        {currentDuty && onRemove && (
-          <div className="mt-4 pt-3 border-t border-slate-100">
-            <button
-              onClick={onRemove}
-              className="w-full py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 text-sm font-semibold transition hover:bg-rose-100 flex items-center justify-center gap-2"
-            >
-              <Trash2 size={15} />
-              Remove Duty
-            </button>
-          </div>
-        )}
+        {otherOpen && <div className="mt-3 space-y-2">
+          <input value={otherText} onChange={(event) => setOtherText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') submitOther(); }} placeholder={t('customPlaceholder')} aria-label={t('customPlaceholder')} autoFocus className="w-full rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-300" />
+          <button type="button" onClick={submitOther} disabled={!otherText.trim()} className="w-full rounded-xl bg-violet-600 py-2 text-sm font-semibold text-white disabled:opacity-40">{t('setDuty')}</button>
+        </div>}
+        {currentDuty && onRemove && <div className="mt-4 border-t border-slate-100 pt-3">
+          <button type="button" onClick={onRemove} className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 py-2 text-sm font-semibold text-rose-600"><Trash2 size={14} />{t(isManualDutyRole(employeeRole) ? 'removeDuty' : 'restoreDefault')}</button>
+        </div>}
       </div>
     </div>
   );
 }
-
 export default memo(ShiftPicker);

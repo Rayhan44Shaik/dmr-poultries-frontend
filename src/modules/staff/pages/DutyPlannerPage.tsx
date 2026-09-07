@@ -7,12 +7,18 @@ import DutyPlannerFilters, { type DutyPlannerView } from '../components/duty-pla
 import DutyPlannerGrid from '../components/duty-planner/DutyPlannerGrid';
 import DutyPlannerReportTable from '../components/duty-planner/DutyPlannerReportTable';
 import ShiftPicker from '../components/duty-planner/ShiftPicker';
+import { useDutyPlannerText } from '../hooks/useDutyPlannerText';
+import { dutyDisplayValue, dutyLocale, localizeDutyError } from '../i18n/dutyPlannerCopy';
+import '../styles/dutyPlanner.css';
 import { filterDutyEmployees, formatDutyDate, getDutyRangeError, todayStr, type DutyReportData, type DutyReportRange } from '../services/dutyReport';
 import { CheckCircle2, AlertCircle, LoaderCircle, RefreshCw, LockKeyhole } from 'lucide-react';
 import type { DutyPlannerFilters as DutyPlannerFiltersType, DutyAssignment } from '../types/staffDashboard';
 
 function DutyPlannerPage() {
   const { showNotification } = useSafeNotification();
+  const { language, t } = useDutyPlannerText();
+  const textRef = useRef(t);
+  useEffect(() => { textRef.current = t; }, [t]);
 
   const {
     employees,
@@ -23,6 +29,9 @@ function DutyPlannerPage() {
     filters,
     setFilters,
     getAssignment,
+    getDutyCell,
+    automaticSaveError,
+    refresh: refreshDuties,
     updateAssignment,
     deleteAssignment,
     moveWeek,
@@ -74,7 +83,7 @@ function DutyPlannerPage() {
     return { fromDate: filters.weekStart, toDate: end.toISOString().slice(0, 10) };
   }, [view, customRange, monthCursor, filters.weekStart]);
   const { fromDate, toDate } = range;
-  const rangeError = getDutyRangeError(range);
+  const rangeError = getDutyRangeError(range, language);
   const reportKey = `${fromDate}:${toDate}:${refreshKey}`;
 
   // A prior range, source or retry must never remain exportable while a new
@@ -93,7 +102,7 @@ function DutyPlannerPage() {
         if (!cancelled) {
           const message = error instanceof Error ? error.message : 'Could not load duty report.';
           setReportState({ key: reportKey, loader: getRangeDuties, data: null, error: message });
-          notifyRef.current('Could not load the duty report. Please retry before exporting.', 'error');
+          notifyRef.current(textRef.current('loadRetry'), 'error');
         }
       });
     return () => { cancelled = true; controller.abort(); };
@@ -101,27 +110,28 @@ function DutyPlannerPage() {
 
   const reportCurrent = !loading && !rangeError && reportState?.key === reportKey && reportState?.loader === getRangeDuties;
   const reportData = reportCurrent ? reportState.data : null;
-  const reportError = reportCurrent ? reportState.error : null;
+  const reportError = reportCurrent && reportState.error ? localizeDutyError(reportState.error, language) : null;
   const today = todayStr();
-  const asOfLabel = formatDutyDate(today);
-  const monthLabel = new Date(monthCursor.y, monthCursor.m, 1).toLocaleDateString('en-IN', {
+  const monthLabel = new Date(monthCursor.y, monthCursor.m, 1).toLocaleDateString(dutyLocale(language), {
     month: 'long', year: 'numeric',
   });
   const prevMonth = () => setMonthCursor(({ y, m }) => (m === 0 ? { y: y - 1, m: 11 } : { y, m: m - 1 }));
   const nextMonth = () => setMonthCursor(({ y, m }) => (m === 11 ? { y: y + 1, m: 0 } : { y, m: m + 1 }));
 
   const handleCellClick = useCallback((employeeId: number, date: string) => {
+    if (date > todayStr()) { showNotification(t('futureLocked'), 'error'); return; }
+    if (isOnApprovedLeave(employeeId, date)) { showNotification(t('leaveLocked'), 'error'); return; }
     if (isDateLocked(date)) {
-      showNotification('Cannot edit duties for previous completed weeks.', 'error');
+      showNotification(t('pastLocked'), 'error');
       return;
     }
     if (!canEditWeek) {
-      showNotification(`This week is ${weekStatus.toLowerCase()} and cannot be modified.`, 'error');
+      showNotification(t('weekReadOnly', { status: dutyDisplayValue(weekStatus, language) }), 'error');
       return;
     }
     setSelectedCell({ employeeId, date });
     setShowPicker(true);
-  }, [canEditWeek, weekStatus, setSelectedCell, setShowPicker, showNotification]);
+  }, [canEditWeek, weekStatus, setSelectedCell, setShowPicker, showNotification, isOnApprovedLeave, language, t]);
 
   const handleSelectShift = useCallback((dutyType: string) => {
     if (!selectedCell) return;
@@ -168,7 +178,7 @@ function DutyPlannerPage() {
   // Export exactly the rows shown in the active table. The range report can
   // contain historical employees that are not part of the editable week roster.
   const tableEmployees = view === 'week' ? filteredEmployees : reportEmployees;
-  const canDownloadExcel = !!reportData && tableEmployees.length > 0 && !saving && !exporting;
+  const canDownloadExcel = !!reportData && tableEmployees.length > 0 && !saving && !exporting && !automaticSaveError;
 
   const handleDownloadExcel = async () => {
     if (!canDownloadExcel || !reportData) return;
@@ -179,11 +189,12 @@ function DutyPlannerPage() {
         data: reportData,
         employees: tableEmployees,
         asOf: today,
-        filterLabel: `Roles: ${filters.role.length ? filters.role.join(', ') : 'All'}${searchQuery.trim() ? ` | Employee search: ${searchQuery.trim()}` : ''}`,
+        language,
+        filterLabel: `${t('filterRole', { roles: filters.role.length ? filters.role.map((role) => dutyDisplayValue(role, language)).join(', ') : t('allRoles') })}${searchQuery.trim() ? ` | ${t('filterSearch', { search: searchQuery.trim() })}` : ''}`,
       });
-      showNotification('Duty Planner Excel downloaded successfully.', 'success');
+      showNotification(t('downloadSuccess'), 'success');
     } catch (error) {
-      showNotification(error instanceof Error ? error.message : 'Could not export Duty Planner to Excel. Please retry.', 'error');
+      showNotification(error ? localizeDutyError(error, language) : t('downloadFailed'), 'error');
     } finally {
       setExporting(false);
     }
@@ -198,16 +209,7 @@ function DutyPlannerPage() {
   const gatedByPrevWeek =
     !loading && !prevWeekClosed && (weekStatus === 'Open' || weekStatus === 'Draft' || weekStatus === '');
 
-  const statusLabel =
-    gatedByPrevWeek
-      ? 'Locked — close previous week'
-      : weekStatus === 'Closed'
-        ? 'Closed'
-        : weekStatus === 'Locked'
-          ? 'Locked'
-          : weekStatus === 'Submitted'
-            ? 'Submitted'
-            : weekStatus || 'Open';
+  const statusLabel = gatedByPrevWeek ? t('lockedPrevious') : dutyDisplayValue(weekStatus || 'Open', language);
 
   const statusClasses =
     gatedByPrevWeek
@@ -227,15 +229,15 @@ function DutyPlannerPage() {
     endDate.setUTCDate(endDate.getUTCDate() + 6);
     const sameYear = startDate.getUTCFullYear() === endDate.getUTCFullYear();
     const sameMonth = sameYear && startDate.getUTCMonth() === endDate.getUTCMonth();
-    const startLabel = compact ? startDate.toLocaleDateString('en-IN', {
+    const startLabel = compact ? startDate.toLocaleDateString(dutyLocale(language), {
       day: '2-digit', month: sameMonth ? undefined : 'short',
       year: sameYear ? undefined : 'numeric', timeZone: 'UTC',
-    }) : formatDutyDate(start);
-    return `${startLabel} – ${formatDutyDate(endDate.toISOString().slice(0, 10))}`;
+    }) : formatDutyDate(start, language);
+    return `${startLabel} – ${formatDutyDate(endDate.toISOString().slice(0, 10), language)}`;
   };
 
   return (
-    <div className="w-full space-y-4 bg-slate-50/30 min-h-screen pb-8">
+    <div lang={language} className="duty-planner-page w-full space-y-3 bg-slate-50/30 min-h-screen pb-8">
       {/* One filter panel controls both the table and its Excel download. */}
       <DutyPlannerFilters
         role={filters.role}
@@ -249,11 +251,9 @@ function DutyPlannerPage() {
         onDownloadExcel={() => { void handleDownloadExcel(); }}
         canDownloadExcel={canDownloadExcel}
         exporting={exporting}
-        downloadTitle={rangeError || reportError || (saving
-          ? 'Wait for duty changes to finish saving.'
-          : reportData
-            ? `Download the displayed table: ${formatDutyDate(fromDate)} – ${formatDutyDate(toDate)}, ${tableEmployees.length} employees. Counts through ${asOfLabel}; future duties are marked Planned.`
-            : 'Wait for the table data to finish loading.')}
+        downloadTitle={rangeError || reportError || (saving ? t('saveWait') : reportData
+          ? t('downloadScope', { from: formatDutyDate(fromDate, language), to: formatDutyDate(toDate, language), count: tableEmployees.length })
+          : t('loading'))}
         view={view}
         onViewChange={setView}
         periodLabel={view === 'month' ? monthLabel : formatWeekRange(filters.weekStart, true)}
@@ -267,35 +267,40 @@ function DutyPlannerPage() {
           <>
             {view === 'week' && (
               <span
-                title={`${statusLabel}${!canEditWeek ? ' (read-only)' : ''}`}
+                title={`${statusLabel}${!canEditWeek ? ` (${t('readOnly')})` : ''}`}
                 className={`inline-flex h-5 items-center whitespace-nowrap rounded-full border px-2 text-[10px] font-semibold ${statusClasses}`}
               >
-                {gatedByPrevWeek ? 'Locked' : statusLabel}
+                {gatedByPrevWeek ? t('locked') : statusLabel}
               </span>
             )}
             {usingSampleData && (
               <span
-                title="Backend unavailable — showing local sample data (edits are kept in memory only)"
+                title={t('sampleHint')}
                 className="inline-flex h-5 items-center whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2 text-[10px] font-semibold text-amber-700"
               >
-                Sample data
+                {t('sample')}
               </span>
             )}
           </>
         )}
-        feedback={rangeError ? (
+        feedback={automaticSaveError ? (
+          <div role="alert" className="flex flex-wrap items-center gap-2 text-xs text-rose-600">
+            <AlertCircle size={14} />{t('autoSaveFailed')}
+            <button type="button" onClick={refreshDuties} className="rounded-md border border-rose-200 px-2 py-1 font-semibold">{t('retrySave')}</button>
+          </div>
+        ) : rangeError ? (
           <p role="alert" className="text-xs font-medium text-rose-600">{rangeError}</p>
         ) : reportError ? (
           <div role="alert" className="flex flex-wrap items-center gap-2 text-xs text-rose-600">
-            <AlertCircle size={14} /> Could not load the full report. {reportError} Export is unavailable until it loads successfully.
+            <AlertCircle size={14} />{t('loadFailed')}
             <button onClick={() => setRefreshKey((key) => key + 1)} className="inline-flex items-center gap-1 rounded-md border border-rose-200 px-2 py-1 font-semibold hover:bg-rose-50">
-              <RefreshCw size={12} /> Retry report
+              <RefreshCw size={12} />{t('retry')}
             </button>
           </div>
         ) : !reportData ? (
-          <p role="status" className="flex items-center gap-1.5 text-xs text-slate-500"><LoaderCircle size={13} className="animate-spin" /> Loading table data…</p>
+          <p role="status" className="flex items-center gap-1.5 text-xs text-slate-500"><LoaderCircle size={13} className="animate-spin" />{t('loading')}</p>
         ) : tableEmployees.length === 0 ? (
-          <p role="status" className="text-xs text-amber-700">No employees match the selected filters. Change the role or employee search to export.</p>
+          <p role="status" className="text-xs text-amber-700">{t('noEmployees')} {t('changeFilters')}</p>
         ) : null}
       />
 
@@ -304,8 +309,7 @@ function DutyPlannerPage() {
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-2.5 text-amber-800">
           <LockKeyhole size={15} className="shrink-0" />
           <p className="text-xs font-medium leading-relaxed">
-            Previous week {prevWeekStart ? `(${formatWeekRange(prevWeekStart)}) ` : ''}is not closed yet.
-            Submit it first — this week will then be open for entries and submission.
+            {t('previousNotClosed', { range: prevWeekStart ? formatWeekRange(prevWeekStart) : '' })}
           </p>
         </div>
       )}
@@ -316,18 +320,17 @@ function DutyPlannerPage() {
           <DutyPlannerGrid
             employees={tableEmployees}
             weekDays={weekDays}
-            getAssignment={getAssignment}
+            getDutyCell={getDutyCell}
             onCellClick={handleCellClick}
             loading={loading}
             weekLocked={!canEditWeek}
-            isOnLeave={isOnApprovedLeave}
           />
         </div>
       ) : reportData ? (
         <DutyPlannerReportTable data={reportData} employees={tableEmployees} asOf={today} />
       ) : (
         <div className="rounded-xl border border-slate-200/90 bg-white p-12 text-center text-sm text-slate-500">
-          {rangeError ? 'Choose a valid date range to view duties.' : reportError ? 'The report could not be loaded. Use Retry report above.' : 'Loading duty report…'}
+          {rangeError ? t('chooseRange') : reportError ? t('loadRetry') : t('loading')}
         </div>
       )}
 
@@ -336,38 +339,38 @@ function DutyPlannerPage() {
       <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <button
           onClick={handleSubmitWeek}
-          disabled={!canEditWeek || loading || saving || unassignedCount > 0}
+          disabled={!canEditWeek || loading || saving || automaticSaveError || unassignedCount > 0}
           title={
             !prevWeekClosed
-              ? 'Close the previous week first — submit it, then this week can be submitted'
+              ? t('closePrevious')
               : unassignedCount > 0
-                ? `Assign duties for all days first — ${unassignedCount} day(s) still empty`
-                : 'Submit this week'
+                ? t('assignAll', { count: unassignedCount })
+                : t('submit')
           }
           className="h-10 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <CheckCircle2 size={15} />
-          Submit Week
+          {t('submit')}
         </button>
         <div className="flex items-center gap-2 text-xs text-slate-500">
           {unassignedCount > 0 ? (
             <span
               className="flex items-center gap-1.5 text-amber-600"
-              title="Every employee needs a duty on every day before the week can be submitted"
+              title={t('assignAll', { count: unassignedCount })}
             >
               <AlertCircle size={12} />
-              {unassignedCount} of {employees.length * weekDays.length} day(s) without duty — assign all to submit
+              {t('unassigned', { count: unassignedCount, total: employees.length * weekDays.length })}
             </span>
           ) : (
             <span className="flex items-center gap-1.5 text-emerald-600">
               <CheckCircle2 size={12} />
-              All duties assigned — ready to submit
+              {t('ready')}
             </span>
           )}
           {!validation.ok && (
             <span className="flex items-center gap-1.5 text-rose-600 ml-2 border-l border-slate-200 pl-2">
               <AlertCircle size={12} />
-              {validation.problems.length} issue(s)
+              {t('issues', { count: validation.problems.length })}
             </span>
           )}
         </div>
@@ -379,10 +382,10 @@ function DutyPlannerPage() {
         <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm space-y-3">
           {!validation.ok && validation.problems.length > 0 && (
             <div className="bg-rose-50/80 border border-rose-200/80 rounded-lg p-2.5 text-xs text-rose-700">
-              <strong className="font-semibold">Validation issues:</strong>
+              <strong className="font-semibold">{t('validation')}:</strong>
               <ul className="mt-1 list-disc list-inside space-y-0.5">
-                {validation.problems.map((p, i) => (
-                  <li key={i}>{p}</li>
+                {validation.problems.map((problem, i) => (
+                  <li key={i}>{language === 'en' ? problem : localizeDutyError(problem, language)}</li>
                 ))}
               </ul>
             </div>
@@ -397,13 +400,11 @@ function DutyPlannerPage() {
           onClose={handleClosePicker}
           onSelect={handleSelectShift}
           onRemove={getAssignment(selectedCell.employeeId, selectedCell.date)?.id ? handleRemoveDuty : undefined}
-          currentDuty={
-            getAssignment(selectedCell.employeeId, selectedCell.date)?.dutyType ??
-            (isOnApprovedLeave(selectedCell.employeeId, selectedCell.date) ? 'Rest' : undefined)
-          }
+          currentDuty={getDutyCell(selectedCell.employeeId, selectedCell.date)?.dutyType ?? undefined}
           date={selectedCell.date}
           employeeName={selectedEmployee ? selectedEmployee.employeeName : ''}
           employeeRole={selectedEmployee ? selectedEmployee.role : ''}
+          employeeDepartment={selectedEmployee?.department}
         />
       )}
     </div>

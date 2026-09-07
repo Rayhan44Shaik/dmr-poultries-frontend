@@ -27,10 +27,11 @@
     "test:e2e": "playwright test",
     "mock:backend": "node scripts/dev-mock-backend.mjs",
     "smoke": "node scripts/ssr-smoke.mjs",
-    "test:duty-planner": "tsx --test src/modules/staff/services/dutyReport.test.ts src/modules/staff/services/dutyReportExcel.test.ts",
+    "test:duty-planner": "tsx --test src/modules/staff/services/dutyReport.test.ts src/modules/staff/services/dutyReportExcel.test.ts src/modules/staff/services/dutyRules.test.ts",
     "test:e2e:duty-planner": "playwright test --config tests/duty-planner/playwright.config.ts"
   },
   "dependencies": {
+    "@fontsource/noto-sans-telugu": "^5.3.0",
     "@tailwindcss/vite": "^4.3.1",
     "@types/react-date-range": "^1.4.10",
     "axios": "^1.19.0",

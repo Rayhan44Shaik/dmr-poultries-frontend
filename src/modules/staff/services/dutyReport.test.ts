@@ -75,15 +75,16 @@ describe('Duty Planner cells, filters and totals', () => {
     assert.equal(data.byEmployee[1][data.byEmployee[1].length - 1].date, range.toDate);
   });
 
-  it('uses only approved leave, deduplicates overlapping leave and lets an assignment override it', () => {
+  it('uses only approved leave, deduplicates overlapping leave and lets approved leave override an assignment', () => {
     const data = countFixture();
     assert.equal(data.byEmployee[2][0].dutyType, 'Rest');
     assert.equal(data.byEmployee[2][0].assignedDutyType, null);
-    assert.equal(data.byEmployee[2][1].dutyType, 'Delivery');
+    assert.equal(data.byEmployee[2][1].dutyType, 'Rest');
+    assert.equal(data.byEmployee[2][1].assignedDutyType, 'Delivery');
     assert.equal(data.byEmployee[2][1].isLeave, true);
     assert.equal(data.byEmployee[2][2].dutyType, null); // pending
     assert.equal(data.byEmployee[2][3].dutyType, null); // rejected
-    assert.deepEqual(countDutyCells(data.byEmployee[2], asOf), { duty: 1, leave: 1, off: 0, weeklyOff: 0, noEntry: 5, future: 2 });
+    assert.deepEqual(countDutyCells(data.byEmployee[2], asOf), { duty: 0, leave: 2, off: 0, weeklyOff: 0, noEntry: 5, future: 2 });
   });
 
   it('retains full custom labels, future plans and source vehicle information', () => {
@@ -104,7 +105,7 @@ describe('Duty Planner cells, filters and totals', () => {
   it('sums per-employee, daily and grand totals consistently', () => {
     const data = countFixture();
     const summary = summarizeDutyReport(data, data.employees, asOf);
-    assert.deepEqual(summary.totals, { duty: 5, leave: 2, off: 1, weeklyOff: 1, noEntry: 19, future: 8 });
+    assert.deepEqual(summary.totals, { duty: 10, leave: 3, off: 1, weeklyOff: 2, noEntry: 12, future: 8 });
     assert.equal(Object.values(summary.dailyDuty).reduce((a, b) => a + b, 0), summary.totals.duty);
     assert.equal(summary.dailyDuty['2026-09-08'], 0);
     assert.equal(summary.dailyDuty['2026-09-02'], 1);

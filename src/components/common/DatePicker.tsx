@@ -60,6 +60,7 @@ import {
   differenceInCalendarDays,
 } from "date-fns";
 import { DayPicker } from "react-day-picker";
+import { te as teluguLocale } from "date-fns/locale";
 import "react-day-picker/style.css";
 
 /* =============================================================================
@@ -100,6 +101,12 @@ const MONTH_SHORT = [
   "Dec",
 ] as const;
 
+// Opt-in localization; existing callers keep their English calendar unchanged.
+const CALENDAR_COPY = {
+  en: { clearDate: 'Clear date', open: 'Open calendar', choose: 'Choose date', previous: 'Previous month', next: 'Next month', month: 'Month', year: 'Year', week: 'This Week', today: 'Today', clear: 'Clear', selected: 'Selected', noDate: 'No date selected', ago: '{days}d ago', ahead: 'in {days}d', formatHint: 'Use DD/MM/YYYY', dateOutside: 'Date is outside the allowed range', todayOutside: 'Today is outside the allowed range', weekOutside: 'This week is outside the allowed range' },
+  te: { clearDate: 'తేదీ తొలగించండి', open: 'క్యాలెండర్ తెరవండి', choose: 'తేదీ ఎంచుకోండి', previous: 'మునుపటి నెల', next: 'తదుపరి నెల', month: 'నెల', year: 'సంవత్సరం', week: 'ఈ వారం', today: 'నేడు', clear: 'తొలగించండి', selected: 'ఎంపిక', noDate: 'తేదీ ఎంచుకోలేదు', ago: '{days} రోజుల క్రితం', ahead: '{days} రోజుల్లో', formatHint: 'రోజు/నెల/సంవత్సరం రూపంలో నమోదు చేయండి', dateOutside: 'ఈ తేదీ అనుమతించిన పరిధిలో లేదు', todayOutside: 'నేటి తేదీ అనుమతించిన పరిధిలో లేదు', weekOutside: 'ఈ వారం అనుమతించిన పరిధిలో లేదు' },
+};
+
 /** How many years before / after the viewed year appear in the year dropdown. */
 const YEAR_WINDOW_PAST = 50;
 const YEAR_WINDOW_FUTURE = 50;
@@ -109,6 +116,8 @@ const YEAR_WINDOW_FUTURE = 50;
  * ============================================================================= */
 
 export interface DatePickerProps {
+  /** Optional calendar language; defaults to English for existing screens. */
+  language?: "en" | "te";
   /** Controlled value in YYYY-MM-DD (empty string = none). */
   value: string;
   /** Fires with YYYY-MM-DD, or "" when cleared. */
@@ -411,6 +420,7 @@ const DAY_PICKER_CLASS_NAMES = {
  * ============================================================================= */
 
 export function DatePicker({
+  language = "en",
   value,
   onChange,
   placeholder = "DD/MM/YYYY",
@@ -436,6 +446,7 @@ export function DatePicker({
   readOnly = false,
   "data-testid": testId,
 }: DatePickerProps) {
+  const copy = CALENDAR_COPY[language];
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -449,7 +460,7 @@ export function DatePicker({
   const [isOpen, setIsOpen] = useState(false);
   const [month, setMonth] = useState<Date>(() => selectedDate ?? new Date());
   const [inputValue, setInputValue] = useState<string>(() => formatDisplay(selectedDate));
-  const [inputError, setInputError] = useState<string>("");
+  const [inputError, setInputError] = useState<keyof typeof CALENDAR_COPY.en | "">("");
 
   /* ---------- sync incoming controlled value → input text + month ---------- */
   useEffect(() => {
@@ -514,7 +525,7 @@ export function DatePicker({
         return;
       }
       if (isDateDisabled(date, minDate, maxDate)) {
-        setInputError("Date is outside the allowed range");
+        setInputError("dateOutside");
         return;
       }
       const clamped = clampToBounds(date, minDate, maxDate);
@@ -566,12 +577,12 @@ export function DatePicker({
     if (!parsed) {
       // Revert to last good controlled value
       setInputValue(formatDisplay(selectedDate));
-      setInputError(selectedDate ? "" : "Use DD/MM/YYYY");
+      setInputError(selectedDate ? "" : "formatHint");
       return;
     }
     if (isDateDisabled(parsed, minDate, maxDate)) {
       setInputValue(formatDisplay(selectedDate));
-      setInputError("Date is outside the allowed range");
+      setInputError("dateOutside");
       return;
     }
     commitDate(parsed, false);
@@ -602,7 +613,7 @@ export function DatePicker({
     if (isDateDisabled(new Date(), minDate, maxDate) && !isSameDay(today, new Date())) {
       // today itself out of bounds — still jump month, don't commit invalid
       setMonth(new Date());
-      setInputError("Today is outside the allowed range");
+      setInputError("todayOutside");
       return;
     }
     commitDate(today, true);
@@ -615,7 +626,7 @@ export function DatePicker({
     const monday = startOfWeek(base, { weekStartsOn: WEEK_STARTS_ON });
     const clamped = clampToBounds(monday, minDate, maxDate);
     if (isDateDisabled(monday, minDate, maxDate) && !isSameDay(clamped, monday)) {
-      setInputError("This week is outside the allowed range");
+      setInputError("weekOutside");
       setMonth(monday);
       return;
     }
@@ -641,9 +652,9 @@ export function DatePicker({
     () =>
       MONTH_LABELS.map((label, index) => ({
         value: index,
-        label,
+        label: language === 'te' ? new Date(2000, index, 1).toLocaleDateString('te-IN', { month: 'long' }) : label,
       })),
-    []
+    [language]
   );
 
   const yearOptions: CalendarDropdownOption[] = useMemo(() => {
@@ -676,7 +687,7 @@ export function DatePicker({
       : "top-[calc(100%+6px)] mt-1";
 
   const showFooter = !hideThisWeek || !hideToday;
-  const mergedError = error || inputError;
+  const mergedError = error || (inputError ? copy[inputError] : "");
 
   /* ---------- render ---------- */
   return (
@@ -729,8 +740,8 @@ export function DatePicker({
               type="button"
               onClick={clearDate}
               className="rounded p-0.5 text-slate-400 hover:text-slate-600 transition"
-              title="Clear date"
-              aria-label="Clear date"
+              title={copy.clearDate}
+              aria-label={copy.clearDate}
               tabIndex={-1}
             >
               <X size={16} />
@@ -744,8 +755,8 @@ export function DatePicker({
               setOpen(!isOpen);
             }}
             className="rounded p-0.5 text-slate-400 hover:text-slate-600 transition disabled:opacity-40"
-            title="Open calendar"
-            aria-label="Open calendar"
+            title={copy.open}
+            aria-label={copy.open}
             tabIndex={-1}
           >
             {icon || <CalendarIcon size={18} className="text-emerald-600" />}
@@ -763,7 +774,7 @@ export function DatePicker({
         <div
           ref={popupRef}
           role="dialog"
-          aria-label="Choose date"
+          aria-label={copy.choose}
           className={`absolute left-0 z-50 w-80 rounded-xl border border-slate-200 bg-white p-3 shadow-xl select-none text-slate-900 ${dropdownPositionClass} ${popupClassName}
             [&_table]:w-full [&_table]:border-collapse [&_tr]:h-auto [&_td]:p-0 [&_th]:p-0 [&_th]:pb-2`}
         >
@@ -773,7 +784,7 @@ export function DatePicker({
               type="button"
               onClick={handlePrevMonth}
               className="h-7 w-7 rounded-lg border border-slate-100 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition"
-              aria-label="Previous month"
+              aria-label={copy.previous}
             >
               <ChevronLeft size={16} />
             </button>
@@ -782,13 +793,13 @@ export function DatePicker({
               <CalendarDropdown
                 value={viewMonth}
                 options={monthOptions}
-                aria-label="Month"
+                aria-label={copy.month}
                 onChange={(e) => handleMonthDropdown(Number(e.target.value))}
               />
               <CalendarDropdown
                 value={viewYear}
                 options={yearOptions}
-                aria-label="Year"
+                aria-label={copy.year}
                 onChange={(e) => handleYearDropdown(Number(e.target.value))}
               />
             </div>
@@ -797,13 +808,17 @@ export function DatePicker({
               type="button"
               onClick={handleNextMonth}
               className="h-7 w-7 rounded-lg border border-slate-100 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition"
-              aria-label="Next month"
+              aria-label={copy.next}
             >
               <ChevronRight size={16} />
             </button>
           </div>
 
           <DayPicker
+            locale={language === 'te' ? teluguLocale : undefined}
+            labels={language === 'te' ? {
+              labelDayButton: (date, modifiers) => `${format(date, 'EEEE, dd MMMM yyyy', { locale: teluguLocale })}${modifiers.today ? `, ${copy.today}` : ''}${modifiers.selected ? `, ${copy.selected}` : ''}`,
+            } : undefined}
             mode="single"
             selected={selectedDate}
             onSelect={handleDateSelect}
@@ -829,7 +844,7 @@ export function DatePicker({
                   onClick={handleThisWeek}
                   className="flex-1 rounded-lg bg-emerald-50 px-2 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition"
                 >
-                  This Week
+                  {copy.week}
                 </button>
               )}
               {!hideToday && (
@@ -838,7 +853,7 @@ export function DatePicker({
                   onClick={handleToday}
                   className="flex-1 rounded-lg bg-slate-50 px-2 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
                 >
-                  Today
+                  {copy.today}
                 </button>
               )}
               {!hideClear && (
@@ -846,10 +861,10 @@ export function DatePicker({
                   type="button"
                   onClick={() => clearDate()}
                   className="flex items-center justify-center gap-1 rounded-lg bg-white border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition"
-                  title="Clear"
+                  title={copy.clear}
                 >
                   <Eraser size={12} />
-                  Clear
+                  {copy.clear}
                 </button>
               )}
             </div>
@@ -859,16 +874,16 @@ export function DatePicker({
           <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400 px-0.5">
             <span>
               {selectedDate
-                ? `Selected · ${formatDisplay(selectedDate)}`
-                : "No date selected"}
+                ? `${copy.selected} · ${formatDisplay(selectedDate)}`
+                : copy.noDate}
             </span>
             {selectedDate && (
               <span>
                 {differenceInCalendarDays(startOfDay(new Date()), startOfDay(selectedDate)) === 0
-                  ? "Today"
+                  ? copy.today
                   : differenceInCalendarDays(startOfDay(new Date()), startOfDay(selectedDate)) > 0
-                    ? `${differenceInCalendarDays(startOfDay(new Date()), startOfDay(selectedDate))}d ago`
-                    : `in ${Math.abs(differenceInCalendarDays(startOfDay(new Date()), startOfDay(selectedDate)))}d`}
+                    ? copy.ago.replace("{days}", String(differenceInCalendarDays(startOfDay(new Date()), startOfDay(selectedDate))))
+                    : copy.ahead.replace("{days}", String(Math.abs(differenceInCalendarDays(startOfDay(new Date()), startOfDay(selectedDate)))))}
               </span>
             )}
           </div>

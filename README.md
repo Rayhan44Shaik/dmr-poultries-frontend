@@ -9,23 +9,32 @@ npm install
 npm run dev
 ```
 
-### Duty Planner Excel reports
+### Duty Planner
 
-In **Staff → Duty Planner**, select **Weekly**, **Monthly**, or **Custom range**, then
-click **Download Excel** beside **Reset** in the same filter bar. The compact desktop filter has two rows: roles above their selected chips on
-the left; period/date controls above search and actions on the right. Custom
-dates replace the period navigator in-place, without a third filter row. Excel
-uses the rows and dates shown in the active table, including the applied role
-and name filters. Custom ranges include both dates and can cross months and years.
+**Staff → Duty Planner** has compact weekly, monthly and custom-range filters.
+**Download Excel** stays beside **Reset** and exports the active table's filtered
+employees and dates, with each employee's **Duty Count** in the last column.
+The table and workbook have no grand-total row or long explanatory footer.
 
-- **Duty Planner** sheet: employee identity on the left, dates across columns,
-  leave/off/weekly-off/no-entry counts, **Duty Count** last, and grand totals.
-- **Daily Details** sheet: full duty text, source duty type, date, vehicle,
-  approved-leave overlap, planned/recorded status, and numeric duty counts.
-- Counts include dates through the displayed **as-of** date, excluding future
-  plans, leave, off and weekly off from Duty Count. An assignment overrides leave.
-- Sample-mode workbooks are explicitly labelled **SAMPLE**. Other pages' PDF
-  exports are unchanged.
+- Supervisor, Driver, Helper and Loader remain manually assigned.
+- Missing duties for other active staff default to **Office** (or **Collection**
+  for collectors/collection departments), with **Weekly Off on Sunday**.
+  Existing explicit exceptions are preserved. Defaults are not generated before
+  joining, for inactive staff, or for orphan historical records.
+- Due defaults are automatically saved using the normal staff assignment API
+  for editable weeks after the previous week is closed. Failed saves are shown
+  with a retry action; closed weeks and existing assignments are not overwritten.
+- **Approved leave always overrides duty**, including automatic duties. Pending
+  and rejected requests do not change duties. Leave updates refresh the planner.
+- Future dates show **empty dotted cells**, remain excluded from counts, and do
+  not expose future duty/vehicle details in Excel. Existing future assignments
+  are retained rather than deleted.
+- **Daily Details** keeps the source types, vehicle and approved-leave information
+  for completed dates. Sample workbooks are explicitly labelled as samples.
+- English/Telugu follows the app language switch, including filters, dates,
+  duty labels, pickers, messages and Excel. Employee names/backend values stay
+  unchanged. Telugu fonts are bundled; the calendar uses opt-in localization.
+- Salary Register and other pages' exports are unchanged.
 
 Focused checks (browser tests mock the staff API; no database is needed):
 
