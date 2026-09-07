@@ -65,8 +65,7 @@ const SAMPLE_EMPLOYEES: Employee[] = [
  * simply show as consecutive "Duty" days — one or two. After a trip the
  * person gets a holiday or two (Rest), depending on orders and vehicle
  * availability. Each role has a few variants; the employee id picks one
- * so the grid doesn't look cloned. Index 5 is Saturday (compulsory
- * duty) — never Rest / WeeklyOff.
+ * so the grid doesn't look cloned.
  */
 const SAMPLE_SCHEDULES: Record<string, string[][]> = {
   Supervisor: [
@@ -90,10 +89,6 @@ const SAMPLE_SCHEDULES: Record<string, string[][]> = {
 function dutyForRole(role: string, dayIndex: number, employeeId: number): string {
   const variants = SAMPLE_SCHEDULES[role] ?? SAMPLE_SCHEDULES.Helper;
   const row = variants[employeeId % variants.length];
-  // Saturday (index 5) is compulsory duty — never Leave / WeeklyOff.
-  if (dayIndex === 5 && (row[dayIndex] === "Rest" || row[dayIndex] === "WeeklyOff")) {
-    return "Delivery";
-  }
   return row[dayIndex];
 }
 
@@ -134,20 +129,19 @@ function buildAssignments(week: { date: string }[]): DutyPlannerWeek["assignment
   return assignments;
 }
 
-/** Re-derive the Saturday summary from the current assignments. */
+/** Re-derive the Saturday summary (informational only — Saturday is an
+ * ordinary day, nothing is compulsory). */
 function refreshSaturday(week: DutyPlannerWeek): DutyPlannerWeek {
   const satDate = week.days[5]?.date;
   const satAssignments = week.assignments.filter((a) => a.date === satDate);
   const assigned = satAssignments.filter((a) => a.dutyType !== "Rest" && a.dutyType !== "WeeklyOff").length;
-  const required = week.employees.length;
-  const shortage = Math.max(0, required - assigned);
   return {
     ...week,
     saturday: {
-      required,
+      required: 0,
       assigned,
-      shortage,
-      status: shortage === 0 ? "Fully Staffed" : `Short ${shortage}`,
+      shortage: 0,
+      status: "Optional",
       requiredByRole: {},
       assignedByRole: {},
       availableByRole: {},

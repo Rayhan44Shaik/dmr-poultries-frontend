@@ -27,7 +27,6 @@ function ShiftPicker({ isOpen, onClose, onSelect, onRemove, currentDuty, date, e
   //   other roles → full list. "Other" (free text) is available to all.
   const shifts = getShiftConfigsForRole(employeeRole);
   const dateObj = new Date(date);
-  const isSaturday = dateObj.getDay() === 6;
 
   const formattedDate = !isNaN(dateObj.getTime())
     ? dateObj.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })
@@ -68,27 +67,17 @@ function ShiftPicker({ isOpen, onClose, onSelect, onRemove, currentDuty, date, e
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          {shifts.map((shift) => {
-            const disabled = isSaturday && (shift.type === 'Rest' || shift.type === 'WeeklyOff');
-            return (
-              <button
-                key={shift.type}
-                onClick={() => {
-                  if (disabled) return;
-                  onSelect(shift.type);
-                }}
-                disabled={disabled}
-                className={`py-2.5 px-3 rounded-xl border text-sm font-semibold transition hover:shadow-md active:scale-95 ${
-                  currentDuty === shift.type ? 'ring-2 ring-blue-500 ring-offset-2' : ''
-                } ${shift.bgColor} ${shift.textColor} ${shift.borderColor} ${
-                  disabled ? 'opacity-40 cursor-not-allowed' : ''
-                }`}
-              >
-                {shift.label}
-                {disabled && <span className="block text-[10px] text-rose-500 font-normal">(Saturday)</span>}
-              </button>
-            );
-          })}
+          {shifts.map((shift) => (
+            <button
+              key={shift.type}
+              onClick={() => onSelect(shift.type)}
+              className={`py-2.5 px-3 rounded-xl border text-sm font-semibold transition hover:shadow-md active:scale-95 ${
+                currentDuty === shift.type ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+              } ${shift.bgColor} ${shift.textColor} ${shift.borderColor}`}
+            >
+              {shift.label}
+            </button>
+          ))}
 
           {/* Other — free-text duty type, available for every role.
               Highlighted when the cell currently holds a custom (non-listed) type. */}
@@ -132,10 +121,6 @@ function ShiftPicker({ isOpen, onClose, onSelect, onRemove, currentDuty, date, e
             </button>
           </div>
         )}
-
-        <div className="mt-4 text-xs text-slate-400 text-center">
-          {isSaturday && <span className="text-rose-500 font-medium">Saturday: Compulsory duty (cannot be Leave or Weekly Off)</span>}
-        </div>
 
         {currentDuty && onRemove && (
           <div className="mt-4 pt-3 border-t border-slate-100">

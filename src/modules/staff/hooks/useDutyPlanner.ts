@@ -170,12 +170,6 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         return false;
       }
 
-      const isSaturday = new Date(date).getDay() === 6;
-      if (isSaturday && (dutyType === 'Rest' || dutyType === 'WeeklyOff')) {
-        showNotification?.('Saturday is compulsory duty. Leave and Weekly Off cannot be assigned.', 'error');
-        return false;
-      }
-
       // Sample mode: apply the change in-memory (the backend is down).
       if (sampleWeek) {
         const next = localUpsertAssignment(sampleWeek, employeeId, date, dutyType);

@@ -34,7 +34,6 @@ function DutyPlannerPage() {
     weekStart,
     weekStatus,
     canEditWeek,
-    saturday,
     validation,
     autoAssignAll,
     submitCurrentWeek,
@@ -242,17 +241,11 @@ function DutyPlannerPage() {
               {validation.problems.length} issue(s)
             </span>
           )}
-          {saturday.shortage > 0 && (
-            <span className="flex items-center gap-1.5 text-rose-600 ml-2 border-l border-slate-200 pl-2">
-              <AlertCircle size={12} />
-              Saturday {saturday.shortage} short
-            </span>
-          )}
         </div>
       </div>
 
       {/* Auto Assign Preview / Conflicts / Validation - Collapsible, only when relevant */}
-      {(lastAutoPlan || !validation.ok || saturday.shortage > 0) && (
+      {(lastAutoPlan || !validation.ok) && (
         <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm space-y-3">
           {lastAutoPlan && (
             <div className="bg-slate-50/60 border border-slate-200 rounded-lg p-3">
@@ -267,15 +260,6 @@ function DutyPlannerPage() {
                   ))}
                 </ul>
               )}
-            </div>
-          )}
-
-          {saturday.shortage > 0 && (
-            <div className="bg-rose-50/80 border border-rose-200/80 rounded-lg p-2.5 text-xs text-rose-700 flex items-start gap-2">
-              <AlertCircle size={14} className="shrink-0 mt-0.5" />
-              <span>
-                Saturday requires <strong>{saturday.shortage} more</strong> assigned employee(s). Week cannot be submitted until resolved.
-              </span>
             </div>
           )}
 

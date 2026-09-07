@@ -35,8 +35,7 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
     const date = new Date(dateStr);
     const dayName = date.toLocaleDateString('en-IN', { weekday: 'short' });
     const dayNum = date.toLocaleDateString('en-IN', { day: '2-digit' });
-    const isSaturday = date.getDay() === 6;
-    return { dayName, dayNum, isSaturday };
+    return { dayName, dayNum };
   };
 
   if (loading) {
@@ -65,17 +64,12 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
                 Employee
               </th>
               {weekDays.map((day, idx) => {
-                const { dayName, dayNum, isSaturday } = getDayLabel(day);
+                const { dayName, dayNum } = getDayLabel(day);
                 return (
                   <th key={idx} className="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider min-w-[100px] max-w-[140px] relative">
                     <div className="flex flex-col items-center gap-0.5">
                       <span className="font-medium">{dayName}</span>
                       <span className="text-sm font-semibold text-slate-700">{dayNum}</span>
-                      {isSaturday && (
-                        <span className="text-[10px] font-medium text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
-                          COMPULSORY
-                        </span>
-                      )}
                     </div>
                   </th>
                 );
@@ -95,9 +89,7 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
                   const assignment = getAssignment(emp.id, day);
                   const dutyType = assignment?.dutyType || '';
                   const { bg, text, border } = getShiftStyle(dutyType);
-                  const isSaturday = new Date(day).getDay() === 6;
                   const locked = weekLocked || isDateLocked(day);
-                  const isRestOrWeeklyOff = dutyType === 'Rest' || dutyType === 'WeeklyOff';
 
                   return (
                     <td key={idx} className="px-1.5 py-1.5 text-center min-w-[100px] max-w-[140px]">
@@ -107,17 +99,9 @@ function DutyPlannerGrid({ employees, weekDays, getAssignment, onCellClick, load
                         className={`w-full h-10 min-h-[40px] rounded-lg text-xs font-medium border transition-all duration-150 ${
                           locked
                             ? 'bg-slate-100 text-slate-400 border-slate-200 opacity-75 cursor-not-allowed'
-                            : isSaturday && isRestOrWeeklyOff
-                              ? 'bg-slate-100 text-slate-400 border-slate-200 line-through opacity-50 cursor-not-allowed'
-                              : `${bg} ${text} ${border} hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`
+                            : `${bg} ${text} ${border} hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`
                         }`}
-                        title={
-                          locked
-                            ? 'Past week locked (cannot edit)'
-                            : isSaturday
-                              ? 'Saturday – compulsory duty (Rest/Weekly Off not allowed)'
-                              : ''
-                        }
+                        title={locked ? 'Past week locked (cannot edit)' : ''}
                         style={{ minWidth: '90px' }}
                       >
                         {dutyType ? (
