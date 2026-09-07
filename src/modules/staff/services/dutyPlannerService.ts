@@ -91,6 +91,10 @@ function str(value: unknown): string {
   return value == null ? "" : String(value);
 }
 
+// SQL DATE values may arrive with a midnight timestamp. Keep calendar dates
+// canonical so existing assignments are never mistaken for missing defaults.
+function dateOnly(value: unknown): string { return str(value).slice(0, 10); }
+
 function num(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -125,7 +129,7 @@ function mapEmployee(raw: Record<string, unknown>): Employee {
     email: str(raw.email),
     salary: num(raw.salary),
     status: toEmployeeStatus(raw),
-    joiningDate: str(raw.joiningDate ?? raw.joining_date),
+    joiningDate: dateOnly(raw.joiningDate ?? raw.joining_date),
   };
 }
 
@@ -137,7 +141,7 @@ function mapAssignment(raw: Record<string, unknown>): DutyAssignment {
     department: str(raw.department),
     role: str(raw.role),
     dutyType: str(raw.dutyType ?? raw.duty_type) as DutyAssignment["dutyType"],
-    date: str(raw.date ?? raw.duty_date),
+    date: dateOnly(raw.date ?? raw.duty_date),
     vehicleId: maybeNum(raw.vehicleId ?? raw.vehicle_id),
     vehicleNo: maybeStr(raw.vehicleNo ?? raw.vehicle_no),
   };
@@ -162,7 +166,7 @@ function mapAutoPlan(raw: Record<string, unknown>): AutoPlan {
         employeeName: str(r.employeeName),
         department: str(r.department),
         role: str(r.role),
-        date: str(r.date),
+        date: dateOnly(r.date),
         dutyType: str(r.dutyType) as DutyType,
         vehicleId: r.vehicleId == null ? null : num(r.vehicleId),
         vehicleNo: r.vehicleNo == null ? null : str(r.vehicleNo),
@@ -186,13 +190,13 @@ function mapAutoPlan(raw: Record<string, unknown>): AutoPlan {
 
 export function mapDutyPlannerWeek(raw: Record<string, unknown>): DutyPlannerWeek {
   return {
-    weekStart: str(raw.weekStart),
-    weekEnd: str(raw.weekEnd),
+    weekStart: dateOnly(raw.weekStart),
+    weekEnd: dateOnly(raw.weekEnd),
     status: str(raw.status ?? "Open"),
     allRoles: Array.isArray(raw.allRoles) ? raw.allRoles.map(str) : [],
     days: Array.isArray(raw.days)
       ? (raw.days as Record<string, unknown>[]).map((d) => ({
-          date: str(d.date),
+          date: dateOnly(d.date),
           weekday: str(d.weekday),
         }))
       : [],
@@ -230,8 +234,8 @@ export async function getDutyPlannerWeekStatus(weekStart: string): Promise<WeekS
     `${DUTY_PLANNER_PATH}/week/${weekStart}`
   );
   return {
-    weekStart: str(data.weekStart),
-    weekEnd: str(data.weekEnd),
+    weekStart: dateOnly(data.weekStart),
+    weekEnd: dateOnly(data.weekEnd),
     status: str(data.status ?? "Open"),
   };
 }
