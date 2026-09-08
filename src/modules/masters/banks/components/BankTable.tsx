@@ -7,9 +7,11 @@ type BankTableProps = {
   banks: Bank[];
   onEdit: (bank: Bank) => void;
   onDelete: (id: number) => void;
+  /** Message shown when the list is empty (e.g. active search with no matches). */
+  emptyMessage?: string;
 };
 
-function BankTable({ banks, onEdit, onDelete }: BankTableProps) {
+function BankTable({ banks, onEdit, onDelete, emptyMessage }: BankTableProps) {
   const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
   return (
     <div className="overflow-x-auto rounded-xl bg-white shadow-sm border border-slate-200">
@@ -54,6 +56,7 @@ function BankTable({ banks, onEdit, onDelete }: BankTableProps) {
                     onClick={() => onEdit(bank)}
                     className="rounded p-1 text-blue-600 hover:bg-blue-50 transition-colors"
                     title="Edit"
+                    aria-label={`Edit bank ${bank.bankName}`}
                   >
                     <Pencil size={16} />
                   </button>
@@ -61,6 +64,7 @@ function BankTable({ banks, onEdit, onDelete }: BankTableProps) {
                     onClick={() => requestDelete(bank.id, { label: `Deleting Bank "${bank.bankName}"` })}
                     className="rounded p-1 text-red-600 hover:bg-red-50 transition-colors"
                     title="Delete"
+                    aria-label={`Delete bank ${bank.bankName}`}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -71,7 +75,7 @@ function BankTable({ banks, onEdit, onDelete }: BankTableProps) {
           {banks.length === 0 && (
             <tr>
               <td colSpan={8} className="px-4 py-6 text-center text-sm text-slate-500">
-                No banks found.
+                {emptyMessage ?? "No banks found."}
               </td>
             </tr>
           )}

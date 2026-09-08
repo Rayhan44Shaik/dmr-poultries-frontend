@@ -66,6 +66,21 @@ function toOptionalString(value: unknown): string | undefined {
   return s === "" ? undefined : s;
 }
 
+/**
+ * API DATE columns usually arrive as plain "YYYY-MM-DD", but some drivers and
+ * the legacy mock respond with a full timestamp ("2024-05-15T00:00:00.000Z").
+ * The shared DatePicker only accepts YYYY-MM-DD and renders a blank field for
+ * anything else, so RC Date / Purchase Date silently came back empty in the
+ * vehicle form. Keep the calendar part and drop any time suffix.
+ */
+function toDateOnly(value: unknown): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  const s = String(value).trim();
+  if (!s) return undefined;
+  const dateOnly = s.split("T")[0].split(" ")[0].trim();
+  return dateOnly || undefined;
+}
+
 function mapVehicle(raw: Record<string, unknown>): Vehicle {
   const registration = raw.vehicleNumber ?? raw.vehicle_number;
   if (registration != null && typeof registration !== "string") throw new Error("Vehicle registration response must be text.");
@@ -81,13 +96,13 @@ function mapVehicle(raw: Record<string, unknown>): Vehicle {
     fastagBank: String(raw.fastagBank ?? raw.fastag_bank ?? ""),
     engineNumber: String(raw.engineNumber ?? raw.engine_number ?? ""),
     chassisNumber: String(raw.chassisNumber ?? raw.chassis_number ?? ""),
-    insuranceExpiry: String(raw.insuranceExpiry ?? raw.insurance_expiry ?? ""),
-    permitExpiry: String(raw.permitExpiry ?? raw.permit_expiry ?? ""),
-    fitnessExpiry: String(raw.fitnessExpiry ?? raw.fitness_expiry ?? ""),
-    purchaseDate: toOptionalString(raw.purchaseDate ?? raw.purchase_date),
+    insuranceExpiry: toDateOnly(raw.insuranceExpiry ?? raw.insurance_expiry) ?? "",
+    permitExpiry: toDateOnly(raw.permitExpiry ?? raw.permit_expiry) ?? "",
+    fitnessExpiry: toDateOnly(raw.fitnessExpiry ?? raw.fitness_expiry) ?? "",
+    purchaseDate: toDateOnly(raw.purchaseDate ?? raw.purchase_date),
     purchaseAmount: toOptionalNumber(raw.purchaseAmount ?? raw.purchase_amount),
-    emiStartDate: toOptionalString(raw.emiStartDate ?? raw.emi_start_date),
-    rcDate: toOptionalString(raw.rcDate ?? raw.rc_date),
+    emiStartDate: toDateOnly(raw.emiStartDate ?? raw.emi_start_date),
+    rcDate: toDateOnly(raw.rcDate ?? raw.rc_date),
     status: normalizeStatus(raw.status),
     isSample: raw._mock === true,
   };

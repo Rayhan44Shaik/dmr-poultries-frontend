@@ -7,9 +7,11 @@ type BirdTypeTableProps = {
   birdTypes: BirdType[];
   onEdit: (birdType: BirdType) => void;
   onDelete: (id: number) => void;
+  /** Message shown when the list is empty (e.g. active search with no matches). */
+  emptyMessage?: string;
 };
 
-function BirdTypeTable({ birdTypes, onEdit, onDelete }: BirdTypeTableProps) {
+function BirdTypeTable({ birdTypes, onEdit, onDelete, emptyMessage }: BirdTypeTableProps) {
   const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
   return (
     <div className="overflow-x-auto rounded-xl bg-white shadow-sm border border-slate-200">
@@ -50,6 +52,7 @@ function BirdTypeTable({ birdTypes, onEdit, onDelete }: BirdTypeTableProps) {
                     onClick={() => onEdit(bt)}
                     className="rounded p-1 text-blue-600 hover:bg-blue-50 transition-colors"
                     title="Edit"
+                    aria-label={`Edit bird type ${bt.birdType}`}
                   >
                     <Pencil size={16} />
                   </button>
@@ -57,6 +60,7 @@ function BirdTypeTable({ birdTypes, onEdit, onDelete }: BirdTypeTableProps) {
                     onClick={() => requestDelete(bt.id, { label: `Deleting Bird Type "${bt.birdType}"` })}
                     className="rounded p-1 text-red-600 hover:bg-red-50 transition-colors"
                     title="Delete"
+                    aria-label={`Delete bird type ${bt.birdType}`}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -67,7 +71,7 @@ function BirdTypeTable({ birdTypes, onEdit, onDelete }: BirdTypeTableProps) {
           {birdTypes.length === 0 && (
             <tr>
               <td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-500">
-                No bird types found.
+                {emptyMessage ?? "No bird types found."}
               </td>
             </tr>
           )}

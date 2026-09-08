@@ -14,7 +14,6 @@ import {
   IndianRupee,
   CalendarDays,
   Clock,
-  Calendar,
 } from "lucide-react";
 import DatePicker from "../../../../components/common/DatePicker";
 
@@ -223,13 +222,49 @@ function VehicleForm({ vehicle, onSave, onCancel, isSaving = false }: VehicleFor
     });
   };
 
+  // ── Shared field chrome (form-local redesign — simple, neat, compact) ────
+  // Every text/number input and the DatePicker's built-in h-10/text-sm input
+  // now share one visual language: 40px tall, rounded-lg, slate border, soft
+  // background, emerald focus ring (matches the ERP calendar theme).
   const inputClass = () =>
-    "w-full pl-12 pr-4 py-4 text-base border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition border-slate-200 bg-white appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
+    "w-full h-10 pl-9 pr-3 text-sm rounded-lg border border-slate-200 bg-slate-50/60 text-slate-800 placeholder:text-slate-400 outline-none transition focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
 
   const numberInputClass = () =>
     inputClass() + " [&::-moz-inner-spin-button]:appearance-none";
 
-  const iconWrapperClass = "absolute left-4 top-1/2 -translate-y-1/2 text-slate-400";
+  const iconWrapperClass = "absolute left-3 top-1/2 -translate-y-1/2 text-slate-400";
+
+  const fieldLabel = (text: string, required = false) => (
+    <label className="block mb-1.5 text-xs font-semibold text-slate-600">
+      {text}
+      {required && <span className="text-red-500"> *</span>}
+    </label>
+  );
+
+  const sectionHeading = (label: string) => (
+    <div className="flex items-center gap-2">
+      <span className="h-3.5 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
+      <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
+        {label}
+      </h3>
+      <div className="h-px flex-1 bg-slate-200/80" aria-hidden="true" />
+    </div>
+  );
+
+  /**
+   * DatePicker draws its own compact input (h-10 / text-sm) and applies
+   * `className` to the wrapper it positions the popup against — so the wrapper
+   * only sets width. The calendar icon on the side is left to the shared
+   * DatePicker's own default (emerald-600), which keeps the green icon
+   * consistent across every master page. `popupClassName` shrinks the calendar
+   * popup for THIS form only (the shared DatePicker is untouched): `w-72!`
+   * beats the popup's built-in `w-80` regardless of utility order, and
+   * `scale-80 origin-top-left` renders the whole calendar 20% smaller while
+   * staying anchored to the input — placement is "bottom", so the popup opens
+   * below the field and its top edge stays glued to it while scaling.
+   */
+  const datePickerWrapperClass = "w-full";
+  const datePickerPopupClass = "w-72! scale-80 origin-top-left";
 
   const title = isEditing ? "Edit Vehicle" : "Add Vehicle";
   const subtitle = isEditing ? "Update information" : "Fill in the information";
@@ -241,25 +276,32 @@ function VehicleForm({ vehicle, onSave, onCancel, isSaving = false }: VehicleFor
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-slate-100 to-slate-200/80 px-8 py-5 flex items-center justify-between border-b border-slate-200/60">
-        <div className="flex items-center gap-4">
-          <div className="bg-blue-100 p-3 rounded-2xl">
-            <Truck className="h-7 w-7 text-blue-600" />
+    <div className="bg-white rounded-2xl shadow-xl border border-slate-200">
+      {/* Header — rounded on its own corners: the card must NOT clip
+          (overflow-hidden) or the date picker's popup gets cut off at the
+          card edge and the dialog cannot scroll to reveal it. */}
+      <div className="rounded-t-2xl px-6 py-4 sm:px-8 sm:py-5 flex items-center justify-between gap-4 border-b border-slate-200/70 bg-gradient-to-r from-emerald-50/70 via-white to-white">
+        <div className="flex items-center gap-3">
+          <div className="bg-emerald-100 text-emerald-700 p-2.5 rounded-xl">
+            <Truck size={22} />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">{title}</h2>
-            <p className="text-sm text-slate-500 font-medium">{subtitle}</p>
+            <h2 className="text-lg sm:text-xl font-bold text-slate-800 tracking-tight">
+              {title}
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium">{subtitle}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-slate-600">Status</span>
+        <div className="flex items-center gap-2.5">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Status
+          </span>
           <button
             type="button"
             onClick={toggleStatus}
             disabled={isSaving}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-200 ${
+            aria-label={`Status: ${status}. Toggle status.`}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-200 ${
               status === "Active" ? "bg-emerald-500" : "bg-slate-300"
             } ${isSaving ? "opacity-60 cursor-not-allowed" : ""}`}
           >
@@ -270,7 +312,7 @@ function VehicleForm({ vehicle, onSave, onCancel, isSaving = false }: VehicleFor
             />
           </button>
           <span
-            className={`text-sm font-medium ${
+            className={`text-sm font-semibold ${
               status === "Active" ? "text-emerald-600" : "text-slate-500"
             }`}
           >
@@ -279,256 +321,243 @@ function VehicleForm({ vehicle, onSave, onCancel, isSaving = false }: VehicleFor
         </div>
       </div>
 
-      {/* Form Body – 3 columns */}
-      <div className="p-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Row 1: Vehicle Number, Vehicle Type, Tracking ID */}
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              Vehicle Number <span className="text-red-500">*</span>
-            </label>
+      {/* Body — four tidy sections */}
+      <div className="p-6 sm:p-8 space-y-7">
+        {/* Section 1: Vehicle identity */}
+        <section className="space-y-3">
+          {sectionHeading("Vehicle Identity")}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="relative">
-              <Truck className={iconWrapperClass} size={20} />
-              <input
-                value={vehicleNumber}
-                onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
-                placeholder="e.g., AP-01-AB-1234"
-                className={inputClass()}
-              />
+              {fieldLabel("Vehicle Number", true)}
+              <div className="relative">
+                <Truck className={iconWrapperClass} size={16} />
+                <input
+                  value={vehicleNumber}
+                  onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
+                  placeholder="e.g., AP-01-AB-1234"
+                  className={inputClass()}
+                />
+              </div>
+            </div>
+
+            <div className="relative">
+              {fieldLabel("Vehicle Type", true)}
+              <div className="relative">
+                <Package className={iconWrapperClass} size={16} />
+                <input
+                  value={vehicleType}
+                  onChange={(e) => setVehicleType(e.target.value)}
+                  placeholder="e.g., LCV, Truck, Trailer"
+                  className={inputClass()}
+                />
+              </div>
+            </div>
+
+            <div className="relative">
+              {fieldLabel("Engine Number", true)}
+              <div className="relative">
+                <Gauge className={iconWrapperClass} size={16} />
+                <input
+                  value={engineNumber}
+                  onChange={(e) => setEngineNumber(e.target.value.toUpperCase())}
+                  placeholder="Engine number"
+                  className={inputClass()}
+                />
+              </div>
+            </div>
+
+            <div className="relative">
+              {fieldLabel("Chassis Number", true)}
+              <div className="relative">
+                <Cpu className={iconWrapperClass} size={16} />
+                <input
+                  value={chassisNumber}
+                  onChange={(e) => setChassisNumber(e.target.value.toUpperCase())}
+                  placeholder="Chassis number"
+                  className={inputClass()}
+                />
+              </div>
             </div>
           </div>
+        </section>
 
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              Vehicle Type <span className="text-red-500">*</span>
-            </label>
+        {/* Section 2: Load capacity */}
+        <section className="space-y-3">
+          {sectionHeading("Load Capacity")}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="relative">
-              <Package className={iconWrapperClass} size={20} />
-              <input
-                value={vehicleType}
-                onChange={(e) => setVehicleType(e.target.value)}
-                placeholder="e.g., LCV, Truck, Trailer"
-                className={inputClass()}
-              />
+              {fieldLabel("No. of Boxes", true)}
+              <div className="relative">
+                <Package className={iconWrapperClass} size={16} />
+                <input
+                  type="number"
+                  value={noOfBoxes}
+                  onChange={(e) => setNoOfBoxes(e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="e.g., 12"
+                  className={numberInputClass()}
+                />
+              </div>
+            </div>
+
+            <div className="relative">
+              {fieldLabel("Bird Capacity", true)}
+              <div className="relative">
+                <Bird className={iconWrapperClass} size={16} />
+                <input
+                  type="number"
+                  step="1"
+                  value={birdCapacity}
+                  onChange={handleBirdCapacityChange}
+                  placeholder="e.g., 2000"
+                  className={numberInputClass()}
+                />
+              </div>
+            </div>
+
+            <div className="relative">
+              {fieldLabel("Capacity (Kg)", true)}
+              <div className="relative">
+                <Weight className={iconWrapperClass} size={16} />
+                <input
+                  type="number"
+                  value={capacityKg}
+                  onChange={(e) => setCapacityKg(e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="e.g., 5000"
+                  className={numberInputClass()}
+                />
+              </div>
             </div>
           </div>
+        </section>
 
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              Tracking ID
-            </label>
+        {/* Section 3: Purchase & finance */}
+        <section className="space-y-3">
+          {sectionHeading("Purchase & Finance")}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="relative">
-              <MapPin className={iconWrapperClass} size={20} />
-              <input
-                value={trackingId}
-                onChange={(e) => setTrackingId(e.target.value)}
-                placeholder="GPS tracking ID"
-                className={inputClass()}
-              />
+              {fieldLabel("Fastag Bank")}
+              <div className="relative">
+                <Landmark className={iconWrapperClass} size={16} />
+                <input
+                  value={fastagBank}
+                  onChange={(e) => setFastagBank(e.target.value)}
+                  placeholder="e.g., HDFC, Axis"
+                  className={inputClass()}
+                />
+              </div>
+            </div>
+
+            <div className="relative">
+              {fieldLabel("Purchase Date")}
+              <div className="relative">
+                <DatePicker
+                  value={purchaseDate}
+                  onChange={setPurchaseDate}
+                  placeholder="Select date"
+                  placement="bottom"
+                  className={datePickerWrapperClass}
+                  popupClassName={datePickerPopupClass}
+                />
+              </div>
+            </div>
+
+            <div className="relative">
+              {fieldLabel("Purchase Amount (₹)")}
+              <div className="relative">
+                <IndianRupee className={iconWrapperClass} size={16} />
+                <input
+                  ref={purchaseInputRef}
+                  type="text"
+                  onFocus={handlePurchaseFocus}
+                  onBlur={handlePurchaseBlur}
+                  onChange={handlePurchaseChange}
+                  placeholder="e.g., 800000"
+                  className={inputClass()}
+                  defaultValue={purchaseAmountRaw ? formatIndianNumber(purchaseAmountRaw) : ""}
+                />
+              </div>
+            </div>
+
+            <div className="relative">
+              {fieldLabel("EMI Day (1–31)")}
+              <div className="relative">
+                <CalendarDays className={iconWrapperClass} size={16} />
+                <input
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={emiDay}
+                  onChange={handleEmiDayChange}
+                  onBlur={handleEmiDayBlur}
+                  placeholder="e.g., 15"
+                  className={numberInputClass()}
+                />
+              </div>
+              <p className="mt-1 text-[11px] leading-snug text-slate-400">
+                EMI due day each month. Month‑end dates adjust automatically.
+              </p>
+            </div>
+
+            <div className="relative">
+              {fieldLabel("Total EMIs (months)")}
+              <div className="relative">
+                <Clock className={iconWrapperClass} size={16} />
+                <input
+                  type="number"
+                  min="1"
+                  value={totalEMIs}
+                  onChange={handleTotalEMIsChange}
+                  placeholder="e.g., 36"
+                  className={numberInputClass()}
+                />
+              </div>
+              <p className="mt-1 text-[11px] leading-snug text-slate-400">
+                Total number of monthly installments.
+              </p>
+            </div>
+
+            <div className="relative">
+              {fieldLabel("RC Date")}
+              <div className="relative">
+                <DatePicker
+                  value={rcDate}
+                  onChange={setRcDate}
+                  placeholder="Select date"
+                  placement="bottom"
+                  className={datePickerWrapperClass}
+                  popupClassName={datePickerPopupClass}
+                />
+              </div>
             </div>
           </div>
+        </section>
 
-          {/* Row 2: No. of Boxes, Bird Capacity, Capacity (kg) */}
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              No. of Boxes <span className="text-red-500">*</span>
-            </label>
+        {/* Section 4: Tracking (kept last) */}
+        <section className="space-y-3">
+          {sectionHeading("Tracking")}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="relative">
-              <Package className={iconWrapperClass} size={20} />
-              <input
-                type="number"
-                value={noOfBoxes}
-                onChange={(e) => setNoOfBoxes(e.target.value === "" ? "" : Number(e.target.value))}
-                placeholder="e.g., 12"
-                className={numberInputClass()}
-              />
+              {fieldLabel("Tracking ID")}
+              <div className="relative">
+                <MapPin className={iconWrapperClass} size={16} />
+                <input
+                  value={trackingId}
+                  onChange={(e) => setTrackingId(e.target.value)}
+                  placeholder="GPS tracking ID"
+                  className={inputClass()}
+                />
+              </div>
             </div>
           </div>
-
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              Bird Capacity <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Bird className={iconWrapperClass} size={20} />
-              <input
-                type="number"
-                step="1"
-                value={birdCapacity}
-                onChange={handleBirdCapacityChange}
-                placeholder="e.g., 2000"
-                className={numberInputClass()}
-              />
-            </div>
-          </div>
-
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              Capacity (Kg) <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Weight className={iconWrapperClass} size={20} />
-              <input
-                type="number"
-                value={capacityKg}
-                onChange={(e) => setCapacityKg(e.target.value === "" ? "" : Number(e.target.value))}
-                placeholder="e.g., 5000"
-                className={numberInputClass()}
-              />
-            </div>
-          </div>
-
-          {/* Row 3: Fastag Bank, Purchase Date, Purchase Amount */}
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              Fastag Bank
-            </label>
-            <div className="relative">
-              <Landmark className={iconWrapperClass} size={20} />
-              <input
-                value={fastagBank}
-                onChange={(e) => setFastagBank(e.target.value)}
-                placeholder="e.g., HDFC, Axis"
-                className={inputClass()}
-              />
-            </div>
-          </div>
-
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              Purchase Date
-            </label>
-            <div className="relative">
-              <CalendarDays className={iconWrapperClass} size={20} />
-              <DatePicker
-                value={purchaseDate}
-                onChange={setPurchaseDate}
-                placeholder="Select date"
-                placement="top"
-                className="w-full pl-12 pr-4 py-4 text-base border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition border-slate-200 bg-white appearance-none"
-              />
-            </div>
-          </div>
-
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              Purchase Amount (₹) {/* 👈 Changed from Loan Amount */}
-            </label>
-            <div className="relative">
-              <IndianRupee className={iconWrapperClass} size={20} />
-              <input
-                ref={purchaseInputRef}
-                type="text"
-                onFocus={handlePurchaseFocus}
-                onBlur={handlePurchaseBlur}
-                onChange={handlePurchaseChange}
-                placeholder="e.g., 800000"
-                className={inputClass()}
-                defaultValue={purchaseAmountRaw ? formatIndianNumber(purchaseAmountRaw) : ""}
-              />
-            </div>
-          </div>
-
-          {/* Row 4: EMI Day, Total EMIs, RC Date */}
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              EMI Day (1–31)
-            </label>
-            <div className="relative">
-              <CalendarDays className={iconWrapperClass} size={20} />
-              <input
-                type="number"
-                min="1"
-                max="31"
-                value={emiDay}
-                onChange={handleEmiDayChange}
-                onBlur={handleEmiDayBlur}
-                placeholder="e.g., 15"
-                className={numberInputClass()}
-              />
-            </div>
-            <p className="mt-1 text-xs text-slate-400">
-              EMI due day each month. Month‑end dates adjust automatically.
-            </p>
-          </div>
-
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              Total EMIs (months)
-            </label>
-            <div className="relative">
-              <Clock className={iconWrapperClass} size={20} />
-              <input
-                type="number"
-                min="1"
-                value={totalEMIs}
-                onChange={handleTotalEMIsChange}
-                placeholder="e.g., 36"
-                className={numberInputClass()}
-              />
-            </div>
-            <p className="mt-1 text-xs text-slate-400">
-              Total number of monthly installments.
-            </p>
-          </div>
-
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              RC Date
-            </label>
-            <div className="relative">
-              <Calendar className={iconWrapperClass} size={20} />
-              <DatePicker
-                value={rcDate}
-                onChange={setRcDate}
-                placeholder="Select date"
-                placement="top"
-                className="w-full pl-12 pr-4 py-4 text-base border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition border-slate-200 bg-white appearance-none"
-              />
-            </div>
-          </div>
-
-          {/* Row 5: Engine Number, Chassis Number, (empty) */}
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              Engine Number <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Gauge className={iconWrapperClass} size={20} />
-              <input
-                value={engineNumber}
-                onChange={(e) => setEngineNumber(e.target.value.toUpperCase())}
-                placeholder="Engine number"
-                className={inputClass()}
-              />
-            </div>
-          </div>
-
-          <div className="relative">
-            <label className="block mb-2 text-base font-medium text-slate-700">
-              Chassis Number <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Cpu className={iconWrapperClass} size={20} />
-              <input
-                value={chassisNumber}
-                onChange={(e) => setChassisNumber(e.target.value.toUpperCase())}
-                placeholder="Chassis number"
-                className={inputClass()}
-              />
-            </div>
-          </div>
-
-          <div className="relative">{/* empty placeholder */}</div>
-        </div>
+        </section>
 
         {/* Action Buttons */}
-        <div className="flex justify-end gap-4 mt-8 pt-6 border-t border-slate-200">
+        <div className="flex justify-end gap-3 pt-5 border-t border-slate-200">
           <button
             type="button"
             onClick={onCancel}
             disabled={isSaving}
-            className="px-8 py-3 border border-slate-300 rounded-xl hover:bg-slate-50 transition font-medium text-base text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition font-medium text-sm text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
@@ -536,7 +565,7 @@ function VehicleForm({ vehicle, onSave, onCancel, isSaving = false }: VehicleFor
             type="button"
             onClick={handleSubmit}
             disabled={isSaving}
-            className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition shadow-sm hover:shadow font-medium text-base disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
+            className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition shadow-sm hover:shadow font-semibold text-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
           >
             {isSaving && (
               <svg

@@ -84,10 +84,13 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
   }, [employees, search, selectedDepartment]);
 
   const totalPages = Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE) || 1;
+  // Deleting or filtering records can leave currentPage beyond the last valid
+  // page; render the last valid page instead of a stranded empty one.
+  const safePage = Math.min(currentPage, totalPages);
   const paginatedEmployees = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
     return filteredEmployees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredEmployees, currentPage]);
+  }, [filteredEmployees, safePage]);
 
   const handleExportPDF = () => {
     if (filteredEmployees.length === 0) {
@@ -405,7 +408,7 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
             )}
           </div>
           <p className="text-slate-500 font-medium">
-            Showing {paginatedEmployees.length} of {filteredEmployees.length} Employees (Page {currentPage} of {totalPages})
+            Showing {paginatedEmployees.length} of {filteredEmployees.length} Employees (Page {safePage} of {totalPages})
           </p>
         </div>
 
@@ -444,6 +447,11 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
               employees={paginatedEmployees}
               onEdit={handleEditEmployee}
               onDelete={handleDeleteEmployee}
+              emptyMessage={
+                search.trim() || selectedDepartment
+                  ? "No employees matching your filters."
+                  : undefined
+              }
             />
           )}
         </div>
@@ -452,7 +460,7 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
         <div className={paginationBarClass}>
           <button
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1 || loading}
+            disabled={safePage === 1 || loading}
             className={paginationNavBtnClass}
           >
             Previous
@@ -463,7 +471,7 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
                 disabled={loading}
-                className={paginationPageBtnClass(currentPage === pageNum)}
+                className={paginationPageBtnClass(safePage === pageNum)}
               >
                 {pageNum}
               </button>
@@ -471,7 +479,7 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
           </div>
           <button
             onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages || loading}
+            disabled={safePage === totalPages || loading}
             className={paginationNavBtnClass}
           >
             Next

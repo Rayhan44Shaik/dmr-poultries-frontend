@@ -8,12 +8,12 @@ import {
   Briefcase,
   Phone,
   Mail,
-  Calendar,
   IndianRupee,
   CreditCard,
   Key,
   Home,
   Users,
+  ChevronDown,
 } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 
@@ -173,12 +173,44 @@ function EmployeeForm({ employee, onSave, onCancel, isSaving = false }: Employee
     });
   };
 
+  // Form-local design shared with the Vehicle master form: compact 40px
+  // fields, slate border, soft background, emerald focus ring.
   const inputClass = (hasError = false) =>
-    `w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition ${
-      hasError ? "border-red-300 focus:border-red-500" : "border-slate-200"
-    } bg-white ${isSaving ? "opacity-70 cursor-not-allowed" : ""}`;
+    `w-full h-10 pl-9 pr-3 text-sm rounded-lg border bg-slate-50/60 text-slate-800 placeholder:text-slate-400 outline-none transition focus:bg-white ${
+      hasError
+        ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-100"
+        : "border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+    } appearance-none`;
 
   const iconWrapperClass = "absolute left-3 top-1/2 -translate-y-1/2 text-slate-400";
+
+  const fieldLabel = (text: string, hint?: string, required = false) => (
+    <label className="block mb-1.5 text-xs font-semibold text-slate-600">
+      {text}
+      {required && <span className="text-red-500"> *</span>}
+      {hint && <span className="ml-1 font-normal text-slate-400">{hint}</span>}
+    </label>
+  );
+
+  const sectionHeading = (label: string) => (
+    <div className="flex items-center gap-2">
+      <span className="h-3.5 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
+      <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
+        {label}
+      </h3>
+      <div className="h-px flex-1 bg-slate-200/80" aria-hidden="true" />
+    </div>
+  );
+
+  /**
+   * Same form-local treatment as the Vehicle form: the DatePicker wrapper only
+   * sets width, the side calendar icon stays the shared DatePicker's default
+   * emerald green, and `popupClassName` shrinks the calendar popup here only —
+   * the shared DatePicker component is untouched. Placement is "bottom" so the
+   * popup opens below the field; `origin-top-left` keeps it anchored there.
+   */
+  const datePickerWrapperClass = "w-full";
+  const datePickerPopupClass = "w-72! scale-80 origin-top-left";
 
   const title = isEditing ? "Edit Employee" : "Add Employee";
   const subtitle = isEditing ? "Update details" : "Fill in the details";
@@ -188,26 +220,28 @@ function EmployeeForm({ employee, onSave, onCancel, isSaving = false }: Employee
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-slate-100 to-slate-200/80 px-6 py-5 flex items-center justify-between border-b border-slate-200/60">
+    <div className="bg-white rounded-2xl shadow-xl border border-slate-200">
+      {/* Header — rounded on its own corners: the card must NOT clip
+          (overflow-hidden) or the date picker's popup gets cut off at the
+          card edge and the dialog cannot scroll to reveal it. */}
+      <div className="rounded-t-2xl px-6 py-4 sm:px-8 sm:py-5 flex items-center justify-between gap-4 border-b border-slate-200/70 bg-gradient-to-r from-emerald-50/70 via-white to-white">
         <div className="flex items-center gap-3">
-          <div className="bg-blue-100 p-2.5 rounded-xl">
-            <Users className="h-6 w-6 text-blue-600" />
+          <div className="bg-emerald-100 text-emerald-700 p-2.5 rounded-xl">
+            <Users size={22} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">{title}</h2>
-            <p className="text-sm text-slate-500 font-medium">{subtitle}</p>
+            <h2 className="text-lg sm:text-xl font-bold text-slate-800 tracking-tight">{title}</h2>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium">{subtitle}</p>
           </div>
         </div>
-
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-slate-600">Status</span>
+        <div className="flex items-center gap-2.5">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</span>
           <button
             type="button"
             onClick={toggleStatus}
             disabled={isSaving}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-200 ${
+            aria-label={`Status: ${status}. Toggle status.`}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-200 ${
               status === "Active" ? "bg-emerald-500" : "bg-slate-300"
             } ${isSaving ? "opacity-60 cursor-not-allowed" : ""}`}
           >
@@ -217,207 +251,200 @@ function EmployeeForm({ employee, onSave, onCancel, isSaving = false }: Employee
               }`}
             />
           </button>
-          <span className={`text-sm font-medium ${status === "Active" ? "text-emerald-600" : "text-slate-500"}`}>
+          <span
+            className={`text-sm font-semibold ${
+              status === "Active" ? "text-emerald-600" : "text-slate-500"
+            }`}
+          >
             {status}
           </span>
         </div>
       </div>
 
-      {/* Form Body */}
-      <div className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Employee Name */}
-          <div className="relative">
-            <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              Employee Name <span className="text-red-500">*</span>
-            </label>
+      {/* Body */}
+      <div className="p-6 sm:p-8 space-y-7">
+        {/* Section 1: Personal details */}
+        <section className="space-y-3">
+          {sectionHeading("Personal Details")}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="relative">
-              <User className={iconWrapperClass} size={18} />
-              <input
-                value={employeeName}
-                onChange={(e) => setEmployeeName(e.target.value)}
-                placeholder="Full name"
-                className={inputClass()}
-                disabled={isSaving}
-              />
+              {fieldLabel("Employee Name", undefined, true)}
+              <div className="relative">
+                <User className={iconWrapperClass} size={16} />
+                <input
+                  value={employeeName}
+                  onChange={(e) => setEmployeeName(e.target.value)}
+                  placeholder="Full name"
+                  className={inputClass()}
+                  disabled={isSaving}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Department – with helper text */}
-          <div className="relative">
-            <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              Department <span className="text-red-500">*</span>
-            </label>
             <div className="relative">
-              <Building2 className={iconWrapperClass} size={18} />
-              <select
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition border-slate-200 bg-white appearance-none ${isSaving ? "opacity-70 cursor-not-allowed" : ""}`}
-                disabled={isSaving}
-              >
-                <option value="" disabled>Select Department</option>
-                {DEPARTMENTS.map((dept) => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
+              {fieldLabel("Phone Number", undefined, true)}
+              <div className="relative">
+                <Phone className={iconWrapperClass} size={16} />
+                <input
+                  value={phoneNumber}
+                  maxLength={10}
+                  onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
+                  placeholder="10-digit mobile number"
+                  className={inputClass()}
+                  disabled={isSaving}
+                />
+              </div>
             </div>
-            {/* Helper text */}
-            <p className="text-xs text-slate-400 mt-1">Departments are listed alphabetically</p>
-          </div>
 
-          {/* Role – optional */}
-          <div className="relative">
-            <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              Role <span className="text-xs text-slate-400 ml-1">(Optional)</span>
-            </label>
             <div className="relative">
-              <Briefcase className={iconWrapperClass} size={18} />
-              <input
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                placeholder="e.g., Manager, Staff, Collector"
-                className={inputClass()}
-                disabled={isSaving}
-              />
+              {fieldLabel("Email", "(Optional)")}
+              <div className="relative">
+                <Mail className={iconWrapperClass} size={16} />
+                <input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  className={inputClass()}
+                  disabled={isSaving}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Phone Number */}
-          <div className="relative">
-            <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              Phone Number <span className="text-red-500">*</span>
-            </label>
             <div className="relative">
-              <Phone className={iconWrapperClass} size={18} />
-              <input
-                value={phoneNumber}
-                maxLength={10}
-                onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
-                placeholder="10-digit mobile number"
-                className={inputClass()}
-                disabled={isSaving}
-              />
+              {fieldLabel("Address")}
+              <div className="relative">
+                <Home className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                <textarea
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Enter address"
+                  rows={2}
+                  className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-slate-50/60 text-slate-800 placeholder:text-slate-400 outline-none transition focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-y"
+                  disabled={isSaving}
+                />
+              </div>
             </div>
           </div>
+        </section>
 
-          {/* Email – optional */}
-          <div className="relative">
-            <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              Email <span className="text-xs text-slate-400 ml-1">(Optional)</span>
-            </label>
+        {/* Section 2: Work details */}
+        <section className="space-y-3">
+          {sectionHeading("Work Details")}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="relative">
-              <Mail className={iconWrapperClass} size={18} />
-              <input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
-                className={inputClass()}
-                disabled={isSaving}
-              />
+              {fieldLabel("Department", undefined, true)}
+              <div className="relative">
+                <Building2 className={iconWrapperClass} size={16} />
+                <select
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  className={`${inputClass()} pr-8 cursor-pointer`}
+                  disabled={isSaving}
+                >
+                  <option value="" disabled>Select Department</option>
+                  {DEPARTMENTS.map((dept) => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+              </div>
+              <p className="mt-1 text-[11px] leading-snug text-slate-400">
+                Departments are listed alphabetically
+              </p>
             </div>
-          </div>
 
-          {/* Joining Date */}
-          <div className="relative">
-            <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              Joining Date
-            </label>
             <div className="relative">
-              <Calendar className={iconWrapperClass} size={18} />
-              <DatePicker
-                value={joiningDate}
-                onChange={setJoiningDate}
-                placeholder="Select joining date"
-                className={`w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition border-slate-200 bg-white ${isSaving ? "opacity-70 cursor-not-allowed" : ""}`}
-                disabled={isSaving}
-              />
+              {fieldLabel("Role", "(Optional)")}
+              <div className="relative">
+                <Briefcase className={iconWrapperClass} size={16} />
+                <input
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  placeholder="e.g., Manager, Staff, Collector"
+                  className={inputClass()}
+                  disabled={isSaving}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Salary */}
-          <div className="relative">
-            <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              Salary <span className="text-red-500">*</span>
-            </label>
             <div className="relative">
-              <IndianRupee className={iconWrapperClass} size={18} />
-              <input
-                type="text"
-                value={salaryDisplay}
-                onChange={handleSalaryChange}
-                onBlur={handleSalaryBlur}
-                placeholder="e.g., 20,000"
-                className={`${inputClass()} [appearance:textfield]`}
-                disabled={isSaving}
-              />
+              {fieldLabel("Joining Date")}
+              <div className="relative">
+                <DatePicker
+                  value={joiningDate}
+                  onChange={setJoiningDate}
+                  placeholder="Select joining date"
+                  placement="bottom"
+                  className={datePickerWrapperClass}
+                  popupClassName={datePickerPopupClass}
+                  disabled={isSaving}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Aadhar Number */}
-          <div className="relative">
-            <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              Aadhar Number
-            </label>
             <div className="relative">
-              <CreditCard className={iconWrapperClass} size={18} />
-              <input
-                value={formatAadhar(aadharNumber)}
-                maxLength={14}
-                onChange={(e) => {
-                  const raw = e.target.value.replace(/\s/g, "");
-                  setAadharNumber(raw);
-                }}
-                placeholder="3044 6064 2044"
-                className={inputClass()}
-                disabled={isSaving}
-              />
+              {fieldLabel("Salary", undefined, true)}
+              <div className="relative">
+                <IndianRupee className={iconWrapperClass} size={16} />
+                <input
+                  type="text"
+                  value={salaryDisplay}
+                  onChange={handleSalaryChange}
+                  onBlur={handleSalaryBlur}
+                  placeholder="e.g., 20,000"
+                  className={`${inputClass()} [appearance:textfield]`}
+                  disabled={isSaving}
+                />
+              </div>
             </div>
           </div>
+        </section>
 
-          {/* License Number */}
-          <div className="relative">
-            <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              License Number
-              <span className="text-xs text-slate-400 ml-1">
-                {(department === "Driver" || department === "Collection") ? "(Required)" : "(Optional)"}
-              </span>
-            </label>
+        {/* Section 3: Documents */}
+        <section className="space-y-3">
+          {sectionHeading("Documents")}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="relative">
-              <Key className={iconWrapperClass} size={18} />
-              <input
-                value={licenseNumber}
-                onChange={(e) => setLicenseNumber(e.target.value)}
-                placeholder="License number"
-                className={inputClass(
-                  (department === "Driver" || department === "Collection") && !licenseNumber
-                )}
-                disabled={isSaving}
-              />
+              {fieldLabel("Aadhar Number")}
+              <div className="relative">
+                <CreditCard className={iconWrapperClass} size={16} />
+                <input
+                  value={formatAadhar(aadharNumber)}
+                  maxLength={14}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\s/g, "");
+                    setAadharNumber(raw);
+                  }}
+                  placeholder="3044 6064 2044"
+                  className={inputClass()}
+                  disabled={isSaving}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Address – full width */}
-          <div className="relative md:col-span-2">
-            <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              Address
-            </label>
             <div className="relative">
-              <Home className="absolute left-3 top-3 text-slate-400" size={18} />
-              <textarea
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Enter address"
-                rows={2}
-                className={`w-full pl-10 pr-4 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition border-slate-200 bg-white resize-y ${isSaving ? "opacity-70 cursor-not-allowed" : ""}`}
-                disabled={isSaving}
-              />
+              {fieldLabel(
+                "License Number",
+                (department === "Driver" || department === "Collection") ? "(Required)" : "(Optional)"
+              )}
+              <div className="relative">
+                <Key className={iconWrapperClass} size={16} />
+                <input
+                  value={licenseNumber}
+                  onChange={(e) => setLicenseNumber(e.target.value)}
+                  placeholder="License number"
+                  className={inputClass(
+                    (department === "Driver" || department === "Collection") && !licenseNumber
+                  )}
+                  disabled={isSaving}
+                />
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
         {/* Action Buttons */}
-        <div className="flex justify-end gap-4 mt-6 pt-5 border-t border-slate-200">
+        <div className="flex justify-end gap-3 pt-5 border-t border-slate-200">
           <button
             type="button"
             onClick={onCancel}
@@ -430,7 +457,7 @@ function EmployeeForm({ employee, onSave, onCancel, isSaving = false }: Employee
             type="button"
             onClick={handleSubmit}
             disabled={isSaving}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition shadow-sm hover:shadow font-medium text-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center"
+            className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition shadow-sm hover:shadow font-semibold text-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
           >
             {isSaving && (
               <svg

@@ -9,9 +9,11 @@ type VehicleTableProps = {
   vehicles: Vehicle[];
   onEdit: (vehicle: Vehicle) => void;
   onDelete: (id: number) => void;
+  /** Message shown when the list is empty (e.g. active search with no matches). */
+  emptyMessage?: string;
 };
 
-function VehicleTable({ vehicles, onEdit, onDelete }: VehicleTableProps) {
+function VehicleTable({ vehicles, onEdit, onDelete, emptyMessage }: VehicleTableProps) {
   const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
   return (
     <div className="overflow-x-auto rounded-xl bg-white shadow-sm border border-slate-200">
@@ -52,6 +54,7 @@ function VehicleTable({ vehicles, onEdit, onDelete }: VehicleTableProps) {
                     onClick={() => onEdit(vehicle)}
                     className="rounded p-1 text-blue-600 hover:bg-blue-50 transition-colors"
                     title="Edit Vehicle"
+                    aria-label={`Edit vehicle ${vehicle.vehicleNumber}`}
                   >
                     <Pencil size={16} />
                   </button>
@@ -59,6 +62,7 @@ function VehicleTable({ vehicles, onEdit, onDelete }: VehicleTableProps) {
                     onClick={() => requestDelete(vehicle.id, { label: `Deleting Vehicle "${vehicle.vehicleNumber}"` })}
                     className="rounded p-1 text-red-600 hover:bg-red-50 transition-colors"
                     title="Delete Vehicle"
+                    aria-label={`Delete vehicle ${vehicle.vehicleNumber}`}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -69,7 +73,7 @@ function VehicleTable({ vehicles, onEdit, onDelete }: VehicleTableProps) {
           {vehicles.length === 0 && (
             <tr>
               <td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-500">
-                No vehicles found.
+                {emptyMessage ?? "No vehicles found."}
               </td>
             </tr>
           )}

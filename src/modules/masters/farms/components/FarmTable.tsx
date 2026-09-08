@@ -7,9 +7,11 @@ type FarmTableProps = {
   farms: Farm[];
   onEdit: (farm: Farm) => void;
   onDelete: (id: number) => void;
+  /** Message shown when the list is empty (e.g. active search with no matches). */
+  emptyMessage?: string;
 };
 
-function FarmTable({ farms, onEdit, onDelete }: FarmTableProps) {
+function FarmTable({ farms, onEdit, onDelete, emptyMessage }: FarmTableProps) {
   const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
   return (
     <div className="overflow-x-auto rounded-xl bg-white shadow-sm border border-slate-200">
@@ -54,6 +56,7 @@ function FarmTable({ farms, onEdit, onDelete }: FarmTableProps) {
                     onClick={() => onEdit(farm)}
                     className="rounded p-1 text-blue-600 hover:bg-blue-50 transition-colors"
                     title="Edit Farm"
+                    aria-label={`Edit farm ${farm.farmName}`}
                   >
                     <Pencil size={16} />
                   </button>
@@ -61,6 +64,7 @@ function FarmTable({ farms, onEdit, onDelete }: FarmTableProps) {
                     onClick={() => requestDelete(farm.id, { label: `Deleting Farm "${farm.farmName}"` })}
                     className="rounded p-1 text-red-600 hover:bg-red-50 transition-colors"
                     title="Delete Farm"
+                    aria-label={`Delete farm ${farm.farmName}`}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -71,7 +75,7 @@ function FarmTable({ farms, onEdit, onDelete }: FarmTableProps) {
           {farms.length === 0 && (
             <tr>
               <td colSpan={8} className="px-4 py-6 text-center text-sm text-slate-500">
-                No farms found.
+                {emptyMessage ?? "No farms found."}
               </td>
             </tr>
           )}

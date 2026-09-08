@@ -72,10 +72,13 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
 
   // Pagination Calculations
   const totalPages = Math.ceil(filteredFarms.length / ITEMS_PER_PAGE) || 1;
+  // Deleting or filtering records can leave currentPage beyond the last valid
+  // page; render the last valid page instead of a stranded empty one.
+  const safePage = Math.min(currentPage, totalPages);
   const paginatedFarms = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
     return filteredFarms.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredFarms, currentPage]);
+  }, [filteredFarms, safePage]);
 
   const handleExportPDF = () => {
     if (filteredFarms.length === 0) {
@@ -423,7 +426,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
             )}
           </div>
           <p className="text-slate-500 font-medium">
-            Showing {paginatedFarms.length} of {filteredFarms.length} Farms (Page {currentPage} of {totalPages})
+            Showing {paginatedFarms.length} of {filteredFarms.length} Farms (Page {safePage} of {totalPages})
           </p>
         </div>
 
@@ -462,6 +465,11 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
               farms={paginatedFarms}
               onEdit={handleEditFarm}
               onDelete={handleDeleteFarm}
+              emptyMessage={
+                search.trim()
+                  ? "No farms matching your search."
+                  : undefined
+              }
             />
           )}
         </div>
@@ -470,7 +478,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
         <div className={paginationBarClass}>
           <button
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1 || loading}
+            disabled={safePage === 1 || loading}
             className={paginationNavBtnClass}
           >
             Previous
@@ -482,7 +490,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
                 disabled={loading}
-                className={paginationPageBtnClass(currentPage === pageNum)}
+                className={paginationPageBtnClass(safePage === pageNum)}
               >
                 {pageNum}
               </button>
@@ -491,7 +499,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
 
           <button
             onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages || loading}
+            disabled={safePage === totalPages || loading}
             className={paginationNavBtnClass}
           >
             Next

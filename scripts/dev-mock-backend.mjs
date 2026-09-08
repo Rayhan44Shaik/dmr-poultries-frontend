@@ -394,6 +394,35 @@ const server = http.createServer((req, res) => {
       : send(404, { error: "trip_not_found", id: Number(singleTrip[1]), mock: true });
   }
 
+  // ⚠️  SAMPLE-ONLY dev stub for the Shops location-capture flow.
+  // The production resolver lives in backend/src/utils/geoResolve.ts; this
+  // stub parses Google Maps URLs locally (no network, deterministic) and
+  // falls back to fixed Hyderabad coordinates for free-text input.
+  if (url.pathname === "/api/masters/resolve-location" && req.method === "POST") {
+    readJsonBody(req).then((body) => {
+      const input = typeof body.input === "string" ? body.input.trim() : "";
+      if (!input) {
+        return send(422, {
+          error: "Paste a Google Maps link or an address to capture the location.",
+          mock: true,
+        });
+      }
+      const at = input.match(/@(-?\d{1,2}(?:\.\d+)?),\s*(-?\d{1,3}(?:\.\d+)?)/);
+      const d34 = input.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/);
+      const seg = input.match(/\/(?:place|search)\/([^/?#]+)/);
+      const name = seg ? decodeURIComponent(seg[1].replace(/\+/g, " ")).trim() : "";
+      const lat = at ? parseFloat(at[1]) : d34 ? parseFloat(d34[1]) : 17.385;
+      const lng = at ? parseFloat(at[2]) : d34 ? parseFloat(d34[2]) : 78.4867;
+      return send(200, {
+        latitude: lat,
+        longitude: lng,
+        address: name || `Sample resolved: ${input}`,
+        mock: true,
+      });
+    });
+    return;
+  }
+
   if (req.method !== "GET") {
     return send(404, { error: "not_found", mock: true });
   }
