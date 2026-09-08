@@ -40,31 +40,6 @@ const formatCurrency = (amount: number) =>
     minimumFractionDigits: 2,
   }).format(amount || 0);
 
-function Kpi({
-  label,
-  value,
-  sub,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  icon: React.ReactNode;
-  tone: string;
-}) {
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-start justify-between">
-      <div className="min-w-0">
-        <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">{label}</div>
-        <div className="text-lg font-extrabold text-slate-800 mt-1 leading-tight">{value}</div>
-        {sub && <div className="text-[11px] text-slate-400 mt-0.5">{sub}</div>}
-      </div>
-      <div className={`p-2 rounded-lg shrink-0 ${tone}`}>{icon}</div>
-    </div>
-  );
-}
-
 function FilterDropdown({
   label,
   value,
@@ -105,7 +80,6 @@ function FilterDropdown({
 
   useEffect(() => {
     if (open && searchable) {
-      setQuery("");
       requestAnimationFrame(() => searchRef.current?.focus());
     }
   }, [open, searchable]);
@@ -130,7 +104,10 @@ function FilterDropdown({
       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</label>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open) setQuery("");
+          setOpen((o) => !o);
+        }}
         className="h-9 px-3 w-56 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white text-slate-700 flex items-center justify-between gap-2 hover:border-slate-300 transition font-medium"
       >
         <span className={`truncate ${value ? "text-slate-700" : "text-slate-400"}`}>{display}</span>

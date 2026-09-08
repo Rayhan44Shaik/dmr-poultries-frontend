@@ -86,7 +86,8 @@ export function SalaryTable({
     totalGross: records.reduce((s, r) => s + (r.totalGross || 0), 0),
     totalDeductions: records.reduce((s, r) => s + (r.totalDeductions || 0), 0),
     netSalary: records.reduce((s, r) => s + (r.netSalary || 0), 0),
-    pending: records.filter((r) => r.status === "Pending" || r.status === "Submitted").length,
+    pending: records.filter((r) => r.status === "Pending").length,
+    submitted: records.filter((r) => r.status === "Submitted").length,
     paid: records.filter((r) => r.status === "Paid").length,
   };
 
