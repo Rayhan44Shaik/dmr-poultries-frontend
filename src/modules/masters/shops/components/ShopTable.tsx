@@ -7,6 +7,8 @@ type ShopTableProps = {
   onEdit: (shop: Shop) => void;
   /** Offset of the first row in the full (filtered) list, so S.No stays global across pages. */
   startIndex?: number;
+  /** Message shown when the list is empty (e.g. active search with no matches). */
+  emptyMessage?: string;
 };
 
 const inrFormatter = new Intl.NumberFormat("en-IN", {
@@ -24,7 +26,7 @@ const thBase =
   "px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap";
 const tdBase = "px-3 py-2.5 align-middle text-sm text-slate-600";
 
-function ShopTable({ shops, onEdit, startIndex = 0 }: ShopTableProps) {
+function ShopTable({ shops, onEdit, startIndex = 0, emptyMessage }: ShopTableProps) {
   const { t } = useI18n();
 
   // Rows arrive already ordered and paginated from ShopsPage; render as given
@@ -159,7 +161,7 @@ function ShopTable({ shops, onEdit, startIndex = 0 }: ShopTableProps) {
           {orderedShops.length === 0 && (
             <tr>
               <td colSpan={10} className="px-4 py-6 text-center text-sm text-slate-500">
-                {t("masters.shops.no_shops_found")}
+                {emptyMessage ?? t("masters.shops.no_shops_found")}
               </td>
             </tr>
           )}

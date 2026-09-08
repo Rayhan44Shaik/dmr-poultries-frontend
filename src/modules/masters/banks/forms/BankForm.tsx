@@ -74,37 +74,73 @@ function BankForm({ bank, onSave, onCancel, isSaving = false }: BankFormProps) {
     });
   };
 
+  // Form-local design shared with the Vehicle master form: compact 40px
+  // fields, slate border, soft background, emerald focus ring.
+  const inputClass = () =>
+    "w-full h-10 pl-9 pr-3 text-sm rounded-lg border border-slate-200 bg-slate-50/60 text-slate-800 placeholder:text-slate-400 outline-none transition focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 appearance-none";
+
+  const iconWrapperClass = "absolute left-3 top-1/2 -translate-y-1/2 text-slate-400";
+
+  const fieldLabel = (text: string, hint?: string, required = false) => (
+    <label className="block mb-1.5 text-xs font-semibold text-slate-600">
+      {text}
+      {required && <span className="text-red-500"> *</span>}
+      {hint && <span className="ml-1 font-normal text-slate-400">{hint}</span>}
+    </label>
+  );
+
+  const sectionHeading = (label: string) => (
+    <div className="flex items-center gap-2">
+      <span className="h-3.5 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
+      <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
+        {label}
+      </h3>
+      <div className="h-px flex-1 bg-slate-200/80" aria-hidden="true" />
+    </div>
+  );
+
+  const title = bank ? "Edit Bank" : "Add Bank";
+  const subtitle = bank ? "Update details" : "Fill in the details";
+
+  const toggleStatus = () => {
+    if (!isSaving) {
+      setStatus(status === "Active" ? "Inactive" : "Active");
+    }
+  };
+
   return (
-    <div className="flex flex-col w-full bg-white rounded-xl">
-      {/* Header Section */}
-      <div className="flex items-center justify-between px-6 py-5 bg-slate-50 border-b border-slate-100 rounded-t-xl">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center justify-center w-12 h-12 bg-blue-100 text-blue-600 rounded-xl">
-            <Landmark size={24} />
+    <div className="bg-white rounded-2xl shadow-xl border border-slate-200">
+      {/* Header — rounded on its own corners: the card must not clip
+          (overflow-hidden), keeping dropdown/popup overflow scrollable. */}
+      <div className="rounded-t-2xl px-6 py-4 sm:px-8 sm:py-5 flex items-center justify-between gap-4 border-b border-slate-200/70 bg-gradient-to-r from-emerald-50/70 via-white to-white">
+        <div className="flex items-center gap-3">
+          <div className="bg-emerald-100 text-emerald-700 p-2.5 rounded-xl">
+            <Landmark size={22} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-800">
-              {bank ? "Edit Bank" : "Add Bank"}
-            </h2>
-            <p className="text-sm text-slate-500">Fill in the details</p>
+            <h2 className="text-lg sm:text-xl font-bold text-slate-800 tracking-tight">{title}</h2>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium">{subtitle}</p>
           </div>
         </div>
-
-        {/* Status Toggle */}
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-slate-700">Status</span>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              className="sr-only peer"
-              checked={status === "Active"}
-              onChange={(e) => setStatus(e.target.checked ? "Active" : "Inactive")}
-              disabled={isSaving}
+        <div className="flex items-center gap-2.5">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</span>
+          <button
+            type="button"
+            onClick={toggleStatus}
+            disabled={isSaving}
+            aria-label={`Status: ${status}. Toggle status.`}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-200 ${
+              status === "Active" ? "bg-emerald-500" : "bg-slate-300"
+            } ${isSaving ? "opacity-60 cursor-not-allowed" : ""}`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                status === "Active" ? "translate-x-6" : "translate-x-1"
+              }`}
             />
-            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-          </label>
+          </button>
           <span
-            className={`text-sm font-medium ${
+            className={`text-sm font-semibold ${
               status === "Active" ? "text-emerald-600" : "text-slate-500"
             }`}
           >
@@ -113,107 +149,95 @@ function BankForm({ bank, onSave, onCancel, isSaving = false }: BankFormProps) {
         </div>
       </div>
 
-      {/* Body Section */}
-      <div className="p-6 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              Bank Name <span className="text-red-500">*</span>
-            </label>
+      {/* Body */}
+      <div className="p-6 sm:p-8 space-y-7">
+        <section className="space-y-3">
+          {sectionHeading("Bank Details")}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Landmark className="h-5 w-5 text-slate-400" />
+              {fieldLabel("Bank Name", undefined, true)}
+              <div className="relative">
+                <Landmark className={iconWrapperClass} size={16} />
+                <input
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                  placeholder="e.g., State Bank of India"
+                  className={inputClass()}
+                  disabled={isSaving}
+                />
               </div>
-              <input
-                value={bankName}
-                onChange={(e) => setBankName(e.target.value)}
-                placeholder="e.g., State Bank of India"
-                className="w-full border border-slate-200 rounded-lg pl-10 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                disabled={isSaving}
-              />
+            </div>
+
+            <div className="relative">
+              {fieldLabel("Branch", undefined, true)}
+              <div className="relative">
+                <MapPin className={iconWrapperClass} size={16} />
+                <input
+                  value={branch}
+                  onChange={(e) => setBranch(e.target.value)}
+                  placeholder="e.g., Guntur Main"
+                  className={inputClass()}
+                  disabled={isSaving}
+                />
+              </div>
             </div>
           </div>
+        </section>
 
-          <div>
-            <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              Branch <span className="text-red-500">*</span>
-            </label>
+        <section className="space-y-3">
+          {sectionHeading("Account Details")}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <MapPin className="h-5 w-5 text-slate-400" />
+              {fieldLabel("Account Number", undefined, true)}
+              <div className="relative">
+                <CreditCard className={iconWrapperClass} size={16} />
+                <input
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value.toUpperCase())}
+                  placeholder="6-20 alphanumeric"
+                  className={inputClass()}
+                  disabled={isSaving}
+                />
               </div>
-              <input
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-                placeholder="e.g., Guntur Main"
-                className="w-full border border-slate-200 rounded-lg pl-10 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                disabled={isSaving}
-              />
+            </div>
+
+            <div className="relative">
+              {fieldLabel("IFSC Code", undefined, true)}
+              <div className="relative">
+                <Hash className={iconWrapperClass} size={16} />
+                <input
+                  value={ifscCode}
+                  onChange={(e) => setIfscCode(e.target.value.toUpperCase())}
+                  placeholder="e.g., SBIN0012345"
+                  className={inputClass()}
+                  disabled={isSaving}
+                />
+              </div>
+            </div>
+
+            <div className="relative">
+              {fieldLabel("UPI ID", "(Optional)")}
+              <div className="relative">
+                <AtSign className={iconWrapperClass} size={16} />
+                <input
+                  value={upiId}
+                  onChange={(e) => setUpiId(e.target.value)}
+                  placeholder="e.g., user@hdfc"
+                  className={inputClass()}
+                  disabled={isSaving}
+                />
+              </div>
             </div>
           </div>
+        </section>
 
-          <div>
-            <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              Account Number <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <CreditCard className="h-5 w-5 text-slate-400" />
-              </div>
-              <input
-                value={accountNumber}
-                onChange={(e) => setAccountNumber(e.target.value.toUpperCase())}
-                placeholder="6-20 alphanumeric"
-                className="w-full border border-slate-200 rounded-lg pl-10 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                disabled={isSaving}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              IFSC Code <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Hash className="h-5 w-5 text-slate-400" />
-              </div>
-              <input
-                value={ifscCode}
-                onChange={(e) => setIfscCode(e.target.value.toUpperCase())}
-                placeholder="e.g., SBIN0012345"
-                className="w-full border border-slate-200 rounded-lg pl-10 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                disabled={isSaving}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block mb-1.5 text-sm font-medium text-slate-700">
-              UPI ID <span className="text-slate-400 text-xs font-normal ml-1">(Optional)</span>
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <AtSign className="h-5 w-5 text-slate-400" />
-              </div>
-              <input
-                value={upiId}
-                onChange={(e) => setUpiId(e.target.value)}
-                placeholder="e.g., user@hdfc"
-                className="w-full border border-slate-200 rounded-lg pl-10 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                disabled={isSaving}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Footer Section */}
-        <div className="flex justify-end gap-3 pt-6 border-t mt-6">
+        {/* Action Buttons */}
+        <div className="flex justify-end gap-3 pt-5 border-t border-slate-200">
           <button
             type="button"
             onClick={onCancel}
             disabled={isSaving}
-            className="px-6 py-2.5 border rounded-lg text-sm font-medium hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-6 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition font-medium text-sm text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
@@ -221,7 +245,7 @@ function BankForm({ bank, onSave, onCancel, isSaving = false }: BankFormProps) {
             type="button"
             onClick={handleSubmit}
             disabled={isSaving}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+            className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition shadow-sm hover:shadow font-semibold text-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
           >
             {isSaving && (
               <svg

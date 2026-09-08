@@ -116,9 +116,11 @@ function PaperRateSelect({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`w-full flex items-center pl-10 pr-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150 ${
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className={`w-full h-10 flex items-center pl-9 pr-8 text-sm rounded-lg border outline-none transition focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 cursor-pointer text-left ${
           hasError ? "border-red-500" : "border-slate-200"
-        } bg-white hover:shadow-sm focus:shadow-md appearance-none cursor-pointer text-left`}
+        } bg-slate-50/60 text-slate-800`}
       >
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
           <IndianRupee size={15} />
@@ -146,7 +148,7 @@ function PaperRateSelect({
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
                 placeholder="Search rate..."
-                className="w-full pl-6 pr-2 py-[5px] text-[13px] border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400/30 focus:border-blue-400"
+                className="w-full pl-6 pr-2 py-[5px] text-[13px] border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400/40 focus:border-emerald-400"
               />
             </div>
           </div>
@@ -318,17 +320,37 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
     city, address, latitude, longitude, paperRate, associationType, openingBalance, status,
     isEditing, onSave, t]);
 
+  // Form-local design shared with the Vehicle master form: compact 40px
+  // fields, slate border, soft background, emerald focus ring. Error state
+  // switches the accent to red.
   const inputClass = (hasError = false) =>
-    `w-full pl-10 pr-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150 ${
-      hasError ? "border-red-500" : "border-slate-200"
-    } bg-white hover:shadow-sm focus:shadow-md appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`;
+    `w-full h-10 pl-9 pr-3 text-sm rounded-lg border bg-slate-50/60 text-slate-800 placeholder:text-slate-400 outline-none transition focus:bg-white ${
+      hasError
+        ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-100"
+        : "border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+    } appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`;
 
   const selectClass = (hasError = false) =>
-    `w-full pl-10 pr-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150 ${
-      hasError ? "border-red-500" : "border-slate-200"
-    } bg-white hover:shadow-sm focus:shadow-md appearance-none cursor-pointer`;
+    `${inputClass(hasError)} pr-8 cursor-pointer`;
 
   const iconWrapperClass = "absolute left-3 top-1/2 -translate-y-1/2 text-slate-400";
+
+  const fieldLabel = (text: string, required = false) => (
+    <label className="block mb-1.5 text-xs font-semibold text-slate-600">
+      {text}
+      {required && <span className="text-red-500 ml-0.5" aria-hidden="true"> *</span>}
+    </label>
+  );
+
+  const sectionHeading = (label: string) => (
+    <div className="flex items-center gap-2">
+      <span className="h-3.5 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
+      <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
+        {label}
+      </h3>
+      <div className="h-px flex-1 bg-slate-200/80" aria-hidden="true" />
+    </div>
+  );
 
   const title = isEditing ? t("masters.shops.dialog.edit_title") : t("masters.shops.dialog.add_title");
   const subtitle = isEditing ? t("masters.shops.dialog.edit_subtitle") : t("masters.shops.dialog.add_subtitle");
@@ -338,12 +360,12 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
   }, [status, isSaving]);
 
   return (
-    <div className="bg-white rounded-xl shadow-xl border border-slate-200/60 overflow-hidden max-h-[90vh] flex flex-col">
+    <div className="bg-white rounded-2xl shadow-xl border border-slate-200/70 overflow-hidden max-h-[90vh] flex flex-col">
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-50 to-slate-100/50 px-5 py-2.5 flex items-center justify-between border-b border-slate-200/60 shrink-0 gap-4">
+      <div className="px-5 py-3.5 flex items-center justify-between border-b border-slate-200/70 bg-gradient-to-r from-emerald-50/70 via-white to-white shrink-0 gap-4">
         <div className="flex items-center gap-2.5">
-          <div className="bg-blue-100 p-1.5 rounded-lg">
-            <Store className="h-4 w-4 text-blue-600" />
+          <div className="bg-emerald-100 text-emerald-700 p-2 rounded-lg">
+            <Store className="h-4 w-4" />
           </div>
           <div>
             <h2 className="text-base font-bold text-slate-800 tracking-tight">{title}</h2>
@@ -351,47 +373,44 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
           </div>
         </div>
         <div className="flex items-center gap-2 ml-auto shrink-0">
-          <span className="text-xs font-medium text-slate-500 hidden sm:inline">{t("masters.shops.form.status")}</span>
+          <span className="text-xs font-semibold text-slate-500 hidden sm:inline">{t("masters.shops.form.status")}</span>
           <button
             type="button" onClick={toggleStatus} disabled={isSaving}
-            className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-200 ${
+            aria-label={t("masters.shops.form.status")}
+            className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-200 ${
               status === "Active" ? "bg-emerald-500" : "bg-slate-300"
             } ${isSaving ? "opacity-60 cursor-not-allowed" : ""}`}
-            aria-label={t("masters.shops.form.status")}
           >
             <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm ${
               status === "Active" ? "translate-x-5" : "translate-x-0.5"
             }`} />
           </button>
-          <span className={`text-xs font-medium hidden sm:inline ${
+          <span className={`text-xs font-semibold hidden sm:inline ${
             status === "Active" ? "text-emerald-600" : "text-slate-400"
           }`}>{status}</span>
         </div>
       </div>
 
       {/* Form body */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
         {/* SHOP DETAILS */}
-        <section>
-          <h3 className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5">
-            <Store className="h-3.5 w-3.5" />
-            {t("masters.shops.form.sections.shop_details")}
-          </h3>
+        <section className="space-y-3">
+          {sectionHeading(t("masters.shops.form.sections.shop_details"))}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-3 gap-y-3">
-            {/* Shop Number — with helper text inside the same grid cell */}
+            {/* Shop Number — read-only when editing */}
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                {t("masters.shops.form.shop_number")} <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
-              </label>
+              {fieldLabel(t("masters.shops.form.shop_number"), true)}
               <div className="relative">
                 <div className={iconWrapperClass}><Store size={15} /></div>
                 <input
                   value={shopNumber}
                   onChange={(e) => setShopNumber(e.target.value.toUpperCase())}
                   placeholder={t("masters.shops.form.shop_number_placeholder")}
-                  className={`w-full pl-10 pr-3 py-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150 bg-white hover:shadow-sm focus:shadow-md appearance-none ${
-                    errors.shopNumber ? "border-red-500" : isEditing ? "bg-slate-50 border-slate-200 text-slate-600" : "border-slate-200"
-                  }`}
+                  className={
+                    isEditing
+                      ? "w-full h-10 pl-9 pr-3 text-sm rounded-lg border border-slate-200 bg-slate-100 text-slate-500 outline-none cursor-not-allowed"
+                      : inputClass(!!errors.shopNumber)
+                  }
                   disabled={isEditing}
                   readOnly={isEditing}
                 />
@@ -404,9 +423,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
             {/* Shop Name */}
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                {t("masters.shops.form.shop_name")} <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
-              </label>
+              {fieldLabel(t("masters.shops.form.shop_name"), true)}
               <div className="relative">
                 <div className={iconWrapperClass}><Store size={15} /></div>
                 <input
@@ -421,9 +438,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
             {/* Owner Name */}
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                {t("masters.shops.form.owner_name")} <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
-              </label>
+              {fieldLabel(t("masters.shops.form.owner_name"), true)}
               <div className="relative">
                 <div className={iconWrapperClass}><User size={15} /></div>
                 <input
@@ -438,9 +453,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
             {/* Mobile Number */}
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                {t("masters.shops.form.mobile_number")} <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
-              </label>
+              {fieldLabel(t("masters.shops.form.mobile_number"), true)}
               <div className="relative">
                 <div className={iconWrapperClass}><Phone size={15} /></div>
                 <input
@@ -456,9 +469,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
             {/* Secondary Mobile */}
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                {t("masters.shops.form.secondary_mobile_number")}
-              </label>
+              {fieldLabel(t("masters.shops.form.secondary_mobile_number"))}
               <div className="relative">
                 <div className={iconWrapperClass}><Phone size={15} /></div>
                 <input
@@ -474,9 +485,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
             {/* Email */}
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                {t("masters.shops.form.email")}
-              </label>
+              {fieldLabel(t("masters.shops.form.email"))}
               <div className="relative">
                 <div className={iconWrapperClass}><Mail size={15} /></div>
                 <input
@@ -493,19 +502,14 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
         </section>
 
         {/* ADDRESS & BUSINESS DETAILS */}
-        <section>
-          <h3 className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5">
-            <MapPin className="h-3.5 w-3.5" />
-            {t("masters.shops.form.sections.address")}
-          </h3>
+        <section className="space-y-3">
+          {sectionHeading(t("masters.shops.form.sections.address"))}
           <div className="space-y-3">
             {/* Row 1: City | Association Type | Paper Rate */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-3 gap-y-3">
               {/* City */}
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  {t("masters.shops.form.city")} <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
-                </label>
+                {fieldLabel(t("masters.shops.form.city"), true)}
                 <div className="relative">
                   <div className={iconWrapperClass}><MapPin size={15} /></div>
                   <input
@@ -520,9 +524,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
               {/* Association Type */}
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  {t("masters.shops.form.association_type")} <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
-                </label>
+                {fieldLabel(t("masters.shops.form.association_type"), true)}
                 <div className="relative">
                   <div className={iconWrapperClass}><Settings size={15} /></div>
                   <select
@@ -535,15 +537,14 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
                       <option key={type} value={type}>{type}</option>
                     ))}
                   </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
                 </div>
                 {errors.associationType && <p className="text-red-600 text-[11px] mt-0.5">{errors.associationType}</p>}
               </div>
 
               {/* Paper Rate — searchable */}
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  {t("masters.shops.form.paper_rate")} <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
-                </label>
+                {fieldLabel(t("masters.shops.form.paper_rate"), true)}
                 <PaperRateSelect
                   value={paperRate}
                   onChange={setPaperRate}
@@ -555,9 +556,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
             {/* Row 2: Full Address + Get GPS */}
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                {t("masters.shops.form.full_address")}
-              </label>
+              {fieldLabel(t("masters.shops.form.full_address"))}
               <LocationPicker
                 latitude={latitude}
                 longitude={longitude}
@@ -569,9 +568,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
             {/* Row 3: Opening Balance */}
             <div className="max-w-xs">
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                {t("masters.shops.form.opening_balance")} <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
-              </label>
+              {fieldLabel(t("masters.shops.form.opening_balance"), true)}
               <div className="relative">
                 <div className={iconWrapperClass}><IndianRupee size={15} /></div>
                 <input
@@ -590,13 +587,13 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       </div>
 
       {/* Footer */}
-      <div className="flex justify-end gap-3 px-5 py-3 border-t border-slate-200/60 bg-slate-50/50 shrink-0">
+      <div className="flex justify-end gap-3 px-5 py-3 border-t border-slate-200/70 bg-slate-50/60 shrink-0">
         <button type="button" onClick={onCancel} disabled={isSaving}
           className="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
           {t("masters.shops.dialog.cancel")}
         </button>
         <button type="button" onClick={handleSubmit} disabled={isSaving}
-          className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+          className="px-5 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2">
           {isSaving && (
             <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

@@ -112,12 +112,14 @@ function BanksPage({
       ),
     );
 
-  const paginatedBanks = useMemo(() => {
-    const safePage = Math.min(
-      currentPage,
-      totalPages,
-    );
+  // Deleting or filtering records can leave currentPage beyond the last valid
+  // page; render the last valid page instead of a stranded empty one.
+  const safePage = Math.min(
+    currentPage,
+    totalPages,
+  );
 
+  const paginatedBanks = useMemo(() => {
     const startIndex =
       (safePage - 1) *
       ITEMS_PER_PAGE;
@@ -129,8 +131,7 @@ function BanksPage({
     );
   }, [
     filteredBanks,
-    currentPage,
-    totalPages,
+    safePage,
   ]);
 
   const handleExportPDF = () => {
@@ -624,7 +625,7 @@ function BanksPage({
             Showing{" "}
             {paginatedBanks.length} of{" "}
             {filteredBanks.length} Banks
-            (Page {currentPage} of{" "}
+            (Page {safePage} of{" "}
             {totalPages})
           </p>
         </div>
@@ -675,6 +676,11 @@ function BanksPage({
                 handleEditBank
               }
               onDelete={handleDeleteBank}
+              emptyMessage={
+                search.trim()
+                  ? "No banks matching your search."
+                  : undefined
+              }
             />
           )}
         </div>
@@ -693,7 +699,7 @@ function BanksPage({
               )
             }
             disabled={
-              currentPage === 1 ||
+              safePage === 1 ||
               loading
             }
             className={paginationNavBtnClass}
@@ -715,7 +721,7 @@ function BanksPage({
               }
               disabled={loading}
               className={paginationPageBtnClass(
-                currentPage === pageNumber,
+                safePage === pageNumber,
               )}
             >
               {pageNumber}
@@ -734,7 +740,7 @@ function BanksPage({
               )
             }
             disabled={
-              currentPage ===
+              safePage ===
                 totalPages ||
               loading
             }
