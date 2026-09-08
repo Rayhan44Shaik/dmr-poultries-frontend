@@ -6,7 +6,7 @@
 // Premium top header: breadcrumbs, global search (command palette),
 // notifications, quick actions, theme toggle and user profile.
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -31,7 +31,7 @@ import { useTheme } from "../../providers/ThemeProvider";
 import { useAuth } from "../../providers/AuthProvider";
 import { useI18n } from "../../i18n";
 import LanguageSwitcher from "./LanguageSwitcher";
-import { collectionService } from "../../modules/operations/collections/services/collectionService";
+import { getPendingCollectionSnapshot, subscribePendingCollectionSnapshot } from "../../modules/operations/collections/services/collectionSnapshot";
 import { tripService } from "../../modules/operations/vehicle-trips/services/tripService";
 import { getDocuments } from "../../modules/fleet-operations/services/storage";
 import { getCurrentUser } from "../../modules/settings/services";
@@ -162,11 +162,32 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, location.search, language]);
 
+  // Reading the header must not initialize unrelated collection/sales APIs.
+  // Cache updates stay reactive; download alerts only when explicitly opened.
+  const pendingCollections = useSyncExternalStore(subscribePendingCollectionSnapshot, getPendingCollectionSnapshot, getPendingCollectionSnapshot);
+  const [notificationPhase, setNotificationPhase] = useState<'idle' | 'loading' | 'error'>('idle');
+  const notificationRead = useRef(false);
+  const notificationMounted = useRef(false);
+  useEffect(() => {
+    notificationMounted.current = true;
+    return () => { notificationMounted.current = false; };
+  }, []);
+  const loadCollectionNotifications = useCallback(() => {
+    if (pendingCollections.loaded || notificationRead.current) return;
+    notificationRead.current = true;
+    setNotificationPhase('loading');
+    void import("../../modules/operations/collections/services/collectionService")
+      .then(({ primeCollectionCache }) => primeCollectionCache())
+      .then(() => { if (notificationMounted.current) setNotificationPhase('idle'); })
+      .catch(() => { if (notificationMounted.current) setNotificationPhase('error'); })
+      .finally(() => { notificationRead.current = false; });
+  }, [pendingCollections.loaded]);
+
   /* ----- Data-driven notifications (existing services only) ----- */
   const notifications = useMemo<NotificationItem[]>(() => {
     const items: NotificationItem[] = [];
     try {
-      const pending = collectionService.getPendingCollections();
+      const pending = pendingCollections.items;
       const overdue = pending.filter((p) => p.overdueDays > 0);
       const totalPending = pending.reduce((sum, p) => sum + (p.currentPending || 0), 0);
       if (overdue.length > 0) {
@@ -239,7 +260,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
     return items;
     // location.key changes on every navigation — recomputes alerts after data entry.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.key, language]);
+  }, [location.key, language, pendingCollections]);
 
   const title = route.page?.labelKey ? t(route.page.labelKey) : (route.page?.label ?? route.section?.label ?? "");
   const sectionLabel = route.section?.labelKey ? t(route.section.labelKey) : route.section?.label;
@@ -311,8 +332,8 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
       {/* Notifications */}
       <Dropdown
         width="w-[360px] max-w-[calc(100vw-2rem)]"
-        trigger={(_open, toggle) => (
-          <IconButton label={t("header.notifications")} onClick={toggle} badge={notifications.length}>
+        trigger={(open, toggle) => (
+          <IconButton label={t("header.notifications")} onClick={() => { toggle(); if (!open) loadCollectionNotifications(); }} badge={notifications.length}>
             <Bell size={18} />
           </IconButton>
         )}
@@ -326,7 +347,16 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
               </span>
             </div>
             <div className="max-h-[320px] overflow-y-auto">
-              {notifications.length === 0 ? (
+              {!pendingCollections.loaded && notificationPhase === 'loading' && (
+                <p role="status" className="px-4 py-6 text-center text-xs text-slate-500">{t("header.loadingNotifications")}</p>
+              )}
+              {!pendingCollections.loaded && notificationPhase === 'error' && (
+                <div role="alert" className="px-4 py-5 text-center text-xs text-amber-700">
+                  <p>{t("header.notificationsUnavailable")}</p>
+                  <button type="button" onClick={loadCollectionNotifications} className="mt-2 rounded-lg px-3 py-1.5 font-semibold text-brand-700 hover:bg-brand-50">{t("common.retry")}</button>
+                </div>
+              )}
+              {notifications.length === 0 ? (pendingCollections.loaded ? (
                 <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-700">
                     <Check size={18} />
@@ -334,7 +364,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
                   <p className="text-sm font-medium text-slate-600 dark:text-slate-300">{t("header.noNotifications")}</p>
                   <p className="text-xs text-slate-400">{t("header.noNotificationsDesc")}</p>
                 </div>
-              ) : (
+              ) : null) : (
                 notifications.map((n) => {
                   const Icon = n.icon;
                   return (

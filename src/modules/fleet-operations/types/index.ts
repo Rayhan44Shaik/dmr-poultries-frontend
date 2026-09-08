@@ -229,6 +229,8 @@ export interface EmiOverview {
   emiDay: number | null;
   emiStartDate: string | null;
   status: EmiOverviewStatus;
+  /** Allows the UI to clearly label records returned by the demo backend. */
+  isSample?: boolean;
 }
 
 /** Individual EMI installment for schedule detail view */
