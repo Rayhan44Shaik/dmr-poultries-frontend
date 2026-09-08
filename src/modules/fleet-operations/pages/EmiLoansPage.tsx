@@ -19,7 +19,7 @@ const PAGE_SIZE = 10;
 const currencyFormatter = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
 const money = (value: number | null) => value != null && Number.isFinite(value) ? `₹${currencyFormatter.format(value)}` : '—';
 const COLUMNS: { key: EmiSortKey; label: string; align: 'left' | 'right' | 'center'; width?: string }[] = [
-  { key: 'vehicleNumber', label: 'fleet.emi.col_vehicle_no', align: 'left', width: '192px' },
+  { key: 'vehicleNumber', label: 'fleet.emi.col_vehicle_no', align: 'left', width: '160px' },
   { key: 'purchaseAmount', label: 'fleet.emi.col_purchase_amount', align: 'center', width: '180px' },
   { key: 'totalEMIs', label: 'fleet.emi.col_total_emi', align: 'center' },
   { key: 'completedEMIs', label: 'fleet.emi.col_completed', align: 'center' },
@@ -160,7 +160,7 @@ const EmiLoansPage = ({ embedded = false, active = true }: EmiLoansPageProps) =>
                       className={`px-3 py-2 ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left'}`}
                     >
                       {column.key === 'vehicleNumber' ? (
-                        <span className="pl-8 text-xs font-bold uppercase tracking-wide text-slate-600">{t(column.label)}</span>
+                        <span className="text-xs font-bold uppercase tracking-wide text-slate-600">{t(column.label)}</span>
                       ) : (
                         <button
                           type="button"
@@ -200,10 +200,7 @@ const EmiLoansPage = ({ embedded = false, active = true }: EmiLoansPageProps) =>
                 ) : paged.map((record) => (
                   <tr key={record.vehicleId} data-vehicle-id={record.vehicleId} className="h-12 transition-colors hover:bg-slate-50/70">
                     <td className="px-3 text-[13px] font-semibold text-slate-900">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-50 text-emerald-700"><Truck size={15} aria-hidden="true" /></span>
-                        <span className="block truncate" title={record.vehicleNumber}>{record.vehicleNumber || '—'}</span>
-                      </div>
+                      <span className="block truncate" title={record.vehicleNumber}>{record.vehicleNumber || '—'}</span>
                     </td>
                     <td title={money(record.purchaseAmount)} className="truncate px-3 text-center text-[13px] tabular-nums text-slate-700">{money(record.purchaseAmount)}</td>
                     <td title={String(record.totalEMIs ?? '—')} className="truncate px-3 text-center text-[13px] tabular-nums text-slate-700">{record.totalEMIs ?? '—'}</td>

@@ -375,7 +375,7 @@ for (const status of [401, 403]) {
   });
 }
 
-test('larger synchronized headings, compact vehicle spacing and flat vector marks stay stable at desktop widths', async ({ page }) => {
+test('larger synchronized headings, plain registrations and the section mark stay stable at desktop widths', async ({ page }) => {
   await page.goto('/fleet?tab=emi');
   await ready(page);
   await expect(page.getByRole('heading', { name: 'EMI Schedule', exact: true })).toHaveCSS('font-size', '16px');
@@ -386,10 +386,10 @@ test('larger synchronized headings, compact vehicle spacing and flat vector mark
     const headings = table(page).getByRole('columnheader');
     await expect(headings.first().locator('span')).toHaveCSS('font-size', '12px');
     for (const button of await table(page).locator('thead button').all()) await expect(button).toHaveCSS('font-size', '12px');
-    expect((await headings.nth(0).boundingBox())!.width).toBe(192);
+    expect((await headings.nth(0).boundingBox())!.width).toBe(160);
     expect((await headings.nth(1).boundingBox())!.width).toBe(180);
     const firstRow = dataRows(page).first();
-    await expect(firstRow.locator('td:first-child svg')).toBeVisible();
+    await expect(dataRows(page).locator('td:first-child svg')).toHaveCount(0);
     const registration = (await firstRow.locator('td:first-child [title]').boundingBox())!;
     const headingText = await headings.first().locator('span').evaluate((element) => {
       const range = document.createRange();
@@ -484,4 +484,136 @@ test('refresh popup is not replayed by switching tabs or background revalidation
   await ready(page);
   await expect(refreshToast(page)).toHaveCount(0);
   expect(readCount(page)).toBe(3);
+});
+
+test('two-page pagination is compact and every control shows the correct rows and range', async ({ page }) => {
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  const nav = page.getByRole('navigation', { name: 'EMI pages', exact: true });
+  const buttons = nav.getByRole('button');
+  await expect(buttons).toHaveCount(4);
+  const boxes = await Promise.all((await buttons.all()).map((button) => button.boundingBox()));
+  for (let index = 1; index < boxes.length; index++) {
+    const previous = boxes[index - 1]!;
+    const current = boxes[index]!;
+    expect(Math.abs(current.y - previous.y)).toBeLessThan(1);
+    expect(current.x - previous.x - previous.width).toBeGreaterThanOrEqual(5);
+    expect(current.x - previous.x - previous.width).toBeLessThanOrEqual(7);
+  }
+  const first = await dataRows(page).locator('td:first-child').allTextContents();
+  await expect(page.getByText('Showing 1–10 of 12 vehicles', { exact: true })).toBeVisible();
+  await expect(nav.getByRole('button', { name: 'Previous', exact: true })).toBeDisabled();
+  await nav.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(dataRows(page)).toHaveCount(2);
+  const last = await dataRows(page).locator('td:first-child').allTextContents();
+  expect(new Set([...first, ...last]).size).toBe(12);
+  await expect(page.getByText('Showing 11–12 of 12 vehicles', { exact: true })).toBeVisible();
+  await expect(nav.getByRole('button', { name: 'Go to page 2', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(nav.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
+  await nav.getByRole('button', { name: 'Previous', exact: true }).click();
+  await expect(dataRows(page).locator('td:first-child')).toHaveText(first);
+  await nav.getByRole('button', { name: 'Go to page 2', exact: true }).press('Enter');
+  await expect(dataRows(page).locator('td:first-child')).toHaveText(last);
+  await nav.getByRole('button', { name: 'Go to page 1', exact: true }).click();
+  await expect(dataRows(page).locator('td:first-child')).toHaveText(first);
+  expect(readCount(page)).toBe(1);
+});
+
+function useManyVehicles(page: Page) {
+  const template = backend(page).rows[0];
+  backend(page).rows = Array.from({ length: 80 }, (_, index) => ({
+    ...template, id: index + 1, vehicleNo: index + 1, vehicleNumber: `AP 16 PG ${String(index + 1).padStart(4, '0')}`,
+  }));
+}
+
+test('the page window reaches later pages and filters reset its range without another GET', async ({ page }) => {
+  useManyVehicles(page);
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  const nav = page.getByRole('navigation', { name: 'EMI pages', exact: true });
+  await expect(nav.getByRole('button', { name: /Go to page/ })).toHaveCount(5);
+  await nav.getByRole('button', { name: 'Go to page 5', exact: true }).click();
+  await expect(page.getByText('Showing 41–50 of 80 vehicles', { exact: true })).toBeVisible();
+  await expect(dataRows(page).first()).toContainText('AP 16 PG 0041');
+  await nav.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(page.getByText('Showing 51–60 of 80 vehicles', { exact: true })).toBeVisible();
+  await nav.getByRole('button', { name: 'Go to page 8', exact: true }).click();
+  await expect(page.getByText('Showing 71–80 of 80 vehicles', { exact: true })).toBeVisible();
+  await expect(nav.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
+  await expect(dataRows(page).first()).toContainText('AP 16 PG 0071');
+  await nav.getByRole('button', { name: 'Previous', exact: true }).press('Space');
+  await expect(page.getByText('Showing 61–70 of 80 vehicles', { exact: true })).toBeVisible();
+  await search(page).fill('PG0001');
+  await expect(dataRows(page)).toHaveCount(1);
+  await expect(page.getByText('Showing 1–1 of 1 vehicles', { exact: true })).toBeVisible();
+  await expect(nav.getByRole('button', { name: /Go to page/ })).toHaveCount(1);
+  await expect(nav.getByRole('button', { name: 'Go to page 1', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(nav.getByRole('button', { name: 'Previous', exact: true })).toBeDisabled();
+  await expect(nav.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
+  expect(readCount(page)).toBe(1);
+});
+
+test('pagination fits small screens with a visible current page and working next/previous controls', async ({ page }) => {
+  useManyVehicles(page);
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  const nav = page.getByRole('navigation', { name: 'EMI pages', exact: true });
+  await nav.getByRole('button', { name: 'Go to page 4', exact: true }).click();
+  for (const width of [320, 390, 640]) {
+    await page.setViewportSize({ width, height: 844 });
+    await nav.scrollIntoViewIfNeeded();
+    await expect(nav.getByRole('button', { name: /Go to page/ })).toHaveCount(width < 640 ? 3 : 5);
+    await expect(nav.locator('[aria-current="page"]')).toBeVisible();
+    const boxes = await Promise.all((await nav.getByRole('button').all()).map((button) => button.boundingBox()));
+    for (const box of boxes) {
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+      expect(Math.abs(box!.y - boxes[0]!.y)).toBeLessThan(1);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const before = await dataRows(page).first().getAttribute('data-vehicle-id');
+    await nav.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(dataRows(page).first()).not.toHaveAttribute('data-vehicle-id', before!);
+    await nav.getByRole('button', { name: 'Previous', exact: true }).click();
+    await expect(dataRows(page).first()).toHaveAttribute('data-vehicle-id', before!);
+  }
+  expect(readCount(page)).toBe(1);
+});
+
+test('loading and empty lists disable pagination without a misleading active page', async ({ page }) => {
+  backend(page).rows = [];
+  const held = holdNext(page);
+  await page.goto('/fleet?tab=emi');
+  await held.started;
+  const nav = page.getByRole('navigation', { name: 'EMI pages', exact: true });
+  for (const button of await nav.getByRole('button').all()) await expect(button).toBeDisabled();
+  await expect(nav.locator('[aria-current="page"]')).toHaveCount(0);
+  held.release();
+  await ready(page);
+  await expect(page.getByText('Showing 0–0 of 0 vehicles', { exact: true })).toBeVisible();
+  for (const button of await nav.getByRole('button').all()) await expect(button).toBeDisabled();
+  await expect(nav.locator('[aria-current="page"]')).toHaveCount(0);
+  expect(readCount(page)).toBe(1);
+});
+
+test('refresh confirmation stays in the viewport top-right corner on desktop and mobile', async ({ page }) => {
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  await refresh(page).click();
+  const toast = refreshToast(page);
+  await expect(toast).toBeVisible();
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.getByRole('navigation', { name: 'EMI pages', exact: true }).scrollIntoViewIfNeeded();
+    await expect(toast).toHaveCSS('position', 'fixed');
+    await expect(toast).toHaveCSS('top', '16px');
+    await expect(toast).toHaveCSS('right', '16px');
+    const box = (await toast.boundingBox())!;
+    expect(box.y).toBe(16);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
+  }
+  await toast.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(toast).toHaveCount(0);
+  expect(readCount(page)).toBe(2);
 });

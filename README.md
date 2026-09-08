@@ -30,11 +30,15 @@ npm run dev
   silently presenting old data as fresh. Access-denied responses clear previously loaded rows instead of
   retaining them. Fixed columns, reserved table space and stable controls avoid jumps.
 - Larger table headings and a flat SVG vehicle/EMI mark improve readability.
-  Vehicle/amount columns use compact, fixed widths; remaining headings and values
-  align consistently. Clear filters uses a filter-X icon, not a second refresh
+  Vehicle/amount columns use compact, fixed widths; registration numbers are
+  plain text without row icons. Remaining headings and values align consistently. Clear filters uses a filter-X icon, not a second refresh
   arrow. There is exactly one Refresh action, including after failed reads.
+- Pagination groups Previous, page numbers and Next without reserved blank slots;
+  its current-page highlight and row range follow the filtered data. Phones show
+  up to three neighboring page numbers, larger screens up to five. Loading/empty
+  states disable navigation rather than presenting an active page with no records.
 - Every successful manual refresh shows one non-blocking, dismissible confirmation
-  popup. It auto-dismisses after five seconds and never appears for initial loads,
+  popup in the top-right corner. It auto-dismisses after five seconds and never appears for initial loads,
   background revalidation, failed requests or an inactive tab.
 - Active-tab entry, successful master edits, a throttled return to the browser,
   and the IST day boundary revalidate data. There is no interval polling or

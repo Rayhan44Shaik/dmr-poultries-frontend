@@ -27,7 +27,7 @@ function EmiRefreshToast({ show, active, eventId, onDismiss }: Props) {
       aria-label={t('fleet.emi.refresh_notification')}
       aria-live="polite"
       aria-atomic="true"
-      className="pointer-events-none fixed bottom-5 right-4 z-[90] flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-800 shadow-lg"
+      className="pointer-events-none fixed top-4 right-4 z-[90] flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-800 shadow-lg"
     >
       <CheckCircle2 size={21} aria-hidden="true" className="shrink-0 text-emerald-600" />
       <span>{t('fleet.emi.refreshed_success')}</span>
