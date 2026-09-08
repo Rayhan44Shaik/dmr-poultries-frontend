@@ -30,7 +30,7 @@ export function useSalaryRegister(month: string, department: string = "") {
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'All' | 'Pending' | 'Submitted' | 'Paid'>('All');
+  const [filter, setFilter] = useState<'All' | 'Pending' | 'Paid'>('All');
   // True while showing the local sample register (backend unavailable).
   const [usingSampleData, setUsingSampleData] = useState(false);
 
@@ -90,7 +90,10 @@ export function useSalaryRegister(month: string, department: string = "") {
 
   const filteredRecords = useMemo(() => {
     if (filter === 'All') return records;
-    return records.filter((r) => r.status === filter);
+    if (filter === 'Pending') {
+      return records.filter((r) => r.status === 'Pending' || r.status === 'Submitted');
+    }
+    return records.filter((r) => r.status === 'Paid');
   }, [records, filter]);
 
   const totals = useMemo<SalaryRegisterTotals>(() => {
@@ -100,7 +103,7 @@ export function useSalaryRegister(month: string, department: string = "") {
       totalDeductions: records.reduce((sum, r) => sum + r.totalDeductions, 0),
       netPayroll: records.reduce((sum, r) => sum + r.netSalary, 0),
       paidCount: records.filter((r) => r.status === 'Paid').length,
-      pendingCount: records.filter((r) => r.status === 'Pending').length,
+      pendingCount: records.filter((r) => r.status === 'Pending' || r.status === 'Submitted').length,
       submittedCount: records.filter((r) => r.status === 'Submitted').length,
     };
   }, [records]);
