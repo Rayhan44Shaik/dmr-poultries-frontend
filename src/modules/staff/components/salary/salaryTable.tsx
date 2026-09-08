@@ -1,6 +1,5 @@
 // src/modules/staff/components/salary/salaryTable.tsx
 
-import { useMemo } from "react";
 import { CheckCircle2, Lock } from "lucide-react";
 import type { SalaryRecord } from "../../types/staffDashboard";
 import {
@@ -17,9 +16,9 @@ type SalaryTableProps = {
   itemsPerPage: number;
   formatCurrency?: (amount: number) => string;
   saving?: boolean;
-  selectedIds: ReadonlySet<string>;
-  onToggleSelect: (id: string) => void;
-  onToggleSelectAll: (ids: string[]) => void;
+  selectedIds?: ReadonlySet<string>;
+  onToggleSelect?: (id: string) => void;
+  onToggleSelectAll?: (ids: string[]) => void;
   onView: (record: SalaryRecord) => void;
 };
 
@@ -29,17 +28,10 @@ function StatusBadge({ record }: { record: SalaryRecord }) {
     record.correctionWindowDaysRemaining != null &&
     record.correctionWindowDaysRemaining > 0;
 
-  if (record.status === "Pending") {
+  if (record.status === "Pending" || record.status === "Submitted") {
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
         Pending
-      </span>
-    );
-  }
-  if (record.status === "Submitted") {
-    return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-        <Lock size={11} /> Submitted
       </span>
     );
   }
@@ -71,24 +63,33 @@ export function SalaryTable({
   onToggleSelectAll,
   onView,
 }: SalaryTableProps) {
+  const selectable = Boolean(selectedIds && onToggleSelect && onToggleSelectAll);
   const formatVal = formatCurrency || ((amount: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(amount || 0));
 
-  const sortedRecords = useMemo(
-    () =>
-      [...records].sort((a, b) =>
-        (a.employeeName || "").localeCompare(b.employeeName || "")
-      ),
-    [records]
-  );
+  const sortedRecords = records;
 
   const totalPages = Math.ceil(sortedRecords.length / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentRecords = sortedRecords.slice(startIndex, startIndex + itemsPerPage);
 
   const pageIds = currentRecords.map((r) => r.id);
-  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
-  const somePageSelected = pageIds.some((id) => selectedIds.has(id));
+  const allPageSelected = selectable && pageIds.length > 0 && pageIds.every((id) => selectedIds!.has(id));
+  const somePageSelected = selectable && pageIds.some((id) => selectedIds!.has(id));
+
+  const footer = {
+    count: records.length,
+    workingDays: records.reduce((s, r) => s + (r.workingDays ?? 0), 0),
+    presentDays: records.reduce((s, r) => s + (r.presentDays ?? 0), 0),
+    leaveDays: records.reduce((s, r) => s + (r.leaveDays ?? 0), 0),
+    basicSalary: records.reduce((s, r) => s + (r.basicSalary || 0), 0),
+    totalGross: records.reduce((s, r) => s + (r.totalGross || 0), 0),
+    totalDeductions: records.reduce((s, r) => s + (r.totalDeductions || 0), 0),
+    netSalary: records.reduce((s, r) => s + (r.netSalary || 0), 0),
+    pending: records.filter((r) => r.status === "Pending").length,
+    submitted: records.filter((r) => r.status === "Submitted").length,
+    paid: records.filter((r) => r.status === "Paid").length,
+  };
 
   if (records.length === 0) {
     return (
@@ -101,10 +102,11 @@ export function SalaryTable({
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200">
+        <table className="w-max min-w-full border-separate border-spacing-0">
           <thead className="bg-slate-50">
             <tr>
-              <th className="px-4 py-3 w-10">
+              {selectable && (
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left">
                 <input
                   type="checkbox"
                   aria-label="Select all visible salaries"
@@ -113,24 +115,24 @@ export function SalaryTable({
                     if (el) el.indeterminate = somePageSelected && !allPageSelected;
                   }}
                   disabled={saving}
-                  onChange={() => onToggleSelectAll(pageIds)}
+                  onChange={() => onToggleSelectAll?.(pageIds)}
                   className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
                 />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Employee</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Department</th>
-              <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Working</th>
-              <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Present</th>
-              <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Leave</th>
-              <th className="px-3 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Basic</th>
-              <th className="px-3 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Gross</th>
-              <th className="px-3 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Deductions</th>
-              <th className="px-3 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Net</th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Status</th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Payment Date</th>
+              )}
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Employee</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Working</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Present</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Leave</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Basic</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Gross</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Deductions</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Net</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Status</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Payment date</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 bg-white">
+          <tbody>
             {currentRecords.map((record) => {
               const windowOpen =
                 record.status === "Paid" &&
@@ -141,40 +143,61 @@ export function SalaryTable({
                 <tr
                   key={record.id}
                   onClick={() => onView(record)}
-                  className="hover:bg-slate-50 transition-colors cursor-pointer"
+                  className="border-t border-slate-100 hover:bg-slate-50/80 transition-colors cursor-pointer"
                 >
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  {selectable && (
+                  <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       aria-label={`Select ${record.employeeName}`}
-                      checked={selectedIds.has(record.id)}
+                      checked={selectedIds!.has(record.id)}
                       disabled={saving}
-                      onChange={() => onToggleSelect(record.id)}
+                      onChange={() => onToggleSelect?.(record.id)}
                       className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
                     />
                   </td>
-                  <td className="px-4 py-3 text-sm font-semibold text-slate-800 whitespace-nowrap">{record.employeeName}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{record.department}</td>
-                  <td className="px-3 py-3 text-center text-sm text-slate-700">{record.workingDays ?? "—"}</td>
-                  <td className="px-3 py-3 text-center text-sm text-slate-700">{record.presentDays ?? "—"}</td>
-                  <td className="px-3 py-3 text-center text-sm text-slate-700">{record.leaveDays ?? "—"}</td>
-                  <td className="px-3 py-3 text-right text-sm text-slate-700">{formatVal(record.basicSalary)}</td>
-                  <td className="px-3 py-3 text-right text-sm text-slate-700">{formatVal(record.totalGross)}</td>
-                  <td className="px-3 py-3 text-right text-sm text-rose-600">{formatVal(record.totalDeductions)}</td>
-                  <td className="px-3 py-3 text-right text-sm font-bold text-slate-800">{formatVal(record.netSalary)}</td>
-                  <td className="px-3 py-3">
+                  )}
+                  <td className="px-3 py-2.5 whitespace-nowrap">
+                    <div className="text-sm font-semibold text-slate-800">{record.employeeName}</div>
+                    {record.department ? (
+                      <div className="text-[11px] text-slate-500 mt-0.5">{record.department}</div>
+                    ) : null}
+                  </td>
+                  <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-700 whitespace-nowrap">{record.workingDays ?? "—"}</td>
+                  <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-700 whitespace-nowrap">{record.presentDays ?? "—"}</td>
+                  <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-700 whitespace-nowrap">{record.leaveDays ?? "—"}</td>
+                  <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-700 whitespace-nowrap">{formatVal(record.basicSalary)}</td>
+                  <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-700 whitespace-nowrap">{formatVal(record.totalGross)}</td>
+                  <td className="px-3 py-2.5 text-right text-sm tabular-nums text-rose-600 whitespace-nowrap">{formatVal(record.totalDeductions)}</td>
+                  <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-900 whitespace-nowrap">{formatVal(record.netSalary)}</td>
+                  <td className="px-3 py-2.5 whitespace-nowrap">
                     <StatusBadge record={record} />
                     {record.status === "Paid" && windowOpen && (
-                      <span className="block text-[10px] text-amber-600 mt-0.5">
-                        window {record.correctionWindowDaysRemaining}d
+                      <span className="ml-1 text-[10px] text-amber-600">
+                        {record.correctionWindowDaysRemaining}d
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-3 text-sm text-slate-600">{record.paymentDate ?? "—"}</td>
+                  <td className="px-3 py-2.5 text-sm tabular-nums text-slate-600 whitespace-nowrap">{record.paymentDate ?? "—"}</td>
                 </tr>
               );
             })}
           </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-slate-200 bg-slate-50">
+              {selectable && <td className="px-3 py-2.5" />}
+              <td className="px-3 py-2.5 text-sm font-bold text-slate-800 whitespace-nowrap">Total ({footer.count})</td>
+              <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-800 whitespace-nowrap">{footer.workingDays}</td>
+              <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-800 whitespace-nowrap">{footer.presentDays}</td>
+              <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-800 whitespace-nowrap">{footer.leaveDays}</td>
+              <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-800 whitespace-nowrap">{formatVal(footer.basicSalary)}</td>
+              <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-800 whitespace-nowrap">{formatVal(footer.totalGross)}</td>
+              <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-rose-700 whitespace-nowrap">{formatVal(footer.totalDeductions)}</td>
+              <td className="px-3 py-2.5 text-right text-sm tabular-nums font-bold text-slate-900 whitespace-nowrap">{formatVal(footer.netSalary)}</td>
+              <td className="px-3 py-2.5 text-sm tabular-nums text-slate-600 whitespace-nowrap">{footer.pending}P · {footer.submitted}S · {footer.paid}Paid</td>
+              <td className="px-3 py-2.5 text-sm text-slate-400 whitespace-nowrap">—</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
 

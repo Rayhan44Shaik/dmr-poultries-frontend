@@ -26,7 +26,7 @@ export function SubmitMonthModal({
               <Send size={18} />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-800">Submit Salary for {monthLabel}?</h3>
+              <h3 className="text-base font-bold text-slate-800">Review and Submit {monthLabel}?</h3>
             </div>
           </div>
           <button
@@ -59,7 +59,7 @@ export function SubmitMonthModal({
             disabled={saving || pendingCount === 0}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm transition flex items-center gap-1.5 disabled:opacity-50"
           >
-            {saving ? "Submitting..." : "Submit Month"}
+            {saving ? "Submitting..." : "Review and Submit"}
           </button>
         </div>
       </div>
