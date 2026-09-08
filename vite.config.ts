@@ -38,7 +38,7 @@ export default defineConfig({
   server: {
     host: true,
     // Allow the sandbox preview host (e.g. <port>-<id>.e2b.app) to connect.
-    allowedHosts: true,
+    allowedHosts: ['.e2b.app', 'localhost'],
     // Pre-transform the entry graph at startup so the first request is fast
     // instead of paying for the whole module graph cold.
     warmup: {
@@ -67,6 +67,6 @@ export default defineConfig({
   },
   preview: {
     host: true,
-    allowedHosts: true,
+    allowedHosts: ['.e2b.app', 'localhost'],
   },
 })

@@ -1336,11 +1336,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                           className="inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-bold text-slate-800 bg-white border border-slate-200 dark:border-slate-700 shadow-sm hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 transition active:scale-95"
                           title="View all trips"
                         >
-                          {item.key === 'sales' || item.key === 'collection' || item.key === 'pending'
-                            ? formatCurrency((totalMetrics[item.key as keyof WeeklyMetrics] as number) || 0)
-                            : item.key === 'weight' || item.key === 'weightLoss'
-                              ? ((totalMetrics[item.key as keyof WeeklyMetrics] as number) || 0).toFixed(2)
-                              : formatNumber((totalMetrics[item.key as keyof WeeklyMetrics] as number) || 0)}
+                          {formatNumber((totalMetrics[item.key as keyof WeeklyMetrics] as number) || 0)}
                         </button>
                       ) : item.key === 'sales' || item.key === 'collection' || item.key === 'pending'
                         ? formatCurrency((totalMetrics[item.key as keyof WeeklyMetrics] as number) || 0)

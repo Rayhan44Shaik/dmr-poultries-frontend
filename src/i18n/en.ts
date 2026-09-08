@@ -60,6 +60,8 @@ export default {
   // Header
   'header.search': 'Search pages…',
   'header.search_short': 'Search',
+  'header.loadingNotifications': 'Loading notifications…',
+  'header.notificationsUnavailable': 'Could not load collection alerts.',
   'header.notifications': 'Notifications',
   'header.quickAdd': 'Quick add',
   'header.theme_light': 'Switch to light mode',

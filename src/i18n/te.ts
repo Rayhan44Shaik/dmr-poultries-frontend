@@ -60,6 +60,8 @@ export default {
   // Header
   'header.search': 'పేజీలను వెతకండి…',
   'header.search_short': 'వెతకండి',
+  'header.loadingNotifications': 'నోటిఫికేషన్లు లోడ్ అవుతున్నాయి…',
+  'header.notificationsUnavailable': 'కలెక్షన్ హెచ్చరికలను లోడ్ చేయలేకపోయాము.',
   'header.notifications': 'నోటిఫికేషన్లు',
   'header.quickAdd': 'త్వరిత జోడింపు',
   'header.theme_light': 'లైట్ మోడ్‌కి మార్చండి',
