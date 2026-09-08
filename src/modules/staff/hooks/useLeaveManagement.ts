@@ -34,7 +34,7 @@ export interface LeaveFilters {
 }
 
 const DEFAULT_FILTERS: LeaveFilters = {
-  status: 'Pending',
+  status: 'All',
   month: new Date().toISOString().slice(0, 7),
   department: '',
   employeeId: null,
