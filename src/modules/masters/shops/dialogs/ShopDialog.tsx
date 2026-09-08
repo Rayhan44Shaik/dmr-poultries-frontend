@@ -1,3 +1,4 @@
+import MasterDialog from "../../components/MasterDialog";
 import { useState } from "react";
 import type { Shop } from "../types/shop";
 import ShopForm from "../forms/ShopForm";
@@ -28,16 +29,19 @@ function ShopDialog({ open, onClose, onSave, shop }: ShopDialogProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="w-full max-w-5xl animate-in fade-in zoom-in duration-200">
-        <ShopForm
-          shop={shop}
-          onSave={handleSave}
-          onCancel={onClose}
-          isSaving={isSaving}
-        />
-      </div>
-    </div>
+    <MasterDialog
+      label={shop ? "Edit Shop" : "Add Shop"}
+      onClose={onClose}
+      isSaving={isSaving}
+      width="wide"
+    >
+      <ShopForm
+        shop={shop}
+        onSave={handleSave}
+        onCancel={onClose}
+        isSaving={isSaving}
+      />
+    </MasterDialog>
   );
 }
 

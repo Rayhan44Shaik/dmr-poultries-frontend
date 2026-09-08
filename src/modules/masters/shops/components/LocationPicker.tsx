@@ -1,14 +1,10 @@
+import { masterInputClass } from "../../components/masterFormStyles";
 import { useState, useRef, useEffect, useCallback } from "react";
-import {
-  MapPin,
-  Navigation,
-  CheckCircle2,
-  XCircle,
-  Loader2,
-} from "lucide-react";
+import { MapPin, Navigation, CheckCircle2, Loader2 } from "lucide-react";
 import { resolveLocation } from "../services/shopService";
 
 type LocationPickerProps = {
+  id?: string;
   latitude: string;
   longitude: string;
   address?: string;
@@ -17,6 +13,7 @@ type LocationPickerProps = {
 };
 
 function LocationPicker({
+  id,
   latitude,
   longitude,
   address: initialAddress,
@@ -52,11 +49,18 @@ function LocationPicker({
 
     try {
       const result = await resolveLocation(input);
-      onChange(result.latitude.toFixed(6), result.longitude.toFixed(6), result.address || undefined);
+      onChange(
+        result.latitude.toFixed(6),
+        result.longitude.toFixed(6),
+        result.address || undefined,
+      );
       if (result.address) setCapturedAddress(result.address);
       setLocationInput("");
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.message || "Unable to determine this location.";
+      const msg =
+        err?.response?.data?.error ||
+        err?.message ||
+        "Unable to determine this location.";
       setError(msg);
     } finally {
       setIsResolving(false);
@@ -82,14 +86,16 @@ function LocationPicker({
       (err) => {
         setIsGettingGps(false);
         if (err.code === err.PERMISSION_DENIED) {
-          setError("Location permission was denied. Please paste a valid Google Maps location or address.");
+          setError(
+            "Location permission was denied. Please paste a valid Google Maps location or address.",
+          );
         } else if (err.code === err.POSITION_UNAVAILABLE) {
           setError("Location information is unavailable.");
         } else {
           setError("Location request timed out.");
         }
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
   }, [onChange, isGettingGps]);
 
@@ -111,13 +117,22 @@ function LocationPicker({
             <MapPin size={15} />
           </div>
           <input
+            id={id}
             ref={inputRef}
             type="text"
             value={locationInput}
-            onChange={(e) => { setLocationInput(e.target.value); setError(""); }}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleResolveInput(); } }}
+            onChange={(e) => {
+              setLocationInput(e.target.value);
+              setError("");
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleResolveInput();
+              }
+            }}
             placeholder="Paste address or Google Maps location..."
-            className="w-full h-10 pl-9 pr-3 text-sm rounded-lg border border-slate-200 bg-slate-50/60 text-slate-800 placeholder:text-slate-400 outline-none transition focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:opacity-60"
+            className={masterInputClass()}
             disabled={disabled || isLoading}
           />
         </div>
@@ -125,9 +140,13 @@ function LocationPicker({
           type="button"
           onClick={handleGetGps}
           disabled={disabled || isLoading}
-          className="inline-flex h-10 items-center gap-1.5 px-3.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50 shrink-0"
+          className="inline-flex h-9 items-center gap-1.5 px-3.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors disabled:opacity-50 shrink-0"
         >
-          {isGettingGps ? <Loader2 size={13} className="animate-spin" /> : <Navigation size={13} />}
+          {isGettingGps ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : (
+            <Navigation size={13} />
+          )}
           {isGettingGps ? "Getting..." : "Get GPS"}
         </button>
       </div>
@@ -137,7 +156,7 @@ function LocationPicker({
         <button
           type="button"
           onClick={handleResolveInput}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors"
         >
           <MapPin size={12} />
           Capture Location
@@ -153,9 +172,7 @@ function LocationPicker({
       )}
 
       {/* Error */}
-      {error && (
-        <p className="text-red-600 text-xs">{error}</p>
-      )}
+      {error && <p className="text-red-600 text-xs">{error}</p>}
 
       {/* Captured location card */}
       {hasValidCoords && !error && (
@@ -163,7 +180,9 @@ function LocationPicker({
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-1.5">
               <CheckCircle2 size={13} className="text-emerald-600" />
-              <span className="text-xs font-medium text-emerald-800">Location captured</span>
+              <span className="text-xs font-medium text-emerald-800">
+                Location captured
+              </span>
             </div>
             <button
               type="button"
@@ -174,7 +193,9 @@ function LocationPicker({
             </button>
           </div>
           {capturedAddress && (
-            <p className="text-xs text-emerald-700 leading-relaxed pl-5">{capturedAddress}</p>
+            <p className="text-xs text-emerald-700 leading-relaxed pl-5">
+              {capturedAddress}
+            </p>
           )}
           <div className="flex items-center gap-2 pl-5 mt-0.5 text-[11px] text-emerald-600/80">
             <span>Lat {parseFloat(latitude).toFixed(6)}</span>
@@ -186,7 +207,9 @@ function LocationPicker({
 
       {/* Not captured */}
       {!hasValidCoords && !error && !isResolving && (
-        <p className="text-[11px] text-slate-400 italic pl-0.5">Location not captured</p>
+        <p className="text-[11px] text-slate-400 italic pl-0.5">
+          Location not captured
+        </p>
       )}
     </div>
   );

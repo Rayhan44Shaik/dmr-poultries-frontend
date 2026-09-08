@@ -1,3 +1,7 @@
+import MasterListToolbar from "../../components/MasterListToolbar";
+import MasterListSummary from "../../components/MasterListSummary";
+import MasterPagination from "../../components/MasterPagination";
+import "../../styles/masters.css";
 // D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\masters\farms\pages\FarmsPage.tsx
 
 import React, { useState, useMemo } from "react";
@@ -11,12 +15,7 @@ import { exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/farmService";
 import type { Farm } from "../types/farm";
-import {
-  paginationBarClass,
-  paginationNavBtnClass,
-  paginationPageBtnClass,
-  shouldShowPagination,
-} from "../../../../shared/ui/paginationStyles";
+import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
 import { buildFarmBulkImportConfig } from "../bulkImportConfig";
 import jsPDF from "jspdf";
@@ -49,7 +48,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
 
   const farmBulkImportConfig = useMemo(
     () => buildFarmBulkImportConfig({ addFarmsBulk, reload }),
-    [addFarmsBulk, reload]
+    [addFarmsBulk, reload],
   );
 
   // Reset to page 1 whenever search keyword changes
@@ -66,7 +65,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
         farm.ownerName.toLowerCase().includes(keyword) ||
         farm.supervisorName.toLowerCase().includes(keyword) ||
         farm.village.toLowerCase().includes(keyword) ||
-        farm.phoneNumber.includes(keyword)
+        farm.phoneNumber.includes(keyword),
     );
   }, [farms, search]);
 
@@ -90,14 +89,27 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
     const doc = new jsPDF("l", "mm", "a4");
     const pageWidth = doc.internal.pageSize.getWidth(); // 297mm for A4 Landscape
     const margin = 14;
-    const usableWidth = pageWidth - (margin * 2);
+    const usableWidth = pageWidth - margin * 2;
 
     // Adjusted weights to ensure total sum maps precisely to usableWidth without clipping right borders
     // [Farm No, Farm Name, Owner, Supervisor, Village, Phone, Status]
     const relativeWeights = [0.09, 0.23, 0.18, 0.18, 0.16, 0.08, 0.08];
-    const columnStylesConfig: { [key: number]: { cellWidth: number; halign?: "center" | "left" | "right" } } = {};
+    const columnStylesConfig: {
+      [key: number]: {
+        cellWidth: number;
+        halign?: "center" | "left" | "right";
+      };
+    } = {};
 
-    const headers = ["Farm No", "Farm Name", "Owner", "Supervisor", "Village", "Phone", "Status"];
+    const headers = [
+      "Farm No",
+      "Farm Name",
+      "Owner",
+      "Supervisor",
+      "Village",
+      "Phone",
+      "Status",
+    ];
     headers.forEach((_, index) => {
       const computedWidth = usableWidth * relativeWeights[index];
       const isCentered = index === 0 || index === headers.length - 1;
@@ -160,14 +172,16 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
         doc.text(
           `Confidential Business Report • Page ${data.pageNumber} of ${pageCount}`,
           margin,
-          doc.internal.pageSize.height - 10
+          doc.internal.pageSize.height - 10,
         );
       },
     });
 
     const filename = `Farms_${new Date().toISOString().split("T")[0]}`;
     doc.save(`${filename}.pdf`);
-    logAuditEvent("EXPORT_PDF", "Farms", undefined, { count: filteredFarms.length });
+    logAuditEvent("EXPORT_PDF", "Farms", undefined, {
+      count: filteredFarms.length,
+    });
     showNotification("PDF exported successfully!", "success");
   };
 
@@ -176,7 +190,15 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
       showNotification("No data to export.", "error");
       return;
     }
-    const headers = ["Farm No", "Farm Name", "Owner", "Supervisor", "Village", "Phone", "Status"];
+    const headers = [
+      "Farm No",
+      "Farm Name",
+      "Owner",
+      "Supervisor",
+      "Village",
+      "Phone",
+      "Status",
+    ];
     const rows = filteredFarms.map((farm) => [
       farm.farmNo.toString(),
       farm.farmName,
@@ -189,7 +211,9 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
     const filename = `Farms_${new Date().toISOString().split("T")[0]}`;
 
     exportToExcel("Farms - Master List", headers, rows, filename);
-    logAuditEvent("EXPORT_EXCEL", "Farms", undefined, { count: filteredFarms.length });
+    logAuditEvent("EXPORT_EXCEL", "Farms", undefined, {
+      count: filteredFarms.length,
+    });
     showNotification("Excel exported successfully!", "success");
   };
 
@@ -201,7 +225,13 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
     const village = farm.village?.trim() ?? "";
     const capacity = Number(farm.capacity);
 
-    if (!farmName || !ownerName || !supervisorName || !phoneNumber || !village) {
+    if (
+      !farmName ||
+      !ownerName ||
+      !supervisorName ||
+      !phoneNumber ||
+      !village
+    ) {
       return "Please fill all required fields (marked with *).";
     }
     if (ownerName.length < 3) {
@@ -217,14 +247,14 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
     const duplicateFarm = farms.some(
       (f) =>
         f.farmName.trim().toLowerCase() === farmName.toLowerCase() &&
-        f.id !== editingFarm?.id
+        f.id !== editingFarm?.id,
     );
     if (duplicateFarm) {
       return "Farm Name already exists.";
     }
 
     const duplicatePhone = farms.some(
-      (f) => f.phoneNumber === phoneNumber && f.id !== editingFarm?.id
+      (f) => f.phoneNumber === phoneNumber && f.id !== editingFarm?.id,
     );
     if (duplicatePhone) {
       return "Phone Number already exists.";
@@ -253,7 +283,10 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
 
     try {
       if (editingFarm) {
-        await editFarm(editingFarm.id, { ...payload, farmNo: editingFarm.farmNo });
+        await editFarm(editingFarm.id, {
+          ...payload,
+          farmNo: editingFarm.farmNo,
+        });
         logAuditEvent("UPDATE_FARM", "Farms", editingFarm.id);
         showNotification("Farm updated successfully!", "success");
       } else {
@@ -261,7 +294,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
         const created = list.find(
           (f) =>
             f.farmName === payload.farmName &&
-            f.phoneNumber === payload.phoneNumber
+            f.phoneNumber === payload.phoneNumber,
         );
         logAuditEvent("CREATE_FARM", "Farms", created?.id);
         showNotification("Farm added successfully!", "success");
@@ -294,141 +327,37 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
   };
 
   const content = (
-    <div className="w-full space-y-2 farm-page-container">
-      <style>{`
-        .farm-page-container button,
-        [role="dialog"] button {
-          transition: all 0.15s ease-in-out;
-        }
-        .farm-page-container button:hover,
-        [role="dialog"] button:hover {
-          transform: translateY(-1px);
-        }
-      `}</style>
-
+    <div className="master-page w-full min-w-0 space-y-3 font-sans text-slate-700">
       {/* Main Container - Removed overflow-hidden so dropdowns overlay properly */}
       <div className="w-full bg-white rounded-xl border border-slate-200/90 shadow-sm">
         {/* Toolbar - Search on LEFT, Buttons on RIGHT in same line */}
-        <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/40 rounded-t-xl">
-          <div className="flex items-center justify-between gap-4">
-            {/* Search Bar - Left Side */}
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search Farm..."
-                  value={search}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  className="w-full pl-9 pr-4 py-1.5 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                  disabled={loading}
-                />
-                <svg
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              </div>
-            </div>
-
-            {/* Action Buttons - Right Side */}
-            <div className="flex items-center gap-3 flex-shrink-0">
-              
-              {/* 1. Export Dropdown (Soft Light Emerald Fill) */}
-              <div className="relative group z-50">
-                <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 hover:border-emerald-300 transition-all shadow-sm">
-                  <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
-                  Export
-                  <svg className="w-4 h-4 text-emerald-500 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {/* Dropdown Menu */}
-                <div className="absolute right-0 mt-2 w-32 bg-white border border-slate-200 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-2 group-hover:translate-y-0 overflow-hidden">
-                  <button
-                    onClick={handleExportPDF}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
-                      <path fillRule="evenodd" d="M8 11a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1zm0 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1zm0 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" />
-                    </svg>
-                    PDF
-                  </button>
-                  <button
-                    onClick={handleExportExcel}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-green-600 hover:bg-green-50 transition-colors border-t border-slate-100"
-                  >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M2 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V4zm6 0a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1H9a1 1 0 01-1-1V4zm6 0a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
-                    </svg>
-                    Excel
-                  </button>
-                </div>
-              </div>
-
-              {/* 2. Import Button (Soft Light Indigo Fill) */}
-              <button
-                onClick={() => setShowBulkImport(true)}
-                disabled={loading || saving}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-all shadow-sm disabled:opacity-50 z-40"
-              >
-                <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                Import
-              </button>
-
-              {/* 3. Add Farm Button (Solid Blue Fill) */}
-              <button
-                onClick={() => {
-                  setEditingFarm(null);
-                  setShowDialog(true);
-                }}
-                disabled={loading}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50 z-10"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add Farm
-              </button>
-            </div>
-          </div>
-        </div>
+        <MasterListToolbar
+          search={search}
+          onSearchChange={handleSearchChange}
+          searchPlaceholder="Search Farm..."
+          addLabel="Add Farm"
+          onAdd={() => {
+            setEditingFarm(null);
+            setShowDialog(true);
+          }}
+          onExportPDF={handleExportPDF}
+          onExportExcel={handleExportExcel}
+          loading={loading}
+          saving={saving}
+          onImport={() => setShowBulkImport(true)}
+        />
 
         {/* Status Counter Bar */}
-        <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-600 uppercase tracking-wider">
-              Farms Directory
-            </span>
-            <span className="px-2 py-0.5 font-semibold text-blue-700 bg-blue-50 border border-blue-200/60 rounded-full">
-              {filteredFarms.length} records
-            </span>
-            {(loading || saving || deletingId !== null) && (
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 font-medium text-slate-600 bg-slate-100 border border-slate-200 rounded-full">
-                <svg className="animate-spin h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                {loading ? "Loading..." : "Saving..."}
-              </span>
-            )}
-          </div>
-          <p className="text-slate-500 font-medium">
-            Showing {paginatedFarms.length} of {filteredFarms.length} Farms (Page {safePage} of {totalPages})
-          </p>
-        </div>
+        <MasterListSummary
+          title="Farms Directory"
+          total={filteredFarms.length}
+          shown={paginatedFarms.length}
+          page={safePage}
+          totalPages={totalPages}
+          loading={loading}
+          saving={saving}
+          deleting={deletingId !== null}
+        />
 
         {error && !loading && (
           <div className="mx-4 mt-3 px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-3">
@@ -449,16 +378,36 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
         <div className="p-0 relative min-h-[120px]">
           {loading && farms.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
-              <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              <svg
+                className="animate-spin h-8 w-8 text-blue-600"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
               </svg>
               <p className="text-sm font-medium">Loading farms...</p>
             </div>
           ) : !loading && farms.length === 0 && !error ? (
             <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
-              <p className="text-sm font-medium text-slate-700">No farms found.</p>
-              <p className="text-xs text-slate-500">Add a farm to get started.</p>
+              <p className="text-sm font-medium text-slate-700">
+                No farms found.
+              </p>
+              <p className="text-xs text-slate-500">
+                Add a farm to get started.
+              </p>
             </div>
           ) : (
             <FarmTable
@@ -466,45 +415,19 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
               onEdit={handleEditFarm}
               onDelete={handleDeleteFarm}
               emptyMessage={
-                search.trim()
-                  ? "No farms matching your search."
-                  : undefined
+                search.trim() ? "No farms matching your search." : undefined
               }
             />
           )}
         </div>
 
         {shouldShowPagination(filteredFarms.length) && (
-        <div className={paginationBarClass}>
-          <button
-            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={safePage === 1 || loading}
-            className={paginationNavBtnClass}
-          >
-            Previous
-          </button>
-
-          <div className="flex items-center gap-1.5">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-              <button
-                key={pageNum}
-                onClick={() => setCurrentPage(pageNum)}
-                disabled={loading}
-                className={paginationPageBtnClass(safePage === pageNum)}
-              >
-                {pageNum}
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={safePage === totalPages || loading}
-            className={paginationNavBtnClass}
-          >
-            Next
-          </button>
-        </div>
+          <MasterPagination
+            page={safePage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            disabled={loading}
+          />
         )}
       </div>
 
@@ -529,7 +452,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
           });
           showNotification(
             `Imported ${result.imported} of ${result.total} farms.`,
-            result.failed === 0 ? "success" : "error"
+            result.failed === 0 ? "success" : "error",
           );
         }}
       />

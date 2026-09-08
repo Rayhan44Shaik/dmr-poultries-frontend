@@ -1,4 +1,20 @@
-import { useEffect, useState } from "react";
+import {
+  Warehouse,
+  User,
+  Users,
+  Phone,
+  MapPin,
+  Bird,
+  Home,
+} from "lucide-react";
+import MasterForm, { MasterSectionHeading } from "../../components/MasterForm";
+import {
+  masterInputClass,
+  masterTextareaClass,
+  masterIconClass,
+  masterLabelClass,
+} from "../../components/masterFormStyles";
+import { useId, useEffect, useState } from "react";
 import type { Farm } from "../types/farm";
 
 type FarmFormProps = {
@@ -18,6 +34,8 @@ type FarmFormProps = {
 };
 
 function FarmForm({ farm, onSave, onCancel, isSaving = false }: FarmFormProps) {
+  const formId = useId();
+  const fieldId = (field: string) => `${formId}-${field}`;
   const [farmName, setFarmName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [supervisorName, setSupervisorName] = useState("");
@@ -71,6 +89,7 @@ function FarmForm({ farm, onSave, onCancel, isSaving = false }: FarmFormProps) {
   };
 
   const handleSubmit = () => {
+    if (isSaving) return;
     let hasError = false;
     const newErrors = { ...errors };
 
@@ -140,237 +159,206 @@ function FarmForm({ farm, onSave, onCancel, isSaving = false }: FarmFormProps) {
     });
   };
 
-  const inputClass = (field: keyof typeof errors) =>
-    `w-full rounded-lg border bg-white p-3 text-sm transition-colors focus:outline-none focus:ring-2 ${
-      errors[field]
-        ? "border-rose-300 focus:border-rose-500 focus:ring-rose-200"
-        : "border-slate-200 focus:border-indigo-300 focus:ring-indigo-100"
-    }`;
+  const label = (text: string, field: string, required = true) => (
+    <label htmlFor={fieldId(field)} className={masterLabelClass}>
+      {text}
+      {required && (
+        <span className="text-red-500" aria-hidden="true">
+          {" "}
+          *
+        </span>
+      )}
+    </label>
+  );
+  const errorMessage = (field: keyof typeof errors) =>
+    errors[field] && (
+      <p
+        id={`${fieldId(field)}-error`}
+        role="alert"
+        className="mt-1 text-xs text-red-600"
+      >
+        {errors[field]}
+      </p>
+    );
+  const errorProps = (field: keyof typeof errors) => ({
+    "aria-invalid": !!errors[field],
+    "aria-describedby": errors[field] ? `${fieldId(field)}-error` : undefined,
+  });
 
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200/50 sm:p-8">
-      {/* Header with logo, title, and status toggle on the right */}
-      <div className="mb-6 flex items-center justify-between border-b border-slate-100 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.8}
-              stroke="currentColor"
-              className="h-6 w-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M20.25 7.5l-8.25-4.5-8.25 4.5m16.5 0v9m-16.5-9v9m16.5 0l-8.25 4.5-8.25-4.5m16.5 0l-8.25 4.5-8.25-4.5"
+    <MasterForm
+      title={farm ? "Edit Farm" : "Add Farm"}
+      subtitle={farm ? "Update details" : "Fill in the details"}
+      icon={<Warehouse size={20} />}
+      status={status}
+      onStatusChange={setStatus}
+      onSubmit={handleSubmit}
+      onCancel={onCancel}
+      isSaving={isSaving}
+      submitLabel={farm ? "Update Farm" : "Save Farm"}
+    >
+      <section className="space-y-3">
+        <MasterSectionHeading>Farm Details</MasterSectionHeading>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            {label("Farm Name", "farmName")}
+            <div className="relative">
+              <Warehouse
+                size={16}
+                aria-hidden="true"
+                className={masterIconClass}
               />
-            </svg>
+              <input
+                id={fieldId("farmName")}
+                required
+                value={farmName}
+                {...errorProps("farmName")}
+                onChange={(event) => {
+                  setFarmName(event.target.value);
+                  clearFieldError("farmName");
+                }}
+                placeholder="e.g., Green Valley Farm"
+                className={masterInputClass(!!errors.farmName)}
+              />
+            </div>
+            {errorMessage("farmName")}
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-slate-800">
-              {farm ? "Edit Farm" : "Add New Farm"}
-            </h2>
-            {/* Dynamic subtitle */}
-            <p className="text-sm text-slate-500">
-              {farm ? "Update details" : "Fill in the details below"}
-            </p>
+            {label("Owner Name", "ownerName")}
+            <div className="relative">
+              <User size={16} aria-hidden="true" className={masterIconClass} />
+              <input
+                id={fieldId("ownerName")}
+                required
+                value={ownerName}
+                {...errorProps("ownerName")}
+                onChange={(event) => {
+                  setOwnerName(event.target.value);
+                  clearFieldError("ownerName");
+                }}
+                placeholder="Full name"
+                className={masterInputClass(!!errors.ownerName)}
+              />
+            </div>
+            {errorMessage("ownerName")}
           </div>
         </div>
-        {/* Status toggle – moved to top right */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-slate-600">Status</span>
-          <button
-            type="button"
-            onClick={() => {
-              if (!isSaving) setStatus(status === "Active" ? "Inactive" : "Active");
-            }}
-            disabled={isSaving}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-200 ${
-              status === "Active" ? "bg-emerald-500" : "bg-slate-300"
-            } ${isSaving ? "opacity-60 cursor-not-allowed" : ""}`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                status === "Active" ? "translate-x-6" : "translate-x-1"
-              }`}
-            />
-          </button>
-          <span className={`text-sm font-medium ${status === "Active" ? "text-emerald-600" : "text-slate-500"}`}>
-            {status}
-          </span>
-        </div>
-      </div>
-
-      <div className="space-y-5">
-        {/* Row 1: Farm Name + Owner Name */}
-        <div className="grid gap-5 sm:grid-cols-2">
+      </section>
+      <section className="space-y-3">
+        <MasterSectionHeading>Contact Details</MasterSectionHeading>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-              Farm Name <span className="text-rose-500">*</span>
-            </label>
-            <input
-              value={farmName}
-              onChange={(e) => {
-                setFarmName(e.target.value);
-                clearFieldError("farmName");
-              }}
-              placeholder="e.g. Green Valley Farm"
-              className={inputClass("farmName")}
-            />
-            {errors.farmName && (
-              <p className="mt-1 text-sm text-rose-500">{errors.farmName}</p>
-            )}
+            {label("Supervisor Name", "supervisorName")}
+            <div className="relative">
+              <Users size={16} aria-hidden="true" className={masterIconClass} />
+              <input
+                id={fieldId("supervisorName")}
+                required
+                value={supervisorName}
+                {...errorProps("supervisorName")}
+                onChange={(event) => {
+                  setSupervisorName(event.target.value);
+                  clearFieldError("supervisorName");
+                }}
+                placeholder="Full name"
+                className={masterInputClass(!!errors.supervisorName)}
+              />
+            </div>
+            {errorMessage("supervisorName")}
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-              Owner Name <span className="text-rose-500">*</span>
-            </label>
-            <input
-              value={ownerName}
-              onChange={(e) => {
-                setOwnerName(e.target.value);
-                clearFieldError("ownerName");
-              }}
-              placeholder="Full name"
-              className={inputClass("ownerName")}
-            />
-            {errors.ownerName && (
-              <p className="mt-1 text-sm text-rose-500">{errors.ownerName}</p>
-            )}
+            {label("Mobile Number", "phoneNumber")}
+            <div className="relative">
+              <Phone size={16} aria-hidden="true" className={masterIconClass} />
+              <input
+                id={fieldId("phoneNumber")}
+                type="tel"
+                inputMode="numeric"
+                required
+                value={phoneNumber}
+                maxLength={10}
+                {...errorProps("phoneNumber")}
+                onChange={(event) => {
+                  setPhoneNumber(event.target.value.replace(/\D/g, ""));
+                  clearFieldError("phoneNumber");
+                }}
+                placeholder="10-digit mobile number"
+                className={masterInputClass(!!errors.phoneNumber)}
+              />
+            </div>
+            {errorMessage("phoneNumber")}
           </div>
         </div>
-
-        {/* Row 2: Supervisor Name + Mobile Number */}
-        <div className="grid gap-5 sm:grid-cols-2">
+      </section>
+      <section className="space-y-3">
+        <MasterSectionHeading>Location & Capacity</MasterSectionHeading>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-              Supervisor Name <span className="text-rose-500">*</span>
-            </label>
-            <input
-              value={supervisorName}
-              onChange={(e) => {
-                setSupervisorName(e.target.value);
-                clearFieldError("supervisorName");
-              }}
-              placeholder="Full name"
-              className={inputClass("supervisorName")}
-            />
-            {errors.supervisorName && (
-              <p className="mt-1 text-sm text-rose-500">{errors.supervisorName}</p>
-            )}
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-              Mobile Number <span className="text-rose-500">*</span>
-            </label>
-            <input
-              value={phoneNumber}
-              maxLength={10}
-              onChange={(e) => {
-                setPhoneNumber(e.target.value.replace(/\D/g, ""));
-                clearFieldError("phoneNumber");
-              }}
-              placeholder="10 digits"
-              className={inputClass("phoneNumber")}
-            />
-            {errors.phoneNumber && (
-              <p className="mt-1 text-sm text-rose-500">{errors.phoneNumber}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Row 3: Village + Bird Capacity */}
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-              Village <span className="text-rose-500">*</span>
-            </label>
-            <input
-              value={village}
-              onChange={(e) => {
-                setVillage(e.target.value);
-                clearFieldError("village");
-              }}
-              placeholder="Village name"
-              className={inputClass("village")}
-            />
-            {errors.village && (
-              <p className="mt-1 text-sm text-rose-500">{errors.village}</p>
-            )}
+            {label("Village", "village")}
+            <div className="relative">
+              <MapPin
+                size={16}
+                aria-hidden="true"
+                className={masterIconClass}
+              />
+              <input
+                id={fieldId("village")}
+                required
+                value={village}
+                {...errorProps("village")}
+                onChange={(event) => {
+                  setVillage(event.target.value);
+                  clearFieldError("village");
+                }}
+                placeholder="Village name"
+                className={masterInputClass(!!errors.village)}
+              />
+            </div>
+            {errorMessage("village")}
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-              Bird Capacity <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="number"
-              value={capacity}
-              onChange={(e) => {
-                setCapacity(e.target.value === "" ? "" : Number(e.target.value));
-                clearFieldError("capacity");
-              }}
-              placeholder="e.g. 500"
-              className={`
-                ${inputClass("capacity")}
-                [appearance:textfield] 
-                [&::-webkit-inner-spin-button]:appearance-none 
-                [&::-webkit-outer-spin-button]:appearance-none
-              `}
-            />
-            {errors.capacity && (
-              <p className="mt-1 text-sm text-rose-500">{errors.capacity}</p>
-            )}
+            {label("Bird Capacity", "capacity")}
+            <div className="relative">
+              <Bird size={16} aria-hidden="true" className={masterIconClass} />
+              <input
+                id={fieldId("capacity")}
+                type="number"
+                required
+                value={capacity}
+                {...errorProps("capacity")}
+                onChange={(event) => {
+                  setCapacity(
+                    event.target.value === "" ? "" : Number(event.target.value),
+                  );
+                  clearFieldError("capacity");
+                }}
+                placeholder="e.g., 500"
+                className={masterInputClass(!!errors.capacity)}
+              />
+            </div>
+            {errorMessage("capacity")}
+          </div>
+          <div className="sm:col-span-2">
+            {label("Address", "address", false)}
+            <div className="relative">
+              <Home
+                size={16}
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3 top-2.5 text-slate-400"
+              />
+              <textarea
+                id={fieldId("address")}
+                value={address}
+                rows={2}
+                onChange={(event) => setAddress(event.target.value)}
+                placeholder="Street, landmark, etc."
+                className={masterTextareaClass}
+              />
+            </div>
           </div>
         </div>
-
-        {/* Address – full width */}
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-slate-700">
-            Address
-          </label>
-          <textarea
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="Street, landmark, etc."
-            className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm transition-colors focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            rows={2}
-          />
-        </div>
-
-        {/* Buttons */}
-        <div className="flex flex-col-reverse gap-3 pt-3 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isSaving}
-            className="w-full rounded-lg border border-slate-200 bg-white px-6 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-100 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isSaving}
-            className="w-full rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 sm:w-auto disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
-          >
-            {isSaving && (
-              <svg
-                className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-            )}
-            {isSaving ? "Saving..." : farm ? "Update Farm" : "Save Farm"}
-          </button>
-        </div>
-      </div>
-    </div>
+      </section>
+    </MasterForm>
   );
 }
 

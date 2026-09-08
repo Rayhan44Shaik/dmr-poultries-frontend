@@ -116,6 +116,8 @@ const YEAR_WINDOW_FUTURE = 50;
  * ============================================================================= */
 
 export interface DatePickerProps {
+  /** Optional caller-specific dropdown chrome; existing calendars are unchanged. */
+  dropdownComponent?: React.ComponentType<CalendarDropdownProps>;
   /** Optional calendar language; defaults to English for existing screens. */
   language?: "en" | "te";
   /** Controlled value in YYYY-MM-DD (empty string = none). */
@@ -167,7 +169,7 @@ interface CalendarDropdownOption {
   disabled?: boolean;
 }
 
-interface CalendarDropdownInternalProps {
+export interface CalendarDropdownProps {
   value: number | string;
   onChange: (e: { target: { value: string | number } }) => void;
   options: CalendarDropdownOption[];
@@ -269,7 +271,7 @@ function CalendarDropdown({
   onChange,
   options,
   "aria-label": ariaLabel,
-}: CalendarDropdownInternalProps) {
+}: CalendarDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -420,6 +422,7 @@ const DAY_PICKER_CLASS_NAMES = {
  * ============================================================================= */
 
 export function DatePicker({
+  dropdownComponent: DropdownComponent = CalendarDropdown,
   language = "en",
   value,
   onChange,
@@ -790,13 +793,13 @@ export function DatePicker({
             </button>
 
             <div className="flex items-center gap-2">
-              <CalendarDropdown
+              <DropdownComponent
                 value={viewMonth}
                 options={monthOptions}
                 aria-label={copy.month}
                 onChange={(e) => handleMonthDropdown(Number(e.target.value))}
               />
-              <CalendarDropdown
+              <DropdownComponent
                 value={viewYear}
                 options={yearOptions}
                 aria-label={copy.year}

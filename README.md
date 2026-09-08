@@ -9,6 +9,39 @@ npm install
 npm run dev
 ```
 
+### Masters
+
+Shops, Farms, Vehicles, Employees, Banks and Bird Types share consistent
+form frames, field spacing, typography, directory toolbars, status badges and
+compact pagination. The Farm form follows the Vehicle/Shop layout, with
+separate farm, contact, and location/capacity sections. Form headers and save
+buttons remain visible while the body scrolls on smaller screens.
+
+Every master dropdown uses the **Salary Register Department/Employee** reference:
+36px white controls, rounded menus, compact rows and an inset search where
+appropriate. This includes Department, City, Association Type, Paper Rate,
+rows per page, Export, and the master calendars' month/year controls.
+Dropdowns support keyboard navigation, typeahead/search, Escape, outside-click
+closing and focus restoration. Menus stay outside scrolling form/table areas
+while remaining inside their modal. The shared calendar's new dropdown override
+is opt-in; Salary Register and other calendars keep their existing appearance.
+
+Existing API endpoints, payloads, required-field rules, import/export handlers
+and failed-save behaviour are preserved. No sample data or database writes are
+introduced into the application by these styling changes.
+
+```bash
+npx playwright install chromium
+npm run test:e2e:masters  # Isolated API fixtures; no real database or master writes
+npm run build
+```
+
+The browser checks cover all six tabs at desktop, tablet and phone widths,
+compare dropdown styles against the actual Salary Register, and exercise
+filtering, pagination, exports, keyboard/focus behaviour, calendars, validation,
+create/edit payloads, disabled save states and failure/retry. Set
+`MASTERS_TEST_BASE_URL` to reuse an already running frontend.
+
 ### EMI
 
 `/fleet?tab=emi` is a **read-only** view of Vehicle Master finance details.

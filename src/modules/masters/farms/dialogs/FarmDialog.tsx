@@ -1,3 +1,4 @@
+import MasterDialog from "../../components/MasterDialog";
 import { useState } from "react";
 import FarmForm from "../forms/FarmForm";
 import type { Farm } from "../types/farm";
@@ -28,16 +29,18 @@ function FarmDialog({ open, onClose, onSave, farm }: FarmDialogProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 animate-in fade-in zoom-in duration-200">
-        <FarmForm
-          farm={farm}
-          onSave={handleSave}
-          onCancel={onClose}
-          isSaving={isSaving}
-        />
-      </div>
-    </div>
+    <MasterDialog
+      label={farm ? "Edit Farm" : "Add Farm"}
+      onClose={onClose}
+      isSaving={isSaving}
+    >
+      <FarmForm
+        farm={farm}
+        onSave={handleSave}
+        onCancel={onClose}
+        isSaving={isSaving}
+      />
+    </MasterDialog>
   );
 }
 
