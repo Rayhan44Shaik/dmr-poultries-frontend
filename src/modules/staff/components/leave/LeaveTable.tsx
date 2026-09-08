@@ -1,10 +1,15 @@
 // src/modules/staff/components/leave/LeaveTable.tsx
 
-import { memo, useState } from 'react';
+import { memo, useState, useMemo, useEffect } from 'react';
 import { CheckCircle, XCircle, Trash2, Eye, X, Calendar } from 'lucide-react';
 import type { LeaveRequest } from '../../types/staffDashboard';
 import { usePendingDelete } from '../../../../hooks/usePendingDelete';
 import { PendingDeleteNotification } from '../../../../components/common/PendingDeleteNotification';
+import {
+  getOrAssignLeaveNumber,
+  loadLeaveNumberMap,
+  saveLeaveNumberMap,
+} from './leaveNumber';
 
 interface LeaveTableProps {
   leaves: LeaveRequest[];
@@ -21,7 +26,27 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) 
   } | null>(null);
 
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<string>('all'); // 'all' or '0' to '11'
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+
+  // Persistent leave number map — assigned once per leave id, never reused.
+  const [leaveNumberMap, setLeaveNumberMap] = useState<Map<string, string>>(() => loadLeaveNumberMap());
+
+  // Assign leave numbers for any new leaves we haven't seen before.
+  useEffect(() => {
+    let changed = false;
+    const updated = new Map(leaveNumberMap);
+    for (const leave of leaves) {
+      if (!updated.has(leave.id)) {
+        const num = getOrAssignLeaveNumber(leave.id, leave.createdAt, updated);
+        updated.set(leave.id, num);
+        changed = true;
+      }
+    }
+    if (changed) {
+      setLeaveNumberMap(updated);
+      saveLeaveNumberMap(updated);
+    }
+  }, [leaves]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -43,37 +68,31 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) 
   };
 
   // Filter leaves for the modal view based on employee, year, and month
-  const employeeLeaveHistory = viewEmployeeModal
-    ? leaves.filter((leave) => {
-        const matchesEmployee =
-          leave.employeeId === viewEmployeeModal.employeeId ||
-          leave.employeeName === viewEmployeeModal.employeeName;
+  const employeeLeaveHistory = useMemo(() => {
+    if (!viewEmployeeModal) return [];
+    return leaves.filter((leave) => {
+      const matchesEmployee =
+        leave.employeeId === viewEmployeeModal.employeeId ||
+        leave.employeeName === viewEmployeeModal.employeeName;
+      if (!matchesEmployee) return false;
+      if (!leave.fromDate) return false;
+      const leaveDate = new Date(leave.fromDate + 'T00:00:00');
+      if (leaveDate.getFullYear() !== selectedYear) return false;
+      if (selectedMonth !== 'all' && leaveDate.getMonth() !== Number(selectedMonth)) return false;
+      return true;
+    });
+  }, [leaves, viewEmployeeModal, selectedYear, selectedMonth]);
 
-        if (!matchesEmployee) return false;
-
-        if (!leave.fromDate) return false;
-        const leaveDate = new Date(leave.fromDate + 'T00:00:00');
-        const leaveYear = leaveDate.getFullYear();
-        const leaveMonth = leaveDate.getMonth();
-
-        if (leaveYear !== selectedYear) return false;
-
-        if (selectedMonth !== 'all' && leaveMonth !== Number(selectedMonth)) {
-          return false;
-        }
-
-        return true;
-      })
-    : [];
-
-  const totalDaysTaken = employeeLeaveHistory.reduce((sum, l) => {
-    return l.status === 'Approved' ? sum + (l.days || 0) : sum;
-  }, 0);
+  const totalDaysTaken = useMemo(() => {
+    return employeeLeaveHistory.reduce((sum, l) => {
+      return l.status === 'Approved' ? sum + (l.days || 0) : sum;
+    }, 0);
+  }, [employeeLeaveHistory]);
 
   if (leaves.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500">
-        No leave requests found.
+      <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
+        <p className="text-sm font-medium text-slate-500">No leave requests found</p>
       </div>
     );
   }
@@ -85,41 +104,44 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) 
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Employee</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Department</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Type</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">From → To</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Days</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Reason</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Actions</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Leave No.</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase">Employee</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase">Department</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase">Leave Type</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">From</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">To</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-slate-500 uppercase">Days</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase">Reason</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-slate-500 uppercase">Status</th>
+                <th className="px-3 py-3 text-right text-xs font-medium text-slate-500 uppercase">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
               {leaves.map((leave) => (
                 <tr key={leave.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 text-sm font-medium text-slate-800">{leave.employeeName}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{leave.department || '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${getTypeColor(leave.type)}`}>
+                  <td className="px-3 py-3 text-xs font-mono font-semibold text-slate-700 whitespace-nowrap">
+                    {leaveNumberMap.get(leave.id) || '—'}
+                  </td>
+                  <td className="px-3 py-3 text-sm font-medium text-slate-800 whitespace-nowrap">{leave.employeeName}</td>
+                  <td className="px-3 py-3 text-sm text-slate-600 whitespace-nowrap">{leave.department || '—'}</td>
+                  <td className="px-3 py-3">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${getTypeColor(leave.type)}`}>
                       {leave.type}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-slate-600">
-                    {leave.fromDate} → {leave.toDate}
+                  <td className="px-3 py-3 text-sm text-slate-600 whitespace-nowrap">{leave.fromDate}</td>
+                  <td className="px-3 py-3 text-sm text-slate-600 whitespace-nowrap">{leave.toDate}</td>
+                  <td className="px-3 py-3 text-sm text-slate-600 text-center font-semibold">{leave.days}</td>
+                  <td className="px-3 py-3 text-sm text-slate-500 max-w-[160px] truncate" title={leave.reason}>
+                    {leave.reason || '—'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-slate-600 text-center">{leave.days}</td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-3 py-3 text-center">
                     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(leave.status)}`}>
                       {leave.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-slate-500 max-w-[180px] truncate" title={leave.reason}>
-                    {leave.reason || '—'}
-                  </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-3 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {/* View button - Opens Year/Month filter modal */}
                       <button
                         onClick={() => {
                           setSelectedYear(new Date().getFullYear());
@@ -134,15 +156,11 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) 
                       >
                         <Eye size={16} />
                       </button>
-
-                      {/* Approve (only for Pending) */}
                       {leave.status === 'Pending' && (
                         <button onClick={() => onApprove(leave.id)} className="p-1 text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition" title="Approve">
                           <CheckCircle size={16} />
                         </button>
                       )}
-
-                      {/* Reject (only for Pending) */}
                       {leave.status === 'Pending' && (
                         <button
                           onClick={() => {
@@ -155,8 +173,6 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) 
                           <XCircle size={16} />
                         </button>
                       )}
-
-                      {/* Delete (only for Pending) */}
                       {leave.status === 'Pending' && (
                         <button onClick={() => requestDelete(leave.id, { label: `Deleting leave for ${leave.employeeName}` })} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition" title="Delete">
                           <Trash2 size={16} />
@@ -200,7 +216,6 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) 
                 <span className="text-xs font-medium text-slate-600">Filter By:</span>
               </div>
               <div className="flex items-center gap-2">
-                {/* Year Select */}
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(Number(e.target.value))}
@@ -210,8 +225,6 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) 
                     <option key={y} value={y}>{y}</option>
                   ))}
                 </select>
-
-                {/* Month Select */}
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}

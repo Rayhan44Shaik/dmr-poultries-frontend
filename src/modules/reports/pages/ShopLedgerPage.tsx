@@ -1441,11 +1441,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               type="button"
               onClick={() => void handleExportPDF()}
               disabled={pdfGenerating}
-              title="Generate Weekly Statement PDFs"
+              title={appliedSelectedShop === "All Shops" ? "Generate PDFs for all shops" : `Generate PDF for ${appliedSelectedShop}`}
               className={`${actionButtonClass} ${pdfButtonClass} disabled:opacity-60`}
             >
               {pdfGenerating ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
-              {pdfProgress ?? "PDF"}
+              {pdfProgress ?? (appliedSelectedShop === "All Shops" ? "PDF" : "PDF")}
             </button>
             <button
               type="button"

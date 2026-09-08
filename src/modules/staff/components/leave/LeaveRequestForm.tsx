@@ -1,7 +1,7 @@
 // src/modules/staff/components/leave/LeaveRequestForm.tsx
 
 import { memo, useState, useEffect, useRef } from 'react';
-import { Plus, X, ChevronDown, User, Briefcase, FileText, Layers, Hash } from 'lucide-react';
+import { Plus, X, ChevronDown, User, Briefcase, FileText, Layers, Hash, Search } from 'lucide-react';
 import { useSafeNotification } from '../../../../hooks/useSafeNotification';
 import { DatePicker } from '../../../../components/common/DatePicker';
 import { getEmployees } from '../../../masters/employees/services/employeeService';
@@ -11,6 +11,100 @@ interface LeaveRequestFormProps {
   employees?: Employee[];
   onSubmit: (data: any) => void;
   onCancel: () => void;
+}
+
+/** Compact custom dropdown with max 5 visible items + scroll. */
+function FormDropdown({
+  label,
+  icon,
+  value,
+  options,
+  searchable,
+  onChange,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  value: string;
+  options: { value: string; label: string }[];
+  searchable?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const filtered = options.filter((o) =>
+    o.label.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const displayLabel = options.find((o) => o.value === value)?.label || label;
+
+  return (
+    <div className="relative" ref={ref}>
+      <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+        {icon} {label}
+      </label>
+      <button
+        type="button"
+        onClick={() => { setOpen(!open); setSearch(''); }}
+        className="w-full h-11 px-3.5 rounded-xl border border-slate-200 text-sm bg-slate-50/50 hover:bg-slate-50 transition text-left flex items-center justify-between text-slate-700 font-medium"
+      >
+        <span className="truncate">{displayLabel}</span>
+        <ChevronDown size={16} className="text-slate-400 shrink-0 ml-1" />
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 z-50 mt-1 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden">
+          {searchable && options.length > 5 && (
+            <div className="p-1.5 border-b border-slate-100">
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search..."
+                  autoFocus
+                  className="w-full h-8 pl-7 pr-2 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-slate-50/50 text-slate-700 placeholder-slate-400"
+                />
+              </div>
+            </div>
+          )}
+          <div className="max-h-[200px] overflow-y-auto p-1">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-slate-400 text-center">No matches</div>
+            ) : (
+              filtered.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(o.value);
+                    setOpen(false);
+                    setSearch('');
+                  }}
+                  className={`w-full text-left px-3 py-2 text-xs font-medium rounded-lg transition ${
+                    value === o.value
+                      ? 'bg-blue-50 text-blue-700 font-semibold'
+                      : 'text-slate-700 hover:bg-blue-50 hover:text-blue-700'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: LeaveRequestFormProps) {
@@ -28,8 +122,6 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
   };
 
   const getEmpId = (emp: any): number | string => {
-    // Backend leave_requests.employee_id references employees.id (PK), so the
-    // DB id must be sent, not the employee number.
     return emp?.id ?? emp?.employeeId ?? emp?.employeeNo ?? 0;
   };
 
@@ -61,7 +153,6 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
   const [isEmployeeDropdownOpen, setIsEmployeeDropdownOpen] = useState(false);
   const employeeDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Filter employees strictly by selected department first
   const departmentFilteredEmployees = employees.filter(
     (emp) => getEmpDepartment(emp) === selectedDepartment
   );
@@ -145,6 +236,14 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
     onSubmit(form);
   };
 
+  const departmentOptions = uniqueDepartments.map((d) => ({ value: d, label: d }));
+  const leaveTypeOptions = [
+    { value: 'Casual', label: 'Casual Leave' },
+    { value: 'Sick', label: 'Sick Leave' },
+    { value: 'Emergency', label: 'Emergency Leave' },
+    { value: 'Annual', label: 'Annual Leave' },
+  ];
+
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-sm space-y-5 transition-all">
       <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -167,23 +266,17 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Line 1 - Item 1: Department Field First */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-            <Briefcase size={13} className="text-blue-500" /> Department First
-          </label>
-          <select
-            value={selectedDepartment}
-            onChange={(e) => handleDepartmentChange(e.target.value)}
-            className="w-full h-11 px-3.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-slate-50/50 hover:bg-slate-50 transition text-slate-700 font-medium"
-          >
-            {uniqueDepartments.map((dept) => (
-              <option key={dept} value={dept}>{dept}</option>
-            ))}
-          </select>
-        </div>
+        {/* Line 1 - Department */}
+        <FormDropdown
+          label="Department"
+          icon={<Briefcase size={13} className="text-blue-500" />}
+          value={selectedDepartment}
+          options={departmentOptions}
+          searchable
+          onChange={handleDepartmentChange}
+        />
 
-        {/* Line 1 - Item 2: Respective Employee Field */}
+        {/* Line 1 - Employee */}
         <div className="relative" ref={employeeDropdownRef}>
           <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
             <User size={13} className="text-blue-500" /> Respective Employee
@@ -221,7 +314,7 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
           </div>
 
           {isEmployeeDropdownOpen && (
-            <div className="absolute left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl text-slate-700">
+            <div className="absolute left-0 right-0 z-50 mt-1 max-h-[200px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl text-slate-700">
               {(employeeSearch === '' ? departmentFilteredEmployees : filteredEmployees).length > 0 ? (
                 (employeeSearch === '' ? departmentFilteredEmployees : filteredEmployees).map((emp) => {
                   const empName = getEmpName(emp);
@@ -249,14 +342,14 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
                 })
               ) : (
                 <div className="px-3 py-2 text-xs text-slate-400 text-center">
-                  No employees found in "{selectedDepartment}"
+                  No employees found in &quot;{selectedDepartment}&quot;
                 </div>
               )}
             </div>
           )}
         </div>
 
-        {/* Line 2 - Item 1: From Date */}
+        {/* Line 2 - From Date */}
         <div>
           <DatePicker
             label="From Date"
@@ -267,7 +360,7 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
           />
         </div>
 
-        {/* Line 2 - Item 2: To Date */}
+        {/* Line 2 - To Date */}
         <div>
           <DatePicker
             label="To Date"
@@ -278,24 +371,16 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
           />
         </div>
 
-        {/* Line 3 - Item 1: Leave Type */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-            <Layers size={13} className="text-blue-500" /> Leave Type
-          </label>
-          <select
-            value={form.type}
-            onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value as any }))}
-            className="w-full h-11 px-3.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-slate-50/50 hover:bg-slate-50 transition text-slate-700 font-medium"
-          >
-            <option value="Casual">Casual Leave</option>
-            <option value="Sick">Sick Leave</option>
-            <option value="Emergency">Emergency Leave</option>
-            <option value="Annual">Annual Leave</option>
-          </select>
-        </div>
+        {/* Line 3 - Leave Type */}
+        <FormDropdown
+          label="Leave Type"
+          icon={<Layers size={13} className="text-blue-500" />}
+          value={form.type}
+          options={leaveTypeOptions}
+          onChange={(val) => setForm((prev) => ({ ...prev, type: val as any }))}
+        />
 
-        {/* Line 3 - Item 2: Days Counter Box */}
+        {/* Line 3 - Days Counter */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
             <Hash size={13} className="text-blue-500" /> Calculated Days
