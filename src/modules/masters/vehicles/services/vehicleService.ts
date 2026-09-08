@@ -13,6 +13,14 @@ import {
 import type { Vehicle } from "../types/vehicle";
 
 const VEHICLES_PATH = "/masters/vehicles";
+export const VEHICLES_CHANGED_EVENT = "dmr:vehicles-changed";
+let vehiclesRevision = 0;
+export const getVehiclesRevision = () => vehiclesRevision;
+
+function notifyVehiclesChanged(): void {
+  ++vehiclesRevision;
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(VEHICLES_CHANGED_EVENT));
+}
 
 /** Legacy browser keys that previously held mock vehicle lists. */
 const LEGACY_STORAGE_KEYS = [
@@ -45,8 +53,11 @@ function normalizeStatus(status: unknown): Vehicle["status"] {
 
 function toOptionalNumber(value: unknown): number | undefined {
   if (value === null || value === undefined || value === "") return undefined;
+  if (typeof value !== "number" && typeof value !== "string") throw new Error("Invalid numeric Vehicle Master field.");
+  if (typeof value === "string" && value.trim() === "") return undefined;
   const n = Number(value);
-  return Number.isNaN(n) ? undefined : n;
+  if (!Number.isFinite(n)) throw new Error("Invalid numeric Vehicle Master field.");
+  return n;
 }
 
 function toOptionalString(value: unknown): string | undefined {
@@ -56,6 +67,8 @@ function toOptionalString(value: unknown): string | undefined {
 }
 
 function mapVehicle(raw: Record<string, unknown>): Vehicle {
+  const registration = raw.vehicleNumber ?? raw.vehicle_number;
+  if (registration != null && typeof registration !== "string") throw new Error("Vehicle registration response must be text.");
   const mapped: Vehicle & { emiDay?: number; totalEMIs?: number } = {
     id: Number(raw.id),
     vehicleNo: Number(raw.vehicleNo ?? raw.vehicle_no ?? 0),
@@ -76,6 +89,7 @@ function mapVehicle(raw: Record<string, unknown>): Vehicle {
     emiStartDate: toOptionalString(raw.emiStartDate ?? raw.emi_start_date),
     rcDate: toOptionalString(raw.rcDate ?? raw.rc_date),
     status: normalizeStatus(raw.status),
+    isSample: raw._mock === true,
   };
 
   const emiDay = toOptionalNumber(raw.emiDay ?? raw.emi_day);
@@ -112,7 +126,10 @@ function toPayload(input: VehicleInput | Partial<Vehicle> & { emiDay?: number; t
 }
 
 function setCacheFromApi(rows: Record<string, unknown>[] | null | undefined): Vehicle[] {
-  vehiclesCache = Array.isArray(rows) ? rows.map(mapVehicle) : [];
+  if (!Array.isArray(rows) || rows.some((row) => !row || typeof row !== "object" || Array.isArray(row))) {
+    throw new Error("Vehicle list response must be an array of records.");
+  }
+  vehiclesCache = rows.map(mapVehicle);
   return vehiclesCache;
 }
 
@@ -143,6 +160,7 @@ export async function createVehicle(input: VehicleInput): Promise<Vehicle> {
     VEHICLES_PATH,
     toPayload(input)
   );
+  notifyVehiclesChanged();
   return mapVehicle(data);
 }
 
@@ -154,6 +172,7 @@ export async function bulkCreateVehicles(inputs: VehicleInput[]): Promise<Vehicl
     `${VEHICLES_PATH}/bulk`,
     payload
   );
+  notifyVehiclesChanged();
   return Array.isArray(data) ? data.map(mapVehicle) : [];
 }
 
@@ -167,6 +186,7 @@ export async function updateVehicle(
     `${VEHICLES_PATH}/${id}`,
     toPayload({ ...(input as VehicleInput), vehicleNo: input.vehicleNo })
   );
+  notifyVehiclesChanged();
   return mapVehicle(data);
 }
 
@@ -174,6 +194,7 @@ export async function updateVehicle(
 export async function deleteVehicle(id: number): Promise<void> {
   clearLegacyVehicleStorage();
   await apiDelete(`${VEHICLES_PATH}/${id}`);
+  notifyVehiclesChanged();
 }
 
 /** Always re-fetch from PostgreSQL. */

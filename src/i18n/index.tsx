@@ -1,10 +1,11 @@
 import {
-  createContext,
   useContext,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
+import { I18nContext, type Language } from './context';
+
 import enCommon from './en';
 import teCommon from './te';
 import enLayout from './modules/layout.en';
@@ -32,16 +33,7 @@ import teSupervisorMobile from './modules/supervisor-mobile.te';
 import enShared from './modules/shared.en';
 import teShared from './modules/shared.te';
 
-export type Language = 'en' | 'te';
-
-interface I18nContextType {
-  language: Language;
-  setLanguage: (lang: Language) => void;
-  toggleLanguage: () => void;
-  t: (key: string, params?: Record<string, string | number>) => string;
-}
-
-const I18nContext = createContext<I18nContextType | undefined>(undefined);
+export type { Language } from './context';
 
 interface I18nProviderProps {
   children: ReactNode;

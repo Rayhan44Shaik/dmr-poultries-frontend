@@ -7,18 +7,20 @@
 // Collection Report correctly shows its error state. Run this stub to explore
 // the UI with deterministic sample data:
 //
-//   npm run mock:backend        # serves sample JSON on http://127.0.0.1:4000
+//   npm run mock:backend        # serves sample JSON on port 4000 (all interfaces)
 //
 // Served today: /api/health, /api/masters/{shops,employees,vehicles},
 // /api/trips (+ /api/trips/:id and POST /api/trips/:id/steps/deliveries for the
 // Orders Collection / Assignment / Delivery Tracking page) and the
-// /api/operations/collection-entry/* report endpoints.
+// /api/operations/collection-entry/* report endpoints. Vehicle responses also
+// include 12 fictional EMI schedules for /fleet?tab=emi.
 //
 // For REAL data, run the actual ERP backend on port 4000 instead — no config
 // change needed (the Vite dev proxy targets 127.0.0.1:4000).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import http from "node:http";
+import { buildSampleEmiVehicles } from "./fixtures/emi-vehicles.mjs";
 
 const PORT = Number(process.env.MOCK_BACKEND_PORT ?? 4000);
 
@@ -159,21 +161,7 @@ function buildReport(query) {
 // The store below is in-memory, so Save Progress / Finish actions persist for
 // the lifetime of this stub server (restart = back to the seeded state).
 
-const VEHICLES = [
-  { id: 1, vehicleNo: 1, vehicleNumber: "TS 09 AB 1234", vehicleType: "Truck", noOfBoxes: 120, birdCapacity: 1200, capacityKg: 3000, status: "Active" },
-  { id: 2, vehicleNo: 2, vehicleNumber: "TS 09 CD 5678", vehicleType: "Truck", noOfBoxes: 80, birdCapacity: 800, capacityKg: 2000, status: "Active" },
-  { id: 3, vehicleNo: 3, vehicleNumber: "TS 09 EF 9012", vehicleType: "Lorry", noOfBoxes: 100, birdCapacity: 1000, capacityKg: 2500, status: "Active" },
-].map((v) => ({
-  trackingId: "",
-  fastagBank: "",
-  engineNumber: "",
-  chassisNumber: "",
-  insuranceExpiry: "",
-  permitExpiry: "",
-  fitnessExpiry: "",
-  rcDate: "",
-  ...v,
-}));
+const VEHICLES = buildSampleEmiVehicles();
 
 const VEHICLE_BY_ID = new Map(VEHICLES.map((v) => [v.id, v]));
 
@@ -465,7 +453,8 @@ const server = http.createServer((req, res) => {
   }
 });
 
-server.listen(PORT, "127.0.0.1", () => {
-  console.log(`[mock-backend] ⚠️  SAMPLE DATA ONLY — listening on http://127.0.0.1:${PORT}`);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`[mock-backend] ⚠️  SAMPLE DATA ONLY — listening on http://0.0.0.0:${PORT}`);
   console.log(`[mock-backend] ${ROWS.length} sample collection rows over the last 45 days`);
+  console.log(`[mock-backend] ${VEHICLES.length} sample EMI vehicles — open /fleet?tab=emi in the frontend preview`);
 });

@@ -1,0 +1,487 @@
+import { test, expect, type Page } from '@playwright/test';
+import { buildSampleEmiVehicles } from '../../scripts/fixtures/emi-vehicles.mjs';
+
+const NOW = new Date('2026-09-08T12:00:00+05:30');
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+interface Reply {
+  status?: number;
+  data?: unknown;
+  gate?: ReturnType<typeof deferred>;
+  started?: ReturnType<typeof deferred>;
+}
+interface Backend {
+  rows: Record<string, unknown>[];
+  replies: Reply[];
+  requests: { method: string; path: string }[];
+  errors: string[];
+  gates: ReturnType<typeof deferred>[];
+  notificationsAllowed?: boolean;
+}
+const backends = new WeakMap<Page, Backend>();
+const backend = (page: Page) => backends.get(page)!;
+const table = (page: Page) => page.getByRole('table', { name: 'EMI Schedule', exact: true });
+const dataRows = (page: Page) => table(page).locator('tbody tr[data-vehicle-id]');
+const search = (page: Page) => page.getByRole('textbox', { name: 'Search', exact: true });
+const refresh = (page: Page) => page.getByRole('button', { name: 'Refresh', exact: true });
+const counts = (page: Page) => page.locator('[data-emi-toolbar-row] dd');
+const dataStatus = (page: Page) => page.getByRole('status', { name: 'EMI data status', exact: true });
+const refreshToast = (page: Page) => page.getByRole('status', { name: 'Refresh notification', exact: true });
+const readCount = (page: Page) => backend(page).requests.length;
+
+function holdNext(page: Page, overrides: Omit<Reply, 'gate' | 'started'> = {}) {
+  const gate = deferred();
+  const started = deferred();
+  backend(page).gates.push(gate);
+  backend(page).replies.push({ ...overrides, gate, started });
+  return { release: gate.resolve, started: started.promise };
+}
+async function ready(page: Page) {
+  await expect(refresh(page)).toBeEnabled();
+  await expect(table(page)).toHaveAttribute('aria-busy', 'false');
+}
+async function navigateTab(page: Page, tab: 'emi' | 'fastag') {
+  await page.evaluate((tab) => {
+    history.pushState(null, '', `/fleet?tab=${tab}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, tab);
+}
+
+// Every request is intercepted; these tests never reach a real database or
+// exercise order/assignment/vehicle mutation endpoints.
+test.beforeEach(async ({ page, baseURL }) => {
+  const state: Backend = { rows: buildSampleEmiVehicles(NOW), replies: [], requests: [], errors: [], gates: [] };
+  backends.set(page, state);
+  await page.clock.setFixedTime(NOW);
+  page.on('pageerror', (error) => state.errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error' && /ErrorBoundary|must be used within|same key/.test(message.text())) state.errors.push(message.text());
+  });
+  await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    expect(url.origin).toBe(new URL(baseURL!).origin);
+    state.requests.push({ method: request.method(), path: url.pathname });
+    if (url.pathname !== '/api/masters/vehicles') {
+      await route.fulfill({ json: [] });
+      return;
+    }
+    const reply = state.replies.shift() ?? {};
+    const payload = Object.hasOwn(reply, 'data') ? reply.data : structuredClone(state.rows);
+    reply.started?.resolve();
+    if (reply.gate) await reply.gate.promise;
+    if (page.isClosed()) return;
+    // A held request may be canceled only by test/context cleanup.
+    await route.fulfill({ status: reply.status ?? 200, json: payload }).catch(() => {});
+  });
+});
+
+test.afterEach(async ({ page }) => {
+  const state = backend(page);
+  for (const gate of state.gates) gate.resolve();
+  expect(state.errors).toEqual([]);
+  expect(state.requests.every((request) => request.method === 'GET' && (request.path === '/api/masters/vehicles' || state.notificationsAllowed))).toBe(true);
+});
+
+test('one StrictMode GET, truthful loading, slightly larger search and no input/layout loss on first response', async ({ page }) => {
+  const held = holdNext(page);
+  await page.goto('/fleet?tab=emi');
+  await held.started;
+  expect(readCount(page)).toBe(1);
+  await expect(refresh(page)).toBeDisabled();
+  await expect(table(page)).toHaveAttribute('aria-busy', 'true');
+  await expect(counts(page)).toHaveText(['—', '—', '—']);
+  expect((await search(page).boundingBox())!.width).toBe(224);
+  const input = await search(page).elementHandle();
+  const frame = (await page.locator('[data-emi-table-frame]').boundingBox())!;
+  const footer = (await page.getByRole('navigation', { name: 'EMI pages' }).boundingBox())!;
+  await search(page).fill('AP16');
+  await page.locator('.emi-status__control').click();
+  await page.getByRole('option', { name: 'Pending', exact: true }).click();
+  held.release();
+  await ready(page);
+  await expect(dataRows(page)).toHaveCount(3);
+  await expect(search(page)).toHaveValue('AP16');
+  expect(await input!.evaluate((element) => element.isConnected)).toBe(true);
+  await expect(counts(page)).toHaveText(['12', '3', '9']);
+  const frameAfter = (await page.locator('[data-emi-table-frame]').boundingBox())!;
+  const footerAfter = (await page.getByRole('navigation', { name: 'EMI pages' }).boundingBox())!;
+  expect(Math.abs(frameAfter.y - frame.y)).toBeLessThan(1);
+  expect(Math.abs(frameAfter.height - frame.height)).toBeLessThan(1);
+  expect(Math.abs(footerAfter.y - footer.y)).toBeLessThan(1);
+  expect(readCount(page)).toBe(1);
+});
+
+test('rapid refreshes share one request while mounted rows and focused user input remain usable', async ({ page }) => {
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  await search(page).fill('AP39');
+  await expect(dataRows(page)).toHaveCount(4);
+  const input = await search(page).elementHandle();
+  const row = await dataRows(page).first().elementHandle();
+  const before = await dataRows(page).allTextContents();
+  const held = holdNext(page);
+  await search(page).focus();
+  await refresh(page).evaluate((button: HTMLButtonElement) => { for (let i = 0; i < 40; i++) button.click(); });
+  await held.started;
+  expect(readCount(page)).toBe(2);
+  await expect(table(page)).toHaveAttribute('aria-busy', 'true');
+  await expect(dataRows(page)).toHaveText(before);
+  await expect(counts(page)).toHaveText(['12', '3', '9']);
+  await expect(dataStatus(page)).toContainText('Existing data remains visible');
+  await expect(search(page)).toBeFocused();
+  await search(page).press('End');
+  await search(page).pressSequentially(' UA');
+  await expect(dataRows(page)).toHaveCount(1);
+  held.release();
+  await ready(page);
+  await expect(search(page)).toHaveValue('AP39 UA');
+  expect(await input!.evaluate((element) => element.isConnected)).toBe(true);
+  expect(await row!.evaluate((element) => element.isConnected)).toBe(true);
+  await expect(search(page)).toBeFocused();
+  expect(readCount(page)).toBe(2);
+});
+
+test('refresh failure preserves rows and filters with a persistent stale-data warning, then the single Refresh action replaces them', async ({ page }) => {
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  await search(page).fill('AP16TC4101');
+  const previous = await dataRows(page).allTextContents();
+  backend(page).replies.push({ status: 503, data: { message: 'Private backend details must not appear in the UI' } });
+  await refresh(page).click();
+  await expect(dataStatus(page)).toContainText('Refresh failed. Showing last loaded data');
+  await expect(dataRows(page)).toHaveText(previous);
+  await expect(search(page)).toHaveValue('AP16TC4101');
+  await expect(page.getByText('Private backend details must not appear in the UI')).toHaveCount(0);
+  await expect(page.getByText('No EMI records found')).toHaveCount(0);
+  backend(page).rows = backend(page).rows.map((row) => row.id === 4 ? { ...row, purchaseAmount: 2450000 } : row);
+  await refresh(page).click();
+  await ready(page);
+  await expect(dataRows(page)).toContainText(['₹24,50,000']);
+  await expect(refreshToast(page)).toContainText('EMI data refreshed');
+  await expect(search(page)).toHaveValue('AP16TC4101');
+  expect(readCount(page)).toBe(3);
+});
+
+test('initial failure is not a false empty state and retry does not clear typed input', async ({ page }) => {
+  const held = holdNext(page, { status: 503, data: { error: 'unavailable' } });
+  await page.goto('/fleet?tab=emi');
+  await held.started;
+  await search(page).fill('TS09CD5678');
+  held.release();
+  await expect(dataStatus(page)).toContainText('Unable to load EMI data.');
+  await expect(counts(page)).toHaveText(['—', '—', '—']);
+  await expect(dataRows(page)).toHaveCount(0);
+  await expect(page.getByText('No EMI records found')).toHaveCount(0);
+  await expect(page.getByRole('complementary')).toHaveCount(0);
+  await refresh(page).click();
+  await ready(page);
+  await expect(dataRows(page)).toHaveCount(1);
+  await expect(search(page)).toHaveValue('TS09CD5678');
+  expect(readCount(page)).toBe(2);
+});
+
+test('in-flight invalidations are coalesced and an obsolete response is never published', async ({ page }) => {
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  await search(page).fill('AP16TC4101');
+  const previous = await dataRows(page).allTextContents();
+  backend(page).rows = backend(page).rows.map((row) => row.id === 4 ? { ...row, purchaseAmount: 2222222 } : row);
+  const obsolete = holdNext(page);
+  await refresh(page).click();
+  await obsolete.started;
+  backend(page).rows = backend(page).rows.map((row) => row.id === 4 ? { ...row, purchaseAmount: 2600000 } : row);
+  const fresh = holdNext(page);
+  await page.evaluate(() => { for (let i = 0; i < 20; i++) window.dispatchEvent(new Event('dmr:vehicles-changed')); });
+  expect(readCount(page)).toBe(2);
+  obsolete.release();
+  await fresh.started;
+  expect(readCount(page)).toBe(3);
+  await expect(dataRows(page)).toHaveText(previous);
+  await expect(table(page)).toHaveAttribute('aria-busy', 'true');
+  fresh.release();
+  await ready(page);
+  await expect(dataRows(page)).toContainText(['₹26,00,000']);
+  await expect(page.getByText('₹22,22,222')).toHaveCount(0);
+  expect(readCount(page)).toBe(3);
+});
+
+test('tab re-entry preserves the same input node and revalidates instead of accepting a hidden-view response', async ({ page }) => {
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  await search(page).fill('AP16TC4101');
+  const input = await search(page).elementHandle();
+  backend(page).rows = backend(page).rows.map((row) => row.id === 4 ? { ...row, purchaseAmount: 2222222 } : row);
+  const obsolete = holdNext(page);
+  await refresh(page).click();
+  await obsolete.started;
+  await navigateTab(page, 'fastag');
+  await expect(table(page)).toHaveCount(0);
+  backend(page).rows = backend(page).rows.map((row) => row.id === 4 ? { ...row, purchaseAmount: 2700000 } : row);
+  const fresh = holdNext(page);
+  await navigateTab(page, 'emi');
+  await expect(search(page)).toHaveValue('AP16TC4101');
+  await expect(table(page)).toHaveAttribute('aria-busy', 'true');
+  obsolete.release();
+  await fresh.started;
+  await expect(page.getByText('₹22,22,222')).toHaveCount(0);
+  fresh.release();
+  await ready(page);
+  await expect(dataRows(page)).toContainText(['₹27,00,000']);
+  expect(await input!.evaluate((element) => element.isConnected)).toBe(true);
+  expect(readCount(page)).toBe(3);
+});
+
+test('identical duplicate rows are collapsed while malformed/conflicting data is not silently accepted', async ({ page }) => {
+  backend(page).rows.push({ ...backend(page).rows[0] });
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  await expect(counts(page)).toHaveText(['12', '3', '9']);
+  const firstIds = await dataRows(page).evaluateAll((rows) => rows.map((row) => row.getAttribute('data-vehicle-id')));
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  const lastIds = await dataRows(page).evaluateAll((rows) => rows.map((row) => row.getAttribute('data-vehicle-id')));
+  expect(new Set([...firstIds, ...lastIds]).size).toBe(12);
+  backend(page).rows.push({ ...backend(page).rows[0], purchaseAmount: 111111 });
+  await refresh(page).click();
+  await expect(dataStatus(page)).toContainText('Refresh failed. Showing last loaded data');
+  await expect(counts(page)).toHaveText(['12', '3', '9']);
+  await expect(page.getByText('₹1,11,111')).toHaveCount(0);
+});
+
+test('malformed 200 responses show an error, but a genuine empty response shows real zero totals', async ({ page }) => {
+  backend(page).replies.push({ data: { items: [] } });
+  await page.goto('/fleet?tab=emi');
+  await expect(dataStatus(page)).toContainText('Unable to load EMI data.');
+  await expect(counts(page)).toHaveText(['—', '—', '—']);
+  await expect(page.getByText('No EMI records found')).toHaveCount(0);
+  backend(page).rows = [];
+  await refresh(page).click();
+  await ready(page);
+  await expect(counts(page)).toHaveText(['0', '0', '0']);
+  await expect(page.getByText('No EMI records found')).toBeVisible();
+});
+
+test('dataset shrink/grow does not resurrect an old page or move the table footer', async ({ page }) => {
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(dataRows(page)).toHaveCount(2);
+  const footer = (await page.getByRole('navigation', { name: 'EMI pages' }).boundingBox())!;
+  backend(page).rows = backend(page).rows.slice(0, 5);
+  await refresh(page).click();
+  await expect(counts(page).first()).toHaveText('5');
+  await expect(page.getByRole('button', { name: 'Go to page 1', exact: true })).toHaveAttribute('aria-current', 'page');
+  backend(page).rows = buildSampleEmiVehicles(NOW);
+  await refresh(page).click();
+  await expect(counts(page).first()).toHaveText('12');
+  await expect(page.getByRole('button', { name: 'Go to page 1', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(dataRows(page)).toHaveCount(10);
+  expect(Math.abs((await page.getByRole('navigation', { name: 'EMI pages' }).boundingBox())!.y - footer.y)).toBeLessThan(1);
+});
+
+test('focus/visibility bursts are throttled into one deliberate revalidation', async ({ page }) => {
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  await page.evaluate(() => { for (let i = 0; i < 20; i++) window.dispatchEvent(new Event('focus')); });
+  expect(readCount(page)).toBe(1);
+  await page.clock.setFixedTime(new Date(NOW.getTime() + 31_000));
+  const held = holdNext(page);
+  await page.evaluate(() => {
+    for (let i = 0; i < 20; i++) {
+      window.dispatchEvent(new Event('focus'));
+      document.dispatchEvent(new Event('visibilitychange'));
+    }
+  });
+  await held.started;
+  expect(readCount(page)).toBe(2);
+  held.release();
+  await ready(page);
+  expect(readCount(page)).toBe(2);
+});
+
+test('20,000 vehicles keep a small DOM and searchable registration input without more requests', async ({ page }) => {
+  const template = backend(page).rows[0];
+  backend(page).rows = Array.from({ length: 20_000 }, (_, index) => ({
+    ...template, id: index + 1, vehicleNo: index + 1, vehicleNumber: `AP 16 TEST ${index + 1}`, totalEMIs: 1_000_000_000,
+  }));
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  await expect(dataRows(page)).toHaveCount(10);
+  await expect(counts(page).first()).toHaveText('20000');
+  const start = Date.now();
+  await search(page).fill('AP16TEST19999');
+  await expect(dataRows(page)).toHaveCount(1);
+  await expect(dataRows(page)).toContainText(['AP 16 TEST 19999']);
+  expect(Date.now() - start).toBeLessThan(1500);
+  await expect(search(page)).toHaveValue('AP16TEST19999');
+  expect(readCount(page)).toBe(1);
+});
+
+test('backend strings render as text, search is bounded, and the page makes no mutation requests', async ({ page }) => {
+  const malicious = '<img data-emi-xss src=x onerror="window.__emiXss=1">';
+  backend(page).rows = [{ ...backend(page).rows[0], vehicleNumber: malicious }];
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  await expect(dataRows(page).locator('td').first()).toHaveText(malicious);
+  await expect(page.locator('img[data-emi-xss]')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as Window & { __emiXss?: number }).__emiXss)).toBeUndefined();
+  await expect(search(page)).toHaveAttribute('maxlength', '80');
+  expect(backend(page).requests).toEqual([{ method: 'GET', path: '/api/masters/vehicles' }]);
+});
+
+
+test('global collection alerts load only on demand and do not duplicate their initialization', async ({ page }) => {
+  const state = backend(page);
+  state.notificationsAllowed = true;
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  expect(readCount(page)).toBe(1);
+  await search(page).fill('AP16');
+  const input = await search(page).elementHandle();
+  await page.getByRole('button', { name: 'Notifications', exact: true }).click();
+  await expect(page.getByText("You're all caught up", { exact: true })).toBeVisible();
+  expect(state.requests.map((request) => request.path).sort()).toEqual([
+    '/api/masters/shops', '/api/masters/vehicles', '/api/operations/collection-entry', '/api/operations/shop-sales',
+  ]);
+  await page.getByRole('heading', { name: 'EMI Schedule', exact: true }).click();
+  await page.getByRole('button', { name: 'Notifications', exact: true }).click();
+  await expect(page.getByText("You're all caught up", { exact: true })).toBeVisible();
+  expect(readCount(page)).toBe(4);
+  expect(await input!.evaluate((element) => element.isConnected)).toBe(true);
+  await expect(search(page)).toHaveValue('AP16');
+});
+
+
+for (const status of [401, 403]) {
+  test(`HTTP ${status} clears previously loaded financial rows instead of retaining an unauthorized snapshot`, async ({ page }) => {
+    await page.goto('/fleet?tab=emi');
+    await ready(page);
+    await search(page).fill('AP16TC4101');
+    await expect(dataRows(page)).toHaveCount(1);
+    backend(page).replies.push({ status, data: { message: 'Private permission detail' } });
+    await refresh(page).click();
+    await expect(dataStatus(page)).toContainText('Previously loaded rows have been cleared');
+    await expect(dataRows(page)).toHaveCount(0);
+    await expect(counts(page)).toHaveText(['—', '—', '—']);
+    await expect(page.getByText('Private permission detail')).toHaveCount(0);
+    await expect(search(page)).toHaveValue('AP16TC4101');
+    await refresh(page).click();
+    await ready(page);
+    await expect(dataRows(page)).toHaveCount(1);
+    expect(readCount(page)).toBe(3);
+  });
+}
+
+test('larger synchronized headings, compact vehicle spacing and flat vector marks stay stable at desktop widths', async ({ page }) => {
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  await expect(page.getByRole('heading', { name: 'EMI Schedule', exact: true })).toHaveCSS('font-size', '16px');
+  await expect(page.locator('[data-emi-logo]')).toBeVisible();
+  await expect(page.locator('[data-emi-logo]')).toHaveAttribute('viewBox', '0 0 40 40');
+  for (const width of [1440, 1280]) {
+    await page.setViewportSize({ width, height: 1050 });
+    const headings = table(page).getByRole('columnheader');
+    await expect(headings.first().locator('span')).toHaveCSS('font-size', '12px');
+    for (const button of await table(page).locator('thead button').all()) await expect(button).toHaveCSS('font-size', '12px');
+    expect((await headings.nth(0).boundingBox())!.width).toBe(192);
+    expect((await headings.nth(1).boundingBox())!.width).toBe(180);
+    const firstRow = dataRows(page).first();
+    await expect(firstRow.locator('td:first-child svg')).toBeVisible();
+    const registration = (await firstRow.locator('td:first-child [title]').boundingBox())!;
+    const headingText = await headings.first().locator('span').evaluate((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return range.getBoundingClientRect().x;
+    });
+    expect(Math.abs(headingText - registration.x)).toBeLessThan(1);
+    const price = await firstRow.locator('td:nth-child(2)').evaluate((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return range.getBoundingClientRect().x;
+    });
+    expect(price - (registration.x + registration.width)).toBeGreaterThan(0);
+    expect(price - (registration.x + registration.width)).toBeLessThan(130);
+  }
+});
+
+test('one Refresh action and a clearly distinct clear-filter icon, including error recovery', async ({ page }) => {
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  await expect(refresh(page)).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(0);
+  const clear = page.getByRole('region', { name: 'EMI filters and vehicle totals' }).getByRole('button', { name: 'Clear filters', exact: true });
+  await expect(clear.locator('svg')).not.toHaveClass(/rotate-ccw|refresh-cw/);
+  backend(page).replies.push({ status: 503 });
+  await refresh(page).click();
+  await expect(dataStatus(page)).toContainText('Refresh failed');
+  await expect(refresh(page)).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(0);
+  await expect(refreshToast(page)).toHaveCount(0);
+  await refresh(page).click();
+  await ready(page);
+  await expect(refreshToast(page)).toContainText('EMI data refreshed');
+  expect(readCount(page)).toBe(3);
+});
+
+test('successful manual refresh shows one popup only after completion and does not move the table', async ({ page }) => {
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  await expect(refreshToast(page)).toHaveCount(0);
+  await search(page).fill('AP16');
+  const input = await search(page).elementHandle();
+  const footerY = (await page.getByRole('navigation', { name: 'EMI pages' }).boundingBox())!.y;
+  const first = holdNext(page);
+  await refresh(page).click();
+  await first.started;
+  await expect(refreshToast(page)).toHaveCount(0);
+  first.release();
+  await ready(page);
+  await expect(refreshToast(page)).toBeVisible();
+  await expect(refreshToast(page)).toHaveCount(1);
+  await expect(refreshToast(page)).toContainText('EMI data refreshed');
+  await expect(dataStatus(page)).not.toContainText('EMI data refreshed');
+  expect(Math.abs((await page.getByRole('navigation', { name: 'EMI pages' }).boundingBox())!.y - footerY)).toBeLessThan(1);
+  const oldPopup = await refreshToast(page).elementHandle();
+  // The fixed test clock gives both reads the same timestamp. The new receipt
+  // still gets its own popup/timer, rather than reusing a timestamp as identity.
+  const second = holdNext(page);
+  await refresh(page).click();
+  await second.started;
+  await expect(refreshToast(page)).toHaveCount(0);
+  second.release();
+  await ready(page);
+  await expect(refreshToast(page)).toHaveCount(1);
+  expect(await oldPopup!.evaluate((element) => element.isConnected)).toBe(false);
+  await refreshToast(page).getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(refreshToast(page)).toHaveCount(0);
+  await expect(search(page)).toHaveValue('AP16');
+  expect(await input!.evaluate((element) => element.isConnected)).toBe(true);
+  expect(readCount(page)).toBe(3);
+});
+
+test('refresh popup auto-dismisses without fetching again', async ({ page }) => {
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  await refresh(page).click();
+  await expect(refreshToast(page)).toBeVisible();
+  await expect(refreshToast(page)).toHaveCount(0, { timeout: 7_000 });
+  await expect(dataRows(page)).toHaveCount(10);
+  expect(readCount(page)).toBe(2);
+});
+
+test('refresh popup is not replayed by switching tabs or background revalidation', async ({ page }) => {
+  await page.goto('/fleet?tab=emi');
+  await ready(page);
+  await refresh(page).click();
+  await expect(refreshToast(page)).toBeVisible();
+  await navigateTab(page, 'fastag');
+  await expect(table(page)).toHaveCount(0);
+  await expect(refreshToast(page)).toHaveCount(0);
+  await navigateTab(page, 'emi');
+  await ready(page);
+  await expect(refreshToast(page)).toHaveCount(0);
+  expect(readCount(page)).toBe(3);
+});

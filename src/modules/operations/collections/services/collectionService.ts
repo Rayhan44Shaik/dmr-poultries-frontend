@@ -1,4 +1,6 @@
-﻿import type {
+﻿import { publishPendingCollectionSnapshot } from "./collectionSnapshot";
+
+import type {
   Collection,
   CollectionApiEntry,
   CollectionEntryInput,
@@ -36,6 +38,8 @@ const SHOPS_PATH = "/masters/shops";
    Synchronous getters below read this cache so non-collection modules
    (Header, dashboard, accounts, Shop Ledger) keep working unchanged.
 ================================================================== */
+let initialized = false;
+let initialLoad: Promise<void> | undefined;
 let entriesCache: CollectionApiEntry[] = [];
 let collectionsCache: Collection[] = [];
 let pendingCache: PendingCollection[] = [];
@@ -242,6 +246,8 @@ function rebuildCache() {
     .filter((e) => !e.deleted)
     .map(mapEntryToCollection);
   pendingCache = buildPending();
+  initialized = true;
+  publishPendingCollectionSnapshot(pendingCache);
 }
 
 /**
@@ -679,9 +685,22 @@ getShopSales,
   fetchPendingSummary,
 };
 
-/** Prime the cache as soon as the module is imported (e.g. Header/dashboard). */
+/** Only initialization is shared. Explicit post-mutation refreshes retain
+ * their existing behavior and never join a pre-mutation initialization read. */
+export function primeCollectionCache(): Promise<void> {
+  if (initialized) return Promise.resolve();
+  if (initialLoad) return initialLoad;
+  const pending = refreshFromBackend().finally(() => {
+    if (initialLoad === pending) initialLoad = undefined;
+  });
+  initialLoad = pending;
+  return pending;
+}
+
+// Actual collection/dashboard consumers keep the existing initialization.
+// The shared header imports only collectionSnapshot until alerts are opened.
 if (typeof window !== "undefined") {
-  refreshFromBackend().catch(() => {
-    /* cache stays empty until a collection module triggers a refresh */
+  void primeCollectionCache().catch(() => {
+    /* an explicit consumer can retry; never substitute sample data */
   });
 }

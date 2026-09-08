@@ -20,7 +20,7 @@ import FleetTabSkeleton from "../components/common/FleetTabSkeleton";
  *   expenses   → ./VehicleExpenseReportPage
  */
 
-const tabComponents: Record<VisibleFleetTab, React.LazyExoticComponent<React.ComponentType<{ embedded?: boolean }>>> = {
+const tabComponents: Record<VisibleFleetTab, React.LazyExoticComponent<React.ComponentType<{ embedded?: boolean; active?: boolean }>>> = {
   entry: lazy(() => import("./MaintenanceEntryPage")),
   history: lazy(() => import("./MaintenanceHistoryPage")),
   permits: lazy(() => import("./DocumentsExpiryPage")),
@@ -59,14 +59,14 @@ function FleetPages() {
     <div className="w-full px-4 pb-8 pt-6 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-[1480px]">
         {(Object.entries(tabComponents) as Array<
-          [VisibleFleetTab, React.LazyExoticComponent<React.ComponentType<{ embedded?: boolean }>>]
+          [VisibleFleetTab, React.LazyExoticComponent<React.ComponentType<{ embedded?: boolean; active?: boolean }>>]
         >).map(([tab, Component]) => {
-          if (!visitedTabs.has(tab)) return null;
+          if (!visitedTabs.has(tab) && tab !== activeTab) return null;
           const isActive = tab === activeTab;
           return (
             <div key={tab} hidden={!isActive} aria-hidden={!isActive}>
               <Suspense fallback={<FleetTabSkeleton />}>
-                <Component embedded={true} />
+                <Component embedded={true} active={tab === "emi" ? isActive : undefined} />
               </Suspense>
             </div>
           );
