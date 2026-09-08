@@ -1,3 +1,4 @@
+import MasterDialog from "../../components/MasterDialog";
 import { useState } from "react";
 import BankForm from "../forms/BankForm";
 import type { Bank } from "../types/bank";
@@ -28,18 +29,18 @@ function BankDialog({ open, onClose, onSave, bank }: BankDialogProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      {/* Increased width to max-w-4xl – same as other forms */}
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 animate-in fade-in zoom-in duration-200">
-        {/* No duplicate title – BankForm provides its own header */}
-        <BankForm
-          bank={bank}
-          onSave={handleSave}
-          onCancel={onClose}
-          isSaving={isSaving}
-        />
-      </div>
-    </div>
+    <MasterDialog
+      label={bank ? "Edit Bank" : "Add Bank"}
+      onClose={onClose}
+      isSaving={isSaving}
+    >
+      <BankForm
+        bank={bank}
+        onSave={handleSave}
+        onCancel={onClose}
+        isSaving={isSaving}
+      />
+    </MasterDialog>
   );
 }
 
