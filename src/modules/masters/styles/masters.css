@@ -1,0 +1,80 @@
+/* Only master directories/forms: never restyle Salary Register or other tabs. */
+.master-page {
+  min-width: 0;
+}
+
+.master-table {
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  background: white;
+}
+
+.master-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.master-table th {
+  padding: 12px 16px;
+  color: var(--color-slate-500);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  letter-spacing: 0.035em;
+  white-space: nowrap;
+}
+
+.master-table td {
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 20px;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+
+.master-table tbody tr {
+  height: 52px;
+  border-color: var(--color-slate-100);
+}
+
+.master-table td > button,
+.master-table td > div > button {
+  display: inline-flex;
+  height: 30px;
+  width: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+/* Stable controls: global button lift must not move dropdowns or calendar rows. */
+[data-master-dropdown-panel] button:hover:not(:disabled),
+[data-master-dropdown-panel] button:active:not(:disabled),
+.master-form button[role="combobox"]:hover:not(:disabled),
+.master-form button[role="switch"]:hover:not(:disabled),
+[data-master-toolbar] button:hover:not(:disabled) {
+  transform: none;
+}
+
+.master-form input,
+.master-form textarea {
+  scroll-margin-block: 16px;
+}
+
+@media (max-width: 639px) {
+  .master-table th,
+  .master-table td {
+    padding-inline: 12px;
+  }
+}
+
+.master-table--shops th,
+.master-table--shops td {
+  padding-inline: 12px;
+}
+
+.master-page > div > div:has(> .master-table):last-child,
+.master-page > div > div:has(> .master-table):last-child .master-table {
+  border-radius: 0 0 12px 12px;
+}

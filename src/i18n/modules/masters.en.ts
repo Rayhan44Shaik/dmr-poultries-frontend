@@ -1,2 +1,17 @@
-﻿export default {};
-
+export default {
+  'masters.ui.search_options': 'Search...',
+  'masters.ui.no_matches': 'No matches',
+  'masters.ui.required_fields': 'Required fields',
+  'masters.ui.clear_search': 'Clear search',
+  'masters.ui.actions': 'Master actions',
+  'masters.ui.import': 'Import',
+  'masters.ui.department': 'Department',
+  'masters.ui.all_departments': 'All Departments',
+  'masters.ui.select_department': 'Select Department',
+  'masters.ui.select_paper_rate': 'Select Paper Rate',
+  'masters.ui.records': '{count} records',
+  'masters.ui.showing': 'Showing {shown} of {total} · Page {page} of {pages}',
+  'masters.ui.pagination': 'Master directory pages',
+  'masters.ui.page': 'Page {page}',
+  'masters.ui.deleting': 'Deleting…',
+};
