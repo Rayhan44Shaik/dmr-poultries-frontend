@@ -73,10 +73,13 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
 
   // Pagination Calculations
   const totalPages = Math.ceil(filteredVehicles.length / ITEMS_PER_PAGE) || 1;
+  // Deleting or filtering records can leave currentPage beyond the last valid
+  // page; render the last valid page instead of a stranded empty one.
+  const safePage = Math.min(currentPage, totalPages);
   const paginatedVehicles = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
     return filteredVehicles.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredVehicles, currentPage]);
+  }, [filteredVehicles, safePage]);
 
   const handleExportPDF = () => {
     if (filteredVehicles.length === 0) {
@@ -361,7 +364,7 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
             )}
           </div>
           <p className="text-slate-500 font-medium">
-            Showing {paginatedVehicles.length} of {filteredVehicles.length} Vehicles (Page {currentPage} of {totalPages})
+            Showing {paginatedVehicles.length} of {filteredVehicles.length} Vehicles (Page {safePage} of {totalPages})
           </p>
         </div>
 
@@ -400,6 +403,11 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
               vehicles={paginatedVehicles}
               onEdit={handleEditVehicle}
               onDelete={handleDeleteVehicle}
+              emptyMessage={
+                search.trim()
+                  ? "No vehicles matching your search."
+                  : undefined
+              }
             />
           )}
         </div>
@@ -408,7 +416,7 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
         <div className={paginationBarClass}>
           <button
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1 || loading}
+            disabled={safePage === 1 || loading}
             className={paginationNavBtnClass}
           >
             Previous
@@ -420,7 +428,7 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
                 disabled={loading}
-                className={paginationPageBtnClass(currentPage === pageNum)}
+                className={paginationPageBtnClass(safePage === pageNum)}
               >
                 {pageNum}
               </button>
@@ -429,7 +437,7 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
 
           <button
             onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages || loading}
+            disabled={safePage === totalPages || loading}
             className={paginationNavBtnClass}
           >
             Next

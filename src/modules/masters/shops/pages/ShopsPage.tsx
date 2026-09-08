@@ -565,6 +565,11 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
               shops={paginatedShops}
               onEdit={handleEditShop}
               startIndex={pageStartIndex}
+              emptyMessage={
+                search.trim() || cityFilter
+                  ? "No shops matching your search or city filter."
+                  : undefined
+              }
             />
           )}
         </div>

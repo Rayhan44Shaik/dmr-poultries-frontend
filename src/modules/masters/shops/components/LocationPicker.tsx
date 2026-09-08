@@ -46,7 +46,7 @@ function LocationPicker({
 
   const handleResolveInput = useCallback(async () => {
     const input = locationInput.trim();
-    if (!input) return;
+    if (!input || isResolving) return;
     setError("");
     setIsResolving(true);
 
@@ -61,9 +61,10 @@ function LocationPicker({
     } finally {
       setIsResolving(false);
     }
-  }, [locationInput, onChange]);
+  }, [locationInput, onChange, isResolving]);
 
   const handleGetGps = useCallback(() => {
+    if (isGettingGps) return;
     if (!navigator.geolocation) {
       setError("Geolocation is not supported by your browser.");
       return;
@@ -90,7 +91,7 @@ function LocationPicker({
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  }, [onChange]);
+  }, [onChange, isGettingGps]);
 
   const handleClearLocation = useCallback(() => {
     onChange("", "", "");
@@ -116,7 +117,7 @@ function LocationPicker({
             onChange={(e) => { setLocationInput(e.target.value); setError(""); }}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleResolveInput(); } }}
             placeholder="Paste address or Google Maps location..."
-            className="w-full pl-10 pr-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150 bg-white hover:shadow-sm focus:shadow-md"
+            className="w-full h-10 pl-9 pr-3 text-sm rounded-lg border border-slate-200 bg-slate-50/60 text-slate-800 placeholder:text-slate-400 outline-none transition focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:opacity-60"
             disabled={disabled || isLoading}
           />
         </div>
@@ -124,7 +125,7 @@ function LocationPicker({
           type="button"
           onClick={handleGetGps}
           disabled={disabled || isLoading}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium text-slate-600 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50 shrink-0"
+          className="inline-flex h-10 items-center gap-1.5 px-3.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50 shrink-0"
         >
           {isGettingGps ? <Loader2 size={13} className="animate-spin" /> : <Navigation size={13} />}
           {isGettingGps ? "Getting..." : "Get GPS"}
@@ -136,7 +137,7 @@ function LocationPicker({
         <button
           type="button"
           onClick={handleResolveInput}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
         >
           <MapPin size={12} />
           Capture Location

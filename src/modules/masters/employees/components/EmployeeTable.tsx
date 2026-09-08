@@ -7,9 +7,11 @@ type EmployeeTableProps = {
   employees: Employee[];
   onEdit: (employee: Employee) => void;
   onDelete: (id: number) => void;
+  /** Message shown when the list is empty (e.g. active search with no matches). */
+  emptyMessage?: string;
 };
 
-function EmployeeTable({ employees, onEdit, onDelete }: EmployeeTableProps) {
+function EmployeeTable({ employees, onEdit, onDelete, emptyMessage }: EmployeeTableProps) {
   const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
   const formatSalary = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -62,6 +64,7 @@ function EmployeeTable({ employees, onEdit, onDelete }: EmployeeTableProps) {
                     onClick={() => onEdit(emp)}
                     className="rounded p-1 text-blue-600 hover:bg-blue-50 transition-colors"
                     title="Edit"
+                    aria-label={`Edit employee ${emp.employeeName}`}
                   >
                     <Pencil size={16} />
                   </button>
@@ -69,6 +72,7 @@ function EmployeeTable({ employees, onEdit, onDelete }: EmployeeTableProps) {
                     onClick={() => requestDelete(emp.id, { label: `Deleting Employee "${emp.employeeName}"` })}
                     className="rounded p-1 text-red-600 hover:bg-red-50 transition-colors"
                     title="Delete"
+                    aria-label={`Delete employee ${emp.employeeName}`}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -79,7 +83,7 @@ function EmployeeTable({ employees, onEdit, onDelete }: EmployeeTableProps) {
           {employees.length === 0 && (
             <tr>
               <td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-500">
-                No employees found.
+                {emptyMessage ?? "No employees found."}
               </td>
             </tr>
           )}
