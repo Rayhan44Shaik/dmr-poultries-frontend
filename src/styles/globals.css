@@ -116,3 +116,12 @@ body {
 .animate-slide-in {
   animation: slideIn 0.2s ease-out;
 }
+
+/* Month-only DatePicker: hide the day grid, show only month/year dropdowns */
+.month-only-picker table,
+.month-only-picker .rdp-month_grid,
+.month-only-picker .rdp-weekdays,
+.month-only-picker .rdp-week,
+.month-only-picker .rdp-day {
+  display: none !important;
+}

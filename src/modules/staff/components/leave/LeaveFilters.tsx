@@ -7,14 +7,16 @@ import {
   Clock,
   XCircle,
   LayoutGrid,
-  CalendarDays,
   Users,
   Filter,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   X,
   RefreshCw,
   Plus,
   RotateCcw,
+  Calendar,
 } from 'lucide-react';
 import type { LeaveFilters as LeaveFilterState } from '../../hooks/useLeaveManagement';
 import type { Employee } from '../../../masters/employees/types/employee';
@@ -46,6 +48,122 @@ const STATUS_TABS: { label: LeaveFilterState['status']; icon: React.ReactNode }[
 ];
 
 const LEAVE_TYPES = ['All', 'Casual', 'Sick', 'Emergency', 'Annual'] as const;
+
+const MONTHS = [
+  { value: '01', label: 'Jan' },
+  { value: '02', label: 'Feb' },
+  { value: '03', label: 'Mar' },
+  { value: '04', label: 'Apr' },
+  { value: '05', label: 'May' },
+  { value: '06', label: 'Jun' },
+  { value: '07', label: 'Jul' },
+  { value: '08', label: 'Aug' },
+  { value: '09', label: 'Sep' },
+  { value: '10', label: 'Oct' },
+  { value: '11', label: 'Nov' },
+  { value: '12', label: 'Dec' },
+];
+
+/** Month-only picker: shows a grid of month names with year navigation. */
+function MonthPicker({
+  value,
+  onChange,
+}: {
+  value: string; // YYYY-MM
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const selectedYear = value ? Number(value.slice(0, 4)) : new Date().getFullYear();
+  const selectedMonth = value ? value.slice(5, 7) : '';
+  const [viewYear, setViewYear] = useState(selectedYear);
+
+  useEffect(() => {
+    if (value) setViewYear(Number(value.slice(0, 4)));
+  }, [value]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const displayLabel = value
+    ? `${MONTHS.find((m) => m.value === selectedMonth)?.label || ''} ${selectedYear}`
+    : 'Select month';
+
+  const handleMonthClick = (monthValue: string) => {
+    onChange(`${viewYear}-${monthValue}`);
+    setOpen(false);
+  };
+
+  const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+  const currentYear = new Date().getFullYear();
+
+  return (
+    <div className="relative" ref={ref}>
+      <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5">
+        <Calendar size={13} className="text-brand-500" /> Month
+      </span>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm bg-slate-50/50 hover:bg-slate-50 transition text-left flex items-center justify-between text-slate-700 font-medium"
+      >
+        <span>{displayLabel}</span>
+        <ChevronDown size={14} className="text-slate-400 shrink-0 ml-1" />
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 z-50 mt-1 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden min-w-[260px]">
+          {/* Year navigation */}
+          <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-100">
+            <button
+              type="button"
+              onClick={() => setViewYear((y) => y - 1)}
+              className="p-1 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-sm font-bold text-slate-800">{viewYear}</span>
+            <button
+              type="button"
+              onClick={() => setViewYear((y) => y + 1)}
+              className="p-1 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+          {/* Month grid — 4 columns x 3 rows */}
+          <div className="grid grid-cols-4 gap-1 p-2">
+            {MONTHS.map((month) => {
+              const isSelected = selectedMonth === month.value && selectedYear === viewYear;
+              const isCurrentMonth = month.value === currentMonth && viewYear === currentYear;
+              return (
+                <button
+                  key={month.value}
+                  type="button"
+                  onClick={() => handleMonthClick(month.value)}
+                  className={`py-2.5 rounded-lg text-xs font-semibold transition ${
+                    isSelected
+                      ? 'bg-brand-600 text-white shadow-sm'
+                      : isCurrentMonth
+                        ? 'bg-brand-50 text-brand-700 border border-brand-200'
+                        : 'text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  {month.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Compact searchable dropdown. Max 5 visible items at a time. */
 function SearchableDropdown({
@@ -191,17 +309,12 @@ function LeaveFilters({
     <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs space-y-3">
       {/* Row 1 — Month, Department, Employee, Leave Type */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <label className="block">
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5">
-            <CalendarDays size={13} className="text-brand-500" /> Month
-          </span>
-          <input
-            type="month"
+        <div>
+          <MonthPicker
             value={filters.month}
-            onChange={(e) => onFilterChange('month', e.target.value)}
-            className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none bg-slate-50/50 transition text-slate-700 font-medium"
+            onChange={(val) => onFilterChange('month', val)}
           />
-        </label>
+        </div>
 
         <SearchableDropdown
           label="Department"
