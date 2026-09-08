@@ -61,6 +61,19 @@ const docConfig: Record<string, DocStyleConfig> = {
 
 const fallbackConfig = { icon: FileText, bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-700' };
 
+/* Scan-action buttons share one height and padding so the row stays level
+ * whether it holds one control or four. `whitespace-nowrap` keeps labels from
+ * folding mid-word now that the modal is wide enough to fit them. */
+const scanActionClass =
+  'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold whitespace-nowrap transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500';
+const scanAttachClass = `${scanActionClass} border border-slate-200 bg-white text-slate-600 shadow-sm hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800`;
+const scanViewClass = `${scanActionClass} bg-blue-50 text-blue-700 hover:bg-blue-100`;
+const scanDownloadClass = `${scanActionClass} bg-slate-100 text-slate-700 hover:bg-slate-200`;
+const scanRemoveClass = `${scanActionClass} bg-rose-50 text-rose-600 hover:bg-rose-100`;
+/** Selected-file chip and the "will be removed" confirm share one shell. */
+const scanChipClass =
+  'inline-flex h-9 min-w-0 items-center gap-2 rounded-lg border px-3 text-xs font-semibold';
+
 const getExpiry = (doc: PermitDocView | undefined): string | undefined => {
   if (doc && typeof doc === 'object') {
     return doc.expiryDate;
@@ -226,7 +239,7 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
           NewPaymentModal pattern): the shared DatePicker renders its calendar as
           an absolutely positioned popup, so any `overflow-hidden` /
           `overflow-y-auto` ancestor clips it and the calendar becomes unusable. */}
-      <div className="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-5xl my-auto flex flex-col overflow-visible animate-fade-in">
+      <div className="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-6xl my-auto flex flex-col overflow-visible animate-fade-in">
 
         {/* Header — rounded-t-2xl keeps the corners clean now that the card no
             longer relies on overflow-hidden to clip it. */}
@@ -329,95 +342,104 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
                       </div>
                     )}
 
-                    {/* File Upload / Scan Actions */}
-                    <div className="mt-auto pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {/* Scan — attach / view / download / remove on one level row.
+                        Label on the left, every control in a single right-aligned
+                        group, all sharing one height so the row never ragged. */}
+                    <div className="mt-auto border-t border-slate-100 pt-4">
+                      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                        <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-slate-500">
+                          Scan
+                        </span>
 
-                        {/* New File Selected State */}
-                        {selectedFileName ? (
-                          <div className="flex items-center justify-between w-full sm:w-auto gap-3 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700">
-                            <div className="flex items-center gap-1.5 truncate max-w-[150px]">
-                              <CheckCircle2 className="w-4 h-4 shrink-0" />
-                              <span className="text-xs font-semibold truncate" title={selectedFileName}>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          {/* Newly selected file */}
+                          {selectedFileName ? (
+                            <span
+                              className={`${scanChipClass} max-w-full border-emerald-200 bg-emerald-50 text-emerald-700 sm:max-w-[280px]`}
+                            >
+                              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                              <span className="truncate" title={selectedFileName}>
                                 {selectedFileName}
                               </span>
-                            </div>
+                              <button
+                                type="button"
+                                onClick={() => handleFileChange(type, null)}
+                                title="Undo upload"
+                                aria-label="Undo upload"
+                                className="-mr-1 shrink-0 rounded p-1 text-emerald-600 transition-colors hover:bg-emerald-100 hover:text-emerald-800"
+                              >
+                                <Undo2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              </button>
+                            </span>
+                          ) : (
+                            <label className={`${scanAttachClass} cursor-pointer`}>
+                              <Upload className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+                              {hasScan ? 'Replace Scan' : 'Attach Scan (Optional)'}
+                              <input
+                                type="file"
+                                accept=".png,.jpg,.jpeg,.pdf"
+                                className="hidden"
+                                onChange={(e) => handleFileChange(type, e.target.files?.[0] ?? null)}
+                              />
+                            </label>
+                          )}
+
+                          {/* Existing scan actions */}
+                          {hasScan && !selectedFileName && (
+                            <a
+                              href={permitApi.documentUrl(vehicle.id, type)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={scanViewClass}
+                              title={doc?.fileName ?? undefined}
+                            >
+                              <Eye className="h-3.5 w-3.5" aria-hidden="true" /> View
+                            </a>
+                          )}
+
+                          {hasScan && !selectedFileName && (
                             <button
                               type="button"
-                              onClick={() => handleFileChange(type, null)}
-                              className="text-emerald-600 hover:text-emerald-800 p-1"
-                              title="Undo upload"
+                              onClick={() => permitApi.downloadDocument(vehicle.id, type, doc?.fileName)}
+                              className={scanDownloadClass}
+                              title="Download scan"
                             >
-                              <Undo2 className="w-3.5 h-3.5" />
+                              <Download className="h-3.5 w-3.5" aria-hidden="true" /> Download
                             </button>
-                          </div>
-                        ) : (
-                          /* Standard Upload Button */
-                          <label className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 cursor-pointer transition-colors shadow-sm">
-                            <Upload className="w-3.5 h-3.5 text-slate-400" />
-                            {hasScan ? 'Replace Scan' : 'Attach Scan (Optional)'}
-                            <input
-                              type="file"
-                              accept=".png,.jpg,.jpeg,.pdf"
-                              className="hidden"
-                              onChange={(e) => handleFileChange(type, e.target.files?.[0] ?? null)}
-                            />
-                          </label>
-                        )}
-                      </div>
+                          )}
 
-                      {/* Existing Scan Actions */}
-                      <div className="flex items-center gap-2 w-full sm:w-auto">
-                        {hasScan && !selectedFileName && (
-                          <a
-                            href={permitApi.documentUrl(vehicle.id, type)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
-                            title={doc?.fileName ?? undefined}
-                          >
-                            <Eye className="w-3.5 h-3.5" /> View
-                          </a>
-                        )}
-
-                        {hasScan && !selectedFileName && (
-                          <button
-                            type="button"
-                            onClick={() => permitApi.downloadDocument(vehicle.id, type, doc?.fileName)}
-                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
-                            title="Download scan"
-                          >
-                            <Download className="w-3.5 h-3.5" /> Download
-                          </button>
-                        )}
-
-                        {hasScan && !isRemoving && !selectedFileName && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setRemoveFlags((prev) => ({ ...prev, [type]: true }));
-                              setSelectedFiles((prev) => ({ ...prev, [type]: null }));
-                            }}
-                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" /> Remove
-                          </button>
-                        )}
-
-                        {isRemoving && !selectedFileName && (
-                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 flex-1 sm:flex-none justify-between">
-                            <span className="text-[11px] font-semibold">Scan will be removed</span>
+                          {hasScan && !isRemoving && !selectedFileName && (
                             <button
                               type="button"
-                              className="text-xs font-bold underline hover:text-rose-900"
-                              onClick={() => setRemoveFlags((prev) => ({ ...prev, [type]: false }))}
+                              onClick={() => {
+                                setRemoveFlags((prev) => ({ ...prev, [type]: true }));
+                                setSelectedFiles((prev) => ({ ...prev, [type]: null }));
+                              }}
+                              className={scanRemoveClass}
+                              title="Remove scan"
                             >
-                              Undo
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Remove
                             </button>
-                          </div>
-                        )}
+                          )}
+
+                          {isRemoving && !selectedFileName && (
+                            <span
+                              className={`${scanChipClass} border-rose-200 bg-rose-50 text-rose-700`}
+                            >
+                              Scan will be removed
+                              <button
+                                type="button"
+                                onClick={() => setRemoveFlags((prev) => ({ ...prev, [type]: false }))}
+                                className="shrink-0 font-bold underline decoration-rose-300 underline-offset-2 transition-colors hover:text-rose-900"
+                              >
+                                Undo
+                              </button>
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
+
                   </div>
                 </div>
               );
