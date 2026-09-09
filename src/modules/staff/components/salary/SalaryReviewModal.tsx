@@ -346,7 +346,7 @@ export function SalaryReviewModal({
           {selected && currentValues && currentTotals ? (
             <div className="flex-1 min-w-0 overflow-y-auto bg-slate-100 p-5">
               <div className="flex justify-center">
-                <div className="w-full max-w-[640px]">
+                <div className="w-full max-w-[820px]">
                   <div className="bg-white shadow-[0_1px_3px_rgba(15,23,42,0.12)] ring-1 ring-slate-200">
                     <ClassicPayslipSheet
                       record={selected}

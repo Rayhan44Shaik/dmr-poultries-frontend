@@ -4,21 +4,20 @@
 // PURE DRAWING MODULE: no asset imports and no browser APIs, so it can be
 // rendered in the browser, in Electron, or from a Node smoke test.
 //
-// CLASSIC FORMAL PAYSLIP — plain white sheet, black borders, no colour bands:
+// FORMAL PAYSLIP (A4) — white sheet, black rules. Colours only on the
+// Earnings (green) / Deductions (red) column headings:
 //
-//   [hen logo]                     — the DMR POULTRIES mark, centred
-//   DMR POULTRIES                  — navy wordmark, centred
-//   address · phone · email        — muted, centred
+//   DMR POULTRIES                  — navy wordmark, centred (no hen)
 //   ──── • ● • ────                — red brand divider + navy hairline
-//              PAYSLIP             — plain bold title, centred
-//      for the month of September 2026
+//   PAYSLIP - SEPTEMBER 2026       — single left-aligned title
 //   ┌───────────────────────────── outer border ─────────────────────────┐
-//   │ employee details grid   — name / id / department / role / month /  │
+//   │ employee details        — name / id / department                   │
 //   │ attendance strip        — working · present · leave · weekly off   │
 //   │ earnings | deductions   — classic 4-column table + bold totals     │
 //   │ NET SALARY (TAKE HOME)  — bold boxed row, amount in words below    │
 //   └────────────────────────────────────────────────────────────────────┘
 //                                        ______________
+//                                        D. Srinivas Chakrapani
 //                                        Authorised Signatory
 //   ─── footer ───                 — thin line + centred "computer-generated"
 //                                    note + generated-on date
@@ -28,7 +27,6 @@ import autoTable from "jspdf-autotable";
 import {
   createDmrPoultryPdf,
   DMR_POULTRY_DETAILS,
-  type DmrPoultryHeaderAssets,
 } from "../../../utils/drawDmrPoultryHeader";
 import type { SalaryRecord } from "../types/staffDashboard";
 
@@ -36,8 +34,10 @@ type RGB = [number, number, number];
 
 /** Navy brand ink — wordmark and header hairline only. */
 const NAVY: RGB = [15, 35, 79];
-/** Red brand accent — the header divider dots only. */
+/** Red brand accent — the header divider dots only / deductions heading. */
 const RED: RGB = [178, 20, 34];
+/** Green — earnings heading. */
+const GREEN: RGB = [21, 128, 61];
 /** Near-black ink — titles, values, net pay, outer border. */
 const INK: RGB = [26, 32, 44];
 /** Muted grey — labels, address line, notes. */
@@ -128,15 +128,12 @@ export type PayslipPdfDocument = {
 };
 
 /**
- * Draws the classic formal A4 portrait payslip for one salary record.
+ * Draws the formal A4 portrait payslip for one salary record.
  *
  * @param record  the salary row (from the register table)
- * @param assets  preprepared brand assets (hen cutout); omit for the
- *                text-only header fallback
  */
 export function drawPayslipPdf(
-  record: SalaryRecord,
-  assets: DmrPoultryHeaderAssets = {}
+  record: SalaryRecord
 ): PayslipPdfDocument {
   const doc = createDmrPoultryPdf("portrait");
   doc.setProperties({
@@ -157,60 +154,17 @@ export function drawPayslipPdf(
 
   let y: number;
 
-  /* ── Centered DMR POULTRIES header ────────────────────────────────────
-   *   [hen logo]              — the DMR POULTRIES mark, centered
-   *   DMR POULTRIES           — navy wordmark
-   *   address                 — muted, centered
-   *   phone · email           — muted, centered
-   *   ──── • ● • ────         — red brand divider + navy hairline
-   */
+  /* ── Centered DMR POULTRIES header — wordmark only (no hen) ────────── */
   const brand = DMR_POULTRY_DETAILS;
-  const henMaxWidth = 24;
-  const henMaxHeight = 21;
-  if (assets.hen) {
-    const ratio = Math.min(
-      henMaxWidth / assets.hen.width,
-      henMaxHeight / assets.hen.height
-    );
-    const henWidth = assets.hen.width * ratio;
-    const henHeight = assets.hen.height * ratio;
-    doc.addImage(
-      assets.hen.dataUrl,
-      "PNG",
-      pageWidth / 2 - henWidth / 2,
-      9,
-      henWidth,
-      henHeight,
-      undefined,
-      "FAST"
-    );
-    y = 9 + henHeight;
-  } else {
-    y = 11;
-  }
-  y += 3.5;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
-  doc.text(brand.businessName, pageWidth / 2, y + 4.5, { align: "center" });
-  y += 8.5;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.8);
-  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-  doc.text(brand.address, pageWidth / 2, y + 3, { align: "center" });
-  y += 4.5;
-  doc.text(
-    `${brand.mobileNumber}   ·   ${brand.emailAddress}`,
-    pageWidth / 2,
-    y + 3,
-    { align: "center" }
-  );
-  y += 5;
+  doc.text(brand.businessName, pageWidth / 2, 16, { align: "center" });
+  y = 20;
 
   // Red brand divider: two line segments with three dots at the centre.
-  const dividerY = y + 1.5;
+  const dividerY = y;
   doc.setDrawColor(RED[0], RED[1], RED[2]);
   doc.setLineWidth(0.45);
   doc.line(MARGIN, dividerY, pageWidth / 2 - 12, dividerY);
@@ -225,35 +179,30 @@ export function drawPayslipPdf(
   doc.setDrawColor(NAVY[0], NAVY[1], NAVY[2]);
   doc.setLineWidth(0.18);
   doc.line(MARGIN, y, pageWidth - MARGIN, y);
-  y += 8;
+  y += 7;
 
-  /* ── Plain PAYSLIP title — no band, just bold ink ───────────────────── */
+  /* ── PAYSLIP title — single left-aligned line ──────────────────────── */
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(13.5);
+  doc.setFontSize(14);
   doc.setTextColor(INK[0], INK[1], INK[2]);
-  doc.text("PAYSLIP", pageWidth / 2, y + 3.5, { align: "center" });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
   doc.text(
-    `for the month of ${formatMonthLabel(record.month)}`,
-    pageWidth / 2,
-    y + 9
+    `PAYSLIP - ${formatMonthLabel(record.month).toUpperCase()}`,
+    MARGIN,
+    y + 4.5
   );
-  y += 14;
+  y += 11;
 
   /* ── Everything from the employee grid to the amount-in-words sits
    *    inside ONE classic outer border, drawn after the content. ──────── */
   const boxTop = y;
 
   /* ── Employee details (two-column grid) ─────────────────────────────── */
+  // Core identity only (name / id / department). Role, salary month & status
+  // are left off the document — the period reads in the title line above.
   const employeeRows: Array<[string, string]> = [
     ["Employee Name", fmt(record.employeeName)],
     ["Employee ID", record.employeeId != null ? `#${record.employeeId}` : "—"],
     ["Department", fmt(record.department)],
-    ["Role", fmt(record.role)],
-    ["Salary Month", fmt(record.month)],
-    ["Status", fmt(record.status)],
   ];
   const pairs: string[][] = [];
   for (let i = 0; i < employeeRows.length; i += 2) {
@@ -381,6 +330,13 @@ export function drawPayslipPdf(
       3: { cellWidth: contentWidth * 0.19, halign: "right" },
     },
     didParseCell: (data) => {
+      // Colour the Earnings / Deductions column headings (green / red).
+      if (data.section === "head") {
+        const raw = data.cell.raw;
+        if (raw === "Earnings") data.cell.styles.textColor = GREEN;
+        if (raw === "Deductions") data.cell.styles.textColor = RED;
+        return;
+      }
       if (data.section !== "body") return;
       const isTotalRow = data.row.index === tableBody.length - 1;
       const isAmountCol = data.column.index === 1 || data.column.index === 3;
@@ -430,15 +386,18 @@ export function drawPayslipPdf(
   y += 6;
 
   /* ── Signature (single, right-aligned) ─────────────────────────────── */
+  const sigRight = pageWidth - MARGIN;
   doc.setDrawColor(RULE[0], RULE[1], RULE[2]);
   doc.setLineWidth(0.18);
-  doc.line(pageWidth - MARGIN - 42, y + 13, pageWidth - MARGIN, y + 13);
+  doc.line(sigRight - 42, y + 13, sigRight, y + 13);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  doc.text("D. Srinivas Chakrapani", sigRight, y + 17, { align: "right" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-  doc.text("Authorised Signatory", pageWidth - MARGIN, y + 17, {
-    align: "right",
-  });
+  doc.text("Authorised Signatory", sigRight, y + 21, { align: "right" });
 
   /* ── Footer — thin line + small centered note ──────────────────────── */
   const generatedStr = new Date().toLocaleString("en-IN", {

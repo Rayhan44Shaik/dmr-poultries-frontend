@@ -73,7 +73,7 @@ export function SalaryView({
       }
     >
       <div className="bg-slate-100 px-3 py-6 sm:px-6">
-        <div className="mx-auto max-w-[760px] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.12)] ring-1 ring-slate-200">
+        <div className="mx-auto max-w-[900px] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.12)] ring-1 ring-slate-200">
           <ClassicPayslipSheet record={record} values={values} {...totals} />
         </div>
 

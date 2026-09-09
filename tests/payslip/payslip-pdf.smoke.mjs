@@ -69,8 +69,7 @@ const text = content.items.map((item) => item.str).join(" ").replace(/\s+/g, " "
 
 const ordered = [
   "DMR POULTRIES",
-  "PAYSLIP",
-  "for the month of September 2026",
+  "PAYSLIP - SEPTEMBER 2026",
   "Ramesh Kumar",
   "Working Days",
   "Amount (Rs.)",
@@ -80,6 +79,7 @@ const ordered = [
   "NET SALARY (TAKE HOME)",
   "Rs. 18,600.00",
   "Net salary in words",
+  "D. Srinivas Chakrapani",
   "Authorised Signatory",
   "This is a computer-generated payslip",
   "Generated on",
