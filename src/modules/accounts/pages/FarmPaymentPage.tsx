@@ -76,29 +76,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
         );
       
       setAllTrips(completed);
-
-      const savedPayments: Record<string, Partial<FarmPayment>> = {};
-      completed.forEach((trip) => {
-        const tripId = String(trip.id);
-        const existingPayment = FarmPaymentService.getByTripId(tripId);
-        
-        if (existingPayment) {
-          savedPayments[tripId] = {
-            ...existingPayment,
-            totalBirds: trip.totalBirds || 0,
-            dcWeight: trip.dcWeight || 0,
-          };
-        } else {
-          savedPayments[tripId] = {
-            tripId,
-            totalBirds: trip.totalBirds || 0,
-            dcWeight: trip.dcWeight || 0,
-            paymentStatus: 'Unpaid',
-          };
-        }
-      });
-      
-      setPaymentData(savedPayments);
+      syncPaymentData(completed);
       // paymentData now mirrors persisted storage — nothing is unsaved anymore.
       clearDirty();
     } catch (error) {
@@ -107,6 +85,34 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     } finally {
       setLoading(false);
     }
+  };
+
+  // Rebuild paymentData from persisted payments for the given trips — a pure
+  // local sync with NO network call and NO loading spinner. Used after save
+  // and reset (saving payments never changes the trip list, so a full reload
+  // would just flash "Loading trips..." for nothing) and by loadCompletedTrips.
+  const syncPaymentData = (trips: Trip[]) => {
+    const savedPayments: Record<string, Partial<FarmPayment>> = {};
+    trips.forEach((trip) => {
+      const tripId = String(trip.id);
+      const existingPayment = FarmPaymentService.getByTripId(tripId);
+
+      if (existingPayment) {
+        savedPayments[tripId] = {
+          ...existingPayment,
+          totalBirds: trip.totalBirds || 0,
+          dcWeight: trip.dcWeight || 0,
+        };
+      } else {
+        savedPayments[tripId] = {
+          tripId,
+          totalBirds: trip.totalBirds || 0,
+          dcWeight: trip.dcWeight || 0,
+          paymentStatus: 'Unpaid',
+        };
+      }
+    });
+    setPaymentData(savedPayments);
   };
 
   useEffect(() => {
@@ -264,9 +270,12 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
         if (paymentStatus === 'Partially Paid') partialCount++;
       }
 
+      // Instant local sync — no refetch, no loading spinner. Saving payments
+      // never changes the completed-trip list, so a full reload is unnecessary;
+      // paymentData is rebuilt from the just-persisted FarmPaymentService.
+      syncPaymentData(allTrips);
       clearDirty();
-      setRefreshKey(prev => prev + 1);
-      
+
       const paymentWord = savedCount === 1 ? 'payment' : 'payments';
       const partialWord = partialCount === 1 ? 'partial payment' : 'partial payments';
       const message = partialCount > 0
@@ -288,27 +297,8 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
       return;
     }
     clearDirty();
-
-    const savedPayments: Record<string, Partial<FarmPayment>> = {};
-    allTrips.forEach((trip) => {
-      const tripId = String(trip.id);
-      const existingPayment = FarmPaymentService.getByTripId(tripId);
-      if (existingPayment) {
-        savedPayments[tripId] = {
-          ...existingPayment,
-          totalBirds: trip.totalBirds || 0,
-          dcWeight: trip.dcWeight || 0,
-        };
-      } else {
-        savedPayments[tripId] = {
-          tripId,
-          totalBirds: trip.totalBirds || 0,
-          dcWeight: trip.dcWeight || 0,
-          paymentStatus: 'Unpaid',
-        };
-      }
-    });
-    setPaymentData(savedPayments);
+    // Instant local sync from persisted payments — no reload.
+    syncPaymentData(allTrips);
     showNotification('All changes reset', 'info');
   };
 
