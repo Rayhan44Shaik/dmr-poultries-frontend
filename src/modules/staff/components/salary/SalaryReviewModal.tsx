@@ -226,45 +226,53 @@ export function SalaryReviewModal({
         </div>
 
         {/* Body */}
-        <div className="flex flex-1 min-h-0">
-          {/* LEFT: selection panel (mirrors Shop Ledger "Select shops") */}
-          <aside className="w-72 shrink-0 flex flex-col min-h-0 border-r border-slate-100 bg-slate-50/70">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          {/* LEFT: selection panel — full, independently scrollable list */}
+          <aside className="flex w-80 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-slate-50/80">
             {/* Panel header */}
-            <div className="space-y-2.5 border-b border-slate-100 bg-white/70 px-3.5 py-3">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+            <div className="space-y-2.5 border-b border-slate-200 bg-white px-3.5 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-600">
                   <span className="flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm">
                     <ListChecks size={12} />
                   </span>
                   Select employees
                 </span>
                 {emailsSentCount > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
                     <CheckCircle2 size={11} /> {emailsSentCount} emailed
                   </span>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => onToggleSelectAll(allIds)}
-                  className={`flex h-7 items-center justify-center gap-1 rounded-lg border text-[11px] font-semibold transition ${
-                    allSelected
-                      ? "border-blue-300 bg-blue-50 text-blue-700"
-                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  <CheckSquare size={11} /> All
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onToggleSelectAll([])}
-                  disabled={selectedCount === 0}
-                  className="flex h-7 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Square size={11} /> None
-                </button>
+              {/* Selection summary + All / None segmented control */}
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-2 py-1">
+                <span className="text-[11px] font-semibold text-slate-600">
+                  <span className="tabular-nums text-blue-700">{selectedCount}</span>
+                  <span className="text-slate-400"> / </span>
+                  <span className="tabular-nums">{filtered.length}</span> selected
+                </span>
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => onToggleSelectAll(allIds)}
+                    className={`inline-flex h-6 items-center gap-1 rounded-md px-2 text-[11px] font-semibold transition ${
+                      allSelected
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <CheckSquare size={11} /> All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onToggleSelectAll([])}
+                    disabled={selectedCount === 0}
+                    className="inline-flex h-6 items-center gap-1 rounded-md px-2 text-[11px] font-semibold text-slate-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Square size={11} /> None
+                  </button>
+                </div>
               </div>
 
               <div className="relative">
@@ -275,70 +283,100 @@ export function SalaryReviewModal({
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search employees..."
                   aria-label="Search employees"
-                  className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-7 pr-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300"
+                  className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-7 pr-8 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    aria-label="Clear search"
+                    className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Employee list */}
-            <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-2.5">
-              <div className="space-y-0.5">
-                {filtered.map((r) => {
-                  const isActive = r.id === selected?.id;
-                  const isSelected = selectedIds.has(r.id);
-                  const isBusy = savingId === r.id;
-                  return (
-                    <div
-                      key={r.id}
-                      className={`group flex items-center gap-2 rounded-xl border px-2 py-1.5 transition ${
-                        isActive
-                          ? "border-blue-200 bg-blue-50/70 ring-1 ring-blue-300"
-                          : isSelected
-                          ? "border-blue-100 bg-blue-50/40"
-                          : "border-transparent hover:border-slate-200/70 hover:bg-white"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => onToggleSelect(r.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        aria-label={`Select ${r.employeeName}`}
-                        className="h-4 w-4 shrink-0 cursor-pointer accent-blue-600"
-                      />
-                      <button
-                        type="button"
+            {/* Employee list — all employees, scrollable */}
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2 overscroll-contain">
+                <div className="space-y-1">
+                  {filtered.map((r) => {
+                    const isActive = r.id === selected?.id;
+                    const isSelected = selectedIds.has(r.id);
+                    const isBusy = savingId === r.id;
+                    const initial = (r.employeeName || "?")
+                      .trim()
+                      .charAt(0)
+                      .toUpperCase();
+                    return (
+                      <div
+                        key={r.id}
                         onClick={() => setSelectedId(r.id)}
-                        title={r.employeeName}
-                        className="flex min-w-0 flex-1 items-center text-left"
+                        className={`group flex cursor-pointer items-center gap-2.5 rounded-xl border px-2.5 py-2 transition ${
+                          isActive
+                            ? "border-blue-300 bg-white shadow-sm ring-1 ring-blue-200"
+                            : isSelected
+                            ? "border-blue-100 bg-white"
+                            : "border-transparent bg-slate-100/60 hover:border-slate-200 hover:bg-white"
+                        }`}
                       >
+                        <span
+                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold ${
+                            isActive
+                              ? "bg-blue-600 text-white"
+                              : "bg-gradient-to-br from-blue-500 to-indigo-600 text-white"
+                          }`}
+                        >
+                          {initial}
+                        </span>
                         <span className="min-w-0 flex-1">
                           <span
-                            className={`block truncate text-xs ${
+                            className={`block truncate text-[12.5px] leading-tight ${
                               isActive
                                 ? "font-bold text-blue-700"
                                 : "font-semibold text-slate-700"
                             }`}
+                            title={r.employeeName}
                           >
                             {r.employeeName}
                           </span>
-                          <span className="block truncate text-[10px] text-slate-400">
+                          <span className="block truncate text-[10.5px] text-slate-400">
                             {r.department}
                           </span>
                         </span>
-                      </button>
-                      {isBusy ? (
-                        <Loader2 size={13} className="shrink-0 animate-spin text-blue-500" />
-                      ) : null}
-                    </div>
-                  );
-                })}
+                        {isBusy ? (
+                          <Loader2 size={14} className="shrink-0 animate-spin text-blue-500" />
+                        ) : (
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => onToggleSelect(r.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Select ${r.employeeName}`}
+                            className="h-[18px] w-[18px] shrink-0 cursor-pointer rounded accent-blue-600"
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {filtered.length === 0 && (
+                  <p className="px-2 py-6 text-center text-xs text-slate-400">
+                    No employees match “{query}”.
+                  </p>
+                )}
               </div>
-              {filtered.length === 0 && (
-                <p className="px-2 py-4 text-center text-xs text-slate-400">
-                  No employees match “{query}”.
+
+              {/* List footer — always visible so users know the rest is one scroll away */}
+              <div className="shrink-0 border-t border-slate-200 bg-white px-3.5 py-2">
+                <p className="text-[10px] font-medium text-slate-400">
+                  {filtered.length > 0
+                    ? `${filtered.length} of ${records.length} shown — scroll for the rest`
+                    : `${records.length} employees`}
                 </p>
-              )}
+              </div>
             </div>
           </aside>
 
