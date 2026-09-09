@@ -61,6 +61,10 @@ export const MaintenanceEventSchema = z.object({
   garage: z.string().optional(),
   mechanic: z.string().optional(),
   nextServiceKM: z.number().nonnegative(),
+  /** Per-maintenance-type next-service odometer targets. Each maintenance type
+   * (Tyre Rotation, Engine Oil Change, Brake Service, …) carries its own next
+   * service KM so the Upcoming Service panel can list one schedule per type. */
+  nextServiceByType: z.record(z.string(), z.number().nonnegative()).optional(),
   totalCost: z.number().nonnegative(),
   parts: z.array(PartItemSchema),
   remarks: z.string().optional(),

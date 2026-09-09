@@ -8,7 +8,6 @@ import {
   paginationBarClass,
   paginationNavBtnClass,
   paginationPageBtnClass,
-  shouldShowPagination,
 } from '../../../../shared/ui/paginationStyles';
 import { usePendingDelete } from '../../../../hooks/usePendingDelete';
 import { PendingDeleteNotification } from '../../../../components/common/PendingDeleteNotification';
@@ -78,8 +77,8 @@ const LatestMaintenanceTable = ({
   };
 
   const filteredRecords = useMemo(() => {
-    if (!searchTerm.trim()) return validRecords;
     const term = searchTerm.trim().toLowerCase();
+    if (!term) return validRecords;
     return validRecords.filter(rec => {
       const vehicleNumber = resolveVehicleNumber(rec);
       const searchable = [
@@ -468,8 +467,8 @@ const LatestMaintenanceTable = ({
             </table>
           </div>
 
-          {/* Pagination */}
-          {shouldShowPagination(totalRecords) && (
+          {/* Pagination — show whenever there is more than one page (pageSize rows). */}
+          {totalRecords > pageSize && (
             <div className={paginationBarClass}>
               <button
                 onClick={() => { setSelectedId(null); onPageChange(currentPage - 1); }}

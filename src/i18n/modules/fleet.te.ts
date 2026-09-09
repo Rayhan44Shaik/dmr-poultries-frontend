@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   // ----- Fleet dashboard (deferred module) -----
   'fleet.dashboard.active_vehicles': 'యాక్టివ్ వాహనాలు',
   'fleet.dashboard.avg_fuel_efficiency': 'సగటు ఇంధన సామర్థ్యం',
@@ -99,6 +99,7 @@
   'fleet.maintenance_form.select_date': 'దయచేసి తేదీని ఎంచుకోండి.',
   'fleet.maintenance_form.select_type': 'దయచేసి కనీసం ఒక మెయింటెనెన్స్ రకాన్ని ఎంచుకోండి.',
   'fleet.maintenance_form.select_types': 'రకాలను ఎంచుకోండి',
+  'fleet.maintenance_form.select_types_first': 'తదుపరి సర్వీస్ కి.మీ సెట్ చేయడానికి మెయింటెనెన్స్ రకం(లను) ఎంచుకోండి',
   'fleet.maintenance_form.service_type': 'సర్వీస్ రకం',
   'fleet.maintenance_form.service_type_example': 'ఉదా. ఆయిల్ చేంజ్',
   'fleet.maintenance_form.unsupported_file': 'PNG, JPG/JPEG మరియు PDF ఫైల్‌లకు మాత్రమే మద్దతు ఉంది.',

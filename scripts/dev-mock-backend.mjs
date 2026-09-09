@@ -171,6 +171,291 @@ const VEHICLES = buildSampleEmiVehicles();
 
 const VEHICLE_BY_ID = new Map(VEHICLES.map((v) => [v.id, v]));
 
+// ── Sample Fleet Maintenance records ─────────────────────────────────────────
+// The real maintenance rows live in the separate ERP backend (PostgreSQL) and
+// are reached at /api/fleet/maintenance. This stub seeds a few records so the
+// Maintenance Entry (list) and Upcoming Service panels can be reviewed in a
+// hosted preview without a backend.
+//
+// KEY IDEA: each record can list several maintenance types (comma-separated)
+// AND a per-type next-service schedule (`nextServiceByType`). Every type keeps
+// its OWN independent "next service" kilometre target, so the Upcoming Service
+// panel shows one row per type — tyre change, oil change, brake change, etc.
+// all surface together for a vehicle that was serviced for several things.
+
+const daysAgo = (n) => iso(addDays(new Date(), -n));
+
+const PART = (name, quantity, rate, specification = "") => ({
+  name, specification, quantity, rate, amount: quantity * rate,
+});
+
+const MAINTENANCE = [
+  // Vehicle 1 — three independent schedules: oil + filter + tyre rotation.
+  {
+    id: 1001, vehicleId: 1, vehicleNo: VEHICLE_BY_ID.get(1).vehicleNumber,
+    date: `${daysAgo(15)}T09:30:00`, billNo: "MNT-20260825-001", currentKM: 54000,
+    maintenanceType: "Engine Oil Change, Oil Filter Replacement",
+    serviceType: "Preventive", garage: "Sri Balaji Garage", mechanic: "Ravi",
+    driverId: 21, driverName: "Imran S",
+    nextServiceKM: 59000,
+    nextServiceByType: { "Engine Oil Change": 59000, "Oil Filter Replacement": 59000 },
+    totalCost: 6400,
+    parts: [PART("Engine Oil 15W40", 2, 2200, "OEM 15W40"), PART("Oil Filter", 1, 600, "OEM"), PART("Labour", 1, 1400)],
+    remarks: "Routine oil service", paymentStatus: "approved",
+    createdAt: `${daysAgo(15)}T10:00:00`, approvedAt: `${daysAgo(14)}T09:00:00`, approvedBy: "Owner", documents: [],
+  },
+  {
+    id: 1002, vehicleId: 1, vehicleNo: VEHICLE_BY_ID.get(1).vehicleNumber,
+    date: `${daysAgo(40)}T11:00:00`, billNo: "MNT-20260731-002", currentKM: 52000,
+    maintenanceType: "Tyre Rotation",
+    serviceType: "Preventive", garage: "Sri Balaji Garage", mechanic: "Ravi",
+    driverId: 21, driverName: "Imran S",
+    nextServiceKM: 56000,
+    nextServiceByType: { "Tyre Rotation": 56000 },
+    totalCost: 2200,
+    parts: [PART("Tyre Rotation", 1, 1200), PART("Labour", 1, 1000)],
+    remarks: "Rotated tyres front to rear", paymentStatus: "approved",
+    createdAt: `${daysAgo(40)}T11:30:00`, approvedAt: `${daysAgo(39)}T09:00:00`, approvedBy: "Owner", documents: [],
+  },
+
+  // Vehicle 2 — brake due soon + a PENDING clutch job (must NOT appear upcoming).
+  {
+    id: 1003, vehicleId: 2, vehicleNo: VEHICLE_BY_ID.get(2).vehicleNumber,
+    date: `${daysAgo(10)}T08:45:00`, billNo: "MNT-20260830-001", currentKM: 47000,
+    maintenanceType: "Brake Service",
+    serviceType: "Corrective", garage: "Venkatadri Garage", mechanic: "Suresh",
+    driverId: 22, driverName: "Kiran P",
+    nextServiceKM: 49000, nextServiceByType: { "Brake Service": 49000 },
+    totalCost: 3800,
+    parts: [PART("Brake Pads", 2, 1400, "OEM"), PART("Labour", 1, 1000)],
+    remarks: "Front brake pads replaced", paymentStatus: "approved",
+    createdAt: `${daysAgo(10)}T09:00:00`, approvedAt: `${daysAgo(9)}T09:00:00`, approvedBy: "Owner", documents: [],
+  },
+  {
+    id: 1004, vehicleId: 2, vehicleNo: VEHICLE_BY_ID.get(2).vehicleNumber,
+    date: `${daysAgo(3)}T10:15:00`, billNo: "MNT-20260906-002", currentKM: 48400,
+    maintenanceType: "Clutch Plate Replacement",
+    serviceType: "Corrective", garage: "Venkatadri Garage", mechanic: "Suresh",
+    driverId: 22, driverName: "Kiran P",
+    nextServiceKM: 58400, nextServiceByType: { "Clutch Plate Replacement": 58400 },
+    totalCost: 9500,
+    parts: [PART("Clutch Plate", 1, 7500, "OEM"), PART("Labour", 1, 2000)],
+    remarks: "Awaiting approval", paymentStatus: "pending",
+    createdAt: `${daysAgo(3)}T10:30:00`, documents: [],
+  },
+
+  // Vehicle 3 — brake OVERDUE (next target already passed).
+  {
+    id: 1005, vehicleId: 3, vehicleNo: VEHICLE_BY_ID.get(3).vehicleNumber,
+    date: `${daysAgo(60)}T09:00:00`, billNo: "MNT-20260711-001", currentKM: 40000,
+    maintenanceType: "Brake Service",
+    serviceType: "Corrective", garage: "Annapurna Garage", mechanic: "Lakshmi",
+    driverId: 21, driverName: "Imran S",
+    nextServiceKM: 44000, nextServiceByType: { "Brake Service": 44000 },
+    totalCost: 4100,
+    parts: [PART("Brake Shoes", 4, 775, "OEM"), PART("Labour", 1, 1000)],
+    remarks: "Brake shoes replaced", paymentStatus: "approved",
+    createdAt: `${daysAgo(60)}T09:20:00`, approvedAt: `${daysAgo(59)}T09:00:00`, approvedBy: "Owner", documents: [],
+  },
+
+  // Vehicle 4 — safe / far from due.
+  {
+    id: 1006, vehicleId: 4, vehicleNo: VEHICLE_BY_ID.get(4).vehicleNumber,
+    date: `${daysAgo(20)}T10:00:00`, billNo: "MNT-20260820-001", currentKM: 40000,
+    maintenanceType: "Engine Oil Change",
+    serviceType: "Preventive", garage: "Kakatiya Garage", mechanic: "Prasad",
+    driverId: 22, driverName: "Kiran P",
+    nextServiceKM: 50000, nextServiceByType: { "Engine Oil Change": 50000 },
+    totalCost: 3200,
+    parts: [PART("Engine Oil 15W40", 1, 2200, "OEM 15W40"), PART("Labour", 1, 1000)],
+    remarks: "Oil change only", paymentStatus: "approved",
+    createdAt: `${daysAgo(20)}T10:20:00`, approvedAt: `${daysAgo(19)}T09:00:00`, approvedBy: "Owner", documents: [],
+  },
+
+  // Vehicle 7 — two types with DIFFERENT next-service targets.
+  {
+    id: 1007, vehicleId: 7, vehicleNo: VEHICLE_BY_ID.get(7).vehicleNumber,
+    date: `${daysAgo(25)}T09:40:00`, billNo: "MNT-20260815-001", currentKM: 60000,
+    maintenanceType: "Tyre Rotation, Wheel Alignment",
+    serviceType: "Preventive", garage: "Sri Balaji Garage", mechanic: "Ravi",
+    driverId: 21, driverName: "Imran S",
+    nextServiceKM: 66000,
+    nextServiceByType: { "Tyre Rotation": 66000, "Wheel Alignment": 64000 },
+    totalCost: 3000,
+    parts: [PART("Tyre Rotation", 1, 1200), PART("Wheel Alignment", 1, 800), PART("Labour", 1, 1000)],
+    remarks: "Tyres rotated, wheels aligned", paymentStatus: "approved",
+    createdAt: `${daysAgo(25)}T10:00:00`, approvedAt: `${daysAgo(24)}T09:00:00`, approvedBy: "Owner", documents: [],
+  },
+
+  // Vehicle 8 — battery (safe) + a PENDING suspension job.
+  {
+    id: 1008, vehicleId: 8, vehicleNo: VEHICLE_BY_ID.get(8).vehicleNumber,
+    date: `${daysAgo(12)}T11:10:00`, billNo: "MNT-20260828-001", currentKM: 50000,
+    maintenanceType: "Battery Replacement",
+    serviceType: "Corrective", garage: "Venkatadri Garage", mechanic: "Suresh",
+    driverId: 22, driverName: "Kiran P",
+    nextServiceKM: 65000, nextServiceByType: { "Battery Replacement": 65000 },
+    totalCost: 7200,
+    parts: [PART("Battery 130Ah", 1, 6500, "Exide"), PART("Labour", 1, 700)],
+    remarks: "Battery replaced", paymentStatus: "approved",
+    createdAt: `${daysAgo(12)}T11:30:00`, approvedAt: `${daysAgo(11)}T09:00:00`, approvedBy: "Owner", documents: [],
+  },
+  {
+    id: 1009, vehicleId: 8, vehicleNo: VEHICLE_BY_ID.get(8).vehicleNumber,
+    date: `${daysAgo(2)}T09:00:00`, billNo: "MNT-20260907-002", currentKM: 51800,
+    maintenanceType: "Suspension Repair",
+    serviceType: "Corrective", garage: "Venkatadri Garage", mechanic: "Suresh",
+    driverId: 22, driverName: "Kiran P",
+    nextServiceKM: 61800, nextServiceByType: { "Suspension Repair": 61800 },
+    totalCost: 5200,
+    parts: [PART("Shock Absorber", 2, 2100, "OEM"), PART("Labour", 1, 1000)],
+    remarks: "Pending approval", paymentStatus: "pending",
+    createdAt: `${daysAgo(2)}T09:15:00`, documents: [],
+  },
+
+  // Vehicle 6 — a soft-deleted record (appears only on the Deleted tab).
+  {
+    id: 1010, vehicleId: 6, vehicleNo: VEHICLE_BY_ID.get(6).vehicleNumber,
+    date: `${daysAgo(90)}T10:00:00`, billNo: "MNT-20260611-001", currentKM: 24000,
+    maintenanceType: "General Service",
+    serviceType: "Preventive", garage: "Kakatiya Garage", mechanic: "Prasad",
+    driverId: 21, driverName: "Imran S",
+    nextServiceKM: 29000, nextServiceByType: { "General Service": 29000 },
+    totalCost: 2800,
+    parts: [PART("General Service", 1, 1800), PART("Consumables", 1, 1000)],
+    remarks: "Removed (wrong vehicle)", paymentStatus: "approved",
+    createdAt: `${daysAgo(90)}T10:20:00`, approvedAt: `${daysAgo(89)}T09:00:00`, approvedBy: "Owner",
+    deletedAt: `${daysAgo(80)}T09:00:00`, documents: [],
+  },
+];
+
+// Authoritative "current odometer" per vehicle (what /meter-summary serves).
+// Chosen so the Upcoming Service panel shows due-soon, overdue and safe rows.
+const VEHICLE_METERS = {
+  1: 55800, 2: 48500, 3: 46000, 4: 41000, 5: 38000, 6: 29000,
+  7: 61000, 8: 52000, 9: 33000, 10: 20500, 11: 47000, 12: 16000,
+};
+
+let nextMaintenanceId = 2000;
+
+function listMaintenance(query) {
+  let rows = MAINTENANCE.slice();
+  const status = query.get("status");
+  const includeDeleted = query.get("includeDeleted") === "true";
+  const latestApproved = query.get("latestApproved") === "true";
+  const vehicleId = query.get("vehicleId");
+  const driverId = query.get("driverId");
+  const fromDate = query.get("fromDate");
+  const toDate = query.get("toDate");
+  const search = (query.get("search") || "").trim().toLowerCase();
+
+  if (!includeDeleted) rows = rows.filter((r) => !r.deletedAt);
+  if (status) rows = rows.filter((r) => String(r.paymentStatus || "").toLowerCase() === status.toLowerCase());
+  if (vehicleId) rows = rows.filter((r) => String(r.vehicleId) === String(vehicleId));
+  if (driverId) rows = rows.filter((r) => String(r.driverId) === String(driverId));
+  if (fromDate) rows = rows.filter((r) => (r.date || "").slice(0, 10) >= fromDate);
+  if (toDate) rows = rows.filter((r) => (r.date || "").slice(0, 10) <= toDate);
+  if (search) {
+    rows = rows.filter((r) =>
+      [r.billNo, r.vehicleNo, r.driverName, r.maintenanceType, r.serviceType, r.garage, r.mechanic, r.remarks]
+        .join(" ").toLowerCase().includes(search)
+    );
+  }
+
+  if (latestApproved) {
+    const map = new Map();
+    rows
+      .filter((r) => String(r.paymentStatus || "").toLowerCase() === "approved")
+      .forEach((r) => {
+        const prev = map.get(String(r.vehicleId));
+        if (!prev || new Date(r.date) > new Date(prev.date)) map.set(String(r.vehicleId), r);
+      });
+    rows = [...map.values()];
+  }
+
+  rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return rows.map((r) => ({ ...r, _mock: true }));
+}
+
+/** Minimal multipart/form-data parser — returns text fields and file metadata. */
+function readMultipart(req) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => {
+      const buf = Buffer.concat(chunks);
+      const contentType = String(req.headers["content-type"] || "");
+      const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/);
+      const boundary = boundaryMatch ? (boundaryMatch[1] || boundaryMatch[2]).trim() : "";
+      const fields = {};
+      const files = [];
+      if (boundary) {
+        const delim = `--${boundary}`;
+        const parts = buf.toString("latin1").split(delim);
+        for (const raw of parts) {
+          if (raw.includes("Content-Disposition")) {
+            const headerEnd = raw.indexOf("\r\n\r\n");
+            if (headerEnd === -1) continue;
+            const header = raw.slice(0, headerEnd);
+            const value = raw.slice(headerEnd + 4).replace(/\r\n$/, "").replace(/\r\n--$/, "");
+            const nameMatch = header.match(/name="([^"]+)"/);
+            const fileMatch = header.match(/filename="([^"]*)"/);
+            if (!nameMatch) continue;
+            const name = nameMatch[1];
+            if (fileMatch && fileMatch[1]) {
+              files.push({ name, filename: fileMatch[1], contentType: "", data: Buffer.from(value, "latin1") });
+            } else {
+              fields[name] = value;
+            }
+          }
+        }
+      }
+      resolve({ fields, files });
+    });
+  });
+}
+
+function createMaintenance(fields) {
+  const vehicleId = Number(fields.vehicleId) || 0;
+  const vehicle = VEHICLE_BY_ID.get(vehicleId) || {};
+  const today = new Date();
+  const stamp = iso(today).replaceAll("-", "");
+  const billNo = `MNT-${stamp}-${String(nextMaintenanceId).padStart(3, "0")}`;
+  let maintenanceType = [];
+  try { maintenanceType = JSON.parse(fields.maintenanceType || "[]"); } catch { /* ignore */ }
+  let parts = [];
+  try { parts = JSON.parse(fields.parts || "[]"); } catch { /* ignore */ }
+  let nextServiceByType = {};
+  try { nextServiceByType = JSON.parse(fields.nextServiceByType || "{}"); } catch { /* ignore */ }
+  const firstType = Array.isArray(maintenanceType) ? maintenanceType[0] : undefined;
+  const record = {
+    id: nextMaintenanceId++,
+    vehicleId,
+    vehicleNo: vehicle.vehicleNumber || "",
+    date: fields.date || iso(today),
+    billNo,
+    currentKM: Number(fields.currentKM) || 0,
+    maintenanceType: Array.isArray(maintenanceType) ? maintenanceType.join(", ") : String(maintenanceType || ""),
+    serviceType: fields.serviceType || "General",
+    garage: fields.garage || "",
+    mechanic: fields.mechanic || "",
+    driverId: Number(fields.driverId) || 0,
+    driverName: fields.driverName || "",
+    nextServiceKM: firstType && nextServiceByType[firstType] != null ? nextServiceByType[firstType] : (Number(fields.nextServiceKM) || 0),
+    nextServiceByType,
+    totalCost: parts.reduce((sum, p) => sum + (Number(p.amount) || 0), 0),
+    parts,
+    remarks: fields.remarks || "",
+    paymentStatus: "pending",
+    createdAt: new Date().toISOString(),
+    approvedAt: null,
+    approvedBy: null,
+    documents: [],
+  };
+  MAINTENANCE.push(record);
+  return record;
+}
+
 // ── Farm (Step 2) sample details + DC weighbridge photo ─────────────────────
 // The Accounts → Farm Payment trip-history modal opens on Step 2 (Farm), so
 // the sample trips carry full farm details and a DC photo (a deterministic
@@ -746,6 +1031,56 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── Fleet Maintenance (sample) ────────────────────────────────────────────
+  // GET /api/fleet/maintenance — list (filters: status, latestApproved,
+  // includeDeleted, vehicleId, driverId, fromDate, toDate, search).
+  if (url.pathname === "/api/fleet/maintenance" && req.method === "GET") {
+    return send(200, listMaintenance(url.searchParams));
+  }
+
+  // POST /api/fleet/maintenance — create (multipart form-data).
+  if (url.pathname === "/api/fleet/maintenance" && req.method === "POST") {
+    readMultipart(req).then(({ fields }) => send(200, { ...createMaintenance(fields), _mock: true }));
+    return;
+  }
+
+  // POST /api/fleet/maintenance/:id/approve
+  const approveMatch = url.pathname.match(/^\/api\/fleet\/maintenance\/(\d+)\/approve$/);
+  if (approveMatch && req.method === "POST") {
+    const record = MAINTENANCE.find((r) => r.id === Number(approveMatch[1]));
+    if (!record) return send(404, { error: "not_found", mock: true });
+    record.paymentStatus = "approved";
+    record.approvedAt = new Date().toISOString();
+    record.approvedBy = "system";
+    return send(200, { ...record, _mock: true });
+  }
+
+  // DELETE /api/fleet/maintenance/:id — soft delete.
+  const deleteMaintenanceMatch = url.pathname.match(/^\/api\/fleet\/maintenance\/(\d+)$/);
+  if (deleteMaintenanceMatch && req.method === "DELETE") {
+    const record = MAINTENANCE.find((r) => r.id === Number(deleteMaintenanceMatch[1]));
+    if (!record) return send(404, { error: "not_found", mock: true });
+    record.deletedAt = new Date().toISOString();
+    return send(200, { ...record, _mock: true });
+  }
+
+  // GET /api/fleet/vehicles/meter-summary — authoritative odometer per vehicle.
+  if (url.pathname === "/api/fleet/vehicles/meter-summary" && req.method === "GET") {
+    const summary = VEHICLES.map((v) => ({
+      vehicleId: v.id,
+      vehicleNo: v.vehicleNumber,
+      meter: Math.max(Number(VEHICLE_METERS[v.id] || 0), ...MAINTENANCE.filter((m) => m.vehicleId === v.id && !m.deletedAt).map((m) => Number(m.currentKM) || 0), 0),
+    }));
+    return send(200, summary);
+  }
+
+  // GET /api/fleet/vehicles/:id/meter-history — trip/fuel meter events (the
+  // maintenance timeline also pulls these; empty is fine for the sample).
+  const meterHistoryMatch = url.pathname.match(/^\/api\/fleet\/vehicles\/(\d+)\/meter-history$/);
+  if (meterHistoryMatch && req.method === "GET") {
+    return send(200, []);
+  }
+
   if (req.method !== "GET") {
     return send(404, { error: "not_found", mock: true });
   }
@@ -809,4 +1144,5 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`[mock-backend] ⚠️  SAMPLE DATA ONLY — listening on http://0.0.0.0:${PORT}`);
   console.log(`[mock-backend] ${ROWS.length} sample collection rows over the last 45 days`);
   console.log(`[mock-backend] ${VEHICLES.length} sample EMI vehicles — open /fleet?tab=emi in the frontend preview`);
+  console.log(`[mock-backend] ${MAINTENANCE.length} sample maintenance records — open /fleet?tab=maintenance in the frontend preview`);
 });

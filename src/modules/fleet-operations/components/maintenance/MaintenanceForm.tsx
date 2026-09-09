@@ -2,7 +2,7 @@ import React, { memo, useState } from 'react';
 import Select from 'react-select';
 import { useI18n } from '../../../../i18n';
 import { DatePicker } from '../../../../components/common/DatePicker';
-import { Car, User, Gauge, Wrench, Cog, Building2, UserCog, FileText, Hash, Paperclip, Upload, Trash2, File as FileIcon, AlertTriangle } from 'lucide-react';
+import { Car, User, Gauge, Wrench, Cog, Building2, UserCog, FileText, Paperclip, Upload, Trash2, File as FileIcon, AlertTriangle } from 'lucide-react';
 import PartsTable from './PartsTable';
 import type { PartItem } from '../../types';
 import { maintenanceApi } from '../../services/maintenanceApi';
@@ -32,6 +32,7 @@ interface MaintenanceFormProps {
     driverId: string;
     driverName: string;
     nextServiceKM: string;
+    nextServiceByType?: Record<string, string>;
     remarks: string;
     id?: string;
   };
@@ -134,29 +135,9 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
   return (
     <div className="space-y-5">
-      {/* Row 1: Maintenance Number, Vehicle, Date, Driver */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* 1. Maintenance Number (server-generated, globally unique) */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            {t('fleet.maintenance_form.maintenance_number')}
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Hash size={16} className="text-slate-400" />
-            </div>
-            <input
-              type="text"
-              value={form.billNumber}
-              readOnly
-              disabled
-              placeholder={t('fleet.maintenance_form.auto_generated')}
-              className={`${inputClass} bg-slate-50 text-slate-400 cursor-not-allowed`}
-            />
-          </div>
-        </div>
-
-        {/* 2. Vehicle */}
+      {/* Row 1: Vehicle, Date, Driver */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* 1. Vehicle */}
         <div>
           <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
             {t('common.vehicle')} <span className="text-red-500">*</span>
@@ -234,8 +215,8 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
         </div>
       </div>
 
-      {/* Row 2: Current KM, Next KM, Garage, Mechanic */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* Row 2: Current KM, Garage, Mechanic */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* 5. Current KM */}
         <div>
           <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
@@ -254,25 +235,6 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
             />
           </div>
           {kmError && <p className="mt-1 text-xs text-red-500">{kmError}</p>}
-        </div>
-
-        {/* 6. Next Service KM */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            {t('fleet.maintenance_form.next_service_km')}
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Gauge size={16} className="text-slate-400" />
-            </div>
-            <input
-              type="number"
-              value={form.nextServiceKM}
-              onChange={(e) => setFormField('nextServiceKM', e.target.value)}
-              placeholder={t('fleet.maintenance_form.number_placeholder', { value: '50000' })}
-              className={`${inputClass} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-            />
-          </div>
         </div>
 
         {/* 7. Garage */}
@@ -348,6 +310,55 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               }}
             />
           </div>
+
+          {/* Next Service KM — one target per selected maintenance type */}
+          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mt-3 mb-1.5">
+            {t('fleet.maintenance_form.next_service_km')}
+          </label>
+          {form.maintenanceType.length === 0 ? (
+            <div className="flex h-10 items-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 text-xs text-slate-400">
+              {t('fleet.maintenance_form.select_types_first')}
+            </div>
+          ) : form.maintenanceType.length === 1 ? (
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Gauge size={16} className="text-slate-400" />
+              </div>
+              <input
+                type="number"
+                value={form.nextServiceByType?.[form.maintenanceType[0]] ?? ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormField('nextServiceByType', { ...(form.nextServiceByType || {}), [form.maintenanceType[0]]: value });
+                  if (value !== '') setFormField('nextServiceKM', value);
+                }}
+                placeholder={t('fleet.maintenance_form.number_placeholder', { value: '50000' })}
+                className={`${inputClass} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+              />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {form.maintenanceType.map((type) => (
+                <div key={type} className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600">
+                    {type}
+                  </span>
+                  <div className="relative w-36 shrink-0">
+                    <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                      <Gauge size={14} className="text-slate-400" />
+                    </div>
+                    <input
+                      type="number"
+                      value={form.nextServiceByType?.[type] ?? ''}
+                      onChange={(e) => setFormField('nextServiceByType', { ...(form.nextServiceByType || {}), [type]: e.target.value })}
+                      placeholder="KM"
+                      className={`h-9 w-full pl-8 pr-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* 10. Service Type */}

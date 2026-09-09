@@ -179,6 +179,9 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
       driverId: record.driverId || '',
       driverName: record.driverName || '',
       nextServiceKM: String(record.nextServiceKM || ''),
+      nextServiceByType: Object.fromEntries(
+        Object.entries(record.nextServiceByType || {}).map(([type, km]) => [type, String(km)])
+      ),
       remarks: record.remarks || '',
       createdAt: record.createdAt || '',
     });

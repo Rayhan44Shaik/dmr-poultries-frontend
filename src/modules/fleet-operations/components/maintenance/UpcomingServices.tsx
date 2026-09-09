@@ -1,8 +1,9 @@
 import { memo } from 'react';
-import { AlertTriangle, CheckCircle2, Clock, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, ShieldCheck, Wrench } from 'lucide-react';
 
 interface UpcomingService {
   vehicle: any;
+  maintenanceType: string;
   lastMaint: any;
   nextKM: number;
   dueKM: number;
@@ -41,7 +42,7 @@ const UpcomingServices = ({ services }: UpcomingServicesProps) => {
         
         return (
           <div
-            key={item.vehicle.id}
+            key={`${item.vehicle.id}-${item.maintenanceType}`}
             className={`border rounded-2xl p-4 transition-all duration-300 hover:shadow-md ${
               item.isDue 
                 ? 'border-rose-100 bg-gradient-to-br from-rose-50/30 to-rose-50/70 hover:border-rose-200' 
@@ -68,6 +69,14 @@ const UpcomingServices = ({ services }: UpcomingServicesProps) => {
                     <ShieldCheck className="w-3 h-3" /> Safe
                   </span>
                 )}
+              </div>
+
+              {/* Maintenance type badge — each type has its own service schedule */}
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-bold uppercase tracking-wider rounded-md">
+                  <Wrench className="w-3 h-3" />
+                  {item.maintenanceType || 'General Service'}
+                </span>
               </div>
               
               {/* Odometer Tracking Comparison */}

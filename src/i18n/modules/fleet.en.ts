@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   // ----- Fleet dashboard (deferred module) -----
   'fleet.dashboard.active_vehicles': 'Active Vehicles',
   'fleet.dashboard.avg_fuel_efficiency': 'Avg Fuel Efficiency',
@@ -99,6 +99,7 @@
   'fleet.maintenance_form.select_date': 'Please select a date.',
   'fleet.maintenance_form.select_type': 'Please select at least one maintenance type.',
   'fleet.maintenance_form.select_types': 'Select types',
+  'fleet.maintenance_form.select_types_first': 'Select maintenance type(s) to set the next service KM',
   'fleet.maintenance_form.service_type': 'Service Type',
   'fleet.maintenance_form.service_type_example': 'e.g. Oil Change',
   'fleet.maintenance_form.unsupported_file': 'Only PNG, JPG/JPEG, and PDF files are supported.',
