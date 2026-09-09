@@ -76,7 +76,7 @@ const ordered = [
   "Basic Salary",
   "Gross Salary",
   "Total Deductions",
-  "NET SALARY (TAKE HOME)",
+  "NET SALARY",
   "Rs. 18,600.00",
   "Net salary in words",
   "D. Srinivas Chakrapani",

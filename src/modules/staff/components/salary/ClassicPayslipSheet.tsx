@@ -12,7 +12,7 @@
 //   │  Employee | ID | Department    (one compact side-by-side row)      │
 //   │  Working · Present · Leave · Weekly Off   (attendance, one row)    │
 //   │  EARNINGS  |  DEDUCTIONS  — classic 4-column table + bold totals   │
-//   │  NET SALARY (TAKE HOME)  — emphasised band                         │
+//   │  NET SALARY  — emphasised band                                     │
 //   │  Net salary in words: …                                            │
 //   └────────────────────────────────────────────────────────────────────┘
 //                                     ______________
@@ -332,7 +332,7 @@ export function ClassicPayslipSheet({
           style={{ borderColor: INK, borderTopWidth: 2, backgroundColor: "#f4f6f8" }}
         >
           <span className="font-extrabold tracking-[0.05em]" style={{ color: NAVY, fontSize: 13 }}>
-            NET SALARY (TAKE HOME)
+            NET SALARY
           </span>
           <span className="font-extrabold tabular-nums" style={{ color: NAVY, fontSize: 20, lineHeight: 1 }}>
             Rs. {fmtMoney(net)}

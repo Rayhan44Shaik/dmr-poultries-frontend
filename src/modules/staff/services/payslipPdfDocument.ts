@@ -14,7 +14,7 @@
 //   │ employee details        — name / id / department                   │
 //   │ attendance strip        — working · present · leave · weekly off   │
 //   │ earnings | deductions   — classic 4-column table + bold totals     │
-//   │ NET SALARY (TAKE HOME)  — bold boxed row, amount in words below    │
+//   │ NET SALARY            — bold boxed row, amount in words below      │
 //   └────────────────────────────────────────────────────────────────────┘
 //                                        ______________
 //                                        D. Srinivas Chakrapani
@@ -360,7 +360,7 @@ export function drawPayslipPdf(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(INK[0], INK[1], INK[2]);
-  doc.text("NET SALARY (TAKE HOME)", MARGIN + 4, y + 7.2);
+  doc.text("NET SALARY", MARGIN + 4, y + 7.2);
   doc.setFontSize(12.5);
   // "Rs." not "₹" — jsPDF's built-in helvetica has no rupee glyph.
   doc.text(`Rs. ${money(record.netSalary)}`, pageWidth - MARGIN - 4, y + 7.4, {
