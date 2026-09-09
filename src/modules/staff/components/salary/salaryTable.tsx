@@ -129,21 +129,24 @@ export function SalaryTable({
   return (
     <div className={uiTableWrapClass}>
       {/* Table title — "Salary Register" above the employee columns */}
-      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
-        <div className="flex min-w-0 items-baseline gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
+        <div className="min-w-0">
           <h3 className="text-sm font-bold tracking-tight text-slate-800">
             Salary Register
           </h3>
-          {monthLabel && (
-            <span className="truncate text-[11px] font-semibold text-slate-500 tabular-nums">
-              {monthLabel}
-            </span>
-          )}
-          {paidOnDate && (
-            <span className="shrink-0 text-[11px] font-semibold text-emerald-700 tabular-nums">
-              Paid on {formatDisplayDate(paidOnDate)}
-            </span>
-          )}
+          <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+            {monthLabel && (
+              <span className="text-sm font-semibold text-slate-700 tabular-nums">
+                {monthLabel}
+              </span>
+            )}
+            {paidOnDate && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 tabular-nums">
+                <CheckCircle2 size={12} />
+                Paid on {formatDisplayDate(paidOnDate)}
+              </span>
+            )}
+          </div>
         </div>
         <span className="shrink-0 text-[11px] font-medium text-slate-500 tabular-nums">
           {records.length} employee{records.length === 1 ? "" : "s"}
