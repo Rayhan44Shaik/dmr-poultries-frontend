@@ -460,18 +460,17 @@ function SalaryRegisterPage() {
     });
   }, []);
 
-  const handleDownloadSelected = useCallback(async () => {
-    const targets = visibleRecords.filter((r) => selectedIds.has(r.id));
-    if (targets.length === 0) return;
-    for (const r of targets) {
+  const handleDownloadSelected = useCallback(async (ids: string[]) => {
+    if (ids.length === 0) return;
+    for (const id of ids) {
       try {
-        await downloadPayslipPdf(r.id);
+        await downloadPayslipPdf(id);
       } catch {
         /* best-effort; backend may be offline */
       }
     }
-    showNotification(`Downloading ${targets.length} payslip PDF(s)...`, "info");
-  }, [visibleRecords, selectedIds, showNotification]);
+    showNotification(`Downloading ${ids.length} payslip PDF(s)...`, "info");
+  }, [showNotification]);
 
   const handleSaveRecord = useCallback(
     async (record: SalaryRecord) => {
@@ -703,37 +702,6 @@ function SalaryRegisterPage() {
       )}
 
       {/* Table / states — data remains visible during refresh */}
-      {selectedIds.size > 0 && (
-        <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-4 py-2">
-          <span className="text-xs font-semibold text-blue-800">
-            {selectedIds.size} selected
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleDownloadSelected}
-              className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition"
-            >
-              Download Selected
-            </button>
-            <button
-              type="button"
-              onClick={() => setEmailOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition"
-            >
-              Email Payslips
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedIds(new Set())}
-              className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-      )}
-
       {loading ? (
         <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 flex flex-col items-center justify-center space-y-2">
           <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
@@ -797,6 +765,11 @@ function SalaryRegisterPage() {
           downloadingId={downloadingId}
           onSaveRecord={(record) => handleSaveRecord(record)}
           submitDisabled={!emailsSent}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onToggleSelectAll={toggleSelectAll}
+          onDownloadSelected={(ids) => void handleDownloadSelected(ids)}
+          onEmailSelected={() => setEmailOpen(true)}
         />
       )}
 

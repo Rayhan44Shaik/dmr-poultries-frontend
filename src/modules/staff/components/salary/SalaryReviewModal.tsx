@@ -3,10 +3,11 @@
 // "Review & Submit" popup for the Salary Register.
 //
 // A simple, clean A4-portrait payslip (single column, light styling) with an
-// employee list on the left and the payslip on the right. The payslip is
-// read-only by default; the always-visible "Edit" button turns the amount
-// fields into inputs so a Pending record can be corrected and saved back to the
-// salary table.
+// employee list on the left (with multi-select checkboxes) and the payslip on
+// the right. The selection toolbar (Download Selected / Email Payslips / Clear)
+// lives inside this modal. The payslip is read-only by default; the always-
+// visible "Edit" button turns the amount fields into inputs so a Pending record
+// can be corrected and saved back to the salary table.
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import {
@@ -18,6 +19,7 @@ import {
   Loader2,
   Lock,
   ClipboardCheck,
+  Mail,
 } from "lucide-react";
 import type { SalaryRecord } from "../../types/staffDashboard";
 
@@ -35,6 +37,12 @@ export type SalaryReviewModalProps = {
   downloadingId?: string | null;
   /** Persist edits to a single salary record (Pending only). */
   onSaveRecord: (record: SalaryRecord) => Promise<void>;
+  // Selection (owned by the page's salary table).
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onToggleSelectAll: (ids: string[]) => void;
+  onDownloadSelected: (ids: string[]) => void;
+  onEmailSelected: () => void;
 };
 
 type FieldKey =
@@ -155,6 +163,11 @@ export function SalaryReviewModal({
   onDownload,
   downloadingId,
   onSaveRecord,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
+  onDownloadSelected,
+  onEmailSelected,
 }: SalaryReviewModalProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -185,6 +198,10 @@ export function SalaryReviewModal({
         String(r.employeeId ?? "").includes(q)
     );
   }, [records, query]);
+
+  const allIds = useMemo(() => records.map((r) => r.id), [records]);
+  const allSelected =
+    allIds.length > 0 && allIds.every((id) => selectedIds.has(id));
 
   const ensureDraft = useCallback(
     (record: SalaryRecord): FieldValues =>
@@ -279,10 +296,55 @@ export function SalaryReviewModal({
           </button>
         </div>
 
+        {/* Selection toolbar (inside the modal) */}
+        <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border-b border-slate-200">
+          <span className="text-xs font-semibold text-slate-600">
+            {selectedIds.size} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onDownloadSelected([...selectedIds])}
+              disabled={selectedIds.size === 0}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold transition disabled:opacity-50"
+            >
+              <Download size={13} /> Download Selected
+            </button>
+            <button
+              type="button"
+              onClick={onEmailSelected}
+              disabled={selectedIds.size === 0}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition disabled:opacity-50"
+            >
+              <Mail size={13} /> Email Payslips
+            </button>
+            <button
+              type="button"
+              onClick={() => onToggleSelectAll([])}
+              disabled={selectedIds.size === 0}
+              className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold transition disabled:opacity-50"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
         {/* Body */}
         <div className="flex flex-1 min-h-0">
-          {/* LEFT: employee list */}
+          {/* LEFT: employee list with multi-select */}
           <div className="w-64 shrink-0 border-r border-slate-200 bg-white flex flex-col">
+            <div className="p-3 border-b border-slate-100 flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={() => onToggleSelectAll(allIds)}
+                className="h-4 w-4 accent-blue-600 shrink-0"
+                aria-label="Select all"
+              />
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Employees
+              </span>
+            </div>
             <div className="p-3 border-b border-slate-100">
               <div className="flex items-center gap-1.5 h-9 px-2.5 rounded-lg bg-slate-50 border border-slate-200">
                 <Search size={13} className="text-slate-400 shrink-0" />
@@ -311,16 +373,24 @@ export function SalaryReviewModal({
                   vals.loanEMI -
                   vals.latePenalty -
                   vals.otherDeductions;
+                const checked = selectedIds.has(r.id);
                 return (
-                  <button
+                  <div
                     key={r.id}
-                    type="button"
                     onClick={() => setSelectedId(r.id)}
-                    className={`w-full text-left px-3 py-2.5 border-b border-slate-100 flex items-center justify-between gap-3 transition ${
+                    className={`w-full text-left px-3 py-2.5 border-b border-slate-100 flex items-center gap-3 transition cursor-pointer ${
                       active ? "bg-blue-50/70" : "hover:bg-slate-50"
                     }`}
                   >
-                    <div className="min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => onToggleSelect(r.id)}
+                      className="h-4 w-4 accent-blue-600 shrink-0"
+                      aria-label={`Select ${r.employeeName}`}
+                    />
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm font-semibold text-slate-800 truncate">
                           {r.employeeName}
@@ -336,7 +406,7 @@ export function SalaryReviewModal({
                     <div className="text-xs font-bold text-slate-800 tabular-nums shrink-0">
                       {formatCurrency(net)}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
               {filtered.length === 0 && (
@@ -381,8 +451,7 @@ export function SalaryReviewModal({
         {/* Footer */}
         <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-slate-200">
           <p className="text-[11px] text-slate-500 max-w-md truncate">
-            Select an employee to review their payslip. Use Edit to adjust a
-            Pending record, then submit the month.
+            Select employees, review their payslips, email, then submit the month.
           </p>
           <button
             type="button"
