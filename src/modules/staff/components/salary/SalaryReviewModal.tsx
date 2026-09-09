@@ -162,10 +162,12 @@ export function SalaryReviewModal({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
 
-  const selected = useMemo(
-    () => records.find((r) => r.id === selectedId) ?? records[0] ?? null,
-    [records, selectedId]
-  );
+  const selected = useMemo(() => {
+    const byId = records.find((r) => r.id === selectedId);
+    if (byId) return byId;
+    // Default to the first Pending employee so the Edit option is visible.
+    return records.find((r) => r.status === "Pending") ?? records[0] ?? null;
+  }, [records, selectedId]);
 
   // Leave edit mode when switching employees.
   useEffect(() => {
@@ -620,34 +622,35 @@ function PayslipDocument({
           )}
           {downloading ? "Preparing..." : "Download Payslip"}
         </button>
-        {canEdit &&
-          (editing ? (
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={!dirty || savingId === record.id}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition disabled:opacity-50"
-            >
-              {savingId === record.id ? (
-                <Loader2 size={13} className="animate-spin" />
-              ) : (
-                <Save size={13} />
-              )}
-              {savingId === record.id
-                ? "Saving..."
-                : dirty
-                ? "Save Changes"
-                : "Saved"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onToggleEdit}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition"
-            >
-              <Pencil size={13} /> Edit
-            </button>
-          ))}
+        {editing ? (
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={!dirty || savingId === record.id}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition disabled:opacity-50"
+          >
+            {savingId === record.id ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Save size={13} />
+            )}
+            {savingId === record.id
+              ? "Saving..."
+              : dirty
+              ? "Save Changes"
+              : "Saved"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onToggleEdit}
+            disabled={!canEdit}
+            title={canEdit ? "Edit this payslip" : "Locked — only Pending records can be edited"}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Pencil size={13} /> {canEdit ? "Edit" : "Locked"}
+          </button>
+        )}
       </div>
     </div>
   );
