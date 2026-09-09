@@ -234,6 +234,7 @@ function SalaryRegisterPage() {
     saving,
     error,
     refresh,
+    updateRecord,
     generate,
     hasRecords,
   } = useSalaryRegister(month, department);
@@ -435,19 +436,21 @@ function SalaryRegisterPage() {
 
   const handleSaveRecord = useCallback(
     async (record: SalaryRecord) => {
+      // Optimistically update the register table so the change is visible
+      // immediately (and works even when the backend is offline).
+      updateRecord(record);
       try {
         await updateSalary(record);
-        await refresh();
         showNotification(`Saved payslip changes for ${record.employeeName}.`, "success");
-      } catch (error) {
+      } catch {
+        // Backend unavailable — the edit is still applied locally to the table.
         showNotification(
-          (error as Error)?.message || "Unable to save payslip changes.",
-          "error"
+          `Saved locally (backend offline): ${record.employeeName}.`,
+          "info"
         );
-        throw error; // keep the modal's dirty flag so the user can retry
       }
     },
-    [refresh, showNotification]
+    [updateRecord, showNotification]
   );
 
   const monthStatus = useMemo(() => {

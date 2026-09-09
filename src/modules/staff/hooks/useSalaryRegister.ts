@@ -162,6 +162,14 @@ export function useSalaryRegister(month: string, department: string = "") {
     [runMutation, month, department]
   );
 
+  /** Optimistically update a single record in the local register so edits made
+   *  in the review modal are reflected in the salary table immediately. */
+  const updateRecord = useCallback((updated: SalaryRecord) => {
+    setRecords((prev) =>
+      prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r))
+    );
+  }, []);
+
   return {
     records: filteredRecords,
     allRecords: records,
@@ -174,6 +182,7 @@ export function useSalaryRegister(month: string, department: string = "") {
     error,
     usingSampleData,
     refresh,
+    updateRecord,
     markPaidBulk,
     markUnpaidBulk,
     generate,

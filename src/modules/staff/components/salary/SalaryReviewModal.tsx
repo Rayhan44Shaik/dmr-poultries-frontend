@@ -2,10 +2,11 @@
 //
 // "Review & Submit" popup for the Salary Register.
 //
-// A simple, neat A4-portrait payslip (plain DMR POULTRIES title, no proprietor
-// block / hen logo / status badges) with an employee list on the left and the
-// payslip on the right. The payslip is read-only by default; an "Edit" button
-// turns the amount fields into inputs so a Pending record can be corrected.
+// A simple, clean A4-portrait payslip (plain DMR POULTRIES header, no
+// proprietor block / hen logo / status badges) with an employee list on the
+// left and the payslip on the right. The payslip is read-only by default; an
+// "Edit" button turns the amount fields into inputs so a Pending record can be
+// corrected and saved back to the salary table.
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import {
@@ -249,7 +250,7 @@ export function SalaryReviewModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-slate-900/60 p-0 sm:p-4">
-      <div className="bg-slate-100 w-full sm:max-w-5xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden sm:max-h-[94vh]">
+      <div className="bg-white w-full sm:max-w-5xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden sm:max-h-[94vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200">
           <div className="flex items-center gap-2.5">
@@ -343,7 +344,7 @@ export function SalaryReviewModal({
             </div>
           </div>
 
-          {/* RIGHT: payslip */}
+          {/* RIGHT: payslip (scrollable) */}
           {selected && currentValues && currentTotals ? (
             <div className="flex-1 min-w-0 overflow-y-auto bg-slate-100 p-5">
               <div className="flex justify-center">
@@ -406,29 +407,8 @@ export function SalaryReviewModal({
 }
 
 // ---------------------------------------------------------------------------
-// Simple, neat A4-portrait payslip document.
+// Simple, clean A4-portrait payslip document.
 // ---------------------------------------------------------------------------
-
-function Detail({
-  label,
-  value,
-  alignRight = false,
-}: {
-  label: string;
-  value: string;
-  alignRight?: boolean;
-}) {
-  return (
-    <div className={alignRight ? "text-right" : ""}>
-      <div className="text-[10px] uppercase tracking-wider text-slate-400">
-        {label}
-      </div>
-      <div className="text-sm font-semibold text-slate-800 truncate">
-        {value}
-      </div>
-    </div>
-  );
-}
 
 function Stat({
   label,
@@ -463,9 +443,9 @@ function LineRow({
   formatCurrency: (amount: number) => string;
 }) {
   return (
-    <div className="px-3 py-1.5 flex items-center justify-between gap-3">
+    <div className="px-4 py-2 flex items-center justify-between gap-3">
       <span className="text-xs text-slate-600">{label}</span>
-      <div className="w-32 text-right">
+      <div className="w-36 text-right">
         <AmountCell
           value={value}
           editing={editing}
@@ -514,29 +494,45 @@ function PayslipDocument({
   })();
 
   return (
-    <div className="w-full max-w-[520px] bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden">
+    <div className="w-full max-w-[540px] bg-white border border-slate-300 shadow-sm">
       {/* Header */}
       <div
-        className="px-5 py-4 flex items-center justify-between text-white"
+        className="px-6 py-4 flex items-center justify-between text-white"
         style={{ background: NAVY }}
       >
-        <div className="text-xl font-extrabold tracking-wide">DMR POULTRIES</div>
+        <div className="text-2xl font-extrabold tracking-wide leading-none">
+          DMR POULTRIES
+        </div>
         <div className="text-right">
-          <div className="text-[10px] uppercase tracking-wider text-blue-200">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-blue-200">
             Salary Payslip
           </div>
-          <div className="text-sm font-semibold">{monthLabel}</div>
+          <div className="text-sm font-semibold mt-0.5">{monthLabel}</div>
         </div>
       </div>
 
       {/* Employee details */}
-      <div className="px-5 py-4 grid grid-cols-2 gap-y-3 gap-x-4 border-b border-slate-200">
-        <Detail label="Employee Name" value={record.employeeName} />
-        <Detail label="Department" value={record.department} alignRight />
+      <div className="grid grid-cols-2 border-b border-slate-200">
+        <div className="px-6 py-3 border-r border-slate-200">
+          <div className="text-[10px] uppercase tracking-wider text-slate-400">
+            Employee
+          </div>
+          <div className="text-sm font-semibold text-slate-800 truncate">
+            {record.employeeName}
+          </div>
+        </div>
+        <div className="px-6 py-3 text-right">
+          <div className="text-[10px] uppercase tracking-wider text-slate-400">
+            Department
+          </div>
+          <div className="text-sm font-semibold text-slate-800 truncate">
+            {record.department}
+          </div>
+        </div>
       </div>
 
       {/* Attendance summary */}
-      <div className="grid grid-cols-4 divide-x divide-slate-200 border-b border-slate-200 bg-slate-50/60">
+      <div className="grid grid-cols-4 divide-x divide-slate-200 border-b border-slate-200 bg-slate-50">
         <Stat label="Working" value={record.workingDays} />
         <Stat label="Present" value={record.presentDays} />
         <Stat label="Leave" value={record.leaveDays} />
@@ -544,17 +540,12 @@ function PayslipDocument({
       </div>
 
       {/* Earnings | Deductions */}
-      <section className="border-b border-slate-200">
-        <div className="grid grid-cols-2">
-          <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50/60 border-r border-slate-200">
+      <section className="grid grid-cols-2 divide-x divide-slate-200">
+        <div className="flex flex-col">
+          <div className="px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 border-b border-slate-200">
             Earnings
           </div>
-          <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50/60">
-            Deductions
-          </div>
-        </div>
-        <div className="grid grid-cols-2 divide-x divide-slate-200">
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 flex-1">
             {EARNING_FIELDS.map((f) => (
               <LineRow
                 key={f.key}
@@ -566,7 +557,19 @@ function PayslipDocument({
               />
             ))}
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="px-4 py-2 flex items-center justify-between border-t border-slate-200 bg-slate-50">
+            <span className="text-xs font-bold text-slate-700">Gross</span>
+            <span className="text-sm font-bold text-slate-900 tabular-nums">
+              {formatCurrency(totals.gross)}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col">
+          <div className="px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50 border-b border-slate-200">
+            Deductions
+          </div>
+          <div className="divide-y divide-slate-100 flex-1">
             {DEDUCTION_FIELDS.map((f) => (
               <LineRow
                 key={f.key}
@@ -578,17 +581,7 @@ function PayslipDocument({
               />
             ))}
           </div>
-        </div>
-        <div className="grid grid-cols-2 divide-x divide-slate-200 border-t border-slate-200 bg-slate-50">
-          <div className="px-3 py-2 flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-700">
-              Gross Salary
-            </span>
-            <span className="text-sm font-bold text-slate-900 tabular-nums">
-              {formatCurrency(totals.gross)}
-            </span>
-          </div>
-          <div className="px-3 py-2 flex items-center justify-between">
+          <div className="px-4 py-2 flex items-center justify-between border-t border-slate-200 bg-slate-50">
             <span className="text-xs font-bold text-slate-700">
               Total Deductions
             </span>
@@ -600,22 +593,20 @@ function PayslipDocument({
       </section>
 
       {/* Net payable */}
-      <div className="px-5 py-4">
-        <div
-          className="rounded-lg px-4 py-3 flex items-center justify-between text-white"
-          style={{ background: NAVY }}
-        >
-          <span className="text-[11px] uppercase tracking-wider text-blue-100">
-            Net Salary Payable
-          </span>
-          <span className="text-2xl font-extrabold tabular-nums">
-            {formatCurrency(totals.net)}
-          </span>
-        </div>
+      <div
+        className="px-6 py-4 flex items-center justify-between text-white"
+        style={{ background: NAVY }}
+      >
+        <span className="text-[11px] uppercase tracking-wider text-blue-200">
+          Net Salary Payable
+        </span>
+        <span className="text-2xl font-extrabold tabular-nums">
+          {formatCurrency(totals.net)}
+        </span>
       </div>
 
       {/* Actions */}
-      <div className="px-5 pb-5 flex items-center justify-between">
+      <div className="px-6 py-4 flex items-center justify-between border-t border-slate-200">
         <button
           type="button"
           onClick={onDownload}
