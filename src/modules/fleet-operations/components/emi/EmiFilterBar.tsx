@@ -1,4 +1,6 @@
 import { memo, useId, useMemo } from 'react';
+import { cn } from "../../../../utils/cn";
+import { uiSearchInputClass } from "../../../../shared/ui/uiTokens";
 import Select, {
   components,
   type DropdownIndicatorProps,
@@ -144,7 +146,7 @@ function EmiFilterBar({
                 value={search}
                 onChange={(event) => onSearchChange(event.target.value)}
                 placeholder={t('fleet.emi.search_placeholder')}
-                className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                className={cn(uiSearchInputClass, "pl-9 pr-8")}
               />
               {search && (
                 <button
@@ -181,7 +183,7 @@ function EmiFilterBar({
             />
           </div>
 
-          <dl aria-label={t('fleet.emi.vehicle_totals')} className="flex h-9 shrink-0 items-center divide-x divide-slate-200 border-l border-slate-200">
+          <dl aria-label={t('fleet.emi.vehicle_totals')} className="flex h-10 shrink-0 items-center divide-x divide-slate-200 border-l border-slate-200">
             {totals.map((total) => (
               <div key={total.key} className="flex items-center gap-1.5 whitespace-nowrap px-2">
                 <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{total.label}</dt>
@@ -192,7 +194,8 @@ function EmiFilterBar({
             ))}
           </dl>
 
-          <div className="ml-auto flex h-9 shrink-0 items-center gap-2">
+          {/* 40px so this row shares one control height with the search field. */}
+        <div className="ml-auto flex h-10 shrink-0 items-center gap-2">
             <button
               type="button"
               onClick={onReset}

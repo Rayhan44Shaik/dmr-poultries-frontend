@@ -6,6 +6,7 @@
 // table page, and summaries live in compact bars inside each workflow.
 
 import React, { useEffect, useId, useRef, useState } from "react";
+import { uiSearchInputWithClearClass } from '../../../../shared/ui/uiTokens';
 import {
   AlertTriangle,
   Check,
@@ -264,7 +265,7 @@ export function OrdersSearchInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={ariaLabel ?? placeholder}
-        className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-7 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400"
+        className={uiSearchInputWithClearClass}
       />
       {value && (
         <button

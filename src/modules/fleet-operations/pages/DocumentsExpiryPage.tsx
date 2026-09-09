@@ -1,4 +1,5 @@
 import { memo, useState, useCallback, useMemo } from 'react';
+import { uiSearchInputWithClearClass } from '../../../shared/ui/uiTokens';
 import { addDays, format } from 'date-fns';
 import { useI18n } from '../../../i18n';
 import { useDocumentsData } from '../hooks/useDocumentsData';
@@ -478,7 +479,7 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
                     setCurrentPage(1);
                   }}
                   placeholder={t('fleet.documents.search_placeholder')}
-                  className="w-full sm:w-72 pl-9 pr-8 py-2 text-sm border border-slate-200/80 rounded-xl bg-slate-50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm text-slate-700 placeholder:text-slate-400"
+                  className={`${uiSearchInputWithClearClass} sm:w-72`}
                 />
                 {searchTerm && (
                   <button

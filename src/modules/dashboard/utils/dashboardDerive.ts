@@ -3,6 +3,7 @@
 // No side effects — easy to reuse from any client (web / mobile).
 
 import type { LucideIcon } from "lucide-react";
+import { toBusinessDate } from '../../../utils/businessDate';
 import {
   Bird,
   CreditCard,
@@ -94,7 +95,7 @@ export interface DerivedDashboard {
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return toBusinessDate(new Date());
 }
 
 function isoDaysAgo(days: number): string {

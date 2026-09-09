@@ -11,6 +11,7 @@ import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 import { getNextIncompleteTripStep, isTripWizardComplete, TRIP_STEP_LABELS, isValidTripStatusTransition, getValidNextStatuses, type TripStatus } from "../../../../shared/trip";
 import { useI18n } from "../../../../i18n";
+import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
 import { uniqueTripsById } from "../services/tripHeaderApiService";
 
 interface Props {
@@ -159,7 +160,12 @@ function TripRecentTable({
   };
 
   const confirmDelete = () => {
-    if (!tripToDelete || deleteReason.trim() === "") return alert(t("ops.trip.delete_reason_required"));
+    if (!tripToDelete || deleteReason.trim() === "") {
+      // Was `return alert(...)`. The early-return guard is preserved exactly;
+      // only the blocking native dialog became a shared toast.
+      globalNotify.warning(t("ops.trip.delete_reason_required"));
+      return;
+    }
     const id = Number(tripToDelete.id);
     if (!Number.isFinite(id) || id <= 0) return;
     const reason = deleteReason.trim();

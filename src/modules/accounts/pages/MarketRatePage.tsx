@@ -1,11 +1,12 @@
 // src/modules/accounts/pages/MarketRatePage.tsx
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Save, Tag, ChevronLeft, ChevronRight, CheckCircle2, X, RefreshCw, AlertCircle, Table2, Sigma, Layers, CalendarRange, RotateCcw } from "lucide-react";
+import { Save, Tag, ChevronLeft, ChevronRight, CheckCircle2, RefreshCw, AlertCircle, Table2, Sigma, Layers, CalendarRange, RotateCcw } from "lucide-react";
 import { DatePicker } from "../../../components/common/DatePicker";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { handleApiError } from "../../../api";
 import { useI18n } from "../../../i18n";
+import { shiftMonths, toBusinessDate } from "../../../utils/businessDate";
 import {
   listMarketRates,
   saveMarketRates,
@@ -60,22 +61,11 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
   const [activeTab, setActiveTab] = useState<'This Week' | 'Month' | 'Quarter' | 'Custom Range'>('This Week');
   const [autoSaveStatus, setAutoSaveStatus] = useState<'Saved' | 'Saving...' | 'Error'>('Saved');
 
-  // Local, non-modal corner toast for in-page feedback (Refresh / Clear).
-  // Self-contained: no global NotificationProvider, no overlay, auto-dismiss.
-  const [toast, setToast] = useState<{ visible: boolean; message: string; tone: 'success' | 'info' }>({
-    visible: false,
-    message: '',
-    tone: 'success',
-  });
-  const showCornerToast = useCallback(
-    (message: string, tone: 'success' | 'info' = 'success', durationMs = 5000) => {
-      setToast({ visible: true, message, tone });
-      window.setTimeout(() => {
-        setToast((prev) => (prev.message === message ? { ...prev, visible: false } : prev));
-      }, durationMs);
-    },
-    []
-  );
+  // Feedback for Refresh / Clear goes through the ONE global notification
+  // system (rendered by <NotificationHost /> in App.tsx). This page previously
+  // kept a second, page-local corner toast alongside `showNotification`, so the
+  // same screen had two different notification styles. The local state and its
+  // JSX have been removed; messages and timing are unchanged.
 
   // Helper to get current Monday to Sunday dates (local, date-safe)
   const getCurrentWeekRange = (dateObj: Date = new Date()) => {
@@ -94,21 +84,29 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
   const [toDate, setToDate] = useState(weekRange.to);
 
   // Function to navigate weeks or months back or forward using the table headers
+  //
+  // Month/quarter stepping uses `shiftMonths` (calendar-aware) instead of
+  // `Date.prototype.setMonth`. `setMonth` silently rolls over when the anchor
+  // day does not exist in the target month — e.g. Monday 31 March + 1 month
+  // became 1 May, so "Next Month" skipped April entirely and requested a range
+  // the user never asked for. `shiftMonths` anchors on the 1st and clamps to
+  // the real month length, so every emitted YYYY-MM-DD is a valid calendar
+  // date. The API contract (local YYYY-MM-DD strings) is unchanged.
   const handleShiftTime = (direction: 'prev' | 'next') => {
     if (activeTab === 'Month') {
-      const currentFrom = parseLocalDate(fromDate);
-      currentFrom.setMonth(currentFrom.getMonth() + (direction === 'next' ? 1 : -1));
-      const firstDay = formatLocalDate(new Date(currentFrom.getFullYear(), currentFrom.getMonth(), 1));
-      const lastDay = formatLocalDate(new Date(currentFrom.getFullYear(), currentFrom.getMonth() + 1, 0));
+      const shifted = shiftMonths(fromDate, direction === 'next' ? 1 : -1);
+      const firstDay = toBusinessDate(new Date(shifted.getFullYear(), shifted.getMonth(), 1));
+      // Day 0 of the next month === the last day of this month (never a
+      // hard-coded 30/31, so February and 30-day months stay correct).
+      const lastDay = toBusinessDate(new Date(shifted.getFullYear(), shifted.getMonth() + 1, 0));
       setFromDate(firstDay);
       setToDate(lastDay);
     } else if (activeTab === 'Quarter') {
-      const currentFrom = parseLocalDate(fromDate);
-      currentFrom.setMonth(currentFrom.getMonth() + (direction === 'next' ? 3 : -3));
-      const firstDay = formatLocalDate(new Date(currentFrom.getFullYear(), currentFrom.getMonth(), 1));
+      const shifted = shiftMonths(fromDate, direction === 'next' ? 3 : -3);
+      const firstDay = toBusinessDate(new Date(shifted.getFullYear(), shifted.getMonth(), 1));
       // last day of the (start month + 2) month
-      const lastMonth = new Date(currentFrom.getFullYear(), currentFrom.getMonth() + 3, 0);
-      const lastDay = formatLocalDate(lastMonth);
+      const lastMonth = new Date(shifted.getFullYear(), shifted.getMonth() + 3, 0);
+      const lastDay = toBusinessDate(lastMonth);
       setFromDate(firstDay);
       setToDate(lastDay);
     } else {
@@ -302,7 +300,7 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
     setFromDate(range.from);
     setToDate(range.to);
     setActiveTab('This Week');
-    showCornerToast('Cleared. Showing this week.', 'info');
+    showNotification('Cleared. Showing this week.', 'info');
   };
 
   // Reusable compact navigation header component for tables
@@ -463,7 +461,7 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
                     .then((rows) => {
                       // Re-apply the freshly loaded rows to the page state so
                       // the user sees the latest persisted values, then show
-                      // a non-modal top-right corner toast for 5 seconds.
+                      // one non-blocking global notification.
                       const summary: Record<string, Record<string, string>> = {};
                       const tableOne: Record<string, Record<string, string>> = {};
                       const tableTwo: Record<string, Record<string, string>> = {};
@@ -480,14 +478,13 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
                       setTableOneData(tableOne);
                       setTableTwoData(tableTwo);
                       setAutoSaveStatus("Saved");
-                      showCornerToast('Market rates refreshed.', 'success', 5000);
+                      showNotification('Market rates refreshed.', 'success');
                     })
                     .catch((err) => {
                       setAutoSaveStatus("Error");
-                      showCornerToast(
+                      showNotification(
                         `Unable to refresh: ${handleApiError(err)}`,
-                        'info',
-                        5000
+                        'error'
                       );
                     });
                 }
@@ -685,43 +682,6 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
         </div>
       )}
 
-      {/* Top-right corner toast — local, non-modal, auto-dismiss after 5s.
-         Used by the Refresh and Clear actions so feedback shows in the
-         viewport corner instead of the global modal dialog. */}
-      {toast.visible && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed top-4 right-4 z-[60] pointer-events-none"
-        >
-          <div
-            className={`pointer-events-auto flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-xl shadow-lg border text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-200 ${
-              toast.tone === 'success'
-                ? 'bg-white border-emerald-200 text-emerald-700'
-                : 'bg-white border-slate-200 text-slate-700'
-            }`}
-          >
-            <span
-              className={`flex items-center justify-center w-6 h-6 rounded-full ${
-                toast.tone === 'success' ? 'bg-emerald-100' : 'bg-slate-100'
-              }`}
-            >
-              <CheckCircle2
-                size={14}
-                className={toast.tone === 'success' ? 'text-emerald-600' : 'text-slate-500'}
-              />
-            </span>
-            <span>{toast.message}</span>
-            <button
-              onClick={() => setToast((prev) => ({ ...prev, visible: false }))}
-              className="ml-1 text-slate-400 hover:text-slate-600 transition-colors"
-              aria-label="Dismiss"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -1,13 +1,7 @@
 import { useId, type ReactNode } from "react";
-import {
-  FileSpreadsheet,
-  FileText,
-  Plus,
-  Search,
-  Upload,
-  X,
-} from "lucide-react";
+import { FileSpreadsheet, FileText, Plus } from "lucide-react";
 import { useI18n } from "../../../i18n";
+import { Button, ImportButton, SearchInput } from "../../../ui";
 import MasterDropdown from "./MasterDropdown";
 
 interface MasterListToolbarProps {
@@ -24,7 +18,20 @@ interface MasterListToolbarProps {
   children?: ReactNode;
 }
 
-/** Shared responsive toolbar for Shops, Farms, Vehicles, Employees, Banks and Bird Types. */
+/**
+ * Shared responsive toolbar for Shops, Farms, Vehicles, Employees, Banks and
+ * Bird Types.
+ *
+ * Standardised on the global UI kit (search, semantic action buttons, button
+ * system) so a master list toolbar is pixel-identical to every other toolbar in
+ * the application — same 40px control row, same 8px radius, same emerald focus
+ * ring, and the canonical Upload icon + emerald treatment for Import.
+ *
+ * Behaviour is unchanged: search still filters on every keystroke (`onChange`),
+ * PDF/Excel still route through the Export dropdown, and Import stays optional.
+ * SearchInput adds Enter-to-run, Escape/click-to-clear and an identical-value
+ * guard on top of that.
+ */
 export default function MasterListToolbar({
   search,
   onSearchChange,
@@ -53,35 +60,18 @@ export default function MasterListToolbar({
           >
             {t("common.search")}
           </label>
-          <div className="relative">
-            <Search
-              size={14}
-              aria-hidden="true"
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-            <input
-              id={id}
-              type="search"
-              autoComplete="off"
-              aria-label={searchPlaceholder.replace(/\.+$/, "")}
-              placeholder={searchPlaceholder}
-              value={search}
-              onChange={(event) => onSearchChange(event.target.value)}
-              disabled={loading}
-              className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 [&::-webkit-search-cancel-button]:appearance-none"
-            />
-            {search && (
-              <button
-                type="button"
-                disabled={loading}
-                aria-label={t("masters.ui.clear_search")}
-                onClick={() => onSearchChange("")}
-                className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-600 disabled:opacity-50"
-              >
-                <X size={13} aria-hidden="true" />
-              </button>
-            )}
-          </div>
+          <SearchInput
+            id={id}
+            value={search}
+            // Instant filtering preserved: onChange only, no debounce.
+            onChange={onSearchChange}
+            placeholder={searchPlaceholder}
+            // No aria-label: the visible <label htmlFor={id}> above IS the
+            // accessible name (WCAG 2.5.3 "label in name"). The previous
+            // aria-label silently overrode it, so screen readers announced the
+            // placeholder instead of "Search".
+            disabled={loading}
+          />
         </div>
         {children}
       </div>
@@ -112,25 +102,22 @@ export default function MasterListToolbar({
           disabled={loading || saving}
         />
         {onImport && (
-          <button
-            type="button"
+          <ImportButton
             onClick={onImport}
+            loading={saving}
             disabled={loading || saving}
-            className="flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Upload size={14} aria-hidden="true" />
             {t("masters.ui.import")}
-          </button>
+          </ImportButton>
         )}
-        <button
-          type="button"
+        <Button
           onClick={onAdd}
+          loading={saving}
           disabled={loading || saving}
-          className="flex h-9 items-center gap-1.5 rounded-xl border border-transparent bg-emerald-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+          icon={<Plus size={16} aria-hidden="true" />}
         >
-          <Plus size={15} aria-hidden="true" />
           {addLabel}
-        </button>
+        </Button>
       </div>
     </div>
   );

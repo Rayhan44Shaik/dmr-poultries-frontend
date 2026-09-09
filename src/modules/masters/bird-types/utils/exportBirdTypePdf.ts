@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import { toBusinessDate } from '../../../../utils/businessDate';
 import autoTable from "jspdf-autotable";
 
 import henImage from "../../../../assets/dmr-hen.jpg";
@@ -103,9 +104,7 @@ function getSafeFilename(
 ): string {
   const cleaned =
     filename.trim() ||
-    `BirdTypes_${new Date()
-      .toISOString()
-      .slice(0, 10)}`;
+    `BirdTypes_${toBusinessDate(new Date())}`;
 
   return cleaned
     .toLowerCase()

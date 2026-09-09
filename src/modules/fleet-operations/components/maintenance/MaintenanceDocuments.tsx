@@ -5,6 +5,7 @@ import type { MaintenanceDocument } from '../../types';
 import { maintenanceApi } from '../../services/maintenanceApi';
 import { handleApiError } from '../../../../api/errors';
 import { useSafeNotification } from '../../../../hooks/useSafeNotification';
+import { confirmDialog } from '../../../../ui/confirm/confirmStore';
 import DocumentViewerModal from './DocumentViewerModal';
 
 interface MaintenanceDocumentsProps {
@@ -30,7 +31,18 @@ const MaintenanceDocuments = ({ maintenanceId, documents, allowRemove = true, on
   useEffect(() => setVisibleDocs(Array.isArray(documents) ? documents : []), [documents]);
 
   const remove = async (doc: MaintenanceDocument) => {
-    if (!window.confirm(t('fleet.maintenance_docs.confirm_remove', { file: doc.fileName }))) return;
+    // Global confirmation dialog instead of the blocking native
+    // `window.confirm`. The handler was already async, so the guard keeps its
+    // exact linear shape and nothing below it changes.
+    const confirmed = await confirmDialog({
+      title: t('common.remove'),
+      message: t('fleet.maintenance_docs.confirm_remove', { file: doc.fileName }),
+      record: doc.fileName,
+      confirmLabel: t('common.remove'),
+      cancelLabel: t('common.cancel'),
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     setRemovingId(doc.id);
     try {
       await maintenanceApi.removeDocument(maintenanceId, doc.id);

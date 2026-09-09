@@ -48,7 +48,7 @@ export const Table: React.FC<Props> = ({
             value={searchTerm} 
             onChange={(e) => setSearchTerm(e.target.value)} 
             placeholder={searchPlaceholder} 
-            className="w-full pl-9 pr-4 py-2 h-[42px] rounded-xl border border-slate-200 bg-white text-sm outline-none focus:border-[#6c5ce7] focus:ring-4 focus:ring-[#6c5ce7]/10 transition-all" 
+            className="w-full pl-9 pr-4 py-2 h-[42px] rounded-xl border border-slate-200 bg-white text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all" 
           />
         </div>
         {onExport && <Button variant="outline" onClick={onExport} className="text-xs">Export Excel</Button>}

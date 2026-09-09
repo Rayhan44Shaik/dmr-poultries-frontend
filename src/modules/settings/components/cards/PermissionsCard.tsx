@@ -29,7 +29,7 @@ export const PermissionsCard: React.FC = () => {
                 <td className="py-3 px-3 font-medium text-slate-700">{mod}</td>
                 {["View", "Add", "Edit", "Delete"].map(perm => (
                   <td key={`${mod}-${perm}`} className="py-3 px-3 text-center">
-                    <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-[#6c5ce7] focus:ring-[#6c5ce7] cursor-pointer" defaultChecked={perm !== "Add"} />
+                    <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer" defaultChecked={perm !== "Add"} />
                   </td>
                 ))}
               </tr>

@@ -14,7 +14,7 @@ export const AboutCard: React.FC = () => (
       <div className="flex justify-between border-b border-slate-100 pb-1"><span className="text-slate-500">Database Version</span><span className="font-medium">PostgreSQL 15.3</span></div>
       <div className="flex justify-between border-b border-slate-100 pb-1"><span className="text-slate-500">Last Update</span><span className="font-medium">28-May-2026</span></div>
       <div className="flex justify-between border-b border-slate-100 pb-1"><span className="text-slate-500">Developer</span><span className="font-medium">DMR Solutions</span></div>
-      <div className="flex justify-between border-b border-slate-100 pb-1"><span className="text-slate-500">Support Email</span><span className="font-medium text-[#6c5ce7]">support@dmrpoultries.com</span></div>
+      <div className="flex justify-between border-b border-slate-100 pb-1"><span className="text-slate-500">Support Email</span><span className="font-medium text-emerald-600">support@dmrpoultries.com</span></div>
     </div>
   </Card>
 );

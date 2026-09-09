@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   CalendarDays,
@@ -10,6 +10,9 @@ import {
   Truck,
   Wrench,
 } from 'lucide-react';
+import { RefreshButton } from '../../../ui';
+import { notify } from '../../../ui/notifications/notificationStore';
+import { uiSearchInputClass } from '../../../shared/ui/uiTokens';
 import { DatePicker } from '../../../components/common/DatePicker';
 import { apiGet } from '../../../api';
 import { useI18n, translateStatus } from '../../../i18n';
@@ -70,22 +73,6 @@ const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProp
     setPending({ vehicle: 'all', driver: 'all', maintenanceType: 'all', serviceType: 'all', status: 'all', fromDate: '', toDate: '', search: '' });
     data.resetFilters();
   };
-
-  // Bottom-right corner toast for the Refresh action. Self-contained, auto-dismiss.
-  const [toast, setToast] = useState<{ visible: boolean; message: string; tone: 'success' | 'info' }>({
-    visible: false,
-    message: '',
-    tone: 'success',
-  });
-  const showCornerToast = useCallback(
-    (message: string, tone: 'success' | 'info' = 'success', durationMs = 5000) => {
-      setToast({ visible: true, message, tone });
-      window.setTimeout(() => {
-        setToast((prev) => (prev.message === message ? { ...prev, visible: false } : prev));
-      }, durationMs);
-    },
-    []
-  );
 
   // Trip/Fuel meter events for the timeline. When a single vehicle is selected we
   // hit the per-vehicle endpoint; when "All Vehicles" is selected we fan out to every
@@ -191,10 +178,10 @@ const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProp
             <select value={pending.status} onChange={(e) => setPendingField('status', e.target.value)} className={`${selectClass} min-w-[140px]`}><option value="all">{t('fleet.maintenance_history.all_statuses')}</option><option value="Approved">{translateStatus(t, 'Approved')}</option><option value="Pending">{translateStatus(t, 'Pending')}</option><option value="Deleted">{translateStatus(t, 'Deleted')}</option></select>
             <div className="w-40"><DatePicker value={pending.fromDate} onChange={(v) => setPendingField('fromDate', v)} placeholder={t('reports.date_from')} /></div>
             <div className="w-40"><DatePicker value={pending.toDate} onChange={(v) => setPendingField('toDate', v)} placeholder={t('reports.date_to')} /></div>
-            <div className="relative min-w-[220px] flex-1"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={pending.search} onChange={(e) => setPendingField('search', e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') applyFilters(); }} placeholder={t('fleet.maintenance_history.search_placeholder')} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-semibold outline-none focus:border-blue-500 focus:bg-white" /></div>
+            <div className="relative min-w-[220px] flex-1"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={pending.search} onChange={(e) => setPendingField('search', e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') applyFilters(); }} placeholder={t('fleet.maintenance_history.search_placeholder')} className={uiSearchInputClass} /></div>
             <button onClick={applyFilters} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50"><Search size={14} /> {t('common.search')}</button>
             <button onClick={clearFilters} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50"><FilterX size={14} /> {t('common.clear')}</button>
-            <button onClick={() => { data.refresh(); showCornerToast('Trip Data Refreshed.', 'success', 5000); }} className="h-10 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">{t('common.refresh')}</button>
+            <RefreshButton onClick={() => { data.refresh(); notify.success('Trip Data Refreshed.'); }}>{t('common.refresh')}</RefreshButton>
           </div>
           <p className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-400"><CalendarDays size={12} /> {t('fleet.maintenance_history.filter_hint')}</p>
         </div>
@@ -207,33 +194,6 @@ const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProp
         </div>
       </div>
 
-      {toast.visible && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-4 right-4 z-[60] pointer-events-none"
-        >
-          <div
-            className={`pointer-events-auto flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-xl shadow-lg border text-sm font-medium ${
-              toast.tone === 'success'
-                ? 'bg-white border-emerald-200 text-emerald-700'
-                : 'bg-white border-slate-200 text-slate-700'
-            }`}
-          >
-            <span
-              className={`flex items-center justify-center w-6 h-6 rounded-full ${
-                toast.tone === 'success' ? 'bg-emerald-100' : 'bg-slate-100'
-              }`}
-            >
-              <CheckCircle2
-                size={14}
-                className={toast.tone === 'success' ? 'text-emerald-600' : 'text-slate-500'}
-              />
-            </span>
-            <span>{toast.message}</span>
-          </div>
-        </div>
-      )}
     </ErrorBoundary>
   );
 };

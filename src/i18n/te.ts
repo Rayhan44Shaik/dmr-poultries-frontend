@@ -222,6 +222,11 @@ export default {
   'common.desc': 'అవరో',
   'common.page': 'పేజీ',
   'common.of': 'లో',
+  'common.showing': 'చూపుతోంది',
+  'common.no_records': 'రికార్డులు లేవు',
+  'common.rows_per_page': 'ప్రతి పేజీకి వరుసలు',
+  'common.previous_page': 'మునుపటి పేజీ',
+  'common.next_page': 'తదుపరి పేజీ',
   'common.per_page': 'ప్రతి పేజీకి',
   'common.rows': 'వరుసలు',
   'common.items': 'అంశాలు',
@@ -322,6 +327,7 @@ export default {
   'validation.date_range': 'తేదీ {min} మరియు {max} మధ్య ఉండాలి',
 
   // Notifications
+  'notification.region': 'నోటిఫికేషన్‌లు',
   'notification.saved_success': 'విజయవంతంగా సేవ్ చేయబడింది.',
   'notification.updated_success': 'విజయవంతంగా నవీకరించబడింది.',
   'notification.deleted_success': 'విజయవంతంగా తొలగించబడింది.',

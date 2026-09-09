@@ -1,4 +1,5 @@
 import { memo, useState } from 'react';
+import { toBusinessDate } from '../../../../utils/businessDate';
 import type { LucideIcon } from 'lucide-react';
 import {
   X,
@@ -160,7 +161,7 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
 
   const handleSave = async () => {
     const newErrors: Record<string, string> = {};
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = toBusinessDate(new Date());
 
     const updates: Record<string, { expiryDate?: string; documentNumber?: string; validFrom?: string; remarks?: string }> = {};
     const files: Record<string, File> = {};

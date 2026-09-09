@@ -1,7 +1,6 @@
-import { memo, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { CheckCircle2, X } from 'lucide-react';
+import { memo, useEffect, useRef } from 'react';
 import { useI18n } from '../../../../i18n';
+import { push } from '../../../../ui/notifications/notificationStore';
 
 interface Props {
   show: boolean;
@@ -10,38 +9,51 @@ interface Props {
   onDismiss: () => void;
 }
 
+/**
+ * "Refreshed" feedback for the EMI tab.
+ *
+ * Previously a bespoke portalled toast (`fixed top-4 right-4 z-[90]`, its own
+ * emerald shell, CheckCircle2 glyph and 5-second timer) — a near-verbatim copy
+ * of `DocumentRefreshToast`, and a third toast renderer alongside the global
+ * NotificationHost. It is now an adapter over the ONE global store, so the EMI
+ * and Documents tabs and the rest of the ERP all announce refreshes identically.
+ *
+ * Props are unchanged; no consumer needed editing.
+ *
+ * The `eventId` bump is still what re-triggers the notification, and the store
+ * refreshes the timer of an already-visible identical message instead of
+ * stacking a second one — so repeated refreshes behave exactly as before,
+ * without duplicate toasts.
+ *
+ * `onDismiss` is ref'd and kept out of the deps for the same reason as in the
+ * staff `RefreshToast`: consumers pass an inline callback, and depending on it
+ * would restart the timer on every parent render.
+ */
 function EmiRefreshToast({ show, active, eventId, onDismiss }: Props) {
   const { t } = useI18n();
+  const dismissRef = useRef(onDismiss);
+  // Assigned in an effect, never during render: writing a ref while
+  // rendering is unsafe under concurrent rendering (and is flagged by
+  // the react-hooks compiler rules). This keeps the latest callback
+  // without putting it in the deps below.
+  useEffect(() => {
+    dismissRef.current = onDismiss;
+  }, [onDismiss]);
+
   useEffect(() => {
     if (!show) return;
-    if (!active) { onDismiss(); return; }
-    const timer = window.setTimeout(onDismiss, 5_000);
+    // Preserve the original guard: only the active tab announces a refresh.
+    if (!active) {
+      dismissRef.current();
+      return;
+    }
+    push(t('fleet.emi.refreshed_success'), 'success', { duration: 5_000 });
+    const timer = window.setTimeout(() => dismissRef.current(), 5_000);
     return () => window.clearTimeout(timer);
-  }, [show, active, eventId, onDismiss]);
+    // `eventId` is the re-trigger; `t` is stable for the current locale.
+  }, [show, active, eventId, t]);
 
-  if (!show || !active || typeof document === 'undefined') return null;
-  return createPortal(
-    <div
-      key={eventId}
-      role="status"
-      aria-label={t('fleet.emi.refresh_notification')}
-      aria-live="polite"
-      aria-atomic="true"
-      className="pointer-events-none fixed top-4 right-4 z-[90] flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-800 shadow-lg"
-    >
-      <CheckCircle2 size={21} aria-hidden="true" className="shrink-0 text-emerald-600" />
-      <span>{t('fleet.emi.refreshed_success')}</span>
-      <button
-        type="button"
-        onClick={onDismiss}
-        aria-label={t('common.close')}
-        className="pointer-events-auto -mr-1 ml-1 shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
-      >
-        <X size={16} aria-hidden="true" />
-      </button>
-    </div>,
-    document.body,
-  );
+  return null;
 }
 
 export default memo(EmiRefreshToast);

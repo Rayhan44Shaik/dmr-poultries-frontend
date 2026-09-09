@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { uiSearchInputWithClearClass } from '../../../shared/ui/uiTokens';
 import { format, subDays } from "date-fns";
 import {
   ArrowDownLeft,
@@ -1417,7 +1418,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               }}
               placeholder="Search all details — date, particulars, birds, weight, rate, debit, credit, payment mode…"
               aria-label="Search all Shop Ledger details"
-              className="h-9 w-full rounded-lg border border-slate-300 bg-white pl-8 pr-7 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-400"
+              className={uiSearchInputWithClearClass}
             />
             {searchValue && (
               <button

@@ -1,17 +1,33 @@
-import { useState, useCallback } from 'react';
+/**
+ * Fleet-operations toast hook — adapter over the global notification store.
+ *
+ * This previously kept the message in local component state that no consumer
+ * rendered, so actions like "Exporting … as PDF" produced no visible feedback.
+ * It now feeds the single system rendered by `<NotificationHost />`.
+ *
+ * COMPATIBILITY
+ *   `showToast(message, type)` is unchanged.
+ *   `toast` is retained in the return shape for existing destructuring, but it
+ *   is always `null`: rendering is owned globally, so a consumer that still
+ *   reads `toast` cannot accidentally draw a SECOND notification for the same
+ *   action.
+ */
 
-interface Toast {
+import { useCallback } from "react";
+import { push, type NotificationTone } from "../../../ui/notifications/notificationStore";
+
+export interface FleetToastState {
   message: string;
-  type: 'success' | 'error' | 'info';
+  type: NotificationTone;
 }
 
-export function useToast() {
-  const [toast, setToast] = useState<Toast | null>(null);
-
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+export function useToast(): {
+  toast: FleetToastState | null;
+  showToast: (message: string, type?: NotificationTone) => void;
+} {
+  const showToast = useCallback((message: string, type: NotificationTone = "success") => {
+    push(message, type);
   }, []);
 
-  return { toast, showToast };
+  return { toast: null, showToast };
 }

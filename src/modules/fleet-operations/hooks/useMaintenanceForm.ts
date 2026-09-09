@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { toBusinessDate } from '../../../utils/businessDate';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import {
   maintenanceApi,
@@ -56,7 +57,7 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
   const [form, setForm] = useState({
     id: '',
     vehicleId: '',
-    date: new Date().toISOString().split('T')[0],
+    date: toBusinessDate(new Date()),
     billNumber: '',
     currentKM: '',
     maintenanceType: [] as string[],
@@ -160,7 +161,7 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
     setForm(prev => ({
       id: '',
       vehicleId: prev.vehicleId,
-      date: new Date().toISOString().split('T')[0],
+      date: toBusinessDate(new Date()),
       billNumber: '',
       currentKM: '',
       maintenanceType: [],
@@ -240,7 +241,7 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
     setForm({
       id: '',
       vehicleId: '',
-      date: new Date().toISOString().split('T')[0],
+      date: toBusinessDate(new Date()),
       billNumber: '',
       currentKM: '',
       maintenanceType: [],

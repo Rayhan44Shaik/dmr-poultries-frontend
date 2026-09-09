@@ -3,6 +3,7 @@ import { X, Save, Eye, Calendar, User, CreditCard, Hash, IndianRupee, FileText, 
 import type { Collection, CollectionApiEntry } from "../../types/collection";
 import { collectionService } from "../../services/collectionService";
 import { useI18n } from "../../../../../i18n";
+import { notify as globalNotify } from "../../../../../ui/notifications/notificationStore";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -117,7 +118,9 @@ export function EditCollectionModal({
 
   const handleSave = async () => {
     if (!selected) {
-      alert(t("ops.collection.no_collection_to_edit"));
+      // Was a blocking window.alert: it froze the modal, could not be
+      // dismissed with Escape, and bypassed the shared toast vocabulary.
+      globalNotify.warning(t("ops.collection.no_collection_to_edit"));
       return;
     }
     const updated: Collection = {
@@ -134,7 +137,7 @@ export function EditCollectionModal({
       onRefresh();
       onClose();
     } else {
-      alert(t("ops.collection.failed_update_locked"));
+      globalNotify.error(t("ops.collection.failed_update_locked"));
     }
   };
 

@@ -3,6 +3,7 @@
 // row click → detail drawer, loading skeleton and business empty states.
 
 import { memo, useMemo, useState } from "react";
+import { uiSearchInputClass } from '../../../../shared/ui/uiTokens';
 import { ArrowDown, ArrowUp, ChevronsUpDown, Search } from "lucide-react";
 import type { VehicleReportRow, VehicleReportSortKey } from "../types/vehicleReportTypes";
 import {
@@ -218,7 +219,7 @@ function VehicleReportTable({ rows, loading = false, selectedVehicleNumber, onSe
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter table by vehicle…"
-            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-[13px] text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            className={`${uiSearchInputClass} dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200`}
           />
         </div>
       </div>

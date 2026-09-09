@@ -8,6 +8,7 @@ import { listTrips, changeTripStatus, deleteTripFromApi } from "../services/trip
 import { clearStep5Draft } from "../../../../shared/trip/step5DraftStore";
 import { sendTripDeliveryEmails } from "../services/deliveryEmailService";
 import { translate } from "../../../../i18n";
+import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
 
 type NotificationFn = (message: string, type?: "success" | "error" | "info") => void;
 
@@ -19,7 +20,17 @@ export default function useTrips(
   notifyRef.current = showNotification;
   const notify = useCallback(
     (message: string, type?: "success" | "error" | "info") =>
-      notifyRef.current ? notifyRef.current(message, type) : alert(message),
+      // A caller-supplied notifier still wins. The fallback used to be a
+      // blocking window.alert; it now uses the global notification store,
+      // which is always mounted (NotificationHost in App), so this hook still
+      // surfaces a real, dismissible toast when used outside a provider.
+      notifyRef.current
+        ? notifyRef.current(message, type)
+        : type === "error"
+          ? globalNotify.error(message)
+          : type === "success"
+            ? globalNotify.success(message)
+            : globalNotify.info(message),
     []
   );
 

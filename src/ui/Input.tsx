@@ -1,29 +1,95 @@
-import React from "react";
+/**
+ * =============================================================================
+ * GLOBAL TEXT INPUT
+ * =============================================================================
+ * One chrome for every text-like control: 40px height, control radius, one
+ * border colour, one focus ring, one placeholder treatment, one error state.
+ *
+ * Wrapping in <Field /> gives the label association, `aria-invalid` and
+ * `aria-describedby` wiring for free — so a page that uses <Input label=… />
+ * is accessible without doing anything extra.
+ *
+ * The error state swaps border/ring COLOUR only. Nothing changes size, so
+ * showing a validation message never moves the control or the fields below it.
+ * =============================================================================
+ */
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+import type { InputHTMLAttributes, ReactNode } from "react";
+import { forwardRef } from "react";
+import { cn } from "../utils/cn";
+import { Field } from "./Field";
+import {
+  uiFocusRing,
+  uiInputClass,
+  uiInputErrorClass,
+  uiInputReadOnlyClass,
+} from "../shared/ui/uiTokens";
+
+export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
   label?: string;
   helper?: string;
   error?: string;
   required?: boolean;
+  /** Trailing inline element on the label row (unit, counter, hint). */
+  labelAction?: ReactNode;
+  /** Compact 36px height for dense forms and dialog footers. */
+  compact?: boolean;
 }
 
-export const Input: React.FC<InputProps> = ({ label, helper, error, required, className = "", ...props }) => {
-  return (
-    <div className="w-full">
-      {label && (
-        <label className="mb-1 block text-xs font-semibold text-slate-600">
-          {label}
-          {required && <span className="ml-0.5 text-rose-500">*</span>}
-        </label>
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
+  { label, helper, error, required, labelAction, compact, className, readOnly, type = "text", ...props },
+  ref,
+) {
+  const control = (ids: { id: string; describedBy?: string; invalid: boolean }) => (
+    <input
+      ref={ref}
+      id={ids.id || undefined}
+      type={type}
+      readOnly={readOnly}
+      required={required}
+      aria-invalid={ids.invalid || undefined}
+      aria-describedby={ids.describedBy}
+      aria-required={required || undefined}
+      className={cn(
+        uiInputClass,
+        compact && "h-9",
+        ids.invalid && uiInputErrorClass,
+        readOnly && uiInputReadOnlyClass,
+        // Numbers and codes line up when they share a column.
+        (type === "number" || type === "tel") && "tabular-nums",
+        type === "number" && "no-spinner",
+        className,
       )}
-      <input
-        className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:ring-2 focus:ring-brand-500/20 ${
-          error ? "border-rose-400 focus:border-rose-500 focus:ring-rose-500/15" : "border-slate-300 focus:border-brand-500"
-        } ${className}`}
-        {...props}
-      />
-      {helper && !error && <p className="mt-1 text-xs text-slate-400">{helper}</p>}
-      {error && <p className="mt-1 text-xs text-rose-600">{error}</p>}
-    </div>
+      {...props}
+    />
   );
-};
+
+  // Without a label there is nothing for <Field /> to add; render the bare
+  // control so callers can supply their own `aria-label`.
+  if (!label && !helper && !error) {
+    return control({
+      id: (props.id as string) ?? "",
+      describedBy: undefined,
+      invalid: false,
+    });
+  }
+
+  return (
+    <Field
+      label={label}
+      htmlFor={props.id}
+      required={required}
+      helper={helper}
+      error={error}
+      labelAction={labelAction}
+    >
+      {control}
+    </Field>
+  );
+});
+
+// NOTE: `uiFocusRing` is intentionally NOT re-exported from this component
+// file — a module that exports both components and constants breaks React Fast
+// Refresh. Import it from `shared/ui/uiTokens` (the single source of truth).
+
+export default Input;
