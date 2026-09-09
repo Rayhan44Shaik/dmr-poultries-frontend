@@ -107,6 +107,15 @@ export function SalaryTable({
 
   return (
     <div className={uiTableWrapClass}>
+      {/* Table title — "Salary Register" above the employee columns */}
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
+        <h3 className="text-sm font-bold tracking-tight text-slate-800">
+          Salary Register
+        </h3>
+        <span className="text-[11px] font-medium text-slate-500 tabular-nums">
+          {records.length} employee{records.length === 1 ? "" : "s"}
+        </span>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-max min-w-full border-separate border-spacing-0">
           <thead className="bg-slate-50">
