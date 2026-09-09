@@ -108,18 +108,52 @@ try {
     await server.ssrLoadModule("/src/modules/staff/services/staffSampleData.ts");
   const { default: DutyPlannerGrid } = await server.ssrLoadModule("/src/modules/staff/components/duty-planner/DutyPlannerGrid.tsx");
   const { getShiftConfigsForRole } = await server.ssrLoadModule("/src/modules/staff/services/staffService.ts");
+  // The grid uses useI18n(), so it must be rendered inside the same provider
+  // the real app always mounts above it (App.tsx) — rendering it bare would
+  // throw "useI18n must be used within I18nProvider", which is a harness
+  // artifact rather than an app bug.
+  const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.tsx");
 
-  const week = buildSampleDutyWeek("2026-09-07");
+  // Use a fully-elapsed week (Monday two weeks back) rather than a hardcoded
+  // date: the grid intentionally renders future cells blank, so a pinned week
+  // that drifts into the future would hide the sample duty labels asserted
+  // below.
+  const mondayTwoWeeksBack = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 14);
+    const dow = (d.getDay() + 6) % 7; // Monday-start
+    d.setDate(d.getDate() - dow);
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  })();
+  const week = buildSampleDutyWeek(mondayTwoWeeksBack);
   const weekDays = week.days.map((d) => d.date);
-  const getAssignment = (employeeId, date) => week.assignments.find((a) => a.employeeId === employeeId && a.date === date);
+  // The grid consumes DutyReportCell objects via getDutyCell — adapt the
+  // sample DutyAssignment rows onto that shape (same mapping the real page
+  // performs) instead of passing raw assignments.
+  const getDutyCell = (employeeId, date) => {
+    const a = week.assignments.find((x) => x.employeeId === employeeId && x.date === date);
+    if (!a) return undefined;
+    return {
+      date,
+      dutyType: a.dutyType ?? null,
+      assignedDutyType: a.dutyType ?? null,
+      isLeave: false,
+      vehicleNo: a.vehicleNo ?? "",
+    };
+  };
   const html = renderToString(
-    React.createElement(DutyPlannerGrid, {
-      employees: week.employees,
-      weekDays,
-      getAssignment,
-      onCellClick: () => {},
-      loading: false,
-    })
+    React.createElement(
+      I18nProvider,
+      null,
+      React.createElement(DutyPlannerGrid, {
+        employees: week.employees,
+        weekDays,
+        getDutyCell,
+        onCellClick: () => {},
+        loading: false,
+      })
+    )
   );
   const namesShown = week.employees.filter((e) => html.includes(e.employeeName)).length;
   const ok = namesShown === week.employees.length;
@@ -194,18 +228,45 @@ try {
   console.log(`     month duties: ${month.days.length} days × ${Object.keys(month.byEmployee).length} employees  (Karthik: ${karthikWork}d duty, ${karthikLeave}d leave; Ravi: ${raviOff}d off)`);
   if (!monthOk || raviOff < 1) failed.push({ name: "month-duties", err: new Error(`month duties matrix wrong (raviOff=${raviOff})`) });
 
-  // PDF report: generate a real PDF from the month data.
-  const { buildMonthDutiesPdf, todayStr } = await server.ssrLoadModule(
-    "/src/modules/staff/services/dutyReportPdf.ts"
+  // Excel report: build a real workbook from the month data. (The duty report
+  // is exported as .xlsx via dutyReportExcel — there is no PDF path here.)
+  const { buildDutyWorkbook, getDutyExcelFilename } = await server.ssrLoadModule(
+    "/src/modules/staff/services/dutyReportExcel.ts"
   );
-  const pdfDoc = buildMonthDutiesPdf({ data: month, employees: SAMPLE_EMPLOYEE_LIST });
-  const pdfBytes = Buffer.from(pdfDoc.output("arraybuffer"));
+  const { todayStr } = await server.ssrLoadModule("/src/modules/staff/services/dutyReport.ts");
+  // buildSampleMonthDuties returns the compact month shape; the workbook
+  // builder consumes DutyReportData (a date range + full report cells), so
+  // widen it the same way the Staff page does before exporting.
+  const reportData = {
+    fromDate: month.days[0].date,
+    toDate: month.days[month.days.length - 1].date,
+    days: month.days,
+    employees: SAMPLE_EMPLOYEE_LIST,
+    byEmployee: Object.fromEntries(
+      Object.entries(month.byEmployee).map(([id, cells]) => [
+        id,
+        cells.map((c) => ({
+          date: c.date,
+          dutyType: c.dutyType,
+          assignedDutyType: c.dutyType,
+          isLeave: c.isLeave,
+          vehicleNo: "",
+        })),
+      ])
+    ),
+    usingSampleData: true,
+  };
+  const workbook = buildDutyWorkbook({ data: reportData, employees: SAMPLE_EMPLOYEE_LIST });
+  const xlsxBytes = Buffer.from(await workbook.xlsx.writeBuffer());
   const today = todayStr();
   const futureDays = month.days.filter((d) => d.date > today).length;
-  const pdfOk =
-    Boolean(pdfBytes && pdfBytes.length > 8000 && pdfBytes.subarray(0, 5).toString("latin1") === "%PDF-");
-  console.log(`     pdf report: ${pdfOk ? "valid PDF" : "FAILED"} ${pdfBytes?.length ?? 0} bytes  (${futureDays} future day(s) shown blank, not counted)`);
-  if (!pdfOk) failed.push({ name: "pdf-report", err: new Error("pdf generation failed") });
+  // .xlsx is a ZIP container — verify the magic bytes and a plausible size.
+  const xlsxOk = Boolean(
+    xlsxBytes && xlsxBytes.length > 5000 && xlsxBytes.subarray(0, 2).toString("latin1") === "PK"
+  );
+  const filename = getDutyExcelFilename(reportData, reportData.usingSampleData);
+  console.log(`     excel report: ${xlsxOk ? "valid XLSX" : "FAILED"} ${xlsxBytes?.length ?? 0} bytes  ${filename}  (${futureDays} future day(s) shown blank, not counted)`);
+  if (!xlsxOk) failed.push({ name: "excel-report", err: new Error("excel generation failed") });
 
   // Grid shows friendly labels ("Duty"/"Leave") and NOT the raw types
   // ("Delivery"/"Rest"); custom "Other" types render as typed.

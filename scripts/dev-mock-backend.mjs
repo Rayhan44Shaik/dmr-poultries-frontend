@@ -87,6 +87,55 @@ function buildRows() {
 }
 const ROWS = buildRows();
 
+// ── Sample collection-entry register rows ────────────────────────────────────
+// Shape mirrors the backend `CollectionApiEntry` contract consumed by
+// collectionService.mapRawEntry (GET /operations/collection-entry).
+const COLLECTION_ENTRIES = ROWS.map((r, idx) => ({
+  id: 5000 + idx,
+  collectionNo: r.collectionNo,
+  collectionDate: r.date,
+  shopId: r.shopId,
+  shopName: r.shopName,
+  tripId: null,
+  amountDue: r.amount,
+  amount: r.amount,
+  amountCollected: r.amount,
+  collector: r.collector,
+  paymentMode: r.paymentMode,
+  referenceNo: r.paymentMode === "Cash" ? "" : `REF-${String(90000 + idx)}`,
+  remarks: "",
+  status: "Approved",
+  deleted: false,
+  deletedBy: null,
+  deletedAt: null,
+  isFinancial: true,
+  openingBalance: null,
+  closingBalance: null,
+  approvedBy: "rubullaadmin",
+  approvedAt: `${r.date}T18:00:00`,
+  createdBy: r.collector,
+  createdAt: `${r.date}T17:30:00`,
+  updatedAt: `${r.date}T18:00:00`,
+  canDelete: true,
+  _mock: true,
+}));
+
+
+/** Applies fromDate/toDate/search filters and the optional page/limit
+ *  pagination contract (plain array when no page/limit is supplied). */
+function paginate(rows, query) {
+  const page = Number(query.get("page"));
+  const limit = Number(query.get("limit"));
+  if (!Number.isFinite(page) || !Number.isFinite(limit) || page <= 0 || limit <= 0) {
+    return rows;
+  }
+  const start = (page - 1) * limit;
+  return {
+    data: rows.slice(start, start + limit),
+    meta: { total: rows.length, page, limit, totalPages: Math.max(1, Math.ceil(rows.length / limit)) },
+  };
+}
+
 // ── Report aggregation (mirrors the backend contract consumed by the UI) ─────
 function buildReport(query) {
   const today = new Date();
@@ -164,6 +213,74 @@ function buildReport(query) {
 const VEHICLES = buildSampleEmiVehicles();
 
 const VEHICLE_BY_ID = new Map(VEHICLES.map((v) => [v.id, v]));
+
+// ── Sample shop sales (Rate Entry locked) ────────────────────────────────────
+// Shape mirrors the backend `ApiShopSale` contract consumed by
+// shopSaleMapping.mapApiSaleToShopSale (GET /operations/shop-sales).
+// Sale amounts run slightly ahead of collections so the derived pending
+// balances stay positive and realistic in the preview.
+const BIRD_TYPES = [
+  { id: 1, name: "Broiler" },
+  { id: 2, name: "Country" },
+];
+
+function buildShopSales() {
+  const today = new Date();
+  const sales = [];
+  let seq = 0;
+  for (let back = 44; back >= 0; back--) {
+    const date = iso(addDays(today, -back));
+    const daySeed = Number(date.replaceAll("-", ""));
+    SHOPS.forEach((shop, shopIdx) => {
+      const rnd = seeded(daySeed * 17 + shopIdx * 11 + 3);
+      if (rnd() < 0.25) return; // some shops have no sale that day
+      const birdType = BIRD_TYPES[Math.floor(rnd() * BIRD_TYPES.length)];
+      const birds = 120 + Math.floor(rnd() * 380);
+      const weight = Number((birds * (1.4 + rnd() * 0.4)).toFixed(2));
+      const rate = Math.round((105 + rnd() * 40) * 100) / 100;
+      seq += 1;
+      sales.push({
+        id: 7000 + seq,
+        saleNo: `TR-${date.replaceAll("-", "")}-${String(shop.id).padStart(3, "0")}-S${String(seq).padStart(3, "0")}`,
+        saleDate: date,
+        shopId: shop.id,
+        shopName: shop.shopName,
+        birdTypeId: birdType.id,
+        birdType: birdType.name,
+        tripId: 9100 + (shopIdx % 3),
+        tripNo: `TRP-${date.replaceAll("-", "")}-0${(shopIdx % 3) + 1}`,
+        shopNo: shop.shopNumber,
+        vehicleNo: VEHICLE_BY_ID.get((shopIdx % 3) + 1)?.vehicleNumber ?? null,
+        farmName: "Annapurna Broiler Farm",
+        birds,
+        weight,
+        rate,
+        amount: Math.round(weight * rate * 100) / 100,
+        mortality: Math.floor(rnd() * 4),
+        remarks: "",
+        status: "Completed",
+        deleted: false,
+        deletedReason: null,
+        tripDeleted: false,
+        editable: back <= 10,
+        lockReason: back <= 10 ? null : "Correction window closed",
+        windowExpiresAt: iso(addDays(today, -back + 10)),
+        approvedBy: "rubullaadmin",
+        approvedAt: `${date}T19:00:00`,
+        createdAt: `${date}T12:00:00`,
+        updatedAt: `${date}T19:00:00`,
+        rateCompleted: true,
+        rateLockedAt: `${date}T19:00:00`,
+        rateLockedBy: "rubullaadmin",
+        correctionWindowExpired: back > 10,
+        correctionWindowClosesAt: iso(addDays(today, -back + 10)),
+        _mock: true,
+      });
+    });
+  }
+  return sales;
+}
+const SHOP_SALES = buildShopSales();
 
 /** One Orders plan row (`[ORDER]` marker, boxNo = boxes). */
 function planRow(serialNo, shopId, boxes, birds, over = {}) {
@@ -439,6 +556,38 @@ const server = http.createServer((req, res) => {
     case "/api/trips":
       return send(200, TRIPS);
 
+    case "/api/operations/collection-entry": {
+      const includeDeleted = url.searchParams.get("includeDeleted") === "true";
+      const fromDate = url.searchParams.get("fromDate");
+      const toDate = url.searchParams.get("toDate");
+      const shopId = url.searchParams.get("shopId") ? Number(url.searchParams.get("shopId")) : undefined;
+      const rows = COLLECTION_ENTRIES.filter(
+        (r) =>
+          (includeDeleted || !r.deleted) &&
+          (!fromDate || r.collectionDate >= fromDate) &&
+          (!toDate || r.collectionDate <= toDate) &&
+          (shopId === undefined || r.shopId === shopId)
+      ).sort(
+        (a, b) => b.collectionDate.localeCompare(a.collectionDate) || b.id - a.id
+      );
+      return send(200, paginate(rows, url.searchParams));
+    }
+    case "/api/operations/shop-sales": {
+      const fromDate = url.searchParams.get("fromDate");
+      const toDate = url.searchParams.get("toDate");
+      const search = (url.searchParams.get("search") || "").trim().toLowerCase();
+      const rows = SHOP_SALES.filter(
+        (s) =>
+          !s.deleted &&
+          (!fromDate || s.saleDate >= fromDate) &&
+          (!toDate || s.saleDate <= toDate) &&
+          (search === "" ||
+            s.shopName.toLowerCase().includes(search) ||
+            s.saleNo.toLowerCase().includes(search) ||
+            s.tripNo.toLowerCase().includes(search))
+      ).sort((a, b) => b.saleDate.localeCompare(a.saleDate) || b.id - a.id);
+      return send(200, paginate(rows, url.searchParams));
+    }
     case "/api/operations/collection-entry/week-bounds": {
       const today = new Date();
       const day = (today.getDay() + 6) % 7;
