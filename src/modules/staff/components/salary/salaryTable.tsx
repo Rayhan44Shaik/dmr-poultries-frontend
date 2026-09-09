@@ -15,6 +15,21 @@ import {
   shouldShowPagination,
 } from "../../../../shared/ui/paginationStyles";
 
+/** Render "YYYY-MM-DD" (or ISO) as a readable "28 Sep 2026" string. */
+function formatDisplayDate(raw: string): string {
+  if (!raw) return raw;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw.trim());
+  if (iso) {
+    const d = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  }
+  const d = new Date(raw);
+  if (!Number.isNaN(d.getTime())) {
+    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  }
+  return raw;
+}
+
 type SalaryTableProps = {
   records: SalaryRecord[];
   currentPage: number;
@@ -29,6 +44,10 @@ type SalaryTableProps = {
   /** Optional per-row quick actions to email / WhatsApp an employee's payslip. */
   onEmail?: (record: SalaryRecord) => void;
   onWhatsApp?: (record: SalaryRecord) => void;
+  /** Month label shown beside the title, e.g. "September 2026". */
+  monthLabel?: string;
+  /** When set, the whole month is paid — the title shows "Paid on {date}". */
+  paidOnDate?: string | null;
 };
 
 function StatusBadge({ record }: { record: SalaryRecord }) {
@@ -67,6 +86,8 @@ export function SalaryTable({
   onView,
   onEmail,
   onWhatsApp,
+  monthLabel = "",
+  paidOnDate,
 }: SalaryTableProps) {
   const selectable = Boolean(selectedIds && onToggleSelect && onToggleSelectAll);
   const hasRowActions = Boolean(onEmail || onWhatsApp);
@@ -109,10 +130,22 @@ export function SalaryTable({
     <div className={uiTableWrapClass}>
       {/* Table title — "Salary Register" above the employee columns */}
       <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
-        <h3 className="text-sm font-bold tracking-tight text-slate-800">
-          Salary Register
-        </h3>
-        <span className="text-[11px] font-medium text-slate-500 tabular-nums">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <h3 className="text-sm font-bold tracking-tight text-slate-800">
+            Salary Register
+          </h3>
+          {monthLabel && (
+            <span className="truncate text-[11px] font-semibold text-slate-500 tabular-nums">
+              {monthLabel}
+            </span>
+          )}
+          {paidOnDate && (
+            <span className="shrink-0 text-[11px] font-semibold text-emerald-700 tabular-nums">
+              Paid on {formatDisplayDate(paidOnDate)}
+            </span>
+          )}
+        </div>
+        <span className="shrink-0 text-[11px] font-medium text-slate-500 tabular-nums">
           {records.length} employee{records.length === 1 ? "" : "s"}
         </span>
       </div>
@@ -143,7 +176,6 @@ export function SalaryTable({
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Deductions</th>
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Net</th>
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Status</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Payment date</th>
               {hasRowActions && (
                 <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Send</th>
               )}
@@ -194,7 +226,6 @@ export function SalaryTable({
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-sm tabular-nums text-slate-600 whitespace-nowrap">{record.paymentDate ?? "—"}</td>
                   {hasRowActions && (
                     <td
                       className="px-3 py-2.5 whitespace-nowrap text-center"
@@ -243,7 +274,6 @@ export function SalaryTable({
               <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-rose-700 whitespace-nowrap">{formatVal(footer.totalDeductions)}</td>
               <td className="px-3 py-2.5 text-right text-sm tabular-nums font-bold text-slate-900 whitespace-nowrap">{formatVal(footer.netSalary)}</td>
               <td className="px-3 py-2.5 text-sm tabular-nums text-slate-600 whitespace-nowrap">{footer.pending}P · {footer.submitted}S · {footer.paid}Paid</td>
-              <td className="px-3 py-2.5 text-sm text-slate-400 whitespace-nowrap">—</td>
               {hasRowActions && <td className="px-3 py-2.5" />}
             </tr>
           </tfoot>

@@ -445,6 +445,21 @@ function SalaryRegisterPage() {
     return { label: "Pending", tone: "warning" as StatusTone };
   }, [monthSummary]);
 
+  // The payment date for the register heading. Shown only when the ENTIRE
+  // month's register is Paid AND every paid record shares one payment date.
+  // Individual payment dates still appear in each employee's payslip view.
+  const monthPaidOnDate = useMemo(() => {
+    if (allRecords.length === 0) return null;
+    const paid = allRecords.filter((r) => r.status === "Paid");
+    if (paid.length !== allRecords.length) return null;
+    const dates = paid
+      .map((r) => r.paymentDate ?? null)
+      .filter((d): d is string => Boolean(d));
+    if (dates.length === 0) return null;
+    const distinct = new Set(dates);
+    return distinct.size === 1 ? dates[0] : null;
+  }, [allRecords]);
+
   // Status segmented control — same treatment as the Leave page's status tabs
   // (active = white chip + brand text, inactive = quiet slate).
   const statusTab = (key: 'All' | 'Pending' | 'Paid', label: string, icon: React.ReactNode) => (
@@ -704,6 +719,8 @@ function SalaryRegisterPage() {
           onView={setViewTarget}
           onEmail={(record) => openEmailFor([record])}
           onWhatsApp={(record) => openWhatsAppFor([record])}
+          monthLabel={formatMonthName(month)}
+          paidOnDate={monthPaidOnDate}
         />
       )}
 

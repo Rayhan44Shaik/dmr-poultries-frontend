@@ -10,11 +10,24 @@
 // Read-only lifecycle notices (paid / correction window / month closed) are
 // listed below the sheet — they are UI state, not part of the formal document.
 
-import { Lock, Info, Download } from "lucide-react";
+import { Lock, Info, Download, CheckCircle2 } from "lucide-react";
 import type { SalaryRecord } from "../../types/staffDashboard";
 import { Button, Modal } from "../../../../ui";
 import { ClassicPayslipSheet } from "./ClassicPayslipSheet";
 import { computePayslipTotals, toAmountValues } from "./payslipModel";
+
+/** Render "YYYY-MM-DD" / ISO as "28 Sep 2026". */
+function formatViewDate(raw: string): string {
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw.trim());
+  if (iso) {
+    const d = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  }
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime())
+    ? raw
+    : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 export type SalaryViewProps = {
   record: SalaryRecord;
@@ -78,6 +91,15 @@ export function SalaryView({
         </div>
 
         {/* Lifecycle notices — UI state, kept below the formal document */}
+        {record.status === "Paid" && record.paymentDate && (
+          <div className="mx-auto mt-4 flex max-w-[760px] items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
+            <CheckCircle2 size={14} className="shrink-0" />
+            <span>Paid on {formatViewDate(record.paymentDate)}</span>
+            {record.paymentRef && (
+              <span className="text-emerald-700">· Ref {record.paymentRef}</span>
+            )}
+          </div>
+        )}
         {record.monthClosed && (
           <div className="mx-auto mt-4 flex max-w-[760px] items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 p-3 text-xs text-slate-600">
             <Lock size={14} className="shrink-0" />
