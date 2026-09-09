@@ -5,7 +5,7 @@ import {
   masterIconClass,
   masterLabelClass,
 } from "../../components/masterFormStyles";
-import { useId, useEffect, useRef, useState, useCallback } from "react";
+import { useId, useRef, useState, useCallback } from "react";
 import type { Shop } from "../types/shop";
 import { Store, User, Phone, Mail, MapPin, IndianRupee } from "lucide-react";
 import { useI18n } from "../../../../i18n";
@@ -14,22 +14,7 @@ import LocationPicker from "../components/LocationPicker";
 
 type ShopFormProps = {
   shop?: Shop | null;
-  onSave: (shop: {
-    shopNumber: string;
-    shopName: string;
-    ownerName: string;
-    phoneNumber: string;
-    secondaryPhoneNumber: string;
-    email: string;
-    city: string;
-    address: string;
-    latitude: string;
-    longitude: string;
-    paperRate: number;
-    associationType: string;
-    status: "Active" | "Inactive";
-    openingBalance: number;
-  }) => void;
+  onSave: (shop: Partial<Shop>) => void;
   onCancel: () => void;
   isSaving?: boolean;
 };
@@ -41,22 +26,22 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
   const { t } = useI18n();
   const formId = useId();
   const fieldId = (text: string) => `${formId}-${text.replace(/\s+/g, "-")}`;
-  const [shopNumber, setShopNumber] = useState("");
-  const [shopName, setShopName] = useState("");
-  const [ownerName, setOwnerName] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [secondaryPhoneNumber, setSecondaryPhoneNumber] = useState("");
-  const [email, setEmail] = useState("");
-  const [city, setCity] = useState("");
-  const [address, setAddress] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
-  const [paperRate, setPaperRate] = useState("1");
-  const [associationType, setAssociationType] = useState("");
-  const [openingBalance, setOpeningBalance] = useState("0");
+  const [shopNumber, setShopNumber] = useState(shop?.shopNumber || (shop ? String(shop.shopNo).padStart(6, "0") : ""));
+  const [shopName, setShopName] = useState(shop?.shopName ?? "");
+  const [ownerName, setOwnerName] = useState(shop?.ownerName ?? "");
+  const [phoneNumber, setPhoneNumber] = useState(shop?.phoneNumber ?? "");
+  const [secondaryPhoneNumber, setSecondaryPhoneNumber] = useState(shop?.secondaryPhoneNumber ?? "");
+  const [email, setEmail] = useState(shop?.email ?? "");
+  const [city, setCity] = useState(shop?.city ?? "");
+  const [address, setAddress] = useState(shop?.address ?? "");
+  const [latitude, setLatitude] = useState(shop?.latitude !== undefined ? String(shop.latitude) : "");
+  const [longitude, setLongitude] = useState(shop?.longitude !== undefined ? String(shop.longitude) : "");
+  const [paperRate, setPaperRate] = useState(shop?.paperRate !== undefined ? String(shop.paperRate) : "1");
+  const [associationType, setAssociationType] = useState(shop?.associationType ?? "");
+  const [openingBalance, setOpeningBalance] = useState(shop?.openingBalance !== undefined ? String(shop.openingBalance) : "0");
   const [isBalanceFocused, setIsBalanceFocused] = useState(false);
   const balanceInputRef = useRef<HTMLInputElement>(null);
-  const [status, setStatus] = useState<"Active" | "Inactive">("Active");
+  const [status, setStatus] = useState<"Active" | "Inactive">(shop?.status ?? "Active");
 
   const [errors, setErrors] = useState({
     shopNumber: "",
@@ -75,56 +60,6 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
   const isEditing = !!shop;
 
-  useEffect(() => {
-    if (shop) {
-      setShopNumber(shop.shopNumber || String(shop.shopNo).padStart(6, "0"));
-      setShopName(shop.shopName);
-      setOwnerName(shop.ownerName);
-      setPhoneNumber(shop.phoneNumber);
-      setSecondaryPhoneNumber(shop.secondaryPhoneNumber ?? "");
-      setEmail(shop.email ?? "");
-      setCity(shop.city);
-      setAddress(shop.address ?? "");
-      setLatitude(shop.latitude !== undefined ? String(shop.latitude) : "");
-      setLongitude(shop.longitude !== undefined ? String(shop.longitude) : "");
-      setPaperRate(shop.paperRate !== undefined ? String(shop.paperRate) : "1");
-      setAssociationType(shop.associationType ?? "");
-      setOpeningBalance(
-        shop.openingBalance !== undefined ? String(shop.openingBalance) : "0",
-      );
-      setStatus(shop.status);
-    } else {
-      setShopNumber("");
-      setShopName("");
-      setOwnerName("");
-      setPhoneNumber("");
-      setSecondaryPhoneNumber("");
-      setEmail("");
-      setCity("");
-      setAddress("");
-      setLatitude("");
-      setLongitude("");
-      setPaperRate("1");
-      setAssociationType("");
-      setOpeningBalance("0");
-      setStatus("Active");
-    }
-    setErrors({
-      shopNumber: "",
-      shopName: "",
-      ownerName: "",
-      phoneNumber: "",
-      secondaryPhoneNumber: "",
-      email: "",
-      city: "",
-      latitude: "",
-      longitude: "",
-      paperRate: "",
-      associationType: "",
-      openingBalance: "",
-    });
-  }, [shop]);
-
   const formatDisplayBalance = useCallback((raw: string): string => {
     const num = parseFloat(raw);
     if (isNaN(num) || raw === "") return "₹0.00";
@@ -133,7 +68,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
 
   const parseBalanceInput = useCallback((input: string): string => {
     const cleaned = input.replace(/[₹,\s]/g, "");
-    const valid = cleaned.replace(/[^0-9.\-]/g, "");
+    const valid = cleaned.replace(/[^0-9.-]/g, "");
     const dotIndex = valid.indexOf(".");
     if (dotIndex !== -1) {
       return (
@@ -241,15 +176,14 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       email,
       city,
       address,
-      latitude: latitude.trim() || "0",
-      longitude: longitude.trim() || "0",
+      latitude: latitude.trim() ? Number(latitude) : undefined,
+      longitude: longitude.trim() ? Number(longitude) : undefined,
       paperRate: rate,
       associationType,
       status,
       openingBalance: parsedBalance,
     });
   }, [
-    shop,
     shopNumber,
     shopName,
     ownerName,

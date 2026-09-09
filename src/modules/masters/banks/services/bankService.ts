@@ -76,13 +76,6 @@ export function getBanks(): Bank[] {
   return banksCache;
 }
 
-/**
- * @deprecated Do not use for Banks UI. Mutations must go through API helpers.
- */
-export function saveBanks(_banks: Bank[]): void {
-  // Intentionally no-op. Cache is API-owned.
-}
-
 /** GET /api/masters/banks — sole source of truth for the Banks table. */
 export async function loadBanks(): Promise<Bank[]> {
   clearLegacyBankStorage();

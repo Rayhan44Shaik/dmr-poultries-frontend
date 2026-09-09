@@ -73,13 +73,6 @@ export function getBirdTypes(): BirdType[] {
   return birdTypesCache;
 }
 
-/**
- * @deprecated Do not use for Bird Types UI. Mutations must go through API helpers.
- */
-export function saveBirdTypes(_birdTypes: BirdType[]): void {
-  // Intentionally no-op. Cache is API-owned.
-}
-
 /** GET /api/masters/bird-types — sole source of truth for the Bird Types table. */
 export async function loadBirdTypes(): Promise<BirdType[]> {
   clearLegacyBirdTypeStorage();

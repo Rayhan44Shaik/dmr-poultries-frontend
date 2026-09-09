@@ -106,13 +106,6 @@ export function getAll(): Shop[] {
   return getShops();
 }
 
-/**
- * @deprecated Do not use for Shops UI. Mutations must go through API helpers.
- */
-export function saveAll(_shops: Shop[]): void {
-  // Intentionally no-op. Cache is API-owned.
-}
-
 /** GET /api/masters/shops — sole source of truth for the Shops table. */
 export async function loadShops(): Promise<Shop[]> {
   clearLegacyShopStorage();
@@ -178,7 +171,6 @@ export async function resolveLocation(
 /** Compatibility object for modules that import `shopService.getAll()`. */
 export const shopService = {
   getAll,
-  saveAll,
 };
 
 export { handleApiError };

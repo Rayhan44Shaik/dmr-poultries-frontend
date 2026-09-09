@@ -187,7 +187,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       },
       columnStyles: columnStylesConfig,
       didDrawPage: (data) => {
-        const pageCount = (doc as any).internal.getNumberOfPages();
+        const pageCount = doc.getNumberOfPages();
         doc.setFontSize(8);
         doc.setTextColor(148, 163, 184);
         doc.text(

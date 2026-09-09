@@ -55,7 +55,7 @@ export function useMasterRecords<T>(config: Config<T>, options?: MasterQuery) {
     }
   }, [config, queryKey]);
   useEffect(() => {
-    void reload().catch(() => {});
+    queueMicrotask(() => void reload().catch(() => {}));
     return () => { generation.current += 1; };
   }, [reload]);
   const mutate = useCallback(async (operation: () => Promise<unknown>) => {

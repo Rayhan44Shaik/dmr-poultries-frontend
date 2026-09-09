@@ -1,7 +1,7 @@
 import { masterInputClass } from "../../components/masterFormStyles";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { MapPin, Navigation, CheckCircle2, Loader2 } from "lucide-react";
-import { resolveLocation } from "../services/shopService";
+import { handleApiError, resolveLocation } from "../services/shopService";
 
 type LocationPickerProps = {
   id?: string;
@@ -37,10 +37,6 @@ function LocationPicker({
     parseFloat(longitude) >= -180 &&
     parseFloat(longitude) <= 180;
 
-  useEffect(() => {
-    if (initialAddress) setCapturedAddress(initialAddress);
-  }, [initialAddress]);
-
   const handleResolveInput = useCallback(async () => {
     const input = locationInput.trim();
     if (!input || isResolving) return;
@@ -56,12 +52,8 @@ function LocationPicker({
       );
       if (result.address) setCapturedAddress(result.address);
       setLocationInput("");
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.error ||
-        err?.message ||
-        "Unable to determine this location.";
-      setError(msg);
+    } catch (err: unknown) {
+      setError(handleApiError(err) || "Unable to determine this location.");
     } finally {
       setIsResolving(false);
     }

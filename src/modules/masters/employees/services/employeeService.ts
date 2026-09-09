@@ -124,13 +124,6 @@ export function getEmployees(): Employee[] {
   return employeesCache;
 }
 
-/**
- * @deprecated Do not use for Employees UI. Mutations must go through API helpers.
- */
-export function saveEmployees(_employees: Employee[]): void {
-  // Intentionally no-op for Employees page data. Cache is API-owned.
-}
-
 /** GET /api/masters/employees — sole source of truth for the Employees table. */
 export async function loadEmployees(department?: string): Promise<Employee[]> {
   clearLegacyEmployeeStorage();

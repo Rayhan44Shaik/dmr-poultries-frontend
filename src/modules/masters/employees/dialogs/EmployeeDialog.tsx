@@ -7,7 +7,7 @@ import type { Employee } from "../types/employee";
 type EmployeeDialogProps = {
   open: boolean;
   onClose: () => void;
-  onSave: (employee: any) => void | boolean | Promise<void | boolean>;
+  onSave: (employee: Partial<Employee>) => void | boolean | Promise<void | boolean>;
   employee?: Employee | null;
 };
 
@@ -21,15 +21,15 @@ function EmployeeDialog({
 
   if (!open) return null;
 
-  const handleSave = async (formData: any) => {
+  const handleSave = async (formData: Partial<Employee>) => {
     setIsSaving(true);
     try {
       const result = await Promise.resolve(onSave(formData));
       // Keep dialog open when parent signals validation/API failure (false)
       if (result === false) return;
       onClose();
-    } catch (error) {
-      console.error("Save failed", error);
+    } catch {
+      // The page-level mutation handler retains the form and surfaces the API error.
       // Keep dialog open so the user can fix and retry
     } finally {
       setIsSaving(false);
@@ -43,6 +43,7 @@ function EmployeeDialog({
       isSaving={isSaving}
     >
       <EmployeeForm
+        key={employee?.id ?? "new"}
         employee={employee}
         onSave={handleSave}
         onCancel={onClose}

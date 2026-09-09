@@ -81,13 +81,6 @@ export function getFarms(): Farm[] {
   return farmsCache;
 }
 
-/**
- * @deprecated Do not use for Farms UI. Mutations must go through API helpers.
- */
-export function saveFarms(_farms: Farm[]): void {
-  // Intentionally no-op. Cache is API-owned.
-}
-
 /** GET /api/masters/farms — sole source of truth for the Farms table. */
 export async function loadFarms(): Promise<Farm[]> {
   clearLegacyFarmStorage();

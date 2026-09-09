@@ -54,25 +54,26 @@ function VehicleForm({
   const { showNotification } = useSafeNotification();
 
   // Fields (in new order)
-  const [vehicleNumber, setVehicleNumber] = useState("");
-  const [vehicleType, setVehicleType] = useState("");
-  const [trackingId, setTrackingId] = useState("");
-  const [noOfBoxes, setNoOfBoxes] = useState<number | "">("");
-  const [birdCapacity, setBirdCapacity] = useState<number | "">("");
-  const [capacityKg, setCapacityKg] = useState<number | "">("");
-  const [fastagBank, setFastagBank] = useState("");
-  const [purchaseDate, setPurchaseDate] = useState("");
-  const [purchaseAmount, setPurchaseAmount] = useState<number | "">(""); // renamed from loanAmount
-  const [emiDay, setEmiDay] = useState<number | "">("");
-  const [totalEMIs, setTotalEMIs] = useState<number | "">("");
-  const [engineNumber, setEngineNumber] = useState("");
-  const [chassisNumber, setChassisNumber] = useState("");
-  const [rcDate, setRcDate] = useState("");
+  const model = vehicle as VehicleModel | null | undefined;
+  const [vehicleNumber, setVehicleNumber] = useState(vehicle?.vehicleNumber ?? "");
+  const [vehicleType, setVehicleType] = useState(vehicle?.vehicleType ?? "");
+  const [trackingId, setTrackingId] = useState(vehicle?.trackingId ?? "");
+  const [noOfBoxes, setNoOfBoxes] = useState<number | "">(vehicle?.noOfBoxes ?? "");
+  const [birdCapacity, setBirdCapacity] = useState<number | "">(vehicle?.birdCapacity ?? "");
+  const [capacityKg, setCapacityKg] = useState<number | "">(vehicle?.capacityKg ?? "");
+  const [fastagBank, setFastagBank] = useState(vehicle?.fastagBank ?? "");
+  const [purchaseDate, setPurchaseDate] = useState(vehicle?.purchaseDate ?? "");
+  const [purchaseAmount, setPurchaseAmount] = useState<number | "">(vehicle?.purchaseAmount ?? "");
+  const [emiDay, setEmiDay] = useState<number | "">(model?.emiDay ?? "");
+  const [totalEMIs, setTotalEMIs] = useState<number | "">(model?.totalEMIs ?? "");
+  const [engineNumber, setEngineNumber] = useState(vehicle?.engineNumber ?? "");
+  const [chassisNumber, setChassisNumber] = useState(vehicle?.chassisNumber ?? "");
+  const [rcDate, setRcDate] = useState(vehicle?.rcDate ?? "");
 
-  const [status, setStatus] = useState<"Active" | "Inactive">("Active");
+  const [status, setStatus] = useState<"Active" | "Inactive">(vehicle?.status ?? "Active");
 
   // Raw digits for Purchase Amount (without commas)
-  const [purchaseAmountRaw, setPurchaseAmountRaw] = useState<string>("");
+  const [purchaseAmountRaw, setPurchaseAmountRaw] = useState<string>(vehicle?.purchaseAmount ? String(vehicle.purchaseAmount) : "");
   const purchaseInputRef = useRef<HTMLInputElement>(null);
 
   const isEditing = !!vehicle;
@@ -86,48 +87,6 @@ function VehicleForm({
     if (isNaN(num)) return "";
     return num.toLocaleString("en-IN");
   };
-
-  useEffect(() => {
-    if (vehicle) {
-      setVehicleNumber(vehicle.vehicleNumber);
-      setVehicleType(vehicle.vehicleType);
-      setTrackingId(vehicle.trackingId ?? "");
-      setNoOfBoxes(vehicle.noOfBoxes);
-      setBirdCapacity(vehicle.birdCapacity);
-      setCapacityKg(vehicle.capacityKg);
-      setFastagBank(vehicle.fastagBank ?? "");
-      setPurchaseDate(vehicle.purchaseDate ?? "");
-      setPurchaseAmount(vehicle.purchaseAmount ?? "");
-      setPurchaseAmountRaw(
-        vehicle.purchaseAmount ? String(vehicle.purchaseAmount) : "",
-      );
-      const model = vehicle as VehicleModel;
-      setEmiDay(model.emiDay ?? "");
-      setTotalEMIs(model.totalEMIs ?? "");
-      setEngineNumber(vehicle.engineNumber ?? "");
-      setChassisNumber(vehicle.chassisNumber ?? "");
-      setRcDate(vehicle.rcDate ?? "");
-      setStatus(vehicle.status);
-    } else {
-      // Reset all
-      setVehicleNumber("");
-      setVehicleType("");
-      setTrackingId("");
-      setNoOfBoxes("");
-      setBirdCapacity("");
-      setCapacityKg("");
-      setFastagBank("");
-      setPurchaseDate("");
-      setPurchaseAmount("");
-      setPurchaseAmountRaw("");
-      setEmiDay("");
-      setTotalEMIs("");
-      setEngineNumber("");
-      setChassisNumber("");
-      setRcDate("");
-      setStatus("Active");
-    }
-  }, [vehicle]);
 
   // Sync purchaseAmountRaw with purchaseAmount when vehicle changes
   useEffect(() => {

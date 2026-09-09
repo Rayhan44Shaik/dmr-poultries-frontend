@@ -5,14 +5,14 @@ import {
   masterLabelClass,
   masterTextareaClass,
 } from "../../components/masterFormStyles";
-import { useId, useEffect, useState } from "react";
+import { useId, useState } from "react";
 import type { BirdType } from "../types/birdType";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { Bird, Weight, FileText } from "lucide-react";
 
 type BirdTypeFormProps = {
   birdType?: BirdType | null;
-  onSave: (birdType: any) => void;
+  onSave: (birdType: Partial<BirdType>) => void;
   onCancel: () => void;
   isSaving?: boolean;
 };
@@ -26,26 +26,12 @@ function BirdTypeForm({
   const formId = useId();
   const fieldId = (text: string) => `${formId}-${text.replace(/\s+/g, "-")}`;
   const { showNotification } = useSafeNotification();
-  const [birdTypeName, setBirdTypeName] = useState("");
-  const [averageWeight, setAverageWeight] = useState<number | "">("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<"Active" | "Inactive">("Active");
+  const [birdTypeName, setBirdTypeName] = useState(birdType?.birdType ?? "");
+  const [averageWeight, setAverageWeight] = useState<number | "">(birdType?.averageWeight ?? "");
+  const [description, setDescription] = useState(birdType?.description ?? "");
+  const [status, setStatus] = useState<"Active" | "Inactive">(birdType?.status ?? "Active");
 
   const isEditing = !!birdType;
-
-  useEffect(() => {
-    if (birdType) {
-      setBirdTypeName(birdType.birdType);
-      setAverageWeight(birdType.averageWeight);
-      setDescription(birdType.description ?? "");
-      setStatus(birdType.status);
-    } else {
-      setBirdTypeName("");
-      setAverageWeight("");
-      setDescription("");
-      setStatus("Active");
-    }
-  }, [birdType]);
 
   const handleSubmit = () => {
     if (isSaving) return;

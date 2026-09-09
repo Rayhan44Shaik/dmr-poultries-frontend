@@ -6,7 +6,7 @@ import type { BirdType } from "../types/birdType";
 type BirdTypeDialogProps = {
   open: boolean;
   onClose: () => void;
-  onSave: (birdType: any) => void | boolean | Promise<void | boolean>;
+  onSave: (birdType: Partial<BirdType>) => void | boolean | Promise<void | boolean>;
   birdType?: BirdType | null;
 };
 
@@ -20,14 +20,14 @@ function BirdTypeDialog({
 
   if (!open) return null;
 
-  const handleSave = async (formData: any) => {
+  const handleSave = async (formData: Partial<BirdType>) => {
     setIsSaving(true);
     try {
       const result = await Promise.resolve(onSave(formData));
       if (result === false) return;
       onClose();
-    } catch (error) {
-      console.error("Save failed", error);
+    } catch {
+      // The page-level mutation handler retains the form and surfaces the API error.
     } finally {
       setIsSaving(false);
     }
@@ -40,6 +40,7 @@ function BirdTypeDialog({
       isSaving={isSaving}
     >
       <BirdTypeForm
+        key={birdType?.id ?? "new"}
         birdType={birdType}
         onSave={handleSave}
         onCancel={onClose}

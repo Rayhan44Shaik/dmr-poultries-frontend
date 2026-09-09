@@ -132,7 +132,7 @@ export interface LeaveRequest {
   fromDate: string;
   toDate: string;
   days: number;
-  status: 'Pending' | 'Approved' | 'Rejected';
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Cancelled';
   reason?: string;
   rejectionReason?: string;
   createdAt: string;

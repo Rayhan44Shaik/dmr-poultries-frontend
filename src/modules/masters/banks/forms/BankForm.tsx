@@ -4,14 +4,14 @@ import {
   masterIconClass,
   masterLabelClass,
 } from "../../components/masterFormStyles";
-import { useId, useEffect, useState } from "react";
+import { useId, useState } from "react";
 import { Landmark, MapPin, Hash, AtSign, CreditCard } from "lucide-react";
 import type { Bank } from "../types/bank";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
 type BankFormProps = {
   bank?: Bank | null;
-  onSave: (bank: any) => void;
+  onSave: (bank: Partial<Bank>) => void;
   onCancel: () => void;
   isSaving?: boolean;
 };
@@ -20,30 +20,12 @@ function BankForm({ bank, onSave, onCancel, isSaving = false }: BankFormProps) {
   const formId = useId();
   const fieldId = (text: string) => `${formId}-${text.replace(/\s+/g, "-")}`;
   const { showNotification } = useSafeNotification();
-  const [bankName, setBankName] = useState("");
-  const [branch, setBranch] = useState("");
-  const [accountNumber, setAccountNumber] = useState("");
-  const [ifscCode, setIfscCode] = useState("");
-  const [upiId, setUpiId] = useState("");
-  const [status, setStatus] = useState<"Active" | "Inactive">("Active");
-
-  useEffect(() => {
-    if (bank) {
-      setBankName(bank.bankName);
-      setBranch(bank.branch);
-      setAccountNumber(bank.accountNumber);
-      setIfscCode(bank.ifscCode);
-      setUpiId(bank.upiId ?? "");
-      setStatus(bank.status);
-    } else {
-      setBankName("");
-      setBranch("");
-      setAccountNumber("");
-      setIfscCode("");
-      setUpiId("");
-      setStatus("Active");
-    }
-  }, [bank]);
+  const [bankName, setBankName] = useState(bank?.bankName ?? "");
+  const [branch, setBranch] = useState(bank?.branch ?? "");
+  const [accountNumber, setAccountNumber] = useState(bank?.accountNumber ?? "");
+  const [ifscCode, setIfscCode] = useState(bank?.ifscCode ?? "");
+  const [upiId, setUpiId] = useState(bank?.upiId ?? "");
+  const [status, setStatus] = useState<"Active" | "Inactive">(bank?.status ?? "Active");
 
   const handleSubmit = () => {
     if (isSaving) return;

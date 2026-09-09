@@ -123,13 +123,18 @@ export function isCanceledError(error: unknown): boolean {
   return apiError.code === "CANCELED";
 }
 
+const loggedApiErrors = new WeakSet<ApiError>();
+
 export function handleApiError(error: unknown): string {
   const apiError = toApiError(error);
   if (apiError.code === "CANCELED") return apiError.message;
-  logger.error(
-    `[API ${apiError.code ?? "ERROR"}] ${apiError.method ?? ""} ${apiError.url ?? ""} → ${apiError.message}`,
-    apiError.details
-  );
+  if (!loggedApiErrors.has(apiError)) {
+    loggedApiErrors.add(apiError);
+    logger.error(
+      `[API ${apiError.code ?? "ERROR"}] ${apiError.method ?? ""} ${apiError.url ?? ""} → ${apiError.message}`,
+      apiError.details
+    );
+  }
   return apiError.message;
 }
 

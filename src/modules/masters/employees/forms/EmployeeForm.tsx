@@ -8,7 +8,7 @@ import {
   masterTextareaClass,
 } from "../../components/masterFormStyles";
 // src/modules/masters/employees/forms/EmployeeForm.tsx
-import { useId, useEffect, useState } from "react";
+import { useId, useState } from "react";
 import type { Employee } from "../types/employee";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import {
@@ -26,7 +26,7 @@ import DatePicker from "../../components/MasterDatePicker";
 
 type EmployeeFormProps = {
   employee?: Employee | null;
-  onSave: (employee: any) => void;
+  onSave: (employee: Partial<Employee>) => void;
   onCancel: () => void;
   isSaving?: boolean;
 };
@@ -72,47 +72,19 @@ function EmployeeForm({
   const fieldId = (text: string) => `${formId}-${text.replace(/\s+/g, "-")}`;
   const { showNotification } = useSafeNotification();
 
-  const [employeeName, setEmployeeName] = useState("");
-  const [department, setDepartment] = useState("");
-  const [role, setRole] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [email, setEmail] = useState("");
-  const [address, setAddress] = useState("");
-  const [joiningDate, setJoiningDate] = useState("");
-  const [aadharNumber, setAadharNumber] = useState("");
-  const [licenseNumber, setLicenseNumber] = useState("");
-  const [salaryDisplay, setSalaryDisplay] = useState("");
-  const [status, setStatus] = useState<"Active" | "Inactive">("Active");
+  const [employeeName, setEmployeeName] = useState(employee?.employeeName ?? "");
+  const [department, setDepartment] = useState(employee?.department ?? "");
+  const [role, setRole] = useState(employee?.role ?? "");
+  const [phoneNumber, setPhoneNumber] = useState(employee?.phoneNumber ?? "");
+  const [email, setEmail] = useState(employee?.email ?? "");
+  const [address, setAddress] = useState(employee?.address ?? "");
+  const [joiningDate, setJoiningDate] = useState(employee?.joiningDate ?? "");
+  const [aadharNumber, setAadharNumber] = useState(employee?.aadharNumber ?? "");
+  const [licenseNumber, setLicenseNumber] = useState(employee?.licenseNumber ?? "");
+  const [salaryDisplay, setSalaryDisplay] = useState(formatSalary(employee?.salary ?? ""));
+  const [status, setStatus] = useState<"Active" | "Inactive">(employee?.status ?? "Active");
 
   const isEditing = !!employee;
-
-  useEffect(() => {
-    if (employee) {
-      setEmployeeName(employee.employeeName);
-      setDepartment(employee.department);
-      setRole(employee.role);
-      setPhoneNumber(employee.phoneNumber);
-      setEmail(employee.email);
-      setAddress(employee.address ?? "");
-      setJoiningDate(employee.joiningDate ?? "");
-      setAadharNumber(employee.aadharNumber ?? "");
-      setLicenseNumber(employee.licenseNumber ?? "");
-      setSalaryDisplay(formatSalary(employee.salary ?? ""));
-      setStatus(employee.status);
-    } else {
-      setEmployeeName("");
-      setDepartment("");
-      setRole("");
-      setPhoneNumber("");
-      setEmail("");
-      setAddress("");
-      setJoiningDate("");
-      setAadharNumber("");
-      setLicenseNumber("");
-      setSalaryDisplay("");
-      setStatus("Active");
-    }
-  }, [employee]);
 
   const formatAadhar = (value: string) => {
     const digits = value.replace(/\D/g, "");

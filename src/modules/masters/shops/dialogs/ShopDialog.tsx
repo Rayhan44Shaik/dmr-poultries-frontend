@@ -6,7 +6,7 @@ import ShopForm from "../forms/ShopForm";
 type ShopDialogProps = {
   open: boolean;
   onClose: () => void;
-  onSave: (shop: any) => void | boolean | Promise<void | boolean>;
+  onSave: (shop: Partial<Shop>) => void | boolean | Promise<void | boolean>;
   shop?: Shop | null;
 };
 
@@ -15,14 +15,14 @@ function ShopDialog({ open, onClose, onSave, shop }: ShopDialogProps) {
 
   if (!open) return null;
 
-  const handleSave = async (formData: any) => {
+  const handleSave = async (formData: Partial<Shop>) => {
     setIsSaving(true);
     try {
       const result = await Promise.resolve(onSave(formData));
       if (result === false) return;
       onClose();
-    } catch (error) {
-      console.error("Save failed", error);
+    } catch {
+      // The page-level mutation handler retains the form and surfaces the API error.
     } finally {
       setIsSaving(false);
     }
@@ -36,6 +36,7 @@ function ShopDialog({ open, onClose, onSave, shop }: ShopDialogProps) {
       width="wide"
     >
       <ShopForm
+        key={shop?.id ?? "new"}
         shop={shop}
         onSave={handleSave}
         onCancel={onClose}

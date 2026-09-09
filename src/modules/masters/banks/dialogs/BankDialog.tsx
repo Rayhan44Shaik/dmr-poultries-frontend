@@ -6,7 +6,7 @@ import type { Bank } from "../types/bank";
 type BankDialogProps = {
   open: boolean;
   onClose: () => void;
-  onSave: (bank: any) => void | boolean | Promise<void | boolean>;
+  onSave: (bank: Partial<Bank>) => void | boolean | Promise<void | boolean>;
   bank?: Bank | null;
 };
 
@@ -15,14 +15,14 @@ function BankDialog({ open, onClose, onSave, bank }: BankDialogProps) {
 
   if (!open) return null;
 
-  const handleSave = async (formData: any) => {
+  const handleSave = async (formData: Partial<Bank>) => {
     setIsSaving(true);
     try {
       const result = await Promise.resolve(onSave(formData));
       if (result === false) return;
       onClose();
-    } catch (error) {
-      console.error("Save failed", error);
+    } catch {
+      // The page-level mutation handler retains the form and surfaces the API error.
     } finally {
       setIsSaving(false);
     }
@@ -35,6 +35,7 @@ function BankDialog({ open, onClose, onSave, bank }: BankDialogProps) {
       isSaving={isSaving}
     >
       <BankForm
+        key={bank?.id ?? "new"}
         bank={bank}
         onSave={handleSave}
         onCancel={onClose}
