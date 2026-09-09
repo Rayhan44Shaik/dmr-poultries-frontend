@@ -108,8 +108,6 @@ export function SalaryReviewModal({
   }, [records, query]);
 
   const allIds = useMemo(() => records.map((r) => r.id), [records]);
-  const allSelected =
-    allIds.length > 0 && allIds.every((id) => selectedIds.has(id));
   const selectedCount = selectedIds.size;
 
   // Pagination — show PAGE_SIZE employees at a time. `activePage` is clamped
@@ -248,63 +246,38 @@ export function SalaryReviewModal({
 
         {/* Body */}
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          {/* LEFT: selection panel — full, independently scrollable list */}
-          <aside className="flex w-80 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-slate-50/80">
-            {/* Panel header */}
-            <div className="space-y-2.5 border-b border-slate-200 bg-white px-3.5 py-3">
+          {/* LEFT: employee selection */}
+          <aside className="flex w-80 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-slate-50/60">
+            {/* Header */}
+            <div className="border-b border-slate-200 bg-white px-4 py-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-600">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm">
-                    <ListChecks size={12} />
-                  </span>
-                  Select employees
-                </span>
+                <h4 className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
+                  <ListChecks size={15} className="text-blue-600" />
+                  Review employees
+                </h4>
                 {emailsSentCount > 0 && (
-                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
                     <CheckCircle2 size={11} /> {emailsSentCount} emailed
                   </span>
                 )}
               </div>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                {records.length} employee{records.length === 1 ? "" : "s"} ·{" "}
+                {pendingCount} pending
+              </p>
+            </div>
 
-              {/* Selection summary + All / None segmented control */}
-              <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-2 py-1">
-                <span className="text-[11px] font-semibold text-slate-600">
-                  <span className="tabular-nums text-blue-700">{selectedCount}</span>
-                  <span className="text-slate-400"> / </span>
-                  <span className="tabular-nums">{filtered.length}</span> selected
-                </span>
-                <div className="flex items-center gap-0.5">
-                  <button
-                    type="button"
-                    onClick={() => onToggleSelectAll(allIds)}
-                    className={`inline-flex h-6 items-center gap-1 rounded-md px-2 text-[11px] font-semibold transition ${
-                      allSelected
-                        ? "bg-blue-600 text-white shadow-sm"
-                        : "text-slate-600 hover:bg-white"
-                    }`}
-                  >
-                    <CheckSquare size={11} /> All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onToggleSelectAll([])}
-                    disabled={selectedCount === 0}
-                    className="inline-flex h-6 items-center gap-1 rounded-md px-2 text-[11px] font-semibold text-slate-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Square size={11} /> None
-                  </button>
-                </div>
-              </div>
-
+            {/* Toolbar: search + bulk actions */}
+            <div className="space-y-2 border-b border-slate-200 bg-white px-3 py-2.5">
               <div className="relative">
                 <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={query}
                   onChange={(e) => handleQueryChange(e.target.value)}
-                  placeholder="Search employees..."
+                  placeholder="Search by name or department"
                   aria-label="Search employees"
-                  className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-7 pr-8 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50/70 pl-7 pr-8 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/15"
                 />
                 {query && (
                   <button
@@ -317,111 +290,130 @@ export function SalaryReviewModal({
                   </button>
                 )}
               </div>
+
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-medium text-slate-500">
+                  <span className="font-bold text-blue-700 tabular-nums">{selectedCount}</span> selected
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onToggleSelectAll(allIds)}
+                    className="rounded-md px-2 py-1 font-semibold text-blue-600 transition hover:bg-blue-50"
+                  >
+                    <span className="inline-flex items-center gap-1"><CheckSquare size={12} /> All</span>
+                  </button>
+                  <span className="text-slate-300">|</span>
+                  <button
+                    type="button"
+                    onClick={() => onToggleSelectAll([])}
+                    disabled={selectedCount === 0}
+                    className="rounded-md px-2 py-1 font-semibold text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <span className="inline-flex items-center gap-1"><Square size={12} /> None</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* Employee list — 10 at a time, name + per-row delivery counts */}
+            {/* Employee list — 10 at a time */}
             <div className="flex min-h-0 flex-1 flex-col">
-              <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2 overscroll-contain">
-                <div className="space-y-1">
-                  {pageRecords.map((r) => {
-                    const isActive = r.id === selected?.id;
-                    const isSelected = selectedIds.has(r.id);
-                    const isBusy = savingId === r.id;
-                    const emailsSent = r.emailsSent ?? 0;
-                    const whatsappsSent = r.whatsappsSent ?? 0;
-                    return (
-                      <div
-                        key={r.id}
-                        onClick={() => setSelectedId(r.id)}
-                        className={`group flex cursor-pointer items-center gap-2 rounded-lg border px-2 py-2 transition ${
-                          isActive
-                            ? "border-blue-300 bg-white shadow-sm ring-1 ring-blue-200"
-                            : isSelected
-                            ? "border-blue-200 bg-white"
-                            : "border-transparent hover:border-slate-200 hover:bg-white"
-                        }`}
-                      >
-                        {/* Simple select on the left */}
-                        <span
-                          className="flex h-[18px] w-[18px] shrink-0 items-center justify-center"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {isBusy ? (
-                            <Loader2 size={14} className="animate-spin text-blue-500" />
-                          ) : (
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => onToggleSelect(r.id)}
-                              aria-label={`Select ${r.employeeName}`}
-                              className="h-[17px] w-[17px] cursor-pointer rounded accent-blue-600"
-                            />
-                          )}
-                        </span>
-
-                        {/* Name */}
-                        <span className="min-w-0 flex-1">
-                          <span
-                            className={`block truncate text-[13px] leading-tight ${
+              <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-1.5 overscroll-contain">
+                {pageRecords.length > 0 ? (
+                  <ul className="space-y-0.5">
+                    {pageRecords.map((r) => {
+                      const isActive = r.id === selected?.id;
+                      const isSelected = selectedIds.has(r.id);
+                      const isBusy = savingId === r.id;
+                      const emailsSent = r.emailsSent ?? 0;
+                      const whatsappsSent = r.whatsappsSent ?? 0;
+                      return (
+                        <li key={r.id}>
+                          <div
+                            onClick={() => setSelectedId(r.id)}
+                            className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition ${
                               isActive
-                                ? "font-bold text-blue-700"
-                                : "font-semibold text-slate-700"
+                                ? "bg-blue-50 ring-1 ring-blue-200"
+                                : isSelected
+                                ? "bg-blue-50/40"
+                                : "hover:bg-white"
                             }`}
-                            title={r.employeeName}
                           >
-                            {r.employeeName}
-                          </span>
-                          <span className="block truncate text-[10.5px] text-slate-400">
-                            {r.department}
-                          </span>
-                        </span>
+                            <span
+                              className="flex h-4 w-4 shrink-0 items-center justify-center"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {isBusy ? (
+                                <Loader2 size={13} className="animate-spin text-blue-500" />
+                              ) : (
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => onToggleSelect(r.id)}
+                                  aria-label={`Select ${r.employeeName}`}
+                                  className="h-4 w-4 cursor-pointer accent-blue-600"
+                                />
+                              )}
+                            </span>
 
-                        {/* Delivery counts — email & WhatsApp, right of the name */}
-                        <span className="flex shrink-0 items-center gap-1">
-                          <span
-                            title={`${emailsSent} email${emailsSent === 1 ? "" : "s"} sent`}
-                            className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
-                              emailsSent > 0
-                                ? "bg-blue-50 text-blue-600"
-                                : "bg-slate-100 text-slate-300"
-                            }`}
-                          >
-                            <Mail size={10} />
-                            {emailsSent}
-                          </span>
-                          <span
-                            title={`${whatsappsSent} WhatsApp${whatsappsSent === 1 ? "" : "s"} sent`}
-                            className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
-                              whatsappsSent > 0
-                                ? "bg-emerald-50 text-emerald-600"
-                                : "bg-slate-100 text-slate-300"
-                            }`}
-                          >
-                            <MessageCircle size={10} />
-                            {whatsappsSent}
-                          </span>
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-                {pageRecords.length === 0 && (
-                  <p className="px-2 py-6 text-center text-xs text-slate-400">
-                    No employees match “{query}”.
+                            <span className="min-w-0 flex-1">
+                              <span
+                                className={`block truncate text-[13px] leading-tight ${
+                                  isActive
+                                    ? "font-bold text-blue-700"
+                                    : "font-medium text-slate-700"
+                                }`}
+                                title={r.employeeName}
+                              >
+                                {r.employeeName}
+                              </span>
+                              <span className="block truncate text-[10.5px] text-slate-400">
+                                {r.department}
+                              </span>
+                            </span>
+
+                            <span className="flex shrink-0 items-center gap-0.5">
+                              <span
+                                title={`${emailsSent} email${emailsSent === 1 ? "" : "s"} sent`}
+                                className={`inline-flex items-center gap-0.5 rounded px-1 text-[10px] font-semibold tabular-nums ${
+                                  emailsSent > 0 ? "text-blue-600" : "text-slate-300"
+                                }`}
+                              >
+                                <Mail size={10} />
+                                {emailsSent}
+                              </span>
+                              <span
+                                title={`${whatsappsSent} WhatsApp${whatsappsSent === 1 ? "" : "s"} sent`}
+                                className={`inline-flex items-center gap-0.5 rounded px-1 text-[10px] font-semibold tabular-nums ${
+                                  whatsappsSent > 0 ? "text-emerald-600" : "text-slate-300"
+                                }`}
+                              >
+                                <MessageCircle size={10} />
+                                {whatsappsSent}
+                              </span>
+                            </span>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="px-2 py-8 text-center text-xs text-slate-400">
+                    No employees match your search.
                   </p>
                 )}
               </div>
 
-              {/* Pagination — small prev / next with page indicator */}
+              {/* Pagination */}
               {filtered.length > 0 && (
                 <div className="flex shrink-0 items-center justify-between border-t border-slate-200 bg-white px-3 py-1.5">
-                  <span className="text-[10px] font-medium text-slate-400">
-                    {filtered.length > 0
-                      ? `${(activePage - 1) * PAGE_SIZE + 1}–${Math.min(
-                          activePage * PAGE_SIZE,
-                          filtered.length
-                        )} of ${filtered.length}`
-                      : ""}
+                  <span className="text-[11px] text-slate-400 tabular-nums">
+                    {`${(activePage - 1) * PAGE_SIZE + 1}–${Math.min(
+                      activePage * PAGE_SIZE,
+                      filtered.length
+                    )}`}
+                    <span className="text-slate-300"> of </span>
+                    {filtered.length}
                   </span>
                   <div className="flex items-center gap-1">
                     <button
@@ -429,11 +421,11 @@ export function SalaryReviewModal({
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={activePage <= 1}
                       aria-label="Previous page"
-                      className="flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex h-6 w-6 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
                     >
-                      <ChevronLeft size={14} />
+                      <ChevronLeft size={15} />
                     </button>
-                    <span className="px-1 text-[11px] font-bold text-slate-600 tabular-nums">
+                    <span className="px-1 text-[11px] font-semibold text-slate-600 tabular-nums">
                       {activePage}/{totalPages}
                     </span>
                     <button
@@ -441,9 +433,9 @@ export function SalaryReviewModal({
                       onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                       disabled={activePage >= totalPages}
                       aria-label="Next page"
-                      className="flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex h-6 w-6 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
                     >
-                      <ChevronRight size={14} />
+                      <ChevronRight size={15} />
                     </button>
                   </div>
                 </div>
