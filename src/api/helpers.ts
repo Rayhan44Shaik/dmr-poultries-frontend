@@ -1,6 +1,6 @@
 import type { AxiosRequestConfig } from "axios";
 import { apiClient } from "./client";
-import { handleApiError, throwApiError } from "./errors";
+import { handleApiError, toApiError } from "./errors";
 import type { ApiRequestOptions, ApiResult } from "./types";
 
 function toAxiosConfig(options?: ApiRequestOptions): AxiosRequestConfig {
@@ -14,13 +14,21 @@ function toAxiosConfig(options?: ApiRequestOptions): AxiosRequestConfig {
 }
 
 async function request<T>(
-  config: AxiosRequestConfig
+  config: AxiosRequestConfig & { quiet404?: boolean }
 ): Promise<ApiResult<T>> {
   try {
     const response = await apiClient.request<T>(config);
     return { data: response.data, status: response.status };
   } catch (error) {
-    throwApiError(error);
+    const apiError = toApiError(error);
+    // Opt-in per request (ApiRequestOptions.quiet404): a 404 on an endpoint
+    // that may legitimately be absent in this environment is surfaced to the
+    // caller without a console log line. Every other failure keeps the
+    // standard log-and-throw behaviour.
+    if (!(config.quiet404 && apiError.status === 404)) {
+      handleApiError(apiError);
+    }
+    throw apiError;
   }
 }
 
@@ -29,7 +37,12 @@ export async function apiGet<T>(
   url: string,
   options?: ApiRequestOptions
 ): Promise<ApiResult<T>> {
-  return request<T>({ method: "GET", url, ...toAxiosConfig(options) });
+  return request<T>({
+    method: "GET",
+    url,
+    ...toAxiosConfig(options),
+    quiet404: options?.quiet404,
+  });
 }
 
 /** POST helper */
@@ -43,6 +56,7 @@ export async function apiPost<T, B = unknown>(
     url,
     data: body,
     ...toAxiosConfig(options),
+    quiet404: options?.quiet404,
   });
 }
 
@@ -57,6 +71,7 @@ export async function apiPut<T, B = unknown>(
     url,
     data: body,
     ...toAxiosConfig(options),
+    quiet404: options?.quiet404,
   });
 }
 
@@ -71,6 +86,7 @@ export async function apiPatch<T, B = unknown>(
     url,
     data: body,
     ...toAxiosConfig(options),
+    quiet404: options?.quiet404,
   });
 }
 
@@ -79,7 +95,12 @@ export async function apiDelete<T = void>(
   url: string,
   options?: ApiRequestOptions
 ): Promise<ApiResult<T>> {
-  return request<T>({ method: "DELETE", url, ...toAxiosConfig(options) });
+  return request<T>({
+    method: "DELETE",
+    url,
+    ...toAxiosConfig(options),
+    quiet404: options?.quiet404,
+  });
 }
 
 /**

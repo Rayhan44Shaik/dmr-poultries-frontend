@@ -1,4 +1,4 @@
-﻿import { publishPendingCollectionSnapshot } from "./collectionSnapshot";
+import { publishPendingCollectionSnapshot } from "./collectionSnapshot";
 
 import type {
   Collection,
@@ -24,6 +24,7 @@ import {
   apiPatch,
   apiDelete,
   handleApiError,
+  toApiError,
 } from "../../../../api";
 import { calculateCollectorSummary, calculatePaymentModeSummary } from "../utils/collectionCalculation";
 
@@ -127,12 +128,17 @@ function buildPending(): PendingCollection[] {
 /* ==================================================================
    backend helpers
 ================================================================== */
-async function fetchPage<T>(path: string, filters: Record<string, unknown> = {}): Promise<T[]> {
+async function fetchPage<T>(
+  path: string,
+  filters: Record<string, unknown> = {},
+  quiet404?: boolean
+): Promise<T[]> {
   const all: T[] = [];
   let page = 1;
   for (;;) {
     const { data } = await apiGet<T[] | { data: T[]; meta: { total: number; totalPages: number } }>(path, {
       params: { ...filters, page, limit: PAGE_SIZE },
+      quiet404,
     });
     if (Array.isArray(data)) {
       all.push(...data);
@@ -146,15 +152,15 @@ async function fetchPage<T>(path: string, filters: Record<string, unknown> = {})
   return all;
 }
 
-async function fetchCollections(): Promise<CollectionApiEntry[]> {
+async function fetchCollections(quiet404?: boolean): Promise<CollectionApiEntry[]> {
   const rows = await fetchPage<Record<string, unknown>>(COLLECTION_PATH, {
     includeDeleted: "false",
-  });
+  }, quiet404);
   return rows.map(mapRawEntry);
 }
 
-async function fetchShopSales(): Promise<ShopSale[]> {
-  const rows = await fetchPage<Record<string, unknown>>(SHOP_SALES_PATH);
+async function fetchShopSales(quiet404?: boolean): Promise<ShopSale[]> {
+  const rows = await fetchPage<Record<string, unknown>>(SHOP_SALES_PATH, {}, quiet404);
   return rows.map(mapRawSale);
 }
 
@@ -253,12 +259,22 @@ function rebuildCache() {
 /**
  * Pull everything from PostgreSQL and rebuild the cache. Call once at app
  * start (and after every mutation). Synchronous getters then serve fresh data.
+ *
+ * `quietNotFound`: the module-scope background warm-up passes this — a 404
+ * means the environment simply does not serve these optional endpoints
+ * (e.g. the preview mock backend). It then degrades to an empty pending
+ * snapshot (safe fallback for the Header badge) WITHOUT console noise and
+ * WITHOUT marking the cache initialized, so any explicit consumer still
+ * performs its own, error-surfacing initialization. Every other failure
+ * (network / 401 / 403 / 5xx …) keeps the existing log-and-throw behavior.
  */
-export async function refreshFromBackend(): Promise<void> {
+export async function refreshFromBackend(options?: {
+  quietNotFound?: boolean;
+}): Promise<void> {
   try {
     const [entries, sales, shops] = await Promise.all([
-      fetchCollections(),
-      fetchShopSales(),
+      fetchCollections(options?.quietNotFound),
+      fetchShopSales(options?.quietNotFound),
       fetchShops(),
     ]);
     entriesCache = entries;
@@ -266,6 +282,10 @@ export async function refreshFromBackend(): Promise<void> {
     shopsCache = shops;
     rebuildCache();
   } catch (error) {
+    if (options?.quietNotFound && toApiError(error).status === 404) {
+      publishPendingCollectionSnapshot([]);
+      return;
+    }
     handleApiError(error);
     throw error;
   }
@@ -687,10 +707,12 @@ getShopSales,
 
 /** Only initialization is shared. Explicit post-mutation refreshes retain
  * their existing behavior and never join a pre-mutation initialization read. */
-export function primeCollectionCache(): Promise<void> {
+export function primeCollectionCache(options?: {
+  quietNotFound?: boolean;
+}): Promise<void> {
   if (initialized) return Promise.resolve();
   if (initialLoad) return initialLoad;
-  const pending = refreshFromBackend().finally(() => {
+  const pending = refreshFromBackend(options).finally(() => {
     if (initialLoad === pending) initialLoad = undefined;
   });
   initialLoad = pending;
@@ -700,7 +722,10 @@ export function primeCollectionCache(): Promise<void> {
 // Actual collection/dashboard consumers keep the existing initialization.
 // The shared header imports only collectionSnapshot until alerts are opened.
 if (typeof window !== "undefined") {
-  void primeCollectionCache().catch(() => {
+  // Background warm-up only: a 404 (endpoints absent in this environment)
+  // degrades quietly to an empty pending snapshot — no console noise, and the
+  // cache stays uninitialized so explicit consumers still surface errors.
+  void primeCollectionCache({ quietNotFound: true }).catch(() => {
     /* an explicit consumer can retry; never substitute sample data */
   });
 }

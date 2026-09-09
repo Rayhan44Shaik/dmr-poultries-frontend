@@ -44,7 +44,7 @@ export default {
   'nav.deductions': 'తగ్గింపులు',
   'nav.accountsDashboard': 'అకౌంట్స్ డ్యాష్‌బోర్డ్',
   'nav.collectionRegister': 'కలెక్షన్ రిజిస్టర్',
-  'nav.farmerPayments': 'రైతు చెల్లింపులు',
+  'nav.farmerPayments': 'ఫారం చెల్లింపు',
   'nav.newPaymentEntry': 'కొత్త చెల్లింపు నమోదు',
   'nav.shopLedger': 'షాప్ లెడ్జర్',
   'nav.dailyWeeklyReports': 'రోజువారీ / వారపు నివేదికలు',

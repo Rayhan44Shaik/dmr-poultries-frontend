@@ -36,6 +36,7 @@
     "test:e2e:masters": "playwright test --config tests/masters/playwright.config.ts"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.3.0",
     "@fontsource/noto-sans-telugu": "^5.3.0",
     "@tailwindcss/vite": "^4.3.1",
     "@types/react-date-range": "^1.4.10",

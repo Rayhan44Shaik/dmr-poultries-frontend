@@ -10,10 +10,16 @@
 //   npm run mock:backend        # serves sample JSON on port 4000 (all interfaces)
 //
 // Served today: /api/health, /api/masters/{shops,employees,vehicles},
-// /api/trips (+ /api/trips/:id and POST /api/trips/:id/steps/deliveries for the
-// Orders Collection / Assignment / Delivery Tracking page) and the
-// /api/operations/collection-entry/* report endpoints. Vehicle responses also
-// include 12 fictional EMI schedules for /fleet?tab=emi.
+// /api/trips (+ /api/trips/:id, POST /api/trips/:id/steps/deliveries for the
+// Orders Collection / Assignment / Delivery Tracking page, and
+// PATCH /api/trips/:id/status for the Draft→Pending→Completed lifecycle),
+// and the /api/operations/collection-entry/* report endpoints. Vehicle
+// responses also include 12 fictional EMI schedules for /fleet?tab=emi.
+// The seeded trips include several COMPLETED ones with farm details
+// (sourceFarm / totalBirds / dcWeight), full Step 2 farm data (address, meter,
+// GPS) and DC weighbridge photos, so the Accounts → Farm Payment page and its
+// trip-history modal show rich sample rows; complete the Pending TRP trip from
+// Trip List to watch a newly completed trip appear there too.
 //
 // For REAL data, run the actual ERP backend on port 4000 instead — no config
 // change needed (the Vite dev proxy targets 127.0.0.1:4000).
@@ -165,9 +171,77 @@ const VEHICLES = buildSampleEmiVehicles();
 
 const VEHICLE_BY_ID = new Map(VEHICLES.map((v) => [v.id, v]));
 
+// ── Farm (Step 2) sample details + DC weighbridge photo ─────────────────────
+// The Accounts → Farm Payment trip-history modal opens on Step 2 (Farm), so
+// the sample trips carry full farm details and a DC photo (a deterministic
+// SVG "weighbridge slip" rendered as an image data URL — no binary assets).
+
+/** Deterministic weighbridge-slip SVG as an image data URL. */
+function dcPhotoSvg({ tripNo, farm, weightKg, date, slip = 1 }) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400">
+  <rect width="640" height="400" fill="#f8fafc"/>
+  <rect x="16" y="16" width="608" height="368" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <rect x="16" y="16" width="608" height="64" rx="18" fill="#0f766e"/>
+  <text x="40" y="46" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#ffffff">DMR POULTRIES — WEIGHBRIDGE SLIP</text>
+  <text x="40" y="68" font-family="Arial, sans-serif" font-size="12" fill="#ccfbf1">DC Weight Proof · Slip ${slip} of 2</text>
+  <line x1="40" y1="110" x2="600" y2="110" stroke="#e2e8f0" stroke-width="2"/>
+  <text x="40" y="145" font-family="Arial, sans-serif" font-size="14" fill="#64748b">TRIP NO</text>
+  <text x="220" y="145" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#0f172a">${tripNo}</text>
+  <text x="40" y="180" font-family="Arial, sans-serif" font-size="14" fill="#64748b">FARM</text>
+  <text x="220" y="180" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#0f172a">${farm}</text>
+  <text x="40" y="215" font-family="Arial, sans-serif" font-size="14" fill="#64748b">DATE</text>
+  <text x="220" y="215" font-family="Arial, sans-serif" font-size="16" fill="#0f172a">${date}</text>
+  <rect x="40" y="245" width="560" height="90" rx="14" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="70" y="283" font-family="Arial, sans-serif" font-size="14" fill="#64748b">GROSS DC WEIGHT</text>
+  <text x="70" y="318" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#0f766e">${weightKg} kg</text>
+  <text x="600" y="360" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#94a3b8">SAMPLE DATA — mock backend</text>
+</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+/** Step 2 (Farm) + Step 3 (Pickup) fields shared by every vehicle trip below. */
+function farmStepDetails({ farm, address, destMeter, reachedTime, loadTime, tolls, avgBirdWeight, gps, tripNo, weightKg, birds, date }) {
+  // Step 3: boxes of ~100 birds each, weights derived from the DC weight.
+  const boxCount = Math.max(1, Math.ceil(birds / 100));
+  const baseBirds = Math.floor(birds / boxCount);
+  const extra = birds % boxCount;
+  const perBirdKg = birds > 0 ? weightKg / birds : 0;
+  const boxDetails = Array.from({ length: boxCount }, (_, i) => {
+    const boxBirds = baseBirds + (i < extra ? 1 : 0);
+    return {
+      boxNo: i + 1,
+      birds: boxBirds,
+      weight: Number((boxBirds * perBirdKg).toFixed(2)),
+      avgWeight: Number(perBirdKg.toFixed(3)),
+    };
+  });
+  return {
+    farmAddress: address,
+    destMeter,
+    reachedTime,
+    pickupTolls: tolls,
+    avgBirdWeight,
+    farmGpsLat: gps[0],
+    farmGpsLon: gps[1],
+    farmGpsAccuracy: 8,
+    farmGpsTime: `${date}T${reachedTime}:00`,
+    pickupLoadTime: loadTime,
+    boxes: boxCount,
+    boxDetails,
+    // Lets the read-only StepPickup view show "boxes / capacity" cleanly
+    // instead of falling back to a vehicle-master lookup.
+    vehicleBoxCapacity: 12,
+    dcPhotoKey: `dc_photo_${tripNo}_1`,
+    dcPhotoMime: "image/svg+xml",
+    dcPhotoData: dcPhotoSvg({ tripNo, farm, weightKg, date, slip: 1 }),
+    dcPhotoKey2: `dc_photo_${tripNo}_2`,
+    dcPhotoMime2: "image/svg+xml",
+    dcPhotoData2: dcPhotoSvg({ tripNo, farm, weightKg: (weightKg * 0.98).toFixed(0), date, slip: 2 }),
+  };
+}
+
 /** One Orders plan row (`[ORDER]` marker, boxNo = boxes). */
-function planRow(serialNo, shopId, boxes, birds, over = {}) {
-  const shop = SHOPS.find((s) => s.id === shopId) ?? { shopName: `Shop ${shopId}` };
+function planRow(serialNo, shopId, boxes, birds, over = {}) {  const shop = SHOPS.find((s) => s.id === shopId) ?? { shopName: `Shop ${shopId}` };
   const weight = Number((birds * 1.5).toFixed(2));
   return {
     id: serialNo,
@@ -253,6 +327,7 @@ function buildTrips() {
       ],
     }),
     // ── Vehicle 1: shops 1 + 2 assigned, shop 1 already delivered ────────────
+    // (Pending — complete it from Trip List to watch it appear on Farm Payment)
     baseTrip({
       id: 9101,
       tripNo: `TRP-${stamp(yesterday)}-01`,
@@ -262,6 +337,24 @@ function buildTrips() {
       vehicleNo: VEHICLE_BY_ID.get(1).vehicleNumber,
       driverName: "Imran S",
       supervisorName: "Ravi Kumar",
+      sourceFarmId: 1,
+      sourceFarm: "Sri Balaji Broiler Farm",
+      totalBirds: 800,
+      dcWeight: 1200,
+      ...farmStepDetails({
+        farm: "Sri Balaji Broiler Farm",
+        address: "Survey 42, Keesara Road, Medchal — 501401",
+        destMeter: 1840,
+        reachedTime: "06:35",
+        loadTime: "07:20",
+        tolls: 150,
+        avgBirdWeight: 1.5,
+        gps: [17.4849, 78.6033],
+        tripNo: `TRP-${stamp(yesterday)}-01`,
+        weightKg: 1200,
+        birds: 800,
+        date: yesterday,
+      }),
       startStepSubmitted: true,
       farmStepSubmitted: true,
       pickupStepSubmitted: true,
@@ -284,6 +377,25 @@ function buildTrips() {
       vehicleNo: VEHICLE_BY_ID.get(2).vehicleNumber,
       driverName: "Kiran P",
       supervisorName: "Srinivas G",
+      sourceFarmId: 2,
+      sourceFarm: "Anand Agro Farms",
+      totalBirds: 350,
+      dcWeight: 525,
+      approvedBy: "Owner",
+      ...farmStepDetails({
+        farm: "Anand Agro Farms",
+        address: "Plot 7, Bhongir Road, Yadadri — 508116",
+        destMeter: 3265,
+        reachedTime: "07:10",
+        loadTime: "08:05",
+        tolls: 200,
+        avgBirdWeight: 1.5,
+        gps: [17.5151, 78.6497],
+        tripNo: `TRP-${stamp(yesterday)}-02`,
+        weightKg: 525,
+        birds: 350,
+        date: yesterday,
+      }),
       startStepSubmitted: true,
       farmStepSubmitted: true,
       pickupStepSubmitted: true,
@@ -312,6 +424,192 @@ function buildTrips() {
       startStepSubmitted: true,
       farmStepSubmitted: true,
     }),
+    // ── Completed trips (fully approved, all wizard steps submitted) ─────────
+    // These are what the Accounts → Farm Payment page lists: status Completed,
+    // not deleted, pickup step submitted. Plain delivery rows (no `[ORDER]`
+    // remarks) so the Orders scenario above is unaffected.
+    ...buildCompletedFarmTrips({ stamp }),
+  ];
+}
+
+/** Completed trips with farm details for the Farm Payment page sample data. */
+function buildCompletedFarmTrips({ stamp }) {
+  const on = (offset) => iso(addDays(new Date(), offset));
+  // Plain delivery rows — remarks must NOT start with "[ORDER]" (that marker
+  // is reserved for Orders-module rows and would pollute its classification).
+  const rows = (shopIds, date, startHour) =>
+    shopIds.map((shopId, i) =>
+      planRow(i + 1, shopId, 20 + i * 10, 200 + i * 100, {
+        remarks: "",
+        autoCaptureTime: `${date}T${String(startHour + i).padStart(2, "0")}:10:00`,
+      })
+    );
+
+  // Generated completed history (every other day over the past ~3 weeks) so
+  // the Farm Payment page's pagination has real pages to page through.
+  const FARMS = [
+    { id: 1, name: "Sri Balaji Broiler Farm", address: "Survey 42, Keesara Road, Medchal — 501401", gps: [17.4849, 78.6033], tolls: 150 },
+    { id: 2, name: "Anand Agro Farms", address: "Plot 7, Bhongir Road, Yadadri — 508116", gps: [17.5151, 78.6497], tolls: 200 },
+    { id: 3, name: "Godavari Broiler Farm", address: "Near Prattipadu Cross, Guntur District — 522019", gps: [16.3067, 80.4365], tolls: 300 },
+  ];
+  const DRIVERS = ["Imran S", "Kiran P"];
+  const SUPERVISORS = ["Ravi Kumar", "Srinivas G", "Mohan Rao"];
+  const generated = [];
+  let genId = 9110;
+  for (let back = 8; back <= 26; back += 2) {
+    const date = on(-back);
+    const farm = FARMS[(back / 2 - 4) % FARMS.length];
+    const birds = 300 + ((back * 37) % 6) * 100; // 300–800, deterministic
+    const weightKg = Math.round(birds * 1.5);
+    const vehicleId = ((back / 2 - 4) % 6) + 7; // vehicles 7–12
+    const vehicle = VEHICLE_BY_ID.get(vehicleId);
+    const tripNo = `TRP-${stamp(date)}-0${(back / 2 - 3) % 9 || 1}`;
+    generated.push(
+      baseTrip({
+        id: genId++,
+        tripNo,
+        tripDate: date,
+        status: "Completed",
+        vehicleId,
+        vehicleNo: vehicle ? vehicle.vehicleNumber : `AP 16 TS ${4000 + vehicleId}`,
+        driverName: DRIVERS[back % DRIVERS.length],
+        supervisorName: SUPERVISORS[(back / 2) % SUPERVISORS.length],
+        sourceFarmId: farm.id,
+        sourceFarm: farm.name,
+        totalBirds: birds,
+        dcWeight: weightKg,
+        approvedBy: "Owner",
+        ...farmStepDetails({
+          farm: farm.name,
+          address: farm.address,
+          destMeter: 1500 + back * 90,
+          reachedTime: `0${5 + (back % 3)}:${back % 2 ? "15" : "45"}`,
+          loadTime: `0${6 + (back % 3)}:${back % 2 ? "05" : "35"}`,
+          tolls: farm.tolls,
+          avgBirdWeight: 1.5,
+          gps: farm.gps,
+          tripNo,
+          weightKg,
+          birds,
+          date,
+        }),
+        startStepSubmitted: true,
+        farmStepSubmitted: true,
+        pickupStepSubmitted: true,
+        deliveryStepSubmitted: true,
+        endStepSubmitted: true,
+        deliveries: rows([1 + (back % 4), 2 + (back % 3), 4], date, 8),
+      })
+    );
+  }
+
+  return [
+    baseTrip({
+      id: 9104,
+      tripNo: `TRP-${stamp(on(-2))}-03`,
+      tripDate: on(-2),
+      status: "Completed",
+      vehicleId: 4,
+      vehicleNo: VEHICLE_BY_ID.get(4).vehicleNumber,
+      driverName: "Kiran P",
+      supervisorName: "Ravi Kumar",
+      sourceFarmId: 1,
+      sourceFarm: "Sri Balaji Broiler Farm",
+      totalBirds: 480,
+      dcWeight: 720,
+      approvedBy: "Owner",
+      ...farmStepDetails({
+        farm: "Sri Balaji Broiler Farm",
+        address: "Survey 42, Keesara Road, Medchal — 501401",
+        destMeter: 2115,
+        reachedTime: "06:50",
+        loadTime: "07:40",
+        tolls: 150,
+        avgBirdWeight: 1.5,
+        gps: [17.4849, 78.6033],
+        tripNo: `TRP-${stamp(on(-2))}-03`,
+        weightKg: 720,
+        birds: 480,
+        date: on(-2),
+      }),
+      startStepSubmitted: true,
+      farmStepSubmitted: true,
+      pickupStepSubmitted: true,
+      deliveryStepSubmitted: true,
+      endStepSubmitted: true,
+      deliveries: rows([1, 2], on(-2), 9),
+    }),
+    baseTrip({
+      id: 9105,
+      tripNo: `TRP-${stamp(on(-4))}-01`,
+      tripDate: on(-4),
+      status: "Completed",
+      vehicleId: 5,
+      vehicleNo: VEHICLE_BY_ID.get(5).vehicleNumber,
+      driverName: "Imran S",
+      supervisorName: "Srinivas G",
+      sourceFarmId: 3,
+      sourceFarm: "Godavari Broiler Farm",
+      totalBirds: 620,
+      dcWeight: 930,
+      approvedBy: "Owner",
+      ...farmStepDetails({
+        farm: "Godavari Broiler Farm",
+        address: "Near Prattipadu Cross, Guntur District — 522019",
+        destMeter: 4480,
+        reachedTime: "05:55",
+        loadTime: "06:45",
+        tolls: 300,
+        avgBirdWeight: 1.5,
+        gps: [16.3067, 80.4365],
+        tripNo: `TRP-${stamp(on(-4))}-01`,
+        weightKg: 930,
+        birds: 620,
+        date: on(-4),
+      }),
+      startStepSubmitted: true,
+      farmStepSubmitted: true,
+      pickupStepSubmitted: true,
+      deliveryStepSubmitted: true,
+      endStepSubmitted: true,
+      deliveries: rows([1, 3, 4], on(-4), 8),
+    }),
+    baseTrip({
+      id: 9106,
+      tripNo: `TRP-${stamp(on(-6))}-02`,
+      tripDate: on(-6),
+      status: "Completed",
+      vehicleId: 6,
+      vehicleNo: VEHICLE_BY_ID.get(6).vehicleNumber,
+      driverName: "Kiran P",
+      supervisorName: "Mohan Rao",
+      sourceFarmId: 2,
+      sourceFarm: "Anand Agro Farms",
+      totalBirds: 300,
+      dcWeight: 450,
+      approvedBy: "Owner",
+      ...farmStepDetails({
+        farm: "Anand Agro Farms",
+        address: "Plot 7, Bhongir Road, Yadadri — 508116",
+        destMeter: 3970,
+        reachedTime: "07:25",
+        loadTime: "08:15",
+        tolls: 200,
+        avgBirdWeight: 1.5,
+        gps: [17.5151, 78.6497],
+        tripNo: `TRP-${stamp(on(-6))}-02`,
+        weightKg: 450,
+        birds: 300,
+        date: on(-6),
+      }),
+      startStepSubmitted: true,
+      farmStepSubmitted: true,
+      pickupStepSubmitted: true,
+      deliveryStepSubmitted: true,
+      endStepSubmitted: true,
+      deliveries: rows([2, 4], on(-6), 10),
+    }),
+    ...generated,
   ];
 }
 
@@ -383,6 +681,31 @@ const server = http.createServer((req, res) => {
   const stepMatch = url.pathname.match(/^\/api\/trips\/(\d+)\/steps\/deliveries$/);
   if (stepMatch && req.method === "POST") {
     readJsonBody(req).then((body) => send(200, applyDeliveriesPayload(stepMatch[1], body)));
+    return;
+  }
+
+  // PATCH /api/trips/:id/status — backend-authoritative status transition
+  // (Draft → Pending, Pending → Completed), same contract as the ERP backend.
+  // This is what the Trip List / Recent Trips "approve" action calls; a trip
+  // completed here immediately becomes eligible for the Farm Payment page.
+  const statusMatch = url.pathname.match(/^\/api\/trips\/(\d+)\/status$/);
+  if (statusMatch && req.method === "PATCH") {
+    readJsonBody(req).then((body) => {
+      const trip = TRIPS.find((t) => t.id === Number(statusMatch[1]));
+      if (!trip) {
+        return send(404, { error: "trip_not_found", id: Number(statusMatch[1]), mock: true });
+      }
+      const next = body.status;
+      const valid =
+        (trip.status === "Draft" && next === "Pending") ||
+        (trip.status === "Pending" && next === "Completed");
+      if (!valid) {
+        return send(422, { error: "invalid_status_transition", from: trip.status, to: next, mock: true });
+      }
+      trip.status = next;
+      if (next === "Completed") trip.approvedBy = typeof body.approvedBy === "string" ? body.approvedBy : "Owner";
+      return send(200, trip);
+    });
     return;
   }
 

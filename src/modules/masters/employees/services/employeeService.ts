@@ -111,10 +111,6 @@ function toPayload(
     status: normalizeStatus(input.status ?? "Active"),
   };
 
-  if (input.id != null && !Number.isNaN(Number(input.id))) {
-    payload.id = Number(input.id);
-  }
-
   return payload;
 }
 
@@ -171,7 +167,6 @@ export async function updateEmployee(
   input: EmployeeInput | Partial<Employee>
 ): Promise<Employee> {
   clearLegacyEmployeeStorage();
-  // Send the complete employee object, including id, for the PUT body.
   const { data } = await apiPut<Record<string, unknown>>(
     `${EMPLOYEES_PATH}/${id}`,
     toPayload({

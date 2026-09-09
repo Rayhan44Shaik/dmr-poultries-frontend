@@ -14,6 +14,13 @@ export interface ApiRequestOptions {
   params?: Record<string, unknown>;
   /** Override timeout (ms) for this request */
   timeout?: number;
+  /**
+   * Opt-in per request: do not console-log a 404 (endpoint legitimately
+   * absent in this environment, e.g. an optional background warm-up).
+   * The error is still THROWN unchanged — only the log line is suppressed,
+   * and every other status (401/403/500/network…) logs exactly as before.
+   */
+  quiet404?: boolean;
 }
 
 export interface ApiErrorBody {

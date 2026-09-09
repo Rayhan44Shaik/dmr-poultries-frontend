@@ -44,7 +44,7 @@ export default {
   'nav.deductions': 'Deductions',
   'nav.accountsDashboard': 'Accounts Dashboard',
   'nav.collectionRegister': 'Collection Register',
-  'nav.farmerPayments': 'Farmer Payments',
+  'nav.farmerPayments': 'Farm Payment',
   'nav.newPaymentEntry': 'New Payment Entry',
   'nav.shopLedger': 'Shop Ledger',
   'nav.dailyWeeklyReports': 'Daily / Weekly Reports',

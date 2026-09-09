@@ -39,6 +39,11 @@ export function FarmerPaymentFilters({
   const [farmSearch, setFarmSearch] = React.useState('');
   const [showFarmDropdown, setShowFarmDropdown] = React.useState(false);
   const farmDropdownRef = React.useRef<HTMLDivElement>(null);
+  const farmTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const farmSearchRef = React.useRef<HTMLInputElement>(null);
+  const farmOptionRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
+  const farmLabelId = React.useId();
+  const farmListboxId = React.useId();
 
   const filteredFarms = React.useMemo(() => {
     if (!farmSearch.trim()) return farms;
@@ -49,11 +54,42 @@ export function FarmerPaymentFilters({
     const handleClickOutside = (e: MouseEvent) => {
       if (farmDropdownRef.current && !farmDropdownRef.current.contains(e.target as Node)) {
         setShowFarmDropdown(false);
+        setFarmSearch('');
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Focus the farm search box whenever the dropdown opens.
+  React.useEffect(() => {
+    if (showFarmDropdown) farmSearchRef.current?.focus();
+  }, [showFarmDropdown]);
+
+  const closeFarmDropdown = (restoreFocus = true) => {
+    setShowFarmDropdown(false);
+    setFarmSearch('');
+    if (restoreFocus) farmTriggerRef.current?.focus();
+  };
+
+  /** Keyboard navigation inside the farm listbox: Escape closes, arrows move. */
+  const handleFarmListKeydown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeFarmDropdown();
+      return;
+    }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    const buttons = farmOptionRefs.current.filter((b): b is HTMLButtonElement => Boolean(b));
+    if (buttons.length === 0) return;
+    const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const next =
+      e.key === 'ArrowDown'
+        ? (current + 1) % buttons.length
+        : (current - 1 + buttons.length) % buttons.length;
+    buttons[next].focus();
+  };
 
   const statusOptions = [
     { value: 'All', label: 'All Status', color: 'text-slate-600' },
@@ -90,44 +126,70 @@ export function FarmerPaymentFilters({
           className="w-full"
         />
 
-        {/* Farm dropdown – searchable */}
+        {/* Farm dropdown – searchable, fully keyboard operable */}
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Farm</label>
+          <label id={farmLabelId} className="block text-xs font-medium text-slate-600 mb-1">Farm</label>
           <div className="relative" ref={farmDropdownRef}>
-            <div
+            <button
+              type="button"
+              ref={farmTriggerRef}
+              aria-labelledby={farmLabelId}
+              aria-haspopup="listbox"
+              aria-expanded={showFarmDropdown}
+              onClick={() => (showFarmDropdown ? closeFarmDropdown(false) : setShowFarmDropdown(true))}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  setShowFarmDropdown(true);
+                }
+              }}
               className="w-full h-10 px-3 rounded-lg border border-slate-300 bg-white flex items-center justify-between cursor-pointer text-sm focus:ring-2 focus:ring-blue-400 outline-none"
-              onClick={() => setShowFarmDropdown(!showFarmDropdown)}
             >
               <span className="truncate">{selectedFarm}</span>
               <Search size={16} className="text-slate-400" />
-            </div>
+            </button>
             {showFarmDropdown && (
-              <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl max-h-56 overflow-y-auto p-1">
+              <div
+                role="listbox"
+                id={farmListboxId}
+                aria-labelledby={farmLabelId}
+                onKeyDown={handleFarmListKeydown}
+                className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl max-h-56 overflow-y-auto p-1"
+              >
                 <input
                   type="text"
+                  ref={farmSearchRef}
                   value={farmSearch}
                   onChange={(e) => setFarmSearch(e.target.value)}
                   placeholder="Search farm..."
+                  aria-label="Search farm"
                   className={`${uiInputClass} mb-1`}
                   onClick={(e) => e.stopPropagation()}
                 />
-                {filteredFarms.map((farm) => (
-                  <div
+                {filteredFarms.map((farm, index) => (
+                  <button
+                    type="button"
                     key={farm}
+                    role="option"
+                    aria-selected={selectedFarm === farm}
+                    ref={(el) => {
+                      farmOptionRefs.current[index] = el;
+                    }}
                     onClick={() => {
                       onFarmChange(farm);
-                      setShowFarmDropdown(false);
-                      setFarmSearch('');
+                      closeFarmDropdown(false);
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-blue-50 transition ${
+                    className={`w-full text-left px-3 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-blue-50 transition focus:outline-none focus:ring-2 focus:ring-blue-400 ${
                       selectedFarm === farm ? 'bg-blue-100 font-semibold text-blue-700' : ''
                     }`}
                   >
                     {farm}
-                  </div>
+                  </button>
                 ))}
                 {filteredFarms.length === 0 && (
-                  <div className="px-3 py-2 text-sm text-slate-400">No farms found</div>
+                  <div className="px-3 py-2 text-sm text-slate-400" role="status">
+                    No farms found
+                  </div>
                 )}
               </div>
             )}
@@ -165,11 +227,14 @@ export function FarmerPaymentFilters({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search by Trip No, Vehicle, Farm, Driver, Supervisor..."
+              aria-label="Search trips"
               className="w-full h-10 pl-9 pr-3 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white"
             />
             {searchQuery && (
               <button
+                type="button"
                 onClick={() => onSearchChange('')}
+                aria-label="Clear search"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
                 <X size={16} />
