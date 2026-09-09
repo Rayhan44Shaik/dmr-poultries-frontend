@@ -15,6 +15,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSalaryRegister } from "../hooks/useSalaryRegister";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
+import { todayBusinessDate } from "../../../utils/businessDate";
 import { loadEmployees } from "../../masters/employees/services/employeeService";
 import { getSalaryMonthSummary, downloadPayslipPdf, updateSalary, emailSalaryPayslips, whatsappSalaryPayslips, bulkUpdateSalaryStatus } from "../services/salaryService";
 import {
@@ -166,8 +167,17 @@ function SalaryRegisterPage() {
         setIsMonthPickerOpen(false);
       }
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape closes the month popover (and only the month popover — the page
+      // has no other overlay open at this layer).
+      if (e.key === "Escape") setIsMonthPickerOpen(false);
+    };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   useEffect(() => {
@@ -361,7 +371,7 @@ function SalaryRegisterPage() {
       try {
         const result = await bulkUpdateSalaryStatus(ids, {
           status: "Paid",
-          paymentDate: new Date().toISOString().slice(0, 10),
+          paymentDate: todayBusinessDate(),
           paymentMode: "Bank Transfer",
         });
         await refresh();
@@ -494,6 +504,7 @@ function SalaryRegisterPage() {
     <button
       type="button"
       onClick={() => handleFilterChange(key)}
+      aria-pressed={filter === key}
       className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
         filter === key
           ? "bg-white text-brand-700 shadow-sm border border-slate-200/60"
@@ -508,14 +519,19 @@ function SalaryRegisterPage() {
   return (
     <div className="space-y-4 w-full">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        {monthStatus && (
-          <span className={uiBadgeClass(monthStatus.tone)}>
-            {monthStatus.label === "Closed" || monthStatus.label === "Paid" ? <Lock size={11} /> : null}
-            {monthStatus.label}
-          </span>
-        )}
-        <div className="flex items-center gap-2 ml-auto">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+            Salary Register
+          </h1>
+          {monthStatus && (
+            <span className={uiBadgeClass(monthStatus.tone)}>
+              {monthStatus.label === "Closed" || monthStatus.label === "Paid" ? <Lock size={11} /> : null}
+              {monthStatus.label}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
           {!hasRecords && !loading && (
             <Button
               variant="primary"
@@ -542,6 +558,9 @@ function SalaryRegisterPage() {
                 if (y) setPickerYear(Number(y));
                 setIsMonthPickerOpen((o) => !o);
               }}
+              aria-haspopup="dialog"
+              aria-expanded={isMonthPickerOpen}
+              aria-label={`Select month, currently ${formatMonthName(month)}`}
               className="flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none transition hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             >
               <span>{formatMonthName(month)}</span>
@@ -549,7 +568,11 @@ function SalaryRegisterPage() {
             </button>
 
             {isMonthPickerOpen && (
-              <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-lg border border-slate-200 p-4 z-50 space-y-4">
+              <div
+                role="dialog"
+                aria-label="Choose month"
+                className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-lg border border-slate-200 p-4 z-50 space-y-4"
+              >
                 <div className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/60">
                   <button type="button" onClick={() => setPickerYear((p) => p - 1)} className="p-1.5 hover:bg-white rounded-lg text-slate-600 transition">
                     <ChevronLeft size={16} />
@@ -627,7 +650,11 @@ function SalaryRegisterPage() {
 
           <div>
             <span className={filterLabelClass}>Status</span>
-            <div className="inline-flex bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 h-9 items-center">
+            <div
+              role="group"
+              aria-label="Filter by status"
+              className="inline-flex bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 h-9 items-center"
+            >
               {statusTab("All", "All", <LayoutGrid size={12} className="text-slate-400" />)}
               {statusTab("Pending", "Pending", <Clock size={12} className="text-slate-400" />)}
               {statusTab("Paid", "Paid", <CheckCircle size={12} className="text-slate-400" />)}
