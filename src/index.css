@@ -25,6 +25,14 @@
 @import "@fontsource/noto-sans-telugu/telugu-500.css";
 @import "@fontsource/noto-sans-telugu/telugu-600.css";
 @import "@fontsource/noto-sans-telugu/telugu-700.css";
+/* Inter (Latin) served locally through the same @fontsource mechanism — the
+   app no longer requests fonts.googleapis.com, so typography is identical
+   (same faces/weights) but fully self-contained and deterministic offline. */
+@import "@fontsource/inter/latin-400.css";
+@import "@fontsource/inter/latin-500.css";
+@import "@fontsource/inter/latin-600.css";
+@import "@fontsource/inter/latin-700.css";
+@import "@fontsource/inter/latin-800.css";
 
 /* Class-based dark mode (toggled by ThemeProvider via .dark on <html>) */
 @custom-variant dark (&:where(.dark, .dark *));

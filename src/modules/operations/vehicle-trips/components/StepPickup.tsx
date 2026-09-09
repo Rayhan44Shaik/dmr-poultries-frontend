@@ -177,6 +177,35 @@ export default function StepPickup({
   // ─── Toast state ────────────────────────────────────────────────────
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
+  // ─── One operation per intentional action ─────────────────────────────
+  // Guards the read-only view's DC-photo download and Pickup KPI PDF at the
+  // OPERATION level (not just the disabled attribute): a mouse double-click
+  // or repeated Enter/Space cannot produce duplicate downloads. The lock is
+  // ref-based so it also protects programmatic invocation, held briefly
+  // (500ms) after completion to swallow the second click of a double-click,
+  // and released immediately on unmount. A failed operation re-arms the same
+  // way, so retry always works.
+  const [busyAction, setBusyAction] = useState<"image" | "pdf" | null>(null);
+  const actionLockRef = useRef<"image" | "pdf" | null>(null);
+  const actionLockTimerRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    // Cleanup-safe: never leave a stale timer/lock after unmount.
+    return () => window.clearTimeout(actionLockTimerRef.current);
+  }, []);
+  const beginAction = (action: "image" | "pdf"): boolean => {
+    if (actionLockRef.current !== null) return false;
+    actionLockRef.current = action;
+    setBusyAction(action);
+    return true;
+  };
+  const endAction = () => {
+    window.clearTimeout(actionLockTimerRef.current);
+    actionLockTimerRef.current = window.setTimeout(() => {
+      actionLockRef.current = null;
+      setBusyAction(null);
+    }, 500);
+  };
+
   // ─── Confirmation state ─────────────────────────────────────────────
   const [confirmation, setConfirmation] = useState<{
     isOpen: boolean;
@@ -354,8 +383,9 @@ export default function StepPickup({
 
   // ─── Download Image ──────────────────────────────────────────────────
   const downloadImage = async () => {
-    if (!photos[0]?.data) return;
+    if (!beginAction("image")) return;
     try {
+      if (!photos[0]?.data) return;
       const link = document.createElement("a");
       link.href = photos[0].data;
       link.download = `DC_Photo_${trip.tripNo || "trip"}.jpg`;
@@ -365,6 +395,8 @@ export default function StepPickup({
     } catch (error) {
       console.error("Failed to download image:", error);
       setToast({ message: t("ops.trip.failed_download_image"), type: "error" });
+    } finally {
+      endAction();
     }
   };
 
@@ -457,6 +489,7 @@ export default function StepPickup({
   // ─── PDF Generation ─────────────────────────────────────────────────
   const generatePDF = () => {
     if (!trip.pickupStepSubmitted) return;
+    if (!beginAction("pdf")) return;
     try {
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -573,6 +606,8 @@ export default function StepPickup({
       console.error('PDF generation error:', error);
       // Was a blocking window.alert inside a catch block.
       globalNotify.error(t('ops.trip.pdf_generation_failed'));
+    } finally {
+      endAction();
     }
   };
 
@@ -720,18 +755,22 @@ export default function StepPickup({
             {photos.length > 0 && (
               <button
                 onClick={downloadImage}
-                className="flex items-center justify-center p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-xs transition-all active:scale-95"
+                disabled={busyAction !== null}
+                aria-label={t("ops.trip.download_image")}
+                className="flex items-center justify-center p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
                 title={t("ops.trip.download_image")}
               >
-                <Download size={16} />
+                <Download size={16} className={busyAction === "image" ? "animate-pulse" : ""} />
               </button>
             )}
             <button
               onClick={generatePDF}
-              className="flex items-center justify-center p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs transition-all active:scale-95"
+              disabled={busyAction !== null}
+              aria-label={t("ops.trip.download_pdf")}
+              className="flex items-center justify-center p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
               title={t("ops.trip.download_pdf")}
             >
-              <FileText size={16} />
+              <FileText size={16} className={busyAction === "pdf" ? "animate-pulse" : ""} />
             </button>
           </div>
         </div>

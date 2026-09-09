@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import type { Trip } from '../../../operations/vehicle-trips/types/trip';
 import type { FarmPayment } from '../../types/farmPayment.types';
-import { BadgeCheck, AlertTriangle, Clock, Lock } from 'lucide-react';
+import { BadgeCheck, AlertTriangle, Clock, Lock, Eye } from 'lucide-react';
 
 interface FarmPaymentTableProps {
   trips: Trip[];
@@ -12,12 +12,18 @@ interface FarmPaymentTableProps {
   onPaymentSaved: () => void;
   onRefresh: () => void;
   showNotification: (message: string, type?: 'success' | 'error' | 'info') => void;
+  /** Open the read-only trip view modal (full trip history) for a trip. */
+  onViewTrip: (trip: Trip) => void;
+  /** Empty-state message (the page distinguishes "no data" from "no match"). */
+  emptyMessage?: string;
 }
 
 const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
   trips,
   paymentData,
   onPaymentUpdate,
+  onViewTrip,
+  emptyMessage = 'No completed trips found',
 }) => {
   const [tooltipTripId, setTooltipTripId] = useState<string | null>(null);
 
@@ -56,8 +62,11 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
           <div className="relative inline-block">
             <span
               className="inline-flex items-center gap-1 px-2 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-semibold border border-orange-200 cursor-help"
+              tabIndex={0}
               onMouseEnter={() => setTooltipTripId(tripId)}
               onMouseLeave={() => setTooltipTripId(null)}
+              onFocus={() => setTooltipTripId(tripId)}
+              onBlur={() => setTooltipTripId(null)}
             >
               <AlertTriangle size={12} /> Partial
             </span>
@@ -110,10 +119,20 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
     return payment.paymentStatus === 'Paid' || payment.paymentStatus === 'Partially Paid';
   };
 
+  // Locked (already paid/partial) rows show their saved rate read-only.
+  const lockedRate = (value: number) => (
+    <div className="flex items-center gap-1.5">
+      <Lock size={12} className="text-slate-400" />
+      <span className="text-sm font-semibold text-slate-700">
+        {value > 0 ? `₹${value.toFixed(2)}` : '—'}
+      </span>
+    </div>
+  );
+
   if (trips.length === 0) {
     return (
-      <div className="p-8 text-center">
-        <p className="text-slate-500 text-sm">No completed trips found</p>
+      <div className="p-8 text-center" role="status">
+        <p className="text-slate-500 text-sm">{emptyMessage}</p>
       </div>
     );
   }
@@ -135,15 +154,16 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
         <table className="w-full">
           <thead>
             <tr className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Trip No</th>
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Date</th>
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Farm</th>
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Vehicle</th>
-              <th className="px-3 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Total Birds</th>
-              <th className="px-3 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">DC Wt (Kg)</th>
-              <th className="px-3 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Rate/Bird (₹)</th>
-              <th className="px-3 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Total Amount</th>
-              <th className="px-3 py-2.5 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Status</th>
+              <th scope="col" className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Trip No</th>
+              <th scope="col" className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Date</th>
+              <th scope="col" className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Farm</th>
+              <th scope="col" className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Vehicle</th>
+              <th scope="col" className="px-3 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Total Birds</th>
+              <th scope="col" className="px-3 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">DC Wt (Kg)</th>
+              <th scope="col" className="px-3 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Rate/Kg (₹)</th>
+              <th scope="col" className="px-3 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Total Amount</th>
+              <th scope="col" className="px-3 py-2.5 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Trip</th>
+              <th scope="col" className="px-3 py-2.5 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -152,8 +172,9 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
               
               const totalBirdsLoaded = trip.totalBirds || 0;
               const dcWeight = trip.dcWeight || 0;
-              const ratePerBird = payment.ratePerBird || 0;
-              const totalAmount = payment.totalAmount || (totalBirdsLoaded * ratePerBird);
+              const ratePerKg = payment.ratePerKg || 0;
+              // Weight-based pricing: Rate/Kg × DC weight.
+              const totalAmount = payment.totalAmount || dcWeight * ratePerKg;
               const paidAmount = payment.amountPaid || 0;
               const balance = totalAmount - paidAmount;
               const paymentStatus = payment.paymentStatus || 
@@ -185,21 +206,25 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
                   <td className="px-3 py-2.5">
                     <div className="flex justify-end">
                       {locked ? (
-                        <div className="flex items-center gap-1.5">
-                          <Lock size={12} className="text-slate-400" />
-                          <span className="text-sm font-semibold text-slate-700">
-                            ₹{ratePerBird.toFixed(2)}
-                          </span>
-                        </div>
+                        lockedRate(ratePerKg)
                       ) : (
                         <input
                           type="number"
-                          value={ratePerBird || ''}
+                          value={ratePerKg || ''}
+                          min={0}
+                          step="0.01"
+                          inputMode="decimal"
+                          aria-label={`Rate per kg for trip ${trip.tripNo}`}
                           onChange={(e) => {
-                            const rate = parseFloat(e.target.value) || 0;
-                            const newTotal = totalBirdsLoaded * rate;
+                            // A rate is never negative: clamp pasted/typed
+                            // negative values to 0 so the live total can never
+                            // disagree with what Save will persist (the save
+                            // filter already ignores non-positive rates).
+                            const rate = Math.max(0, parseFloat(e.target.value) || 0);
+                            const newTotal = dcWeight * rate;
                             onPaymentUpdate(String(trip.id), {
-                              ratePerBird: rate,
+                              ratePerKg: rate,
+                              ratePerBird: 0,
                               totalAmount: newTotal,
                               totalBirds: totalBirdsLoaded,
                               dcWeight: dcWeight,
@@ -213,6 +238,17 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
                   </td>
                   <td className={`px-3 py-2.5 text-sm text-right font-bold whitespace-nowrap ${amountColorClass}`}>
                     {formatCurrency(totalAmount)}
+                  </td>
+                  <td className="px-3 py-2.5 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onViewTrip(trip)}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-600 hover:shadow focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                      title={`View trip history — ${trip.tripNo}`}
+                      aria-label={`View trip history for ${trip.tripNo}`}
+                    >
+                      <Eye size={14} />
+                    </button>
                   </td>
                   <td className="px-3 py-2.5 text-center">
                     {getPaymentStatusBadge(String(trip.id), totalAmount, paidAmount, balance)}

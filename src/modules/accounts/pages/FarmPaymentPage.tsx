@@ -1,19 +1,15 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { toBusinessDate } from '../../../utils/businessDate';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { FarmPaymentTable } from '../components/farm-payment/FarmPaymentTable';
 import { FarmerPaymentFilters } from '../components/farm-payment/FarmerPaymentFilters';
-import { tripService } from '../../operations/vehicle-trips/services/tripService';
+import { listTrips } from '../../operations/vehicle-trips/services/tripHeaderApiService';
+import { FarmPaymentTripViewModal } from '../components/farm-payment/FarmPaymentTripViewModal';
 import { FarmPaymentService } from '../services/FarmPaymentService';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { FarmPayment } from '../types/farmPayment.types';
-import { Save, RotateCcw } from 'lucide-react';
-import {
-  paginationBarClass,
-  paginationNavBtnClass,
-  paginationPageBtnClass,
-  shouldShowPagination,
-} from '../../../shared/ui/paginationStyles';
+import { Save, RotateCcw, RefreshCw } from 'lucide-react';
+import Pagination from '../../../ui/Pagination';
 
 type FarmerPaymentPageProps = { embedded?: boolean };
 
@@ -23,7 +19,13 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   // ----- state -----
   const [allTrips, setAllTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Timestamp of the last initiated refresh: a double-click on Refresh is one
+  // user intent, so a second click within 500ms is ignored instead of firing
+  // a duplicate fetch (fast responses already reset `loading` between clicks).
+  const lastRefreshAtRef = useRef(0);
 
   // Payment state management
   const [paymentData, setPaymentData] = useState<Record<string, Partial<FarmPayment>>>({});
@@ -36,63 +38,121 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   const [statusFilter, setStatusFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Pagination
+  // Pagination (global <Pagination /> bar — page size is user-selectable)
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [pageSize, setPageSize] = useState(10);
+
+  // Trip opened in the read-only trip view modal (per-row eye button).
+  const [viewingTrip, setViewingTrip] = useState<Trip | null>(null);
+
+  // Trip IDs whose payment the user edited since the last load/save. Only
+  // these rows are saved by "Save Payments" — rows restored from a previous
+  // save are untouched, so the toast count always matches what was just
+  // entered (editing one row after a save saves exactly one payment).
+  const [dirtyTripIds, setDirtyTripIds] = useState<Set<string>>(() => new Set());
+  const markDirty = (tripId: string) =>
+    setDirtyTripIds((prev) => {
+      if (prev.has(tripId)) return prev;
+      const next = new Set(prev);
+      next.add(tripId);
+      return next;
+    });
+  const clearDirty = () => setDirtyTripIds(new Set());
 
   // ----- load data -----
-  const loadCompletedTrips = () => {
-    setLoading(true);
-    try {
-      const all = tripService.getAll();
-      
-      const completed = all.filter((t) => {
-        const isCompleted = t.status === 'Completed';
-        const notDeleted = !t.deleted;
-        const pickupSubmitted = t.pickupStepSubmitted === true;
-        return isCompleted && notDeleted && pickupSubmitted;
-      });
-      
-      setAllTrips(completed);
+  // Completed trips are backend-authoritative (GET /api/trips — the same
+  // source of truth as Trip List / Recent Trips). Trips completed through the
+  // wizard or the Pending → Completed approval flow are persisted by the
+  // backend and never written to the legacy localStorage key, so the Farm
+  // Payment page must read them from the API to see every completed trip.
+  //
+  // setState only ever runs in .then/.catch/.finally callbacks (never
+  // synchronously in the effect body), and the `cancelled` cleanup flag drops
+  // superseded responses: if a newer load starts while a request is in
+  // flight, the stale response can never overwrite the newer state.
 
-      const savedPayments: Record<string, Partial<FarmPayment>> = {};
-      completed.forEach((trip) => {
-        const tripId = String(trip.id);
-        const existingPayment = FarmPaymentService.getByTripId(tripId);
-        
-        if (existingPayment) {
-          savedPayments[tripId] = {
-            ...existingPayment,
-            totalBirds: trip.totalBirds || 0,
-            dcWeight: trip.dcWeight || 0,
-          };
-        } else {
-          savedPayments[tripId] = {
-            tripId,
-            totalBirds: trip.totalBirds || 0,
-            dcWeight: trip.dcWeight || 0,
-            paymentStatus: 'Unpaid',
-          };
-        }
-      });
-      
-      setPaymentData(savedPayments);
-    } catch (error) {
-      console.error('Failed to load trips:', error);
-      showNotification('Failed to load trips', 'error');
-    } finally {
-      setLoading(false);
-    }
+  // Rebuild paymentData from persisted payments for the given trips — a pure
+  // local sync with NO network call and NO loading spinner. Used after save
+  // and reset (saving payments never changes the trip list, so a full reload
+  // would just flash "Loading trips..." for nothing) and by loadCompletedTrips.
+  const syncPaymentData = (trips: Trip[]) => {
+    const savedPayments: Record<string, Partial<FarmPayment>> = {};
+    trips.forEach((trip) => {
+      const tripId = String(trip.id);
+      const existingPayment = FarmPaymentService.getByTripId(tripId);
+
+      if (existingPayment) {
+        savedPayments[tripId] = {
+          ...existingPayment,
+          totalBirds: trip.totalBirds || 0,
+          dcWeight: trip.dcWeight || 0,
+        };
+      } else {
+        savedPayments[tripId] = {
+          tripId,
+          totalBirds: trip.totalBirds || 0,
+          dcWeight: trip.dcWeight || 0,
+          paymentStatus: 'Unpaid',
+        };
+      }
+    });
+    setPaymentData(savedPayments);
   };
 
   useEffect(() => {
-    loadCompletedTrips();
+    let cancelled = false;
+    listTrips()
+      .then((all) => {
+        if (cancelled) return; // superseded — drop the stale response
+        setLoadError(null);
+
+        const completed = all
+          .filter((t) => {
+            const isCompleted = t.status === 'Completed';
+            const notDeleted = !t.deleted;
+            const pickupSubmitted = t.pickupStepSubmitted === true;
+            return isCompleted && notDeleted && pickupSubmitted;
+          })
+          .sort(
+            // Deterministic order: newest date first, then highest trip id,
+            // so same-date trips never shuffle between refreshes.
+            (a, b) =>
+              b.tripDate.localeCompare(a.tripDate) || (b.id as number) - (a.id as number)
+          );
+
+        setAllTrips(completed);
+        syncPaymentData(completed);
+        // paymentData now mirrors persisted storage — nothing is unsaved.
+        clearDirty();
+      })
+      .catch((error) => {
+        if (cancelled) return; // superseded — ignore
+        console.error('Failed to load trips:', error);
+        // Keep any previously loaded rows visible; surface the failure both
+        // as a toast and as an inline state (the table alone would otherwise
+        // read as "no completed trips", misleading on a fetch error).
+        setLoadError('Failed to load trips. Please try refreshing.');
+        showNotification('Failed to load trips', 'error');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
-  useEffect(() => {
+  // Any filter change returns the view to page 1 (otherwise page 5 of a
+  // narrowed result set would be a stranded empty page). Done as a render-
+  // phase adjustment — the React-documented pattern for resetting derived
+  // state — instead of an extra cascading render from an effect.
+  const filterSignature = `${dateFrom}|${dateTo}|${selectedFarm}|${statusFilter}|${searchQuery}`;
+  const [lastFilterSignature, setLastFilterSignature] = useState(filterSignature);
+  if (filterSignature !== lastFilterSignature) {
+    setLastFilterSignature(filterSignature);
     setCurrentPage(1);
-  }, [dateFrom, dateTo, selectedFarm, statusFilter, searchQuery]);
+  }
 
   // ----- compute unique farms -----
   const farms = useMemo(() => {
@@ -157,37 +217,15 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   }, [totalAmountKPI, totalPaidKPI]);
 
   // ----- pagination -----
-  const totalPages = Math.ceil(filteredTrips.length / itemsPerPage) || 1;
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedTrips = filteredTrips.slice(startIndex, startIndex + itemsPerPage);
-  const startEntry = filteredTrips.length === 0 ? 0 : startIndex + 1;
-  const endEntry = Math.min(startIndex + itemsPerPage, filteredTrips.length);
-  void startEntry;
-  void endEntry;
-
-  const goToPage = (page: number) => {
-    if (page < 1 || page > totalPages) return;
-    setCurrentPage(page);
-  };
-
-  const getPageNumbers = (): (number | 'ellipsis')[] => {
-    const pages: (number | 'ellipsis')[] = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      pages.push(1);
-      if (currentPage > 3) pages.push('ellipsis');
-      const start = Math.max(2, currentPage - 1);
-      const end = Math.min(totalPages - 1, currentPage + 1);
-      for (let i = start; i <= end; i++) pages.push(i);
-      if (currentPage < totalPages - 2) pages.push('ellipsis');
-      pages.push(totalPages);
-    }
-    return pages;
-  };
+  // ----- pagination (global <Pagination /> handles clamping + windows) -----
+  const paginatedTrips = useMemo(
+    () => filteredTrips.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filteredTrips, currentPage, pageSize]
+  );
 
   // ----- payment handlers -----
   const handlePaymentUpdate = (tripId: string, updates: Partial<FarmPayment>) => {
+    markDirty(tripId);
     setPaymentData((prev) => {
       const existing = prev[tripId] || {};
       return {
@@ -203,14 +241,20 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   };
 
   const handleSaveAll = async () => {
-    const paymentsToSave = Object.entries(paymentData).filter(([, payment]) => {
-      return payment.ratePerBird !== undefined || 
-             payment.ratePerKg !== undefined || 
-             payment.totalAmount !== undefined;
+    // Re-entrancy guard: the button is disabled while saving, but this makes
+    // double-submission impossible even via keyboard/rapid re-entry.
+    if (savingPayments) return;
+
+    // Save ONLY the rows edited in this session (see dirtyTripIds). A row
+    // restored from a previous save keeps its rate fields, so filtering on
+    // "has a rate" alone would re-save old payments and inflate the count.
+    const paymentsToSave = Object.entries(paymentData).filter(([tripId, payment]) => {
+      if (!dirtyTripIds.has(tripId)) return false;
+      return (payment.ratePerKg ?? 0) > 0 || (payment.totalAmount ?? 0) > 0;
     });
 
     if (paymentsToSave.length === 0) {
-      showNotification('No payments to save. Please fill in payment details first.', 'info');
+      showNotification('No payment changes to save. Please fill in payment details first.', 'info');
       return;
     }
 
@@ -226,8 +270,9 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
 
         const totalBirdsLoaded = trip.totalBirds || 0;
         const dcWeight = trip.dcWeight || 0;
-        const ratePerBird = paymentDataItem.ratePerBird || 0;
-        const totalAmount = paymentDataItem.totalAmount || (totalBirdsLoaded * ratePerBird);
+        const ratePerKg = paymentDataItem.ratePerKg || 0;
+        // Weight-based pricing: Rate/Kg × DC weight.
+        const totalAmount = paymentDataItem.totalAmount || dcWeight * ratePerKg;
         const paidAmount = paymentDataItem.amountPaid || 0;
         const paymentStatus = paidAmount > 0 
           ? (paidAmount >= totalAmount ? 'Paid' : 'Partially Paid')
@@ -259,11 +304,17 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
         if (paymentStatus === 'Partially Paid') partialCount++;
       }
 
-      setRefreshKey(prev => prev + 1);
-      
+      // Instant local sync — no refetch, no loading spinner. Saving payments
+      // never changes the completed-trip list, so a full reload is unnecessary;
+      // paymentData is rebuilt from the just-persisted FarmPaymentService.
+      syncPaymentData(allTrips);
+      clearDirty();
+
+      const paymentWord = savedCount === 1 ? 'payment' : 'payments';
+      const partialWord = partialCount === 1 ? 'partial payment' : 'partial payments';
       const message = partialCount > 0
-        ? `Saved ${savedCount} payments (${partialCount} partial payments)`
-        : `${savedCount} payments saved successfully`;
+        ? `Saved ${savedCount} ${paymentWord} (${partialCount} ${partialWord})`
+        : `${savedCount} ${paymentWord} saved successfully`;
       showNotification(message, 'success');
 
     } catch (error) {
@@ -279,31 +330,23 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
       showNotification('No changes to reset', 'info');
       return;
     }
-
-    const savedPayments: Record<string, Partial<FarmPayment>> = {};
-    allTrips.forEach((trip) => {
-      const tripId = String(trip.id);
-      const existingPayment = FarmPaymentService.getByTripId(tripId);
-      if (existingPayment) {
-        savedPayments[tripId] = {
-          ...existingPayment,
-          totalBirds: trip.totalBirds || 0,
-          dcWeight: trip.dcWeight || 0,
-        };
-      } else {
-        savedPayments[tripId] = {
-          tripId,
-          totalBirds: trip.totalBirds || 0,
-          dcWeight: trip.dcWeight || 0,
-          paymentStatus: 'Unpaid',
-        };
-      }
-    });
-    setPaymentData(savedPayments);
+    clearDirty();
+    // Instant local sync from persisted payments — no reload.
+    syncPaymentData(allTrips);
     showNotification('All changes reset', 'info');
   };
 
   const handleRefresh = () => {
+    // One click = one request: ignore clicks while a load is already running,
+    // and treat double-clicks as a single refresh intent (500ms window).
+    // Loading/error flags are set here (event handler) — the load effect
+    // itself never sets state synchronously.
+    if (loading) return;
+    const now = Date.now();
+    if (now - lastRefreshAtRef.current < 500) return;
+    lastRefreshAtRef.current = now;
+    setLoading(true);
+    setLoadError(null);
     setRefreshKey(prev => prev + 1);
     showNotification('Refreshed', 'info');
   };
@@ -318,13 +361,15 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     showNotification('Filters cleared', 'info');
   };
 
+  // Unsaved rows = edited since the last load/save (same set Save Payments
+  // persists), so the Save/Reset buttons enable exactly when there is
+  // something new to save — never for rows restored from a previous save.
   const modifiedCount = useMemo(() => {
-    return Object.values(paymentData).filter(payment => {
-      return payment.ratePerBird !== undefined || 
-             payment.ratePerKg !== undefined || 
-             payment.totalAmount !== undefined;
+    return Object.entries(paymentData).filter(([tripId, payment]) => {
+      if (!dirtyTripIds.has(tripId)) return false;
+      return (payment.ratePerKg ?? 0) > 0 || (payment.totalAmount ?? 0) > 0;
     }).length;
-  }, [paymentData]);
+  }, [paymentData, dirtyTripIds]);
 
   // Format number with L, Cr notation
   const formatNumber = (num: number): string => {
@@ -406,6 +451,14 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
           <h2 className="text-sm font-bold text-slate-800">Farm Payments</h2>
           <div className="flex items-center gap-2">
             <button
+              onClick={handleRefresh}
+              disabled={loading}
+              className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-1.5"
+              title="Reload completed trips from the backend"
+            >
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
+            </button>
+            <button
               onClick={handleResetPayments}
               disabled={modifiedCount === 0}
               className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-1.5"
@@ -414,7 +467,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
             </button>
             <button
               onClick={handleSaveAll}
-              disabled={savingPayments || modifiedCount === 0}
+              disabled={savingPayments || loading || modifiedCount === 0}
               className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {savingPayments ? (
@@ -431,11 +484,28 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
           </div>
         </div>
 
-        {/* Table */}
-        {loading ? (
+        {/* Table — the full spinner shows only on the FIRST load (no data yet).
+            A refresh keeps the current rows on screen (no flicker / no input
+            loss); the spinning Refresh icon signals activity. */}
+        {loading && allTrips.length === 0 && !loadError ? (
           <div className="p-8 text-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
             <p className="mt-3 text-slate-500 text-sm">Loading trips...</p>
+          </div>
+        ) : loadError && allTrips.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-sm font-semibold text-red-600">{loadError}</p>
+            <button
+              onClick={() => {
+                if (loading) return;
+                setLoading(true);
+                setLoadError(null);
+                setRefreshKey(prev => prev + 1);
+              }}
+              className="mt-3 px-4 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 transition"
+            >
+              Try Again
+            </button>
           </div>
         ) : (
           <>
@@ -446,45 +516,38 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
               onPaymentSaved={handleSaveAll}
               onRefresh={handleRefresh}
               showNotification={showNotification}
+              onViewTrip={setViewingTrip}
+              emptyMessage={
+                isFilterActive
+                  ? 'No trips match the current filters.'
+                  : 'No completed trips found'
+              }
             />
 
-            {/* Pagination Footer */}
-            {shouldShowPagination(filteredTrips.length) && (
-            <div className={paginationBarClass}>
-                <button
-                  onClick={() => goToPage(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className={paginationNavBtnClass}
-                >
-                  Previous
-                </button>
-
-                {getPageNumbers().map((page, idx) =>
-                  page === 'ellipsis' ? (
-                    <span key={`ellipsis-${idx}`} className="px-1.5 text-xs text-slate-400">…</span>
-                  ) : (
-                    <button
-                      key={page}
-                      onClick={() => goToPage(page)}
-                      className={paginationPageBtnClass(currentPage === page)}
-                    >
-                      {page}
-                    </button>
-                  )
-                )}
-
-                <button
-                  onClick={() => goToPage(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className={paginationNavBtnClass}
-                >
-                  Next
-                </button>
-            </div>
-            )}
+            {/* Global pagination bar — identical appearance/behaviour app-wide */}
+            <Pagination
+              page={currentPage}
+              pageSize={pageSize}
+              totalItems={filteredTrips.length}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+              disabled={loading}
+              ariaLabel="Farm payment pagination"
+            />
           </>
         )}
       </div>
+
+      {/* Separate read-only trip view — Step 2 (Farm) + Step 3 (Pickup) only,
+          same step detail as the Trip List view. */}
+      <FarmPaymentTripViewModal
+        open={Boolean(viewingTrip)}
+        trip={viewingTrip}
+        onClose={() => setViewingTrip(null)}
+      />
     </div>
   );
 
