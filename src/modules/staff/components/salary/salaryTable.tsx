@@ -148,18 +148,6 @@ export function SalaryTable({
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-full table-fixed border-separate border-spacing-0">
-          <colgroup>
-            {selectable && <col style={{ width: "4%" }} />}
-            <col style={{ width: "22%" }} />
-            <col style={{ width: "6%" }} />
-            <col style={{ width: "6%" }} />
-            <col style={{ width: "6%" }} />
-            <col style={{ width: "11%" }} />
-            <col style={{ width: "11%" }} />
-            <col style={{ width: "12%" }} />
-            <col style={{ width: hasRowActions ? "10%" : "20%" }} />
-            {hasRowActions && <col style={{ width: "16%" }} />}
-          </colgroup>
           <thead className="bg-slate-50">
             <tr>
               {selectable && (
