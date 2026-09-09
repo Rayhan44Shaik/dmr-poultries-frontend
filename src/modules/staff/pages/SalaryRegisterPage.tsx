@@ -29,6 +29,7 @@ import {
   Plus,
   FileText,
   Lock,
+  FilterX,
 } from "lucide-react";
 import { Button, ConfirmDialog, EmptyState, SearchInput } from "../../../ui";
 import MasterDropdown from "../../masters/components/MasterDropdown";
@@ -303,6 +304,25 @@ function SalaryRegisterPage() {
     setWhatsappSent(false);
     setWhatsappSentCount(0);
   }, []);
+
+  // Reset every active filter back to its default: the current month (i.e.
+  // the current/Sep register), all departments & employees, no text search,
+  // default sort, and the "All" status view.
+  const handleClearFilters = useCallback(() => {
+    setMonth(getCurrentYearMonth());
+    setPickerYear(Number(getCurrentYearMonth().split("-")[0]));
+    setDepartment("");
+    setEmployeeName("");
+    setSearchQuery("");
+    setSortKey("name-asc");
+    setFilter("All");
+    setCurrentPage(1);
+    setIsMonthPickerOpen(false);
+    setEmailsSent(false);
+    setEmailsSentCount(0);
+    setWhatsappSent(false);
+    setWhatsappSentCount(0);
+  }, [setFilter]);
 
   const confirm = useCallback((title: string, message: string, onConfirm: () => void) => {
     setConfirmConfig({ title, message, onConfirm });
@@ -645,6 +665,15 @@ function SalaryRegisterPage() {
             className="w-full sm:w-56"
           />
           <div className="ml-auto flex items-end gap-2">
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={handleClearFilters}
+              disabled={loading}
+              icon={<FilterX size={14} />}
+            >
+              Clear
+            </Button>
             <Button
               variant="success"
               size="md"
