@@ -24,7 +24,13 @@ import {
   Square,
   CheckCircle2,
 } from "lucide-react";
-import BrandMark from "../../../../ui/BrandMark";
+import { ClassicPayslipSheet } from "./ClassicPayslipSheet";
+import {
+  computePayslipTotals,
+  toAmountValues,
+  type AmountFieldKey,
+  type AmountValues,
+} from "./payslipModel";
 import type { SalaryRecord } from "../../types/staffDashboard";
 
 export type SalaryReviewModalProps = {
@@ -33,7 +39,6 @@ export type SalaryReviewModalProps = {
   pendingCount: number;
   /** Disables the Submit Selected action (e.g. until payslips are emailed). */
   submitDisabled?: boolean;
-  formatCurrency?: (amount: number) => string;
   onClose: () => void;
   /** Submit only the given (selected + emailed) employee ids. */
   onSubmitSelected: (ids: string[]) => void;
@@ -48,117 +53,14 @@ export type SalaryReviewModalProps = {
   emailsSentCount?: number;
 };
 
-type FieldKey =
-  | "basicSalary"
-  | "overtime"
-  | "incentives"
-  | "fuelAllowance"
-  | "nightAllowance"
-  | "leaveDeduction"
-  | "advanceRecovery"
-  | "loanEMI"
-  | "latePenalty"
-  | "otherDeductions";
-
-type FieldValues = Record<FieldKey, number>;
-
-const EARNING_FIELDS: { key: FieldKey; label: string }[] = [
-  { key: "basicSalary", label: "Basic Salary" },
-  { key: "overtime", label: "Overtime" },
-  { key: "incentives", label: "Incentives" },
-  { key: "fuelAllowance", label: "Fuel Allowance" },
-  { key: "nightAllowance", label: "Night Allowance" },
-];
-
-const DEDUCTION_FIELDS: { key: FieldKey; label: string }[] = [
-  { key: "leaveDeduction", label: "Leave Deduction" },
-  { key: "advanceRecovery", label: "Advance Recovery" },
-  { key: "loanEMI", label: "Loan EMI" },
-  { key: "latePenalty", label: "Late Penalty" },
-  { key: "otherDeductions", label: "Other Deductions" },
-];
-
-function toFieldValues(record: SalaryRecord): FieldValues {
-  return {
-    basicSalary: record.basicSalary || 0,
-    overtime: record.overtime || 0,
-    incentives: record.incentives || 0,
-    fuelAllowance: record.fuelAllowance || 0,
-    nightAllowance: record.nightAllowance || 0,
-    leaveDeduction: record.leaveDeduction || 0,
-    advanceRecovery: record.advanceRecovery || 0,
-    loanEMI: record.loanEMI || 0,
-    latePenalty: record.latePenalty || 0,
-    otherDeductions: record.otherDeductions || 0,
-  };
-}
-
-function computeTotals(values: FieldValues): {
-  gross: number;
-  deductions: number;
-  net: number;
-} {
-  const gross =
-    values.basicSalary +
-    values.overtime +
-    values.incentives +
-    values.fuelAllowance +
-    values.nightAllowance;
-  const deductions =
-    values.leaveDeduction +
-    values.advanceRecovery +
-    values.loanEMI +
-    values.latePenalty +
-    values.otherDeductions;
-  return { gross, deductions, net: gross - deductions };
-}
-
-function AmountCell({
-  value,
-  editing,
-  onChange,
-  formatCurrency,
-}: {
-  value: number;
-  editing: boolean;
-  onChange: (next: number) => void;
-  formatCurrency: (amount: number) => string;
-}) {
-  const [text, setText] = useState(String(value));
-  useEffect(() => setText(String(value)), [value]);
-
-  if (!editing) {
-    return (
-      <span className="block text-right text-sm font-medium text-slate-800 tabular-nums">
-        {formatCurrency(value)}
-      </span>
-    );
-  }
-  return (
-    <input
-      type="text"
-      inputMode="decimal"
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={() =>
-        onChange(Number(String(text).replace(/[^0-9.]/g, "")) || 0)
-      }
-      className="w-full text-right text-sm tabular-nums px-2 py-1 rounded-md border border-blue-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20"
-    />
-  );
-}
+type FieldKey = AmountFieldKey;
+type FieldValues = AmountValues;
 
 export function SalaryReviewModal({
   monthLabel,
   records,
   pendingCount,
   submitDisabled = false,
-  formatCurrency = (amt) =>
-    new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 2,
-    }).format(amt || 0),
   onClose,
   onSubmitSelected,
   onSaveRecord,
@@ -231,12 +133,12 @@ export function SalaryReviewModal({
 
   const ensureDraft = useCallback(
     (record: SalaryRecord): FieldValues =>
-      drafts[record.id] ?? toFieldValues(record),
+      drafts[record.id] ?? toAmountValues(record),
     [drafts]
   );
 
   const currentValues = selected ? ensureDraft(selected) : null;
-  const currentTotals = currentValues ? computeTotals(currentValues) : null;
+  const currentTotals = currentValues ? computePayslipTotals(currentValues) : null;
   const canEdit = selected?.status === "Pending";
 
   const setField = useCallback(
@@ -244,7 +146,7 @@ export function SalaryReviewModal({
       setDrafts((prev) => ({
         ...prev,
         [record.id]: {
-          ...(prev[record.id] ?? toFieldValues(record)),
+          ...(prev[record.id] ?? toAmountValues(record)),
           [key]: value,
         },
       }));
@@ -255,8 +157,8 @@ export function SalaryReviewModal({
 
   const handleSave = useCallback(async () => {
     if (!selected) return;
-    const values = drafts[selected.id] ?? toFieldValues(selected);
-    const totals = computeTotals(values);
+    const values = drafts[selected.id] ?? toAmountValues(selected);
+    const totals = computePayslipTotals(values);
     const merged: SalaryRecord = {
       ...selected,
       basicSalary: values.basicSalary,
@@ -444,14 +346,19 @@ export function SalaryReviewModal({
           {selected && currentValues && currentTotals ? (
             <div className="flex-1 min-w-0 overflow-y-auto bg-slate-100 p-5">
               <div className="flex justify-center">
-                <PayslipDocument
-                  record={selected}
-                  values={currentValues}
-                  totals={currentTotals}
-                  editing={editing && canEdit}
-                  formatCurrency={formatCurrency}
-                  onFieldChange={(key, val) => setField(selected, key, val)}
-                />
+                <div className="w-full max-w-[640px]">
+                  <div className="bg-white shadow-[0_1px_3px_rgba(15,23,42,0.12)] ring-1 ring-slate-200">
+                    <ClassicPayslipSheet
+                      record={selected}
+                      values={currentValues}
+                      gross={currentTotals.gross}
+                      deductions={currentTotals.deductions}
+                      net={currentTotals.net}
+                      editing={editing && canEdit}
+                      onFieldChange={(key, val) => setField(selected, key, val)}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
@@ -535,183 +442,5 @@ export function SalaryReviewModal({
 }
 
 // ---------------------------------------------------------------------------
-// Simple, clean A4-portrait payslip document (single column).
-// ---------------------------------------------------------------------------
-
-function Stat({
-  label,
-  value,
-}: {
-  label: string;
-  value?: number | string | null;
-}) {
-  return (
-    <div className="px-2 py-2 text-center">
-      <div className="text-[10px] uppercase tracking-wider text-slate-400">
-        {label}
-      </div>
-      <div className="text-sm font-semibold text-slate-800 tabular-nums mt-0.5">
-        {value ?? "—"}
-      </div>
-    </div>
-  );
-}
-
-function LineRow({
-  label,
-  value,
-  editing,
-  onChange,
-  formatCurrency,
-}: {
-  label: string;
-  value: number;
-  editing: boolean;
-  onChange: (next: number) => void;
-  formatCurrency: (amount: number) => string;
-}) {
-  return (
-    <div className="px-3 py-1.5 flex items-center justify-between gap-3">
-      <span className="text-xs text-slate-600">{label}</span>
-      <div className="w-40 text-right">
-        <AmountCell
-          value={value}
-          editing={editing}
-          onChange={onChange}
-          formatCurrency={formatCurrency}
-        />
-      </div>
-    </div>
-  );
-}
-
-function PayslipDocument({
-  record,
-  values,
-  totals,
-  editing,
-  formatCurrency,
-  onFieldChange,
-}: {
-  record: SalaryRecord;
-  values: FieldValues;
-  totals: { gross: number; deductions: number; net: number };
-  editing: boolean;
-  formatCurrency: (amount: number) => string;
-  onFieldChange: (key: FieldKey, value: number) => void;
-}) {
-  const monthLabel = (() => {
-    if (!record.month) return "";
-    const [y, m] = record.month.split("-");
-    const d = new Date(Number(y), Number(m) - 1, 1);
-    return d.toLocaleString("default", { month: "long", year: "numeric" });
-  })();
-
-  return (
-    <div className="w-full max-w-[420px] bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden">
-      {/* Header — same document identity as the payslip view:
-          DMR POULTRIES brand, "Payslip" title, period. */}
-      <div className="border-b border-slate-200 px-5 py-3 text-center">
-        <div className="flex items-center justify-center gap-2">
-          <BrandMark size="xs" />
-          <span className="text-[13px] font-extrabold tracking-[0.14em] text-slate-900">
-            DMR POULTRIES
-          </span>
-        </div>
-        <div className="mt-1 flex items-baseline justify-center gap-2">
-          <span className="text-sm font-bold tracking-tight text-slate-900">Payslip</span>
-          <span className="text-slate-300">·</span>
-          <span className="text-xs font-semibold text-slate-600">{monthLabel}</span>
-        </div>
-      </div>
-
-      {/* Employee */}
-      <div className="grid grid-cols-2 gap-y-2 px-5 py-3 border-b border-slate-200 text-sm">
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-slate-400">
-            Employee
-          </div>
-          <div className="font-semibold text-slate-800 truncate">
-            {record.employeeName}
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-[10px] uppercase tracking-wider text-slate-400">
-            Department
-          </div>
-          <div className="font-semibold text-slate-800 truncate">
-            {record.department}
-          </div>
-        </div>
-        <div className="col-span-2 grid grid-cols-4 gap-2 pt-1">
-          <Stat label="Working" value={record.workingDays} />
-          <Stat label="Present" value={record.presentDays} />
-          <Stat label="Leave" value={record.leaveDays} />
-          <Stat label="Weekly Off" value={record.weeklyOffDays} />
-        </div>
-      </div>
-
-      {/* Earnings */}
-      <div className="px-5 py-3">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 mb-1">
-          Earnings
-        </div>
-        <div className="divide-y divide-slate-100 rounded-md border border-slate-100">
-          {EARNING_FIELDS.map((f) => (
-            <LineRow
-              key={f.key}
-              label={f.label}
-              value={values[f.key]}
-              editing={editing}
-              onChange={(v) => onFieldChange(f.key, v)}
-              formatCurrency={formatCurrency}
-            />
-          ))}
-        </div>
-        <div className="flex items-center justify-between px-3 pt-2 mt-1 border-t border-slate-100 text-sm font-bold">
-          <span className="text-slate-700">Gross Salary</span>
-          <span className="text-slate-900 tabular-nums">
-            {formatCurrency(totals.gross)}
-          </span>
-        </div>
-      </div>
-
-      {/* Deductions */}
-      <div className="px-5 pb-3">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-rose-700 mb-1">
-          Deductions
-        </div>
-        <div className="divide-y divide-slate-100 rounded-md border border-slate-100">
-          {DEDUCTION_FIELDS.map((f) => (
-            <LineRow
-              key={f.key}
-              label={f.label}
-              value={values[f.key]}
-              editing={editing}
-              onChange={(v) => onFieldChange(f.key, v)}
-              formatCurrency={formatCurrency}
-            />
-          ))}
-        </div>
-        <div className="flex items-center justify-between px-3 pt-2 mt-1 border-t border-slate-100 text-sm font-bold">
-          <span className="text-slate-700">Total Deductions</span>
-          <span className="text-rose-700 tabular-nums">
-            {formatCurrency(totals.deductions)}
-          </span>
-        </div>
-      </div>
-
-      {/* Net payable — the take-home band, brand emerald like the payslip view */}
-      <div className="px-5 py-3 flex items-center justify-between bg-emerald-600 text-white">
-        <span className="text-[11px] font-bold uppercase tracking-wider">
-          Net Salary (Take Home)
-        </span>
-        <span className="text-lg font-extrabold tabular-nums">
-          {formatCurrency(totals.net)}
-        </span>
-      </div>
-    </div>
-  );
-}
 
 export default SalaryReviewModal;

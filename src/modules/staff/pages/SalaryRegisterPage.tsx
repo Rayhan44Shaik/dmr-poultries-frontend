@@ -685,7 +685,6 @@ function SalaryRegisterPage() {
         <SalaryView
           record={viewTarget}
           onClose={() => setViewTarget(null)}
-          formatCurrency={formatCurrency}
           onDownload={() => void handleDownload(viewTarget)}
           downloading={downloadingId === viewTarget.id}
         />
@@ -696,7 +695,6 @@ function SalaryRegisterPage() {
           monthLabel={formatMonthName(month)}
           records={allRecords}
           pendingCount={totals.pendingCount}
-          formatCurrency={formatCurrency}
           onClose={() => setSubmitMonthOpen(false)}
           onSubmitSelected={(ids) => void handleSubmitSelected(ids)}
           onSaveRecord={(record) => handleSaveRecord(record)}
