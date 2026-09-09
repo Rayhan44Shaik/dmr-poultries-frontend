@@ -5,7 +5,7 @@ import { uiInputClass } from '../../../shared/ui/uiTokens';
 import { useSalaryRegister } from "../hooks/useSalaryRegister";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { loadEmployees } from "../../masters/employees/services/employeeService";
-import { getSalaryMonthSummary, downloadPayslipPdf, submitSalaryMonth } from "../services/salaryService";
+import { getSalaryMonthSummary, downloadPayslipPdf, updateSalary, emailSalaryPayslips, bulkUpdateSalaryStatus } from "../services/salaryService";
 import {
   Calendar,
   ChevronDown,
@@ -23,7 +23,8 @@ import {
 } from "lucide-react";
 import { SalaryTable } from "../components/salary/salaryTable";
 import { SalaryView } from "../components/salary/SalaryView";
-import { SubmitMonthModal } from "../components/salary/SubmitMonthModal";
+import { SalaryReviewModal } from "../components/salary/SalaryReviewModal";
+import { EmailPayslipsModal } from "../components/salary/EmailPayslipsModal";
 import { SAMPLE_EMPLOYEE_LIST } from "../services/staffSampleData";
 import type { SalaryMonthSummary, SalaryRecord } from "../types/staffDashboard";
 
@@ -234,6 +235,7 @@ function SalaryRegisterPage() {
     saving,
     error,
     refresh,
+    updateRecord,
     generate,
     hasRecords,
   } = useSalaryRegister(month, department);
@@ -376,6 +378,16 @@ function SalaryRegisterPage() {
   // ---- Actions -----------------------------------------------------------
   const [viewTarget, setViewTarget] = useState<SalaryRecord | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [emailsSent, setEmailsSent] = useState(false);
+  const [emailsSentCount, setEmailsSentCount] = useState(0);
+  const [emailOpen, setEmailOpen] = useState(false);
+
+  // A successful email send is required before the month can be submitted.
+  useEffect(() => {
+    setEmailsSent(false);
+    setEmailsSentCount(0);
+  }, [selectedIds]);
 
   const confirm = useCallback((title: string, message: string, onConfirm: () => void) => {
     setConfirmConfig({ title, message, onConfirm });
@@ -400,24 +412,30 @@ function SalaryRegisterPage() {
     );
   }, [confirm, generate, month, runConfirm]);
 
-  const handleSubmitMonth = useCallback(async () => {
-    setSubmitMonthOpen(false);
-    try {
-      const result = await submitSalaryMonth(month);
-      await refresh();
-      let message = `${formatMonthName(month)} salary submitted successfully.`;
-      if (result.emailQueuedCount > 0 && result.emailFailedCount === 0) {
-        message = `${formatMonthName(month)} salary submitted. Payslip emails queued for ${result.emailQueuedCount} employees.`;
-      } else if (result.emailQueuedCount > 0) {
-        message = `${formatMonthName(month)} salary submitted. ${result.emailSentCount} payslips sent, ${result.emailFailedCount} email deliveries need attention.`;
-      } else if (result.submittedCount === 0) {
-        message = `${formatMonthName(month)} salary already submitted. No duplicate emails queued.`;
+  const handleSubmitSelected = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return;
+      try {
+        const result = await bulkUpdateSalaryStatus(ids, {
+          status: "Paid",
+          paymentDate: new Date().toISOString().slice(0, 10),
+          paymentMode: "Bank Transfer",
+        });
+        await refresh();
+        setSubmitMonthOpen(false);
+        showNotification(
+          `Submitted ${result.updated.length} salary record(s) successfully.`,
+          "success"
+        );
+      } catch (error) {
+        showNotification(
+          (error as Error)?.message || "Unable to submit selected salaries.",
+          "error"
+        );
       }
-      showNotification(message, "success");
-    } catch (error) {
-      showNotification((error as Error)?.message || "Unable to submit month.", "error");
-    }
-  }, [showNotification, month, refresh]);
+    },
+    [refresh, showNotification]
+  );
 
   const handleDownload = useCallback(
     async (record: SalaryRecord) => {
@@ -431,6 +449,54 @@ function SalaryRegisterPage() {
       }
     },
     [showNotification]
+  );
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback((ids: string[]) => {
+    setSelectedIds((prev) => {
+      const allSelected =
+        ids.length > 0 && ids.every((id) => prev.has(id));
+      return allSelected ? new Set<string>() : new Set(ids);
+    });
+  }, []);
+
+  const handleDownloadSelected = useCallback(async (ids: string[]) => {
+    if (ids.length === 0) return;
+    for (const id of ids) {
+      try {
+        await downloadPayslipPdf(id);
+      } catch {
+        /* best-effort; backend may be offline */
+      }
+    }
+    showNotification(`Downloading ${ids.length} payslip PDF(s)...`, "info");
+  }, [showNotification]);
+
+  const handleSaveRecord = useCallback(
+    async (record: SalaryRecord) => {
+      // Optimistically update the register table so the change is visible
+      // immediately (and works even when the backend is offline).
+      updateRecord(record);
+      try {
+        await updateSalary(record);
+        showNotification(`Saved payslip changes for ${record.employeeName}.`, "success");
+      } catch {
+        // Backend unavailable — the edit is still applied locally to the table.
+        showNotification(
+          `Saved locally (backend offline): ${record.employeeName}.`,
+          "info"
+        );
+      }
+    },
+    [updateRecord, showNotification]
   );
 
   const monthStatus = useMemo(() => {
@@ -618,7 +684,7 @@ function SalaryRegisterPage() {
             <button
               type="button"
               onClick={() => setSubmitMonthOpen(true)}
-              disabled={saving || refreshing || totals.pendingCount === 0}
+              disabled={saving || refreshing || allRecords.length === 0}
               className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
             >
               <ClipboardCheck size={15} /> Review and Submit
@@ -692,12 +758,37 @@ function SalaryRegisterPage() {
       )}
 
       {submitMonthOpen && (
-        <SubmitMonthModal
+        <SalaryReviewModal
           monthLabel={formatMonthName(month)}
+          records={allRecords}
           pendingCount={totals.pendingCount}
+          formatCurrency={formatCurrency}
+          onClose={() => setSubmitMonthOpen(false)}
+          onSubmitSelected={(ids) => void handleSubmitSelected(ids)}
+          onSaveRecord={(record) => handleSaveRecord(record)}
+          submitDisabled={!emailsSent}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onToggleSelectAll={toggleSelectAll}
+          onDownloadSelected={(ids) => void handleDownloadSelected(ids)}
+          onEmailSelected={() => setEmailOpen(true)}
+          emailsSentCount={emailsSentCount}
+        />
+      )}
+
+      {emailOpen && (
+        <EmailPayslipsModal
+          monthLabel={formatMonthName(month)}
+          records={visibleRecords.filter((r) => selectedIds.has(r.id))}
           saving={saving}
-          onCancel={() => setSubmitMonthOpen(false)}
-          onConfirm={() => void handleSubmitMonth()}
+          onClose={() => setEmailOpen(false)}
+          onSent={(sent) => {
+            setEmailsSentCount(sent);
+            setEmailsSent(true);
+            setEmailOpen(false);
+            showNotification("Payslips emailed. You can now submit the month.", "success");
+          }}
+          onSend={async (ids, payload) => emailSalaryPayslips(ids, payload)}
         />
       )}
 

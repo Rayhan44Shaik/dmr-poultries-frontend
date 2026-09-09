@@ -125,7 +125,6 @@ export function SalaryTable({
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Present</th>
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Leave</th>
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Basic</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Gross</th>
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Deductions</th>
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Net</th>
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Status</th>
@@ -167,7 +166,6 @@ export function SalaryTable({
                   <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-700 whitespace-nowrap">{record.presentDays ?? "—"}</td>
                   <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-700 whitespace-nowrap">{record.leaveDays ?? "—"}</td>
                   <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-700 whitespace-nowrap">{formatVal(record.basicSalary)}</td>
-                  <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-700 whitespace-nowrap">{formatVal(record.totalGross)}</td>
                   <td className="px-3 py-2.5 text-right text-sm tabular-nums text-rose-600 whitespace-nowrap">{formatVal(record.totalDeductions)}</td>
                   <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-900 whitespace-nowrap">{formatVal(record.netSalary)}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">
@@ -191,7 +189,6 @@ export function SalaryTable({
               <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-800 whitespace-nowrap">{footer.presentDays}</td>
               <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-800 whitespace-nowrap">{footer.leaveDays}</td>
               <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-800 whitespace-nowrap">{formatVal(footer.basicSalary)}</td>
-              <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-800 whitespace-nowrap">{formatVal(footer.totalGross)}</td>
               <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-rose-700 whitespace-nowrap">{formatVal(footer.totalDeductions)}</td>
               <td className="px-3 py-2.5 text-right text-sm tabular-nums font-bold text-slate-900 whitespace-nowrap">{formatVal(footer.netSalary)}</td>
               <td className="px-3 py-2.5 text-sm tabular-nums text-slate-600 whitespace-nowrap">{footer.pending}P · {footer.submitted}S · {footer.paid}Paid</td>
