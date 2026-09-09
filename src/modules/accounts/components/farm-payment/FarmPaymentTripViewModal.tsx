@@ -9,7 +9,7 @@
 //     trip history: pickup KPI cards, DC photo card, the 3-column box table
 //     and its own Download Image + Pickup (box) PDF actions.
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   FileText,
   FileDown,
@@ -40,24 +40,86 @@ export function FarmPaymentTripViewModal({ open, trip, onClose }: FarmPaymentTri
   const { t } = useI18n();
   // Opens on Step 2 (Farm Details) — the payment reviewer's primary step.
   const [step, setStep] = useState<1 | 2>(1);
+  const [pdfDownloading, setPdfDownloading] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  const isOpen = open && Boolean(trip);
+
+  // Dialog behaviour while open: Escape closes, body scrolling is locked,
+  // focus lands inside the dialog (announced via its aria-label), and Tab
+  // wraps within it. All listeners are cleaned up on close/unmount.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    dialogRef.current?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      // Simple focus trap: wrap Tab/Shift+Tab inside the dialog.
+      const focusables = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusables || focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (!dialogRef.current?.contains(document.activeElement)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   // Read-only noops for the real StepPickup view (same pattern as the trip
   // history modal): the locked view only renders persisted trip data.
   const noop = () => {};
   const noopDispatch = () => {};
 
-  if (!open || !trip) return null;
+  if (!isOpen || !trip) return null;
 
   const stepLabel = (index: 1 | 2) =>
     `${t('ops.trip.step_label', { step: index + 1 })} · ${t(`ops.trip.step.${STEP_OPTIONS[index - 1].key}`)}`;
 
+  // One download per click: jsPDF generation is heavy; a re-entrancy guard
+  // prevents double-clicks from producing duplicate PDF files.
   const downloadTripReport = async () => {
-    await generateTripReportPDF(trip, null);
+    if (pdfDownloading) return;
+    setPdfDownloading(true);
+    try {
+      await generateTripReportPDF(trip, null);
+    } finally {
+      setPdfDownloading(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${trip.tripNo} — ${t('ops.trip.read_only_overview')}`}
+        tabIndex={-1}
+        className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col outline-none"
+      >
         {/* ─── Header ─────────────────────────────────────────────── */}
         <div className="border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80 px-6 md:px-8 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4 min-w-0 flex-1">
@@ -89,11 +151,12 @@ export function FarmPaymentTripViewModal({ open, trip, onClose }: FarmPaymentTri
             <button
               type="button"
               onClick={() => void downloadTripReport()}
-              className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 p-2 text-red-700 shadow-sm transition-all active:scale-95"
+              disabled={pdfDownloading}
+              className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 p-2 text-red-700 shadow-sm transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
               title={t('ops.trip.create_pdf_title')}
-              aria-label={t('ops.trip.create_pdf')}
+              aria-label={pdfDownloading ? 'Generating PDF…' : t('ops.trip.create_pdf')}
             >
-              <FileDown size={16} />
+              <FileDown size={16} className={pdfDownloading ? 'animate-pulse' : ''} />
             </button>
           </div>
         </div>

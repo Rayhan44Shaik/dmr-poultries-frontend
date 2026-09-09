@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { toBusinessDate } from '../../../utils/businessDate';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { FarmPaymentTable } from '../components/farm-payment/FarmPaymentTable';
@@ -19,7 +19,18 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   // ----- state -----
   const [allTrips, setAllTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Monotonic sequence for in-flight trip loads: if a load is superseded
+  // (rapid refreshes), its response is dropped so a slow OLD response can
+  // never overwrite the state of a newer one (stale-response race guard).
+  const loadSeqRef = useRef(0);
+
+  // Timestamp of the last initiated refresh: a double-click on Refresh is one
+  // user intent, so a second click within 500ms is ignored instead of firing
+  // a duplicate fetch (fast responses already reset `loading` between clicks).
+  const lastRefreshAtRef = useRef(0);
 
   // Payment state management
   const [paymentData, setPaymentData] = useState<Record<string, Partial<FarmPayment>>>({});
@@ -60,9 +71,17 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   // backend and never written to the legacy localStorage key, so the Farm
   // Payment page must read them from the API to see every completed trip.
   const loadCompletedTrips = async () => {
-    setLoading(true);
+    const seq = ++loadSeqRef.current;
     try {
+      // First statement is the await: no synchronous setState runs inside the
+      // mount/refresh effect that calls this (repo-idiomatic data-load shape,
+      // same as useTrips). `loading` starts true and is set by event handlers.
       const all = await listTrips();
+
+      // A newer load started while this request was in flight — drop the
+      // stale response instead of overwriting the newer state.
+      if (seq !== loadSeqRef.current) return;
+      setLoadError(null);
 
       const completed = all
         .filter((t) => {
@@ -72,7 +91,10 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
           return isCompleted && notDeleted && pickupSubmitted;
         })
         .sort(
-          (a, b) => new Date(b.tripDate).getTime() - new Date(a.tripDate).getTime()
+          // Deterministic order: newest date first, then highest trip id, so
+          // same-date trips never shuffle between refreshes.
+          (a, b) =>
+            b.tripDate.localeCompare(a.tripDate) || (b.id as number) - (a.id as number)
         );
       
       setAllTrips(completed);
@@ -80,10 +102,15 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
       // paymentData now mirrors persisted storage — nothing is unsaved anymore.
       clearDirty();
     } catch (error) {
+      if (seq !== loadSeqRef.current) return; // superseded — ignore
       console.error('Failed to load trips:', error);
+      // Keep any previously loaded rows visible; surface the failure both as
+      // a toast and as an inline state (the table alone would otherwise read
+      // as "no completed trips", which would be misleading on a fetch error).
+      setLoadError('Failed to load trips. Please try refreshing.');
       showNotification('Failed to load trips', 'error');
     } finally {
-      setLoading(false);
+      if (seq === loadSeqRef.current) setLoading(false);
     }
   };
 
@@ -120,9 +147,16 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
-  useEffect(() => {
+  // Any filter change returns the view to page 1 (otherwise page 5 of a
+  // narrowed result set would be a stranded empty page). Done as a render-
+  // phase adjustment — the React-documented pattern for resetting derived
+  // state — instead of an extra cascading render from an effect.
+  const filterSignature = `${dateFrom}|${dateTo}|${selectedFarm}|${statusFilter}|${searchQuery}`;
+  const [lastFilterSignature, setLastFilterSignature] = useState(filterSignature);
+  if (filterSignature !== lastFilterSignature) {
+    setLastFilterSignature(filterSignature);
     setCurrentPage(1);
-  }, [dateFrom, dateTo, selectedFarm, statusFilter, searchQuery]);
+  }
 
   // ----- compute unique farms -----
   const farms = useMemo(() => {
@@ -211,6 +245,10 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   };
 
   const handleSaveAll = async () => {
+    // Re-entrancy guard: the button is disabled while saving, but this makes
+    // double-submission impossible even via keyboard/rapid re-entry.
+    if (savingPayments) return;
+
     // Save ONLY the rows edited in this session (see dirtyTripIds). A row
     // restored from a previous save keeps its rate fields, so filtering on
     // "has a rate" alone would re-save old payments and inflate the count.
@@ -303,6 +341,16 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   };
 
   const handleRefresh = () => {
+    // One click = one request: ignore clicks while a load is already running,
+    // and treat double-clicks as a single refresh intent (500ms window).
+    // Loading/error flags are set here (event handler) — the load effect
+    // itself never sets state synchronously.
+    if (loading) return;
+    const now = Date.now();
+    if (now - lastRefreshAtRef.current < 500) return;
+    lastRefreshAtRef.current = now;
+    setLoading(true);
+    setLoadError(null);
     setRefreshKey(prev => prev + 1);
     showNotification('Refreshed', 'info');
   };
@@ -423,7 +471,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
             </button>
             <button
               onClick={handleSaveAll}
-              disabled={savingPayments || modifiedCount === 0}
+              disabled={savingPayments || loading || modifiedCount === 0}
               className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {savingPayments ? (
@@ -440,11 +488,28 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
           </div>
         </div>
 
-        {/* Table */}
-        {loading ? (
+        {/* Table — the full spinner shows only on the FIRST load (no data yet).
+            A refresh keeps the current rows on screen (no flicker / no input
+            loss); the spinning Refresh icon signals activity. */}
+        {loading && allTrips.length === 0 && !loadError ? (
           <div className="p-8 text-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
             <p className="mt-3 text-slate-500 text-sm">Loading trips...</p>
+          </div>
+        ) : loadError && allTrips.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-sm font-semibold text-red-600">{loadError}</p>
+            <button
+              onClick={() => {
+                if (loading) return;
+                setLoading(true);
+                setLoadError(null);
+                setRefreshKey(prev => prev + 1);
+              }}
+              className="mt-3 px-4 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 transition"
+            >
+              Try Again
+            </button>
           </div>
         ) : (
           <>
@@ -456,6 +521,11 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
               onRefresh={handleRefresh}
               showNotification={showNotification}
               onViewTrip={setViewingTrip}
+              emptyMessage={
+                isFilterActive
+                  ? 'No trips match the current filters.'
+                  : 'No completed trips found'
+              }
             />
 
             {/* Global pagination bar — identical appearance/behaviour app-wide */}
