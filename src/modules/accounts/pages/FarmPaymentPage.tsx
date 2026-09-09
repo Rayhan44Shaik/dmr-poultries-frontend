@@ -22,11 +22,6 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Monotonic sequence for in-flight trip loads: if a load is superseded
-  // (rapid refreshes), its response is dropped so a slow OLD response can
-  // never overwrite the state of a newer one (stale-response race guard).
-  const loadSeqRef = useRef(0);
-
   // Timestamp of the last initiated refresh: a double-click on Refresh is one
   // user intent, so a second click within 500ms is ignored instead of firing
   // a duplicate fetch (fast responses already reset `loading` between clicks).
@@ -70,49 +65,11 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   // wizard or the Pending → Completed approval flow are persisted by the
   // backend and never written to the legacy localStorage key, so the Farm
   // Payment page must read them from the API to see every completed trip.
-  const loadCompletedTrips = async () => {
-    const seq = ++loadSeqRef.current;
-    try {
-      // First statement is the await: no synchronous setState runs inside the
-      // mount/refresh effect that calls this (repo-idiomatic data-load shape,
-      // same as useTrips). `loading` starts true and is set by event handlers.
-      const all = await listTrips();
-
-      // A newer load started while this request was in flight — drop the
-      // stale response instead of overwriting the newer state.
-      if (seq !== loadSeqRef.current) return;
-      setLoadError(null);
-
-      const completed = all
-        .filter((t) => {
-          const isCompleted = t.status === 'Completed';
-          const notDeleted = !t.deleted;
-          const pickupSubmitted = t.pickupStepSubmitted === true;
-          return isCompleted && notDeleted && pickupSubmitted;
-        })
-        .sort(
-          // Deterministic order: newest date first, then highest trip id, so
-          // same-date trips never shuffle between refreshes.
-          (a, b) =>
-            b.tripDate.localeCompare(a.tripDate) || (b.id as number) - (a.id as number)
-        );
-      
-      setAllTrips(completed);
-      syncPaymentData(completed);
-      // paymentData now mirrors persisted storage — nothing is unsaved anymore.
-      clearDirty();
-    } catch (error) {
-      if (seq !== loadSeqRef.current) return; // superseded — ignore
-      console.error('Failed to load trips:', error);
-      // Keep any previously loaded rows visible; surface the failure both as
-      // a toast and as an inline state (the table alone would otherwise read
-      // as "no completed trips", which would be misleading on a fetch error).
-      setLoadError('Failed to load trips. Please try refreshing.');
-      showNotification('Failed to load trips', 'error');
-    } finally {
-      if (seq === loadSeqRef.current) setLoading(false);
-    }
-  };
+  //
+  // setState only ever runs in .then/.catch/.finally callbacks (never
+  // synchronously in the effect body), and the `cancelled` cleanup flag drops
+  // superseded responses: if a newer load starts while a request is in
+  // flight, the stale response can never overwrite the newer state.
 
   // Rebuild paymentData from persisted payments for the given trips — a pure
   // local sync with NO network call and NO loading spinner. Used after save
@@ -143,7 +100,46 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   };
 
   useEffect(() => {
-    void loadCompletedTrips();
+    let cancelled = false;
+    listTrips()
+      .then((all) => {
+        if (cancelled) return; // superseded — drop the stale response
+        setLoadError(null);
+
+        const completed = all
+          .filter((t) => {
+            const isCompleted = t.status === 'Completed';
+            const notDeleted = !t.deleted;
+            const pickupSubmitted = t.pickupStepSubmitted === true;
+            return isCompleted && notDeleted && pickupSubmitted;
+          })
+          .sort(
+            // Deterministic order: newest date first, then highest trip id,
+            // so same-date trips never shuffle between refreshes.
+            (a, b) =>
+              b.tripDate.localeCompare(a.tripDate) || (b.id as number) - (a.id as number)
+          );
+
+        setAllTrips(completed);
+        syncPaymentData(completed);
+        // paymentData now mirrors persisted storage — nothing is unsaved.
+        clearDirty();
+      })
+      .catch((error) => {
+        if (cancelled) return; // superseded — ignore
+        console.error('Failed to load trips:', error);
+        // Keep any previously loaded rows visible; surface the failure both
+        // as a toast and as an inline state (the table alone would otherwise
+        // read as "no completed trips", misleading on a fetch error).
+        setLoadError('Failed to load trips. Please try refreshing.');
+        showNotification('Failed to load trips', 'error');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
