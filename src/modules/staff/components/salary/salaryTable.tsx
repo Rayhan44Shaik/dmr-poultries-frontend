@@ -1,6 +1,7 @@
 // src/modules/staff/components/salary/salaryTable.tsx
 
-import { CheckCircle2, Lock, Mail } from "lucide-react";
+import { CheckCircle2, Eye, Lock, Mail } from "lucide-react";
+import { Pagination } from "../../../../ui";
 import { WhatsAppBrandIcon } from "../../../../ui/WhatsAppBrandIcon";
 import type { SalaryRecord } from "../../types/staffDashboard";
 import {
@@ -8,12 +9,6 @@ import {
   uiCheckClass,
   uiTableWrapClass,
 } from "../../../../shared/ui/uiTokens";
-import {
-  paginationBarClass,
-  paginationNavBtnClass,
-  paginationPageBtnClass,
-  shouldShowPagination,
-} from "../../../../shared/ui/paginationStyles";
 
 /** Render "YYYY-MM-DD" (or ISO) as a readable "28 Sep 2026" string. */
 function formatDisplayDate(raw: string): string {
@@ -90,15 +85,16 @@ export function SalaryTable({
   paidOnDate,
 }: SalaryTableProps) {
   const selectable = Boolean(selectedIds && onToggleSelect && onToggleSelectAll);
-  const hasRowActions = Boolean(onEmail || onWhatsApp);
+  const hasRowActions = Boolean(onView || onEmail || onWhatsApp);
   const formatVal = formatCurrency || ((amount: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(amount || 0));
 
-  const sortedRecords = records;
-
-  const totalPages = Math.ceil(sortedRecords.length / itemsPerPage) || 1;
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentRecords = sortedRecords.slice(startIndex, startIndex + itemsPerPage);
+  const totalPages = Math.ceil(records.length / itemsPerPage) || 1;
+  // Clamp the active page so a refresh or filter that shrinks the result set
+  // can never strand the user on an empty page.
+  const safePage = Math.max(1, Math.min(currentPage, totalPages));
+  const startIndex = (safePage - 1) * itemsPerPage;
+  const currentRecords = records.slice(startIndex, startIndex + itemsPerPage);
 
   const pageIds = currentRecords.map((r) => r.id);
   const allPageSelected = selectable && pageIds.length > 0 && pageIds.every((id) => selectedIds!.has(id));
@@ -174,7 +170,7 @@ export function SalaryTable({
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Net</th>
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Status</th>
               {hasRowActions && (
-                <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Sent</th>
+                <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Actions</th>
               )}
             </tr>
           </thead>
@@ -229,6 +225,15 @@ export function SalaryTable({
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          type="button"
+                          title={`View payslip for ${record.employeeName}`}
+                          aria-label={`View payslip for ${record.employeeName}`}
+                          onClick={() => onView(record)}
+                          className="inline-flex h-7 items-center justify-center rounded-lg border border-slate-200 bg-white px-1.5 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:opacity-40"
+                        >
+                          <Eye size={13} />
+                        </button>
                         {onEmail && (
                           <button
                             type="button"
@@ -272,42 +277,22 @@ export function SalaryTable({
               <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-800 whitespace-nowrap">{formatVal(footer.basicSalary)}</td>
               <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-rose-700 whitespace-nowrap">{formatVal(footer.totalDeductions)}</td>
               <td className="px-3 py-2.5 text-right text-sm tabular-nums font-bold text-slate-900 whitespace-nowrap">{formatVal(footer.netSalary)}</td>
-              <td className="px-3 py-2.5 text-sm tabular-nums text-slate-600 whitespace-nowrap">{footer.pending}P · {footer.submitted}S · {footer.paid}Paid</td>
+              <td className="px-3 py-2.5 text-sm tabular-nums text-slate-600 whitespace-nowrap">
+                {footer.pending} Pending · {footer.submitted} Submitted · {footer.paid} Paid
+              </td>
               {hasRowActions && <td className="px-3 py-2.5" />}
             </tr>
           </tfoot>
         </table>
       </div>
 
-      {shouldShowPagination(sortedRecords.length) && (
-        <div className={paginationBarClass}>
-          <button
-            type="button"
-            onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
-            disabled={currentPage === 1}
-            className={paginationNavBtnClass}
-          >
-            Previous
-          </button>
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <button
-              key={page}
-              type="button"
-              onClick={() => setCurrentPage(page)}
-              className={paginationPageBtnClass(currentPage === page)}
-            >
-              {page}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPages))}
-            disabled={currentPage === totalPages}
-            className={paginationNavBtnClass}
-          >
-            Next
-          </button>
-        </div>
+      {records.length > itemsPerPage && (
+        <Pagination
+          page={currentPage}
+          pageSize={itemsPerPage}
+          totalItems={records.length}
+          onPageChange={setCurrentPage}
+        />
       )}
     </div>
   );
