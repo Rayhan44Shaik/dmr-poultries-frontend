@@ -3,6 +3,11 @@
 import { CheckCircle2, Lock } from "lucide-react";
 import type { SalaryRecord } from "../../types/staffDashboard";
 import {
+  uiBadgeClass,
+  uiCheckClass,
+  uiTableWrapClass,
+} from "../../../../shared/ui/uiTokens";
+import {
   paginationBarClass,
   paginationNavBtnClass,
   paginationPageBtnClass,
@@ -30,20 +35,14 @@ function StatusBadge({ record }: { record: SalaryRecord }) {
 
   if (record.status === "Pending" || record.status === "Submitted") {
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+      <span className={uiBadgeClass("warning")}>
         Pending
       </span>
     );
   }
   // Paid
   return (
-    <span
-      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
-        record.monthClosed || !windowOpen
-          ? "bg-slate-100 text-slate-600 border-slate-200"
-          : "bg-emerald-50 text-emerald-700 border-emerald-200"
-      }`}
-    >
+    <span className={uiBadgeClass(record.monthClosed || !windowOpen ? "neutral" : "success")}>
       <CheckCircle2 size={11} />
       Paid
       {(record.monthClosed || !windowOpen) && <Lock size={10} />}
@@ -100,7 +99,7 @@ export function SalaryTable({
   }
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+    <div className={uiTableWrapClass}>
       <div className="overflow-x-auto">
         <table className="w-max min-w-full border-separate border-spacing-0">
           <thead className="bg-slate-50">
@@ -116,19 +115,19 @@ export function SalaryTable({
                   }}
                   disabled={saving}
                   onChange={() => onToggleSelectAll?.(pageIds)}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                  className={uiCheckClass + " disabled:opacity-50"}
                 />
               </th>
               )}
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Employee</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Working</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Present</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Leave</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Basic</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Deductions</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Net</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Status</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Payment date</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Employee</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Working</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Present</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Leave</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Basic</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Deductions</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Net</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Status</th>
+              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Payment date</th>
             </tr>
           </thead>
           <tbody>
@@ -152,7 +151,7 @@ export function SalaryTable({
                       checked={selectedIds!.has(record.id)}
                       disabled={saving}
                       onChange={() => onToggleSelect?.(record.id)}
-                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                      className={uiCheckClass + " disabled:opacity-50"}
                     />
                   </td>
                   )}

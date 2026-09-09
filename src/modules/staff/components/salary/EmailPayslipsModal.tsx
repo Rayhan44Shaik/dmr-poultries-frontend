@@ -6,8 +6,9 @@
 // payslip PDF attached), and a Send action.
 
 import { useState, useMemo, useEffect } from "react";
-import { X, Mail, Send, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { X, Mail, Send, Loader2, CheckCircle2, AlertCircle, Download } from "lucide-react";
 import { loadEmployees } from "../../../masters/employees/services/employeeService";
+import { generatePayslipPdf } from "../../services/payslipPdf";
 import type { SalaryRecord } from "../../types/staffDashboard";
 
 type Language = "en" | "te";
@@ -50,6 +51,8 @@ export function EmailPayslipsModal({
   const [body, setBody] = useState("");
   const [emails, setEmails] = useState<Record<number, string>>({});
   const [status, setStatus] = useState<{ sent: number; failed: number } | null>(null);
+  const [apiDown, setApiDown] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   // Resolve employee emails by id (employee master has the email address).
   useEffect(() => {
@@ -99,6 +102,7 @@ export function EmailPayslipsModal({
 
   const handleSend = async () => {
     setStatus(null);
+    setApiDown(false);
     try {
       const result = await onSend(
         records.map((r) => r.id),
@@ -107,7 +111,26 @@ export function EmailPayslipsModal({
       setStatus(result);
       onSent(result.sent, result.failed);
     } catch {
+      // Backend email service unavailable — offer the branded PDFs so the
+      // payslips can still be sent by downloading and attaching them.
+      setApiDown(true);
       setStatus({ sent: 0, failed: recipients.length });
+    }
+  };
+
+  /** Fallback: download the same A4 DMR POULTRIES payslip PDFs that would
+   *  have been attached, so they can be sent from any mail app. */
+  const handleDownloadAll = async () => {
+    setDownloading(true);
+    try {
+      for (const record of records) {
+        await generatePayslipPdf(record, "download");
+        if (records.length > 1) {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+        }
+      }
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -226,19 +249,48 @@ export function EmailPayslipsModal({
           {/* Status */}
           {status && (
             <div
-              className={`flex items-center gap-2 text-xs rounded-xl px-3 py-2 border ${
+              className={`rounded-xl border px-3 py-2 text-xs ${
                 status.failed === 0
-                  ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-700 flex items-center gap-2"
                   : "bg-amber-50 border-amber-200 text-amber-700"
               }`}
             >
               {status.failed === 0 ? (
-                <CheckCircle2 size={14} />
+                <>
+                  <CheckCircle2 size={14} className="shrink-0" />
+                  {status.sent} email{status.sent === 1 ? "" : "s"} queued
+                  {status.failed > 0 && `, ${status.failed} failed (no email on file)`}.
+                </>
+              ) : apiDown ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <span>
+                      The email service is not reachable. You can download the
+                      payslip PDFs and attach them to your own email — they are
+                      the same A4 DMR POULTRIES documents.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleDownloadAll()}
+                    disabled={downloading}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-white border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-50 disabled:opacity-50"
+                  >
+                    {downloading ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <Download size={13} />
+                    )}
+                    {downloading ? "Preparing PDFs..." : `Download ${records.length} PDF(s)`}
+                  </button>
+                </div>
               ) : (
-                <AlertCircle size={14} />
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={14} className="shrink-0" />
+                  {status.sent} email{status.sent === 1 ? "" : "s"} queued, {status.failed} failed (no email on file).
+                </div>
               )}
-              {status.sent} email{status.sent === 1 ? "" : "s"} queued
-              {status.failed > 0 && `, ${status.failed} failed (no email on file)`}.
             </div>
           )}
         </div>
@@ -252,19 +304,35 @@ export function EmailPayslipsModal({
           >
             Close
           </button>
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={saving || withEmail === 0}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm transition disabled:opacity-50"
-          >
-            {saving ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Send size={14} />
-            )}
-            {saving ? "Sending..." : `Send ${withEmail} Email${withEmail === 1 ? "" : "s"}`}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleDownloadAll()}
+              disabled={downloading || records.length === 0}
+              title="Download the A4 payslip PDFs to attach and send from any email app"
+              className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition disabled:opacity-50"
+            >
+              {downloading ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Download size={14} />
+              )}
+              {downloading ? "Preparing..." : "Download PDFs"}
+            </button>
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={saving || withEmail === 0}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm transition disabled:opacity-50"
+            >
+              {saving ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Send size={14} />
+              )}
+              {saving ? "Sending..." : `Send ${withEmail} Email${withEmail === 1 ? "" : "s"}`}
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,26 +1,38 @@
 // src/modules/staff/pages/SalaryRegisterPage.tsx
+//
+// Salary Register — standardised on the GLOBAL UI kit so the page shares the
+// exact same typography, control chrome and rhythm as every other module:
+//
+//   • Filter bar   → `uiFilterBarClass` surface + the shared `MasterDropdown`
+//                    (the app-wide dropdown: 36px control, 12px corners,
+//                    keyboard nav, portalled menu) + the global `SearchInput`
+//                    (40px, 13px type, leading icon, clear button).
+//   • Buttons      → the global `Button` system (one height/radius/font scale).
+//   • Month status → `uiBadgeClass` tones — the one badge system project-wide.
+//   • Confirm      → the global `ConfirmDialog` (replaces the local modal).
+//   • Empty states → the global `EmptyState` component.
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { uiInputClass } from '../../../shared/ui/uiTokens';
 import { useSalaryRegister } from "../hooks/useSalaryRegister";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { loadEmployees } from "../../masters/employees/services/employeeService";
 import { getSalaryMonthSummary, downloadPayslipPdf, updateSalary, emailSalaryPayslips, bulkUpdateSalaryStatus } from "../services/salaryService";
 import {
   Calendar,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
   LayoutGrid,
   RefreshCw,
-  Search,
   CheckCircle,
   ClipboardCheck,
   Plus,
   FileText,
   Lock,
 } from "lucide-react";
+import { Button, ConfirmDialog, EmptyState, SearchInput } from "../../../ui";
+import MasterDropdown from "../../masters/components/MasterDropdown";
+import { uiBadgeClass, uiFilterBarClass, type StatusTone } from "../../../shared/ui/uiTokens";
 import { SalaryTable } from "../components/salary/salaryTable";
 import { SalaryView } from "../components/salary/SalaryView";
 import { SalaryReviewModal } from "../components/salary/SalaryReviewModal";
@@ -42,132 +54,10 @@ const formatCurrency = (amount: number) =>
     minimumFractionDigits: 2,
   }).format(amount || 0);
 
-function FilterDropdown({
-  label,
-  value,
-  placeholder,
-  options,
-  onChange,
-  searchable = false,
-  allowClear = true,
-}: {
-  label: string;
-  value: string;
-  placeholder: string;
-  options: Array<string | { value: string; label: string }>;
-  onChange: (value: string) => void;
-  searchable?: boolean;
-  allowClear?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
-
-  const items = useMemo(
-    () =>
-      options.map((opt) =>
-        typeof opt === "string" ? { value: opt, label: opt } : opt
-      ),
-    [options]
-  );
-
-  useEffect(() => {
-    const onDocClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
-
-  useEffect(() => {
-    if (open && searchable) {
-      requestAnimationFrame(() => searchRef.current?.focus());
-    }
-  }, [open, searchable]);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((opt) => opt.label.toLowerCase().includes(q));
-  }, [items, query]);
-
-  const selectedLabel = items.find((opt) => opt.value === value)?.label;
-  const display = selectedLabel || placeholder;
-
-  const pick = (next: string) => {
-    onChange(next);
-    setOpen(false);
-    setQuery("");
-  };
-
-  return (
-    <div className="relative" ref={ref}>
-      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</label>
-      <button
-        type="button"
-        onClick={() => {
-          if (!open) setQuery("");
-          setOpen((o) => !o);
-        }}
-        className="h-9 px-3 w-56 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white text-slate-700 flex items-center justify-between gap-2 hover:border-slate-300 transition font-medium"
-      >
-        <span className={`truncate ${value ? "text-slate-700" : "text-slate-400"}`}>{display}</span>
-        <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="absolute top-full left-0 mt-1 z-[80] w-56 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
-          {searchable && (
-            <div className="p-1.5 border-b border-slate-100">
-              <div className="flex items-center gap-1.5 h-8 px-2 rounded-lg bg-slate-50 border border-slate-200">
-                <Search size={12} className="text-slate-400 shrink-0" />
-                <input
-                  ref={searchRef}
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search..."
-                  className="w-full bg-transparent text-xs text-slate-700 outline-none"
-                />
-              </div>
-            </div>
-          )}
-          <ul className="overflow-y-auto overscroll-contain" style={{ maxHeight: "11.25rem" }}>
-            {allowClear && (
-              <li>
-                <button
-                  type="button"
-                  onClick={() => pick("")}
-                  className={`w-full text-left px-3 h-9 text-xs font-medium truncate hover:bg-slate-50 ${
-                    !value ? "text-blue-600 bg-blue-50" : "text-slate-600"
-                  }`}
-                >
-                  {placeholder}
-                </button>
-              </li>
-            )}
-            {filtered.map((opt) => (
-              <li key={opt.value}>
-                <button
-                  type="button"
-                  onClick={() => pick(opt.value)}
-                  className={`w-full text-left px-3 h-9 text-xs font-medium truncate hover:bg-slate-50 ${
-                    value === opt.value ? "text-blue-600 bg-blue-50" : "text-slate-700"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              </li>
-            ))}
-            {filtered.length === 0 && (
-              <li className="px-3 h-9 flex items-center text-xs text-slate-400">No matches</li>
-            )}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
+/** Filter micro-label — identical to `MasterDropdown`'s own filter label so
+ *  every label in one filter row renders on the same type scale. */
+const filterLabelClass =
+  "mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500";
 
 const MONTHS = [
   { name: "Jan", value: "01" },
@@ -384,10 +274,12 @@ function SalaryRegisterPage() {
   const [emailOpen, setEmailOpen] = useState(false);
 
   // A successful email send is required before the month can be submitted.
-  useEffect(() => {
+  // The flags reset directly in the selection handlers (not an effect) so a
+  // changed selection can never leave a stale "emails sent" state behind.
+  const resetEmailsSent = useCallback(() => {
     setEmailsSent(false);
     setEmailsSentCount(0);
-  }, [selectedIds]);
+  }, []);
 
   const confirm = useCallback((title: string, message: string, onConfirm: () => void) => {
     setConfirmConfig({ title, message, onConfirm });
@@ -441,7 +333,7 @@ function SalaryRegisterPage() {
     async (record: SalaryRecord) => {
       setDownloadingId(record.id);
       try {
-        await downloadPayslipPdf(record.id);
+        await downloadPayslipPdf(record);
       } catch {
         showNotification("Unable to download payslip.", "error");
       } finally {
@@ -458,7 +350,8 @@ function SalaryRegisterPage() {
       else next.add(id);
       return next;
     });
-  }, []);
+    resetEmailsSent();
+  }, [resetEmailsSent]);
 
   const toggleSelectAll = useCallback((ids: string[]) => {
     setSelectedIds((prev) => {
@@ -466,19 +359,33 @@ function SalaryRegisterPage() {
         ids.length > 0 && ids.every((id) => prev.has(id));
       return allSelected ? new Set<string>() : new Set(ids);
     });
-  }, []);
+    resetEmailsSent();
+  }, [resetEmailsSent]);
 
   const handleDownloadSelected = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return;
+    // Resolve ids to full records — the payslip PDF is generated from the
+    // record when the backend endpoint is unavailable.
+    const byId = new Map(allRecords.map((r) => [r.id, r]));
+    let downloaded = 0;
     for (const id of ids) {
+      const record = byId.get(id);
+      if (!record) continue;
       try {
-        await downloadPayslipPdf(id);
+        await downloadPayslipPdf(record);
+        downloaded += 1;
+        // Small stagger so browsers accept multiple sequential downloads.
+        if (ids.length > 1) await new Promise((r) => setTimeout(r, 350));
       } catch {
         /* best-effort; backend may be offline */
       }
     }
-    showNotification(`Downloading ${ids.length} payslip PDF(s)...`, "info");
-  }, [showNotification]);
+    if (downloaded > 0) {
+      showNotification(`Downloaded ${downloaded} payslip PDF(s).`, "success");
+    } else {
+      showNotification("Unable to download payslips.", "error");
+    }
+  }, [allRecords, showNotification]);
 
   const handleSaveRecord = useCallback(
     async (record: SalaryRecord) => {
@@ -499,23 +406,30 @@ function SalaryRegisterPage() {
     [updateRecord, showNotification]
   );
 
+  // Month lifecycle badge — rendered with the global badge tokens so the
+  // tone vocabulary (success / warning / info / neutral) matches every other
+  // status pill in the application.
   const monthStatus = useMemo(() => {
     if (!monthSummary) return null;
-    if (monthSummary.closed) return { label: "Closed", tone: "bg-slate-100 text-slate-600 border-slate-200" };
-    if (monthSummary.employees === 0) return { label: "Draft", tone: "bg-slate-50 text-slate-500 border-slate-200" };
-    if (monthSummary.paid === monthSummary.employees) return { label: "Paid", tone: "bg-emerald-50 text-emerald-700 border-emerald-200" };
-    if (monthSummary.paid > 0) return { label: "Partially Paid", tone: "bg-indigo-50 text-indigo-700 border-indigo-200" };
-    if (monthSummary.submitted > 0 && monthSummary.pending === 0) return { label: "Submitted", tone: "bg-blue-50 text-blue-700 border-blue-200" };
-    if (monthSummary.submitted > 0) return { label: "Partially Submitted", tone: "bg-blue-50 text-blue-700 border-blue-200" };
-    return { label: "Pending", tone: "bg-amber-50 text-amber-700 border-amber-200" };
+    if (monthSummary.closed) return { label: "Closed", tone: "neutral" as StatusTone };
+    if (monthSummary.employees === 0) return { label: "Draft", tone: "neutral" as StatusTone };
+    if (monthSummary.paid === monthSummary.employees) return { label: "Paid", tone: "success" as StatusTone };
+    if (monthSummary.paid > 0) return { label: "Partially Paid", tone: "warning" as StatusTone };
+    if (monthSummary.submitted > 0 && monthSummary.pending === 0) return { label: "Submitted", tone: "info" as StatusTone };
+    if (monthSummary.submitted > 0) return { label: "Partially Submitted", tone: "info" as StatusTone };
+    return { label: "Pending", tone: "warning" as StatusTone };
   }, [monthSummary]);
 
+  // Status segmented control — same treatment as the Leave page's status tabs
+  // (active = white chip + brand text, inactive = quiet slate).
   const statusTab = (key: 'All' | 'Pending' | 'Paid', label: string, icon: React.ReactNode) => (
     <button
       type="button"
       onClick={() => handleFilterChange(key)}
-      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
-        filter === key ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-900"
+      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
+        filter === key
+          ? "bg-white text-brand-700 shadow-sm border border-slate-200/60"
+          : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
       }`}
     >
       {icon}
@@ -528,30 +442,31 @@ function SalaryRegisterPage() {
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         {monthStatus && (
-          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${monthStatus.tone}`}>
+          <span className={uiBadgeClass(monthStatus.tone)}>
             {monthStatus.label === "Closed" || monthStatus.label === "Paid" ? <Lock size={11} /> : null}
             {monthStatus.label}
           </span>
         )}
         <div className="flex items-center gap-2 ml-auto">
           {!hasRecords && !loading && (
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              size="md"
               onClick={handleGenerate}
-              disabled={saving}
-              className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+              loading={saving}
+              icon={<Plus size={14} />}
             >
-              <Plus size={14} /> Generate Register
-            </button>
+              Generate Register
+            </Button>
           )}
         </div>
       </div>
 
-      {/* Filter bar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3 overflow-visible relative z-10">
+      {/* Filter bar — the global filter-bar surface + shared dropdown/search */}
+      <div className={`${uiFilterBarClass} space-y-3 overflow-visible relative z-10`}>
         <div className="flex flex-wrap items-end gap-3">
-          <div className="relative" ref={monthPickerRef}>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Month</label>
+          <div className="relative w-full sm:w-44" ref={monthPickerRef}>
+            <label className={filterLabelClass}>Month</label>
             <button
               type="button"
               onClick={() => {
@@ -559,7 +474,7 @@ function SalaryRegisterPage() {
                 if (y) setPickerYear(Number(y));
                 setIsMonthPickerOpen((o) => !o);
               }}
-              className="h-9 px-3 w-44 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white text-slate-700 flex items-center justify-between hover:border-slate-300 transition font-medium"
+              className="flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none transition hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             >
               <span>{formatMonthName(month)}</span>
               <Calendar size={14} className="text-blue-500" />
@@ -619,26 +534,32 @@ function SalaryRegisterPage() {
             )}
           </div>
 
-          <FilterDropdown
+          <MasterDropdown
             label="Department"
             value={department}
             placeholder="All Departments"
             options={departments}
             onChange={handleDepartmentChange}
+            allowClear
+            disabled={loading}
+            className="w-full sm:w-56"
           />
 
-          <FilterDropdown
+          <MasterDropdown
             label="Employee"
             value={employeeName}
             placeholder="All Employees"
             options={employeeNames}
             onChange={handleEmployeeNameChange}
             searchable
+            allowClear
+            disabled={loading}
+            className="w-full sm:w-56"
           />
 
           <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Status</label>
-            <div className="inline-flex bg-slate-100/80 p-0.5 rounded-xl border border-slate-200 h-9 items-center">
+            <span className={filterLabelClass}>Status</span>
+            <div className="inline-flex bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 h-9 items-center">
               {statusTab("All", "All", <LayoutGrid size={12} className="text-slate-400" />)}
               {statusTab("Pending", "Pending", <Clock size={12} className="text-slate-400" />)}
               {statusTab("Paid", "Paid", <CheckCircle size={12} className="text-slate-400" />)}
@@ -648,16 +569,18 @@ function SalaryRegisterPage() {
 
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[200px] max-w-sm">
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Search Employee</label>
-            <input
-              type="text"
+            <label htmlFor="salary-register-search" className={filterLabelClass}>
+              Search Employee
+            </label>
+            <SearchInput
+              id="salary-register-search"
               value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
+              onChange={handleSearchChange}
               placeholder="Search by employee name..."
-              className={uiInputClass}
+              disabled={loading}
             />
           </div>
-          <FilterDropdown
+          <MasterDropdown
             label="Sort"
             value={sortKey}
             placeholder="Name A–Z"
@@ -679,26 +602,28 @@ function SalaryRegisterPage() {
               setSortKey(value as typeof sortKey);
               setCurrentPage(1);
             }}
+            className="w-full sm:w-56"
           />
           <div className="ml-auto flex items-end gap-2">
-            <button
-              type="button"
+            <Button
+              variant="success"
+              size="md"
               onClick={() => setSubmitMonthOpen(true)}
               disabled={saving || refreshing || allRecords.length === 0}
-              className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+              icon={<ClipboardCheck size={15} />}
             >
-              <ClipboardCheck size={15} /> Review and Submit
-            </button>
-            <button
-              type="button"
+              Review and Submit
+            </Button>
+            <Button
+              variant="secondary"
+              size="md"
+              iconOnly
               onClick={handleRefresh}
               disabled={refreshing || saving}
               title="Refresh"
               aria-label="Refresh"
-              className="h-9 w-9 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition flex items-center justify-center disabled:opacity-50"
-            >
-              <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
-            </button>
+              icon={<RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />}
+            />
           </div>
         </div>
       </div>
@@ -716,23 +641,32 @@ function SalaryRegisterPage() {
           <span className="text-xs font-medium">Loading salary register for {formatMonthName(month)}...</span>
         </div>
       ) : !hasRecords ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-sm space-y-3">
-          <div className="mx-auto w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
-            <FileText size={18} />
-          </div>
-          <p>No salary records for {formatMonthName(month)}.</p>
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={saving}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition disabled:opacity-50"
-          >
-            <Plus size={14} /> Generate Register for this Month
-          </button>
+        <div className="bg-white rounded-xl border border-slate-200">
+          <EmptyState
+            variant="no-data"
+            icon={<FileText />}
+            title={`No salary records for ${formatMonthName(month)}`}
+            description="Generate the register for this month to create salary records for all employees."
+            action={
+              <Button
+                variant="primary"
+                size="md"
+                onClick={handleGenerate}
+                loading={saving}
+                icon={<Plus size={14} />}
+              >
+                Generate Register for this Month
+              </Button>
+            }
+          />
         </div>
       ) : visibleRecords.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-sm">
-          No records match the current filters.
+        <div className="bg-white rounded-xl border border-slate-200">
+          <EmptyState
+            variant="no-filters"
+            title="No records match the current filters"
+            description="No salary records match the selected month, department, employee or search. Adjust the filters to see more."
+          />
         </div>
       ) : (
         <SalaryTable
@@ -792,32 +726,17 @@ function SalaryRegisterPage() {
         />
       )}
 
-      {confirmConfig && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl border border-slate-200 space-y-4">
-            <h3 className="text-base font-bold text-slate-900">{confirmConfig.title}</h3>
-            <p className="text-xs text-slate-600">{confirmConfig.message}</p>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setConfirmConfig(null)}
-                disabled={saving}
-                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmConfig.onConfirm}
-                disabled={saving}
-                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition shadow-sm disabled:opacity-50"
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={Boolean(confirmConfig)}
+        title={confirmConfig?.title ?? ""}
+        message={confirmConfig?.message}
+        tone="primary"
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        loading={saving}
+        onConfirm={confirmConfig ? confirmConfig.onConfirm : () => setConfirmConfig(null)}
+        onCancel={() => setConfirmConfig(null)}
+      />
     </div>
   );
 }

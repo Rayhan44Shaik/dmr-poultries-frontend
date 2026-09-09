@@ -46,3 +46,6 @@ vite.config.d.ts
 Duty-Report-*.pdf
 
 Duty-Planner-*.xlsx
+
+# Payslip smoke-test artefact (sample PDF for manual inspection)
+tests/payslip/out/

@@ -11,6 +11,7 @@ import {
   apiPost,
   handleApiError,
 } from "../../../api";
+import { generatePayslipPdf } from "./payslipPdf";
 import type {
   SalaryMonthSummary,
   SalaryRecord,
@@ -18,6 +19,18 @@ import type {
 } from "../types/staffDashboard";
 
 const SALARY_PATH = "/staff/salaries";
+
+/** Saves a Blob as a file download (shared by the backend and local paths). */
+function saveBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
 
 // ---------------------------------------------------------------------------
 // Coercion helpers (backend rows -> typed frontend values)
@@ -139,23 +152,28 @@ export async function getSalaryMonthSummary(month: string): Promise<SalaryMonthS
   };
 }
 
-/** GET /api/staff/salaries/:id/payslip.pdf — canonical downloadable payslip. */
-export async function downloadPayslipPdf(id: string): Promise<void> {
-  const response = await apiClient.get<Blob>(`${SALARY_PATH}/${id}/payslip.pdf`, {
-    responseType: "blob",
-  });
-  const disposition = String(response.headers?.["content-disposition"] ?? "");
-  const match = /filename="?([^";]+)"?/i.exec(disposition);
-  const fileName = match?.[1] ?? `DMR-Poultries-Payslip-${id}.pdf`;
-  const blob = response.data;
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
+/** GET /api/staff/salaries/:id/payslip.pdf — canonical downloadable payslip.
+ *
+ * The backend route is the canonical source, but it may not be deployed yet —
+ * in that case (404 / network error) the payslip is generated client-side as
+ * the SAME A4 portrait DMR POULTRIES document, so downloading always works.
+ */
+export async function downloadPayslipPdf(record: SalaryRecord): Promise<void> {
+  try {
+    const response = await apiClient.get<Blob>(
+      `${SALARY_PATH}/${record.id}/payslip.pdf`,
+      { responseType: "blob" }
+    );
+    const disposition = String(response.headers?.["content-disposition"] ?? "");
+    const match = /filename="?([^";]+)"?/i.exec(disposition);
+    const fileName = match?.[1] ?? `DMR-Poultries-Payslip-${record.employeeName}-${record.month}.pdf`;
+    saveBlob(response.data, fileName);
+    return;
+  } catch {
+    // Backend payslip endpoint unavailable — generate the identical A4
+    // portrait payslip locally (branded DMR POULTRIES header first).
+    await generatePayslipPdf(record, "download");
+  }
 }
 
 /** GET /api/staff/salaries?month=YYYY-MM&department= */
