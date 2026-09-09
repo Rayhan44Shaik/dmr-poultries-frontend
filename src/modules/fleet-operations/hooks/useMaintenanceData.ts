@@ -8,6 +8,9 @@ import type { MaintenanceEvent } from '../types';
 
 interface UpcomingService {
   vehicle: any;
+  /** The maintenance type this upcoming-service row tracks (each type has its
+   * own independent next-service schedule). */
+  maintenanceType: string;
   lastMaint: MaintenanceEvent | null;
   nextKM: number;
   dueKM: number;
@@ -218,31 +221,78 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
     documents: filtered.reduce((sum, record) => sum + (record.documents?.length || 0), 0),
   }), [filtered]);
 
-  const lastApprovedByVehicle = useMemo(() => {
-    const map = new Map<string, MaintenanceEvent>();
-    approvedHistory.forEach((record) => {
-      const id = String(record.vehicleId);
-      const previous = map.get(id);
-      if (!previous || new Date(record.date).getTime() > new Date(previous.date).getTime()) {
-        map.set(id, record);
-      }
-    });
-    return map;
-  }, [approvedHistory]);
-
   const upcomingServices = useMemo((): UpcomingService[] => {
-    const list = vehicles.map((vehicle: any) => {
-      const lastMaint = lastApprovedByVehicle.get(String(vehicle.id)) || null;
+    const list: UpcomingService[] = [];
+    vehicles.forEach((vehicle: any) => {
+      const vehicleId = String(vehicle.id);
+      // Approved records for this vehicle, newest first. Only approved records
+      // drive upcoming-service schedules (pending entries are not yet effective).
+      const records = approvedHistory
+        .filter((record) => String(record.vehicleId) === vehicleId)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
       // Authoritative latest chronological meter from the backend ledger. The
       // vehicle master `currentKM` is a soft fallback when no meter event exists.
-      const backendMeter = Number(latestMeters[String(vehicle.id)] || 0);
-      const liveCurrentKM = Math.max(Number(vehicle.currentKM) || 0, backendMeter, lastMaint?.currentKM || 0);
-      const nextKM = lastMaint?.nextServiceKM && lastMaint.nextServiceKM > 0 ? lastMaint.nextServiceKM : liveCurrentKM + 5000;
-      const dueKM = nextKM - liveCurrentKM;
-      return { vehicle, lastMaint, nextKM, dueKM, isDue: dueKM <= 1000, liveCurrentKM };
-    }).sort((a, b) => a.dueKM - b.dueKM);
+      const backendMeter = Number(latestMeters[vehicleId] || 0);
+      const newestRecord = records[0] || null;
+      const liveCurrentKM = Math.max(Number(vehicle.currentKM) || 0, backendMeter, newestRecord?.currentKM || 0);
+
+      // Each maintenance type carries its own next-service KM. Walk newest →
+      // oldest so the most recent schedule per type wins.
+      const typeSchedules = new Map<string, number>();
+      records.forEach((record) => {
+        const types = String(record.maintenanceType || '')
+          .split(',').map((value) => value.trim()).filter(Boolean);
+        types.forEach((type) => {
+          if (typeSchedules.has(type)) return;
+          const perType = record.nextServiceByType?.[type];
+          const value = perType && perType > 0
+            ? perType
+            : (record.nextServiceKM && record.nextServiceKM > 0 ? record.nextServiceKM : 0);
+          if (value > 0) typeSchedules.set(type, value);
+        });
+      });
+
+      // No per-type schedule available → single generic fallback row (the
+      // previous behaviour), so every vehicle still surfaces in the panel.
+      if (typeSchedules.size === 0) {
+        const nextKM = newestRecord?.nextServiceKM && newestRecord.nextServiceKM > 0
+          ? newestRecord.nextServiceKM
+          : liveCurrentKM + 5000;
+        const fallbackType = String(newestRecord?.maintenanceType || '')
+          .split(',')[0]?.trim() || 'General Service';
+        list.push({
+          vehicle,
+          maintenanceType: fallbackType,
+          lastMaint: newestRecord,
+          nextKM,
+          dueKM: nextKM - liveCurrentKM,
+          isDue: nextKM - liveCurrentKM <= 1000,
+          liveCurrentKM,
+        });
+        return;
+      }
+
+      typeSchedules.forEach((nextKM, type) => {
+        const lastMaint = records.find((record) =>
+          String(record.maintenanceType || '').split(',').map((value) => value.trim()).includes(type)
+        ) || null;
+        const dueKM = nextKM - liveCurrentKM;
+        list.push({
+          vehicle,
+          maintenanceType: type,
+          lastMaint,
+          nextKM,
+          dueKM,
+          isDue: dueKM <= 1000,
+          liveCurrentKM,
+        });
+      });
+    });
+
+    list.sort((a, b) => a.dueKM - b.dueKM);
     return selectedVehicle === 'all' ? list : list.filter((item) => String(item.vehicle.id) === selectedVehicle);
-  }, [lastApprovedByVehicle, latestMeters, selectedVehicle, vehicles]);
+  }, [approvedHistory, latestMeters, selectedVehicle, vehicles]);
 
   const hasActiveFilters = selectedVehicle !== 'all' || selectedDriver !== 'all' ||
     selectedMaintenanceType !== 'all' || selectedServiceType !== 'all' || selectedStatus !== 'all' ||

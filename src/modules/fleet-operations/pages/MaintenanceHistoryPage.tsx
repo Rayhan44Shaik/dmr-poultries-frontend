@@ -17,6 +17,7 @@ import { DatePicker } from '../../../components/common/DatePicker';
 import { apiGet } from '../../../api';
 import { useI18n, translateStatus } from '../../../i18n';
 import ErrorBoundary from '../components/common/ErrorBoundary';
+import SearchableSelect from '../../../components/common/SearchableSelect';
 import MaintenanceTimeline, { type VehicleMeterEvent } from '../components/maintenance/MaintenanceTimeline';
 import UpcomingServices from '../components/maintenance/UpcomingServices';
 import { useMaintenanceData } from '../hooks/useMaintenanceData';
@@ -24,7 +25,8 @@ import { safeDate } from '../utils/maintenanceHelpers';
 import { useEmployees } from '../../masters/employees/hooks/useEmployees';
 
 interface MaintenanceHistoryPageProps { embedded?: boolean }
-const selectClass = 'h-10 min-w-[170px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15';
+
+const STATUS_OPTIONS = ['Approved', 'Pending', 'Deleted'] as const;
 
 const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProps) => {
   const { t } = useI18n();
@@ -171,13 +173,52 @@ const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProp
 
         <div className="relative overflow-visible rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-end gap-3">
-            <select value={pending.vehicle} onChange={(e) => setPendingField('vehicle', e.target.value)} className={selectClass}><option value="all">{t('fleet.maintenance_history.all_vehicles')}</option>{data.vehicles.map((vehicle: any) => <option key={vehicle.id} value={String(vehicle.id)}>{vehicle.vehicleNumber}</option>)}</select>
-            <select value={pending.driver} onChange={(e) => setPendingField('driver', e.target.value)} className={selectClass}><option value="all">{t('fleet.maintenance_history.all_drivers')}</option>{drivers.map((driver) => <option key={driver.id} value={String(driver.id)}>{driver.employeeName}</option>)}</select>
-            <select value={pending.maintenanceType} onChange={(e) => setPendingField('maintenanceType', e.target.value)} className={selectClass}><option value="all">{t('fleet.maintenance_history.all_maintenance_types')}</option>{data.maintenanceTypes.map((type) => <option key={type}>{type}</option>)}</select>
-            <select value={pending.serviceType} onChange={(e) => setPendingField('serviceType', e.target.value)} className={selectClass}><option value="all">{t('fleet.maintenance_history.all_service_types')}</option>{data.serviceTypes.map((type) => <option key={type}>{type}</option>)}</select>
-            <select value={pending.status} onChange={(e) => setPendingField('status', e.target.value)} className={`${selectClass} min-w-[140px]`}><option value="all">{t('fleet.maintenance_history.all_statuses')}</option><option value="Approved">{translateStatus(t, 'Approved')}</option><option value="Pending">{translateStatus(t, 'Pending')}</option><option value="Deleted">{translateStatus(t, 'Deleted')}</option></select>
             <div className="w-40"><DatePicker value={pending.fromDate} onChange={(v) => setPendingField('fromDate', v)} placeholder={t('reports.date_from')} /></div>
             <div className="w-40"><DatePicker value={pending.toDate} onChange={(v) => setPendingField('toDate', v)} placeholder={t('reports.date_to')} /></div>
+            <SearchableSelect
+              label={t('common.vehicle')}
+              value={pending.vehicle === 'all' ? '' : pending.vehicle}
+              placeholder={t('fleet.maintenance_history.all_vehicles')}
+              options={data.vehicles.map((vehicle: any) => ({ value: String(vehicle.id), label: vehicle.vehicleNumber }))}
+              onChange={(v) => setPendingField('vehicle', v || 'all')}
+              searchable
+              widthClass="w-48"
+            />
+            <SearchableSelect
+              label={t('common.driver')}
+              value={pending.driver === 'all' ? '' : pending.driver}
+              placeholder={t('fleet.maintenance_history.all_drivers')}
+              options={drivers.map((driver) => ({ value: String(driver.id), label: driver.employeeName }))}
+              onChange={(v) => setPendingField('driver', v || 'all')}
+              searchable
+              widthClass="w-48"
+            />
+            <SearchableSelect
+              label={t('operations.maintenance_type')}
+              value={pending.maintenanceType === 'all' ? '' : pending.maintenanceType}
+              placeholder={t('fleet.maintenance_history.all_maintenance_types')}
+              options={data.maintenanceTypes}
+              onChange={(v) => setPendingField('maintenanceType', v || 'all')}
+              searchable
+              widthClass="w-56"
+            />
+            <SearchableSelect
+              label={t('fleet.maintenance_form.service_type')}
+              value={pending.serviceType === 'all' ? '' : pending.serviceType}
+              placeholder={t('fleet.maintenance_history.all_service_types')}
+              options={data.serviceTypes}
+              onChange={(v) => setPendingField('serviceType', v || 'all')}
+              searchable
+              widthClass="w-48"
+            />
+            <SearchableSelect
+              label={t('common.status')}
+              value={pending.status === 'all' ? '' : pending.status}
+              placeholder={t('fleet.maintenance_history.all_statuses')}
+              options={STATUS_OPTIONS.map((status) => ({ value: status, label: translateStatus(t, status) }))}
+              onChange={(v) => setPendingField('status', v || 'all')}
+              widthClass="w-44"
+            />
             <div className="relative min-w-[220px] flex-1"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={pending.search} onChange={(e) => setPendingField('search', e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') applyFilters(); }} placeholder={t('fleet.maintenance_history.search_placeholder')} className={uiSearchInputClass} /></div>
             <button onClick={applyFilters} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50"><Search size={14} /> {t('common.search')}</button>
             <button onClick={clearFilters} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50"><FilterX size={14} /> {t('common.clear')}</button>

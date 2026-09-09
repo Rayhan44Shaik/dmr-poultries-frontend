@@ -67,6 +67,8 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
     driverId: '',
     driverName: '',
     nextServiceKM: '',
+    /** Per-maintenance-type next-service KM (string form for the inputs). */
+    nextServiceByType: {} as Record<string, string>,
     remarks: '',
     createdAt: '',
   });
@@ -171,6 +173,7 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
       driverId: prev.driverId,
       driverName: prev.driverName,
       nextServiceKM: '',
+      nextServiceByType: {},
       remarks: '',
       createdAt: '',
     }));
@@ -207,7 +210,28 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
     formData.append('vehicleId', form.vehicleId);
     if (form.driverId) formData.append('driverId', form.driverId);
     formData.append('currentKM', form.currentKM);
-    if (form.nextServiceKM) formData.append('nextServiceKM', form.nextServiceKM);
+
+    // Per-maintenance-type next-service schedule. Only non-empty, positive KM
+    // values are submitted; each type keeps its own independent target.
+    const nextByType: Record<string, number> = {};
+    // Only submit schedules for maintenance types that are still selected, so a
+    // deselected type never leaves a stale target behind.
+    (form.maintenanceType || []).forEach((type) => {
+      const raw = (form.nextServiceByType || {})[type];
+      if (raw == null) return;
+      const num = Number(raw);
+      if (raw !== '' && Number.isFinite(num) && num > 0) nextByType[type] = num;
+    });
+    formData.append('nextServiceByType', JSON.stringify(nextByType));
+
+    // Legacy single value — kept for consumers (tables/timeline/dashboard) that
+    // still read `nextServiceKM`. Derived from the first selected type when the
+    // dedicated per-type values are present.
+    const firstType = form.maintenanceType[0];
+    const firstTypeKM = firstType ? nextByType[firstType] : undefined;
+    if (firstTypeKM != null) formData.append('nextServiceKM', String(firstTypeKM));
+    else if (form.nextServiceKM) formData.append('nextServiceKM', form.nextServiceKM);
+
     formData.append('maintenanceType', JSON.stringify(form.maintenanceType));
     formData.append('serviceType', form.serviceType);
     if (form.garage) formData.append('garage', form.garage);
@@ -251,6 +275,7 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
       driverId: '',
       driverName: '',
       nextServiceKM: '',
+      nextServiceByType: {},
       remarks: '',
       createdAt: '',
     });
@@ -278,6 +303,8 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
   const setDriverId = useCallback((id: string, name?: string) =>
     setForm(prev => ({ ...prev, driverId: id, driverName: name || prev.driverName })), []);
   const setNextServiceKM = useCallback((km: string) => setForm(prev => ({ ...prev, nextServiceKM: km })), []);
+  const setNextServiceByType = useCallback((type: string, km: string) =>
+    setForm(prev => ({ ...prev, nextServiceByType: { ...(prev.nextServiceByType || {}), [type]: km } })), []);
   const setRemarks = useCallback((remarks: string) => setForm(prev => ({ ...prev, remarks })), []);
   const markDocumentRemoval = useCallback((key: string) => {
     setDocuments(prev => prev.map(d => d.key === key ? { ...d, markedForRemoval: true } : d));
@@ -301,6 +328,7 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
     setMechanic,
     setDriverId,
     setNextServiceKM,
+    setNextServiceByType,
     setRemarks,
     // documents
     documents,

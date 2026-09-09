@@ -52,6 +52,16 @@ export function mapMaintenanceToEvent(record: any): MaintenanceEvent {
     driverId: record.driverId != null ? String(record.driverId) : '',
     driverName: record.driverName || '',
     nextServiceKM: record.nextServiceKM != null ? Number(record.nextServiceKM) : 0,
+    nextServiceByType: (() => {
+      const raw = record.nextServiceByType;
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+      const map: Record<string, number> = {};
+      for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+        const num = Number(value);
+        if (key && Number.isFinite(num) && num > 0) map[key] = num;
+      }
+      return Object.keys(map).length > 0 ? map : undefined;
+    })(),
     totalCost: Number(record.totalCost) || 0,
     parts: Array.isArray(record.parts) ? record.parts : [],
     remarks: record.remarks || '',
