@@ -5,21 +5,19 @@
 //
 //   [hen mark]                     centred, no box
 //   DMR POULTRIES                  navy wordmark, centred
-//   address                        muted, centred
-//   +91 98484 17474 · email        muted, centred
 //   ──── • ● • ────                red brand divider
 //   ───────────────────            navy hairline
-//            PAYSLIP               plain bold title, centred
-//      for the month of …          muted, centred
+//   PAYSLIP - SEPTEMBER 2026       left-aligned, single line under heading
 //   ┌──────────────────────────── single black outer border ────────────┐
-//   │  employee grid   — name/id · department/role · salary month/status│
+//   │  employee grid   — name / id / department                         │
 //   │  attendance strip— working · present · leave · weekly off         │
-//   │  earnings | deductions  — classic 4-column table + bold totals    │
+//   │  EARNINGS  |  DEDUCTIONS   — classic 4-column table + bold totals │
 //   │  NET SALARY (TAKE HOME)  — bold boxed row                         │
 //   │  Net salary in words: …                                           │
 //   └───────────────────────────────────────────────────────────────────┘
 //                                  ______________
 //                                  Authorised Signatory
+//                                  D. Srinivas Chakrapani
 //   ─── footer ───  computer-generated note · generated on date
 //
 // Single white sheet, black rules, no colour bands — the formal register
@@ -45,7 +43,8 @@ import {
  * ------------------------------------------------------------------------- */
 
 const NAVY = "#0f234f"; // 15,35,79
-const RED = "#b21422"; // 178,20,34
+const RED = "#b21422"; // 178,20,34  (brand accent / deductions)
+const GREEN = "#15803d"; // 34,197,94 darker — earnings heading
 const INK = "#1a202c"; // 26,32,44
 const MUTED = "#5a6473"; // 90,100,115
 const FAINT = "#a8b2c0"; // 168,178,192
@@ -73,29 +72,7 @@ function formatMonthLabel(month: string): string {
  * Small rule helpers.
  * ------------------------------------------------------------------------- */
 
-const cellPad: CSSProperties = { padding: "4px 8px" };
-
-function LabelCell({ children }: { children: ReactNode }) {
-  return (
-    <td
-      className="font-bold"
-      style={{ ...cellPad, color: MUTED, fontSize: 10, letterSpacing: "0.04em" }}
-    >
-      {children}
-    </td>
-  );
-}
-
-function ValueCell({ children }: { children: ReactNode }) {
-  return (
-    <td
-      className="font-bold text-slate-800"
-      style={{ ...cellPad, color: INK, fontSize: 12 }}
-    >
-      {children}
-    </td>
-  );
-}
+const cellPad: CSSProperties = { padding: "5px 10px" };
 
 /** Amount display cell (plain Indian number, right aligned). While editing it
  *  becomes a small numeric input; `key={amount}` remounts the field when the
@@ -185,32 +162,16 @@ export function ClassicPayslipSheet({
   note,
 }: ClassicPayslipSheetProps) {
   const monthLabel = formatMonthLabel(record.month);
-  const brand = {
-    businessName: "DMR POULTRIES",
-    address: "Madhira Rd, Peddapuram, Andhra Pradesh 521181",
-    phoneEmail: "+91 98484 17474   ·   dmrpoultries@gmail.com",
-  };
+  const businessName = "DMR POULTRIES";
+  const titleMonth = monthLabel.toUpperCase();
 
-  // Employee grid (label / value pairs) — same rows & order as the PDF.
-  const employeeRows: [string, string, string, string][] = [
-    [
-      "Employee Name",
-      toText(record.employeeName),
-      "Employee ID",
-      record.employeeId != null ? `#${record.employeeId}` : "—",
-    ],
-    [
-      "Department",
-      toText(record.department),
-      "Role",
-      toText(record.role),
-    ],
-    [
-      "Salary Month",
-      toText(record.month),
-      "Status",
-      toText(record.status),
-    ],
+  // Employee grid — same core identity fields as the register (name / id /
+  // department). Role, salary month & status are left off this document; the
+  // period already reads in the title line above.
+  const employeeRows: [string, string][] = [
+    ["Employee Name", toText(record.employeeName)],
+    ["Employee ID", record.employeeId != null ? `#${record.employeeId}` : "—"],
+    ["Department", toText(record.department)],
   ];
 
   const earningsRows = EARNING_FIELDS;
@@ -231,17 +192,11 @@ export function ClassicPayslipSheet({
           className="mt-1 font-extrabold tracking-[0.16em]"
           style={{ color: NAVY, fontSize: 22, lineHeight: 1.1 }}
         >
-          {brand.businessName}
-        </div>
-        <div className="mt-1" style={{ color: MUTED, fontSize: 10.5 }}>
-          {brand.address}
-        </div>
-        <div className="mt-0.5" style={{ color: MUTED, fontSize: 10.5 }}>
-          {brand.phoneEmail}
+          {businessName}
         </div>
 
         {/* red divider — line • • line */}
-        <div className="mt-2 flex items-center justify-center">
+        <div className="mt-3 flex items-center justify-center">
           <div style={{ height: 1, width: "42%", background: RED }} />
           <div className="mx-[7px] flex items-center gap-[3px]" style={{ color: RED }}>
             <span style={{ width: 3, height: 3, borderRadius: 999, background: RED, display: "inline-block" }} />
@@ -254,34 +209,47 @@ export function ClassicPayslipSheet({
         <div className="mt-[6px]" style={{ height: 1, background: NAVY }} />
       </div>
 
-      {/* ── Title ────────────────────────────────────────────────────── */}
-      <div className="pt-5 text-center">
-        <div className="font-extrabold tracking-[0.12em]" style={{ color: INK, fontSize: 19 }}>
-          PAYSLIP
-        </div>
-        <div className="mt-0.5" style={{ color: MUTED, fontSize: 11.5 }}>
-          for the month of {monthLabel}
+      {/* ── Title — single left-aligned line under the heading ───────── */}
+      <div className="px-4 pt-6">
+        <div
+          className="text-left"
+          style={{ color: INK }}
+        >
+          <span className="font-extrabold tracking-[0.08em]" style={{ fontSize: 16 }}>PAYSLIP</span>
+          <span className="mx-2" style={{ color: MUTED }}>–</span>
+          <span className="font-semibold tracking-[0.05em]" style={{ color: MUTED, fontSize: 15 }}>
+            {titleMonth}
+          </span>
         </div>
       </div>
 
       {/* ── Body inside one classic black outer border ───────────────── */}
-      <div className="mx-5 mt-3 mb-5" style={{ border: `1.2px solid ${INK}` }}>
-        {/* Employee grid */}
+      <div className="mx-4 mt-3 mb-5" style={{ border: `1.2px solid ${INK}` }}>
+        {/* Employee grid — name / id / department (single column) */}
         <table className="w-full border-collapse">
           <tbody>
-            {employeeRows.map((row, i) => (
-              <tr key={i} style={{ borderBottom: i === employeeRows.length - 1 ? "none" : `0.6px solid ${BORDER}` }}>
-                <LabelCell>{row[0]}</LabelCell>
-                <ValueCell>{row[1]}</ValueCell>
-                <LabelCell>{row[2]}</LabelCell>
-                <ValueCell>{row[3]}</ValueCell>
+            {employeeRows.map(([label, value], i) => (
+              <tr key={label} style={{ borderBottom: i === employeeRows.length - 1 ? "none" : `0.6px solid ${BORDER}` }}>
+                <td className="w-[38%]" style={{ ...cellPad, verticalAlign: "top" }}>
+                  <span className="font-bold" style={{ color: MUTED, fontSize: 10.5, letterSpacing: "0.05em" }}>
+                    {label}
+                  </span>
+                </td>
+                <td style={{ ...cellPad, verticalAlign: "top" }}>
+                  <span className="font-bold text-slate-800" style={{ color: INK, fontSize: 13 }}>
+                    {value}
+                  </span>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
 
         {/* Attendance strip */}
-        <div className="my-[5px]" style={{ borderTop: `0.6px solid ${BORDER}`, borderBottom: `0.6px solid ${BORDER}` }}>
+        <div
+          className="my-[6px]"
+          style={{ borderTop: `0.6px solid ${BORDER}`, borderBottom: `0.6px solid ${BORDER}`, backgroundColor: "#fafafa" }}
+        >
           <table className="w-full border-collapse">
             <tbody>
               <tr>
@@ -299,26 +267,26 @@ export function ClassicPayslipSheet({
           <thead>
             <tr>
               <th
-                className="border border-collapse text-center font-bold"
-                style={{ borderColor: BORDER, color: INK, fontSize: 11, letterSpacing: "0.04em", ...cellPad }}
+                className="border text-left font-bold"
+                style={{ borderColor: BORDER, color: GREEN, fontSize: 12, letterSpacing: "0.06em", padding: "8px 10px" }}
               >
-                Earnings
+                EARNINGS
               </th>
               <th
-                className="border border-collapse text-center font-bold"
-                style={{ borderColor: BORDER, color: INK, fontSize: 11, letterSpacing: "0.04em", ...cellPad }}
+                className="border text-left font-bold"
+                style={{ borderColor: BORDER, color: INK, fontSize: 10.5, letterSpacing: "0.02em", padding: "8px 10px", textAlign: "right", fontWeight: 600 }}
               >
                 Amount (Rs.)
               </th>
               <th
-                className="border border-collapse text-center font-bold"
-                style={{ borderColor: BORDER, color: INK, fontSize: 11, letterSpacing: "0.04em", ...cellPad }}
+                className="border text-left font-bold"
+                style={{ borderColor: BORDER, color: RED, fontSize: 12, letterSpacing: "0.06em", padding: "8px 10px" }}
               >
-                Deductions
+                DEDUCTIONS
               </th>
               <th
-                className="border border-collapse text-center font-bold"
-                style={{ borderColor: BORDER, color: INK, fontSize: 11, letterSpacing: "0.04em", ...cellPad }}
+                className="border text-left font-bold"
+                style={{ borderColor: BORDER, color: INK, fontSize: 10.5, letterSpacing: "0.02em", padding: "8px 10px", textAlign: "right", fontWeight: 600 }}
               >
                 Amount (Rs.)
               </th>
@@ -378,30 +346,33 @@ export function ClassicPayslipSheet({
         {/* NET SALARY — bold boxed row */}
         <div
           className="flex items-center justify-between"
-          style={{ borderTop: `1.2px solid ${INK}`, padding: "7px 10px" }}
+          style={{ borderTop: `1.2px solid ${INK}`, padding: "9px 12px", backgroundColor: "#fafafa" }}
         >
           <span className="font-extrabold tracking-[0.04em]" style={{ color: INK, fontSize: 13 }}>
             NET SALARY (TAKE HOME)
           </span>
-          <span className="font-extrabold tabular-nums" style={{ color: INK, fontSize: 17 }}>
+          <span className="font-extrabold tabular-nums" style={{ color: INK, fontSize: 18 }}>
             Rs. {fmtMoney(net)}
           </span>
         </div>
 
         {/* Amount in words */}
         <div
-          className="px-[8px] pb-2 italic"
-          style={{ borderTop: `0.6px solid ${BORDER}`, color: MUTED, fontSize: 11.5, paddingTop: 5 }}
+          className="px-[10px] pb-2.5 italic"
+          style={{ borderTop: `0.6px solid ${BORDER}`, color: MUTED, fontSize: 11.5, paddingTop: 6 }}
         >
           Net salary in words: {amountInWords(Number(net) || 0)}
         </div>
       </div>
 
       {/* ── Signature ────────────────────────────────────────────────── */}
-      <div className="flex justify-end px-10 pb-1">
-        <div className="text-right">
-          <div style={{ borderTop: `1px solid ${RULE}`, width: 150, marginLeft: "auto" }} />
-          <div className="mt-1" style={{ color: MUTED, fontSize: 11 }}>
+      <div className="flex justify-end px-8 pb-2">
+        <div className="text-center">
+          <div style={{ borderTop: `1px solid ${INK}`, width: 160 }} />
+          <div className="mt-1.5 font-bold" style={{ color: INK, fontSize: 12 }}>
+            D. Srinivas Chakrapani
+          </div>
+          <div className="mt-0.5" style={{ color: MUTED, fontSize: 11 }}>
             Authorised Signatory
           </div>
         </div>
