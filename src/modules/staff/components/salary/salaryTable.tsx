@@ -1,6 +1,7 @@
 // src/modules/staff/components/salary/salaryTable.tsx
 
-import { CheckCircle2, Lock } from "lucide-react";
+import { CheckCircle2, Lock, Mail } from "lucide-react";
+import { WhatsAppBrandIcon } from "../../../../ui/WhatsAppBrandIcon";
 import type { SalaryRecord } from "../../types/staffDashboard";
 import {
   uiBadgeClass,
@@ -25,6 +26,9 @@ type SalaryTableProps = {
   onToggleSelect?: (id: string) => void;
   onToggleSelectAll?: (ids: string[]) => void;
   onView: (record: SalaryRecord) => void;
+  /** Optional per-row quick actions to email / WhatsApp an employee's payslip. */
+  onEmail?: (record: SalaryRecord) => void;
+  onWhatsApp?: (record: SalaryRecord) => void;
 };
 
 function StatusBadge({ record }: { record: SalaryRecord }) {
@@ -61,8 +65,11 @@ export function SalaryTable({
   onToggleSelect,
   onToggleSelectAll,
   onView,
+  onEmail,
+  onWhatsApp,
 }: SalaryTableProps) {
   const selectable = Boolean(selectedIds && onToggleSelect && onToggleSelectAll);
+  const hasRowActions = Boolean(onEmail || onWhatsApp);
   const formatVal = formatCurrency || ((amount: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(amount || 0));
 
@@ -128,6 +135,9 @@ export function SalaryTable({
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Net</th>
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Status</th>
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Payment date</th>
+              {hasRowActions && (
+                <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Send</th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -176,6 +186,39 @@ export function SalaryTable({
                     )}
                   </td>
                   <td className="px-3 py-2.5 text-sm tabular-nums text-slate-600 whitespace-nowrap">{record.paymentDate ?? "—"}</td>
+                  {hasRowActions && (
+                    <td
+                      className="px-3 py-2.5 whitespace-nowrap text-center"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        {onEmail && (
+                          <button
+                            type="button"
+                            title={`Email payslip to ${record.employeeName}`}
+                            aria-label={`Email payslip to ${record.employeeName}`}
+                            onClick={() => onEmail(record)}
+                            disabled={saving}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40"
+                          >
+                            <Mail size={14} />
+                          </button>
+                        )}
+                        {onWhatsApp && (
+                          <button
+                            type="button"
+                            title={`WhatsApp payslip to ${record.employeeName}`}
+                            aria-label={`WhatsApp payslip to ${record.employeeName}`}
+                            onClick={() => onWhatsApp(record)}
+                            disabled={saving}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#25D366]/15 text-[#1DA851] transition hover:bg-[#25D366] hover:text-white disabled:opacity-40"
+                          >
+                            <WhatsAppBrandIcon size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -192,6 +235,7 @@ export function SalaryTable({
               <td className="px-3 py-2.5 text-right text-sm tabular-nums font-bold text-slate-900 whitespace-nowrap">{formatVal(footer.netSalary)}</td>
               <td className="px-3 py-2.5 text-sm tabular-nums text-slate-600 whitespace-nowrap">{footer.pending}P · {footer.submitted}S · {footer.paid}Paid</td>
               <td className="px-3 py-2.5 text-sm text-slate-400 whitespace-nowrap">—</td>
+              {hasRowActions && <td className="px-3 py-2.5" />}
             </tr>
           </tfoot>
         </table>

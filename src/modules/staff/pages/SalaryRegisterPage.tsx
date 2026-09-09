@@ -276,6 +276,10 @@ function SalaryRegisterPage() {
   const [whatsappSentCount, setWhatsappSentCount] = useState(0);
   const [emailOpen, setEmailOpen] = useState(false);
   const [whatsappOpen, setWhatsappOpen] = useState(false);
+  // Which records the send modals act on. Populated either from the Review
+  // & Submit selection or from a single employee's row in the salary table.
+  const [emailTarget, setEmailTarget] = useState<SalaryRecord[]>([]);
+  const [whatsappTarget, setWhatsappTarget] = useState<SalaryRecord[]>([]);
 
   // A successful payslip send (email OR WhatsApp) is required before the month
   // can be submitted. The flags reset directly in the selection handlers (not
@@ -283,6 +287,17 @@ function SalaryRegisterPage() {
   const resetEmailsSent = useCallback(() => {
     setEmailsSent(false);
     setEmailsSentCount(0);
+  }, []);
+
+  // Open the email / WhatsApp composer for a chosen set of employees (either
+  // the current selection in Review & Submit, or a single table row).
+  const openEmailFor = useCallback((records: SalaryRecord[]) => {
+    setEmailTarget(records);
+    setEmailOpen(true);
+  }, []);
+  const openWhatsAppFor = useCallback((records: SalaryRecord[]) => {
+    setWhatsappTarget(records);
+    setWhatsappOpen(true);
   }, []);
   const resetWhatsappSent = useCallback(() => {
     setWhatsappSent(false);
@@ -687,6 +702,8 @@ function SalaryRegisterPage() {
           formatCurrency={formatCurrency}
           saving={saving}
           onView={setViewTarget}
+          onEmail={(record) => openEmailFor([record])}
+          onWhatsApp={(record) => openWhatsAppFor([record])}
         />
       )}
 
@@ -713,8 +730,12 @@ function SalaryRegisterPage() {
           onToggleSelect={toggleSelect}
           onToggleSelectAll={toggleSelectAll}
           onDownloadSelected={(ids) => void handleDownloadSelected(ids)}
-          onEmailSelected={() => setEmailOpen(true)}
-          onWhatsAppSelected={() => setWhatsappOpen(true)}
+          onEmailSelected={() => {
+            openEmailFor(allRecords.filter((r) => selectedIds.has(r.id)));
+          }}
+          onWhatsAppSelected={() => {
+            openWhatsAppFor(allRecords.filter((r) => selectedIds.has(r.id)));
+          }}
           emailsSentCount={emailsSentCount}
           whatsappSentCount={whatsappSentCount}
         />
@@ -723,9 +744,12 @@ function SalaryRegisterPage() {
       {emailOpen && (
         <EmailPayslipsModal
           monthLabel={formatMonthName(month)}
-          records={visibleRecords.filter((r) => selectedIds.has(r.id))}
+          records={emailTarget}
           saving={saving}
-          onClose={() => setEmailOpen(false)}
+          onClose={() => {
+            setEmailOpen(false);
+            setEmailTarget([]);
+          }}
           onSent={(sent, failed) => {
             // Submit unlocks only once EVERY selected payslip was emailed
             // successfully. Any failure keeps the modal open for retry.
@@ -733,6 +757,7 @@ function SalaryRegisterPage() {
               setEmailsSentCount(sent);
               setEmailsSent(true);
               setEmailOpen(false);
+              setEmailTarget([]);
               showNotification("All selected payslips emailed. You can now submit the month.", "success");
             } else {
               showNotification(
@@ -748,9 +773,12 @@ function SalaryRegisterPage() {
       {whatsappOpen && (
         <WhatsAppPayslipsModal
           monthLabel={formatMonthName(month)}
-          records={visibleRecords.filter((r) => selectedIds.has(r.id))}
+          records={whatsappTarget}
           saving={saving}
-          onClose={() => setWhatsappOpen(false)}
+          onClose={() => {
+            setWhatsappOpen(false);
+            setWhatsappTarget([]);
+          }}
           onSent={(sent, failed) => {
             // Submit unlocks only once EVERY selected payslip was sent on
             // WhatsApp. Any failure keeps the modal open for retry.
@@ -758,6 +786,7 @@ function SalaryRegisterPage() {
               setWhatsappSentCount(sent);
               setWhatsappSent(true);
               setWhatsappOpen(false);
+              setWhatsappTarget([]);
               showNotification("All selected payslips sent on WhatsApp. You can now submit the month.", "success");
             } else {
               showNotification(
