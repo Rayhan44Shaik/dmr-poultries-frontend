@@ -147,7 +147,19 @@ export function SalaryTable({
         </span>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-max min-w-full border-separate border-spacing-0">
+        <table className="w-full min-w-full table-fixed border-separate border-spacing-0">
+          <colgroup>
+            {selectable && <col style={{ width: "4%" }} />}
+            <col style={{ width: "22%" }} />
+            <col style={{ width: "6%" }} />
+            <col style={{ width: "6%" }} />
+            <col style={{ width: "6%" }} />
+            <col style={{ width: "11%" }} />
+            <col style={{ width: "11%" }} />
+            <col style={{ width: "12%" }} />
+            <col style={{ width: hasRowActions ? "10%" : "20%" }} />
+            {hasRowActions && <col style={{ width: "16%" }} />}
+          </colgroup>
           <thead className="bg-slate-50">
             <tr>
               {selectable && (
@@ -203,10 +215,10 @@ export function SalaryTable({
                     />
                   </td>
                   )}
-                  <td className="px-3 py-2.5 whitespace-nowrap">
-                    <div className="text-sm font-semibold text-slate-800">{record.employeeName}</div>
+                  <td className="px-3 py-2.5 min-w-0">
+                    <div className="truncate text-sm font-semibold text-slate-800" title={record.employeeName}>{record.employeeName}</div>
                     {record.department ? (
-                      <div className="text-[11px] text-slate-500 mt-0.5">{record.department}</div>
+                      <div className="truncate text-[11px] text-slate-500 mt-0.5" title={record.department}>{record.department}</div>
                     ) : null}
                   </td>
                   <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-700 whitespace-nowrap">{record.workingDays ?? "—"}</td>

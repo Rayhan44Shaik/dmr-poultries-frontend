@@ -93,6 +93,8 @@ function SalaryRegisterPage() {
   const [sortKey, setSortKey] = useState<
     | "name-asc"
     | "name-desc"
+    | "status-pending-first"
+    | "status-paid-first"
     | "salary-asc"
     | "salary-desc"
     | "deduction-asc"
@@ -235,10 +237,16 @@ function SalaryRegisterPage() {
     });
 
     const num = (v: number | undefined | null) => Number(v ?? 0);
+    const statusRank = (s: string) =>
+      s === "Pending" ? 0 : s === "Submitted" ? 1 : 2; // Pending < Submitted < Paid
     const sorted = [...filtered].sort((a, b) => {
       switch (sortKey) {
         case "name-desc":
           return (b.employeeName || "").localeCompare(a.employeeName || "");
+        case "status-pending-first":
+          return statusRank(a.status) - statusRank(b.status) || (a.employeeName || "").localeCompare(b.employeeName || "");
+        case "status-paid-first":
+          return statusRank(b.status) - statusRank(a.status) || (a.employeeName || "").localeCompare(b.employeeName || "");
         case "salary-asc":
           return num(a.netSalary) - num(b.netSalary);
         case "salary-desc":
@@ -625,23 +633,9 @@ function SalaryRegisterPage() {
               {statusTab("Paid", "Paid", <CheckCircle size={12} className="text-slate-400" />)}
             </div>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[200px] max-w-sm">
-            <label htmlFor="salary-register-search" className={filterLabelClass}>
-              Search Employee
-            </label>
-            <SearchInput
-              id="salary-register-search"
-              value={searchQuery}
-              onChange={handleSearchChange}
-              placeholder="Search by employee name..."
-              disabled={loading}
-            />
-          </div>
           <MasterDropdown
-            label="Sort"
+            label="Sort by"
             value={sortKey}
             placeholder="Name A–Z"
             searchable
@@ -649,6 +643,8 @@ function SalaryRegisterPage() {
             options={[
               { value: "name-asc", label: "Name A–Z" },
               { value: "name-desc", label: "Name Z–A" },
+              { value: "status-pending-first", label: "Status: Pending first" },
+              { value: "status-paid-first", label: "Status: Paid first" },
               { value: "salary-asc", label: "Salary: Low to High" },
               { value: "salary-desc", label: "Salary: High to Low" },
               { value: "deduction-asc", label: "Deductions: Low to High" },
@@ -664,6 +660,21 @@ function SalaryRegisterPage() {
             }}
             className="w-full sm:w-56"
           />
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[200px] max-w-sm">
+            <label htmlFor="salary-register-search" className={filterLabelClass}>
+              Search Employee
+            </label>
+            <SearchInput
+              id="salary-register-search"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              placeholder="Search by employee name..."
+              disabled={loading}
+            />
+          </div>
           <div className="ml-auto flex items-end gap-2">
             <Button
               variant="secondary"
