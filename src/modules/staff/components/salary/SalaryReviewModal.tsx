@@ -326,7 +326,7 @@ export function SalaryReviewModal({
                         )}
                       </div>
                       <div className="text-[11px] text-slate-500 truncate">
-                        {r.department} · {r.employeeId}
+                        {r.department}
                       </div>
                     </div>
                     <div className="text-xs font-bold text-slate-800 tabular-nums shrink-0">
@@ -345,22 +345,24 @@ export function SalaryReviewModal({
 
           {/* RIGHT: payslip */}
           {selected && currentValues && currentTotals ? (
-            <div className="flex-1 min-w-0 overflow-y-auto bg-slate-100 p-5 flex justify-center">
-              <PayslipDocument
-                record={selected}
-                values={currentValues}
-                totals={currentTotals}
-                editing={editing && canEdit}
-                canEdit={canEdit}
-                formatCurrency={formatCurrency}
-                onFieldChange={(key, val) => setField(selected, key, val)}
-                savingId={savingId}
-                dirty={Boolean(dirty[selected.id])}
-                onToggleEdit={() => setEditing((e) => !e)}
-                onSave={handleSave}
-                onDownload={() => onDownload(selected)}
-                downloading={downloadingId === selected.id}
-              />
+            <div className="flex-1 min-w-0 overflow-y-auto bg-slate-100 p-5">
+              <div className="flex justify-center">
+                <PayslipDocument
+                  record={selected}
+                  values={currentValues}
+                  totals={currentTotals}
+                  editing={editing && canEdit}
+                  canEdit={canEdit}
+                  formatCurrency={formatCurrency}
+                  onFieldChange={(key, val) => setField(selected, key, val)}
+                  savingId={savingId}
+                  dirty={Boolean(dirty[selected.id])}
+                  onToggleEdit={() => setEditing((e) => !e)}
+                  onSave={handleSave}
+                  onDownload={() => onDownload(selected)}
+                  downloading={downloadingId === selected.id}
+                />
+              </div>
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
@@ -512,34 +514,25 @@ function PayslipDocument({
   })();
 
   return (
-    <div className="w-full max-w-[480px] bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden">
-      {/* Title */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
-        <div>
-          <div
-            className="text-lg font-extrabold tracking-wide"
-            style={{ color: NAVY }}
-          >
-            DMR POULTRIES
-          </div>
-          <div className="text-[11px] text-slate-500">Salary Payslip</div>
-        </div>
+    <div className="w-full max-w-[520px] bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden">
+      {/* Header */}
+      <div
+        className="px-5 py-4 flex items-center justify-between text-white"
+        style={{ background: NAVY }}
+      >
+        <div className="text-xl font-extrabold tracking-wide">DMR POULTRIES</div>
         <div className="text-right">
-          <div className="text-[10px] uppercase tracking-wider text-slate-400">
-            For the month of
+          <div className="text-[10px] uppercase tracking-wider text-blue-200">
+            Salary Payslip
           </div>
-          <div className="text-sm font-semibold text-slate-800">
-            {monthLabel}
-          </div>
+          <div className="text-sm font-semibold">{monthLabel}</div>
         </div>
       </div>
 
       {/* Employee details */}
       <div className="px-5 py-4 grid grid-cols-2 gap-y-3 gap-x-4 border-b border-slate-200">
         <Detail label="Employee Name" value={record.employeeName} />
-        <Detail label="Employee ID" value={String(record.employeeId)} alignRight />
-        <Detail label="Department" value={record.department} />
-        <Detail label="Role" value={record.role || "—"} alignRight />
+        <Detail label="Department" value={record.department} alignRight />
       </div>
 
       {/* Attendance summary */}
