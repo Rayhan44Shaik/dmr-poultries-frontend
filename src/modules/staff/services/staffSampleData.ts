@@ -321,6 +321,11 @@ export function buildSampleSalaryRecords(month: string, weekStart?: string): Sal
       submittedBy = "Rubulla";
     }
 
+    // Payslip delivery counts for the Review & Submit list. Deterministic
+    // variety so the per-row email / WhatsApp indicators have something to show.
+    const emailsSent = (i * 2) % 4; // 0,2,0,2,0,2 ...
+    const whatsappsSent = (i * 3) % 4; // 0,3,0,3,0,3 ...
+
     return {
       id: `sample-salary-${emp.id}-${month}`,
       employeeId: emp.id,
@@ -352,6 +357,8 @@ export function buildSampleSalaryRecords(month: string, weekStart?: string): Sal
       presentDays: att.presentDays,
       leaveDays: att.leaveDays,
       weeklyOffDays: att.weeklyOffDays,
+      emailsSent,
+      whatsappsSent,
     };
   });
 }

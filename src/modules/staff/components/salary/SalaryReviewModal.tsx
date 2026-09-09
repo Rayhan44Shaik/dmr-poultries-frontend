@@ -23,7 +23,13 @@ import {
   CheckSquare,
   Square,
   CheckCircle2,
+  MessageCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+
+/** Number of employees shown per page in the left selection list. */
+const PAGE_SIZE = 10;
 import { ClassicPayslipSheet } from "./ClassicPayslipSheet";
 import {
   computePayslipTotals,
@@ -77,6 +83,7 @@ export function SalaryReviewModal({
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [page, setPage] = useState(1);
 
   const selected = useMemo(() => {
     const byId = records.find((r) => r.id === selectedId);
@@ -105,7 +112,21 @@ export function SalaryReviewModal({
     allIds.length > 0 && allIds.every((id) => selectedIds.has(id));
   const selectedCount = selectedIds.size;
 
-  // Arrow-key navigation across the filtered list.
+  // Pagination — show PAGE_SIZE employees at a time. `activePage` is clamped
+  // so the slice/indicator never overflow even if the list shrinks.
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const activePage = Math.min(page, totalPages);
+  const pageRecords = useMemo(
+    () => filtered.slice((activePage - 1) * PAGE_SIZE, activePage * PAGE_SIZE),
+    [filtered, activePage]
+  );
+
+  const handleQueryChange = useCallback((value: string) => {
+    setQuery(value);
+    setPage(1);
+  }, []);
+
+  // Arrow-key navigation across the current page.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -117,19 +138,19 @@ export function SalaryReviewModal({
       ) {
         return;
       }
-      if (filtered.length === 0) return;
+      if (pageRecords.length === 0) return;
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
         const dir = e.key === "ArrowDown" ? 1 : -1;
-        const idx = filtered.findIndex((r) => r.id === selected?.id);
+        const idx = pageRecords.findIndex((r) => r.id === selected?.id);
         const nextIdx =
-          idx < 0 ? 0 : (idx + dir + filtered.length) % filtered.length;
-        setSelectedId(filtered[nextIdx].id);
+          idx < 0 ? 0 : (idx + dir + pageRecords.length) % pageRecords.length;
+        setSelectedId(pageRecords[nextIdx].id);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [filtered, selected]);
+  }, [pageRecords, selected]);
 
   const ensureDraft = useCallback(
     (record: SalaryRecord): FieldValues =>
@@ -280,7 +301,7 @@ export function SalaryReviewModal({
                 <input
                   type="text"
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  onChange={(e) => handleQueryChange(e.target.value)}
                   placeholder="Search employees..."
                   aria-label="Search employees"
                   className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-7 pr-8 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
@@ -288,7 +309,7 @@ export function SalaryReviewModal({
                 {query && (
                   <button
                     type="button"
-                    onClick={() => setQuery("")}
+                    onClick={() => handleQueryChange("")}
                     aria-label="Clear search"
                     className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                   >
@@ -298,42 +319,50 @@ export function SalaryReviewModal({
               </div>
             </div>
 
-            {/* Employee list — all employees, scrollable */}
+            {/* Employee list — 10 at a time, name + per-row delivery counts */}
             <div className="flex min-h-0 flex-1 flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2 overscroll-contain">
                 <div className="space-y-1">
-                  {filtered.map((r) => {
+                  {pageRecords.map((r) => {
                     const isActive = r.id === selected?.id;
                     const isSelected = selectedIds.has(r.id);
                     const isBusy = savingId === r.id;
-                    const initial = (r.employeeName || "?")
-                      .trim()
-                      .charAt(0)
-                      .toUpperCase();
+                    const emailsSent = r.emailsSent ?? 0;
+                    const whatsappsSent = r.whatsappsSent ?? 0;
                     return (
                       <div
                         key={r.id}
                         onClick={() => setSelectedId(r.id)}
-                        className={`group flex cursor-pointer items-center gap-2.5 rounded-xl border px-2.5 py-2 transition ${
+                        className={`group flex cursor-pointer items-center gap-2 rounded-lg border px-2 py-2 transition ${
                           isActive
                             ? "border-blue-300 bg-white shadow-sm ring-1 ring-blue-200"
                             : isSelected
-                            ? "border-blue-100 bg-white"
-                            : "border-transparent bg-slate-100/60 hover:border-slate-200 hover:bg-white"
+                            ? "border-blue-200 bg-white"
+                            : "border-transparent hover:border-slate-200 hover:bg-white"
                         }`}
                       >
+                        {/* Simple select on the left */}
                         <span
-                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold ${
-                            isActive
-                              ? "bg-blue-600 text-white"
-                              : "bg-gradient-to-br from-blue-500 to-indigo-600 text-white"
-                          }`}
+                          className="flex h-[18px] w-[18px] shrink-0 items-center justify-center"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          {initial}
+                          {isBusy ? (
+                            <Loader2 size={14} className="animate-spin text-blue-500" />
+                          ) : (
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => onToggleSelect(r.id)}
+                              aria-label={`Select ${r.employeeName}`}
+                              className="h-[17px] w-[17px] cursor-pointer rounded accent-blue-600"
+                            />
+                          )}
                         </span>
+
+                        {/* Name */}
                         <span className="min-w-0 flex-1">
                           <span
-                            className={`block truncate text-[12.5px] leading-tight ${
+                            className={`block truncate text-[13px] leading-tight ${
                               isActive
                                 ? "font-bold text-blue-700"
                                 : "font-semibold text-slate-700"
@@ -346,37 +375,79 @@ export function SalaryReviewModal({
                             {r.department}
                           </span>
                         </span>
-                        {isBusy ? (
-                          <Loader2 size={14} className="shrink-0 animate-spin text-blue-500" />
-                        ) : (
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => onToggleSelect(r.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={`Select ${r.employeeName}`}
-                            className="h-[18px] w-[18px] shrink-0 cursor-pointer rounded accent-blue-600"
-                          />
-                        )}
+
+                        {/* Delivery counts — email & WhatsApp, right of the name */}
+                        <span className="flex shrink-0 items-center gap-1">
+                          <span
+                            title={`${emailsSent} email${emailsSent === 1 ? "" : "s"} sent`}
+                            className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+                              emailsSent > 0
+                                ? "bg-blue-50 text-blue-600"
+                                : "bg-slate-100 text-slate-300"
+                            }`}
+                          >
+                            <Mail size={10} />
+                            {emailsSent}
+                          </span>
+                          <span
+                            title={`${whatsappsSent} WhatsApp${whatsappsSent === 1 ? "" : "s"} sent`}
+                            className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+                              whatsappsSent > 0
+                                ? "bg-emerald-50 text-emerald-600"
+                                : "bg-slate-100 text-slate-300"
+                            }`}
+                          >
+                            <MessageCircle size={10} />
+                            {whatsappsSent}
+                          </span>
+                        </span>
                       </div>
                     );
                   })}
                 </div>
-                {filtered.length === 0 && (
+                {pageRecords.length === 0 && (
                   <p className="px-2 py-6 text-center text-xs text-slate-400">
                     No employees match “{query}”.
                   </p>
                 )}
               </div>
 
-              {/* List footer — always visible so users know the rest is one scroll away */}
-              <div className="shrink-0 border-t border-slate-200 bg-white px-3.5 py-2">
-                <p className="text-[10px] font-medium text-slate-400">
-                  {filtered.length > 0
-                    ? `${filtered.length} of ${records.length} shown — scroll for the rest`
-                    : `${records.length} employees`}
-                </p>
-              </div>
+              {/* Pagination — small prev / next with page indicator */}
+              {filtered.length > 0 && (
+                <div className="flex shrink-0 items-center justify-between border-t border-slate-200 bg-white px-3 py-1.5">
+                  <span className="text-[10px] font-medium text-slate-400">
+                    {filtered.length > 0
+                      ? `${(activePage - 1) * PAGE_SIZE + 1}–${Math.min(
+                          activePage * PAGE_SIZE,
+                          filtered.length
+                        )} of ${filtered.length}`
+                      : ""}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={activePage <= 1}
+                      aria-label="Previous page"
+                      className="flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <span className="px-1 text-[11px] font-bold text-slate-600 tabular-nums">
+                      {activePage}/{totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={activePage >= totalPages}
+                      aria-label="Next page"
+                      className="flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </aside>
 
