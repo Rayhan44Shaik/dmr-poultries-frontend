@@ -295,7 +295,10 @@ export function SalaryReviewModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-slate-900/60 p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-5xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden sm:max-h-[94vh]">
+      <div
+        className="bg-white w-full sm:max-w-5xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden sm:max-h-[94vh]"
+        style={{ fontFamily: "var(--font-sans)" }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200">
           <div className="flex items-center gap-2.5">
@@ -436,26 +439,6 @@ export function SalaryReviewModal({
                 </p>
               )}
             </div>
-
-            {/* Actions */}
-            <div className="space-y-2 border-t border-slate-100 bg-white/70 px-3.5 py-3">
-              <button
-                type="button"
-                onClick={() => onDownloadSelected([...selectedIds])}
-                disabled={selectedCount === 0}
-                className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-semibold text-white shadow-sm transition hover:from-blue-600 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Download size={13} /> Download selected ({selectedCount})
-              </button>
-              <button
-                type="button"
-                onClick={onEmailSelected}
-                disabled={selectedCount === 0}
-                className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Mail size={13} /> Email Payslips ({selectedCount})
-              </button>
-            </div>
           </aside>
 
           {/* RIGHT: payslip (scrollable) */}
@@ -479,8 +462,11 @@ export function SalaryReviewModal({
           )}
         </div>
 
-        {/* Footer: Close + Edit on the left, Submit Selected on the right */}
-        <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-slate-200">
+        {/* Footer: Close + Edit on the left, Download / Email / Submit on the right */}
+        <div
+          className="flex items-center justify-between gap-3 px-4 py-3 bg-white border-t border-slate-200"
+          style={{ fontFamily: "var(--font-sans)" }}
+        >
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -516,15 +502,33 @@ export function SalaryReviewModal({
               </button>
             )}
           </div>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={selectedCount === 0 || submitDisabled}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition disabled:opacity-50"
-          >
-            <ClipboardCheck size={15} />
-            Submit Selected ({selectedCount})
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onDownloadSelected([...selectedIds])}
+              disabled={selectedCount === 0}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-semibold shadow-sm transition hover:from-blue-600 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download size={13} /> Download ({selectedCount})
+            </button>
+            <button
+              type="button"
+              onClick={onEmailSelected}
+              disabled={selectedCount === 0}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-semibold transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Mail size={13} /> Email ({selectedCount})
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={selectedCount === 0 || submitDisabled}
+              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition disabled:opacity-50"
+            >
+              <ClipboardCheck size={15} />
+              Submit Selected ({selectedCount})
+            </button>
+          </div>
         </div>
       </div>
     </div>
