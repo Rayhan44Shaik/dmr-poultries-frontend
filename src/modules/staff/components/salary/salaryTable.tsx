@@ -128,25 +128,19 @@ export function SalaryTable({
 
   return (
     <div className={uiTableWrapClass}>
-      {/* Table title — "Salary Register" above the employee columns */}
+      {/* Table title — "Salary Register — <month>" above the employee columns */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
-        <div className="min-w-0">
-          <h3 className="text-sm font-bold tracking-tight text-slate-800">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+          <h3 className="text-sm font-bold tracking-tight text-slate-800 whitespace-nowrap">
             Salary Register
+            {monthLabel ? <span className="font-semibold text-slate-700"> — {monthLabel}</span> : null}
           </h3>
-          <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-            {monthLabel && (
-              <span className="text-sm font-semibold text-slate-700 tabular-nums">
-                {monthLabel}
-              </span>
-            )}
-            {paidOnDate && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 tabular-nums">
-                <CheckCircle2 size={12} />
-                Paid on {formatDisplayDate(paidOnDate)}
-              </span>
-            )}
-          </div>
+          {paidOnDate && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 tabular-nums">
+              <CheckCircle2 size={12} />
+              Paid on {formatDisplayDate(paidOnDate)}
+            </span>
+          )}
         </div>
         <span className="shrink-0 text-[11px] font-medium text-slate-500 tabular-nums">
           {records.length} employee{records.length === 1 ? "" : "s"}
@@ -180,7 +174,7 @@ export function SalaryTable({
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Net</th>
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Status</th>
               {hasRowActions && (
-                <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Send</th>
+                <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Sent</th>
               )}
             </tr>
           </thead>
@@ -231,32 +225,34 @@ export function SalaryTable({
                   </td>
                   {hasRowActions && (
                     <td
-                      className="px-3 py-2.5 whitespace-nowrap text-center"
+                      className="px-3 py-2.5 text-center"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center justify-center gap-1.5">
                         {onEmail && (
                           <button
                             type="button"
-                            title={`Email payslip to ${record.employeeName}`}
+                            title={`Email payslip to ${record.employeeName}${(record.emailsSent ?? 0) > 0 ? ` (${record.emailsSent} already sent)` : ""}`}
                             aria-label={`Email payslip to ${record.employeeName}`}
                             onClick={() => onEmail(record)}
                             disabled={saving}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40"
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-slate-200 bg-white px-1.5 text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40"
                           >
-                            <Mail size={14} />
+                            <Mail size={13} />
+                            <span className="text-[10px] font-bold tabular-nums">{record.emailsSent ?? 0}</span>
                           </button>
                         )}
                         {onWhatsApp && (
                           <button
                             type="button"
-                            title={`WhatsApp payslip to ${record.employeeName}`}
+                            title={`WhatsApp payslip to ${record.employeeName}${(record.whatsappsSent ?? 0) > 0 ? ` (${record.whatsappsSent} already sent)` : ""}`}
                             aria-label={`WhatsApp payslip to ${record.employeeName}`}
                             onClick={() => onWhatsApp(record)}
                             disabled={saving}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#25D366]/15 text-[#1DA851] transition hover:bg-[#25D366] hover:text-white disabled:opacity-40"
+                            className="inline-flex h-7 items-center gap-1 rounded-lg bg-[#25D366]/15 px-1.5 text-[#1DA851] transition hover:bg-[#25D366] hover:text-white disabled:opacity-40"
                           >
-                            <WhatsAppBrandIcon size={14} />
+                            <WhatsAppBrandIcon size={13} />
+                            <span className="text-[10px] font-bold tabular-nums">{record.whatsappsSent ?? 0}</span>
                           </button>
                         )}
                       </div>
