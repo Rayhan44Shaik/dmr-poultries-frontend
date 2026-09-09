@@ -141,7 +141,6 @@ export function SalaryReviewModal({
   monthLabel,
   records,
   pendingCount,
-  saving,
   formatCurrency = (amt) =>
     new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -363,6 +362,8 @@ export function SalaryReviewModal({
                   onSave={handleSave}
                   onDownload={() => onDownload(selected)}
                   downloading={downloadingId === selected.id}
+                  onSubmitMonth={handleSubmit}
+                  pendingCount={pendingCount}
                 />
               </div>
             </div>
@@ -379,28 +380,13 @@ export function SalaryReviewModal({
             Select an employee to review their payslip. Use Edit to adjust a
             Pending record, then submit the month.
           </p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition"
-            >
-              Close
-            </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={saving || pendingCount === 0}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition flex items-center gap-1.5 disabled:opacity-50"
-            >
-              {saving ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <ClipboardCheck size={15} />
-              )}
-              {saving ? "Submitting..." : `Submit Month (${pendingCount})`}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>
@@ -472,6 +458,8 @@ function PayslipDocument({
   onSave,
   onDownload,
   downloading,
+  onSubmitMonth,
+  pendingCount,
 }: {
   record: SalaryRecord;
   values: FieldValues;
@@ -486,6 +474,8 @@ function PayslipDocument({
   onSave: () => void;
   onDownload: () => void;
   downloading: boolean;
+  onSubmitMonth: () => void;
+  pendingCount: number;
 }) {
   const monthLabel = (() => {
     if (!record.month) return "";
@@ -502,40 +492,12 @@ function PayslipDocument({
           <div className="text-base font-bold text-slate-900">Salary Payslip</div>
           <div className="text-[11px] text-slate-500">DMR POULTRIES</div>
         </div>
-        <div className="flex items-center gap-2">
-          {editing ? (
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={!dirty || savingId === record.id}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition disabled:opacity-50"
-            >
-              {savingId === record.id ? (
-                <Loader2 size={13} className="animate-spin" />
-              ) : (
-                <Save size={13} />
-              )}
-              {savingId === record.id ? "Saving..." : dirty ? "Save" : "Saved"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onToggleEdit}
-              disabled={!canEdit}
-              title={canEdit ? "Edit this payslip" : "Locked — only Pending records can be edited"}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {canEdit ? <Pencil size={13} /> : <Lock size={13} />}
-              {canEdit ? "Edit" : "Locked"}
-            </button>
-          )}
-          <div className="text-right">
-            <div className="text-[10px] uppercase tracking-wider text-slate-400">
-              Month
-            </div>
-            <div className="text-sm font-semibold text-slate-800">
-              {monthLabel}
-            </div>
+        <div className="text-right">
+          <div className="text-[10px] uppercase tracking-wider text-slate-400">
+            Month
+          </div>
+          <div className="text-sm font-semibold text-slate-800">
+            {monthLabel}
           </div>
         </div>
       </div>
@@ -629,21 +591,62 @@ function PayslipDocument({
         </span>
       </div>
 
-      {/* Download */}
-      <div className="px-5 py-3 border-t border-slate-200 flex justify-end">
+      {/* Actions: Submit Month (left) + Download / Edit (right) on one line */}
+      <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-between gap-2">
         <button
           type="button"
-          onClick={onDownload}
-          disabled={downloading}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition disabled:opacity-50"
+          onClick={onSubmitMonth}
+          disabled={pendingCount === 0}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition disabled:opacity-50"
         >
-          {downloading ? (
-            <Loader2 size={13} className="animate-spin" />
-          ) : (
-            <Download size={13} />
-          )}
-          {downloading ? "Preparing..." : "Download Payslip"}
+          <ClipboardCheck size={14} />
+          Submit Month ({pendingCount})
         </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onDownload}
+            disabled={downloading}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition disabled:opacity-50"
+          >
+            {downloading ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Download size={13} />
+            )}
+            {downloading ? "Preparing..." : "Download"}
+          </button>
+          {editing ? (
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={!dirty || savingId === record.id}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition disabled:opacity-50"
+            >
+              {savingId === record.id ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <Save size={13} />
+              )}
+              {savingId === record.id
+                ? "Saving..."
+                : dirty
+                ? "Save"
+                : "Saved"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onToggleEdit}
+              disabled={!canEdit}
+              title={canEdit ? "Edit this payslip" : "Locked — only Pending records can be edited"}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {canEdit ? <Pencil size={13} /> : <Lock size={13} />}
+              {canEdit ? "Edit" : "Locked"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
