@@ -5,7 +5,7 @@ import { uiInputClass } from '../../../shared/ui/uiTokens';
 import { useSalaryRegister } from "../hooks/useSalaryRegister";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { loadEmployees } from "../../masters/employees/services/employeeService";
-import { getSalaryMonthSummary, downloadPayslipPdf, submitSalaryMonth, updateSalary, emailSalaryPayslips } from "../services/salaryService";
+import { getSalaryMonthSummary, downloadPayslipPdf, updateSalary, emailSalaryPayslips, bulkUpdateSalaryStatus } from "../services/salaryService";
 import {
   Calendar,
   ChevronDown,
@@ -412,24 +412,30 @@ function SalaryRegisterPage() {
     );
   }, [confirm, generate, month, runConfirm]);
 
-  const handleSubmitMonth = useCallback(async () => {
-    setSubmitMonthOpen(false);
-    try {
-      const result = await submitSalaryMonth(month);
-      await refresh();
-      let message = `${formatMonthName(month)} salary submitted successfully.`;
-      if (result.emailQueuedCount > 0 && result.emailFailedCount === 0) {
-        message = `${formatMonthName(month)} salary submitted. Payslip emails queued for ${result.emailQueuedCount} employees.`;
-      } else if (result.emailQueuedCount > 0) {
-        message = `${formatMonthName(month)} salary submitted. ${result.emailSentCount} payslips sent, ${result.emailFailedCount} email deliveries need attention.`;
-      } else if (result.submittedCount === 0) {
-        message = `${formatMonthName(month)} salary already submitted. No duplicate emails queued.`;
+  const handleSubmitSelected = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return;
+      try {
+        const result = await bulkUpdateSalaryStatus(ids, {
+          status: "Paid",
+          paymentDate: new Date().toISOString().slice(0, 10),
+          paymentMode: "Bank Transfer",
+        });
+        await refresh();
+        setSubmitMonthOpen(false);
+        showNotification(
+          `Submitted ${result.updated.length} salary record(s) successfully.`,
+          "success"
+        );
+      } catch (error) {
+        showNotification(
+          (error as Error)?.message || "Unable to submit selected salaries.",
+          "error"
+        );
       }
-      showNotification(message, "success");
-    } catch (error) {
-      showNotification((error as Error)?.message || "Unable to submit month.", "error");
-    }
-  }, [showNotification, month, refresh]);
+    },
+    [refresh, showNotification]
+  );
 
   const handleDownload = useCallback(
     async (record: SalaryRecord) => {
@@ -756,12 +762,9 @@ function SalaryRegisterPage() {
           monthLabel={formatMonthName(month)}
           records={allRecords}
           pendingCount={totals.pendingCount}
-          saving={saving}
           formatCurrency={formatCurrency}
           onClose={() => setSubmitMonthOpen(false)}
-          onSubmitMonth={() => void handleSubmitMonth()}
-          onDownload={(record) => void handleDownload(record)}
-          downloadingId={downloadingId}
+          onSubmitSelected={(ids) => void handleSubmitSelected(ids)}
           onSaveRecord={(record) => handleSaveRecord(record)}
           submitDisabled={!emailsSent}
           selectedIds={selectedIds}

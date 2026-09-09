@@ -2,11 +2,11 @@
 //
 // "Review & Submit" popup for the Salary Register.
 //
-// Mirrors the Shop Ledger PDF "Select shops" pattern: a left selection panel
-// (count chip, progress bar, All/None, search, checkbox list with initials +
-// net salary) and the payslip preview on the right. The payslip is read-only by
-// default; the always-visible "Edit" button turns the amount fields into inputs
-// so a Pending record can be corrected and saved back to the salary table.
+// Left selection panel (mirrors the Shop Ledger "Select shops" pattern): search,
+// All/None, checkbox list, and bottom actions (Download Selected / Email
+// Payslips). The payslip preview is on the right (read-only by default; the
+// footer Edit toggles inline editing). After a successful email send, "Submit
+// Selected" submits only the chosen employees.
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import {
@@ -30,15 +30,12 @@ export type SalaryReviewModalProps = {
   monthLabel: string;
   records: SalaryRecord[];
   pendingCount: number;
-  saving: boolean;
-  /** Disables the Submit Month action (e.g. until payslips are emailed). */
+  /** Disables the Submit Selected action (e.g. until payslips are emailed). */
   submitDisabled?: boolean;
   formatCurrency?: (amount: number) => string;
   onClose: () => void;
-  onSubmitMonth: () => void;
-  onDownload: (record: SalaryRecord) => void;
-  downloadingId?: string | null;
-  /** Persist edits to a single salary record (Pending only). */
+  /** Submit only the given (selected + emailed) employee ids. */
+  onSubmitSelected: (ids: string[]) => void;
   onSaveRecord: (record: SalaryRecord) => Promise<void>;
   // Selection (owned by the page's salary table).
   selectedIds: Set<string>;
@@ -164,9 +161,7 @@ export function SalaryReviewModal({
       minimumFractionDigits: 2,
     }).format(amt || 0),
   onClose,
-  onSubmitMonth,
-  onDownload,
-  downloadingId,
+  onSubmitSelected,
   onSaveRecord,
   selectedIds,
   onToggleSelect,
@@ -208,6 +203,32 @@ export function SalaryReviewModal({
   const allSelected =
     allIds.length > 0 && allIds.every((id) => selectedIds.has(id));
   const selectedCount = selectedIds.size;
+
+  // Arrow-key navigation across the filtered list.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT")
+      ) {
+        return;
+      }
+      if (filtered.length === 0) return;
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const dir = e.key === "ArrowDown" ? 1 : -1;
+        const idx = filtered.findIndex((r) => r.id === selected?.id);
+        const nextIdx =
+          idx < 0 ? 0 : (idx + dir + filtered.length) % filtered.length;
+        setSelectedId(filtered[nextIdx].id);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [filtered, selected]);
 
   const ensureDraft = useCallback(
     (record: SalaryRecord): FieldValues =>
@@ -266,13 +287,11 @@ export function SalaryReviewModal({
   }, [selected, drafts, onSaveRecord]);
 
   const handleSubmit = useCallback(() => {
-    const id = selected?.id;
-    if (id && dirty[id]) {
-      void handleSave().then(() => onSubmitMonth());
-    } else {
-      onSubmitMonth();
-    }
-  }, [selected, dirty, handleSave, onSubmitMonth]);
+    if (selectedCount === 0) return;
+    const afterSave =
+      selected && dirty[selected.id] ? handleSave() : Promise.resolve();
+    afterSave.then(() => onSubmitSelected([...selectedIds]));
+  }, [selected, selectedCount, dirty, handleSave, onSubmitSelected, selectedIds]);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-slate-900/60 p-0 sm:p-4">
@@ -305,7 +324,7 @@ export function SalaryReviewModal({
         {/* Body */}
         <div className="flex flex-1 min-h-0">
           {/* LEFT: selection panel (mirrors Shop Ledger "Select shops") */}
-          <aside className="w-72 shrink-0 flex flex-col border-r border-slate-100 bg-slate-50/70">
+          <aside className="w-72 shrink-0 flex flex-col min-h-0 border-r border-slate-100 bg-slate-50/70">
             {/* Panel header */}
             <div className="space-y-2.5 border-b border-slate-100 bg-white/70 px-3.5 py-3">
               <div className="flex items-center justify-between">
@@ -364,9 +383,6 @@ export function SalaryReviewModal({
                   const isActive = r.id === selected?.id;
                   const isSelected = selectedIds.has(r.id);
                   const isBusy = savingId === r.id;
-                  const initial = (r.employeeName || "?")
-                    .charAt(0)
-                    .toUpperCase();
                   return (
                     <div
                       key={r.id}
@@ -390,17 +406,8 @@ export function SalaryReviewModal({
                         type="button"
                         onClick={() => setSelectedId(r.id)}
                         title={r.employeeName}
-                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                        className="flex min-w-0 flex-1 items-center text-left"
                       >
-                        <span
-                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-bold transition ${
-                            isSelected
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-slate-100 text-slate-500"
-                          }`}
-                        >
-                          {initial}
-                        </span>
                         <span className="min-w-0 flex-1">
                           <span
                             className={`block truncate text-xs ${
@@ -446,7 +453,7 @@ export function SalaryReviewModal({
                 disabled={selectedCount === 0}
                 className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Mail size={13} /> Email Payslips
+                <Mail size={13} /> Email Payslips ({selectedCount})
               </button>
             </div>
           </aside>
@@ -460,18 +467,8 @@ export function SalaryReviewModal({
                   values={currentValues}
                   totals={currentTotals}
                   editing={editing && canEdit}
-                  canEdit={canEdit}
                   formatCurrency={formatCurrency}
                   onFieldChange={(key, val) => setField(selected, key, val)}
-                  savingId={savingId}
-                  dirty={Boolean(dirty[selected.id])}
-                  onToggleEdit={() => setEditing((e) => !e)}
-                  onSave={handleSave}
-                  onDownload={() => onDownload(selected)}
-                  downloading={downloadingId === selected.id}
-                  onSubmitMonth={handleSubmit}
-                  pendingCount={pendingCount}
-                  submitDisabled={submitDisabled}
                 />
               </div>
             </div>
@@ -482,17 +479,51 @@ export function SalaryReviewModal({
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer: Close + Edit on the left, Submit Selected on the right */}
         <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-slate-200">
-          <p className="text-[11px] text-slate-500 max-w-md truncate">
-            Select employees, review their payslips, email, then submit the month.
-          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition"
+            >
+              Close
+            </button>
+            {editing ? (
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={!dirty || savingId === selected?.id}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition disabled:opacity-50"
+              >
+                {savingId === selected?.id ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <Save size={13} />
+                )}
+                {savingId === selected?.id ? "Saving..." : dirty ? "Save" : "Saved"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                disabled={!canEdit}
+                title={canEdit ? "Edit this payslip" : "Locked — only Pending records can be edited"}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {canEdit ? <Pencil size={13} /> : <Lock size={13} />}
+                {canEdit ? "Edit" : "Locked"}
+              </button>
+            )}
+          </div>
           <button
             type="button"
-            onClick={onClose}
-            className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition"
+            onClick={handleSubmit}
+            disabled={selectedCount === 0 || submitDisabled}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition disabled:opacity-50"
           >
-            Close
+            <ClipboardCheck size={15} />
+            Submit Selected ({selectedCount})
           </button>
         </div>
       </div>
@@ -556,35 +587,15 @@ function PayslipDocument({
   values,
   totals,
   editing,
-  canEdit,
   formatCurrency,
   onFieldChange,
-  savingId,
-  dirty,
-  onToggleEdit,
-  onSave,
-  onDownload,
-  downloading,
-  onSubmitMonth,
-  pendingCount,
-  submitDisabled,
 }: {
   record: SalaryRecord;
   values: FieldValues;
   totals: { gross: number; deductions: number; net: number };
   editing: boolean;
-  canEdit: boolean;
   formatCurrency: (amount: number) => string;
   onFieldChange: (key: FieldKey, value: number) => void;
-  savingId: string | null;
-  dirty: boolean;
-  onToggleEdit: () => void;
-  onSave: () => void;
-  onDownload: () => void;
-  downloading: boolean;
-  onSubmitMonth: () => void;
-  pendingCount: number;
-  submitDisabled: boolean;
 }) {
   const monthLabel = (() => {
     if (!record.month) return "";
@@ -698,64 +709,6 @@ function PayslipDocument({
         <span className="text-xl font-extrabold tabular-nums">
           {formatCurrency(totals.net)}
         </span>
-      </div>
-
-      {/* Actions: Submit Month (left) + Download / Edit (right) on one line */}
-      <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={onSubmitMonth}
-          disabled={pendingCount === 0 || submitDisabled}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition disabled:opacity-50"
-        >
-          <ClipboardCheck size={14} />
-          Submit Month ({pendingCount})
-        </button>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onDownload}
-            disabled={downloading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition disabled:opacity-50"
-          >
-            {downloading ? (
-              <Loader2 size={13} className="animate-spin" />
-            ) : (
-              <Download size={13} />
-            )}
-            {downloading ? "Preparing..." : "Download"}
-          </button>
-          {editing ? (
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={!dirty || savingId === record.id}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition disabled:opacity-50"
-            >
-              {savingId === record.id ? (
-                <Loader2 size={13} className="animate-spin" />
-              ) : (
-                <Save size={13} />
-              )}
-              {savingId === record.id
-                ? "Saving..."
-                : dirty
-                ? "Save"
-                : "Saved"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onToggleEdit}
-              disabled={!canEdit}
-              title={canEdit ? "Edit this payslip" : "Locked — only Pending records can be edited"}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {canEdit ? <Pencil size={13} /> : <Lock size={13} />}
-              {canEdit ? "Edit" : "Locked"}
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );
