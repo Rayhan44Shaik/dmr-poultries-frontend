@@ -9,7 +9,6 @@ import {
   apiGet,
   apiPatch,
   apiPost,
-  apiPut,
   handleApiError,
 } from "../../../api";
 import type {
@@ -241,16 +240,33 @@ export async function bulkUpdateSalaryStatus(
   return { updated, skipped };
 }
 
-/** PUT /api/staff/salaries/:id — edit only Pending records; totals recomputed
- *  by the backend from the supplied components. */
+/**
+ * Persist edits to a single salary record. The backend `/salaries` upsert
+ * recomputes gross / deductions / net from the supplied components and is
+ * keyed on (employee_id, month), so editing a Pending record updates the
+ * existing row in place. Returns the authoritative record from the backend.
+ */
 export async function updateSalary(
-  id: string,
-  components: Record<string, number>
+  record: SalaryRecord
 ): Promise<SalaryRecord> {
-  const { data } = await apiPut<Record<string, unknown>>(
-    `${SALARY_PATH}/${id}`,
-    components
-  );
+  const { data } = await apiPost<Record<string, unknown>>(`${SALARY_PATH}`, {
+    employeeId: record.employeeId,
+    employeeName: record.employeeName,
+    department: record.department,
+    month: record.month,
+    basicSalary: record.basicSalary ?? 0,
+    overtime: record.overtime ?? 0,
+    incentives: record.incentives ?? 0,
+    fuelAllowance: record.fuelAllowance ?? 0,
+    nightAllowance: record.nightAllowance ?? 0,
+    leaveDeduction: record.leaveDeduction ?? 0,
+    advanceRecovery: record.advanceRecovery ?? 0,
+    loanEMI: record.loanEMI ?? 0,
+    latePenalty: record.latePenalty ?? 0,
+    otherDeductions: record.otherDeductions ?? 0,
+    status: record.status,
+    paymentDate: record.paymentDate ?? null,
+  });
   return mapSalary(data);
 }
 

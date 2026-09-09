@@ -5,7 +5,7 @@ import { uiInputClass } from '../../../shared/ui/uiTokens';
 import { useSalaryRegister } from "../hooks/useSalaryRegister";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { loadEmployees } from "../../masters/employees/services/employeeService";
-import { getSalaryMonthSummary, downloadPayslipPdf, submitSalaryMonth } from "../services/salaryService";
+import { getSalaryMonthSummary, downloadPayslipPdf, submitSalaryMonth, updateSalary } from "../services/salaryService";
 import {
   Calendar,
   ChevronDown,
@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { SalaryTable } from "../components/salary/salaryTable";
 import { SalaryView } from "../components/salary/SalaryView";
-import { SubmitMonthModal } from "../components/salary/SubmitMonthModal";
+import { SalaryReviewModal } from "../components/salary/SalaryReviewModal";
 import { SAMPLE_EMPLOYEE_LIST } from "../services/staffSampleData";
 import type { SalaryMonthSummary, SalaryRecord } from "../types/staffDashboard";
 
@@ -433,6 +433,23 @@ function SalaryRegisterPage() {
     [showNotification]
   );
 
+  const handleSaveRecord = useCallback(
+    async (record: SalaryRecord) => {
+      try {
+        await updateSalary(record);
+        await refresh();
+        showNotification(`Saved payslip changes for ${record.employeeName}.`, "success");
+      } catch (error) {
+        showNotification(
+          (error as Error)?.message || "Unable to save payslip changes.",
+          "error"
+        );
+        throw error; // keep the modal's dirty flag so the user can retry
+      }
+    },
+    [refresh, showNotification]
+  );
+
   const monthStatus = useMemo(() => {
     if (!monthSummary) return null;
     if (monthSummary.closed) return { label: "Closed", tone: "bg-slate-100 text-slate-600 border-slate-200" };
@@ -618,7 +635,7 @@ function SalaryRegisterPage() {
             <button
               type="button"
               onClick={() => setSubmitMonthOpen(true)}
-              disabled={saving || refreshing || totals.pendingCount === 0}
+              disabled={saving || refreshing || allRecords.length === 0}
               className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
             >
               <ClipboardCheck size={15} /> Review and Submit
@@ -692,12 +709,17 @@ function SalaryRegisterPage() {
       )}
 
       {submitMonthOpen && (
-        <SubmitMonthModal
+        <SalaryReviewModal
           monthLabel={formatMonthName(month)}
+          records={allRecords}
           pendingCount={totals.pendingCount}
           saving={saving}
-          onCancel={() => setSubmitMonthOpen(false)}
-          onConfirm={() => void handleSubmitMonth()}
+          formatCurrency={formatCurrency}
+          onClose={() => setSubmitMonthOpen(false)}
+          onSubmitMonth={() => void handleSubmitMonth()}
+          onDownload={(record) => void handleDownload(record)}
+          downloadingId={downloadingId}
+          onSaveRecord={(record) => handleSaveRecord(record)}
         />
       )}
 
