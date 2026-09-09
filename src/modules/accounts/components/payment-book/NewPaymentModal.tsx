@@ -1,6 +1,7 @@
 // src/modules/accounts/components/payment-book/NewPaymentModal.tsx
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { toBusinessDate } from '../../../../utils/businessDate';
 import { X, CreditCard } from 'lucide-react';
 import type { Payment } from '../../types/payment.types';
 import { createPayment } from '../../services/paymentApiService';
@@ -53,7 +54,7 @@ export function NewPaymentModal({ isOpen, onClose, onSave }: NewPaymentModalProp
   }, []);
 
   const [form, setForm] = useState({
-    paymentDate: new Date().toISOString().split('T')[0],
+    paymentDate: toBusinessDate(new Date()),
     paymentType: '',
     paymentMode: '',
     transactionMethod: '',
@@ -68,7 +69,7 @@ export function NewPaymentModal({ isOpen, onClose, onSave }: NewPaymentModalProp
   useEffect(() => {
     if (isOpen) {
       setForm({
-        paymentDate: new Date().toISOString().split('T')[0],
+        paymentDate: toBusinessDate(new Date()),
         paymentType: '',
         paymentMode: '',
         transactionMethod: '',

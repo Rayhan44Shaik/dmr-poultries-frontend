@@ -1,4 +1,5 @@
 import type {
+
   Employee,
   Trip,
   LeaveRequest,
@@ -10,6 +11,7 @@ import type {
   ShiftConfig,
 } from '../types/staffDashboard';
 
+import { toBusinessDate } from '../../../utils/businessDate';
 // ============================================================
 // CACHE HELPERS
 // ============================================================
@@ -124,7 +126,7 @@ export function getStaffDashboardData(
     ? employees.filter((e) => e.department === department)
     : employees;
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = toBusinessDate(new Date());
 
   const totalEmployees = filteredEmployees.length;
 

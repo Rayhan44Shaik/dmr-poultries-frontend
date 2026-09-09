@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { CheckCircle2, AlertCircle, X } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import { push } from '../../../../ui/notifications/notificationStore';
 
 interface RefreshToastProps {
   message: string;
@@ -9,6 +9,36 @@ interface RefreshToastProps {
   isError?: boolean;
 }
 
+/**
+ * Refresh/save feedback for the staff module.
+ *
+ * This used to be a fourth, independent toast renderer in the app: its own
+ * `fixed top-4 right-4 z-50` shell, its own CheckCircle2/AlertCircle icons, its
+ * own slide-in animation and its own auto-close timer — sitting alongside the
+ * global NotificationHost and the EMI / Documents refresh toasts. Four
+ * implementations of one idea, in four positions, with four visual treatments.
+ *
+ * It is now a thin adapter over the ONE global notification store, so staff
+ * feedback looks, animates, times out and announces itself exactly like every
+ * other notification in the ERP.
+ *
+ * The public props are unchanged, so none of the consuming pages needed edits.
+ *
+ * WHY THIS IS SAFE (and not a behaviour change)
+ *   • The store dedupes by `tone::message` and REFRESHES THE TIMER on a repeat
+ *     push rather than ignoring it — which is precisely the "restart the
+ *     5-second countdown" semantic this component implemented locally.
+ *   • `onClose` is still called after `duration`, so the parent's own
+ *     `isVisible` state is released exactly as before.
+ *   • The host is non-blocking, never steals focus, and is `aria-live`, matching
+ *     the previous `role="alert"` + `aria-live="polite"` announcement.
+ *   • It renders nothing itself, so it can no longer be clipped by an ancestor's
+ *     overflow or stacking context — the host is portalled once in `App`.
+ *
+ * `onClose` is held in a ref and kept OUT of the effect deps: consumers pass an
+ * inline arrow function, so depending on it would re-run the effect (and reset
+ * the timer) on every parent render.
+ */
 const RefreshToast: React.FC<RefreshToastProps> = ({
   message,
   isVisible,
@@ -16,63 +46,29 @@ const RefreshToast: React.FC<RefreshToastProps> = ({
   duration = 5000,
   isError = false,
 }) => {
-  const [show, setShow] = useState(false);
+  const closeRef = useRef(onClose);
+  // Assigned in an effect, never during render: writing a ref while
+  // rendering is unsafe under concurrent rendering (and is flagged by
+  // the react-hooks compiler rules). This keeps the latest callback
+  // without putting it in the deps below.
+  useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
-    if (isVisible) {
-      setShow(true);
-      const timer = setTimeout(() => {
-        setShow(false);
-        onClose();
-      }, duration);
-      return () => clearTimeout(timer);
-    } else {
-      setShow(false);
+    if (!isVisible) return;
+    const text = (message ?? '').toString().trim();
+    // Never announce an empty toast; release the parent state immediately.
+    if (!text) {
+      closeRef.current();
+      return;
     }
-  }, [isVisible, duration, onClose]);
+    push(text, isError ? 'error' : 'success', { duration });
+    const timer = window.setTimeout(() => closeRef.current(), duration);
+    return () => window.clearTimeout(timer);
+  }, [isVisible, message, duration, isError]);
 
-  if (!show) return null;
-
-  return (
-    <div
-      className="fixed top-4 right-4 z-50 animate-slide-in"
-      role="alert"
-      aria-live="polite"
-      style={{ animation: 'slide-in 0.3s ease-out' }}
-    >
-      <div className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[280px] max-w-sm">
-        <div className={`p-2 rounded-lg flex-shrink-0 ${isError ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
-          {isError ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
-        </div>
-        <span className={`text-sm font-medium flex-1 ${isError ? 'text-rose-800' : 'text-slate-800'}`}>{message}</span>
-        <button
-          onClick={() => {
-            setShow(false);
-            onClose();
-          }}
-          className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition flex-shrink-0"
-          aria-label="Dismiss"
-        >
-          <X size={16} />
-        </button>
-      </div>
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes slide-in {
-          from {
-            opacity: 0;
-            transform: translateX(100%);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-        .animate-slide-in {
-          animation: slide-in 0.3s ease-out;
-        }
-      `}} />
-    </div>
-  );
+  return null;
 };
 
-export default React.memo(RefreshToast);
+export default RefreshToast;

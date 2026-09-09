@@ -15,7 +15,7 @@ export const PasswordCard: React.FC = () => {
       </div>
 
       <div className="flex flex-col md:flex-row gap-6">
-        <div className="flex items-center justify-center w-full md:w-1/3 relative text-[#6c5ce7]">
+        <div className="flex items-center justify-center w-full md:w-1/3 relative text-emerald-600">
           <Lock size={80} className="opacity-90 drop-shadow-lg" />
           <div className="absolute -right-2 -bottom-2 bg-white rounded-full p-1 shadow-md border border-slate-200">
             <ShieldCheck size={28} className="text-emerald-500" />

@@ -1,6 +1,7 @@
 // src/modules/accounts/components/payment-book/PaymentEditModal.tsx
 
 import { useState, useEffect, useMemo } from 'react';
+import { toBusinessDate } from '../../../../utils/businessDate';
 import { X, Clock } from 'lucide-react';
 import type { Payment } from '../../types/payment.types';
 import { createPayment, updatePayment } from '../../services/paymentApiService';
@@ -31,7 +32,7 @@ const CATEGORIES = ['Farmer', 'Fuel', 'Maintenance', 'Salary', 'Loan', 'Office',
 
 export function PaymentEditModal({ isOpen, payment, onClose, onSave }: PaymentEditModalProps) {
   const [form, setForm] = useState({
-    paymentDate: new Date().toISOString().split('T')[0],
+    paymentDate: toBusinessDate(new Date()),
     paymentType: PAYMENT_TYPES[0],
     paymentMode: PAYMENT_MODES[0],
     paidTo: '',
@@ -66,7 +67,7 @@ export function PaymentEditModal({ isOpen, payment, onClose, onSave }: PaymentEd
       });
     } else if (isOpen) {
       setForm({
-        paymentDate: new Date().toISOString().split('T')[0],
+        paymentDate: toBusinessDate(new Date()),
         paymentType: PAYMENT_TYPES[0],
         paymentMode: PAYMENT_MODES[0],
         paidTo: '',

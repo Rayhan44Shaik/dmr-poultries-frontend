@@ -1,7 +1,6 @@
-import { memo, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { CheckCircle2, X } from 'lucide-react';
+import { memo, useEffect, useRef } from 'react';
 import { useI18n } from '../../../../i18n';
+import { push } from '../../../../ui/notifications/notificationStore';
 
 interface DocumentRefreshToastProps {
   show: boolean;
@@ -14,44 +13,42 @@ interface DocumentRefreshToastProps {
 const AUTO_CLOSE_MS = 5_000;
 
 /**
- * Top-right confirmation toast shown after a refresh, mirroring the EMI tab's
- * toast so both fleet tabs behave the same. Portalled to <body> so no ancestor
- * overflow or stacking context can clip it, and `pointer-events-none` on the
- * shell (with the close button re-enabled) so it never blocks the page.
+ * "Refreshed" feedback for the Permits & Documents tab.
+ *
+ * This was a near-verbatim copy of `EmiRefreshToast` — its own portal, its own
+ * `fixed top-4 right-4 z-[90]` emerald shell, its own CheckCircle2 glyph and its
+ * own timer — and a fourth toast renderer in the app beside the global
+ * NotificationHost. It is now an adapter over the ONE global store, so both
+ * fleet tabs and every other module announce a refresh identically.
+ *
+ * Props are unchanged; no consumer needed editing.
+ *
+ * `eventId` still restarts the countdown: the store refreshes the timer of an
+ * already-visible identical message instead of stacking a duplicate, which is
+ * exactly the semantic this component implemented by hand.
+ *
+ * `onDismiss` is ref'd and kept out of the deps so an inline callback from the
+ * parent cannot restart the timer on every render.
  */
 function DocumentRefreshToast({ show, eventId, onDismiss }: DocumentRefreshToastProps) {
   const { t } = useI18n();
+  const dismissRef = useRef(onDismiss);
+  // Assigned in an effect, never during render: writing a ref while
+  // rendering is unsafe under concurrent rendering (and is flagged by
+  // the react-hooks compiler rules). This keeps the latest callback
+  // without putting it in the deps below.
+  useEffect(() => {
+    dismissRef.current = onDismiss;
+  }, [onDismiss]);
 
-  // The timer fires from a callback, never synchronously in the effect body.
   useEffect(() => {
     if (!show) return;
-    const timer = window.setTimeout(onDismiss, AUTO_CLOSE_MS);
+    push(t('notification.data_refreshed'), 'success', { duration: AUTO_CLOSE_MS });
+    const timer = window.setTimeout(() => dismissRef.current(), AUTO_CLOSE_MS);
     return () => window.clearTimeout(timer);
-  }, [show, eventId, onDismiss]);
+  }, [show, eventId, t]);
 
-  if (!show || typeof document === 'undefined') return null;
-
-  return createPortal(
-    <div
-      key={eventId}
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
-      className="pointer-events-none fixed top-4 right-4 z-[90] flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-800 shadow-lg"
-    >
-      <CheckCircle2 size={20} aria-hidden="true" className="shrink-0 text-emerald-600" />
-      <span>{t('notification.data_refreshed')}</span>
-      <button
-        type="button"
-        onClick={onDismiss}
-        aria-label={t('common.close')}
-        className="pointer-events-auto -mr-1 ml-1 shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
-      >
-        <X size={16} aria-hidden="true" />
-      </button>
-    </div>,
-    document.body,
-  );
+  return null;
 }
 
 export default memo(DocumentRefreshToast);

@@ -1,90 +1,37 @@
+/**
+ * =============================================================================
+ * COMPATIBILITY ADAPTER → the canonical dialog in `src/ui/Modal`
+ * =============================================================================
+ * This file used to hold a SECOND, weaker dialog implementation: no Escape
+ * handling, no `aria-modal`, no focus trap, no focus restoration, no scroll
+ * containment, and a different radius / shadow / title scale from
+ * `src/ui/Modal`. Two dialog systems is exactly the duplication the design
+ * system exists to remove.
+ *
+ * It is now a thin adapter: this import path keeps working, while every dialog
+ * in the app shares one implementation and one behaviour. The legacy `open` and
+ * `width` props are preserved; `footer` is additive.
+ * =============================================================================
+ */
+
 import type { ReactNode } from "react";
-import { X } from "lucide-react";
-
-
+import { Modal as Dialog } from "../../ui/Modal";
 
 interface Props {
   open: boolean;
   title: string;
+  /** Legacy raw max-width class, e.g. `"max-w-3xl"`. */
   width?: string;
   onClose: () => void;
   children: ReactNode;
+  /** Optional sticky action row (additive). */
+  footer?: ReactNode;
 }
 
-export default function Modal({
-
-  open,
-
-  title,
-
-  width = "max-w-3xl",
-
-  onClose,
-
-  children
-
-}: Props) {
-
-  if (!open) return null;
-
+export default function Modal({ open, title, width = "max-w-3xl", onClose, children, footer }: Props) {
   return (
-
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-
-      {/* Background */}
-
-      <div
-
-        onClick={onClose}
-
-        className="absolute inset-0 bg-black/40"
-
-      />
-
-      {/* Modal */}
-
-      <div
-
-        className={`relative bg-white rounded-2xl shadow-2xl w-full ${width} mx-4 overflow-hidden`}
-
-      >
-
-        {/* Header */}
-
-        <div className="flex items-center justify-between border-b px-6 py-4">
-
-          <h2 className="text-xl font-bold text-slate-800">
-
-            {title}
-
-          </h2>
-
-          <button
-
-            onClick={onClose}
-
-            className="rounded-lg p-2 hover:bg-slate-100"
-
-          >
-
-            <X size={20} />
-
-          </button>
-
-        </div>
-
-        {/* Body */}
-
-        <div className="p-6">
-
-          {children}
-
-        </div>
-
-      </div>
-
-    </div>
-
+    <Dialog isOpen={open} onClose={onClose} title={title} width={width} footer={footer}>
+      {children}
+    </Dialog>
   );
-
 }

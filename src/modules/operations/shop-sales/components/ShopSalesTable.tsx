@@ -22,6 +22,7 @@ import {
   Bird,
 } from "lucide-react";
 import type { ShopSale } from "../types/shopSale";
+import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
 import {
   formatSaleAmount,
   formatSaleRate,
@@ -81,11 +82,13 @@ function ShopSalesTable({ sales, isLoading = false, onUpdateSale }: Props) {
     const newWeight = editData.totalWeight ?? originalSale.totalWeight ?? 0;
     const newRate = editData.rate ?? originalSale.rate ?? 0;
     if (newRate < RATE_MIN || newRate > RATE_MAX) {
-      window.alert(`Rate must be between ₹${RATE_MIN} and ₹${RATE_MAX}.`);
+      // Was window.alert: a blocking native dialog for an inline validation
+      // error. The early-return guard is unchanged, so nothing is still saved.
+      globalNotify.error(`Rate must be between ₹${RATE_MIN} and ₹${RATE_MAX}.`);
       return;
     }
     if (newBirds < 0 || newWeight < 0) {
-      window.alert("Birds and Weight cannot be negative.");
+      globalNotify.error("Birds and Weight cannot be negative.");
       return;
     }
 

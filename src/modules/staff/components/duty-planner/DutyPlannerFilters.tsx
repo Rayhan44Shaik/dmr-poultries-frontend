@@ -1,4 +1,5 @@
 import { memo, useState, useRef, useEffect, useId, type ReactNode } from 'react';
+import { uiSearchInputClass } from '../../../../shared/ui/uiTokens';
 import { ChevronDown, ChevronLeft, ChevronRight, RotateCcw, UsersRound, X, Search, FileSpreadsheet, LoaderCircle, CalendarDays, CalendarCheck2, ArrowRight } from 'lucide-react';
 import { DatePicker } from '../../../../components/common/DatePicker';
 import type { DutyReportRange } from '../../services/dutyReport';
@@ -85,7 +86,7 @@ function DutyPlannerFilters({ role, roles, searchQuery, onSearchChange, onRoleCh
 
         <div className="min-w-0 lg:col-start-4 lg:row-start-1">
           <div className="mb-1 flex h-5 items-center"><label htmlFor={searchId} className={labelClass}>{t('search')}</label></div>
-          <div className="relative"><Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" /><input id={searchId} type="search" aria-label={t('search')} placeholder={t('searchPlaceholder')} value={searchQuery} onChange={(event) => onSearchChange(event.target.value)} className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/60 pl-8 pr-2 text-xs text-slate-700 outline-none placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100" /></div>
+          <div className="relative"><Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" /><input id={searchId} type="search" aria-label={t('search')} placeholder={t('searchPlaceholder')} value={searchQuery} onChange={(event) => onSearchChange(event.target.value)} className={uiSearchInputClass} /></div>
         </div>
 
         <div role="group" aria-label={t('actions')} className="flex items-center gap-2 lg:col-span-2 lg:col-start-3 lg:row-start-2 lg:justify-end">

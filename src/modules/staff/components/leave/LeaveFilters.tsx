@@ -1,6 +1,7 @@
 // src/modules/staff/components/leave/LeaveFilters.tsx
 
 import { memo, useState, useRef, useEffect, useCallback } from 'react';
+import { uiSearchInputWithClearClass } from '../../../../shared/ui/uiTokens';
 import {
   Search,
   CheckCircle2,
@@ -227,7 +228,7 @@ function SearchableDropdown({
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search..."
                   autoFocus
-                  className="w-full h-8 pl-7 pr-7 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none bg-slate-50/50 text-slate-700 placeholder-slate-400"
+                  className={uiSearchInputWithClearClass}
                 />
                 {search && (
                   <button

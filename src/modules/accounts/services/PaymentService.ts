@@ -1,6 +1,7 @@
 // src/modules/accounts/payment-book/PaymentService.ts
 
 import type { Payment, PaymentAttachment, PaymentAudit } from '../types/payment.types';
+import { toBusinessDate } from '../../../utils/businessDate';
 
 const PAYMENTS_KEY = 'dmr-payments';
 const ATTACHMENTS_KEY = 'dmr-payment-attachments';
@@ -22,7 +23,7 @@ function generateId(): string {
 
 function getNextPaymentNo(): string {
   const payments = loadData<Payment>(PAYMENTS_KEY);
-  const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+  const today = toBusinessDate(new Date()).replace(/-/g, '');
   const existing = payments.filter((p) => p.paymentNo.startsWith(`PAY-${today}`));
   const count = existing.length + 1;
   return `PAY-${today}-${String(count).padStart(3, '0')}`;

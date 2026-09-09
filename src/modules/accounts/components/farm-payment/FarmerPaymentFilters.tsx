@@ -1,6 +1,7 @@
 // D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\accounts\components\farm-payment\FarmerPaymentFilters.tsx
 
 import React from 'react';
+import { uiInputClass } from '../../../../shared/ui/uiTokens';
 import { DatePicker } from '../../../../components/common/DatePicker';
 import { Search, X, Filter } from 'lucide-react';
 
@@ -107,7 +108,7 @@ export function FarmerPaymentFilters({
                   value={farmSearch}
                   onChange={(e) => setFarmSearch(e.target.value)}
                   placeholder="Search farm..."
-                  className="w-full px-3 py-1.5 mb-1 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-400 outline-none"
+                  className={`${uiInputClass} mb-1`}
                   onClick={(e) => e.stopPropagation()}
                 />
                 {filteredFarms.map((farm) => (

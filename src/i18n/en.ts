@@ -222,6 +222,16 @@ export default {
   'common.desc': 'Desc',
   'common.page': 'Page',
   'common.of': 'of',
+  // Pagination summary + control labels used by the global <Pagination>.
+  // Added because the component previously passed an English string as t()'s
+  // SECOND argument, which is a params object, not a fallback: the missing key
+  // was returned verbatim and the summary rendered as "common.showing 1-20 of
+  // 100". Both dictionaries now carry the keys.
+  'common.showing': 'Showing',
+  'common.no_records': 'No records',
+  'common.rows_per_page': 'Rows per page',
+  'common.previous_page': 'Previous page',
+  'common.next_page': 'Next page',
   'common.per_page': 'Per Page',
   'common.rows': 'Rows',
   'common.items': 'Items',
@@ -322,6 +332,7 @@ export default {
   'validation.date_range': 'Date must be between {min} and {max}',
 
   // Notifications
+  'notification.region': 'Notifications',
   'notification.saved_success': 'Saved successfully.',
   'notification.updated_success': 'Updated successfully.',
   'notification.deleted_success': 'Deleted successfully.',

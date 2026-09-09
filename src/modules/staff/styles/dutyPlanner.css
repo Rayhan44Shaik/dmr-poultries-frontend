@@ -1,24 +1,33 @@
-@import '@fontsource/noto-sans-telugu/telugu-400.css';
-@import '@fontsource/noto-sans-telugu/telugu-500.css';
-@import '@fontsource/noto-sans-telugu/telugu-600.css';
-@import '@fontsource/noto-sans-telugu/telugu-700.css';
-
-.duty-planner-page:lang(te) {
-  font-family: 'Noto Sans Telugu', system-ui, sans-serif;
-  line-height: 1.65;
-}
-.duty-planner-page:lang(te) button,
-.duty-planner-page:lang(te) input,
-.duty-planner-page:lang(te) select {
-  font-family: inherit;
-  letter-spacing: normal;
-}
-/* Keep the shared header/breadcrumb readable on this Telugu page too, without
-   changing typography on Salary Register or other routes. */
-body:has(.duty-planner-page:lang(te)) {
-  font-family: 'Noto Sans Telugu', system-ui, sans-serif;
-  --font-sans: 'Noto Sans Telugu', system-ui, sans-serif;
-}
-body:has(.duty-planner-page:lang(te)) :is(button, input, select, textarea) {
-  font-family: inherit;
-}
+/* =============================================================================
+ * src/modules/staff/styles/dutyPlanner.css — NOW A NO-OP (kept for the import)
+ * =============================================================================
+ * This stylesheet used to be the ONLY place the Telugu face was applied. It did
+ * that with page-scoped workarounds:
+ *
+ *   1. Four `@import "@fontsource/noto-sans-telugu/telugu-*.css"` lines that
+ *      duplicated the identical imports already in the global `src/index.css`,
+ *      so the font subset was requested twice on this route.
+ *   2. `body:has(.duty-planner-page:lang(te))` — a `:has()` selector that
+ *      reached UP from a page element to restyle `<body>`, overriding
+ *      `--font-sans` for the whole document only while this one route was
+ *      mounted. It also silently retyped the shared Header and Breadcrumb,
+ *      which is why the comment below it had to promise it would not affect
+ *      Salary Register.
+ *
+ * Both are obsolete. Telugu is now handled ONCE, globally and correctly, in
+ * `src/index.css`:
+ *
+ *   :root:lang(te) { --font-sans: "Noto Sans Telugu", "Inter", … }
+ *   :root:lang(te) body { line-height: 1.65 }
+ *
+ * `I18nProvider` sets `document.documentElement.lang` to `te` / `en`, so the
+ * Telugu face leads app-wide whenever Telugu is selected — the Duty Planner no
+ * longer needs a special case, and neither does any other route. Inter has no
+ * Telugu coverage, so this also fixed Telugu text falling back to an arbitrary
+ * system face everywhere else.
+ *
+ * The file is intentionally left in place (empty of rules) so the existing
+ * `import '../styles/dutyPlanner.css'` in DutyPlannerPage.tsx keeps resolving.
+ * Do not add page-scoped font rules here — extend the global `:lang(te)` rule
+ * in `src/index.css` instead.
+ * ===========================================================================*/

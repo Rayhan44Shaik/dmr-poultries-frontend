@@ -16,6 +16,7 @@ import { getEmployees, loadEmployees } from "../../../masters/employees/services
 import { getBanks, loadBanks } from "../../../masters/banks/services/bankService";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { translate } from "../../../../i18n";
+import { confirmDialog } from "../../../../ui/confirm/confirmStore";
 
 const EMPTY_WEEKLY: CollectionWeeklySummary = {
   shopId: 0,
@@ -449,7 +450,16 @@ export default function useCollectionEntry() {
   }
 
   async function rejectCollection(id: string) {
-    const confirmed = window.confirm(translate("ops.collection.confirm_reject"));
+    // Global confirmation dialog instead of the blocking native
+    // `window.confirm`. `rejectCollection` was already async, so the guard
+    // keeps its exact linear shape and the reject call below is unchanged.
+    const confirmed = await confirmDialog({
+      title: translate("common.reject"),
+      message: translate("ops.collection.confirm_reject"),
+      confirmLabel: translate("common.reject"),
+      cancelLabel: translate("common.cancel"),
+      tone: "danger",
+    });
     if (!confirmed) return;
     const success = await collectionService.rejectCollection(id, "Admin");
     if (success) {

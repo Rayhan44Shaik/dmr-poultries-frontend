@@ -1,6 +1,7 @@
 // src/modules/staff/pages/SupervisorPerformancePage.tsx
 
 import { memo, useMemo, useState, useEffect, useCallback } from 'react';
+import { uiSearchInputWithClearClass } from '../../../shared/ui/uiTokens';
 import {
   AlertCircle,
   ClipboardCheck,
@@ -281,7 +282,7 @@ const SupervisorPerformancePage = () => {
                     onChange={(e) => setSearchValue(e.target.value)}
                     onKeyDown={handleSearchKeyDown}
                     placeholder="Search supervisor name…"
-                    className="block w-full rounded-md border border-gray-300 py-2 pl-10 pr-10 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className={uiSearchInputWithClearClass}
                     disabled={perf.loading}
                   />
                   {searchValue && (
