@@ -26,7 +26,7 @@
 @import "@fontsource/noto-sans-telugu/telugu-600.css";
 @import "@fontsource/noto-sans-telugu/telugu-700.css";
 /* Inter (Latin) served locally through the same @fontsource mechanism — the
-   app no longer requests fonts.googleapis.com, so typography is identical
+   app has no external font request, so typography is identical
    (same faces/weights) but fully self-contained and deterministic offline. */
 @import "@fontsource/inter/latin-400.css";
 @import "@fontsource/inter/latin-500.css";

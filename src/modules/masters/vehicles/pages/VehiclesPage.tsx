@@ -30,6 +30,8 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [sortOrder, setSortOrder] = useState("number");
   const [currentPage, setCurrentPage] = useState(1);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -44,7 +46,8 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
     addVehiclesBulk,
     editVehicle,
     removeVehicle,
-  } = useVehicles();
+    total, page: serverPage, exportRows,
+  } = useVehicles({ page: currentPage, pageSize: ITEMS_PER_PAGE, search, status: statusFilter, sort: sortOrder });
 
   const vehicleBulkImportConfig = useMemo(
     () => buildVehicleBulkImportConfig({ addVehiclesBulk, reload }),
@@ -57,30 +60,14 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
     setCurrentPage(1);
   };
 
-  const filteredVehicles = useMemo(() => {
-    const keyword = search.toLowerCase();
-    return vehicles.filter(
-      (vehicle) =>
-        vehicle.vehicleNumber?.toLowerCase().includes(keyword) ||
-        vehicle.vehicleType?.toLowerCase().includes(keyword) ||
-        vehicle.trackingId?.toLowerCase().includes(keyword) ||
-        vehicle.fastagBank?.toLowerCase().includes(keyword) ||
-        vehicle.engineNumber?.toLowerCase().includes(keyword) ||
-        vehicle.chassisNumber?.toLowerCase().includes(keyword),
-    );
-  }, [vehicles, search]);
+  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+  const safePage = serverPage;
+  const paginatedVehicles = vehicles;
 
-  // Pagination Calculations
-  const totalPages = Math.ceil(filteredVehicles.length / ITEMS_PER_PAGE) || 1;
-  // Deleting or filtering records can leave currentPage beyond the last valid
-  // page; render the last valid page instead of a stranded empty one.
-  const safePage = Math.min(currentPage, totalPages);
-  const paginatedVehicles = useMemo(() => {
-    const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
-    return filteredVehicles.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredVehicles, safePage]);
+  const handleExportPDF = async () => {
+    try {
+      const filteredVehicles = await exportRows();
 
-  const handleExportPDF = () => {
     if (filteredVehicles.length === 0) {
       showNotification("No data to export.", "error");
       return;
@@ -107,9 +94,14 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
       count: filteredVehicles.length,
     });
     showNotification("PDF exported successfully!", "success");
+  
+    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    try {
+      const filteredVehicles = await exportRows();
+
     if (filteredVehicles.length === 0) {
       showNotification("No data to export.", "error");
       return;
@@ -136,6 +128,8 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
       count: filteredVehicles.length,
     });
     showNotification("Excel exported successfully!", "success");
+  
+    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
   const validateVehicle = (
@@ -262,6 +256,11 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
       <div className="w-full bg-white rounded-xl border border-slate-200/90 shadow-sm">
         {/* Toolbar - Search on LEFT, Buttons on RIGHT in same line */}
         <MasterListToolbar
+          onRefresh={() => { void reload().catch(() => {}); }}
+          status={statusFilter}
+          onStatusChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
+          sort={sortOrder}
+          onSortChange={(value) => { setSortOrder(value); setCurrentPage(1); }}
           search={search}
           onSearchChange={handleSearchChange}
           searchPlaceholder="Search Vehicle..."
@@ -280,7 +279,7 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
         {/* Status Counter Bar */}
         <MasterListSummary
           title="Vehicles Directory"
-          total={filteredVehicles.length}
+          total={total}
           shown={paginatedVehicles.length}
           page={safePage}
           totalPages={totalPages}
@@ -351,7 +350,7 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
           )}
         </div>
 
-        {shouldShowPagination(filteredVehicles.length) && (
+        {shouldShowPagination(total) && (
           <MasterPagination
             page={safePage}
             totalPages={totalPages}

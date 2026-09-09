@@ -17,15 +17,8 @@ export function ensureTeluguWebFont(): Promise<void> {
   if (typeof document === "undefined") return Promise.resolve();
   if (fontReady) return fontReady;
   fontReady = (async () => {
-    const id = "dmr-noto-sans-telugu";
-    if (!document.getElementById(id)) {
-      const link = document.createElement("link");
-      link.id = id;
-      link.rel = "stylesheet";
-      link.href =
-        "https://fonts.googleapis.com/css2?family=Noto+Sans+Telugu:wght@400;700&display=swap";
-      document.head.appendChild(link);
-    }
+    // Noto Sans Telugu is bundled locally from @fontsource in src/index.css.
+    // Wait for those declared faces instead of injecting a Google Fonts link.
     const wait = async () => {
       try {
         await document.fonts.ready;

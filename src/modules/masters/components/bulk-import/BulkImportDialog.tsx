@@ -1,3 +1,4 @@
+import MasterDialog from "../MasterDialog";
 /**
  * BulkImportDialog — shared multi-step modal used by every master module.
  *
@@ -94,7 +95,8 @@ export default function BulkImportDialog<T, E>({
   };
 
   const handleConfirmImport = async () => {
-    const validRows = rows.filter((r) => r.errors.length === 0);
+    if (step === "progress" || rows.some(r => r.errors.length > 0)) return;
+    const validRows = rows;
     if (validRows.length === 0) return;
 
     setStep("progress");
@@ -129,7 +131,7 @@ export default function BulkImportDialog<T, E>({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+    <MasterDialog label={config.title} onClose={handleClose} isSaving={step === "progress"} width="wide">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
@@ -139,7 +141,7 @@ export default function BulkImportDialog<T, E>({
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-800">{config.title}</h2>
-              <p className="text-xs text-slate-500">{config.subtitle}</p>
+              <p className="text-xs text-slate-500">{config.subtitle}. All rows must be valid; any server failure rolls back the entire batch.</p>
             </div>
           </div>
           <button
@@ -147,7 +149,7 @@ export default function BulkImportDialog<T, E>({
             disabled={step === "progress"}
             className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors disabled:opacity-40"
           >
-            <X size={18} />
+            <X size={18} aria-label="Close import" />
           </button>
         </div>
 
@@ -494,15 +496,15 @@ export default function BulkImportDialog<T, E>({
           {step === "preview" && (
             <button
               onClick={() => void handleConfirmImport()}
-              disabled={validCount === 0}
+              disabled={validCount === 0 || validCount !== rows.length}
               className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Upload size={16} />
-              Import {validCount} valid {config.nounPlural}
+              Import all {validCount} {config.nounPlural}
             </button>
           )}
         </div>
       </div>
-    </div>
+    </MasterDialog>
   );
 }

@@ -30,6 +30,8 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingFarm, setEditingFarm] = useState<Farm | null>(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [sortOrder, setSortOrder] = useState("number");
   const [currentPage, setCurrentPage] = useState(1);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -44,7 +46,8 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
     addFarmsBulk,
     editFarm,
     removeFarm,
-  } = useFarms();
+    total, page: serverPage, exportRows,
+  } = useFarms({ page: currentPage, pageSize: ITEMS_PER_PAGE, search, status: statusFilter, sort: sortOrder });
 
   const farmBulkImportConfig = useMemo(
     () => buildFarmBulkImportConfig({ addFarmsBulk, reload }),
@@ -57,29 +60,14 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
     setCurrentPage(1);
   };
 
-  const filteredFarms = useMemo(() => {
-    const keyword = search.toLowerCase();
-    return farms.filter(
-      (farm) =>
-        farm.farmName.toLowerCase().includes(keyword) ||
-        farm.ownerName.toLowerCase().includes(keyword) ||
-        farm.supervisorName.toLowerCase().includes(keyword) ||
-        farm.village.toLowerCase().includes(keyword) ||
-        farm.phoneNumber.includes(keyword),
-    );
-  }, [farms, search]);
+  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+  const safePage = serverPage;
+  const paginatedFarms = farms;
 
-  // Pagination Calculations
-  const totalPages = Math.ceil(filteredFarms.length / ITEMS_PER_PAGE) || 1;
-  // Deleting or filtering records can leave currentPage beyond the last valid
-  // page; render the last valid page instead of a stranded empty one.
-  const safePage = Math.min(currentPage, totalPages);
-  const paginatedFarms = useMemo(() => {
-    const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
-    return filteredFarms.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredFarms, safePage]);
+  const handleExportPDF = async () => {
+    try {
+      const filteredFarms = await exportRows();
 
-  const handleExportPDF = () => {
     if (filteredFarms.length === 0) {
       showNotification("No data to export.", "error");
       return;
@@ -183,9 +171,14 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
       count: filteredFarms.length,
     });
     showNotification("PDF exported successfully!", "success");
+  
+    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    try {
+      const filteredFarms = await exportRows();
+
     if (filteredFarms.length === 0) {
       showNotification("No data to export.", "error");
       return;
@@ -215,6 +208,8 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
       count: filteredFarms.length,
     });
     showNotification("Excel exported successfully!", "success");
+  
+    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
   const validateFarm = (farm: Partial<Farm>): string | null => {
@@ -332,6 +327,11 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
       <div className="w-full bg-white rounded-xl border border-slate-200/90 shadow-sm">
         {/* Toolbar - Search on LEFT, Buttons on RIGHT in same line */}
         <MasterListToolbar
+          onRefresh={() => { void reload().catch(() => {}); }}
+          status={statusFilter}
+          onStatusChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
+          sort={sortOrder}
+          onSortChange={(value) => { setSortOrder(value); setCurrentPage(1); }}
           search={search}
           onSearchChange={handleSearchChange}
           searchPlaceholder="Search Farm..."
@@ -350,7 +350,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
         {/* Status Counter Bar */}
         <MasterListSummary
           title="Farms Directory"
-          total={filteredFarms.length}
+          total={total}
           shown={paginatedFarms.length}
           page={safePage}
           totalPages={totalPages}
@@ -421,7 +421,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
           )}
         </div>
 
-        {shouldShowPagination(filteredFarms.length) && (
+        {shouldShowPagination(total) && (
           <MasterPagination
             page={safePage}
             totalPages={totalPages}

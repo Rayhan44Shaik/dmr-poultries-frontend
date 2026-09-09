@@ -30,6 +30,8 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [sortOrder, setSortOrder] = useState("number");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -45,7 +47,8 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
     addEmployeesBulk,
     editEmployee,
     removeEmployee,
-  } = useEmployees();
+    total, page: serverPage, exportRows, facets,
+  } = useEmployees({ page: currentPage, pageSize: ITEMS_PER_PAGE, search, status: statusFilter, sort: sortOrder, department: selectedDepartment });
 
   const employeeBulkImportConfig = useMemo(
     () => buildEmployeeBulkImportConfig({ addEmployeesBulk, reload }),
@@ -53,10 +56,7 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
   );
 
   // Get unique departments for filter dropdown
-  const departments = useMemo(() => {
-    const depts = new Set(employees.map((emp) => emp.department));
-    return Array.from(depts).sort();
-  }, [employees]);
+  const departments = facets.department ?? [];
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
@@ -68,33 +68,14 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
     setCurrentPage(1);
   };
 
-  const filteredEmployees = useMemo(() => {
-    const keyword = search.toLowerCase();
-    return employees.filter((emp) => {
-      const matchesSearch =
-        emp.employeeName.toLowerCase().includes(keyword) ||
-        emp.department.toLowerCase().includes(keyword) ||
-        (emp.role && emp.role.toLowerCase().includes(keyword)) ||
-        emp.phoneNumber.includes(keyword) ||
-        emp.email.toLowerCase().includes(keyword);
+  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+  const safePage = serverPage;
+  const paginatedEmployees = employees;
 
-      const matchesDepartment =
-        selectedDepartment === "" || emp.department === selectedDepartment;
+  const handleExportPDF = async () => {
+    try {
+      const filteredEmployees = await exportRows();
 
-      return matchesSearch && matchesDepartment;
-    });
-  }, [employees, search, selectedDepartment]);
-
-  const totalPages = Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE) || 1;
-  // Deleting or filtering records can leave currentPage beyond the last valid
-  // page; render the last valid page instead of a stranded empty one.
-  const safePage = Math.min(currentPage, totalPages);
-  const paginatedEmployees = useMemo(() => {
-    const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
-    return filteredEmployees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredEmployees, safePage]);
-
-  const handleExportPDF = () => {
     if (filteredEmployees.length === 0) {
       showNotification("No data to export.", "error");
       return;
@@ -123,9 +104,14 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
       count: filteredEmployees.length,
     });
     showNotification("PDF exported successfully!", "success");
+  
+    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    try {
+      const filteredEmployees = await exportRows();
+
     if (filteredEmployees.length === 0) {
       showNotification("No data to export.", "error");
       return;
@@ -154,6 +140,8 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
       count: filteredEmployees.length,
     });
     showNotification("Excel exported successfully!", "success");
+  
+    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
   const validateEmployee = (employee: Partial<Employee>): string | null => {
@@ -303,6 +291,11 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
       <div className="w-full bg-white rounded-xl border border-slate-200/90 shadow-sm">
         {/* Toolbar */}
         <MasterListToolbar
+          onRefresh={() => { void reload().catch(() => {}); }}
+          status={statusFilter}
+          onStatusChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
+          sort={sortOrder}
+          onSortChange={(value) => { setSortOrder(value); setCurrentPage(1); }}
           search={search}
           onSearchChange={handleSearchChange}
           searchPlaceholder="Search Employee..."
@@ -332,7 +325,7 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
         {/* Status Counter */}
         <MasterListSummary
           title="Employees Directory"
-          total={filteredEmployees.length}
+          total={total}
           shown={paginatedEmployees.length}
           page={safePage}
           totalPages={totalPages}
@@ -405,7 +398,7 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
           )}
         </div>
 
-        {shouldShowPagination(filteredEmployees.length) && (
+        {shouldShowPagination(total) && (
           <MasterPagination
             page={safePage}
             totalPages={totalPages}

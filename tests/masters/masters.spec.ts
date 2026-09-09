@@ -105,10 +105,31 @@ test.beforeEach(async ({ page }) => {
       if (match && backend.records[match[1]]) {
         const [, key, rawId] = match;
         if (method === 'GET') {
+          const pageNumber = Number(url.searchParams.get('page') ?? 1);
+          const pageSize = Number(url.searchParams.get('pageSize') ?? 10);
+          const search = (url.searchParams.get('search') ?? '').toLocaleLowerCase();
+          const status = url.searchParams.get('status') ?? '';
+          const department = url.searchParams.get('department') ?? '';
+          const city = url.searchParams.get('city') ?? '';
+          const filtered = backend.records[key].filter((record) => {
+            const searchable = Object.values(record).join(' ').toLocaleLowerCase();
+            return (!search || searchable.includes(search))
+              && (!status || record.status === status)
+              && (!department || record.department === department)
+              && (!city || record.city === city);
+          });
+          const offset = (pageNumber - 1) * pageSize;
+          const items = filtered.slice(offset, offset + pageSize);
+          const facets = {
+            department: [...new Set(backend.records[key].map((record) => String(record.department ?? '')).filter(Boolean))].sort(),
+            city: [...new Set(backend.records[key].map((record) => String(record.city ?? '')).filter(Boolean))].sort(),
+          };
           await route.fulfill(
             backend.failReads
               ? { status: 503, json: { message: 'Sample API unavailable' } }
-              : { json: backend.records[key] },
+              : url.searchParams.get('export') === 'true'
+                ? { json: { items: filtered, total: filtered.length, page: 1, pageSize, facets } }
+                : { json: { items, total: filtered.length, page: pageNumber, pageSize, facets } },
           );
         } else {
           const payload = route.request().postDataJSON() as Record<

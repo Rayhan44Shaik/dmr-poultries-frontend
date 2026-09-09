@@ -61,7 +61,7 @@ function normalizeStatus(status: unknown): Employee["status"] {
   return "Inactive";
 }
 
-function mapEmployee(raw: Record<string, unknown>): Employee {
+export function mapEmployee(raw: Record<string, unknown>): Employee {
   return {
     id: Number(raw.id),
     employeeNo: Number(raw.employeeNo ?? raw.employee_no ?? 0),
@@ -154,11 +154,11 @@ export async function createEmployee(input: EmployeeInput): Promise<Employee> {
 export async function bulkCreateEmployees(inputs: EmployeeInput[]): Promise<Employee[]> {
   clearLegacyEmployeeStorage();
   const payload = inputs.map(toPayload);
-  const { data } = await apiPost<Record<string, unknown>[]>(
+  const { data } = await apiPost<{ created: Record<string, unknown>[] }>(
     `${EMPLOYEES_PATH}/bulk`,
     payload
   );
-  return Array.isArray(data) ? data.map(mapEmployee) : [];
+  return data.created.map(mapEmployee);
 }
 
 /** PUT /api/masters/employees/:id then caller should reload via GET. */

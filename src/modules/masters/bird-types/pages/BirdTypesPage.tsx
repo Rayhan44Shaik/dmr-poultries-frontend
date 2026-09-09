@@ -29,6 +29,8 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingBirdType, setEditingBirdType] = useState<BirdType | null>(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [sortOrder, setSortOrder] = useState("number");
   const [currentPage, setCurrentPage] = useState(1);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -43,7 +45,8 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
     addBirdTypesBulk,
     editBirdType,
     removeBirdType,
-  } = useBirdTypes();
+    total, page: serverPage, exportRows,
+  } = useBirdTypes({ page: currentPage, pageSize: ITEMS_PER_PAGE, search, status: statusFilter, sort: sortOrder });
 
   const birdTypeBulkImportConfig = useMemo(
     () => buildBirdTypeBulkImportConfig({ addBirdTypesBulk, reload }),
@@ -56,26 +59,14 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
     setCurrentPage(1);
   };
 
-  const filteredBirdTypes = useMemo(() => {
-    const keyword = search.toLowerCase();
-    return birdTypes.filter(
-      (bt) =>
-        bt.birdType.toLowerCase().includes(keyword) ||
-        bt.description?.toLowerCase().includes(keyword),
-    );
-  }, [birdTypes, search]);
+  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+  const safePage = serverPage;
+  const paginatedBirdTypes = birdTypes;
 
-  // Pagination Calculations
-  const totalPages = Math.ceil(filteredBirdTypes.length / ITEMS_PER_PAGE) || 1;
-  // Deleting or filtering records can leave currentPage beyond the last valid
-  // page; render the last valid page instead of a stranded empty one.
-  const safePage = Math.min(currentPage, totalPages);
-  const paginatedBirdTypes = useMemo(() => {
-    const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
-    return filteredBirdTypes.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredBirdTypes, safePage]);
+  const handleExportPDF = async () => {
+    try {
+      const filteredBirdTypes = await exportRows();
 
-  const handleExportPDF = () => {
     if (filteredBirdTypes.length === 0) {
       showNotification("No data to export.", "error");
       return;
@@ -94,9 +85,14 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
       console.error("Unable to export Bird Type PDF:", exportError);
       showNotification("Unable to export PDF. Please try again.", "error");
     }
+  
+    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    try {
+      const filteredBirdTypes = await exportRows();
+
     if (filteredBirdTypes.length === 0) {
       showNotification("No data to export.", "error");
       return;
@@ -121,6 +117,8 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
       count: filteredBirdTypes.length,
     });
     showNotification("Excel exported successfully!", "success");
+  
+    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
   const validateBirdType = (birdType: Partial<BirdType>): string | null => {
@@ -207,6 +205,11 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
       <div className="w-full bg-white rounded-xl border border-slate-200/90 shadow-sm">
         {/* Toolbar - Search on LEFT, Buttons on RIGHT in same line */}
         <MasterListToolbar
+          onRefresh={() => { void reload().catch(() => {}); }}
+          status={statusFilter}
+          onStatusChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
+          sort={sortOrder}
+          onSortChange={(value) => { setSortOrder(value); setCurrentPage(1); }}
           search={search}
           onSearchChange={handleSearchChange}
           searchPlaceholder="Search Bird Type..."
@@ -225,7 +228,7 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
         {/* Status Counter Bar */}
         <MasterListSummary
           title="Bird Types Directory"
-          total={filteredBirdTypes.length}
+          total={total}
           shown={paginatedBirdTypes.length}
           page={safePage}
           totalPages={totalPages}
@@ -298,7 +301,7 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
           )}
         </div>
 
-        {shouldShowPagination(filteredBirdTypes.length) && (
+        {shouldShowPagination(total) && (
           <MasterPagination
             page={safePage}
             totalPages={totalPages}

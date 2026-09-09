@@ -41,7 +41,7 @@ function normalizeStatus(status: unknown): Bank["status"] {
   return status === "Active" ? "Active" : "Inactive";
 }
 
-function mapBank(raw: Record<string, unknown>): Bank {
+export function mapBank(raw: Record<string, unknown>): Bank {
   return {
     id: Number(raw.id),
     bankNo: Number(raw.bankNo ?? raw.bank_no ?? 0),

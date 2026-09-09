@@ -42,7 +42,7 @@ function normalizeStatus(status: unknown): Farm["status"] {
   return status === "Active" ? "Active" : "Inactive";
 }
 
-function mapFarm(raw: Record<string, unknown>): Farm {
+export function mapFarm(raw: Record<string, unknown>): Farm {
   return {
     id: Number(raw.id),
     farmNo: Number(raw.farmNo ?? raw.farm_no ?? 0),
@@ -109,11 +109,11 @@ export async function createFarm(input: FarmInput): Promise<Farm> {
 export async function bulkCreateFarms(inputs: FarmInput[]): Promise<Farm[]> {
   clearLegacyFarmStorage();
   const payload = inputs.map(toPayload);
-  const { data } = await apiPost<Record<string, unknown>[]>(
+  const { data } = await apiPost<{ created: Record<string, unknown>[] }>(
     `${FARMS_PATH}/bulk`,
     payload
   );
-  return Array.isArray(data) ? data.map(mapFarm) : [];
+  return data.created.map(mapFarm);
 }
 
 /** PUT /api/masters/farms/:id */

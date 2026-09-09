@@ -42,7 +42,7 @@ function normalizeStatus(status: unknown): BirdType["status"] {
   return status === "Active" ? "Active" : "Inactive";
 }
 
-function mapBirdType(raw: Record<string, unknown>): BirdType {
+export function mapBirdType(raw: Record<string, unknown>): BirdType {
   return {
     id: Number(raw.id),
     birdTypeNo: Number(raw.birdTypeNo ?? raw.bird_type_no ?? 0),
@@ -101,11 +101,11 @@ export async function createBirdType(input: BirdTypeInput): Promise<BirdType> {
 export async function bulkCreateBirdTypes(inputs: BirdTypeInput[]): Promise<BirdType[]> {
   clearLegacyBirdTypeStorage();
   const payload = inputs.map(toPayload);
-  const { data } = await apiPost<Record<string, unknown>[]>(
+  const { data } = await apiPost<{ created: Record<string, unknown>[] }>(
     `${BIRD_TYPES_PATH}/bulk`,
     payload
   );
-  return Array.isArray(data) ? data.map(mapBirdType) : [];
+  return data.created.map(mapBirdType);
 }
 
 /** PUT /api/masters/bird-types/:id */

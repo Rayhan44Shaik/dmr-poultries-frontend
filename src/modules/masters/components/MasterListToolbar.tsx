@@ -16,6 +16,11 @@ interface MasterListToolbarProps {
   loading?: boolean;
   saving?: boolean;
   children?: ReactNode;
+  onRefresh?: () => void;
+  status?: string;
+  onStatusChange?: (value: string) => void;
+  sort?: string;
+  onSortChange?: (value: string) => void;
 }
 
 /**
@@ -44,6 +49,7 @@ export default function MasterListToolbar({
   loading = false,
   saving = false,
   children,
+  onRefresh, status, onStatusChange, sort, onSortChange,
 }: MasterListToolbarProps) {
   const { t } = useI18n();
   const id = useId();
@@ -70,16 +76,18 @@ export default function MasterListToolbar({
             // accessible name (WCAG 2.5.3 "label in name"). The previous
             // aria-label silently overrode it, so screen readers announced the
             // placeholder instead of "Search".
-            disabled={loading}
           />
         </div>
         {children}
+        {onStatusChange && <MasterDropdown label="Status" value={status ?? ""} options={[{ value: "", label: "All statuses" }, { value: "Active", label: "Active" }, { value: "Inactive", label: "Inactive" }]} onChange={onStatusChange} />}
+        {onSortChange && <MasterDropdown label="Sort by" value={sort ?? "number"} options={[{ value: "number", label: "Number" }, { value: "name", label: "Name" }, { value: "status", label: "Status" }]} onChange={onSortChange} />}
       </div>
       <div
         className="flex flex-wrap items-center gap-2"
         role="group"
         aria-label={t("masters.ui.actions")}
       >
+        {onRefresh && <Button onClick={onRefresh} disabled={loading || saving}>Refresh</Button>}
         <MasterDropdown
           label={t("common.export")}
           placeholder={t("common.export")}

@@ -22,11 +22,12 @@ export function downloadImportTemplate<T, E = T>(
   );
   const sampleRow = config.columns.map((c) => c.sample);
 
-  const worksheet = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
+  const worksheet = XLSX.utils.aoa_to_sheet([headers]);
   worksheet["!cols"] = config.columns.map(() => ({ wch: 22 }));
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([headers, sampleRow]), "Example - do not import");
 
   const filename = `${config.filenamePrefix}_Template.xlsx`;
   XLSX.writeFile(workbook, filename);
@@ -105,10 +106,21 @@ export async function parseImportFile<T, E = T>(
 
   let workbook: XLSX.WorkBook;
   try {
+    if (!/\.(xlsx|xls|csv)$/i.test(file.name) || file.size === 0 || file.size > 5 * 1024 * 1024) {
+      throw new Error("Use a non-empty .xlsx, .xls or .csv file no larger than 5 MB.");
+    }
     const buffer = await file.arrayBuffer();
-    workbook = XLSX.read(buffer, { type: "array" });
-  } catch {
-    parsed.parseError = "Could not read this file. Please upload a valid .xlsx, .xls or .csv file.";
+    // XLSX is a ZIP archive. Bound advertised decompressed data before parsing.
+    const view = new DataView(buffer);
+    let expanded = 0;
+    for (let i = 0; i + 46 <= view.byteLength; i++) {
+      if (view.getUint32(i, true) !== 0x02014b50) continue;
+      expanded += view.getUint32(i + 24, true);
+      if (expanded > 20 * 1024 * 1024) throw new Error("The workbook expands beyond the 20 MB safety limit.");
+    }
+    workbook = XLSX.read(buffer, { type: "array", sheetRows: 1002, cellDates: true, cellFormula: true });
+  } catch (err) {
+    parsed.parseError = err instanceof Error ? err.message : "Could not read this file. Upload a valid workbook or CSV.";
     return parsed;
   }
 
@@ -118,14 +130,38 @@ export async function parseImportFile<T, E = T>(
     return parsed;
   }
   const worksheet = workbook.Sheets[sheetName];
-  const json: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet);
+  const range = XLSX.utils.decode_range(worksheet["!fullref"] ?? worksheet["!ref"] ?? "A1");
+  if (range.e.r > 1000 || range.e.c > 99) {
+    parsed.parseError = "An import may contain at most 1,000 data rows and 100 columns.";
+    return parsed;
+  }
+  for (const [address, cell] of Object.entries(worksheet)) {
+    if (address.startsWith("!")) continue;
+    if (cell.f) { parsed.parseError = `Formula at ${address}: replace formulas with values before importing.`; return parsed; }
+    if (cell.t === "d" && cell.v instanceof Date) {
+      cell.t = "s"; cell.v = cell.v.toISOString().slice(0, 10); delete cell.w;
+    }
+  }
+  const headerRows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, defval: "" });
+  const rawHeaders = (headerRows[0] ?? []).map(String);
+  const nonEmpty = rawHeaders.filter(h => h.trim()).map(normalizeHeaderLabel);
+  if (new Set(nonEmpty).size !== nonEmpty.length) {
+    parsed.parseError = "Duplicate column headers are ambiguous. Give each column one unique header.";
+    return parsed;
+  }
+  for (const column of config.columns) {
+    if (rawHeaders.filter(h => acceptedLabels(column).some(label => normalizeHeaderLabel(label) === normalizeHeaderLabel(h))).length > 1) {
+      parsed.parseError = `More than one column maps to ${column.key}. Keep only one.`;
+      return parsed;
+    }
+  }
+  const json: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
   if (json.length === 0) {
     parsed.parseError = "The file does not contain any data rows.";
     return parsed;
   }
 
-  const rawHeaders = Object.keys(json[0]);
   parsed.missingColumns = findMissingColumns(rawHeaders, config.columns);
   if (parsed.missingColumns.length > 0) {
     parsed.parseError =
@@ -147,6 +183,10 @@ export async function parseImportFile<T, E = T>(
 
       const data = config.parseRow(record);
       const errors = [...config.validateRow(data, existing)];
+      for (const [key, value] of Object.entries(record)) {
+        if (typeof value === "string" && /^[=+@]/.test(value.trim())) errors.push(`${key}: formula-like values are not allowed.`);
+        if (/status/i.test(key) && value && !["Active", "Inactive", "Suspended"].includes(String(value).trim())) errors.push("Status must be Active, Inactive or Suspended.");
+      }
 
       const dupKey = config.duplicateKey?.(data);
       if (dupKey !== undefined) {

@@ -468,9 +468,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Accounts",
     labelKey: "nav.accounts",
     icon: ReceiptIndianRupee,
-    children: [
-<<<<<<< HEAD
-      {
+    children: [      {
         label: "Accounts Dashboard",
         labelKey: "nav.accountsDashboard",
         path: "/accounts?tab=summary",
@@ -502,12 +500,10 @@ export const NAV_SECTIONS: NavSection[] = [
         tone: "emerald",
         keywords: "payment entry new",
       },
-=======
       { label: "Accounts Dashboard", labelKey: "nav.accountsDashboard", path: "/accounts?tab=summary", icon: BarChart3, tone: "indigo", keywords: "accounts summary totals" },
       { label: "Collection Register", labelKey: "nav.collectionRegister", path: "/accounts?tab=paid-payments", icon: BookOpen, tone: "teal", keywords: "payments register ledger" },
       { label: "Farm Payment", labelKey: "nav.farmerPayments", path: "/accounts?tab=farm-payment", icon: Sprout, tone: "lime", keywords: "farmer farm payment poultry" },
       { label: "New Payment Entry", labelKey: "nav.newPaymentEntry", path: "/accounts?tab=new-payments", icon: CreditCard, tone: "emerald", keywords: "payment entry new" },
->>>>>>> c619bb73c5b5fa8577da6467fb98ae028358c52a
     ],
   },
 

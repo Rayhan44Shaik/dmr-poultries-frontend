@@ -2,7 +2,7 @@ import MasterListToolbar from "../../components/MasterListToolbar";
 import MasterListSummary from "../../components/MasterListSummary";
 import MasterPagination from "../../components/MasterPagination";
 import "../../styles/masters.css";
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 
 import DashboardLayout from "../../../../layouts/DashboardLayout/DashboardLayout";
 import PageLayout from "../../../../components/common/PageLayout";
@@ -31,6 +31,8 @@ function BanksPage({ embedded = false }: BanksPageProps) {
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
 
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [sortOrder, setSortOrder] = useState("number");
 
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -48,49 +50,22 @@ function BanksPage({ embedded = false }: BanksPageProps) {
     addBank,
     editBank,
     removeBank,
-  } = useBanks();
+    total, page: serverPage, exportRows,
+  } = useBanks({ page: currentPage, pageSize: ITEMS_PER_PAGE, search, status: statusFilter, sort: sortOrder });
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
     setCurrentPage(1);
   };
 
-  const filteredBanks = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
+  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+  const safePage = serverPage;
+  const paginatedBanks = banks;
 
-    if (!keyword) {
-      return banks;
-    }
+  const handleExportPDF = async () => {
+    try {
+      const filteredBanks = await exportRows();
 
-    return banks.filter((bank) => {
-      return (
-        bank.bankName.toLowerCase().includes(keyword) ||
-        bank.branch.toLowerCase().includes(keyword) ||
-        bank.accountNumber.toLowerCase().includes(keyword) ||
-        bank.ifscCode.toLowerCase().includes(keyword) ||
-        (bank.upiId ?? "").toLowerCase().includes(keyword) ||
-        bank.status.toLowerCase().includes(keyword) ||
-        String(bank.bankNo).includes(keyword)
-      );
-    });
-  }, [banks, search]);
-
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredBanks.length / ITEMS_PER_PAGE),
-  );
-
-  // Deleting or filtering records can leave currentPage beyond the last valid
-  // page; render the last valid page instead of a stranded empty one.
-  const safePage = Math.min(currentPage, totalPages);
-
-  const paginatedBanks = useMemo(() => {
-    const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
-
-    return filteredBanks.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredBanks, safePage]);
-
-  const handleExportPDF = () => {
     if (filteredBanks.length === 0) {
       showNotification("No data to export.", "error");
 
@@ -114,9 +89,14 @@ function BanksPage({ embedded = false }: BanksPageProps) {
 
       showNotification("Unable to export PDF. Please try again.", "error");
     }
+  
+    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    try {
+      const filteredBanks = await exportRows();
+
     if (filteredBanks.length === 0) {
       showNotification("No data to export.", "error");
 
@@ -160,6 +140,8 @@ function BanksPage({ embedded = false }: BanksPageProps) {
 
       showNotification("Unable to export Excel. Please try again.", "error");
     }
+  
+    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
   const validateBank = (bank: Partial<Bank>): string | null => {
@@ -313,6 +295,11 @@ function BanksPage({ embedded = false }: BanksPageProps) {
     <div className="master-page w-full min-w-0 space-y-3 font-sans text-slate-700">
       <div className="w-full rounded-xl border border-slate-200/90 bg-white shadow-sm">
         <MasterListToolbar
+          onRefresh={() => { void reload().catch(() => {}); }}
+          status={statusFilter}
+          onStatusChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
+          sort={sortOrder}
+          onSortChange={(value) => { setSortOrder(value); setCurrentPage(1); }}
           search={search}
           onSearchChange={handleSearchChange}
           searchPlaceholder="Search Bank..."
@@ -326,7 +313,7 @@ function BanksPage({ embedded = false }: BanksPageProps) {
 
         <MasterListSummary
           title="Banks Directory"
-          total={filteredBanks.length}
+          total={total}
           shown={paginatedBanks.length}
           page={safePage}
           totalPages={totalPages}
@@ -376,7 +363,7 @@ function BanksPage({ embedded = false }: BanksPageProps) {
           )}
         </div>
 
-        {shouldShowPagination(filteredBanks.length) && (
+        {shouldShowPagination(total) && (
           <MasterPagination
             page={safePage}
             totalPages={totalPages}

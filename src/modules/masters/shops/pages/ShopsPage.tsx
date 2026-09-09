@@ -34,6 +34,8 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [sortOrder, setSortOrder] = useState("number");
   const [cityFilter, setCityFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
@@ -48,7 +50,8 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     addShop,
     addShopsBulk,
     editShop,
-  } = useShops();
+    total, page: serverPage, exportRows, facets,
+  } = useShops({ page: currentPage, pageSize: pageSize, search, status: statusFilter, sort: sortOrder, city: cityFilter });
 
   const shopBulkImportConfig = useMemo(
     () => buildShopBulkImportConfig({ addShopsBulk, reload }),
@@ -82,50 +85,17 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   // City dropdown options are derived live from the full loaded shop dataset —
   // never hardcoded. Empty values are ignored; case/whitespace variants collapse
   // to a single option (first spelling seen wins for display).
-  const cityOptions = useMemo(() => {
-    const byKey = new Map<string, string>();
-    for (const shop of shops) {
-      const label = (shop.city ?? "").trim();
-      if (!label) continue;
-      const key = label.toLowerCase();
-      if (!byKey.has(key)) byKey.set(key, label);
-    }
-    return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b));
-  }, [shops]);
+  const cityOptions = facets.city ?? [];
 
-  const filteredShops = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-    const city = cityFilter.trim().toLowerCase();
-    return shops
-      .filter((shop) => {
-        const matchesSearch =
-          keyword === "" ||
-          shop.shopName.toLowerCase().includes(keyword) ||
-          shop.ownerName.toLowerCase().includes(keyword) ||
-          shop.city.toLowerCase().includes(keyword) ||
-          shop.phoneNumber.includes(keyword) ||
-          shop.shopNumber.toLowerCase().includes(keyword);
-        const matchesCity =
-          city === "" || (shop.city ?? "").trim().toLowerCase() === city;
-        return matchesSearch && matchesCity;
-      })
-      .sort((a, b) => a.shopNo - b.shopNo);
-  }, [shops, search, cityFilter]);
-
-  // Pagination Calculations
-  const totalPages = Math.ceil(filteredShops.length / pageSize) || 1;
-
-  // Clamp at render time so a shrinking dataset (filter change, data refresh,
-  // edit that moves a shop's city, delete, or a larger page size) never leaves
-  // us on an empty page.
-  const safePage = Math.min(currentPage, totalPages);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = serverPage;
+  const paginatedShops = shops;
   const pageStartIndex = (safePage - 1) * pageSize;
-  const paginatedShops = useMemo(() => {
-    const startIndex = (safePage - 1) * pageSize;
-    return filteredShops.slice(startIndex, startIndex + pageSize);
-  }, [filteredShops, safePage, pageSize]);
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
+    try {
+      const filteredShops = await exportRows();
+
     if (filteredShops.length === 0) {
       showNotification(t("masters.shops.toast.no_data_export"), "error");
       return;
@@ -234,9 +204,14 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       count: filteredShops.length,
     });
     showNotification(t("masters.shops.toast.pdf_exported"), "success");
+  
+    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    try {
+      const filteredShops = await exportRows();
+
     if (filteredShops.length === 0) {
       showNotification(t("masters.shops.toast.no_data_export"), "error");
       return;
@@ -273,6 +248,8 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       count: filteredShops.length,
     });
     showNotification(t("masters.shops.toast.excel_exported"), "success");
+  
+    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
   const validateShop = (shop: Partial<Shop>): string | null => {
@@ -379,6 +356,11 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       <div className="w-full bg-white rounded-xl border border-slate-200/90 shadow-sm">
         {/* Toolbar - Search on LEFT, Buttons on RIGHT in same line */}
         <MasterListToolbar
+          onRefresh={() => { void reload().catch(() => {}); }}
+          status={statusFilter}
+          onStatusChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
+          sort={sortOrder}
+          onSortChange={(value) => { setSortOrder(value); setCurrentPage(1); }}
           search={search}
           onSearchChange={handleSearchChange}
           searchPlaceholder={t("masters.shops.search_placeholder")}
@@ -419,7 +401,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
         {/* Status Counter Bar */}
         <MasterListSummary
           title={t("masters.shops.outlets_directory")}
-          total={filteredShops.length}
+          total={total}
           shown={paginatedShops.length}
           page={safePage}
           totalPages={totalPages}
@@ -493,7 +475,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
           )}
         </div>
 
-        {shouldShowPagination(filteredShops.length) && (
+        {shouldShowPagination(total) && (
           <MasterPagination
             page={safePage}
             totalPages={totalPages}

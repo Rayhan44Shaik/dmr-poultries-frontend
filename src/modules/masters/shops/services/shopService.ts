@@ -42,7 +42,7 @@ function normalizeStatus(status: unknown): Shop["status"] {
   return status === "Active" ? "Active" : "Inactive";
 }
 
-function mapShop(raw: Record<string, unknown>): Shop {
+export function mapShop(raw: Record<string, unknown>): Shop {
   return {
     id: Number(raw.id),
     shopNo: Number(raw.shopNo ?? raw.shop_no ?? 0),
@@ -51,6 +51,7 @@ function mapShop(raw: Record<string, unknown>): Shop {
     ownerName: String(raw.ownerName ?? raw.owner_name ?? ""),
     phoneNumber: String(raw.phoneNumber ?? raw.phone_number ?? ""),
     secondaryPhoneNumber: String(raw.secondaryPhoneNumber ?? raw.secondary_phone_number ?? ""),
+    whatsappNumber: String(raw.whatsappNumber ?? raw.whatsapp_number ?? ""),
     email: String(raw.email ?? "").trim(),
     city: String(raw.city ?? ""),
     address: String(raw.address ?? ""),
@@ -77,6 +78,7 @@ function toPayload(input: ShopInput | Partial<Shop>): Record<string, unknown> {
     ownerName: input.ownerName?.trim() ?? "",
     phoneNumber: input.phoneNumber?.trim() ?? "",
     secondaryPhoneNumber: input.secondaryPhoneNumber?.trim() ?? "",
+    whatsappNumber: input.whatsappNumber?.trim() ?? "",
     email: input.email?.trim() ?? "",
     city: input.city?.trim() ?? "",
     address: input.address?.trim() ?? "",
@@ -131,11 +133,11 @@ export async function createShop(input: ShopInput): Promise<Shop> {
 /** POST /api/masters/shops/bulk */
 export async function createShopsBulk(inputs: ShopInput[]): Promise<Shop[]> {
   clearLegacyShopStorage();
-  const { data } = await apiPost<Record<string, unknown>[]>(
+  const { data } = await apiPost<{ created: Record<string, unknown>[] }>(
     `${SHOPS_PATH}/bulk`,
     inputs.map(toPayload)
   );
-  return Array.isArray(data) ? data.map(mapShop) : [];
+  return data.created.map(mapShop);
 }
 
 /** PUT /api/masters/shops/:id */

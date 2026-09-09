@@ -60,12 +60,6 @@ function toOptionalNumber(value: unknown): number | undefined {
   return n;
 }
 
-function toOptionalString(value: unknown): string | undefined {
-  if (value === null || value === undefined) return undefined;
-  const s = String(value);
-  return s === "" ? undefined : s;
-}
-
 /**
  * API DATE columns usually arrive as plain "YYYY-MM-DD", but some drivers and
  * the legacy mock respond with a full timestamp ("2024-05-15T00:00:00.000Z").
@@ -81,7 +75,7 @@ function toDateOnly(value: unknown): string | undefined {
   return dateOnly || undefined;
 }
 
-function mapVehicle(raw: Record<string, unknown>): Vehicle {
+export function mapVehicle(raw: Record<string, unknown>): Vehicle {
   const registration = raw.vehicleNumber ?? raw.vehicle_number;
   if (registration != null && typeof registration !== "string") throw new Error("Vehicle registration response must be text.");
   const mapped: Vehicle & { emiDay?: number; totalEMIs?: number } = {
@@ -183,12 +177,12 @@ export async function createVehicle(input: VehicleInput): Promise<Vehicle> {
 export async function bulkCreateVehicles(inputs: VehicleInput[]): Promise<Vehicle[]> {
   clearLegacyVehicleStorage();
   const payload = inputs.map(toPayload);
-  const { data } = await apiPost<Record<string, unknown>[]>(
+  const { data } = await apiPost<{ created: Record<string, unknown>[] }>(
     `${VEHICLES_PATH}/bulk`,
     payload
   );
   notifyVehiclesChanged();
-  return Array.isArray(data) ? data.map(mapVehicle) : [];
+  return data.created.map(mapVehicle);
 }
 
 /** PUT /api/masters/vehicles/:id */
