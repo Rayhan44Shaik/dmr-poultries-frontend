@@ -88,8 +88,21 @@ function mapSalary(raw: Record<string, unknown>): SalaryRecord {
 // API
 // ---------------------------------------------------------------------------
 
-/** POST /api/staff/salaries/submit-month — transactional month submission,
- *  then payslip email queue. Backend-authoritative. */
+/** POST /api/staff/salaries/email — queue payslip emails for the given records.
+ *  Returns how many were queued vs failed (e.g. missing email addresses). */
+export async function emailSalaryPayslips(
+  ids: string[],
+  payload: { language?: "en" | "te"; subject?: string; body?: string }
+): Promise<{ sent: number; failed: number }> {
+  const { data } = await apiPost<Record<string, unknown>>(
+    `${SALARY_PATH}/email`,
+    { ids, ...payload }
+  );
+  return {
+    sent: num(data.sent ?? data.sentCount),
+    failed: num(data.failed ?? data.failedCount),
+  };
+}
 export async function submitSalaryMonth(
   month: string,
   submittedBy = "user"

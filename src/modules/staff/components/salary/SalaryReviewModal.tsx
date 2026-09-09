@@ -26,6 +26,8 @@ export type SalaryReviewModalProps = {
   records: SalaryRecord[];
   pendingCount: number;
   saving: boolean;
+  /** Disables the Submit Month action (e.g. until payslips are emailed). */
+  submitDisabled?: boolean;
   formatCurrency?: (amount: number) => string;
   onClose: () => void;
   onSubmitMonth: () => void;
@@ -141,6 +143,7 @@ export function SalaryReviewModal({
   monthLabel,
   records,
   pendingCount,
+  submitDisabled = false,
   formatCurrency = (amt) =>
     new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -364,6 +367,7 @@ export function SalaryReviewModal({
                   downloading={downloadingId === selected.id}
                   onSubmitMonth={handleSubmit}
                   pendingCount={pendingCount}
+                  submitDisabled={submitDisabled}
                 />
               </div>
             </div>
@@ -460,6 +464,7 @@ function PayslipDocument({
   downloading,
   onSubmitMonth,
   pendingCount,
+  submitDisabled,
 }: {
   record: SalaryRecord;
   values: FieldValues;
@@ -476,6 +481,7 @@ function PayslipDocument({
   downloading: boolean;
   onSubmitMonth: () => void;
   pendingCount: number;
+  submitDisabled: boolean;
 }) {
   const monthLabel = (() => {
     if (!record.month) return "";
@@ -596,7 +602,7 @@ function PayslipDocument({
         <button
           type="button"
           onClick={onSubmitMonth}
-          disabled={pendingCount === 0}
+          disabled={pendingCount === 0 || submitDisabled}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition disabled:opacity-50"
         >
           <ClipboardCheck size={14} />

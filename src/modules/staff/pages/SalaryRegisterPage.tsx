@@ -5,7 +5,7 @@ import { uiInputClass } from '../../../shared/ui/uiTokens';
 import { useSalaryRegister } from "../hooks/useSalaryRegister";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { loadEmployees } from "../../masters/employees/services/employeeService";
-import { getSalaryMonthSummary, downloadPayslipPdf, submitSalaryMonth, updateSalary } from "../services/salaryService";
+import { getSalaryMonthSummary, downloadPayslipPdf, submitSalaryMonth, updateSalary, emailSalaryPayslips } from "../services/salaryService";
 import {
   Calendar,
   ChevronDown,
@@ -24,6 +24,7 @@ import {
 import { SalaryTable } from "../components/salary/salaryTable";
 import { SalaryView } from "../components/salary/SalaryView";
 import { SalaryReviewModal } from "../components/salary/SalaryReviewModal";
+import { EmailPayslipsModal } from "../components/salary/EmailPayslipsModal";
 import { SAMPLE_EMPLOYEE_LIST } from "../services/staffSampleData";
 import type { SalaryMonthSummary, SalaryRecord } from "../types/staffDashboard";
 
@@ -377,6 +378,14 @@ function SalaryRegisterPage() {
   // ---- Actions -----------------------------------------------------------
   const [viewTarget, setViewTarget] = useState<SalaryRecord | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [emailsSent, setEmailsSent] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
+
+  // A successful email send is required before the month can be submitted.
+  useEffect(() => {
+    setEmailsSent(false);
+  }, [selectedIds]);
 
   const confirm = useCallback((title: string, message: string, onConfirm: () => void) => {
     setConfirmConfig({ title, message, onConfirm });
@@ -433,6 +442,36 @@ function SalaryRegisterPage() {
     },
     [showNotification]
   );
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback((ids: string[]) => {
+    setSelectedIds((prev) => {
+      const allSelected =
+        ids.length > 0 && ids.every((id) => prev.has(id));
+      return allSelected ? new Set<string>() : new Set(ids);
+    });
+  }, []);
+
+  const handleDownloadSelected = useCallback(async () => {
+    const targets = visibleRecords.filter((r) => selectedIds.has(r.id));
+    if (targets.length === 0) return;
+    for (const r of targets) {
+      try {
+        await downloadPayslipPdf(r.id);
+      } catch {
+        /* best-effort; backend may be offline */
+      }
+    }
+    showNotification(`Downloading ${targets.length} payslip PDF(s)...`, "info");
+  }, [visibleRecords, selectedIds, showNotification]);
 
   const handleSaveRecord = useCallback(
     async (record: SalaryRecord) => {
@@ -664,6 +703,37 @@ function SalaryRegisterPage() {
       )}
 
       {/* Table / states — data remains visible during refresh */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-4 py-2">
+          <span className="text-xs font-semibold text-blue-800">
+            {selectedIds.size} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadSelected}
+              className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition"
+            >
+              Download Selected
+            </button>
+            <button
+              type="button"
+              onClick={() => setEmailOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition"
+            >
+              Email Payslips
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 flex flex-col items-center justify-center space-y-2">
           <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
@@ -697,6 +767,9 @@ function SalaryRegisterPage() {
           formatCurrency={formatCurrency}
           saving={saving}
           onView={setViewTarget}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onToggleSelectAll={toggleSelectAll}
         />
       )}
 
@@ -723,6 +796,22 @@ function SalaryRegisterPage() {
           onDownload={(record) => void handleDownload(record)}
           downloadingId={downloadingId}
           onSaveRecord={(record) => handleSaveRecord(record)}
+          submitDisabled={!emailsSent}
+        />
+      )}
+
+      {emailOpen && (
+        <EmailPayslipsModal
+          monthLabel={formatMonthName(month)}
+          records={visibleRecords.filter((r) => selectedIds.has(r.id))}
+          saving={saving}
+          onClose={() => setEmailOpen(false)}
+          onSent={() => {
+            setEmailsSent(true);
+            setEmailOpen(false);
+            showNotification("Payslips emailed. You can now submit the month.", "success");
+          }}
+          onSend={async (ids, payload) => emailSalaryPayslips(ids, payload)}
         />
       )}
 
