@@ -244,6 +244,11 @@ export interface SalaryRecord {
   // Derived lifecycle flags returned by the backend salary list.
   monthClosed?: boolean;
   correctionWindowDaysRemaining?: number | null;
+  // Payslip delivery counts for this employee's row (email / WhatsApp).
+  // Supplied by the backend; shown as small per-row indicators in the
+  // salary Review & Submit list. Optional so existing/legacy records render.
+  emailsSent?: number;
+  whatsappsSent?: number;
 }
 
 export interface SalaryCalculation {

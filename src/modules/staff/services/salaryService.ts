@@ -116,6 +116,22 @@ export async function emailSalaryPayslips(
     failed: num(data.failed ?? data.failedCount),
   };
 }
+/** POST /api/staff/salaries/whatsapp — queue payslip WhatsApp messages for the
+ *  given records. Mirrors emailSalaryPayslips. Returns how many were queued vs
+ *  failed (e.g. missing phone numbers). */
+export async function whatsappSalaryPayslips(
+  ids: string[],
+  payload: { language?: "en" | "te"; body?: string }
+): Promise<{ sent: number; failed: number }> {
+  const { data } = await apiPost<Record<string, unknown>>(
+    `${SALARY_PATH}/whatsapp`,
+    { ids, ...payload }
+  );
+  return {
+    sent: num(data.sent ?? data.sentCount),
+    failed: num(data.failed ?? data.failedCount),
+  };
+}
 export async function submitSalaryMonth(
   month: string,
   submittedBy = "user"

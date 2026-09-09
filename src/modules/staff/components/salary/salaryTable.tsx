@@ -1,6 +1,7 @@
 // src/modules/staff/components/salary/salaryTable.tsx
 
-import { CheckCircle2, Lock } from "lucide-react";
+import { CheckCircle2, Lock, Mail } from "lucide-react";
+import { WhatsAppBrandIcon } from "../../../../ui/WhatsAppBrandIcon";
 import type { SalaryRecord } from "../../types/staffDashboard";
 import {
   uiBadgeClass,
@@ -14,6 +15,21 @@ import {
   shouldShowPagination,
 } from "../../../../shared/ui/paginationStyles";
 
+/** Render "YYYY-MM-DD" (or ISO) as a readable "28 Sep 2026" string. */
+function formatDisplayDate(raw: string): string {
+  if (!raw) return raw;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw.trim());
+  if (iso) {
+    const d = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  }
+  const d = new Date(raw);
+  if (!Number.isNaN(d.getTime())) {
+    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  }
+  return raw;
+}
+
 type SalaryTableProps = {
   records: SalaryRecord[];
   currentPage: number;
@@ -25,6 +41,13 @@ type SalaryTableProps = {
   onToggleSelect?: (id: string) => void;
   onToggleSelectAll?: (ids: string[]) => void;
   onView: (record: SalaryRecord) => void;
+  /** Optional per-row quick actions to email / WhatsApp an employee's payslip. */
+  onEmail?: (record: SalaryRecord) => void;
+  onWhatsApp?: (record: SalaryRecord) => void;
+  /** Month label shown beside the title, e.g. "September 2026". */
+  monthLabel?: string;
+  /** When set, the whole month is paid — the title shows "Paid on {date}". */
+  paidOnDate?: string | null;
 };
 
 function StatusBadge({ record }: { record: SalaryRecord }) {
@@ -61,8 +84,13 @@ export function SalaryTable({
   onToggleSelect,
   onToggleSelectAll,
   onView,
+  onEmail,
+  onWhatsApp,
+  monthLabel = "",
+  paidOnDate,
 }: SalaryTableProps) {
   const selectable = Boolean(selectedIds && onToggleSelect && onToggleSelectAll);
+  const hasRowActions = Boolean(onEmail || onWhatsApp);
   const formatVal = formatCurrency || ((amount: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(amount || 0));
 
@@ -100,8 +128,26 @@ export function SalaryTable({
 
   return (
     <div className={uiTableWrapClass}>
+      {/* Table title — "Salary Register — <month>" above the employee columns */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+          <h3 className="text-sm font-bold tracking-tight text-slate-800 whitespace-nowrap">
+            Salary Register
+            {monthLabel ? <span className="font-semibold text-slate-700"> — {monthLabel}</span> : null}
+          </h3>
+          {paidOnDate && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 tabular-nums">
+              <CheckCircle2 size={12} />
+              Paid on {formatDisplayDate(paidOnDate)}
+            </span>
+          )}
+        </div>
+        <span className="shrink-0 text-[11px] font-medium text-slate-500 tabular-nums">
+          {records.length} employee{records.length === 1 ? "" : "s"}
+        </span>
+      </div>
       <div className="overflow-x-auto">
-        <table className="w-max min-w-full border-separate border-spacing-0">
+        <table className="w-full min-w-full table-fixed border-separate border-spacing-0">
           <thead className="bg-slate-50">
             <tr>
               {selectable && (
@@ -127,7 +173,9 @@ export function SalaryTable({
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Deductions</th>
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Net</th>
               <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Status</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Payment date</th>
+              {hasRowActions && (
+                <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Sent</th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -155,10 +203,10 @@ export function SalaryTable({
                     />
                   </td>
                   )}
-                  <td className="px-3 py-2.5 whitespace-nowrap">
-                    <div className="text-sm font-semibold text-slate-800">{record.employeeName}</div>
+                  <td className="px-3 py-2.5 min-w-0">
+                    <div className="truncate text-sm font-semibold text-slate-800" title={record.employeeName}>{record.employeeName}</div>
                     {record.department ? (
-                      <div className="text-[11px] text-slate-500 mt-0.5">{record.department}</div>
+                      <div className="truncate text-[11px] text-slate-500 mt-0.5" title={record.department}>{record.department}</div>
                     ) : null}
                   </td>
                   <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-700 whitespace-nowrap">{record.workingDays ?? "—"}</td>
@@ -175,7 +223,41 @@ export function SalaryTable({
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-sm tabular-nums text-slate-600 whitespace-nowrap">{record.paymentDate ?? "—"}</td>
+                  {hasRowActions && (
+                    <td
+                      className="px-3 py-2.5 text-center"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-center gap-1.5">
+                        {onEmail && (
+                          <button
+                            type="button"
+                            title={`Email payslip to ${record.employeeName}${(record.emailsSent ?? 0) > 0 ? ` (${record.emailsSent} already sent)` : ""}`}
+                            aria-label={`Email payslip to ${record.employeeName}`}
+                            onClick={() => onEmail(record)}
+                            disabled={saving}
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-slate-200 bg-white px-1.5 text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40"
+                          >
+                            <Mail size={13} />
+                            <span className="text-[10px] font-bold tabular-nums">{record.emailsSent ?? 0}</span>
+                          </button>
+                        )}
+                        {onWhatsApp && (
+                          <button
+                            type="button"
+                            title={`WhatsApp payslip to ${record.employeeName}${(record.whatsappsSent ?? 0) > 0 ? ` (${record.whatsappsSent} already sent)` : ""}`}
+                            aria-label={`WhatsApp payslip to ${record.employeeName}`}
+                            onClick={() => onWhatsApp(record)}
+                            disabled={saving}
+                            className="inline-flex h-7 items-center gap-1 rounded-lg bg-[#25D366]/15 px-1.5 text-[#1DA851] transition hover:bg-[#25D366] hover:text-white disabled:opacity-40"
+                          >
+                            <WhatsAppBrandIcon size={13} />
+                            <span className="text-[10px] font-bold tabular-nums">{record.whatsappsSent ?? 0}</span>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -191,7 +273,7 @@ export function SalaryTable({
               <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-rose-700 whitespace-nowrap">{formatVal(footer.totalDeductions)}</td>
               <td className="px-3 py-2.5 text-right text-sm tabular-nums font-bold text-slate-900 whitespace-nowrap">{formatVal(footer.netSalary)}</td>
               <td className="px-3 py-2.5 text-sm tabular-nums text-slate-600 whitespace-nowrap">{footer.pending}P · {footer.submitted}S · {footer.paid}Paid</td>
-              <td className="px-3 py-2.5 text-sm text-slate-400 whitespace-nowrap">—</td>
+              {hasRowActions && <td className="px-3 py-2.5" />}
             </tr>
           </tfoot>
         </table>
