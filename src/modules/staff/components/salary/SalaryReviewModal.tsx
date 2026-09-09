@@ -212,11 +212,14 @@ export function SalaryReviewModal({
   }, [selected, drafts, onSaveRecord]);
 
   const handleSubmit = useCallback(() => {
-    if (selectedCount === 0) return;
+    // Guard: submitting is only allowed after a successful payslip delivery
+    // (email OR WhatsApp). The footer button is disabled via `submitDisabled`,
+    // and this guard prevents it firing through any other path.
+    if (selectedCount === 0 || submitDisabled) return;
     const afterSave =
       selected && dirty[selected.id] ? handleSave() : Promise.resolve();
     afterSave.then(() => onSubmitSelected([...selectedIds]));
-  }, [selected, selectedCount, dirty, handleSave, onSubmitSelected, selectedIds]);
+  }, [selected, selectedCount, dirty, handleSave, onSubmitSelected, selectedIds, submitDisabled]);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-slate-900/60 p-0 sm:p-4">

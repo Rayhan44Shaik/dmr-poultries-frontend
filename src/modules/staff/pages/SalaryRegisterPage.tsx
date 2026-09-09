@@ -726,11 +726,20 @@ function SalaryRegisterPage() {
           records={visibleRecords.filter((r) => selectedIds.has(r.id))}
           saving={saving}
           onClose={() => setEmailOpen(false)}
-          onSent={(sent) => {
-            setEmailsSentCount(sent);
-            setEmailsSent(true);
-            setEmailOpen(false);
-            showNotification("Payslips emailed. You can now submit the month.", "success");
+          onSent={(sent, failed) => {
+            // Submit unlocks only once EVERY selected payslip was emailed
+            // successfully. Any failure keeps the modal open for retry.
+            if (failed === 0 && sent > 0) {
+              setEmailsSentCount(sent);
+              setEmailsSent(true);
+              setEmailOpen(false);
+              showNotification("All selected payslips emailed. You can now submit the month.", "success");
+            } else {
+              showNotification(
+                `Email incomplete — ${sent} sent, ${failed} failed. All selected employees must receive their payslip before submitting.`,
+                "warning"
+              );
+            }
           }}
           onSend={async (ids, payload) => emailSalaryPayslips(ids, payload)}
         />
@@ -742,11 +751,20 @@ function SalaryRegisterPage() {
           records={visibleRecords.filter((r) => selectedIds.has(r.id))}
           saving={saving}
           onClose={() => setWhatsappOpen(false)}
-          onSent={(sent) => {
-            setWhatsappSentCount(sent);
-            setWhatsappSent(true);
-            setWhatsappOpen(false);
-            showNotification("Payslips sent on WhatsApp. You can now submit the month.", "success");
+          onSent={(sent, failed) => {
+            // Submit unlocks only once EVERY selected payslip was sent on
+            // WhatsApp. Any failure keeps the modal open for retry.
+            if (failed === 0 && sent > 0) {
+              setWhatsappSentCount(sent);
+              setWhatsappSent(true);
+              setWhatsappOpen(false);
+              showNotification("All selected payslips sent on WhatsApp. You can now submit the month.", "success");
+            } else {
+              showNotification(
+                `WhatsApp incomplete — ${sent} sent, ${failed} failed. All selected employees must receive their payslip before submitting.`,
+                "warning"
+              );
+            }
           }}
           onSend={async (ids, payload) => whatsappSalaryPayslips(ids, payload)}
         />
