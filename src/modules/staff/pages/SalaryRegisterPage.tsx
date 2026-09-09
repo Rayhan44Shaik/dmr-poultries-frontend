@@ -16,7 +16,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSalaryRegister } from "../hooks/useSalaryRegister";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { loadEmployees } from "../../masters/employees/services/employeeService";
-import { getSalaryMonthSummary, downloadPayslipPdf, updateSalary, emailSalaryPayslips, bulkUpdateSalaryStatus } from "../services/salaryService";
+import { getSalaryMonthSummary, downloadPayslipPdf, updateSalary, emailSalaryPayslips, whatsappSalaryPayslips, bulkUpdateSalaryStatus } from "../services/salaryService";
 import {
   Calendar,
   ChevronLeft,
@@ -37,6 +37,7 @@ import { SalaryTable } from "../components/salary/salaryTable";
 import { SalaryView } from "../components/salary/SalaryView";
 import { SalaryReviewModal } from "../components/salary/SalaryReviewModal";
 import { EmailPayslipsModal } from "../components/salary/EmailPayslipsModal";
+import { WhatsAppPayslipsModal } from "../components/salary/WhatsAppPayslipsModal";
 import { SAMPLE_EMPLOYEE_LIST } from "../services/staffSampleData";
 import type { SalaryMonthSummary, SalaryRecord } from "../types/staffDashboard";
 
@@ -271,14 +272,21 @@ function SalaryRegisterPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [emailsSent, setEmailsSent] = useState(false);
   const [emailsSentCount, setEmailsSentCount] = useState(0);
+  const [whatsappSent, setWhatsappSent] = useState(false);
+  const [whatsappSentCount, setWhatsappSentCount] = useState(0);
   const [emailOpen, setEmailOpen] = useState(false);
+  const [whatsappOpen, setWhatsappOpen] = useState(false);
 
-  // A successful email send is required before the month can be submitted.
-  // The flags reset directly in the selection handlers (not an effect) so a
-  // changed selection can never leave a stale "emails sent" state behind.
+  // A successful payslip send (email OR WhatsApp) is required before the month
+  // can be submitted. The flags reset directly in the selection handlers (not
+  // an effect) so a changed selection can never leave a stale "sent" state.
   const resetEmailsSent = useCallback(() => {
     setEmailsSent(false);
     setEmailsSentCount(0);
+  }, []);
+  const resetWhatsappSent = useCallback(() => {
+    setWhatsappSent(false);
+    setWhatsappSentCount(0);
   }, []);
 
   const confirm = useCallback((title: string, message: string, onConfirm: () => void) => {
@@ -351,7 +359,8 @@ function SalaryRegisterPage() {
       return next;
     });
     resetEmailsSent();
-  }, [resetEmailsSent]);
+    resetWhatsappSent();
+  }, [resetEmailsSent, resetWhatsappSent]);
 
   const toggleSelectAll = useCallback((ids: string[]) => {
     setSelectedIds((prev) => {
@@ -360,7 +369,8 @@ function SalaryRegisterPage() {
       return allSelected ? new Set<string>() : new Set(ids);
     });
     resetEmailsSent();
-  }, [resetEmailsSent]);
+    resetWhatsappSent();
+  }, [resetEmailsSent, resetWhatsappSent]);
 
   const handleDownloadSelected = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return;
@@ -698,13 +708,15 @@ function SalaryRegisterPage() {
           onClose={() => setSubmitMonthOpen(false)}
           onSubmitSelected={(ids) => void handleSubmitSelected(ids)}
           onSaveRecord={(record) => handleSaveRecord(record)}
-          submitDisabled={!emailsSent}
+          submitDisabled={!emailsSent && !whatsappSent}
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
           onToggleSelectAll={toggleSelectAll}
           onDownloadSelected={(ids) => void handleDownloadSelected(ids)}
           onEmailSelected={() => setEmailOpen(true)}
+          onWhatsAppSelected={() => setWhatsappOpen(true)}
           emailsSentCount={emailsSentCount}
+          whatsappSentCount={whatsappSentCount}
         />
       )}
 
@@ -721,6 +733,22 @@ function SalaryRegisterPage() {
             showNotification("Payslips emailed. You can now submit the month.", "success");
           }}
           onSend={async (ids, payload) => emailSalaryPayslips(ids, payload)}
+        />
+      )}
+
+      {whatsappOpen && (
+        <WhatsAppPayslipsModal
+          monthLabel={formatMonthName(month)}
+          records={visibleRecords.filter((r) => selectedIds.has(r.id))}
+          saving={saving}
+          onClose={() => setWhatsappOpen(false)}
+          onSent={(sent) => {
+            setWhatsappSentCount(sent);
+            setWhatsappSent(true);
+            setWhatsappOpen(false);
+            showNotification("Payslips sent on WhatsApp. You can now submit the month.", "success");
+          }}
+          onSend={async (ids, payload) => whatsappSalaryPayslips(ids, payload)}
         />
       )}
 
