@@ -2,12 +2,11 @@
 //
 // "Review & Submit" popup for the Salary Register.
 //
-// A simple, clean A4-portrait payslip (single column, light styling) with an
-// employee list on the left (with multi-select checkboxes) and the payslip on
-// the right. The selection toolbar (Download Selected / Email Payslips / Clear)
-// lives inside this modal. The payslip is read-only by default; the always-
-// visible "Edit" button turns the amount fields into inputs so a Pending record
-// can be corrected and saved back to the salary table.
+// Mirrors the Shop Ledger PDF "Select shops" pattern: a left selection panel
+// (count chip, progress bar, All/None, search, checkbox list with initials +
+// net salary) and the payslip preview on the right. The payslip is read-only by
+// default; the always-visible "Edit" button turns the amount fields into inputs
+// so a Pending record can be corrected and saved back to the salary table.
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import {
@@ -20,6 +19,9 @@ import {
   Lock,
   ClipboardCheck,
   Mail,
+  ListChecks,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import type { SalaryRecord } from "../../types/staffDashboard";
 
@@ -183,7 +185,6 @@ export function SalaryReviewModal({
     return records.find((r) => r.status === "Pending") ?? records[0] ?? null;
   }, [records, selectedId]);
 
-  // Leave edit mode when switching employees.
   useEffect(() => {
     setEditing(false);
   }, [selectedId]);
@@ -202,6 +203,11 @@ export function SalaryReviewModal({
   const allIds = useMemo(() => records.map((r) => r.id), [records]);
   const allSelected =
     allIds.length > 0 && allIds.every((id) => selectedIds.has(id));
+  const selectedCount = selectedIds.size;
+  const progressPct =
+    records.length === 0
+      ? 0
+      : Math.round((selectedCount / records.length) * 100);
 
   const ensureDraft = useCallback(
     (record: SalaryRecord): FieldValues =>
@@ -270,7 +276,7 @@ export function SalaryReviewModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-slate-900/60 p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-4xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden sm:max-h-[94vh]">
+      <div className="bg-white w-full sm:max-w-5xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden sm:max-h-[94vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200">
           <div className="flex items-center gap-2.5">
@@ -296,130 +302,171 @@ export function SalaryReviewModal({
           </button>
         </div>
 
-        {/* Selection toolbar (inside the modal) */}
-        <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border-b border-slate-200">
-          <span className="text-xs font-semibold text-slate-600">
-            {selectedIds.size} selected
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onDownloadSelected([...selectedIds])}
-              disabled={selectedIds.size === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold transition disabled:opacity-50"
-            >
-              <Download size={13} /> Download Selected
-            </button>
-            <button
-              type="button"
-              onClick={onEmailSelected}
-              disabled={selectedIds.size === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition disabled:opacity-50"
-            >
-              <Mail size={13} /> Email Payslips
-            </button>
-            <button
-              type="button"
-              onClick={() => onToggleSelectAll([])}
-              disabled={selectedIds.size === 0}
-              className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold transition disabled:opacity-50"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-
         {/* Body */}
         <div className="flex flex-1 min-h-0">
-          {/* LEFT: employee list with multi-select */}
-          <div className="w-64 shrink-0 border-r border-slate-200 bg-white flex flex-col">
-            <div className="p-3 border-b border-slate-100 flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={allSelected}
-                onChange={() => onToggleSelectAll(allIds)}
-                className="h-4 w-4 accent-blue-600 shrink-0"
-                aria-label="Select all"
-              />
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                Employees · {filtered.length}
-              </span>
-            </div>
-            <div className="p-3 border-b border-slate-100">
-              <div className="flex items-center gap-1.5 h-9 px-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                <Search size={13} className="text-slate-400 shrink-0" />
+          {/* LEFT: selection panel (mirrors Shop Ledger "Select shops") */}
+          <aside className="w-72 shrink-0 flex flex-col border-r border-slate-100 bg-slate-50/70">
+            {/* Panel header */}
+            <div className="space-y-2.5 border-b border-slate-100 bg-white/70 px-3.5 py-3">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm">
+                    <ListChecks size={12} />
+                  </span>
+                  Select employees
+                </span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition ${
+                    selectedCount === records.length
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "bg-blue-50 text-blue-600"
+                  }`}
+                >
+                  {selectedCount} / {records.length}
+                </span>
+              </div>
+
+              <div
+                className="h-1 w-full overflow-hidden rounded-full bg-slate-100"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={records.length}
+                aria-valuenow={selectedCount}
+              >
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-200"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => onToggleSelectAll(allIds)}
+                  className={`flex h-7 items-center justify-center gap-1 rounded-lg border text-[11px] font-semibold transition ${
+                    allSelected
+                      ? "border-blue-300 bg-blue-50 text-blue-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <CheckSquare size={11} /> All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onToggleSelectAll([])}
+                  disabled={selectedCount === 0}
+                  className="flex h-7 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Square size={11} /> None
+                </button>
+              </div>
+
+              <div className="relative">
+                <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search employees..."
-                  className="w-full bg-transparent text-xs text-slate-700 outline-none"
+                  aria-label="Search employees"
+                  className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-7 pr-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300"
                 />
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto">
-              {filtered.map((r) => {
-                const active = r.id === selected?.id;
-                const isDirty = dirty[r.id];
-                const vals = drafts[r.id] ?? toFieldValues(r);
-                const net =
-                  vals.basicSalary +
-                  vals.overtime +
-                  vals.incentives +
-                  vals.fuelAllowance +
-                  vals.nightAllowance -
-                  vals.leaveDeduction -
-                  vals.advanceRecovery -
-                  vals.loanEMI -
-                  vals.latePenalty -
-                  vals.otherDeductions;
-                const checked = selectedIds.has(r.id);
-                return (
-                  <div
-                    key={r.id}
-                    onClick={() => setSelectedId(r.id)}
-                    className={`w-full text-left px-3 py-2.5 border-b border-slate-100 border-l-2 flex items-center gap-3 transition cursor-pointer ${
-                      checked
-                        ? "bg-blue-50 border-l-blue-500"
-                        : active
-                        ? "bg-slate-50"
-                        : "border-l-transparent hover:bg-slate-50"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={() => onToggleSelect(r.id)}
-                      className="h-4 w-4 rounded accent-blue-600 shrink-0"
-                      aria-label={`Select ${r.employeeName}`}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-semibold text-slate-800 truncate">
-                          {r.employeeName}
+
+            {/* Employee list */}
+            <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-2.5">
+              <div className="space-y-0.5">
+                {filtered.map((r) => {
+                  const isActive = r.id === selected?.id;
+                  const isSelected = selectedIds.has(r.id);
+                  const isBusy = savingId === r.id;
+                  const initial = (r.employeeName || "?")
+                    .charAt(0)
+                    .toUpperCase();
+                  return (
+                    <div
+                      key={r.id}
+                      className={`group flex items-center gap-2 rounded-xl border px-2 py-1.5 transition ${
+                        isActive
+                          ? "border-blue-200 bg-blue-50/70 ring-1 ring-blue-300"
+                          : isSelected
+                          ? "border-blue-100 bg-blue-50/40"
+                          : "border-transparent hover:border-slate-200/70 hover:bg-white"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => onToggleSelect(r.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`Select ${r.employeeName}`}
+                        className="h-4 w-4 shrink-0 cursor-pointer accent-blue-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(r.id)}
+                        title={r.employeeName}
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                      >
+                        <span
+                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-bold transition ${
+                            isSelected
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {initial}
                         </span>
-                        {isDirty && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
-                        )}
-                      </div>
-                      <div className="text-[11px] text-slate-500 truncate">
-                        {r.department}
-                      </div>
+                        <span className="min-w-0 flex-1">
+                          <span
+                            className={`block truncate text-xs ${
+                              isActive
+                                ? "font-bold text-blue-700"
+                                : "font-semibold text-slate-700"
+                            }`}
+                          >
+                            {r.employeeName}
+                          </span>
+                          <span className="block truncate text-[10px] text-slate-400">
+                            {r.department}
+                          </span>
+                        </span>
+                      </button>
+                      {isBusy ? (
+                        <Loader2 size={13} className="shrink-0 animate-spin text-blue-500" />
+                      ) : null}
                     </div>
-                    <div className="text-xs font-bold text-slate-800 tabular-nums shrink-0">
-                      {formatCurrency(net)}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
               {filtered.length === 0 && (
-                <div className="p-6 text-center text-xs text-slate-400">
-                  No employees match your search.
-                </div>
+                <p className="px-2 py-4 text-center text-xs text-slate-400">
+                  No employees match “{query}”.
+                </p>
               )}
             </div>
-          </div>
+
+            {/* Actions */}
+            <div className="space-y-2 border-t border-slate-100 bg-white/70 px-3.5 py-3">
+              <button
+                type="button"
+                onClick={() => onDownloadSelected([...selectedIds])}
+                disabled={selectedCount === 0}
+                className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-semibold text-white shadow-sm transition hover:from-blue-600 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Download size={13} /> Download selected ({selectedCount})
+              </button>
+              <button
+                type="button"
+                onClick={onEmailSelected}
+                disabled={selectedCount === 0}
+                className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Mail size={13} /> Email Payslips
+              </button>
+            </div>
+          </aside>
 
           {/* RIGHT: payslip (scrollable) */}
           {selected && currentValues && currentTotals ? (
