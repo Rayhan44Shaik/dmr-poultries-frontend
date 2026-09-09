@@ -24,6 +24,7 @@ import {
   Square,
   CheckCircle2,
 } from "lucide-react";
+import BrandMark from "../../../../ui/BrandMark";
 import type { SalaryRecord } from "../../types/staffDashboard";
 
 export type SalaryReviewModalProps = {
@@ -76,8 +77,6 @@ const DEDUCTION_FIELDS: { key: FieldKey; label: string }[] = [
   { key: "latePenalty", label: "Late Penalty" },
   { key: "otherDeductions", label: "Other Deductions" },
 ];
-
-const NAVY = "#0f234f";
 
 function toFieldValues(record: SalaryRecord): FieldValues {
   return {
@@ -610,19 +609,19 @@ function PayslipDocument({
 
   return (
     <div className="w-full max-w-[420px] bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200">
-        <div>
-          <div className="text-base font-bold text-slate-900">Salary Payslip</div>
-          <div className="text-[11px] text-slate-500">DMR POULTRIES</div>
+      {/* Header — same document identity as the payslip view:
+          DMR POULTRIES brand, "Payslip" title, period. */}
+      <div className="border-b border-slate-200 px-5 py-3 text-center">
+        <div className="flex items-center justify-center gap-2">
+          <BrandMark size="xs" />
+          <span className="text-[13px] font-extrabold tracking-[0.14em] text-slate-900">
+            DMR POULTRIES
+          </span>
         </div>
-        <div className="text-right">
-          <div className="text-[10px] uppercase tracking-wider text-slate-400">
-            Month
-          </div>
-          <div className="text-sm font-semibold text-slate-800">
-            {monthLabel}
-          </div>
+        <div className="mt-1 flex items-baseline justify-center gap-2">
+          <span className="text-sm font-bold tracking-tight text-slate-900">Payslip</span>
+          <span className="text-slate-300">·</span>
+          <span className="text-xs font-semibold text-slate-600">{monthLabel}</span>
         </div>
       </div>
 
@@ -702,15 +701,12 @@ function PayslipDocument({
         </div>
       </div>
 
-      {/* Net payable */}
-      <div
-        className="px-5 py-3 flex items-center justify-between text-white"
-        style={{ background: NAVY }}
-      >
-        <span className="text-[11px] uppercase tracking-wider text-blue-200">
-          Net Salary Payable
+      {/* Net payable — the take-home band, brand emerald like the payslip view */}
+      <div className="px-5 py-3 flex items-center justify-between bg-emerald-600 text-white">
+        <span className="text-[11px] font-bold uppercase tracking-wider">
+          Net Salary (Take Home)
         </span>
-        <span className="text-xl font-extrabold tabular-nums">
+        <span className="text-lg font-extrabold tabular-nums">
           {formatCurrency(totals.net)}
         </span>
       </div>
