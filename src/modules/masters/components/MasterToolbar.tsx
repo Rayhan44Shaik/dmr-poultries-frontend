@@ -1,5 +1,10 @@
-import { FileSpreadsheet, FileText } from "lucide-react";
 import MasterDropdown from "./MasterDropdown";
+import { ExcelButton, PdfButton } from "../../../ui";
+import {
+  uiCardClass,
+  uiFilterFieldClass,
+  uiPaginationSummaryClass,
+} from "../../../shared/ui/uiTokens";
 
 type MasterToolbarProps = {
   moduleName: string;
@@ -11,6 +16,19 @@ type MasterToolbarProps = {
   onPdf: () => void;
 };
 
+/**
+ * Master filter + export toolbar.
+ *
+ * Standardised on the global UI kit:
+ *   • PDF and Excel now carry the canonical semantic actions — FileText in a
+ *     rose outline and FileSpreadsheet in an emerald outline. They were neutral
+ *     slate here, which made them indistinguishable from a secondary button and
+ *     inconsistent with the same two actions in Operations and Reports.
+ *   • The panel uses the global card token (14px radius, hairline border,
+ *     restrained `shadow-card`) instead of an ad-hoc `shadow-sm`.
+ *   • Filters sit in a 40px row so the dropdowns and the export buttons share
+ *     one baseline and one control height.
+ */
 function MasterToolbar({
   moduleName,
   status,
@@ -21,7 +39,7 @@ function MasterToolbar({
   onPdf,
 }: MasterToolbarProps) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className={`${uiCardClass} flex flex-wrap items-end justify-between gap-4 p-4`}>
       <div className="flex flex-wrap items-end gap-3">
         <MasterDropdown
           label="Select Module"
@@ -36,16 +54,16 @@ function MasterToolbar({
             "Bird Types",
             "Routes",
           ]}
-          className="w-56"
+          className={uiFilterFieldClass}
         />
         <MasterDropdown
           label="Status"
           value={status}
           onChange={onStatusChange}
           options={["All", "Active", "Inactive"]}
-          className="w-56"
+          className={uiFilterFieldClass}
         />
-        <p className="pb-2 text-xs text-slate-500">
+        <p className={`${uiPaginationSummaryClass} mr-0 pb-2.5`}>
           Showing{" "}
           <span className="font-semibold tabular-nums text-emerald-700">
             {totalRecords}
@@ -53,23 +71,9 @@ function MasterToolbar({
           records
         </p>
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onExcel}
-          className="flex h-9 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-medium text-slate-600 hover:bg-slate-50"
-        >
-          <FileSpreadsheet size={14} />
-          Excel
-        </button>
-        <button
-          type="button"
-          onClick={onPdf}
-          className="flex h-9 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-medium text-slate-600 hover:bg-slate-50"
-        >
-          <FileText size={14} />
-          PDF
-        </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <ExcelButton onClick={onExcel}>Excel</ExcelButton>
+        <PdfButton onClick={onPdf}>PDF</PdfButton>
       </div>
     </div>
   );

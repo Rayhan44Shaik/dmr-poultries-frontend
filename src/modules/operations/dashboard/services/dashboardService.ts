@@ -4,6 +4,7 @@
  */
 
 import { apiGet, handleApiError } from "../../../../api";
+import { toBusinessDate } from '../../../../utils/businessDate';
 
 const DASHBOARD_PATH = "/operations/dashboard";
 
@@ -141,7 +142,7 @@ function offlineDashboard(): DashboardData {
   const collections = read<CollectionRow>("dmr-collections");
   const fuel = read<FuelRow>("dmr-fuel-expenses");
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toBusinessDate(new Date());
   const weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 

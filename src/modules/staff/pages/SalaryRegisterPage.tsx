@@ -1,6 +1,7 @@
 // src/modules/staff/pages/SalaryRegisterPage.tsx
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { uiInputClass } from '../../../shared/ui/uiTokens';
 import { useSalaryRegister } from "../hooks/useSalaryRegister";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { loadEmployees } from "../../masters/employees/services/employeeService";
@@ -587,7 +588,7 @@ function SalaryRegisterPage() {
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search by employee name..."
-              className="h-9 w-full px-3 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white text-slate-700"
+              className={uiInputClass}
             />
           </div>
           <FilterDropdown

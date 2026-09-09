@@ -1,0 +1,475 @@
+/* =============================================================================
+ * DMR Poultries ERP — GLOBAL DESIGN TOKENS
+ * =============================================================================
+ * THIS FILE IS THE SINGLE SOURCE OF TRUTH FOR THE APPLICATION'S VISUAL LANGUAGE.
+ *
+ *   Design tokens  →  Shared components (src/ui/*)  →  Modules / pages
+ *
+ * A new page should never invent its own colours, radii, shadows, control
+ * heights or spacing. It should consume:
+ *
+ *   • Tailwind utilities generated from the `@theme` block below
+ *     (rounded-*, shadow-*, text-*, bg-emerald-*, bg-rose-*, …)
+ *   • the `--ds-*` custom properties (for hand-written CSS)
+ *   • the semantic class strings in `src/shared/ui/uiTokens.ts`
+ *   • the components in `src/ui/`
+ *
+ * ---------------------------------------------------------------------------
+ * SEMANTIC COLOUR POLICY
+ * ---------------------------------------------------------------------------
+ * One meaning = one family. Redundant Tailwind families are re-pointed at
+ * their canonical family with `var()` indirection, so every existing page
+ * inherits the convergence automatically and the rendered colour is provably
+ * identical to the canonical scale (no hue drift, no per-page edits).
+ *
+ *   canonical  family   meaning
+ *   ---------  ------   ------------------------------------------------
+ *   emerald    brand / primary / success      (blue-*, green-* re-pointed)
+ *   rose       danger / error / destructive   (red-* re-pointed)
+ *   amber      warning / pending / attention  (orange-*, yellow-* re-pointed)
+ *   sky        info / informational accent
+ *   slate      neutral / chrome / text        (gray-* re-pointed)
+ *
+ * Categorical hues (indigo, violet, purple, cyan, teal, pink, lime) are
+ * deliberately LEFT ALONE: they encode chart series and dashboard categories
+ * where distinct hues carry meaning, not status.
+ * ===========================================================================*/
+
+@theme {
+  /* -----------------------------------------------------------------------
+   * 1. TYPOGRAPHY — one global font, everywhere
+   * -----------------------------------------------------------------------
+   * Inter is the single Latin face. "Noto Sans Telugu" sits immediately after
+   * it purely as a glyph fallback: Inter has no Telugu coverage, so the browser
+   * falls back to it *only* for Telugu characters while Latin text stays Inter.
+   * This removes the need for page-specific font overrides.
+   * --------------------------------------------------------------------- */
+  --font-sans:
+    "Inter", "Noto Sans Telugu", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+
+  /* Numeric/data columns share one mono-free tabular treatment via
+     `--font-numeric` (used by .ds-numeric); no second typeface is loaded. */
+  --font-numeric: var(--font-sans);
+
+  /* -----------------------------------------------------------------------
+   * 2. COLOUR — canonical semantic families
+   * --------------------------------------------------------------------- */
+
+  /* Brand / primary / success: emerald (Tailwind v4 emerald is lightness- and
+     hue-identical to the legacy v3 brand hexes; only chroma differs by ~0.02,
+     which is imperceptible — so this unification causes no visible shift). */
+  --color-brand-50: var(--color-emerald-50);
+  --color-brand-100: var(--color-emerald-100);
+  --color-brand-200: var(--color-emerald-200);
+  --color-brand-300: var(--color-emerald-300);
+  --color-brand-400: var(--color-emerald-400);
+  --color-brand-500: var(--color-emerald-500);
+  --color-brand-600: var(--color-emerald-600);
+  --color-brand-700: var(--color-emerald-700);
+  --color-brand-800: var(--color-emerald-800);
+  --color-brand-900: var(--color-emerald-900);
+  --color-brand-950: var(--color-emerald-950);
+
+  /* Explicit semantic aliases. New code should prefer these names so intent is
+     unambiguous (bg-danger-600 rather than bg-rose-600). */
+  --color-primary-50: var(--color-emerald-50);
+  --color-primary-100: var(--color-emerald-100);
+  --color-primary-200: var(--color-emerald-200);
+  --color-primary-300: var(--color-emerald-300);
+  --color-primary-400: var(--color-emerald-400);
+  --color-primary-500: var(--color-emerald-500);
+  --color-primary-600: var(--color-emerald-600);
+  --color-primary-700: var(--color-emerald-700);
+  --color-primary-800: var(--color-emerald-800);
+  --color-primary-900: var(--color-emerald-900);
+  --color-primary-950: var(--color-emerald-950);
+
+  --color-success-50: var(--color-emerald-50);
+  --color-success-100: var(--color-emerald-100);
+  --color-success-200: var(--color-emerald-200);
+  --color-success-300: var(--color-emerald-300);
+  --color-success-400: var(--color-emerald-400);
+  --color-success-500: var(--color-emerald-500);
+  --color-success-600: var(--color-emerald-600);
+  --color-success-700: var(--color-emerald-700);
+  --color-success-800: var(--color-emerald-800);
+  --color-success-900: var(--color-emerald-900);
+  --color-success-950: var(--color-emerald-950);
+
+  --color-danger-50: var(--color-rose-50);
+  --color-danger-100: var(--color-rose-100);
+  --color-danger-200: var(--color-rose-200);
+  --color-danger-300: var(--color-rose-300);
+  --color-danger-400: var(--color-rose-400);
+  --color-danger-500: var(--color-rose-500);
+  --color-danger-600: var(--color-rose-600);
+  --color-danger-700: var(--color-rose-700);
+  --color-danger-800: var(--color-rose-800);
+  --color-danger-900: var(--color-rose-900);
+  --color-danger-950: var(--color-rose-950);
+
+  --color-warning-50: var(--color-amber-50);
+  --color-warning-100: var(--color-amber-100);
+  --color-warning-200: var(--color-amber-200);
+  --color-warning-300: var(--color-amber-300);
+  --color-warning-400: var(--color-amber-400);
+  --color-warning-500: var(--color-amber-500);
+  --color-warning-600: var(--color-amber-600);
+  --color-warning-700: var(--color-amber-700);
+  --color-warning-800: var(--color-amber-800);
+  --color-warning-900: var(--color-amber-900);
+  --color-warning-950: var(--color-amber-950);
+
+  --color-info-50: var(--color-sky-50);
+  --color-info-100: var(--color-sky-100);
+  --color-info-200: var(--color-sky-200);
+  --color-info-300: var(--color-sky-300);
+  --color-info-400: var(--color-sky-400);
+  --color-info-500: var(--color-sky-500);
+  --color-info-600: var(--color-sky-600);
+  --color-info-700: var(--color-sky-700);
+  --color-info-800: var(--color-sky-800);
+  --color-info-900: var(--color-sky-900);
+  --color-info-950: var(--color-sky-950);
+
+  --color-neutral-50: var(--color-slate-50);
+  --color-neutral-100: var(--color-slate-100);
+  --color-neutral-200: var(--color-slate-200);
+  --color-neutral-300: var(--color-slate-300);
+  --color-neutral-400: var(--color-slate-400);
+  --color-neutral-500: var(--color-slate-500);
+  --color-neutral-600: var(--color-slate-600);
+  --color-neutral-700: var(--color-slate-700);
+  --color-neutral-800: var(--color-slate-800);
+  --color-neutral-900: var(--color-slate-900);
+  --color-neutral-950: var(--color-slate-950);
+
+  /* --- Redundant-family convergence (legacy utility names keep working) --- */
+
+  /* Legacy brand alias: pre-existing pages use blue-* for the brand accent. */
+  --color-blue-50: var(--color-emerald-50);
+  --color-blue-100: var(--color-emerald-100);
+  --color-blue-200: var(--color-emerald-200);
+  --color-blue-300: var(--color-emerald-300);
+  --color-blue-400: var(--color-emerald-400);
+  --color-blue-500: var(--color-emerald-500);
+  --color-blue-600: var(--color-emerald-600);
+  --color-blue-700: var(--color-emerald-700);
+  --color-blue-800: var(--color-emerald-800);
+  --color-blue-900: var(--color-emerald-900);
+  --color-blue-950: var(--color-emerald-950);
+
+  /* green-* is a duplicate of the success family. */
+  --color-green-50: var(--color-emerald-50);
+  --color-green-100: var(--color-emerald-100);
+  --color-green-200: var(--color-emerald-200);
+  --color-green-300: var(--color-emerald-300);
+  --color-green-400: var(--color-emerald-400);
+  --color-green-500: var(--color-emerald-500);
+  --color-green-600: var(--color-emerald-600);
+  --color-green-700: var(--color-emerald-700);
+  --color-green-800: var(--color-emerald-800);
+  --color-green-900: var(--color-emerald-900);
+  --color-green-950: var(--color-emerald-950);
+
+  /* red-* is a duplicate of the destructive family (rose is canonical: it is
+     what the destructive actions, Button `danger` and pending-delete already
+     use, so converging on rose keeps the majority of the app unchanged). */
+  --color-red-50: var(--color-rose-50);
+  --color-red-100: var(--color-rose-100);
+  --color-red-200: var(--color-rose-200);
+  --color-red-300: var(--color-rose-300);
+  --color-red-400: var(--color-rose-400);
+  --color-red-500: var(--color-rose-500);
+  --color-red-600: var(--color-rose-600);
+  --color-red-700: var(--color-rose-700);
+  --color-red-800: var(--color-rose-800);
+  --color-red-900: var(--color-rose-900);
+  --color-red-950: var(--color-rose-950);
+
+  /* orange-* / yellow-* are duplicates of the warning family. */
+  --color-orange-50: var(--color-amber-50);
+  --color-orange-100: var(--color-amber-100);
+  --color-orange-200: var(--color-amber-200);
+  --color-orange-300: var(--color-amber-300);
+  --color-orange-400: var(--color-amber-400);
+  --color-orange-500: var(--color-amber-500);
+  --color-orange-600: var(--color-amber-600);
+  --color-orange-700: var(--color-amber-700);
+  --color-orange-800: var(--color-amber-800);
+  --color-orange-900: var(--color-amber-900);
+  --color-orange-950: var(--color-amber-950);
+
+  --color-yellow-50: var(--color-amber-50);
+  --color-yellow-100: var(--color-amber-100);
+  --color-yellow-200: var(--color-amber-200);
+  --color-yellow-300: var(--color-amber-300);
+  --color-yellow-400: var(--color-amber-400);
+  --color-yellow-500: var(--color-amber-500);
+  --color-yellow-600: var(--color-amber-600);
+  --color-yellow-700: var(--color-amber-700);
+  --color-yellow-800: var(--color-amber-800);
+  --color-yellow-900: var(--color-amber-900);
+  --color-yellow-950: var(--color-amber-950);
+
+  /* gray-* is a duplicate of the neutral family. */
+  --color-gray-50: var(--color-slate-50);
+  --color-gray-100: var(--color-slate-100);
+  --color-gray-200: var(--color-slate-200);
+  --color-gray-300: var(--color-slate-300);
+  --color-gray-400: var(--color-slate-400);
+  --color-gray-500: var(--color-slate-500);
+  --color-gray-600: var(--color-slate-600);
+  --color-gray-700: var(--color-slate-700);
+  --color-gray-800: var(--color-slate-800);
+  --color-gray-900: var(--color-slate-900);
+  --color-gray-950: var(--color-slate-950);
+
+  /* -----------------------------------------------------------------------
+   * 3. SURFACES — layered hierarchy (app bg → content → elevated)
+   * --------------------------------------------------------------------- */
+  --color-surface-app: #f8fafc;
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: #f1f5f9;
+  --color-surface-dark-app: #020617;
+  --color-surface-dark-raised: #0f172a;
+
+  /* -----------------------------------------------------------------------
+   * 4. BORDER RADIUS — one coherent, restrained progression
+   * -----------------------------------------------------------------------
+   * The project previously mixed `rounded`, `-md`, `-lg`, `-xl`, `-2xl`,
+   * `-3xl` (0.25 → 1.5rem), so adjacent surfaces disagreed by up to 10px.
+   * The scale below is tight and monotonic, which makes the 1,500+ existing
+   * radius usages read as one system without editing a single page:
+   *
+   *   xs  4px   chips, ticks
+   *   sm  5px   dense controls
+   *   md  6px   `rounded` / small controls
+   *   lg  8px   buttons, inputs, selects, search   ← CONTROL radius
+   *   xl  10px  cards, tables, popovers           ← SURFACE radius
+   *   2xl 12px  dialogs, large panels             ← OVERLAY radius
+   *   3xl 14px  hero surfaces (rare)
+   *   4xl 16px  maximum (rare)
+   * --------------------------------------------------------------------- */
+  --radius: 0.375rem;
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.3125rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.625rem;
+  --radius-2xl: 0.75rem;
+  --radius-3xl: 0.875rem;
+  --radius-4xl: 1rem;
+
+  /* -----------------------------------------------------------------------
+   * 5. ELEVATION — restrained, slate-tinted (never pure black)
+   * -----------------------------------------------------------------------
+   * Heavy `shadow-xl`/`shadow-2xl` were used on inline cards, making every
+   * element look like a separate floating object. The scale below keeps
+   * elevation meaningful but calm: level 0-1 for chrome, 2 for popovers,
+   * 3 for dialogs.
+   * --------------------------------------------------------------------- */
+  --shadow-2xs: 0 1px 1px 0 rgb(15 23 42 / 0.03);
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-sm:
+    0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
+  --shadow: var(--shadow-sm);
+  --shadow-md:
+    0 1px 3px 0 rgb(15 23 42 / 0.05), 0 4px 10px -4px rgb(15 23 42 / 0.1);
+  --shadow-lg:
+    0 2px 6px -1px rgb(15 23 42 / 0.06), 0 10px 22px -8px rgb(15 23 42 / 0.13);
+  --shadow-xl:
+    0 4px 10px -2px rgb(15 23 42 / 0.06), 0 16px 32px -12px rgb(15 23 42 / 0.16);
+  --shadow-2xl:
+    0 8px 18px -4px rgb(15 23 42 / 0.08), 0 24px 44px -18px rgb(15 23 42 / 0.2);
+  --shadow-inner: inset 0 1px 2px 0 rgb(15 23 42 / 0.04);
+
+  /* Semantic elevation names used by the shared components. */
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
+  --shadow-card-lg:
+    0 1px 2px rgb(15 23 42 / 0.04), 0 10px 28px -10px rgb(15 23 42 / 0.12);
+  --shadow-pop:
+    0 4px 10px -2px rgb(15 23 42 / 0.08), 0 14px 34px -10px rgb(15 23 42 / 0.16);
+  --shadow-overlay:
+    0 8px 18px -4px rgb(15 23 42 / 0.1), 0 28px 50px -20px rgb(15 23 42 / 0.24);
+
+  /* -----------------------------------------------------------------------
+   * 6. MOTION — short, subtle, purposeful
+   * --------------------------------------------------------------------- */
+  --ease-ds: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --animate-fade-in: fade-in 0.18s ease-out both;
+  --animate-fade-in-up: fade-in-up 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-scale-in: scale-in 0.14s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-slide-down: slide-down 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-slide-in-left: slide-in-left 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-toast-in: toast-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes slide-down {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes slide-in-left {
+    from { opacity: 0; transform: translateX(-14px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+}
+
+/* =============================================================================
+ * DERIVED ALIASES
+ * -----------------------------------------------------------------------------
+ * These point AT the Tailwind theme variables above (one direction only — no
+ * duplicated literal values), so hand-written CSS and inline styles can use a
+ * readable name while still tracking the single source of truth.
+ * ===========================================================================*/
+:root {
+  /* --- colour ----------------------------------------------------------- */
+  --ds-color-primary: var(--color-emerald-600);
+  --ds-color-primary-hover: var(--color-emerald-700);
+  --ds-color-primary-active: var(--color-emerald-800);
+  --ds-color-primary-soft: var(--color-emerald-50);
+  --ds-color-success: var(--color-emerald-600);
+  --ds-color-success-soft: var(--color-emerald-50);
+  --ds-color-danger: var(--color-rose-600);
+  --ds-color-danger-hover: var(--color-rose-700);
+  --ds-color-danger-soft: var(--color-rose-50);
+  --ds-color-warning: var(--color-amber-600);
+  --ds-color-warning-soft: var(--color-amber-50);
+  --ds-color-info: var(--color-sky-600);
+  --ds-color-info-soft: var(--color-sky-50);
+
+  --ds-text-primary: var(--color-slate-900);
+  --ds-text-secondary: var(--color-slate-600);
+  --ds-text-muted: var(--color-slate-500);
+  --ds-text-faint: var(--color-slate-400);
+  --ds-text-disabled: var(--color-slate-400);
+  --ds-text-inverse: #ffffff;
+
+  --ds-border: var(--color-slate-200);
+  --ds-border-strong: var(--color-slate-300);
+  --ds-border-subtle: var(--color-slate-100);
+
+  --ds-surface-app: var(--color-surface-app);
+  --ds-surface-raised: var(--color-surface-raised);
+  --ds-surface-sunken: var(--color-surface-sunken);
+
+  /* --- radius ------------------------------------------------------------ */
+  --ds-radius-control: var(--radius-lg);
+  --ds-radius-surface: var(--radius-xl);
+  --ds-radius-overlay: var(--radius-2xl);
+  --ds-radius-pill: 9999px;
+
+  /* --- control heights (the invisible grid toolbar rows align to) -------- */
+  --ds-control-h-xs: 1.75rem; /* 28px  dense table action */
+  --ds-control-h-sm: 2rem;    /* 32px  compact / pagination / icon button */
+  --ds-control-h-md: 2.25rem; /* 36px  default button, dialog actions */
+  --ds-control-h-lg: 2.5rem;  /* 40px  toolbar row: search, filters, exports */
+
+  /* --- spacing scale (page rhythm) -------------------------------------- */
+  --ds-space-1: 0.25rem;
+  --ds-space-2: 0.5rem;
+  --ds-space-3: 0.75rem;
+  --ds-space-4: 1rem;
+  --ds-space-5: 1.25rem;
+  --ds-space-6: 1.5rem;
+  --ds-space-8: 2rem;
+
+  /* Page container padding: consistent gutter on every module.
+     Mobile-first defaults; the responsive steps live in the media queries
+     below (kept OUTSIDE the rule so no CSS-nesting support is required). */
+  --ds-page-pad-x: 1rem;          /* mobile  */
+  --ds-page-pad-y: 1rem;
+  --ds-page-section-gap: 1.25rem; /* vertical rhythm between page sections */
+
+  /* --- typography ------------------------------------------------------- */
+  --ds-font: var(--font-sans);
+  --ds-text-page-title: 1.0625rem;   /* 17px */
+  --ds-text-section-title: 0.8125rem;/* 13px */
+  --ds-text-body: 0.8125rem;         /* 13px */
+  --ds-text-label: 0.6875rem;        /* 11px */
+  --ds-text-caption: 0.6875rem;      /* 11px */
+  --ds-text-table-head: 0.6875rem;   /* 11px */
+  --ds-text-table-cell: 0.75rem;     /* 12px */
+
+  /* --- elevation -------------------------------------------------------- */
+  --ds-shadow-control: var(--shadow-xs);
+  --ds-shadow-surface: var(--shadow-card);
+  --ds-shadow-popover: var(--shadow-pop);
+  --ds-shadow-overlay: var(--shadow-overlay);
+
+  /* --- motion ------------------------------------------------------------ */
+  --ds-duration-fast: 120ms;
+  --ds-duration-base: 160ms;
+  --ds-duration-slow: 220ms;
+  --ds-ease: var(--ease-ds);
+
+  /* --- z-index scale (prevents overlay/dialog/picker stacking fights) ---- */
+  --ds-z-base: 0;
+  --ds-z-sticky: 20;
+  --ds-z-header: 30;
+  --ds-z-nav-catcher: 40;
+  --ds-z-popover: 50;
+  --ds-z-datepicker: 55;
+  --ds-z-modal: 60;
+  --ds-z-confirm: 70;
+  --ds-z-notification: 80;
+  --ds-z-max: 90;
+
+  /* --- breakpoints (reference only; Tailwind owns the media queries) ----- */
+  --ds-bp-sm: 640px;
+  --ds-bp-md: 768px;
+  --ds-bp-lg: 1024px;
+  --ds-bp-xl: 1280px;
+  --ds-bp-2xl: 1536px;
+
+  /* --- focus ring (one indicator, everywhere) --------------------------- */
+  --ds-focus-ring-width: 2px;
+  --ds-focus-ring-color: var(--color-emerald-600);
+  --ds-focus-ring-offset: 2px;
+}
+
+/* --- responsive page rhythm ----------------------------------------------
+ * Kept as sibling rules (not nested) so the tokens work without relying on
+ * CSS nesting support. One gutter scale for every module.
+ * ------------------------------------------------------------------------ */
+@media (min-width: 640px) {
+  :root {
+    --ds-page-pad-x: 1.5rem;
+    --ds-page-pad-y: 1.25rem;
+    --ds-page-section-gap: 1.25rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --ds-page-pad-x: 1.75rem;
+    --ds-page-pad-y: 1.5rem;
+    --ds-page-section-gap: 1.5rem;
+  }
+}
+
+@media (min-width: 1440px) {
+  :root {
+    --ds-page-pad-x: 2rem;
+  }
+}

@@ -12,6 +12,7 @@ import { DatePicker } from '../../../components/common/DatePicker';
 import { canEditItem, canDeleteItem } from '../../../utils/dateUtils';
 import { usePendingDelete } from '../../../hooks/usePendingDelete';
 import { PendingDeleteNotification } from '../../../components/common/PendingDeleteNotification';
+import { uiInputClass, uiSearchInputClass } from "../../../shared/ui/uiTokens";
 import {
   Download,
   RefreshCw,
@@ -309,7 +310,7 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
             <select
               value={paymentType}
               onChange={(e) => setPaymentType(e.target.value)}
-              className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white"
+              className={uiInputClass}
             >
               <option value="">All Types</option>
               {paymentTypes.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -322,7 +323,7 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
             <select
               value={paymentMode}
               onChange={(e) => setPaymentMode(e.target.value)}
-              className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white"
+              className={uiInputClass}
             >
               <option value="">All Modes</option>
               {paymentModes.map((m) => <option key={m} value={m}>{m}</option>)}
@@ -337,7 +338,9 @@ export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search reference, paid to, amount..."
-              className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white"
+              // Global search field: 40px control height, 8px radius, brand
+              // emerald focus ring (was 36px with a blue-* ring).
+              className={uiSearchInputClass}
             />
             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
               <FileText className="w-3.5 h-3.5 text-slate-400" />

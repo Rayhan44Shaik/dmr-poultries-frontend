@@ -1,97 +1,80 @@
+/**
+ * =============================================================================
+ * TOAST PROVIDER — adapter over the global notification store
+ * =============================================================================
+ * Kept as the compatibility surface for `useToast()` call sites
+ * (OrdersPage, PendingCollectionsPage, …). Rendering is owned by the single
+ * `<NotificationHost />` mounted in App.tsx, so one action can never produce
+ * two toasts from two competing systems.
+ *
+ * WHAT CHANGED FOR THE USER
+ *   • Toasts are now subtle (white surface + coloured icon) instead of fully
+ *     saturated green/red/blue slabs.
+ *   • A `warning` tone exists.
+ *   • Duplicate (tone + message) notifications collapse into one and refresh
+ *     their timer, instead of stacking.
+ *   • The entrance animation uses a real keyframe (`animate-toast-in`); the
+ *     previous `animate-in slide-in-from-top` classes came from
+ *     `tailwindcss-animate`, which is not installed, so they did nothing.
+ *
+ * API is unchanged and `warning` is additive.
+ * =============================================================================
+ */
+
 import type { ReactNode } from "react";
-import { createContext, useContext, useState, useCallback, useRef } from "react";
-import { CheckCircle, XCircle, Info, X } from "lucide-react";
-import { useI18n } from "../../i18n";
+import { createContext, useCallback, useContext, useMemo } from "react";
+// `useMemo` is used by the provider below to keep the context value stable.
+import {
+  push,
+  type NotificationTone,
+} from "../../ui/notifications/notificationStore";
 
-type ToastType = "success" | "error" | "info";
-
-interface Toast {
-  id: number;
-  message: string;
-  type: ToastType;
-}
+export type ToastType = NotificationTone;
 
 interface ToastContextType {
-  showToast: (message: string, type: ToastType, duration?: number) => void;
+  showToast: (message: string, type?: ToastType, duration?: number) => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const idRef = useRef(0);
-  const { t } = useI18n();
-
-  const showToast = useCallback((message: string, type: ToastType = "info", duration: number = 5000) => {
-    const id = ++idRef.current;
-    setToasts((prev) => [...prev, { id, message, type }]);
-    
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, duration);
-  }, []);
-
-  const removeToast = useCallback((id: number) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
-  return (
-    <ToastContext.Provider value={{ showToast }}>
-      {children}
-      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`pointer-events-auto animate-in slide-in-from-top duration-300 max-w-xs ${
-              toast.type === "success"
-                ? "bg-green-600 text-white"
-                : toast.type === "error"
-                ? "bg-red-600 text-white"
-                : "bg-blue-600 text-white"
-            } rounded-xl shadow-2xl border border-white/20 overflow-hidden`}
-            role="alert"
-            aria-live="polite"
-          >
-            <div className="flex items-start gap-3 p-4">
-              <div
-                className={`flex-shrink-0 rounded-full p-1.5 ${
-                  toast.type === "success"
-                    ? "bg-green-200 text-green-700"
-                    : toast.type === "error"
-                    ? "bg-red-200 text-red-700"
-                    : "bg-blue-200 text-blue-700"
-                }`}
-              >
-                {toast.type === "success" && <CheckCircle size={18} />}
-                {toast.type === "error" && <XCircle size={18} />}
-                {toast.type === "info" && <Info size={18} />}
-              </div>
-              <p className="flex-1 text-sm font-medium leading-relaxed pt-0.5">
-                {toast.message}
-              </p>
-              <button
-                onClick={() => removeToast(toast.id)}
-                className="flex-shrink-0 -mr-1 p-1 text-white/70 hover:text-white rounded-full hover:bg-white/20 transition-colors"
-                aria-label={t("common.close")}
-              >
-                <X size={16} />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </ToastContext.Provider>
+  const showToast = useCallback(
+    (message: string, type: ToastType = "info", duration?: number) => {
+      push(message, type, duration === undefined ? {} : { duration });
+    },
+    [],
   );
+
+  // Stable identity so consumers never re-render because of this provider.
+  const value = useMemo<ToastContextType>(() => ({ showToast }), [showToast]);
+
+  return <ToastContext.Provider value={value}>{children}</ToastContext.Provider>;
 }
 
-export function useToast() {
+export interface ToastApi {
+  success: (message: string, duration?: number) => void;
+  error: (message: string, duration?: number) => void;
+  warning: (message: string, duration?: number) => void;
+  info: (message: string, duration?: number) => void;
+  /** Raw form, matching the previous `showToast(message, type, duration)`. */
+  show: (message: string, type?: ToastType, duration?: number) => void;
+}
+
+export function useToast(): ToastApi {
   const context = useContext(ToastContext);
   if (!context) {
     throw new Error("useToast must be used within a ToastProvider");
   }
+
+  const { showToast } = context;
+
+  // Mirrors the previous shape exactly (a fresh api object per render), so
+  // existing destructuring call sites behave identically.
   return {
-    success: (msg: string, duration?: number) => context.showToast(msg, "success", duration),
-    error: (msg: string, duration?: number) => context.showToast(msg, "error", duration),
-    info: (msg: string, duration?: number) => context.showToast(msg, "info", duration),
+    success: (message, duration) => showToast(message, "success", duration),
+    error: (message, duration) => showToast(message, "error", duration),
+    warning: (message, duration) => showToast(message, "warning", duration),
+    info: (message, duration) => showToast(message, "info", duration),
+    show: (message, type, duration) => showToast(message, type, duration),
   };
 }

@@ -45,7 +45,7 @@ export const Input: React.FC<{
       onChange={onChange}
       placeholder={placeholder}
       readOnly={readOnly}
-      className={`w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-medium text-slate-800 outline-none focus:border-[#6c5ce7] focus:ring-2 focus:ring-[#6c5ce7]/10 transition-all ${className}`}
+      className={`w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 transition-all ${className}`}
     />
   </div>
 );
@@ -62,7 +62,7 @@ export const Select: React.FC<{
     <select
       value={value}
       onChange={onChange}
-      className={`w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 text-xs font-medium text-slate-800 outline-none focus:border-[#6c5ce7] transition-all ${className}`}
+      className={`w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500 transition-all ${className}`}
     >
       {options.map((opt) => (
         <option key={opt} value={opt}>

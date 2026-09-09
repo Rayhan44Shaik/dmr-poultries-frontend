@@ -25,6 +25,7 @@ import type { Shop } from "../../../masters/shops/types/shop";
 import type { DeliveryEmailStatusValue } from "../services/deliveryEmailService";
 import type { DeliveryWhatsAppStatusValue } from "../services/deliveryWhatsAppService";
 import { useI18n } from "../../../../i18n";
+import { uiSearchInputWithClearClass } from "../../../../shared/ui/uiTokens";
 
 export type TripViewShopCardsProps = {
   trip: Trip;
@@ -223,7 +224,8 @@ export function TripViewShopCards({
             onChange={(event) => setSearch(event.target.value)}
             placeholder={t("ops.trip.search_shop_bird")}
             aria-label={t("ops.trip.search_shop_bird")}
-            className="w-full h-9 rounded-xl border border-slate-200 bg-white pl-9 pr-9 text-xs font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15"
+            // Global search field with room for the trailing clear control.
+            className={uiSearchInputWithClearClass}
           />
           {search && (
             <button

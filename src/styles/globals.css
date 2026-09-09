@@ -1,127 +1,27 @@
-/* src/styles/globals.css */
+/* =============================================================================
+ * src/styles/globals.css — DEPRECATED ALIAS
+ * =============================================================================
+ * This file previously contained a SECOND, conflicting global stylesheet:
+ *
+ *   body { font-family: system-ui, … }      ← fought the "Inter" global font
+ *   *:focus-visible { outline: #2563eb }    ← blue focus ring vs. brand emerald
+ *   .rdr… { background: #1e40af }           ← blue calendar vs. brand emerald
+ *   .container { … }                        ← a second page-container system
+ *
+ * It was never imported, so it had no runtime effect — but it was a live trap:
+ * any developer who reached for the obvious "globals.css" would silently
+ * reintroduce a competing design system.
+ *
+ * It is now an alias for the ONE global stylesheet. Importing this path yields
+ * exactly the same design system as `src/index.css`, so there is no second
+ * source of truth to drift.
+ *
+ *   → Design tokens live in `src/styles/tokens.css`
+ *   → Semantic class strings live in `src/shared/ui/uiTokens.ts`
+ *   → Components live in `src/ui/`
+ *
+ * Prefer importing `src/index.css` (already done once in `src/main.tsx`) or, for
+ * a single component's styling, the tokens above. Do not add rules here.
+ * ===========================================================================*/
 
-/* stylelint-disable at-rule-no-unknown */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-/* stylelint-enable at-rule-no-unknown */
-
-/* Base styles */
-* {
-  border-color: #e2e8f0;
-}
-
-body {
-  background-color: #f8fafc;
-  color: #0f172a;
-  font-family: system-ui, -apple-system, sans-serif;
-}
-
-/* Container */
-.container {
-  width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-  padding-left: 1rem;
-  padding-right: 1rem;
-}
-
-@media (min-width: 640px) {
-  .container {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
-  }
-}
-
-@media (min-width: 1024px) {
-  .container {
-    padding-left: 2rem;
-    padding-right: 2rem;
-  }
-}
-
-@media (min-width: 1280px) {
-  .container {
-    max-width: 1280px;
-  }
-}
-
-/* Scrollbar Hide */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-/* Focus styles */
-*:focus-visible {
-  outline: 2px solid #2563eb;
-  outline-offset: 2px;
-}
-
-/* Animations */
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-slide-down {
-  animation: slideDown 0.2s ease-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.15s ease-out;
-}
-
-.animate-slide-in-right {
-  animation: slideInRight 0.2s ease-out;
-}
-
-.animate-slide-in {
-  animation: slideIn 0.2s ease-out;
-}
-
-/* Month-only DatePicker: hide the day grid, show only month/year dropdowns */
-.month-only-picker table,
-.month-only-picker .rdp-month_grid,
-.month-only-picker .rdp-weekdays,
-.month-only-picker .rdp-week,
-.month-only-picker .rdp-day {
-  display: none !important;
-}
+@import "../index.css";

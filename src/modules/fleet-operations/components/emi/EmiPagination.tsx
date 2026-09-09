@@ -1,8 +1,20 @@
 import { memo, useMemo } from 'react';
 import { useI18n } from '../../../../i18n';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  uiPaginationNavButtonClass,
+  uiPaginationPageButtonClass,
+  uiPaginationSummaryClass,
+} from '../../../../shared/ui/uiTokens';
 
-const navButtonClass = 'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-600 sm:w-auto sm:px-3';
+/**
+ * Shared pager tokens. This component already had the correct behaviour
+ * (clamping, same-page no-op, `aria-current`, bounded mobile window); only its
+ * hand-written class strings were bespoke — a `focus-visible:outline` ring
+ * instead of the global focus ring, and its own 32px button metrics. It now
+ * renders from the same tokens as every other pager in the ERP.
+ */
+const navButtonClass = `${uiPaginationNavButtonClass} w-8 sm:w-auto`;
 
 interface Props {
   page: number;
@@ -34,7 +46,7 @@ function EmiPagination({ page, totalPages, totalItems, pageSize, ready, onChange
 
   return (
     <div className="grid min-h-[92px] min-w-0 grid-cols-1 items-center gap-2 rounded-b-xl border-t border-slate-200 px-4 py-3 md:flex md:min-h-[58px] md:justify-between">
-      <p className="text-xs tabular-nums text-slate-500">
+      <p className={`${uiPaginationSummaryClass} mr-0`} aria-live="polite">
         {ready ? t('fleet.emi.showing_rows', { from, to, total: totalItems }) : '—'}
       </p>
       <nav aria-label={t('fleet.emi.pagination_label')} className="flex items-center justify-end gap-1.5">
@@ -53,7 +65,7 @@ function EmiPagination({ page, totalPages, totalItems, pageSize, ready, onChange
               aria-label={t('fleet.emi.go_to_page', { page: number })}
               aria-current={selected ? 'page' : undefined}
               onClick={() => choosePage(number)}
-              className={`${mobileVisible ? 'inline-flex' : 'hidden sm:inline-flex'} h-8 min-w-8 shrink-0 items-center justify-center rounded-lg border px-1.5 text-xs font-bold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-600 sm:min-w-9 ${selected ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+              className={`${uiPaginationPageButtonClass(selected)} ${mobileVisible ? 'inline-flex' : 'hidden sm:inline-flex'}`}
             >
               {number}
             </button>

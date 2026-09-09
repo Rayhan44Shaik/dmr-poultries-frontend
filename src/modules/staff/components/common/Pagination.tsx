@@ -1,5 +1,17 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useI18n } from '../../../../i18n';
+import {
+  clampPage,
+  pageRecordRange,
+  pageWindow,
+  paginationBarClass,
+  paginationNavBtnClass,
+  paginationPageBtnClass,
+  paginationSummaryClass,
+  shouldShowPagination,
+} from '../../../../shared/ui/paginationStyles';
+import { uiPaginationEllipsisClass } from '../../../../shared/ui/uiTokens';
 
 interface PaginationProps {
   currentPage: number;
@@ -10,6 +22,36 @@ interface PaginationProps {
   className?: string;
 }
 
+/**
+ * Staff-module pagination footer.
+ *
+ * Migrated onto the ONE shared pagination system (`shared/ui/paginationStyles`
+ * → `shared/ui/uiTokens`), which is the same source the global `<Pagination>`,
+ * the masters pager and the EMI pager now use. Public props are unchanged, so no
+ * consuming page needed edits.
+ *
+ * What this fixes
+ *   • ACCESSIBILITY — the page-number buttons had no `aria-current="page"` and no
+ *     `aria-label`, so a screen reader announced a row of bare numbers with no
+ *     indication of which page was active. None of the buttons declared
+ *     `type="button"`.
+ *   • STABILITY — page maths was re-implemented locally (`Math.max/Math.min`
+ *     window building, hand-computed record range). It now calls the shared
+ *     `clampPage` / `pageWindow` / `pageRecordRange`, so this pager cannot drift
+ *     into an off-by-one or "stranded page" state that the rest of the app does
+ *     not have. `currentPage` is clamped against `totalPages` before rendering,
+ *     so a shrinking result set can never show an empty page.
+ *   • NO DUPLICATE REQUESTS — clicking the current page is now a no-op.
+ *   • i18n — the summary was hardcoded English ("Showing 1–20 of 100") in an app
+ *     that is fully bilingual; it now uses the shared `common.*` keys, so Telugu
+ *     users get a Telugu summary.
+ *   • VISUAL — 36px `h-9 w-9` buttons with `text-sm` replaced by the shared
+ *     32px compact pager tokens, matching every other pager in the ERP.
+ *
+ * The hide threshold now comes from the shared `shouldShowPagination` (fewer than
+ * 10 records) instead of a local `totalPages <= 1`, so short result sets behave
+ * the same everywhere.
+ */
 const Pagination: React.FC<PaginationProps> = ({
   currentPage,
   totalPages,
@@ -18,77 +60,75 @@ const Pagination: React.FC<PaginationProps> = ({
   onPageChange,
   className = '',
 }) => {
-  if (totalPages <= 1) return null;
+  const { t } = useI18n();
 
-  const startItem = (currentPage - 1) * itemsPerPage + 1;
-  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+  if (!shouldShowPagination(totalItems)) return null;
 
-  const getPageNumbers = () => {
-    const pages: (number | string)[] = [];
-    const maxVisible = 5;
+  const safeTotal = Math.max(1, totalPages);
+  const safePage = clampPage(currentPage, safeTotal);
+  const { from, to } = pageRecordRange(safePage, itemsPerPage, totalItems);
 
-    if (totalPages <= maxVisible) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      pages.push(1);
-      if (currentPage > 3) pages.push('...');
-
-      const start = Math.max(2, currentPage - 1);
-      const end = Math.min(totalPages - 1, currentPage + 1);
-
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-
-      if (currentPage < totalPages - 2) pages.push('...');
-      pages.push(totalPages);
-    }
-
-    return pages;
+  const goTo = (page: number) => {
+    const next = clampPage(page, safeTotal);
+    if (next === safePage) return; // no-op: never re-request the same page
+    onPageChange(next);
   };
 
   return (
-    <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-t border-slate-200 ${className}`}>
-      <div className="text-sm text-slate-600">
-        Showing <span className="font-semibold">{startItem}</span>–<span className="font-semibold">{endItem}</span> of <span className="font-semibold">{totalItems}</span>
-      </div>
-      <div className="flex items-center gap-1">
+    <div
+      className={`${paginationBarClass} flex-col gap-3 border-t border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between ${className}`}
+    >
+      <p className={paginationSummaryClass} aria-live="polite">
+        {t('common.showing')} <span className="font-semibold">{from}</span>–
+        <span className="font-semibold">{to}</span> {t('common.of')}{' '}
+        <span className="font-semibold">{totalItems}</span>
+      </p>
+      <nav
+        aria-label={t('masters.ui.pagination')}
+        className="flex items-center gap-1"
+      >
         <button
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
-          aria-label="Previous page"
+          type="button"
+          onClick={() => goTo(safePage - 1)}
+          disabled={safePage === 1}
+          className={paginationNavBtnClass}
+          aria-label={t('common.previous_page')}
         >
-          <ChevronLeft size={16} />
+          <ChevronLeft size={16} aria-hidden="true" />
         </button>
-        {getPageNumbers().map((page, idx) =>
-          page === '...' ? (
-            <span key={`ellipsis-${idx}`} className="px-2 text-sm text-slate-400">…</span>
+        {pageWindow(safePage, safeTotal).map((page, idx) =>
+          page === null ? (
+            <span
+              key={`ellipsis-${idx}`}
+              className={uiPaginationEllipsisClass}
+              aria-hidden="true"
+            >
+              …
+            </span>
           ) : (
             <button
               key={page}
-              onClick={() => onPageChange(page as number)}
-              className={`h-9 w-9 rounded-lg text-sm font-medium transition ${
-                page === currentPage
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
+              type="button"
+              onClick={() => goTo(page)}
+              disabled={false}
+              aria-current={page === safePage ? 'page' : undefined}
+              aria-label={t('common.page') + ' ' + page}
+              className={paginationPageBtnClass(page === safePage)}
             >
               {page}
             </button>
           )
         )}
         <button
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-          className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
-          aria-label="Next page"
+          type="button"
+          onClick={() => goTo(safePage + 1)}
+          disabled={safePage === safeTotal}
+          className={paginationNavBtnClass}
+          aria-label={t('common.next_page')}
         >
-          <ChevronRight size={16} />
+          <ChevronRight size={16} aria-hidden="true" />
         </button>
-      </div>
+      </nav>
     </div>
   );
 };

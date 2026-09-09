@@ -1,160 +1,193 @@
+/* =============================================================================
+ * DMR Poultries ERP — GLOBAL STYLESHEET
+ * =============================================================================
+ * Composition order matters:
+ *
+ *   1. vendor CSS        (Tailwind, react-datepicker)
+ *   2. design tokens     (src/styles/tokens.css — SINGLE SOURCE OF TRUTH)
+ *   3. font faces        (Telugu declared globally, downloaded only when used)
+ *   4. base layer        (element defaults, typography, focus, scrollbars)
+ *   5. design-system     (.ds-* primitives shared by components AND pages)
+ *   6. vendor theming    (calendar libraries re-skinned onto the tokens)
+ *
+ * Do not add page-specific rules here. Module-level refinements belong in that
+ * module's own stylesheet; global rules belong in the tokens / .ds-* layers.
+ * ===========================================================================*/
+
 @import "tailwindcss";
 @import "react-datepicker/dist/react-datepicker.css";
+@import "./styles/tokens.css";
 
-/* ------------------------------------------------------------------ */
-/*  DMR Poultries ERP — Design System                                  */
-/*  Primary brand: deep emerald green (agriculture / poultry / money)  */
-/* ------------------------------------------------------------------ */
+/* Telugu @font-face declarations. These are DECLARED globally but only ever
+   DOWNLOADED when the document language is Telugu (see the :lang(te) rule in
+   the base layer), because the subset has no unicode-range of its own. */
+@import "@fontsource/noto-sans-telugu/telugu-400.css";
+@import "@fontsource/noto-sans-telugu/telugu-500.css";
+@import "@fontsource/noto-sans-telugu/telugu-600.css";
+@import "@fontsource/noto-sans-telugu/telugu-700.css";
 
 /* Class-based dark mode (toggled by ThemeProvider via .dark on <html>) */
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme {
-  /* Typography */
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-
-  /* ------------------------------------------------------------------
-     Brand scale.
-     The legacy `blue-*` utilities are remapped onto the emerald scale so
-     every pre-existing page inherits the new brand identity without a
-     fragile mass find/replace. New code should use `emerald-*` or the
-     `brand` alias below; keep `sky-*` for informational (blue) accents.
-  ------------------------------------------------------------------ */
-  --color-blue-50: #ecfdf5;
-  --color-blue-100: #d1fae5;
-  --color-blue-200: #a7f3d0;
-  --color-blue-300: #6ee7b7;
-  --color-blue-400: #34d399;
-  --color-blue-500: #10b981;
-  --color-blue-600: #059669;
-  --color-blue-700: #047857;
-  --color-blue-800: #065f46;
-  --color-blue-900: #064e3b;
-  --color-blue-950: #022c22;
-
-  --color-brand-50: #ecfdf5;
-  --color-brand-100: #d1fae5;
-  --color-brand-200: #a7f3d0;
-  --color-brand-300: #6ee7b7;
-  --color-brand-400: #34d399;
-  --color-brand-500: #10b981;
-  --color-brand-600: #059669;
-  --color-brand-700: #047857;
-  --color-brand-800: #065f46;
-  --color-brand-900: #064e3b;
-  --color-brand-950: #022c22;
-
-  /* Soft, layered shadows — restrained elevation */
-  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
-  --shadow-card-lg: 0 1px 2px rgb(15 23 42 / 0.04), 0 10px 28px -10px rgb(15 23 42 / 0.12);
-  --shadow-pop: 0 4px 10px -2px rgb(15 23 42 / 0.08), 0 14px 34px -10px rgb(15 23 42 / 0.16);
-
-  /* Motion */
-  --animate-fade-in: fade-in 0.22s ease-out both;
-  --animate-fade-in-up: fade-in-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
-  --animate-scale-in: scale-in 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
-  --animate-slide-down: slide-down 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
-  --animate-slide-in-left: slide-in-left 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
-
-  @keyframes fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  @keyframes fade-in-up {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes scale-in {
-    from { opacity: 0; transform: scale(0.97); }
-    to { opacity: 1; transform: scale(1); }
-  }
-  @keyframes slide-down {
-    from { opacity: 0; transform: translateY(-6px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes slide-in-left {
-    from { opacity: 0; transform: translateX(-18px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
-}
-
 @layer base {
-  /* Preserve the legacy universal border colour assumption */
+  /* Preserve the legacy universal border-colour assumption */
   *,
   ::before,
   ::after {
-    border-color: var(--color-slate-200);
+    border-color: var(--ds-border);
   }
 
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    background: #f8fafc;
+    background: var(--ds-surface-app);
+    /* Reserve the scrollbar gutter so navigating between short and long pages
+       never shifts content horizontally (prevents layout jump). */
     scrollbar-gutter: stable;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
-    @apply bg-[#f8fafc] font-sans text-slate-900 antialiased;
+    margin: 0;
+    background: var(--ds-surface-app);
+    color: var(--ds-text-primary);
+    font-family: var(--font-sans);
+    font-size: var(--ds-text-body);
+    line-height: 1.5;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-    background: #f8fafc;
+  }
+
+  /* Telugu: lead with the Telugu face app-wide (not just the duty planner).
+     Inter has no Telugu coverage, so previously Telugu text fell back to an
+     arbitrary system face on every other route. */
+  :root:lang(te) {
+    --font-sans:
+      "Noto Sans Telugu", "Inter", ui-sans-serif, system-ui, -apple-system,
+      "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  :root:lang(te) body {
+    line-height: 1.65;
+  }
+
+  /* Form controls inherit the global font instead of the browser default. */
+  button,
+  input,
+  select,
+  textarea,
+  optgroup {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    letter-spacing: inherit;
+    color: inherit;
   }
 
   .dark body {
-    @apply bg-slate-950 text-slate-100;
+    background: var(--ds-surface-dark-app);
+    color: var(--color-slate-100);
   }
 
   ::selection {
-    background: var(--color-brand-200);
-    color: var(--color-brand-950);
+    background: var(--color-emerald-200);
+    color: var(--color-emerald-950);
   }
 
-  h1, h2, h3, h4 {
-    letter-spacing: -0.01em;
+  /* ---------------------------------------------------------------------
+     TYPOGRAPHY HIERARCHY
+     One scale for the whole app. Headings stay calm: weight + size create
+     hierarchy, not colour or decoration.
+     ------------------------------------------------------------------- */
+  h1, h2, h3, h4, h5, h6 {
+    margin: 0;
+    letter-spacing: -0.011em;
+    text-wrap: balance;
+    color: var(--ds-text-primary);
   }
 
-  /* Consistent, brand-tinted keyboard focus */
+  h1 { font-size: var(--ds-text-page-title); font-weight: 700; line-height: 1.3; }
+  h2 { font-size: 0.9375rem; font-weight: 700; line-height: 1.35; }
+  h3 { font-size: var(--ds-text-section-title); font-weight: 650; line-height: 1.4; }
+  h4 { font-size: var(--ds-text-body); font-weight: 600; line-height: 1.45; }
+
+  p { margin: 0; }
+
+  /* Numeric/data text: one tabular treatment so columns line up everywhere. */
+  .ds-numeric,
+  td.ds-numeric,
+  th.ds-numeric {
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+
+  /* ---------------------------------------------------------------------
+     FOCUS — one consistent, always-visible indicator.
+     Never removed without an equivalent replacement.
+     ------------------------------------------------------------------- */
   :focus-visible {
-    outline: 2px solid var(--color-brand-600);
-    outline-offset: 2px;
-    border-radius: 2px;
+    outline: var(--ds-focus-ring-width) solid var(--ds-focus-ring-color);
+    outline-offset: var(--ds-focus-ring-offset);
+    border-radius: var(--radius-xs);
   }
 
-  /* Soft, fast button interaction — GPU-friendly, no reflow or jump.
-     Very subtle lift, high smoothing, preserves stability. */
-  button {
-    transition:
-      transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
-      box-shadow 140ms cubic-bezier(0.16, 1, 0.3, 1),
-      background-color 140ms ease,
-      color 140ms ease,
-      opacity 140ms ease;
-    will-change: transform;
-    backface-visibility: hidden;
+  /* Inputs read better with an inset ring that does not shift layout. */
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline-offset: 0;
   }
 
-  /* Only interactive buttons lift — links/cards are untouched */
-  button:hover:not(:disabled):not([aria-disabled="true"]) {
-    transform: translateY(-0.5px);
+  /* Suppress the ring only on containers that merely wrap a focusable child
+     (e.g. a labelled field wrapper), never on the control itself. */
+  [data-ds-focus-suppress]:focus-visible {
+    outline: none;
   }
 
-  button:active:not(:disabled) {
-    transform: translateY(0) scale(0.99);
-    transition-duration: 90ms;
+  /* ---------------------------------------------------------------------
+     INTERACTION STATES
+     Transitions animate colour/shadow ONLY. No transform on hover: the
+     previous global `translateY(-0.5px)` lift made dropdown triggers,
+     comboboxes and calendar rows appear to move, and required per-module
+     opt-outs in masters.css. Colour-only transitions are stable, cheap and
+     cannot cause layout shift.
+     ------------------------------------------------------------------- */
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  summary,
+  [role="button"],
+  [role="tab"],
+  [role="option"],
+  [role="menuitem"] {
+    transition-property:
+      background-color, border-color, color, fill, stroke,
+      box-shadow, opacity;
+    transition-duration: var(--ds-duration-fast);
+    transition-timing-function: var(--ds-ease);
   }
 
-  /* Respect reduced motion */
+  /* Keyboard parity: an activated control gives the same feedback as hover. */
+  button:active:not(:disabled):not([aria-disabled="true"]) {
+    transition-duration: 60ms;
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    button,
-    button:hover:not(:disabled),
-    button:active:not(:disabled) {
-      transition: none;
-      transform: none;
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
     }
   }
 
-  /* Refined scrollbars */
+  /* ---------------------------------------------------------------------
+     SCROLLBARS — consistent, unobtrusive, never hidden where it harms use.
+     ------------------------------------------------------------------- */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -164,7 +197,7 @@
   }
   ::-webkit-scrollbar-thumb {
     background: var(--color-slate-300);
-    border-radius: 999px;
+    border-radius: var(--ds-radius-pill);
     border: 3px solid transparent;
     background-clip: content-box;
   }
@@ -180,7 +213,102 @@
   }
 }
 
-/* Utility: hide scrollbars but keep scrolling */
+/* =============================================================================
+ * 5. DESIGN-SYSTEM PRIMITIVES (.ds-*)
+ * -----------------------------------------------------------------------------
+ * Small, reusable, token-driven classes. Both shared components and pages use
+ * these so the visual language has exactly one implementation.
+ * ===========================================================================*/
+
+/* --- page layout --------------------------------------------------------- */
+@utility ds-page {
+  width: 100%;
+  min-width: 0;
+  padding-inline: var(--ds-page-pad-x);
+  padding-block: var(--ds-page-pad-y);
+}
+
+@utility ds-page-inner {
+  width: 100%;
+  max-width: 100rem;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-page-section-gap);
+}
+
+/* --- surfaces ------------------------------------------------------------ */
+@utility ds-surface {
+  background: var(--ds-surface-raised);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-surface);
+  box-shadow: var(--ds-shadow-surface);
+}
+
+@utility ds-surface-sunken {
+  background: var(--ds-surface-sunken);
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--ds-radius-surface);
+}
+
+/* --- controls ------------------------------------------------------------ */
+@utility ds-control {
+  height: var(--ds-control-h-md);
+  border-radius: var(--ds-radius-control);
+  font-size: var(--ds-text-body);
+}
+
+@utility ds-control-lg {
+  height: var(--ds-control-h-lg);
+}
+
+@utility ds-control-sm {
+  height: var(--ds-control-h-sm);
+}
+
+/* --- text roles ---------------------------------------------------------- */
+@utility ds-label {
+  display: block;
+  font-size: var(--ds-text-label);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ds-text-secondary);
+}
+
+@utility ds-helper {
+  font-size: var(--ds-text-caption);
+  line-height: 1.35;
+  color: var(--ds-text-faint);
+}
+
+@utility ds-error-text {
+  font-size: var(--ds-text-caption);
+  line-height: 1.35;
+  font-weight: 500;
+  color: var(--ds-color-danger);
+}
+
+@utility ds-muted {
+  color: var(--ds-text-muted);
+}
+
+/* --- misc ---------------------------------------------------------------- */
+@utility ds-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+@utility ds-no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Utility: hide scrollbars but keep scrolling (legacy name, kept working) */
 @utility scrollbar-none {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -189,38 +317,48 @@
   }
 }
 
-/* Utility: hide scrollbars on tables in touch contexts */
+/* Utility: thin scrollbars for dense scroll regions */
 @utility scrollbar-thin {
   scrollbar-width: thin;
 }
 
-/* ============================================================
-   DATE RANGE PICKER OVERRIDES (react-date-range) — brand themed
-   ============================================================ */
+/* Screen-reader-only text (accessible names for icon-only controls) */
+@utility ds-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
 
+/* =============================================================================
+ * 6. VENDOR THEMING — calendar libraries re-skinned onto the design tokens
+ * =============================================================================
+ * These libraries ship their own colours; overriding them here (once) is what
+ * keeps every DatePicker in the app identical. Values reference the tokens so
+ * the calendars can never drift from the brand.
+ * ===========================================================================*/
+
+/* --- react-date-range ---------------------------------------------------- */
 .rdrDateRangePickerWrapper {
   padding: 0 !important;
   width: 100% !important;
 }
 
 .rdrCalendarWrapper {
-  background: white !important;
+  background: var(--ds-surface-raised) !important;
+  font-family: var(--font-sans) !important;
   font-size: 0.7rem !important;
   width: 100% !important;
 }
 
-.rdrMonth {
-  padding: 4px 0 !important;
-}
-
-.rdrMonthAndYearWrapper {
-  padding: 4px 0 !important;
-  height: 32px !important;
-}
-
-.rdrWeekDays {
-  padding: 0 4px !important;
-}
+.rdrMonth { padding: 4px 0 !important; }
+.rdrMonthAndYearWrapper { padding: 4px 0 !important; height: 32px !important; }
+.rdrWeekDays { padding: 0 4px !important; }
 
 .rdrWeekDay {
   height: 28px !important;
@@ -236,24 +374,18 @@
   width: auto !important;
 }
 
-.rdrDayNumber {
-  font-size: 0.65rem !important;
-}
-
-.rdrDayNumber span {
-  color: #1a1a1a !important;
-  font-weight: 600 !important;
-}
+.rdrDayNumber { font-size: 0.65rem !important; }
+.rdrDayNumber span { color: var(--ds-text-primary) !important; font-weight: 600 !important; }
 
 .rdrDaySelected .rdrDayNumber span,
 .rdrDayInRange .rdrDayNumber span,
 .rdrDayStartEdge .rdrDayNumber span,
 .rdrDayEndEdge .rdrDayNumber span {
-  color: white !important;
+  color: var(--ds-text-inverse) !important;
 }
 
 .rdrDayToday .rdrDayNumber span {
-  color: #1a1a1a !important;
+  color: var(--ds-text-primary) !important;
   font-weight: 700 !important;
 }
 
@@ -261,52 +393,102 @@
 .rdrDayToday.rdrDayStartEdge .rdrDayNumber span,
 .rdrDayToday.rdrDayEndEdge .rdrDayNumber span,
 .rdrDayToday.rdrDayInRange .rdrDayNumber span {
-  color: white !important;
+  color: var(--ds-text-inverse) !important;
   font-weight: 700 !important;
 }
 
 .rdrDefinedRangesWrapper,
-.rdrMonthName {
-  display: none !important;
-}
+.rdrMonthName { display: none !important; }
 
-.rdrNextPrevButton {
-  width: 24px !important;
-  height: 24px !important;
-}
+.rdrNextPrevButton,
+.rdrPprevButton,
+.rdrNextButton { width: 24px !important; height: 24px !important; }
 
 .rdrDayStartEdge,
 .rdrDayEndEdge,
-.rdrDayInRange {
-  border-radius: 4px !important;
-}
+.rdrDayInRange { border-radius: var(--radius-xs) !important; }
 
 .rdrDayStartEdge,
 .rdrDayEndEdge,
 .rdrStartEdge,
-.rdrEndEdge {
-  background: #047857 !important;
-}
+.rdrEndEdge { background: var(--color-emerald-700) !important; }
 
 .rdrDayInRange,
-.rdrInRange {
-  background: rgba(16, 185, 129, 0.18) !important;
+.rdrInRange { background: color-mix(in oklab, var(--color-emerald-500) 18%, transparent) !important; }
+
+/* --- react-datepicker ---------------------------------------------------- */
+.react-datepicker {
+  font-family: var(--font-sans) !important;
+  border-color: var(--ds-border) !important;
+  border-radius: var(--ds-radius-surface) !important;
+  box-shadow: var(--ds-shadow-popover) !important;
 }
 
-/* ============================================================
-   DATE PICKER (react-datepicker) — brand themed
-   ============================================================ */
+.react-datepicker__header {
+  background: var(--ds-surface-raised) !important;
+  border-bottom-color: var(--ds-border-subtle) !important;
+}
+
+.react-datepicker__day-name,
+.react-datepicker__day,
+.react-datepicker__time-name {
+  color: var(--ds-text-secondary) !important;
+}
+
 .react-datepicker__day--selected,
 .react-datepicker__day--keyboard-selected {
-  background-color: #059669 !important;
-}
-.react-datepicker__day--selected:hover {
-  background-color: #047857 !important;
+  background-color: var(--color-emerald-600) !important;
+  color: var(--ds-text-inverse) !important;
+  border-radius: var(--radius-xs) !important;
 }
 
-/* ============================================================
-   NUMBER INPUTS — hide native up/down spinners
-   ============================================================ */
+.react-datepicker__day--selected:hover,
+.react-datepicker__day--keyboard-selected:hover {
+  background-color: var(--color-emerald-700) !important;
+}
+
+.react-datepicker__day--today {
+  font-weight: 700 !important;
+  color: var(--color-emerald-700) !important;
+}
+
+.react-datepicker__day:hover {
+  background-color: var(--color-slate-100) !important;
+  border-radius: var(--radius-xs) !important;
+}
+
+.react-datepicker__day--disabled,
+.react-datepicker__day--disabled:hover {
+  color: var(--ds-text-disabled) !important;
+  background: transparent !important;
+  cursor: not-allowed !important;
+}
+
+.react-datepicker__navigation-icon::before {
+  border-color: var(--ds-text-muted) !important;
+}
+
+/* --- react-day-picker (shared DatePicker) -------------------------------- */
+.rdp {
+  --rdp-accent-color: var(--color-emerald-600);
+  --rdp-accent-background-color: var(--color-emerald-50);
+  --rdp-day_button-border-radius: var(--radius-xs);
+  --rdp-selected-border: var(--color-emerald-600);
+  font-family: var(--font-sans);
+}
+
+/* --- month-only DatePicker variant --------------------------------------- */
+.month-only-picker table,
+.month-only-picker .rdp-month_grid,
+.month-only-picker .rdp-weekdays,
+.month-only-picker .rdp-week,
+.month-only-picker .rdp-day {
+  display: none !important;
+}
+
+/* =============================================================================
+ * NUMBER INPUTS — hide native up/down spinners (dense ERP forms)
+ * ===========================================================================*/
 .no-spinner::-webkit-outer-spin-button,
 .no-spinner::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -316,4 +498,11 @@
 .no-spinner[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
+}
+
+/* =============================================================================
+ * PRINT — reports and PDF previews must not print navigation chrome
+ * ===========================================================================*/
+@media print {
+  .ds-no-print { display: none !important; }
 }

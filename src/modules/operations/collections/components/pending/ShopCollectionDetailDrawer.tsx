@@ -3,6 +3,7 @@ import { X, Eye, IndianRupee, Calendar, User, CreditCard, Hash, FileText, Trash2
 import type { Collection, CollectionApiEntry } from "../../types/collection";
 import { collectionService } from "../../services/collectionService";
 import { useSafeNotification } from "../../../../../hooks/useSafeNotification";
+import { confirmDialog } from "../../../../../ui/confirm/confirmStore";
 import { opsSecondaryButtonClass, opsPrimaryButtonClass } from "../../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../../i18n";
 
@@ -82,7 +83,24 @@ export function ShopCollectionDetailDrawer({
       showNotification(t("ops.collection.cannot_delete_window"), "error");
       return;
     }
-    if (!window.confirm(t("ops.collection.confirm_delete_collection", { no: collection.collectionNo, date: formatDate(collection.collectionDate), amount: formatCurrency(Number(collection.amount)) }))) {
+    // Global confirmation dialog instead of the blocking native
+    // `window.confirm`. The handler was already async, so the guard keeps its
+    // exact linear shape; `deletingId` below remains the authoritative
+    // in-flight guard against a double delete.
+    //
+    // The record identity was previously passed as interpolation params that
+    // the translated string has no placeholders for, so it was silently
+    // discarded. It is now shown as the dialog's record line, so the user can
+    // see exactly WHICH collection they are about to delete.
+    const confirmed = await confirmDialog({
+      title: t("common.delete"),
+      message: t("ops.collection.confirm_delete_collection"),
+      record: `${collection.collectionNo} · ${formatDate(collection.collectionDate)} · ${formatCurrency(Number(collection.amount))}`,
+      confirmLabel: t("common.delete"),
+      cancelLabel: t("common.cancel"),
+      tone: "danger",
+    });
+    if (!confirmed) {
       return;
     }
     setDeletingId(collection.id);

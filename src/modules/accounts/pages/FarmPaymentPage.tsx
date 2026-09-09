@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { toBusinessDate } from '../../../utils/businessDate';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { FarmPaymentTable } from '../components/farm-payment/FarmPaymentTable';
 import { FarmerPaymentFilters } from '../components/farm-payment/FarmerPaymentFilters';
@@ -241,7 +242,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
           amountPaid: paidAmount,
           balance: totalAmount - paidAmount,
           paymentStatus,
-          paidDate: paymentDataItem.paidDate || new Date().toISOString().split('T')[0],
+          paidDate: paymentDataItem.paidDate || toBusinessDate(new Date()),
           paymentMode: paymentDataItem.paymentMode || 'Cash',
           createdAt: paymentDataItem.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),

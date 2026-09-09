@@ -13,6 +13,7 @@ import {
   TRIP_FIELD_DEFINITIONS,
 } from "../../../../shared/trip/definitions";
 import { useI18n } from "../../../../i18n";
+import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
 
 interface Props {
   trip: Trip;
@@ -570,7 +571,8 @@ export default function StepPickup({
       doc.save(`Trip_${trip.tripNo || 'report'}_PickupKPI.pdf`);
     } catch (error) {
       console.error('PDF generation error:', error);
-      alert(t('ops.trip.pdf_generation_failed'));
+      // Was a blocking window.alert inside a catch block.
+      globalNotify.error(t('ops.trip.pdf_generation_failed'));
     }
   };
 

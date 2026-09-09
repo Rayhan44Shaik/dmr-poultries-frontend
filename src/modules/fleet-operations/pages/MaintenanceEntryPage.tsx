@@ -1,4 +1,5 @@
 import { memo, useState, useMemo, useCallback } from 'react';
+import { toBusinessDate } from '../../../utils/businessDate';
 import { useI18n } from '../../../i18n';
 import { useEmployees } from '../../masters/employees/hooks/useEmployees';
 import { useMaintenanceData } from '../hooks/useMaintenanceData';
@@ -168,7 +169,7 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
     setFormData({
       id: record.id || '',
       vehicleId: record.vehicleId,
-      date: record.date || new Date().toISOString().split('T')[0],
+      date: record.date || toBusinessDate(new Date()),
       billNumber: record.billNumber || '',
       currentKM: String(record.currentKM),
       maintenanceType: maintTypes,
