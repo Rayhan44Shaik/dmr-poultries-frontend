@@ -735,9 +735,6 @@ function SalaryRegisterPage() {
           formatCurrency={formatCurrency}
           saving={saving}
           onView={setViewTarget}
-          selectedIds={selectedIds}
-          onToggleSelect={toggleSelect}
-          onToggleSelectAll={toggleSelectAll}
         />
       )}
 
