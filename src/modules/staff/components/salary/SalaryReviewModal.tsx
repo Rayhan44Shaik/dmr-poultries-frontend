@@ -22,6 +22,7 @@ import {
   ListChecks,
   CheckSquare,
   Square,
+  CheckCircle2,
 } from "lucide-react";
 import type { SalaryRecord } from "../../types/staffDashboard";
 
@@ -45,6 +46,8 @@ export type SalaryReviewModalProps = {
   onToggleSelectAll: (ids: string[]) => void;
   onDownloadSelected: (ids: string[]) => void;
   onEmailSelected: () => void;
+  /** Number of payslips successfully emailed (shown once sent). */
+  emailsSentCount?: number;
 };
 
 type FieldKey =
@@ -170,6 +173,7 @@ export function SalaryReviewModal({
   onToggleSelectAll,
   onDownloadSelected,
   onEmailSelected,
+  emailsSentCount = 0,
 }: SalaryReviewModalProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -204,10 +208,6 @@ export function SalaryReviewModal({
   const allSelected =
     allIds.length > 0 && allIds.every((id) => selectedIds.has(id));
   const selectedCount = selectedIds.size;
-  const progressPct =
-    records.length === 0
-      ? 0
-      : Math.round((selectedCount / records.length) * 100);
 
   const ensureDraft = useCallback(
     (record: SalaryRecord): FieldValues =>
@@ -315,28 +315,11 @@ export function SalaryReviewModal({
                   </span>
                   Select employees
                 </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition ${
-                    selectedCount === records.length
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "bg-blue-50 text-blue-600"
-                  }`}
-                >
-                  {selectedCount} / {records.length}
-                </span>
-              </div>
-
-              <div
-                className="h-1 w-full overflow-hidden rounded-full bg-slate-100"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={records.length}
-                aria-valuenow={selectedCount}
-              >
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-200"
-                  style={{ width: `${progressPct}%` }}
-                />
+                {emailsSentCount > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                    <CheckCircle2 size={11} /> {emailsSentCount} emailed
+                  </span>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-1.5">

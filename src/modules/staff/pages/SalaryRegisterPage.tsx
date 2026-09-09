@@ -380,11 +380,13 @@ function SalaryRegisterPage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [emailsSent, setEmailsSent] = useState(false);
+  const [emailsSentCount, setEmailsSentCount] = useState(0);
   const [emailOpen, setEmailOpen] = useState(false);
 
   // A successful email send is required before the month can be submitted.
   useEffect(() => {
     setEmailsSent(false);
+    setEmailsSentCount(0);
   }, [selectedIds]);
 
   const confirm = useCallback((title: string, message: string, onConfirm: () => void) => {
@@ -767,6 +769,7 @@ function SalaryRegisterPage() {
           onToggleSelectAll={toggleSelectAll}
           onDownloadSelected={(ids) => void handleDownloadSelected(ids)}
           onEmailSelected={() => setEmailOpen(true)}
+          emailsSentCount={emailsSentCount}
         />
       )}
 
@@ -776,7 +779,8 @@ function SalaryRegisterPage() {
           records={visibleRecords.filter((r) => selectedIds.has(r.id))}
           saving={saving}
           onClose={() => setEmailOpen(false)}
-          onSent={() => {
+          onSent={(sent) => {
+            setEmailsSentCount(sent);
             setEmailsSent(true);
             setEmailOpen(false);
             showNotification("Payslips emailed. You can now submit the month.", "success");
