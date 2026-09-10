@@ -121,10 +121,10 @@ export default function StepDeliveries({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3">
         <div className="flex items-center gap-2.5">
-          <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
+          <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
             4
           </span>
-          <h2 className="text-base font-bold text-slate-800 tracking-tight">
+          <h2 className="text-xl font-bold text-slate-800 tracking-tight">
             {t("ops.trip.title.deliveries").toUpperCase()}
           </h2>
         </div>

@@ -68,6 +68,19 @@ export function validateFarmStep(trip: Trip): TripValidationResult {
   if (required("farmAddress") && !String(trip.farmAddress ?? "").trim()) {
     errors.push("Farm address is required.");
   }
+  // GPS capture is MANDATORY at the farm (Step 2). A valid non-zero pair of
+  // coordinates must be present before the step can be submitted.
+  const farmLat = Number(trip.farmGpsLat);
+  const farmLon = Number(trip.farmGpsLon);
+  const hasFarmGps =
+    trip.farmGpsLat != null &&
+    trip.farmGpsLon != null &&
+    Number.isFinite(farmLat) &&
+    Number.isFinite(farmLon) &&
+    !(farmLat === 0 && farmLon === 0);
+  if (!hasFarmGps) {
+    errors.push("Please capture the farm GPS location.");
+  }
   if (required("destMeter") && (!trip.destMeter || trip.destMeter <= 0)) {
     errors.push("Valid Farm Meter reading is required.");
   }

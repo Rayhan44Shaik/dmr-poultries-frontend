@@ -7,12 +7,27 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { Clock, User, Truck, Gauge, Wallet, Pencil } from "lucide-react";
-import Select from "react-select";
+import {
+  Calendar,
+  ClipboardList,
+  Clock,
+  Gauge,
+  Truck,
+  User,
+  Users,
+  Wallet,
+  Pencil,
+} from "lucide-react";
 import type { Trip } from "../types/trip";
 import { validateStartStep } from "../../../../shared/trip/validation";
-import { fetchLastClosingMeter } from "../services/tripHeaderApiService";
+import {
+  fetchLastClosingMeter,
+  formatStartTimeForDisplay,
+  formatIstStamp,
+} from "../services/tripHeaderApiService";
 import { StepCloseButton, WizardActionBar, WizardStepNotice, type WizardNoticeState } from "./WizardStepUI";
+import { FieldLabel, SearchDropdown, MultiSearchDropdown, StepKpiCard, type DropdownOption } from "./WizardControls";
+import { translateValidationMessage } from "../utils/translateValidation";
 import {
   TRIP_FIELD_DEFINITIONS,
 } from "../../../../shared/trip/definitions";
@@ -56,8 +71,6 @@ type Step1FormState = {
   openingMeterText: string;
   advanceText: string;
 };
-
-const MENU_PORTAL_TARGET = typeof document !== "undefined" ? document.body : null;
 
 const EMPTY_FORM: Step1FormState = {
   vehicleId: 0,
@@ -125,78 +138,40 @@ function formToTripPatch(form: Step1FormState): Partial<Trip> {
   };
 }
 
-const getVehicleLabel = (option: VehicleOption) => option.vehicleNumber || "";
-const getVehicleValue = (option: VehicleOption) => String(option.id ?? "");
-const getEmployeeLabel = (option: EmployeeOption) => option.employeeName || "";
-const getEmployeeValue = (option: EmployeeOption) => option.employeeName || "";
 
-const selectStyles: any = {
-  menuPortal: (base: Record<string, unknown>) => ({ ...base, zIndex: 9999 }),
-  control: (base: any, state: any) => ({
-    ...base,
-    minHeight: 42,
-    borderRadius: "0.75rem",
-    borderColor: state.isFocused ? "#2563eb" : "#e2e8f0",
-    backgroundColor: "#ffffff",
-    boxShadow: state.isFocused ? "0 0 0 2px rgba(37, 99, 235, 0.15)" : "none",
-    "&:hover": { borderColor: "#cbd5e1" },
-  }),
-  singleValue: (base: Record<string, unknown>) => ({
-    ...base,
-    color: "#0f172a",
-    fontWeight: "500",
-    fontSize: "14px",
-  }),
-  multiValue: (base: Record<string, unknown>) => ({
-    ...base,
-    backgroundColor: "#f1f5f9",
-    borderRadius: "0.375rem",
-  }),
-  multiValueLabel: (base: Record<string, unknown>) => ({
-    ...base,
-    color: "#0f172a",
-    fontSize: "13px",
-    paddingLeft: "6px",
-    paddingRight: "6px",
-  }),
-  multiValueRemove: (base: Record<string, unknown>) => ({
-    ...base,
-    color: "#64748b",
-    "&:hover": { backgroundColor: "#e2e8f0", color: "#0f172a" },
-  }),
-  placeholder: (base: Record<string, unknown>) => ({
-    ...base,
-    color: "#94a3b8",
-    fontSize: "14px",
-  }),
-  option: (base: any, { isFocused, isSelected }: any) => ({
-    ...base,
-    backgroundColor: isSelected ? "#2563eb" : isFocused ? "#f8fafc" : "#ffffff",
-    color: isSelected ? "#ffffff" : "#1e293b",
-    fontSize: "13px",
-    cursor: "pointer",
-  }),
-  menu: (base: Record<string, unknown>) => ({
-    ...base,
-    backgroundColor: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: "0.75rem",
-    maxHeight: 180,
-    overflowY: "auto",
-    scrollbarWidth: "none",
-  }),
-};
+// ── Read-only computed fields ────────────────────────────────────────────────
 
-const StartTimeField = React.memo(function StartTimeField({ startTime }: { startTime: string }) {
+const TripDateField = React.memo(function TripDateField({ tripDate }: { tripDate: string }) {
   const { t } = useI18n();
   return (
     <div>
-      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <Clock size={14} className="text-slate-400" /> {t("ops.trip.field.start_time")} {TRIP_FIELD_DEFINITIONS.startTime.required && <span className="text-red-500">*</span>}
-      </label>
+      <FieldLabel
+        icon={Calendar}
+        tone="bg-sky-50 text-sky-600"
+        label={t("ops.trip.field.trip_date")}
+        required={TRIP_FIELD_DEFINITIONS.tripDate.required}
+      />
       <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
-        {startTime ? (
-          startTime
+        {tripDate || <span className="text-slate-400 font-normal text-xs">--</span>}
+      </div>
+    </div>
+  );
+});
+
+const StartTimeField = React.memo(function StartTimeField({ startTime }: { startTime: string }) {
+  const { t } = useI18n();
+  const display = useMemo(() => formatStartTimeForDisplay(startTime), [startTime]);
+  return (
+    <div>
+      <FieldLabel
+        icon={Clock}
+        tone="bg-blue-50 text-blue-600"
+        label={t("ops.trip.field.start_time")}
+        required={TRIP_FIELD_DEFINITIONS.startTime.required}
+      />
+      <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
+        {display ? (
+          display
         ) : (
           <span className="text-slate-400 font-normal text-xs">{t("ops.trip.will_be_captured")}</span>
         )}
@@ -205,24 +180,7 @@ const StartTimeField = React.memo(function StartTimeField({ startTime }: { start
   );
 });
 
-function buildSelectStyles(invalid: boolean): any {
-  return {
-    ...selectStyles,
-    control: (base: any, state: any) => ({
-      ...selectStyles.control(base, state),
-      borderColor: invalid
-        ? "#ef4444"
-        : state.isFocused
-          ? "#2563eb"
-          : "#e2e8f0",
-      boxShadow: invalid
-        ? "0 0 0 2px rgba(239, 68, 68, 0.1)"
-        : state.isFocused
-          ? "0 0 0 2px rgba(37, 99, 235, 0.15)"
-          : "none",
-    }),
-  };
-}
+// ── Select fields (Salary-Register-style searchable dropdowns) ───────────────
 
 const VehicleField = React.memo(function VehicleField({
   vehicleId,
@@ -238,131 +196,211 @@ const VehicleField = React.memo(function VehicleField({
   onSelect: (vehicleId: number, vehicleNo: string) => void;
 }) {
   const { t } = useI18n();
-  const value = useMemo(
-    () => options.find((option) => option.id === vehicleId) || null,
-    [options, vehicleId]
+  const dropdownOptions = useMemo<DropdownOption[]>(
+    () => options.map((option) => ({ value: String(option.id), label: option.vehicleNumber || "" })),
+    [options]
   );
   const handleChange = useCallback(
-    (option: VehicleOption | null) => {
-      onSelect(option?.id || 0, option?.vehicleNumber || "");
+    (value: string) => {
+      const id = Number(value) || 0;
+      const option = options.find((o) => o.id === id);
+      onSelect(id, option?.vehicleNumber || "");
     },
-    [onSelect]
+    [options, onSelect]
   );
-  const styles = useMemo(() => buildSelectStyles(Boolean(invalid)), [invalid]);
 
   return (
     <div>
-      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <Truck size={14} className="text-slate-400" /> {t("operations.vehicle_no")} {TRIP_FIELD_DEFINITIONS.vehicleId.required && <span className="text-red-500">*</span>}
-      </label>
-      <Select<VehicleOption, false>
-        options={options}
-        getOptionLabel={getVehicleLabel}
-        getOptionValue={getVehicleValue}
-        value={value}
-        onChange={handleChange}
-        className="mt-1 text-sm"
+      <FieldLabel
+        icon={Truck}
+        tone="bg-blue-50 text-blue-600"
+        label={t("operations.vehicle_no")}
+        required={TRIP_FIELD_DEFINITIONS.vehicleId.required}
+      />
+      <SearchDropdown
+        value={vehicleId ? String(vehicleId) : ""}
+        options={dropdownOptions}
         placeholder={t("ops.trip.search_vehicle")}
-        isSearchable
-        isDisabled={disabled}
-        styles={styles}
-        menuPortalTarget={MENU_PORTAL_TARGET}
+        searchPlaceholder={t("ops.trip.search_vehicle")}
+        disabled={disabled}
+        invalid={invalid}
+        onChange={handleChange}
       />
     </div>
   );
 });
 
 const SupervisorField = React.memo(function SupervisorField({
-  supervisorName,
+  supervisorId,
   options,
   disabled,
   invalid,
   onSelect,
 }: {
-  supervisorName: string;
+  supervisorId: number;
   options: EmployeeOption[];
   disabled: boolean;
   invalid?: boolean;
   onSelect: (supervisorId: number, supervisorName: string) => void;
 }) {
   const { t } = useI18n();
-  const value = useMemo(
-    () => options.find((option) => option.employeeName === supervisorName) || null,
-    [options, supervisorName]
+  const dropdownOptions = useMemo<DropdownOption[]>(
+    () => options.map((option) => ({ value: String(option.id), label: option.employeeName || "" })),
+    [options]
   );
   const handleChange = useCallback(
-    (option: EmployeeOption | null) => {
-      onSelect(option?.id || 0, option?.employeeName || "");
+    (value: string) => {
+      const id = Number(value) || 0;
+      const option = options.find((o) => o.id === id);
+      onSelect(id, option?.employeeName || "");
     },
-    [onSelect]
+    [options, onSelect]
   );
-  const styles = useMemo(() => buildSelectStyles(Boolean(invalid)), [invalid]);
 
   return (
     <div>
-      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-slate-400" /> {t("common.supervisor")} {TRIP_FIELD_DEFINITIONS.supervisorId.required && <span className="text-red-500">*</span>}
-      </label>
-      <Select<EmployeeOption, false>
-        options={options}
-        getOptionLabel={getEmployeeLabel}
-        getOptionValue={getEmployeeValue}
-        value={value}
-        onChange={handleChange}
-        className="mt-1 text-sm"
+      <FieldLabel
+        icon={User}
+        tone="bg-indigo-50 text-indigo-600"
+        label={t("common.supervisor")}
+        required={TRIP_FIELD_DEFINITIONS.supervisorId.required}
+      />
+      <SearchDropdown
+        value={supervisorId ? String(supervisorId) : ""}
+        options={dropdownOptions}
         placeholder={t("ops.trip.search_supervisor")}
-        isSearchable
-        isDisabled={disabled}
-        styles={styles}
-        menuPortalTarget={MENU_PORTAL_TARGET}
+        searchPlaceholder={t("ops.trip.search_supervisor")}
+        disabled={disabled}
+        invalid={invalid}
+        onChange={handleChange}
       />
     </div>
   );
 });
 
 const DriverField = React.memo(function DriverField({
-  driverName,
+  driverId,
   options,
   disabled,
   invalid,
   onSelect,
 }: {
-  driverName: string;
+  driverId: number;
   options: EmployeeOption[];
   disabled: boolean;
   invalid?: boolean;
   onSelect: (driverId: number, driverName: string) => void;
 }) {
   const { t } = useI18n();
-  const value = useMemo(
-    () => options.find((option) => option.employeeName === driverName) || null,
-    [options, driverName]
+  const dropdownOptions = useMemo<DropdownOption[]>(
+    () => options.map((option) => ({ value: String(option.id), label: option.employeeName || "" })),
+    [options]
   );
   const handleChange = useCallback(
-    (option: EmployeeOption | null) => {
-      onSelect(option?.id || 0, option?.employeeName || "");
+    (value: string) => {
+      const id = Number(value) || 0;
+      const option = options.find((o) => o.id === id);
+      onSelect(id, option?.employeeName || "");
     },
-    [onSelect]
+    [options, onSelect]
   );
-  const styles = useMemo(() => buildSelectStyles(Boolean(invalid)), [invalid]);
 
   return (
     <div>
-      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-slate-400" /> {t("common.driver")} {TRIP_FIELD_DEFINITIONS.driverId.required && <span className="text-red-500">*</span>}
-      </label>
-      <Select<EmployeeOption, false>
-        options={options}
-        getOptionLabel={getEmployeeLabel}
-        getOptionValue={getEmployeeValue}
-        value={value}
-        onChange={handleChange}
-        className="mt-1 text-sm"
+      <FieldLabel
+        icon={User}
+        tone="bg-emerald-50 text-emerald-600"
+        label={t("common.driver")}
+        required={TRIP_FIELD_DEFINITIONS.driverId.required}
+      />
+      <SearchDropdown
+        value={driverId ? String(driverId) : ""}
+        options={dropdownOptions}
         placeholder={t("ops.trip.search_driver")}
-        isSearchable
-        isDisabled={disabled}
-        styles={styles}
-        menuPortalTarget={MENU_PORTAL_TARGET}
+        searchPlaceholder={t("ops.trip.search_driver")}
+        disabled={disabled}
+        invalid={invalid}
+        onChange={handleChange}
+      />
+    </div>
+  );
+});
+
+const HelpersField = React.memo(function HelpersField({
+  helpers,
+  options,
+  disabled,
+  invalid,
+  onChange,
+}: {
+  helpers: string[];
+  options: EmployeeOption[];
+  disabled: boolean;
+  invalid?: boolean;
+  onChange: (helpers: string[]) => void;
+}) {
+  const { t } = useI18n();
+  const dropdownOptions = useMemo<DropdownOption[]>(
+    () => options.map((option) => ({ value: option.employeeName, label: option.employeeName || "" })),
+    [options]
+  );
+
+  return (
+    <div>
+      <FieldLabel
+        icon={Users}
+        tone="bg-teal-50 text-teal-600"
+        label={t("ops.trip.field.helpers")}
+        required={TRIP_FIELD_DEFINITIONS.helpers.required}
+      />
+      <MultiSearchDropdown
+        selected={helpers}
+        options={dropdownOptions}
+        placeholder={t("ops.trip.select_helpers")}
+        searchPlaceholder={t("ops.trip.select_helpers")}
+        disabled={disabled}
+        invalid={invalid}
+        onChange={onChange}
+      />
+    </div>
+  );
+});
+
+const LoadersField = React.memo(function LoadersField({
+  loaders,
+  options,
+  disabled,
+  invalid,
+  onChange,
+}: {
+  loaders: string[];
+  options: EmployeeOption[];
+  disabled: boolean;
+  invalid?: boolean;
+  onChange: (loaders: string[]) => void;
+}) {
+  const { t } = useI18n();
+  const dropdownOptions = useMemo<DropdownOption[]>(
+    () => options.map((option) => ({ value: option.employeeName, label: option.employeeName || "" })),
+    [options]
+  );
+
+  return (
+    <div>
+      <FieldLabel
+        icon={Users}
+        tone="bg-amber-50 text-amber-600"
+        label={t("ops.trip.field.loaders")}
+        required={TRIP_FIELD_DEFINITIONS.loaders.required}
+      />
+      <MultiSearchDropdown
+        selected={loaders}
+        options={dropdownOptions}
+        placeholder={t("ops.trip.select_loaders")}
+        searchPlaceholder={t("ops.trip.select_loaders")}
+        disabled={disabled}
+        invalid={invalid}
+        onChange={onChange}
       />
     </div>
   );
@@ -373,12 +411,14 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
   disabled,
   invalid,
   error,
+  latestMeter,
   onChange,
 }: {
   value: string;
   disabled: boolean;
   invalid?: boolean;
   error?: string | null;
+  latestMeter?: { meter: number; tripNo: string; tripDate: string } | null;
   onChange: (value: string) => void;
 }) {
   const { t } = useI18n();
@@ -394,9 +434,17 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
 
   return (
     <div>
-      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <Gauge size={14} className="text-slate-400" /> {t("ops.trip.field.opening_meter")} {TRIP_FIELD_DEFINITIONS.openingMeter.required && <span className="text-red-500">*</span>}
-      </label>
+      <div className="flex items-center justify-between gap-2">
+        <FieldLabel
+          icon={Gauge}
+          tone="bg-purple-50 text-purple-600"
+          label={t("ops.trip.field.opening_meter")}
+          required={TRIP_FIELD_DEFINITIONS.openingMeter.required}
+        />
+        <span className="whitespace-nowrap text-xs font-medium text-slate-400">
+          {t("ops.trip.enter_manually")}
+        </span>
+      </div>
       <input
         type="text"
         inputMode="decimal"
@@ -415,6 +463,19 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
         <p className="mt-1.5 text-xs font-medium text-red-600 flex items-start gap-1">
           <span aria-hidden>⚠</span>
           <span>{error}</span>
+        </p>
+      ) : latestMeter ? (
+        // While entering: reference line showing the vehicle's last recorded
+        // reading (never auto-filled — the value above is typed by the user).
+        <p className="mt-1.5 text-xs font-medium text-slate-400 flex items-start gap-1">
+          <span aria-hidden>↳</span>
+          <span className="truncate">
+            {t("ops.trip.last_trip_reading_hint", {
+              meter: latestMeter.meter,
+              no: latestMeter.tripNo,
+              date: latestMeter.tripDate,
+            })}
+          </span>
         </p>
       ) : null}
     </div>
@@ -445,9 +506,12 @@ const AdvanceField = React.memo(function AdvanceField({
 
   return (
     <div>
-      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <Wallet size={14} className="text-slate-400" /> {t("operations.advance")} {TRIP_FIELD_DEFINITIONS.advanceAmount.required && <span className="text-red-500">*</span>}
-      </label>
+      <FieldLabel
+        icon={Wallet}
+        tone="bg-orange-50 text-orange-600"
+        label={t("operations.advance")}
+        required={TRIP_FIELD_DEFINITIONS.advanceAmount.required}
+      />
       <input
         type="text"
         inputMode="decimal"
@@ -461,104 +525,6 @@ const AdvanceField = React.memo(function AdvanceField({
             : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
         }`}
         placeholder="0.00"
-      />
-    </div>
-  );
-});
-
-const HelpersField = React.memo(function HelpersField({
-  helpers,
-  options,
-  disabled,
-  invalid,
-  onChange,
-}: {
-  helpers: string[];
-  options: EmployeeOption[];
-  disabled: boolean;
-  invalid?: boolean;
-  onChange: (helpers: string[]) => void;
-}) {
-  const { t } = useI18n();
-  const value = useMemo(
-    () => options.filter((option) => helpers.includes(option.employeeName)),
-    [options, helpers]
-  );
-  const handleChange = useCallback(
-    (selected: readonly EmployeeOption[] | null) => {
-      onChange(selected ? selected.map((option) => option.employeeName) : []);
-    },
-    [onChange]
-  );
-  const styles = useMemo(() => buildSelectStyles(Boolean(invalid)), [invalid]);
-
-  return (
-    <div>
-      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-slate-400" /> {t("ops.trip.field.helpers")} {TRIP_FIELD_DEFINITIONS.helpers.required && <span className="text-red-500">*</span>}
-      </label>
-      <Select<EmployeeOption, true>
-        options={options}
-        getOptionLabel={getEmployeeLabel}
-        getOptionValue={getEmployeeValue}
-        value={value}
-        onChange={handleChange}
-        className="mt-1 text-sm"
-        placeholder={t("ops.trip.select_helpers")}
-        isMulti
-        isSearchable
-        isDisabled={disabled}
-        styles={styles}
-        menuPortalTarget={MENU_PORTAL_TARGET}
-      />
-    </div>
-  );
-});
-
-const LoadersField = React.memo(function LoadersField({
-  loaders,
-  options,
-  disabled,
-  invalid,
-  onChange,
-}: {
-  loaders: string[];
-  options: EmployeeOption[];
-  disabled: boolean;
-  invalid?: boolean;
-  onChange: (loaders: string[]) => void;
-}) {
-  const { t } = useI18n();
-  const value = useMemo(
-    () => options.filter((option) => loaders.includes(option.employeeName)),
-    [options, loaders]
-  );
-  const handleChange = useCallback(
-    (selected: readonly EmployeeOption[] | null) => {
-      onChange(selected ? selected.map((option) => option.employeeName) : []);
-    },
-    [onChange]
-  );
-  const styles = useMemo(() => buildSelectStyles(Boolean(invalid)), [invalid]);
-
-  return (
-    <div>
-      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-amber-500" /> {t("ops.trip.field.loaders")} {TRIP_FIELD_DEFINITIONS.loaders.required && <span className="text-red-500">*</span>}
-      </label>
-      <Select<EmployeeOption, true>
-        options={options}
-        getOptionLabel={getEmployeeLabel}
-        getOptionValue={getEmployeeValue}
-        value={value}
-        onChange={handleChange}
-        className="mt-1 text-sm"
-        placeholder={t("ops.trip.select_loaders")}
-        isMulti
-        isSearchable
-        isDisabled={disabled}
-        styles={styles}
-        menuPortalTarget={MENU_PORTAL_TARGET}
       />
     </div>
   );
@@ -725,16 +691,17 @@ function StepStart({
     const meterValue = Number(form.openingMeterText);
     const meterNumericBad =
       form.openingMeterText.trim() !== "" && (!Number.isFinite(meterValue) || meterValue < 0);
-    // Field-level live rule: the opening reading must be strictly greater than
-    // the vehicle's latest recorded reading (equal is invalid). This is the ONLY
+    // Field-level live rule: the opening reading cannot be LESS than the
+    // vehicle's latest recorded reading (equal is allowed). This is the ONLY
     // field with live validation — all other Step 1 fields only flag after a
     // submit attempt (showErrors), so the user is never shown red borders while
-    // simply filling the form.
+    // simply filling the form. No default is ever pre-filled; the value is
+    // always typed by the user.
     const meterBelowLatest =
       form.openingMeterText.trim() !== "" &&
       latestMeter != null &&
       Number.isFinite(meterValue) &&
-      meterValue <= latestMeter.meter;
+      meterValue < latestMeter.meter;
     return {
       vehicle: showErrors && (!patch.vehicleId || !patch.vehicleNo),
       supervisor: showErrors && (!patch.supervisorId || !patch.supervisorName),
@@ -762,7 +729,7 @@ function StepStart({
       form.openingMeterText.trim() !== "" &&
       latestMeter != null &&
       Number.isFinite(meterValue) &&
-      meterValue <= latestMeter.meter
+      meterValue < latestMeter.meter
     ) {
       const ref = latestMeter.tripNo ? ` (${t("ops.trip.from_trip", { no: latestMeter.tripNo })})` : "";
       return t("ops.trip.meter_must_exceed", { meter: latestMeter.meter, ref });
@@ -807,7 +774,10 @@ function StepStart({
     const validation = validateStartStep(candidate);
     if (!validation.valid) {
       setShowErrors(true);
-      setNotice({ type: "error", message: validation.errors[0] || t("ops.trip.complete_required_fields") });
+      setNotice({
+        type: "error",
+        message: translateValidationMessage(t, validation.errors[0]) || t("ops.trip.complete_required_fields"),
+      });
       return;
     }
 
@@ -846,10 +816,10 @@ function StepStart({
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
+            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
               1
             </span>
-            <h2 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.title.start").toUpperCase()}</h2>
+            <h2 className="text-xl font-bold text-slate-800 tracking-tight">{t("ops.trip.title.start").toUpperCase()}</h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {canEdit && (
@@ -870,70 +840,84 @@ function StepStart({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              {t("operations.trip_no")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.tripNo || "--"}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Clock size={12} className="text-slate-500" /> {t("ops.trip.field.start_time")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{startTime || "--"}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Truck size={12} className="text-blue-500" /> {t("operations.vehicle_no")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.vehicleNo || "--"}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <User size={12} className="text-indigo-500" /> {t("common.supervisor")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.supervisorName || "--"}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <User size={12} className="text-emerald-500" /> {t("common.driver")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.driverName || "--"}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Gauge size={12} className="text-purple-500" /> {t("ops.trip.field.opening_meter")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">
-              {loadSnapshot.openingMeter == null
+          <StepKpiCard
+            icon={ClipboardList}
+            tone="bg-slate-100 text-slate-500"
+            bar="bg-slate-400"
+            label={t("operations.trip_no")}
+            value={loadSnapshot.tripNo || "--"}
+          />
+          <StepKpiCard
+            icon={Calendar}
+            tone="bg-sky-50 text-sky-600"
+            bar="bg-sky-400"
+            label={t("ops.trip.field.trip_date")}
+            value={loadSnapshot.tripDate || "--"}
+          />
+          <StepKpiCard
+            icon={Clock}
+            tone="bg-blue-50 text-blue-600"
+            bar="bg-blue-400"
+            label={t("ops.trip.field.start_time")}
+            value={loadSnapshot.startStepSubmittedAt ? formatIstStamp(loadSnapshot.startStepSubmittedAt) : formatStartTimeForDisplay(startTime) || "--"}
+          />
+          <StepKpiCard
+            icon={Truck}
+            tone="bg-blue-50 text-blue-600"
+            bar="bg-blue-400"
+            label={t("operations.vehicle_no")}
+            value={loadSnapshot.vehicleNo || "--"}
+          />
+          <StepKpiCard
+            icon={User}
+            tone="bg-indigo-50 text-indigo-600"
+            bar="bg-indigo-400"
+            label={t("common.supervisor")}
+            value={loadSnapshot.supervisorName || "--"}
+          />
+          <StepKpiCard
+            icon={User}
+            tone="bg-emerald-50 text-emerald-600"
+            bar="bg-emerald-400"
+            label={t("common.driver")}
+            value={loadSnapshot.driverName || "--"}
+          />
+          <StepKpiCard
+            icon={Users}
+            tone="bg-teal-50 text-teal-600"
+            bar="bg-teal-400"
+            label={t("ops.trip.field.helpers")}
+            value={loadSnapshot.helpers?.join(", ") || "--"}
+          />
+          <StepKpiCard
+            icon={Users}
+            tone="bg-amber-50 text-amber-600"
+            bar="bg-amber-400"
+            label={t("ops.trip.field.loaders")}
+            value={loadSnapshot.loaders?.join(", ") || "--"}
+          />
+          <StepKpiCard
+            icon={Gauge}
+            tone="bg-purple-50 text-purple-600"
+            bar="bg-purple-400"
+            label={t("ops.trip.field.opening_meter")}
+            value={
+              loadSnapshot.openingMeter == null
                 ? t("ops.trip.not_entered")
-                : `${loadSnapshot.openingMeter} KM`}
-            </span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Wallet size={12} className="text-amber-500" /> {t("operations.advance")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">
-              {loadSnapshot.advanceAmount == null
+                : `${loadSnapshot.openingMeter} KM`
+            }
+          />
+          <StepKpiCard
+            icon={Wallet}
+            tone="bg-orange-50 text-orange-600"
+            bar="bg-orange-400"
+            label={t("operations.advance")}
+            value={
+              loadSnapshot.advanceAmount == null
                 ? t("ops.trip.not_entered")
-                : `₹${loadSnapshot.advanceAmount.toLocaleString()}`}
-            </span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <User size={12} className="text-slate-500" /> {t("ops.trip.field.helpers")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.helpers?.join(", ") || "--"}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <User size={12} className="text-amber-500" /> {t("ops.trip.field.loaders")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">
-              {loadSnapshot.loaders?.join(", ") || "--"}
-            </span>
-          </div>
+                : `₹${loadSnapshot.advanceAmount.toLocaleString()}`
+            }
+          />
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-center justify-between">
@@ -957,10 +941,10 @@ function StepStart({
         {headerLoading && <p className="text-xs text-slate-500">{t("ops.trip.loading_trip_header")}</p>}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
+            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
               1
             </span>
-            <h2 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.title.start").toUpperCase()}</h2>
+            <h2 className="text-xl font-bold text-slate-800 tracking-tight">{t("ops.trip.title.start").toUpperCase()}</h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {/* Part E: no top-right X in first-submit / Edit mode — the bottom
@@ -973,7 +957,10 @@ function StepStart({
           </div>
         </div>
 
+        {/* Field order: Trip Date, Start Time, Vehicle No., Supervisor, Driver,
+            Helpers, Loaders, Advance — Opening Meter LAST. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 sm:gap-x-6 gap-y-4 sm:gap-y-5">
+          <TripDateField tripDate={loadSnapshot.tripDate} />
           <StartTimeField startTime={startTime} />
           <VehicleField
             vehicleId={form.vehicleId}
@@ -983,25 +970,32 @@ function StepStart({
             onSelect={handleVehicleSelect}
           />
           <SupervisorField
-            supervisorName={form.supervisorName}
+            supervisorId={form.supervisorId}
             options={supervisorOptions}
             disabled={inputsLocked}
             invalid={fieldInvalid.supervisor}
             onSelect={handleSupervisorSelect}
           />
           <DriverField
-            driverName={form.driverName}
+            driverId={form.driverId}
             options={driverOptions}
             disabled={inputsLocked}
             invalid={fieldInvalid.driver}
             onSelect={handleDriverSelect}
           />
-          <OpeningMeterField
-            value={form.openingMeterText}
+          <HelpersField
+            helpers={form.helpers}
+            options={helperOptions}
             disabled={inputsLocked}
-            invalid={fieldInvalid.openingMeter}
-            error={openingMeterError}
-            onChange={handleOpeningMeterChange}
+            invalid={fieldInvalid.helpers}
+            onChange={handleHelpersChange}
+          />
+          <LoadersField
+            loaders={form.loaders}
+            options={loaderOptions}
+            disabled={inputsLocked}
+            invalid={fieldInvalid.loaders}
+            onChange={handleLoadersChange}
           />
           <AdvanceField
             value={form.advanceText}
@@ -1009,24 +1003,15 @@ function StepStart({
             invalid={fieldInvalid.advance}
             onChange={handleAdvanceChange}
           />
-          <div className="col-span-1 sm:col-span-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <HelpersField
-                helpers={form.helpers}
-                options={helperOptions}
-                disabled={inputsLocked}
-                invalid={fieldInvalid.helpers}
-                onChange={handleHelpersChange}
-              />
-              <LoadersField
-                loaders={form.loaders}
-                options={loaderOptions}
-                disabled={inputsLocked}
-                invalid={fieldInvalid.loaders}
-                onChange={handleLoadersChange}
-              />
-            </div>
-          </div>
+          {/* Opening Meter stays LAST in Step 1 (after Loaders and Advance). */}
+          <OpeningMeterField
+            value={form.openingMeterText}
+            disabled={inputsLocked}
+            invalid={fieldInvalid.openingMeter}
+            error={openingMeterError}
+            latestMeter={latestMeter}
+            onChange={handleOpeningMeterChange}
+          />
         </div>
 
         <WizardStepNotice notice={notice} dirty={hasUnsavedChanges} />

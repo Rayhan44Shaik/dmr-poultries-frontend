@@ -14,6 +14,7 @@ import { GpsAddressText } from "../GpsAddressText";
 import { usePendingDelete } from "../../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../../components/common/PendingDeleteNotification";
 import { useI18n } from "../../../../../i18n";
+import { compressImageFile } from "../../../../../utils/compressImage";
 
 interface DieselExpensesTableProps {
   tripId: number;
@@ -192,7 +193,7 @@ export default function DieselExpensesTable({
     notifyUser(t("ops.trip.new_row_added"), "success");
   };
 
-  const handleImageUpload = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const allowed = ["image/jpeg", "image/jpg", "image/png"];
@@ -201,21 +202,25 @@ export default function DieselExpensesTable({
       e.target.value = "";
       return;
     }
-    if (file.size > 1_048_576) {
-      notifyUser(t("ops.trip.bill_image_size"), "error");
+    // Up to 5 MB accepted — everything is auto-compressed to ≤ ~100 KB on
+    // store (quality-first JPEG stepping keeps bills crisp), so disk usage
+    // stays flat no matter what the camera produces.
+    if (file.size > 5 * 1024 * 1024) {
+      notifyUser(t("ops.trip.image_size_5mb"), "error");
       e.target.value = "";
       return;
     }
     const sequence = String(index).padStart(3, "0");
-    const extension = file.name.includes(".") ? file.name.split(".").pop() : "png";
-    const newFileName = `BILL-${fallbackDateStr}-${sequence}.${extension}`;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = String(reader.result || "");
+    try {
+      const compressed = await compressImageFile(file, { maxBytes: 100 * 1024, maxDimension: 1600 });
+      const result = compressed.dataUrl;
       if (!/^data:image\/(jpeg|jpg|png);base64,/i.test(result)) {
         notifyUser(t("ops.trip.bill_jpeg_png"), "error");
+        e.target.value = "";
         return;
       }
+      // Recompressed output is always JPEG.
+      const newFileName = `BILL-${fallbackDateStr}-${sequence}.jpg`;
       if (editingRow === index) {
         setDraftField(`dieselImageName${index}`, newFileName);
         setDraftField(`dieselImage${index}`, result);
@@ -225,9 +230,21 @@ export default function DieselExpensesTable({
           [`dieselImage${index}`]: result,
         });
       }
-      notifyUser(t("ops.trip.bill_uploaded_row", { row: index }), "success");
-    };
-    reader.readAsDataURL(file);
+      if (compressed.compressed) {
+        notifyUser(
+          t("ops.trip.photo_auto_compressed", {
+            from: Math.round(compressed.originalBytes / 1024),
+            to: Math.round(compressed.storedBytes / 1024),
+          }),
+          "success"
+        );
+      } else {
+        notifyUser(t("ops.trip.bill_uploaded_row", { row: index }), "success");
+      }
+    } catch {
+      notifyUser(t("ops.trip.failed_read_image"), "error");
+    }
+    e.target.value = "";
   };
 
   const handleClearRow = (num: number) => {
@@ -686,7 +703,7 @@ export default function DieselExpensesTable({
                   if (isEditingActionRow) cancelEdit();
                   else handleClearRow(actionRow);
                 }}
-                className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                className="h-9 px-4 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 inline-flex items-center justify-center shrink-0"
               >
                 {t("common.cancel")}
               </button>
@@ -694,7 +711,7 @@ export default function DieselExpensesTable({
                 type="button"
                 onClick={() => handleRowSubmit(actionRow)}
                 disabled={!canSubmit || busyRow === actionRow}
-                className={`px-4 py-2 rounded-lg text-xs font-bold text-white ${
+                className={`h-9 px-4 rounded-lg text-xs font-bold text-white inline-flex items-center justify-center shrink-0 ${
                   canSubmit && busyRow !== actionRow
                     ? "bg-emerald-600 hover:bg-emerald-700"
                     : "bg-slate-300 cursor-not-allowed"

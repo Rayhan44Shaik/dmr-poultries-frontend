@@ -44,8 +44,8 @@ function ConfirmationModal({ isOpen, title, message, confirmLabel = "ops.trip.ye
           </div>
         </div>
         <div className="flex justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
-          <button onClick={onCancel} className="px-5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-xs">{t(cancelLabel)}</button>
-          <button onClick={onConfirm} className={`px-5 py-2 rounded-lg text-sm font-bold text-white shadow-xs transition-all active:scale-[0.98] ${type === "warning" ? "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700" : "bg-emerald-600 hover:bg-emerald-700"}`}>
+          <button onClick={onCancel} className="h-10 px-5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-xs inline-flex items-center justify-center shrink-0">{t(cancelLabel)}</button>
+          <button onClick={onConfirm} className={`h-10 px-5 rounded-lg text-sm font-bold text-white shadow-xs transition-all active:scale-[0.98] inline-flex items-center justify-center shrink-0 ${type === "warning" ? "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700" : "bg-emerald-600 hover:bg-emerald-700"}`}>
             {t(confirmLabel)}
           </button>
         </div>
@@ -542,8 +542,8 @@ export default function StepEnd({
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-3">
             <div className="flex items-center gap-2">
-              <span className="bg-blue-600 text-white w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0">5</span>
-              <h2 className="text-sm font-bold text-slate-800 tracking-tight">{t("ops.trip.title.expenses").toUpperCase()} ({t("ops.trip.submitted").toUpperCase()})</h2>
+              <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">5</span>
+              <h2 className="text-xl font-bold text-slate-800 tracking-tight">{t("ops.trip.title.expenses").toUpperCase()} ({t("ops.trip.submitted").toUpperCase()})</h2>
             </div>
             <div className="flex items-center gap-2 shrink-0">
 
@@ -564,27 +564,27 @@ export default function StepEnd({
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">{t("ops.trip.date_time")}</p>
+              <p className="text-xs text-slate-500 font-medium">{t("ops.trip.date_time")}</p>
               <p className="text-xs font-semibold text-slate-900 mt-0.5">{sheetData.submittedAtTimestamp || (trip as any).expensesStepSubmittedAt || "--"}</p>
             </div>
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">{t("operations.vehicle_no")}</p>
+              <p className="text-xs text-slate-500 font-medium">{t("operations.vehicle_no")}</p>
               <p className="text-xs font-semibold text-slate-900 mt-0.5">{trip.vehicleNo || "--"}</p>
             </div>
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">{t("operations.advance")}</p>
+              <p className="text-xs text-slate-500 font-medium">{t("operations.advance")}</p>
               <p className="text-xs font-semibold text-emerald-700 mt-0.5">₹{Number(trip.advanceAmount || 0).toFixed(2)}</p>
             </div>
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">{t("operations.total_expenses")}</p>
+              <p className="text-xs text-slate-500 font-medium">{t("operations.total_expenses")}</p>
               <p className="text-xs font-semibold text-red-600 mt-0.5">₹{totalAllExpenses.toFixed(2)}</p>
             </div>
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">{t("ops.trip.total_diesel")}</p>
+              <p className="text-xs text-slate-500 font-medium">{t("ops.trip.total_diesel")}</p>
               <p className="text-xs font-semibold text-blue-600 mt-0.5">₹{totalDieselAmount.toFixed(2)}</p>
             </div>
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">{t("ops.trip.remaining_balance")}</p>
+              <p className="text-xs text-slate-500 font-medium">{t("ops.trip.remaining_balance")}</p>
               <p className="text-xs font-semibold text-emerald-600 mt-0.5">₹{remainingBalance.toFixed(2)}</p>
             </div>
           </div>
@@ -619,8 +619,8 @@ export default function StepEnd({
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
             <div className="flex items-center gap-2">
-              <span className="bg-blue-600 text-white w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0">5</span>
-              <h2 className="text-sm font-bold text-slate-800 tracking-tight">{t("ops.trip.title.expenses").toUpperCase()}</h2>
+              <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">5</span>
+              <h2 className="text-xl font-bold text-slate-800 tracking-tight">{t("ops.trip.title.expenses").toUpperCase()}</h2>
             </div>
             <div className="flex items-center gap-2">
 

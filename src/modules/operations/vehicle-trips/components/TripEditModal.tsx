@@ -65,12 +65,12 @@ function TripEditModal({ open, trip, onClose, onEdit }: Props) {
           </div>
         </div>
         <div className="flex justify-end gap-3 px-6 py-5 border-t">
-          <button onClick={onClose} className="px-5 py-2 rounded-xl border">
+          <button onClick={onClose} className="h-10 px-5 rounded-xl border inline-flex items-center justify-center shrink-0">
             {t("common.cancel")}
           </button>
           <button
             onClick={handleEdit}
-            className="px-5 py-2 rounded-xl bg-green-700 hover:bg-green-800 text-white"
+            className="h-10 px-5 rounded-xl bg-green-700 hover:bg-green-800 text-white inline-flex items-center justify-center shrink-0"
           >
             {t("ops.trip.edit_trip")}
           </button>
