@@ -1094,16 +1094,22 @@ export default function UnLoadingTable({
       {/* ─── TOP KPI SUMMARY CARDS ─── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
-          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <Clock size={13} className="text-slate-400" /> {t("ops.trip.captured_time")}
+          <span className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+            <span className="h-5 w-5 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <Clock size={12} />
+            </span>
+            {t("ops.trip.captured_time")}
           </span>
           <span className="text-xs font-bold text-slate-800 mt-1 truncate" title={topKpiTotals.lastCaptureTime}>
             {topKpiTotals.lastCaptureTime}
           </span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
-          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <Building2 size={13} className="text-slate-400" /> {t("ops.trip.shops")}
+          <span className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+            <span className="h-5 w-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <Building2 size={12} />
+            </span>
+            {t("ops.trip.shops")}
           </span>
           <div className="flex items-center gap-3 mt-1">
             <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700" title={t("ops.trip.box_mode")}>

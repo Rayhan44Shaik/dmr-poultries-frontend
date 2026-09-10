@@ -586,6 +586,7 @@ export default {
   'ops.trip.assignment_details_unavailable': 'Assignment details unavailable',
   'ops.trip.sending': 'Sending…',
   'ops.trip.shop_deliveries_count': '{count} shop deliveries',
+  'ops.trip.shop_number': 'Shop No',
   'ops.trip.shop_saved': 'Shop delivery saved.',
   'ops.trip.shop_already_delivered': 'This shop has already been delivered. Edit the existing delivery instead.',
   'ops.trip.shops_available': 'Shops available',

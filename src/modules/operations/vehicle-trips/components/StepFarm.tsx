@@ -261,15 +261,9 @@ export default function StepFarm({
             {t("ops.trip.field.gps_address")}
           </span>
           {hasGps ? (
-            <>
-              <p className="text-sm font-semibold text-slate-800 break-words leading-relaxed">
-                <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback={t("ops.trip.location_captured")} />
-              </p>
-              <p className="text-[11px] text-slate-400 mt-1.5">
-                {Number(trip.farmGpsLat).toFixed(6)}, {Number(trip.farmGpsLon).toFixed(6)}
-                {trip.farmGpsAccuracy != null ? `  ·  ±${Number(trip.farmGpsAccuracy).toFixed(1)} m` : ""}
-              </p>
-            </>
+            <p className="text-sm font-semibold text-slate-800 break-words leading-relaxed">
+              <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback={t("ops.trip.location_captured")} />
+            </p>
           ) : (
             <p className="text-sm font-semibold text-slate-400">{t("ops.trip.not_captured")}</p>
           )}
