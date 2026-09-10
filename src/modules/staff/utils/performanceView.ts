@@ -27,6 +27,7 @@ import type {
   PerformanceRecentTrip,
   SupervisorPerformanceRow,
 } from "../types/performance";
+import { parseBusinessDate } from "../../../utils/businessDate";
 
 type Translate = ReturnType<typeof useI18n>["t"];
 
@@ -289,4 +290,48 @@ export function buildTripRace(
 /** Trip numbers that are off pace (worst first, capped). */
 export function offPaceTripNos(entries: readonly TripRaceEntry[]): string[] {
   return entries.filter((entry) => entry.offPace).map((entry) => entry.trip.tripNo);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Chart ↔ trips: which recent trips fall inside a weekly bucket              */
+/* -------------------------------------------------------------------------- */
+
+export interface WeekTripRow {
+  tripNo: string;
+  /** Translated per-metric summary for the chart tooltip. */
+  summary: string;
+}
+
+/**
+ * Recent trips that belong to the week ending `weekEnd` (a Mon–Sat bucket).
+ * Uses ONLY trips the API already returned (`detail.recentTrips`), so the
+ * mapping is real — when no detail loaded, the list is simply empty.
+ */
+export function recentTripsForWeek(
+  weekEnd: string | number,
+  trips: readonly PerformanceRecentTrip[],
+  kind: StaffPerformanceKind,
+): WeekTripRow[] {
+  const end = parseBusinessDate(String(weekEnd));
+  if (!end || trips.length === 0) return [];
+  const endMs = end.getTime();
+  const DAY = 86_400_000;
+  const rows: WeekTripRow[] = [];
+  for (const trip of trips) {
+    const date = parseBusinessDate(trip.tripDate);
+    if (!date) continue;
+    // Sundays sit outside every Mon–Sat bucket; consistent with the rest of
+    // the app they belong to the reporting week that ended the day before.
+    const adjusted = date.getDay() === 0 ? date.getTime() - DAY : date.getTime();
+    const offset = Math.round((endMs - adjusted) / DAY);
+    if (offset < 0 || offset > 5) continue; // outside this Mon–Sat bucket
+    rows.push({
+      tripNo: trip.tripNo,
+      summary:
+        kind === "drivers"
+          ? `${formatCount(trip.totalKm)} km · ${formatCount(trip.totalShops)}`
+          : `${formatCount(trip.totalBirdsDelivered)} · ${formatDecimal(tripMortalityRate(trip), 1)}%`,
+    });
+  }
+  return rows;
 }

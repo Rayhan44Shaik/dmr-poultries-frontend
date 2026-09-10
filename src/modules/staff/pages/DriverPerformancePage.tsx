@@ -47,6 +47,7 @@ import {
 import {
   buildDrawerFactors,
   buildDrawerImprovements,
+  recentTripsForWeek,
   formatCostPerKm,
   formatCount,
   formatDecimal,
@@ -341,6 +342,13 @@ const DriverPerformancePage = () => {
     [t],
   );
 
+  // Respective trip details for the chart tooltip (loaded person detail only).
+  const chartWeekTrips = useCallback(
+    (point: WeeklyChartPoint) =>
+      recentTripsForWeek(point.week, data.detail?.recentTrips ?? [], "drivers"),
+    [data.detail],
+  );
+
   /* --------------------------- drawer state ----------------------------- */
 
   const selectedEntry = useMemo(
@@ -472,6 +480,7 @@ const DriverPerformancePage = () => {
             rows={chartRows}
             series={chartSeries}
             tooltipExtras={chartTooltipExtras}
+            weekTrips={chartWeekTrips}
             emptyText={t("staff.perf.weekly.empty")}
             loading={initialLoading}
             ariaLabel={t("staff.perf.weekly.aria_driver", { range: appliedRangeLabel })}

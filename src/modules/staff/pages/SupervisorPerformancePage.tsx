@@ -47,6 +47,7 @@ import {
 import {
   buildDrawerFactors,
   buildDrawerImprovements,
+  recentTripsForWeek,
   formatCount,
   formatDecimal,
   formatKg,
@@ -349,6 +350,15 @@ const SupervisorPerformancePage = () => {
     [t],
   );
 
+  // Respective trip details for the chart tooltip: the API's own recent
+  // trips (loaded only with a person filter) mapped into their Mon–Sat
+  // buckets. Empty when no detail is loaded — never fabricated.
+  const chartWeekTrips = useCallback(
+    (point: WeeklyChartPoint) =>
+      recentTripsForWeek(point.week, data.detail?.recentTrips ?? [], "supervisors"),
+    [data.detail],
+  );
+
   /* --------------------------- drawer state ----------------------------- */
 
   const selectedEntry = useMemo(
@@ -475,9 +485,10 @@ const SupervisorPerformancePage = () => {
             rows={chartRows}
             series={chartSeries}
             tooltipExtras={chartTooltipExtras}
+            weekTrips={chartWeekTrips}
             emptyText={t("staff.perf.weekly.empty")}
             loading={initialLoading}
-            variant="panels"
+            heightClass="h-72 sm:h-80"
             ariaLabel={t("staff.perf.weekly.aria_supervisor", { range: appliedRangeLabel })}
           />
         </div>

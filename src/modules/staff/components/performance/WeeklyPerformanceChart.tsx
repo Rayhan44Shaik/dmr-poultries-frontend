@@ -69,11 +69,23 @@ export interface WeeklyTooltipRow {
   color?: string;
 }
 
+/** One real trip mapped into a weekly bucket (see performanceView). */
+export interface WeekTripRow {
+  tripNo: string;
+  summary: string;
+}
+
 interface WeeklyPerformanceChartProps {
   rows: WeeklyChartPoint[];
   series: readonly WeeklyChartSeries[];
   /** Extra derived rows appended to the tooltip (e.g. mileage). */
   tooltipExtras?: (point: WeeklyChartPoint) => WeeklyTooltipRow[];
+  /**
+   * Real trips that fall inside the hovered week (from the person's loaded
+   * detail) — rendered as a dedicated section of the tooltip. Empty when no
+   * detail is loaded, so nothing is ever fabricated.
+   */
+  weekTrips?: (point: WeeklyChartPoint) => WeekTripRow[];
   emptyText: string;
   loading?: boolean;
   /** Accessible description of what the chart shows. */
@@ -119,8 +131,16 @@ interface TipCardProps {
   point?: WeeklyChartPoint;
 }
 
-function TooltipCard({ label, payload, series, tooltipExtras, point }: TipCardProps) {
+function TooltipCard({
+  label,
+  payload,
+  series,
+  tooltipExtras,
+  weekTrips,
+  point,
+}: TipCardProps & { weekTrips?: (point: WeeklyChartPoint) => WeekTripRow[] }) {
   const extras = point ? (tooltipExtras?.(point) ?? []) : [];
+  const trips = point ? (weekTrips?.(point) ?? []) : [];
   return (
     <div className="min-w-[190px] rounded-xl border border-slate-200 bg-white/95 px-3.5 py-3 shadow-xl backdrop-blur">
       <div className="mb-2 border-b border-slate-100 pb-1.5 text-xs font-bold tracking-tight text-slate-900">
@@ -159,6 +179,23 @@ function TooltipCard({ label, payload, series, tooltipExtras, point }: TipCardPr
             ))}
           </div>
         )}
+        {trips.length > 0 && (
+          <div className="space-y-1 border-t border-dashed border-slate-200 pt-1.5">
+            <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+              {trips.length} {trips.length === 1 ? "trip" : "trips"} this week
+            </div>
+            {trips.map((trip) => (
+              <div key={trip.tripNo} className="flex items-center justify-between gap-5">
+                <span className="font-mono text-[10px] font-semibold text-slate-600">
+                  {trip.tripNo}
+                </span>
+                <span className="text-[10px] font-medium tabular-nums text-slate-500">
+                  {trip.summary}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -173,12 +210,14 @@ function GroupedChart({
   rows,
   series,
   tooltipExtras,
+  weekTrips,
   ariaLabel,
   heightClass,
 }: {
   rows: WeeklyChartPoint[];
   series: readonly WeeklyChartSeries[];
   tooltipExtras?: (point: WeeklyChartPoint) => WeeklyTooltipRow[];
+  weekTrips?: (point: WeeklyChartPoint) => WeekTripRow[];
   ariaLabel: string;
   heightClass: string;
 }) {
@@ -232,6 +271,7 @@ function GroupedChart({
                   payload={payload}
                   series={series}
                   tooltipExtras={tooltipExtras}
+                  weekTrips={weekTrips}
                   point={payload[0]?.payload as WeeklyChartPoint | undefined}
                 />
               ) : null
@@ -287,12 +327,14 @@ function PanelsChart({
   rows,
   series,
   tooltipExtras,
+  weekTrips,
   ariaLabel,
   emptyText,
 }: {
   rows: WeeklyChartPoint[];
   series: readonly WeeklyChartSeries[];
   tooltipExtras?: (point: WeeklyChartPoint) => WeeklyTooltipRow[];
+  weekTrips?: (point: WeeklyChartPoint) => WeekTripRow[];
   ariaLabel: string;
   emptyText: string;
 }) {
@@ -356,6 +398,7 @@ function PanelsChart({
                             payload={payload}
                             series={[config]}
                             tooltipExtras={tooltipExtras}
+                            weekTrips={weekTrips}
                             point={payload[0]?.payload as WeeklyChartPoint | undefined}
                           />
                         ) : null
@@ -404,6 +447,7 @@ function WeeklyPerformanceChartImpl({
   rows,
   series,
   tooltipExtras,
+  weekTrips,
   emptyText,
   loading = false,
   ariaLabel,
@@ -452,6 +496,7 @@ function WeeklyPerformanceChartImpl({
         rows={rows}
         series={series}
         tooltipExtras={tooltipExtras}
+        weekTrips={weekTrips}
         ariaLabel={ariaLabel}
         heightClass={heightClass}
       />

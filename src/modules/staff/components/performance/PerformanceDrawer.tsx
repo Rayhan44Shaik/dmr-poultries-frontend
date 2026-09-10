@@ -124,7 +124,7 @@ export function PerformanceDrawer({
 
   const drawer = (
     <div
-      className={`${uiOverlayClass} z-[70] flex justify-end`}
+      className={`${uiOverlayClass} z-[70] flex items-center justify-center p-3 sm:p-6`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -135,7 +135,7 @@ export function PerformanceDrawer({
         aria-modal="true"
         aria-labelledby="performance-drawer-title"
         tabIndex={-1}
-        className="relative flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-2xl border-t border-slate-200/70 bg-white shadow-overlay animate-fade-in inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-0 sm:h-full sm:max-h-full sm:w-full sm:max-w-md sm:rounded-none sm:rounded-l-2xl sm:border-l sm:border-t-0"
+        className="relative flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-overlay animate-scale-in sm:max-w-xl"
       >
         {/* Header */}
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5">
