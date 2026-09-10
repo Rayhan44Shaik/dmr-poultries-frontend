@@ -474,6 +474,7 @@ export default {
   'ops.trip.loss': 'నష్టం',
   'ops.trip.max_2_photos': 'గరిష్టంగా 2 ఫోటోలు',
   'ops.trip.max_6_diesel': 'గరిష్టంగా 6 డీజిల్ ఎంట్రీలు',
+  'ops.trip.max': 'గరిష్టం',
   'ops.trip.meter': 'మీటర్',
   'ops.trip.meter_must_exceed': 'మీటర్ రీడింగ్ {meter} కంటే తక్కువ ఉండకూడదు{ref}.',
   'ops.trip.last_trip_reading_hint': 'గత ట్రిప్: {meter} KM · {no} · {date}',
@@ -782,6 +783,14 @@ export default {
   // Pagination
   'ops.mortality.pagination.showing': '{total} పూర్తయిన ట్రిప్పులలో {start}–{end} చూపుతోంది',
   'ops.mortality.pagination.rows_per_page': 'ఒక పేజీకి వరుసలు',
+
+  // Applied filters indicator
+  'ops.mortality.applied_filters.label': 'వర్తించిన ఫిల్టర్లు',
+  'ops.mortality.applied_filters.from': 'నుండి',
+  'ops.mortality.applied_filters.to': 'వరకు',
+  'ops.mortality.applied_filters.farm': 'ఫారం',
+  'ops.mortality.applied_filters.supervisor': 'సూపర్వైజర్',
+  'ops.mortality.applied_filters.search': 'శోధన',
 
   // Expanded detail
   'ops.mortality.detail.trip_overview': 'ట్రిప్ అవలోకనం',

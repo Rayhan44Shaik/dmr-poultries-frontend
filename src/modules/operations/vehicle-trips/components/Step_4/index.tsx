@@ -17,7 +17,7 @@ import { generateShopPDF } from "../../utils/generateShopPDF";
 import { generatePickupReportPDF } from "../../utils/generatePickupPDF";
 import { generateAssignmentSheetPdf } from "../../../orders/pdf/generateAssignmentSheetPdf";
 import type { AssignmentSheetRow } from "../../../orders/ordersUtils";
-import { pendingBoxesFromRows } from "./remainingBoxes";
+import { pendingBoxesFromRows, shopIdsFromRows } from "./remainingBoxes";
 import { computeDeliveryKpiTotals } from "./deliveryKpis";
 import { formatIstStamp } from "../../services/tripHeaderApiService";
 import type { DeliveriesBalanceError } from "../../../../../shared/trip/validation";
@@ -163,27 +163,33 @@ function buildPendingAssignmentRows(
   rows: ShopDelivery[]
 ): AssignmentSheetRow[] {
   const { ids, names } = buildDeliveredShopKeys(rows);
+  const { ids: assignedIds, order: assignedOrder } = shopIdsFromRows(rows);
+
+  // Only order-assignment shops belong on the sheet. When a trip has no
+  // assignment rows yet (plain manual trip), fall back to the full list.
+  const source =
+    assignedIds.size > 0
+      ? (shops || []).filter((shop: any) =>
+          assignedIds.has(Number(shop.id ?? shop.shopId ?? 0))
+        )
+      : (shops || []);
+
   const isDelivered = (shop: any) => {
     const id = Number(shop.id ?? shop.shopId ?? 0);
     const name = String(shop.shopName ?? shop.name ?? "").trim().toLowerCase();
     return (id > 0 && ids.has(id)) || (Boolean(name) && names.has(name));
   };
 
-  const pending = (shops || []).filter((shop: any) => !isDelivered(shop));
+  const pending = source.filter((shop: any) => !isDelivered(shop));
 
-  const priorityRank = new Map<number, number>();
-  (shops || []).slice(0, 10).forEach((shop: any, idx: number) => {
-    const id = Number(shop.id ?? shop.shopId ?? 0);
-    if (id > 0) priorityRank.set(id, idx);
-  });
-  const isPriority = (shop: any) => priorityRank.has(Number(shop.id ?? shop.shopId ?? 0));
+  const isPriority = (shop: any) => assignedOrder.has(Number(shop.id ?? shop.shopId ?? 0));
   pending.sort((a: any, b: any) => {
     const ap = isPriority(a);
     const bp = isPriority(b);
     if (ap && bp) {
       return (
-        (priorityRank.get(Number(a.id ?? a.shopId ?? 0)) ?? 0) -
-        (priorityRank.get(Number(b.id ?? b.shopId ?? 0)) ?? 0)
+        (assignedOrder.get(Number(a.id ?? a.shopId ?? 0)) ?? 0) -
+        (assignedOrder.get(Number(b.id ?? b.shopId ?? 0)) ?? 0)
       );
     }
     if (ap) return -1;
@@ -389,7 +395,16 @@ export default function UnLoadingTable({
   const pendingShopsCount = useMemo(() => {
     if (!safeShops || safeShops.length === 0) return 0;
     const { ids, names } = buildDeliveredShopKeys(safeRows);
-    return safeShops.filter((shop: any) => {
+    const { ids: assignedIds } = shopIdsFromRows(safeRows);
+    // Only order-assignment shops are counted. When there are no assignment
+    // rows yet, fall back to the full master list.
+    const source =
+      assignedIds.size > 0
+        ? safeShops.filter((shop: any) =>
+            assignedIds.has(Number(shop.id ?? shop.shopId ?? 0))
+          )
+        : safeShops;
+    return source.filter((shop: any) => {
       const id = Number(shop.id ?? shop.shopId ?? 0);
       const name = String(shop.shopName ?? shop.name ?? "").trim().toLowerCase();
       const delivered = (id > 0 && ids.has(id)) || (Boolean(name) && names.has(name));
@@ -469,7 +484,7 @@ export default function UnLoadingTable({
         totalBirds,
         dcWeight,
         avgWeight:
-          totalBirds > 0 ? Number((dcWeight / totalBirds).toFixed(3)) : undefined,
+          totalBirds > 0 ? Number((dcWeight / totalBirds).toFixed(2)) : undefined,
       } as Trip;
       await generatePickupReportPDF(pickupTrip, {
         maxBoxes:
@@ -700,19 +715,8 @@ export default function UnLoadingTable({
       return;
     }
 
-    // A shop can only be delivered once: block a NEW capture for a shop that
-    // already has a delivered row — matched by shop id AND shop name.
-    if (editingId === null) {
-      const { ids, names } = buildDeliveredShopKeys(safeRows);
-      const selId = Number(formData.shopId);
-      const selName = String(formData.shopName ?? "").trim().toLowerCase();
-      const alreadyDelivered =
-        (selId > 0 && ids.has(selId)) || (Boolean(selName) && names.has(selName));
-      if (alreadyDelivered) {
-        setToast({ message: t("ops.trip.shop_already_delivered"), type: "warning" });
-        return;
-      }
-    }
+    // The same shop MAY be captured more than once — e.g. one Box Mode and one
+    // Weight Mode delivery for the same shop. Duplicates are accepted.
 
     let finalBirds = formData.birds;
     let finalWeight = formData.weight;
@@ -746,6 +750,10 @@ export default function UnLoadingTable({
       mortKgVal = formData.mortWeight;
       perBoxData = [];
     }
+
+    // Weights are always stored rounded to two decimals.
+    finalWeight = Number((Number(finalWeight) || 0).toFixed(2));
+    mortKgVal = Number((Number(mortKgVal) || 0).toFixed(2));
 
     const maxSerial = safeRows.reduce((max: number, r: ShopDelivery) => Math.max(max, r.serialNo || 0), 0);
     const newRow: any = {
@@ -799,19 +807,24 @@ export default function UnLoadingTable({
     }
     // Delivered shops are matched by BOTH shop id and shop name.
     const { ids: deliveredIds, names: deliveredNames } = buildDeliveredShopKeys(safeRows);
+    const { ids: assignedIds, order: assignedOrder } = shopIdsFromRows(safeRows);
+
+    // Only the ORDER-ASSIGNMENT shops are offered — not the whole master list.
+    // Fall back to all shops when there are no assignment rows yet.
+    const source =
+      assignedIds.size > 0
+        ? safeShops.filter((shop: any) =>
+            assignedIds.has(Number(shop.id ?? shop.shopId ?? 0))
+          )
+        : safeShops;
+
     const isDeliveredShop = (shop: any) => {
       const id = Number(shop.id ?? shop.shopId ?? 0);
       const name = String(shop.shopName ?? shop.name ?? "").trim().toLowerCase();
       return (id > 0 && deliveredIds.has(id)) || (Boolean(name) && deliveredNames.has(name));
     };
-    // Priority route = the FIRST 10 shops in the master list, in listed order.
-    const priorityRank = new Map<number, number>();
-    safeShops.slice(0, 10).forEach((shop: any, idx: number) => {
-      const id = Number(shop.id ?? shop.shopId ?? 0);
-      if (id > 0) priorityRank.set(id, idx);
-    });
 
-    const opts = safeShops
+    const opts = source
       .filter((shop: any) => {
         const status = String(shop.status ?? "Active");
         const id = shop.id ?? shop.shopId ?? 0;
@@ -825,18 +838,17 @@ export default function UnLoadingTable({
       })
       .filter((opt: { value: number; label: string; isDisabled: boolean }) => opt.value > 0);
 
-    // Delivery queue ordering:
-    //   • PENDING priority shops first, in their listed (mentioned) order.
-    //   • Everything else (remaining pending shops AND already-delivered
-    //     shops) follows in plain alphabetical order — a delivered shop drops
-    //     out of its priority slot and settles alphabetically, never a special
-    //     "last" pile.
+    // Delivery queue ordering: pending assignment shops first in their route
+    // (`serialNo`) order, then already-delivered shops (kept selectable so a
+    // shop can be captured again in the other mode), also in route order.
     const isPendingPriority = (o: { value: number; label: string }) => {
       const id = Number(o.value);
-      const shop = safeShops.find((s: any) => Number(s.id ?? s.shopId ?? 0) === id);
+      const shop = source.find((s: any) => Number(s.id ?? s.shopId ?? 0) === id);
       if (!shop) return false;
-      return priorityRank.has(id) && !isDeliveredShop(shop);
+      return assignedOrder.has(id) && !isDeliveredShop(shop);
     };
+    const orderOf = (o: { value: number; label: string }) =>
+      assignedOrder.get(Number(o.value));
     opts.sort(
       (
         a: { value: number; label: string; isDisabled: boolean },
@@ -844,11 +856,12 @@ export default function UnLoadingTable({
       ) => {
         const aPrio = isPendingPriority(a);
         const bPrio = isPendingPriority(b);
-        if (aPrio && bPrio) {
-          return (priorityRank.get(Number(a.value)) ?? 0) - (priorityRank.get(Number(b.value)) ?? 0);
+        if (aPrio !== bPrio) return aPrio ? -1 : 1;
+        const aOrder = orderOf(a);
+        const bOrder = orderOf(b);
+        if (aOrder !== undefined && bOrder !== undefined && aOrder !== bOrder) {
+          return aOrder - bOrder;
         }
-        if (aPrio) return -1;
-        if (bPrio) return 1;
         return a.label.localeCompare(b.label);
       }
     );
@@ -1019,7 +1032,7 @@ export default function UnLoadingTable({
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pb-3 border-b border-slate-100">
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto flex-1">
           {/* Search Bar */}
-          <div className="relative w-full sm:w-64 max-w-xs">
+          <div className="relative w-full sm:w-80 max-w-sm">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
               <Search size={14} />
             </div>
@@ -1117,7 +1130,7 @@ export default function UnLoadingTable({
             <AlertCircle size={13} className="text-rose-500" /> {t("operations.mortality_count")}
           </span>
           <span className="text-base font-bold text-slate-800">
-            {topKpiTotals.mortality > 0 ? `${topKpiTotals.mortality} bird${topKpiTotals.mortality === 1 ? "" : "s"}` : "—"}
+            {topKpiTotals.mortality > 0 ? `${topKpiTotals.mortality} ${t("common.birds")}` : "—"}
           </span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">

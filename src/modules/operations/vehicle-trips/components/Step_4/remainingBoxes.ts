@@ -99,6 +99,26 @@ export function assignedShopIdsFromRows(rows: ShopDelivery[]): Set<number> {
   return ids;
 }
 
+/** Order-assignment shops = every shop present in the delivery rows (pending
+ *  `[ORDER]` plan rows plus captured deliveries), keyed to its route order
+ *  (`serialNo`). When a delivered shop replaces its `[ORDER]` row, its id
+ *  still lives here so it stays selectable for a duplicate capture. */
+export function shopIdsFromRows(
+  rows: ShopDelivery[]
+): { ids: Set<number>; order: Map<number, number> } {
+  const ids = new Set<number>();
+  const order = new Map<number, number>();
+  for (const row of rows) {
+    const shopId = Number(row.shopId);
+    if (!Number.isFinite(shopId) || shopId <= 0) continue;
+    ids.add(shopId);
+    const serial = Number(row.serialNo) || 0;
+    const prev = order.get(shopId);
+    if (prev === undefined || serial < prev) order.set(shopId, serial);
+  }
+  return { ids, order };
+}
+
 /** Remaining map keyed by boxNo (mirrors `pendingBoxesFromRows` shape). */
 export function remainingBoxesByNumber(
   boxDetails: BoxDetail[],

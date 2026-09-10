@@ -478,6 +478,7 @@ export default {
   'ops.trip.loss': 'Loss',
   'ops.trip.max_2_photos': 'Maximum 2 photos',
   'ops.trip.max_6_diesel': 'Maximum 6 diesel entries',
+  'ops.trip.max': 'Max',
   'ops.trip.meter': 'Meter',
   'ops.trip.meter_must_exceed': 'Meter reading cannot be less than the previous reading {meter}{ref}.',
   'ops.trip.last_trip_reading_hint': 'Last trip: {meter} KM · {no} · {date}',

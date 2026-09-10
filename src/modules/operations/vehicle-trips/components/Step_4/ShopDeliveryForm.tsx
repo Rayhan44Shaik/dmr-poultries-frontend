@@ -182,8 +182,8 @@ export default function ShopDeliveryForm({
   );
   const boxDropdownOptions: DropdownOption[] = availableBoxDetails.map((b: any) => ({
     value: String(b.boxNo),
-    label: `#${b.boxNo} · ${b.birds} ${t("common.birds")} · ${Number(b.weight).toFixed(2)} kg`,
-    chipLabel: `#${b.boxNo}`,
+    label: `${b.boxNo} · ${b.birds} ${t("common.birds")} · ${Number(b.weight).toFixed(2)} kg`,
+    chipLabel: `${b.boxNo}`,
   }));
 
   // Bright, eye-friendly coloured box-number chips for the box dropdown list.
@@ -197,7 +197,7 @@ export default function ShopDeliveryForm({
         <span
           className={`inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1.5 text-[11px] font-bold tabular-nums ${boxTileClass(boxNo)}`}
         >
-          #{boxNo}
+          {boxNo}
         </span>
         <span className="truncate text-xs font-medium text-slate-800">
           {box ? `${box.birds} ${t("common.birds")} · ${Number(box.weight).toFixed(2)} kg` : opt.label}
@@ -237,7 +237,7 @@ export default function ShopDeliveryForm({
 
         {/* Bird type + mode toggle + close — grouped on the right */}
         <div className="flex items-center gap-3 shrink-0">
-        <div className="w-56 shrink-0">
+        <div className="w-64 shrink-0">
           <SearchDropdown
             value={formData.birdTypeId ? String(formData.birdTypeId) : ""}
             options={birdDropdownOptions}
@@ -385,14 +385,14 @@ export default function ShopDeliveryForm({
                     selectedBoxIds.length > 30 ? "h-7 text-[11px]" : "h-10 text-sm"
                   } ${BOX_TILE_PALETTE[idx % BOX_TILE_PALETTE.length]}`}
                 >
-                  <span className="tabular-nums">#{id}</span>
+                  <span className="tabular-nums">{id}</span>
                   {!readOnly && (
                     <button
                       type="button"
                       onClick={() => handleBoxSelection(selectedBoxIds.filter((x) => x !== id))}
                       className="rounded p-0.5 opacity-60 transition-colors hover:opacity-100 hover:bg-black/5"
-                      aria-label={`${t("common.remove")} #${id}`}
-                      title={`${t("common.remove")} #${id}`}
+                      aria-label={`${t("common.remove")} ${id}`}
+                      title={`${t("common.remove")} ${id}`}
                     >
                       <X size={10} strokeWidth={2.75} />
                     </button>
@@ -464,7 +464,7 @@ export default function ShopDeliveryForm({
                 />
                 {validationErrors.birdsExceed && (
                   <p className="text-[10px] text-rose-600 mt-1 flex items-center gap-1 font-medium">
-                    <AlertCircle size={10} /> Max: {farmBirds}
+                    <AlertCircle size={10} /> {t("ops.trip.max")}: {farmBirds}
                   </p>
                 )}
               </MetricTile>
@@ -515,7 +515,7 @@ export default function ShopDeliveryForm({
                   />
                   {validationErrors.birdsExceedFarm && (
                     <p className="text-[10px] text-rose-600 mt-1 flex items-center gap-1 font-medium">
-                      <AlertCircle size={10} /> Max: {farmBirds}
+                      <AlertCircle size={10} /> {t("ops.trip.max")}: {farmBirds}
                     </p>
                   )}
                   {validationErrors.birdsMismatch && !validationErrors.birdsExceedFarm && (
@@ -547,7 +547,7 @@ export default function ShopDeliveryForm({
                   />
                   {validationErrors.weightExceedFarm && (
                     <p className="text-[10px] text-rose-600 mt-1 flex items-center gap-1 font-medium">
-                      <AlertCircle size={10} /> Max: {farmWeight.toFixed(2)} kg
+                      <AlertCircle size={10} /> {t("ops.trip.max")}: {farmWeight.toFixed(2)} kg
                     </p>
                   )}
                 </MetricTile>

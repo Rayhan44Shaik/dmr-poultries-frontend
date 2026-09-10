@@ -27,7 +27,7 @@ import {
 
 type RGB = [number, number, number];
 
-const NAVY: RGB = [15, 35, 79];
+const NAVY: RGB = [52, 68, 115];
 const EMERALD: RGB = [5, 150, 105];
 const MUTED: RGB = [90, 100, 115];
 const GRID_LINE: RGB = [203, 213, 225];

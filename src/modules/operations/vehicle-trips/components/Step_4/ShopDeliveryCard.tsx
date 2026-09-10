@@ -17,7 +17,7 @@ const BOX_CHIP_PALETTE = [
   "bg-indigo-50 text-indigo-700 border-indigo-100",
   "bg-teal-50 text-teal-700 border-teal-100",
   "bg-amber-50 text-amber-700 border-amber-100",
-  "bg-rose-50 text-rose-700 border-rose-100",
+  "bg-rose-50 text-rose-600 border-rose-100",
 ];
 
 export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props) {
@@ -35,8 +35,8 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
   return (
     <div className="group relative overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm hover:shadow-md transition-all duration-200 flex flex-col">
       <div className="p-3 flex flex-col gap-2.5 flex-1">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-2">
+        {/* Header — mode tile + shop name vertically centred on the logo */}
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <div
               className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${
@@ -48,27 +48,9 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
             >
               {isWeightMode ? <Scale size={15} /> : <Box size={15} />}
             </div>
-            <div className="min-w-0">
-              <p className="font-bold text-slate-800 text-[13px] truncate leading-tight" title={row.shopName}>
-                {row.shopName || t("ops.trip.not_entered")}
-              </p>
-              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                {mortalityCount > 0 && (
-                  <span
-                    title={`${t("operations.mortality_count")}: ${mortalityCount} ${t("common.birds")}`}
-                    className="px-1.5 py-px rounded bg-red-50 text-red-700 border border-red-200/60 shrink-0 flex items-center gap-1 text-[10px] font-bold"
-                  >
-                    <AlertCircle size={11} className="text-rose-500 stroke-[2.5]" />
-                    <span>{mortalityCount}</span>
-                  </span>
-                )}
-                {row.birdType ? (
-                  <span className="px-1.5 py-px rounded bg-blue-50 text-blue-700 font-semibold text-[10px] border border-blue-100 shrink-0">
-                    {row.birdType}
-                  </span>
-                ) : null}
-              </div>
-            </div>
+            <p className="font-bold text-slate-800 text-[13px] truncate leading-tight" title={row.shopName}>
+              {row.shopName || t("ops.trip.not_entered")}
+            </p>
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
@@ -110,16 +92,16 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
               <Scale size={10} className="text-emerald-500 stroke-[2]" /> {t("common.weight")}
             </span>
             <span className="text-[13px] font-bold text-slate-800">
-              {row.weight ? `${row.weight.toFixed(2)} kg` : t("ops.trip.not_entered")}
+              {row.weight ? `${Number(row.weight).toFixed(2)} kg` : t("ops.trip.not_entered")}
             </span>
           </div>
         </div>
 
         {(mortalityCount > 0 || mortKg > 0) && (
-          <div className="flex items-center justify-between px-2 py-1 bg-red-50/70 rounded-md border border-red-100 text-[10px]">
-            <span className="text-red-600 font-semibold">{t("operations.mortality_count")}</span>
-            <span className="text-red-700 font-bold">
-              {mortalityCount} {t("common.birds")} · {mortKg ? mortKg.toFixed(2) : "0.00"} kg
+          <div className="flex items-center justify-between px-2 py-1 bg-rose-50/70 rounded-md border border-rose-100 text-[10px]">
+            <span className="text-rose-500 font-semibold">{t("operations.mortality_count")}</span>
+            <span className="text-rose-600 font-bold">
+              {mortalityCount} {t("common.birds")} · {mortKg ? Number(mortKg).toFixed(2) : "0.00"} kg
             </span>
           </div>
         )}
@@ -141,7 +123,7 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
                     manyBoxes ? "px-1 py-px text-[9px]" : "px-1.5 py-0.5 text-[10px]"
                   } ${BOX_CHIP_PALETTE[idx % BOX_CHIP_PALETTE.length]}`}
                 >
-                  #{id}
+                  {id}
                 </span>
               ))}
             </div>
@@ -155,8 +137,25 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
           </p>
         ) : null}
 
-        <div className="flex items-center justify-between pt-1 mt-auto text-[10px] text-slate-400 font-medium border-t border-slate-100">
-          <div className="flex items-center gap-1">
+        {/* Footer — mortality + bird type take the old "time" slot (left),
+            captured time moves to the right */}
+        <div className="flex items-center justify-between gap-2 pt-1 mt-auto text-[10px] font-medium border-t border-slate-100">
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+            {mortalityCount > 0 && (
+              <span className="px-1.5 py-px rounded bg-rose-50 text-rose-600 border border-rose-200/60 shrink-0 flex items-center gap-1 text-[10px] font-bold">
+                <AlertCircle size={11} className="text-rose-400 stroke-[2.5]" />
+                <span>
+                  {t("operations.mortality_count")}: {mortalityCount}
+                </span>
+              </span>
+            )}
+            {row.birdType ? (
+              <span className="px-1.5 py-px rounded bg-blue-50 text-blue-700 font-semibold text-[10px] border border-blue-100 shrink-0">
+                {row.birdType}
+              </span>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-1 shrink-0 text-slate-400">
             <Clock size={11} className="text-slate-400 stroke-[2]" />
             <span>{t("ops.trip.captured")} {row.autoCaptureTime || "—"}</span>
           </div>

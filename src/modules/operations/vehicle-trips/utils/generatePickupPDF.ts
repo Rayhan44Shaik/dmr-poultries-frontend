@@ -18,7 +18,7 @@ import {
 
 type RGB = [number, number, number];
 
-const NAVY: RGB = [15, 35, 79];
+const NAVY: RGB = [52, 68, 115];
 const EMERALD: RGB = [5, 150, 105];
 const MUTED: RGB = [90, 100, 115];
 const GRID_LINE: RGB = [203, 213, 225];
@@ -33,15 +33,15 @@ const toNum = (value: unknown): number | null => {
 const fmt = (value: unknown): string =>
   value == null || value === "" ? "—" : String(value);
 
-/** Per-box average weight: stored value wins, else weight ÷ birds (3 dp). */
+/** Per-box average weight: stored value wins, else weight ÷ birds (2 dp). */
 function boxAvg(birds: number, weight: number, stored?: number | null): string {
   const avg =
     stored != null && Number.isFinite(Number(stored)) && Number(stored) > 0
       ? Number(stored)
       : birds > 0 && weight > 0
-        ? Number((weight / birds).toFixed(3))
+        ? Number((weight / birds).toFixed(2))
         : null;
-  return avg == null ? "—" : avg.toFixed(3);
+  return avg == null ? "—" : avg.toFixed(2);
 }
 
 export interface PickupReportOptions {
@@ -237,7 +237,7 @@ export async function generatePickupReportPDF(
     toNum(trip.avgWeight) && Number(trip.avgWeight) > 0
       ? Number(trip.avgWeight)
       : dcWeight > 0 && totalBirds > 0
-        ? Number((dcWeight / totalBirds).toFixed(3))
+        ? Number((dcWeight / totalBirds).toFixed(2))
         : null;
 
   drawSectionBand("CUMULATIVE SUMMARY");
@@ -246,7 +246,7 @@ export async function generatePickupReportPDF(
     ["Total Boxes Loaded", capacityText],
     ["Total Birds", String(totalBirds)],
     ["Total DC Weight", `${Number(dcWeight).toFixed(2)} KG`],
-    ["Average Weight", avgWeight != null ? `${avgWeight.toFixed(3)} kg / bird` : "—"],
+    ["Average Weight", avgWeight != null ? `${avgWeight.toFixed(2)} kg / bird` : "—"],
     ["Pickup Time", fmt(options.pickupTime)],
     ["Status", trip.pickupStepSubmitted ? "Submitted" : "Not submitted"],
   ]);
