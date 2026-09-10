@@ -43,7 +43,7 @@ export default {
   'nav.attendance': 'హాజరు',
   'nav.deductions': 'తగ్గింపులు',
   'nav.accountsDashboard': 'అకౌంట్స్ డ్యాష్‌బోర్డ్',
-  'nav.collectionRegister': 'కలెక్షన్ రిజిస్టర్',
+  'nav.collectionRegister': 'చెల్లింపుల రిజిస్టర్',
   'nav.farmerPayments': 'ఫారం చెల్లింపు',
   'nav.newPaymentEntry': 'కొత్త చెల్లింపు నమోదు',
   'nav.shopLedger': 'షాప్ లెడ్జర్',
@@ -505,7 +505,7 @@ export default {
   // Accounts
   'accounts.dashboard': 'అకౌంట్స్ డ్యాష్‌బోర్డ్',
   'accounts.summary': 'సారాంశం',
-  'accounts.collection_register': 'కలెక్షన్ రిజిస్టర్',
+  'accounts.collection_register': 'చెల్లింపుల రిజిస్టర్',
   'accounts.farmer_payments': 'రైతు చెల్లింపులు',
   'accounts.new_payment': 'కొత్త చెల్లింపు నమోదు',
   'accounts.market_rates': 'మార్కెట్ రేట్లు',
@@ -884,7 +884,7 @@ export default {
   'page_title.fuel': 'DMR Poultries - ఇంధన ఖర్చులు',
   'page_title.maintenance': 'DMR Poultries - మెయింటెనెన్స్',
   'page_title.shop_ledger': 'DMR Poultries - షాప్ లెడ్జర్',
-  'page_title.collection_register': 'DMR Poultries - కలెక్షన్ రిజిస్టర్',
+  'page_title.collection_register': 'DMR Poultries - చెల్లింపుల రిజిస్టర్',
   'page_title.farmer_payments': 'DMR Poultries - రైతు చెల్లింపులు',
   'page_title.market_rates': 'DMR Poultries - మార్కెట్ రేట్లు',
 

@@ -1,0 +1,175 @@
+# FINAL FRONTEND PRODUCTION REPORT
+
+Scope: **Payment Register only**. Verification date: 10 September 2026.
+
+## 1. Final Status
+
+**PARTIALLY COMPLETE — FRONTEND ONLY**
+
+The register-specific adoption and sample preview work is implemented and passes its focused checks. Full-project gates remain blocked by pre-existing issues, and real-backend end-to-end verification was deliberately not performed. This is not a production sign-off.
+
+## 2. Scope
+
+**Only frontend files were modified.**
+
+Continued from the existing local workspace without resetting earlier work. No global components, backend code, service contracts, authentication, authorization, runtime configuration files, or dependency manifests were changed in this pass. Existing payment type/mode/status/category fields, payload mapping, reference rules, age restrictions, and delayed-deletion controller remain authoritative.
+
+In the development preview, **Accounts → Payment Register** opens with the 18 sample payments automatically. Production still opens with real payments; use **Preview sample data** to opt into examples there. Click **Back to real payments** to leave demo mode. Samples remain read-only and never reach payment APIs.
+
+## 3. Backend Protection
+
+**Backend modified files: 0**
+
+- Backend routes unchanged.
+- Backend services unchanged.
+- Backend utilities unchanged.
+- Database unchanged; no migrations or real database writes were performed.
+- API contracts unchanged.
+- Browser tests intercepted API requests; they did not create, update, or delete real payments.
+
+### Backend observations
+
+Live payment numbers are supplied by the existing API and are displayed unchanged. The frontend cannot guarantee the live `Pay-DDMMYYYY-XXX` issuance format or uniqueness across clients without backend support. Sample numbers follow that format, are sequential per date, and are unique. No backend defect was diagnosed or fixed.
+
+## 4. Global Systems
+
+| System | Actual Payment Register state |
+| --- | --- |
+| Font, typography, colors | Existing application font, shared tokens and semantic status colors; no new font or palette. |
+| Spacing and page layout | Existing Accounts container; responsive filter/form grids; no duplicate page heading or KPI cards. |
+| Search | Shared SearchInput; local combined search across number, type, payee, reference, remarks, mode and amount. |
+| Filters | Shop Register's MasterDropdown with search, clear selection and keyboard interaction; shared DatePicker. |
+| Reset | Shared ResetButton; explicit Clear restores the current week and clears type/mode/search, resets page, and notifies. |
+| Refresh | Shared RefreshButton; request lock, existing rows retained, current filters and page preserved/clamped. |
+| Pagination | Shared Pagination with page sizes and safe parent-state clamping; no requests on page changes. |
+| Buttons and icons | Shared Button and action components; existing Lucide icons; named row actions. |
+| PDF, Excel, import/export | NOT APPLICABLE: this register had no working export/import implementation; no placeholder actions or new workflow added. |
+| DatePicker | Shared component in filters, New and Edit. Local dialog Escape guard protects an open calendar. Invalid date entry checked. |
+| Notifications | Existing global notification store; success feedback tested once per operation; no blocking alert in mounted register UI. |
+| Dialogs | New, Edit, View and pending-delete presentation use shared Modal with trapped/restored focus and pinned footer. |
+| Confirmations | Existing ten-second delayed-delete controller retained; shared modal now presents its countdown. Cancel/Escape keeps the record before commitment. |
+| Loading | Initial loading message and shared action loading; refresh keeps rows; saving locks form/action/close controls. |
+| Empty states | Shared EmptyState distinguishes no records, unmatched search/filters and unavailable data. |
+| Status badges | Shared StatusBadge in table and details; unchanged Draft/Approved/Paid/Cancelled values. |
+| Tabs | NOT APPLICABLE: no local tabs were introduced. Existing Accounts URL remains unchanged. |
+| Keyboard and mouse | Shared controls, native buttons, dropdown search/arrows, Enter activation, Tab/Shift+Tab focus trap and nested Escape checked. |
+| Responsive | Browser checks at 1440, 1280, 768 and 390px; table horizontal scroll, wrapping toolbar, bounded dialogs. |
+| Accessibility | Labels, column headers, icon names, dialog focus, status/error announcements; no screen-reader certification claimed. |
+
+## 5. Module Adoption Matrix
+
+No other ERP module is included in this completion claim.
+
+| Module | Status | Notes |
+| --- | --- | --- |
+| Payment Register overall | PARTIALLY COMPLETE | Implementation verified with fixtures; real API integration and repository release gates remain outstanding. |
+| Header and register filters | COMPLETE | Existing breadcrumb, weekly defaults, combined search/filter, Clear, keyboard dropdown behavior checked. |
+| Read-only sample preview | COMPLETE | 18 fictional records, unique date-sequential numbers, distinct from real data; no create/edit/delete in demo; demo refresh makes no payment request. |
+| Table and pagination | COMPLETE | Shared table tokens/status badges/buttons/pager; pagination reset/clamping and no unnecessary page-change fetches. |
+| New Payment frontend form | COMPLETE | Shared controls/modal; required-field gating, decimal amount, save lock, failure preservation and mocked successful creation checked. |
+| Edit Payment frontend form | COMPLETE | Shared controls/modal; original fields/rules retained; request guard, visible error and mocked update checked. |
+| Payment Details | COMPLETE | Shared modal/status badge; full reference and remarks, date/currency formatting; existing linked-trip resolver retained. |
+| Delayed delete frontend interaction | COMPLETE | Same existing countdown controller; focus trap, Escape/cancel, and one request on expiry tested against mocked API. |
+| Real persistence and multi-user numbering | NOT VERIFIED | Requires real-backend QA; not simulated as production success. |
+
+“COMPLETE” above is bounded to the described frontend component behavior, not real-backend or cross-browser certification.
+
+### Initial audit → adoption map
+
+- Already adopted before this pass: application font/tokens; shared search, dropdowns, pagination; New modal/input/button system; table status badges.
+- Inconsistent before this pass: custom Edit/View dialogs, native date input in Edit, local View status colors, missing Edit submission lock, unrendered Edit save errors, indistinguishable empty states, generic reset/refresh buttons.
+- Discovered during inspection: global pending-delete presentation lacked shared modal focus handling. Only this register's composition was migrated; its shared controller and other callers were not changed.
+- Not applicable: local tabs, selectable grid-row navigation, PDF/Excel/import/export. Row actions use native buttons; arrow keys were not hijacked inside text inputs.
+
+## 6. Stability
+
+- **Duplicate requests/concurrency:** synchronous refs guard New/Edit submission and refresh; existing delete controller guards commitment. Repeated refresh and double-click saves tested.
+- **Stale data:** a mutation during refresh requests a follow-up read; unmounted register ignores completed reads; real and demo datasets remain separate.
+- **Remounts:** no table remount on refresh. Form remount happens only on explicit close/reopen or editing a different payment.
+- **Input preservation:** failed writes retain entered values; refresh retains filters/search/page where valid; mode switching does not reset filters.
+- **Loading:** existing rows remain visible while refreshing; error leaves previous records available.
+- **Pagination:** safe slicing plus global parent page clamping; filters/search/page-size changes reset to page one.
+
+## 7. Accessibility
+
+- Native buttons and shared form controls retain standard keyboard/mouse semantics.
+- Tab/Shift+Tab stay inside dialogs; close restores opener focus when still mounted.
+- Nested dropdown/calendar Escape does not close the containing transaction dialog.
+- Delete cancellation is keyboard accessible; committing deletion cannot be cancelled by closing its modal.
+- Fields have labels and required/error feedback; save failure is announced inline.
+- Table uses column headers and named View/Edit/Delete actions, not a tab stop on every cell.
+- Calendar invalid-date handling and dropdown search/arrows tested.
+- Local tabs and selectable row/grid keyboard behavior are not applicable.
+- Manual screen-reader, high-contrast and complete cross-browser testing remain unverified.
+
+## 8. Verification
+
+| Check | Result |
+| --- | --- |
+| TypeScript | `npm run typecheck`: FAIL — 53 PRE-EXISTING errors; output identical to the pre-edit baseline. |
+| Production build | `npm run build`: PASS; existing chunk-size/mixed-import warnings remain. |
+| Design-system tests | `npm run test:design-system`: PASS — 39/39. |
+| Mobile tests | `npm run test:mobile`: 111 PASS / 10 FAIL — identical baseline failures (`Invalid URL`) in unchanged operations tests. |
+| Other tests | Payment Register unit tests: 6/6 PASS. Payment Register browser tests: 8/8 PASS with intercepted API responses. |
+| ESLint | All changed Payment Register sources/tests: PASS. Full `npm run lint`: FAIL — 748 errors / 49 warnings; baseline was 750 errors / 49 warnings. Two existing Edit-modal lint errors removed. |
+| Diff whitespace | `git diff --check`: PASS. |
+| Backend changes | 0 |
+
+Mobile baseline verification used a temporary read-only archive of the existing commit's frontend sources with the same installed dependencies. It reproduced the exact ten failing test names; no backend files were copied or changed. Temporary browser binaries and baseline/source scratch artifacts were removed after verification.
+
+Re-run focused tests:
+
+```sh
+npx tsx --test src/modules/accounts/utils/paymentRegister.test.ts
+# Start the frontend separately; no real backend needed for these intercepted tests.
+npx playwright test --config tests/payment-register/playwright.config.ts
+```
+
+The browser config accepts `PAYMENT_TEST_BASE_URL` and optionally `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` without modifying environment files.
+
+## 9. Browser Verification
+
+**Verified**
+
+Headless Chromium, using isolated API fixtures: demo safety, breadcrumb, weekly dates, filters/search/Clear, page reset, pagination, stable refresh, read errors, empty states, successful/failed create and edit, single-submit protection, delete cancellation/expiry, named controls, focus containment/restoration, nested Escape, calendar invalid-date rejection, dropdown keyboard search, dialog bounds and document overflow at representative widths. Desktop register/form and mobile register/open-calendar screenshots were also visually inspected.
+
+**Not verified**
+
+Real server persistence, real bank-master availability/mapping, multi-user payment numbering, linked-trip details with real data, screen readers, Firefox/Safari, touch devices, and a production-scale performance/load test. The browser checks are not backend end-to-end tests.
+
+## 10. Remaining Items
+
+1. Resolve the 53 repository TypeScript errors outside this change before a clean full-project typecheck can be claimed.
+2. Resolve the remaining 748 ESLint errors and 49 warnings outside the scoped files.
+3. Repair the ten existing mobile/operations `Invalid URL` test failures; no related service logic was changed here.
+4. QA real payment creation/update/delete, bank-method mapping, linked-trip detail lookup and backend number issuance in an authorized staging environment.
+5. Perform screen-reader and Firefox/Safari/touch-device checks. At narrow widths the unchanged application header has very limited title space; register controls and dialogs remain usable, but the shell requires its own responsive review.
+6. Confirm performance with the expected real dataset size. This page uses the existing list API and local combined filtering; no server-pagination contract was invented.
+
+## 11. Files Changed
+
+Current pass:
+
+- `src/modules/accounts/pages/PaymentBookPage.tsx`
+- `src/modules/accounts/components/payment-book/PaymentTable.tsx`
+- `src/modules/accounts/components/payment-book/NewPaymentModal.tsx`
+- `src/modules/accounts/components/payment-book/PaymentEditModal.tsx`
+- `src/modules/accounts/components/payment-book/PaymentViewModal.tsx`
+- `src/modules/accounts/utils/paymentRegisterDemo.ts`
+- `src/modules/accounts/utils/paymentRegister.test.ts`
+- `tests/payment-register/payment-register.spec.ts`
+- `tests/payment-register/playwright.config.ts`
+- `docs/payment-register-production-report.md`
+
+Earlier local work preserved: `src/modules/accounts/utils/paymentRegister.ts`, the register-related labels in `src/routes/navigation.ts`, `src/i18n/en.ts`, and `src/i18n/te.ts`, plus the existing register redesign. No unrelated module implementation was rewritten.
+
+## 12. Risk Assessment
+
+**Medium.** Register-specific UI checks pass, frontend API payloads and lifecycle rules are preserved, sample data is read-only, and no dependency was added. However, this is a finance UI; live integration and repository-wide gate failures prevent a low-risk production assertion.
+
+## 13. Final Recommendation
+
+- **Further development:** ready.
+- **QA:** ready for Payment Register frontend QA; demo mode is available now.
+- **Staging:** appropriate for controlled integration testing after the team's normal deployment gates.
+- **Production:** not recommended as fully verified until the remaining checks and release blockers are resolved.

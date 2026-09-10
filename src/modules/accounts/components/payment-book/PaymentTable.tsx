@@ -1,197 +1,57 @@
-// src/modules/accounts/components/payment-book/PaymentTable.tsx
-
-import { useState, useMemo } from 'react';
+import { Eye, Pencil, Trash2 } from 'lucide-react';
 import type { Payment } from '../../types/payment.types';
-import {
-  paginationBarClass,
-  paginationNavBtnClass,
-  paginationPageBtnClass,
-  shouldShowPagination,
-} from '../../../../shared/ui/paginationStyles';
+import { EmptyState, type EmptyVariant } from '../../../../ui/EmptyState';
+import { StatusBadge } from '../../../../ui/StatusBadge';
+import { Button } from '../../../../ui/Button';
+import { canEditItem, canDeleteItem } from '../../../../utils/dateUtils';
+import { paymentCurrency } from '../../utils/paymentRegister';
+import { uiTableClass, uiTableHeadClass, uiTableThClass, uiTableTdClass, uiTableRowClass, uiBadgeClass } from '../../../../shared/ui/uiTokens';
 
 interface PaymentTableProps {
   payments: Payment[];
-  selectedId: string | null;
-  onSelect: (id: string | null) => void;
-  itemsPerPage?: number;
+  loading?: boolean;
+  readOnly?: boolean;
+  emptyVariant?: EmptyVariant;
+  error?: boolean;
+  isPending: (id: string) => boolean;
+  onView: (payment: Payment) => void;
+  onEdit: (payment: Payment) => void;
+  onDelete: (payment: Payment) => void;
 }
 
-export function PaymentTable({ payments, selectedId, onSelect, itemsPerPage = 10 }: PaymentTableProps) {
-  const [currentPage, setCurrentPage] = useState(1);
-
-  const totalPages = Math.ceil(payments.length / itemsPerPage) || 1;
-  const paginatedPayments = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    const end = start + itemsPerPage;
-    return payments.slice(start, end);
-  }, [payments, currentPage, itemsPerPage]);
-
-  useMemo(() => {
-    if (currentPage > totalPages) setCurrentPage(1);
-  }, [payments, currentPage, totalPages]);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2,
-    }).format(amount || 0);
-  };
-
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
-
-  // Generate clean sequential Payment Number like #PAY-20260803-001
-  const formatPaymentNo = (payment: Payment, index: number) => {
-    const dateClean = payment.paymentDate ? payment.paymentDate.replace(/-/g, '') : '20260803';
-    const sequentialNum = String(index + 1).padStart(3, '0');
-    return `#PAY-${dateClean}-${sequentialNum}`;
-  };
-
-  const handleRowClick = (id: string) => {
-    onSelect(selectedId === id ? null : id);
-  };
-
-  const getPageNumbers = (): (number | 'ellipsis')[] => {
-    const pages: (number | 'ellipsis')[] = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      pages.push(1);
-      if (currentPage > 3) pages.push('ellipsis');
-      const start = Math.max(2, currentPage - 1);
-      const end = Math.min(totalPages - 1, currentPage + 1);
-      for (let i = start; i <= end; i++) pages.push(i);
-      if (currentPage < totalPages - 2) pages.push('ellipsis');
-      pages.push(totalPages);
-    }
-    return pages;
-  };
-
-  const startItem = (currentPage - 1) * itemsPerPage + 1;
-  const endItem = Math.min(currentPage * itemsPerPage, payments.length);
-  void startItem;
-  void endItem;
-
+export function PaymentTable({ payments, loading, error, readOnly = false, emptyVariant = 'no-data', isPending, onView, onEdit, onDelete }: PaymentTableProps) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-slate-50/80 border-b border-slate-200">
-            <tr>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                Payment No
-              </th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                Date
-              </th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                Payment Type
-              </th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                Paid To
-              </th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap text-right">
-                Amount
-              </th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                Mode
-              </th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                Remarks
-              </th>
+    <div className="overflow-x-auto">
+      <table className={uiTableClass} style={{ minWidth: 1180 }}>
+        <caption className="sr-only">Payment Register transaction records</caption>
+        <thead className={uiTableHeadClass}><tr>
+          {['Payment No', 'Date', 'Payment Type', 'Paid To', 'Amount', 'Mode', 'Reference / Bill No', 'Remarks', 'Status', 'Actions'].map(title => <th key={title} scope="col" className={`${uiTableThClass} ${title === 'Amount' || title === 'Actions' ? 'text-right' : ''}`}>{title}</th>)}
+        </tr></thead>
+        <tbody>
+          {!payments.length ? <tr><td colSpan={10}>
+            {loading ? <p className="px-4 py-14 text-center text-sm text-slate-500" role="status">Loading payments…</p> : <EmptyState variant={error ? 'error' : emptyVariant}
+              title={error ? 'Records unavailable' : emptyVariant === 'no-data' ? 'No payments recorded yet' : 'No payments found'}
+              description={error ? 'Use Refresh to try again.' : emptyVariant === 'no-data' ? 'New payments will appear here once recorded.' : 'Try adjusting your search or date, type and mode filters.'} />}
+          </td></tr> : payments.map(payment => (
+            <tr key={payment.id} className={`${uiTableRowClass} ${payment.status === 'Cancelled' ? 'bg-slate-50 text-slate-400' : ''}`}>
+              <td className={`${uiTableTdClass} whitespace-nowrap font-semibold text-slate-900`}>{payment.paymentNo || <span className="font-normal text-slate-400">Not assigned</span>}</td>
+              <td className={`${uiTableTdClass} whitespace-nowrap tabular-nums`}>{payment.paymentDate.slice(0, 10).split('-').reverse().join('/')}</td>
+              <td className={uiTableTdClass}>{payment.paymentType}</td>
+              <td className={`${uiTableTdClass} min-w-36 font-medium`}>{payment.paidTo}</td>
+              <td className={`${uiTableTdClass} text-right tabular-nums whitespace-nowrap font-semibold text-slate-900`}>{paymentCurrency.format(payment.amount)}</td>
+              <td className={`${uiTableTdClass} whitespace-nowrap`}><span className={uiBadgeClass('neutral')}>{payment.paymentMode || '—'}</span></td>
+              <td className={uiTableTdClass}>{payment.referenceNo || '—'}</td>
+              <td className={`${uiTableTdClass} max-w-52`}><p className="truncate" title={payment.remarks}>{payment.remarks || '—'}</p></td>
+              <td className={uiTableTdClass}><StatusBadge status={payment.status} /></td>
+              <td className={uiTableTdClass}><div className="flex justify-end gap-1">
+                <Button variant="ghost" size="xs" iconOnly aria-label={`View ${payment.paymentNo || payment.paidTo}`} title="View payment" onClick={() => onView(payment)}><Eye size={15} /></Button>
+                {!readOnly && <><Button variant="ghost" size="xs" iconOnly aria-label={`Edit ${payment.paymentNo}`} title={canEditItem(payment.createdAt) ? 'Edit payment' : 'Payments older than 10 days cannot be edited'} disabled={isPending(payment.id) || !canEditItem(payment.createdAt)} onClick={() => onEdit(payment)}><Pencil size={15} /></Button>
+                <Button variant="ghost" size="xs" iconOnly aria-label={`Delete ${payment.paymentNo}`} title={canDeleteItem(payment.createdAt) ? 'Delete payment' : 'Payments older than 10 days cannot be deleted'} disabled={isPending(payment.id) || !canDeleteItem(payment.createdAt)} onClick={() => onDelete(payment)}><Trash2 size={15} /></Button></>}
+              </div></td>
             </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 bg-white">
-            {paginatedPayments.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-slate-400 text-sm">
-                  No payments found. Click <span className="font-semibold text-blue-600">"New Payment"</span> to add one.
-                </td>
-              </tr>
-            ) : (
-              paginatedPayments.map((payment, index) => {
-                const isSelected = selectedId === payment.id;
-                const absoluteIndex = (currentPage - 1) * itemsPerPage + index;
-                return (
-                  <tr
-                    key={payment.id}
-                    onClick={() => handleRowClick(payment.id)}
-                    className={`cursor-pointer transition-all duration-150 group ${
-                      isSelected
-                        ? 'bg-blue-50/40 shadow-[inset_0_0_0_2px_#3b82f6]'
-                        : 'hover:bg-slate-50/80'
-                    }`}
-                  >
-                    <td className="px-6 py-4.5 text-sm font-mono font-semibold text-blue-600 whitespace-nowrap">
-                      {formatPaymentNo(payment, absoluteIndex)}
-                    </td>
-                    <td className="px-6 py-4.5 text-sm text-slate-600 whitespace-nowrap">
-                      {formatDate(payment.paymentDate)}
-                    </td>
-                    <td className="px-6 py-4.5 text-sm text-slate-700 whitespace-nowrap">
-                      {payment.paymentType}
-                    </td>
-                    <td className="px-6 py-4.5 text-sm text-slate-700 whitespace-nowrap">
-                      {payment.paidTo}
-                    </td>
-                    <td className="px-6 py-4.5 text-sm font-bold text-emerald-600 text-right whitespace-nowrap tracking-wide">
-                      {formatCurrency(payment.amount)}
-                    </td>
-                    <td className="px-6 py-4.5 text-sm text-slate-600 whitespace-nowrap">
-                      {payment.paymentMode}
-                    </td>
-                    <td className="px-6 py-4.5 text-sm text-slate-500 truncate max-w-[240px]">
-                      {payment.remarks || '-'}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      {shouldShowPagination(payments.length) && (
-        <div className={paginationBarClass}>
-            <button
-              onClick={() => setCurrentPage(currentPage - 1)}
-              disabled={currentPage === 1}
-              className={paginationNavBtnClass}
-            >
-              Previous
-            </button>
-
-            {getPageNumbers().map((page, idx) =>
-              page === 'ellipsis' ? (
-                <span key={`ellipsis-${idx}`} className="px-2 text-xs text-slate-400">…</span>
-              ) : (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={paginationPageBtnClass(currentPage === page)}
-                >
-                  {page}
-                </button>
-              )
-            )}
-
-            <button
-              onClick={() => setCurrentPage(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className={paginationNavBtnClass}
-            >
-              Next
-            </button>
-        </div>
-      )}
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

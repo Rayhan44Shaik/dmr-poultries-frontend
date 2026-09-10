@@ -1,6 +1,5 @@
-// src/modules/accounts/payment-book/PaymentBookPage.tsx
-
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Plus } from 'lucide-react';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { PaymentTable } from '../components/payment-book/PaymentTable';
 import { PaymentViewModal } from '../components/payment-book/PaymentViewModal';
@@ -10,452 +9,166 @@ import { deletePayment, listPayments } from '../services/paymentApiService';
 import type { Payment } from '../types/payment.types';
 import { DatePicker } from '../../../components/common/DatePicker';
 import { canEditItem, canDeleteItem } from '../../../utils/dateUtils';
+import { weekRange } from '../../../utils/businessDate';
 import { usePendingDelete } from '../../../hooks/usePendingDelete';
-import { PendingDeleteNotification } from '../../../components/common/PendingDeleteNotification';
-import { uiInputClass, uiSearchInputClass } from "../../../shared/ui/uiTokens";
-import {
-  Download,
-  RefreshCw,
-  Plus,
-  FileText,
-  X,
-  Eye,
-  Pencil,
-  Trash2,
-  Calendar,
-  Tag,
-  CreditCard,
-  Wallet,
-  Banknote,
-  TrendingUp,
-} from 'lucide-react';
+import { Modal } from '../../../ui/Modal';
+import { pendingDeleteCountdownLabel } from '../../../shared/ui/pendingDelete';
+import MasterDropdown from '../../masters/components/MasterDropdown';
+import '../../masters/styles/masters.css';
+import { Button } from '../../../ui/Button';
+import { SearchInput } from '../../../ui/SearchInput';
+import { RefreshButton, ResetButton } from '../../../ui/ExportActions';
+import { createDemoPayments } from '../utils/paymentRegisterDemo';
+import { Pagination } from '../../../ui/Pagination';
+import { filterPayments, PAYMENT_TYPES, PAYMENT_MODES, paymentCurrency } from '../utils/paymentRegister';
 
-type PaymentBookPageProps = { embedded?: boolean };
-
-const formatCurrency = (amount: number): string => {
-  if (amount >= 10000000) {
-    return `₹${(amount / 10000000).toFixed(2)}Cr`;
-  }
-  if (amount >= 100000) {
-    return `₹${(amount / 100000).toFixed(2)}L`;
-  }
-  return `₹${amount.toLocaleString('en-IN')}`;
-};
-
-export function PaymentBookPage({ embedded = false }: PaymentBookPageProps) {
+export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const { showNotification } = useSafeNotification();
-
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [paymentType, setPaymentType] = useState('');
-  const [paymentMode, setPaymentMode] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const isFilterActive = useMemo(() => {
-    return Boolean(dateFrom || dateTo || paymentType || paymentMode || searchQuery.trim());
-  }, [dateFrom, dateTo, paymentType, paymentMode, searchQuery]);
-
+  // Show the isolated examples immediately in the development preview.
+  // Production continues to open with real API data; demo remains opt-in there.
+  const [demo, setDemo] = useState(import.meta.env.DEV);
+  const [demoPayments] = useState(() => createDemoPayments());
+  const demoRef = useRef(demo);
+  const mounted = useRef(false);
+  const [realPayments, setPayments] = useState<Payment[]>([]);
+  const [realLoading, setLoading] = useState(true);
+  const [realError, setError] = useState(false);
+  const inFlight = useRef(false);
+  const reloadAfterSave = useRef(false);
+  const [filters, setFilters] = useState(() => ({ ...weekRange(), type: '', mode: '', search: '' }));
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [viewingPayment, setViewingPayment] = useState<Payment | null>(null);
 
-  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const payments = demo ? demoPayments : realPayments;
+  const loading = !demo && realLoading;
+  const error = !demo && realError;
 
-  const loadPayments = useCallback(async () => {
-    const filters: any = { search: searchQuery };
-    if (dateFrom) filters.dateFrom = dateFrom;
-    if (dateTo) filters.dateTo = dateTo;
-    if (paymentType) filters.paymentType = paymentType;
-    if (paymentMode) filters.paymentMode = paymentMode;
-
-    try {
-      const data = await listPayments(filters);
-      setPayments(data);
-    } catch {
-      showNotification('Failed to load payments from the server', 'error');
-    } finally {
-      setLoading(false);
+  // The existing list endpoint returns the dataset. Filter locally so search
+  // covers all displayed fields and paging/filter changes make no requests.
+  const loadPayments = useCallback(async (afterMutation = false) => {
+    if (demoRef.current || !mounted.current) return;
+    if (inFlight.current) {
+      // A save/delete completing during refresh must not leave stale rows.
+      if (afterMutation) reloadAfterSave.current = true;
+      return;
     }
-  }, [dateFrom, dateTo, paymentType, paymentMode, searchQuery, showNotification]);
+    inFlight.current = true;
+    setLoading(true);
+    try {
+      do {
+        reloadAfterSave.current = false;
+        const data = await listPayments();
+        if (mounted.current && !reloadAfterSave.current) setPayments(data);
+      } while (reloadAfterSave.current);
+      if (mounted.current) setError(false);
+    } catch {
+      if (!mounted.current) return;
+      setError(true);
+      if (!demoRef.current) showNotification('Unable to load payments. Please try refreshing.', 'error');
+    } finally {
+      inFlight.current = false;
+      if (mounted.current) setLoading(false);
+    }
+  }, [showNotification]);
 
-  // Auto-sync interval / listener setup for background entries
   useEffect(() => {
-    loadPayments();
-
-    const sync = () => {
-      if (!document.hidden) loadPayments();
-    };
-
-    const interval = setInterval(sync, 1000); // Polls and auto-syncs entries instantly every second
-
-    const handleVisibility = () => {
-      if (!document.hidden) sync();
-    };
-
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
+    mounted.current = true;
+    // Schedule the initial external fetch; cancel it if the view unmounts.
+    const initialLoad = window.setTimeout(() => void loadPayments(), 0);
+    const sync = () => { if (!document.hidden) void loadPayments(); };
+    document.addEventListener('visibilitychange', sync);
+    return () => { mounted.current = false; window.clearTimeout(initialLoad); document.removeEventListener('visibilitychange', sync); };
   }, [loadPayments]);
 
-  useEffect(() => {
-    setSelectedId(null);
-  }, [payments]);
-
-  const kpis = useMemo(() => {
-    if (!isFilterActive) {
-      return { totalPayments: 0, cashPayments: 0, bankPayments: 0, totalTransactions: 0 };
-    }
-    
-    let totalPayments = 0;
-    let cashPayments = 0;
-    let bankPayments = 0;
-
-    payments.forEach((p) => {
-      const amt = Number(p.amount) || 0;
-      totalPayments += amt;
-      if (p.paymentMode && p.paymentMode.toLowerCase().includes('cash')) {
-        cashPayments += amt;
-      } else {
-        bankPayments += amt;
-      }
-    });
-
-    return {
-      totalPayments,
-      cashPayments,
-      bankPayments,
-      totalTransactions: payments.length,
-    };
-  }, [isFilterActive, payments]);
-
-  const selectedPayment = useMemo(
-    () => payments.find((p) => p.id === selectedId) || null,
-    [payments, selectedId]
-  );
-
-  const handleNewPayment = () => {
-    setIsNewModalOpen(true);
+  const toggleDemo = () => {
+    demoRef.current = !demo;
+    setDemo(!demo);
+    if (demo) void loadPayments();
   };
 
-  const handleModalSave = (saved: Payment) => {
-    showNotification(
-      saved.id ? 'Payment successfully saved' : 'Action completed',
-      'success'
-    );
-    loadPayments();
+  const changeFilter = (key: keyof typeof filters, value: string) => {
+    setFilters(previous => ({ ...previous, [key]: value }));
+    setPage(1);
   };
-
-  const handleView = () => {
-    if (selectedPayment) {
-      setViewingPayment(selectedPayment);
-      setIsViewModalOpen(true);
-    }
+  const clearFilters = () => {
+    setFilters({ ...weekRange(), type: '', mode: '', search: '' });
+    setPage(1);
+    showNotification('Filters cleared. Showing the current week.', 'info');
   };
-
-  const handleEdit = () => {
-    if (selectedPayment) {
-      if (!canEditItem(selectedPayment.createdAt)) {
-        showNotification('This payment is older than 10 days and cannot be edited.', 'error');
-        return;
-      }
-      setEditingPayment(selectedPayment);
-      setIsEditModalOpen(true);
-    }
+  const invalidRange = Boolean(filters.from && filters.to && filters.from > filters.to);
+  const filtered = useMemo(() => filterPayments(payments, filters), [payments, filters]);
+  const types = useMemo(() => [...new Set([...PAYMENT_TYPES, ...payments.map(p => p.paymentType)])].filter(Boolean), [payments]);
+  const modes = useMemo(() => [...new Set([...PAYMENT_MODES, ...payments.map(p => p.paymentMode)])].filter(Boolean), [payments]);
+  const total = useMemo(() => filtered.reduce((sum, p) => sum + Number(p.amount || 0), 0), [filtered]);
+  const safePage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
+  const rows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const handleSave = () => {
+    showNotification('Payment saved successfully', 'success');
+    void loadPayments(true);
   };
-
-  const { requestDelete, cancel, pendingItems } = usePendingDelete<string>(async (id) => {
+  const { requestDelete, cancel, pendingItems, isPending } = usePendingDelete<string>(async id => {
+    if (demoRef.current || id.startsWith('demo-payment-')) return;
     try {
       await deletePayment(id);
       showNotification('Payment deleted successfully', 'success');
-      setSelectedId(null);
-      loadPayments();
+      void loadPayments(true);
     } catch {
       showNotification('Failed to delete payment', 'error');
     }
   });
 
-  const handleDelete = () => {
-    if (selectedPayment) {
-      if (!canDeleteItem(selectedPayment.createdAt)) {
-        showNotification('This payment is older than 10 days and cannot be deleted.', 'error');
-        return;
-      }
-      requestDelete(selectedPayment.id, { label: `Deleting payment to ${selectedPayment.paidTo}` });
-    }
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (tableContainerRef.current && !tableContainerRef.current.contains(e.target as Node)) {
-        setSelectedId(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const paymentTypes = useMemo(() => {
-    const types = new Set(payments.map((p) => p.paymentType));
-    return Array.from(types);
-  }, [payments]);
-
-  const paymentModes = useMemo(() => {
-    const modes = new Set(payments.map((p) => p.paymentMode));
-    return Array.from(modes);
-  }, [payments]);
-
-  const clearFilters = () => {
-    setDateFrom('');
-    setDateTo('');
-    setPaymentType('');
-    setPaymentMode('');
-    setSearchQuery('');
-  };
-
   return (
-    <div className={`w-full space-y-5 animate-in fade-in duration-500 ${
-      embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-gradient-to-br from-slate-50 via-white to-slate-50 min-h-screen'
-    }`}>
-      {/* New Payment Button */}
-      <div className="flex justify-end">
-        <button
-          onClick={handleNewPayment}
-          className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-sm font-semibold transition-all shadow-md shadow-blue-200 flex items-center gap-2 hover:shadow-lg hover:scale-[1.02] active:scale-95"
-        >
-          <Plus size={16} /> New Payment
-        </button>
-      </div>
-
-      {/* Compact KPI Cards (Only rendered when a filter is active) */}
-      {isFilterActive && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-in fade-in zoom-in-95 duration-200">
-          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm flex items-center gap-3">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-              <FileText size={16} />
-            </div>
-            <div>
-              <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Total</p>
-              <p className="text-sm font-bold text-slate-800">{formatCurrency(kpis.totalPayments)}</p>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm flex items-center gap-3">
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-              <Wallet size={16} />
-            </div>
-            <div>
-              <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Cash</p>
-              <p className="text-sm font-bold text-slate-800">{formatCurrency(kpis.cashPayments)}</p>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm flex items-center gap-3">
-            <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
-              <Banknote size={16} />
-            </div>
-            <div>
-              <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Bank</p>
-              <p className="text-sm font-bold text-slate-800">{formatCurrency(kpis.bankPayments)}</p>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm flex items-center gap-3">
-            <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
-              <TrendingUp size={16} />
-            </div>
-            <div>
-              <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Transactions</p>
-              <p className="text-sm font-bold text-slate-800">{kpis.totalTransactions}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Filter Bar */}
-      <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-sm">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div>
-            <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-              <Calendar className="inline w-3 h-3 mr-1" /> From
-            </label>
-            <DatePicker
-              value={dateFrom}
-              onChange={setDateFrom}
-              placeholder="Start date"
-              className="w-full"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-              <Calendar className="inline w-3 h-3 mr-1" /> To
-            </label>
-            <DatePicker
-              value={dateTo}
-              onChange={setDateTo}
-              placeholder="End date"
-              className="w-full"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-              <Tag className="inline w-3 h-3 mr-1" /> Type
-            </label>
-            <select
-              value={paymentType}
-              onChange={(e) => setPaymentType(e.target.value)}
-              className={uiInputClass}
-            >
-              <option value="">All Types</option>
-              {paymentTypes.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-              <CreditCard className="inline w-3 h-3 mr-1" /> Mode
-            </label>
-            <select
-              value={paymentMode}
-              onChange={(e) => setPaymentMode(e.target.value)}
-              className={uiInputClass}
-            >
-              <option value="">All Modes</option>
-              {paymentModes.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-100">
-          <div className="flex-1 min-w-[180px] relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search reference, paid to, amount..."
-              // Global search field: 40px control height, 8px radius, brand
-              // emerald focus ring (was 36px with a blue-* ring).
-              className={uiSearchInputClass}
-            />
-            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-              <FileText className="w-3.5 h-3.5 text-slate-400" />
-            </div>
-          </div>
-          <button
-            onClick={clearFilters}
-            className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 transition bg-white flex items-center gap-1.5"
-          >
-            <X size={14} /> Clear
-          </button>
-          <button
-            onClick={() => { loadPayments(); showNotification('Refreshed', 'info'); }}
-            className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 transition bg-white flex items-center gap-1.5"
-          >
-            <RefreshCw size={14} /> Refresh
-          </button>
-          <button
-            onClick={() => showNotification('Export coming soon', 'info')}
-            className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 transition bg-white flex items-center gap-1.5"
-          >
-            <Download size={14} /> Export
-          </button>
+    <div className={`master-page w-full min-w-0 space-y-3 text-slate-700 ${embedded ? '' : 'p-4 sm:p-6'}`}>
+      {/* The application header owns Accounts > Payment Register. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-500">Track outgoing payments and their transaction details.</p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" aria-pressed={demo} disabled={!!pendingItems.length} onClick={toggleDemo}>{demo ? 'Back to real payments' : 'Preview sample data'}</Button>
+          <Button icon={<Plus size={16} />} disabled={demo} title={demo ? 'Return to real payments to create a payment' : undefined} onClick={() => { if (!demoRef.current) setIsNewModalOpen(true); }}>New Payment</Button>
         </div>
       </div>
-
-      {/* Table Card */}
-      <div ref={tableContainerRef} className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-50/80 to-white border-b border-slate-200/60">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold text-slate-800">Payments</h2>
-            <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-              {payments.length}
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={handleView}
-              disabled={!selectedPayment}
-              className={`p-1.5 rounded-lg transition-all ${
-                selectedPayment
-                  ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-              }`}
-              title="View selected payment"
-            >
-              <Eye size={15} />
-            </button>
-            <button
-              onClick={handleEdit}
-              disabled={!selectedPayment}
-              className={`p-1.5 rounded-lg transition-all ${
-                selectedPayment
-                  ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-              }`}
-              title="Edit selected payment"
-            >
-              <Pencil size={15} />
-            </button>
-            <button
-              onClick={handleDelete}
-              disabled={!selectedPayment}
-              className={`p-1.5 rounded-lg transition-all ${
-                selectedPayment
-                  ? 'bg-rose-50 text-rose-700 hover:bg-rose-100'
-                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-              }`}
-              title="Delete selected payment"
-            >
-              <Trash2 size={15} />
-            </button>
-          </div>
+      {demo && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><strong>Demo mode · Sample data only.</strong> These 18 fictional payments are read-only and never saved to the server. Search, filters, pagination and View are available.</div>}
+      <section aria-label="Payment filters" className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <DatePicker label="From Date" value={filters.from} onChange={v => changeFilter('from', v)} />
+          <DatePicker label="To Date" value={filters.to} onChange={v => changeFilter('to', v)} />
+          <MasterDropdown label="Payment Type" value={filters.type} options={types} placeholder="All payment types" onChange={v => changeFilter('type', v)} searchable allowClear />
+          <MasterDropdown label="Payment Mode" value={filters.mode} options={modes} placeholder="All payment modes" onChange={v => changeFilter('mode', v)} searchable allowClear />
         </div>
+        {invalidRange && <p role="alert" className="text-xs text-red-600">From Date must be on or before To Date.</p>}
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchInput value={filters.search} onChange={v => changeFilter('search', v)} aria-label="Search payments" placeholder="Search payment no, payee, reference, remarks or amount…" wrapperClassName="w-full sm:flex-1 sm:min-w-64" />
+          <ResetButton onClick={clearFilters}>Clear</ResetButton>
+          <RefreshButton loading={loading} onClick={() => { if (demo) showNotification('Sample data is up to date. No server request was made.', 'info'); else void loadPayments(); }} />
+        </div>
+      </section>
+      <section aria-label="Payment records" aria-busy={loading} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 text-xs text-slate-500">
+          <span aria-live="polite">{loading ? 'Updating records…' : `${filtered.length} ${filtered.length === 1 ? 'record' : 'records'}`}</span>
+          <span>Filtered total <strong className="ml-2 text-sm tabular-nums text-slate-800">{paymentCurrency.format(total)}</strong></span>
+        </div>
+        {error && <p role="alert" className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">Unable to refresh records. {payments.length ? 'Previously loaded records are still shown. ' : ''}Use Refresh to try again.</p>}
+        <PaymentTable readOnly={demo} emptyVariant={error ? 'error' : !payments.length ? 'no-data' : filters.search.trim() ? 'no-search' : 'no-filters'} isPending={isPending} payments={rows} loading={loading && !payments.length} error={error && !payments.length} onView={setViewingPayment}
+          onEdit={p => { if (!demoRef.current && canEditItem(p.createdAt)) setEditingPayment(p); }}
+          onDelete={p => { if (!demoRef.current && canDeleteItem(p.createdAt)) requestDelete(p.id, { label: `Deleting payment to ${p.paidTo}` }); }} />
+        <Pagination page={page} pageSize={pageSize} totalItems={filtered.length} onPageChange={setPage} onPageSizeChange={size => { setPageSize(size); setPage(1); }} />
 
-        {loading ? (
-          <div className="p-8 text-center">
-            <div className="inline-block animate-spin rounded-full h-6 w-6 border-3 border-blue-500 border-t-transparent"></div>
-            <p className="mt-2 text-slate-500 text-xs">Loading payments...</p>
-          </div>
-        ) : (
-          <PaymentTable
-            payments={payments}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-          />
-        )}
-        <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
-      </div>
-
-      {/* ─── MODALS ─── */}
-      <NewPaymentModal
-        isOpen={isNewModalOpen}
-        onClose={() => setIsNewModalOpen(false)}
-        onSave={handleModalSave}
-      />
-
-      <PaymentEditModal
-        isOpen={isEditModalOpen}
-        payment={editingPayment}
-        onClose={() => {
-          setIsEditModalOpen(false);
-          setEditingPayment(null);
-        }}
-        onSave={handleModalSave}
-      />
-
-      <PaymentViewModal
-        isOpen={isViewModalOpen}
-        payment={viewingPayment}
-        onClose={() => {
-          setIsViewModalOpen(false);
-          setViewingPayment(null);
-        }}
-      />
+      </section>
+      <Modal isOpen={pendingItems.length > 0} title="Payment deletion pending" size="md"
+        closeOnOverlay={false} showCloseButton={false} closeOnEscape={!pendingItems.some(item => item.committing)}
+        onClose={() => pendingItems.filter(item => !item.committing).forEach(item => cancel(item.id))}
+        footer={<Button variant="secondary" disabled={pendingItems.some(item => item.committing)} onClick={() => pendingItems.forEach(item => cancel(item.id))}>Cancel deletion</Button>}>
+        <div className="space-y-3">{pendingItems.map(item => <div key={item.id}>
+          <p className="text-sm font-medium text-slate-800">{item.label}</p>
+          <p className="mt-2 text-sm text-slate-500" role="status">{item.committing ? 'Deleting payment…' : `${pendingDeleteCountdownLabel(item.secondsLeft)}. Cancel to keep this payment.`}</p>
+        </div>)}</div>
+      </Modal>
+      <NewPaymentModal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} onSave={handleSave} />
+      <PaymentEditModal isOpen={!!editingPayment} payment={editingPayment} onClose={() => setEditingPayment(null)} onSave={handleSave} />
+      <PaymentViewModal isOpen={!!viewingPayment} payment={viewingPayment} onClose={() => setViewingPayment(null)} />
     </div>
   );
 }

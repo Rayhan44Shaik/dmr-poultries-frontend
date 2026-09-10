@@ -477,7 +477,7 @@ export const NAV_SECTIONS: NavSection[] = [
         keywords: "accounts summary totals",
       },
       {
-        label: "Collection Register",
+        label: "Payment Register",
         labelKey: "nav.collectionRegister",
         path: "/accounts?tab=paid-payments",
         icon: BookOpen,
