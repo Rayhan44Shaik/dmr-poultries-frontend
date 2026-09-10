@@ -522,6 +522,29 @@ function dcPhotoSvg({ tripNo, farm, weightKg, date, slip = 1 }) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
+/** Sample fuel-station bill (Step 5 diesel ledger proof), same encoding as the DC slips. */
+function dieselBillSvg({ bunk, litres, rate, amount, date, slip = 1 }) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400">
+  <rect width="640" height="400" fill="#f8fafc"/>
+  <rect x="16" y="16" width="608" height="368" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <rect x="16" y="16" width="608" height="64" rx="18" fill="#b45309"/>
+  <text x="40" y="46" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#ffffff">FUEL BILL — DMR POULTRIES</text>
+  <text x="40" y="68" font-family="Arial, sans-serif" font-size="12" fill="#fef3c7">Diesel Receipt · Bill ${slip}</text>
+  <line x1="40" y1="110" x2="600" y2="110" stroke="#e2e8f0" stroke-width="2"/>
+  <text x="40" y="145" font-family="Arial, sans-serif" font-size="14" fill="#64748b">BUNK</text>
+  <text x="220" y="145" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#0f172a">${bunk}</text>
+  <text x="40" y="180" font-family="Arial, sans-serif" font-size="14" fill="#64748b">DATE</text>
+  <text x="220" y="180" font-family="Arial, sans-serif" font-size="16" fill="#0f172a">${date}</text>
+  <rect x="40" y="210" width="560" height="125" rx="14" fill="#fffbeb" stroke="#fcd34d"/>
+  <text x="70" y="248" font-family="Arial, sans-serif" font-size="14" fill="#92400e">DIESEL</text>
+  <text x="220" y="248" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#0f172a">${litres} L @ ₹${rate}</text>
+  <text x="70" y="300" font-family="Arial, sans-serif" font-size="14" fill="#92400e">AMOUNT PAID</text>
+  <text x="220" y="305" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#b45309">₹${amount}</text>
+  <text x="600" y="360" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#94a3b8">SAMPLE DATA — mock backend</text>
+</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 /** Step 2 (Farm) + Step 3 (Pickup) fields shared by every vehicle trip below. */
 function farmStepDetails({ farm, address, destMeter, reachedTime, loadTime, tolls, avgBirdWeight, gps, tripNo, weightKg, birds, date }) {
   // Step 3: boxes of ~100 birds each, weights derived from the DC weight.
@@ -758,6 +781,332 @@ function buildTrips() {
     // (Deliveries), 9304 → Step 5 (End/Expenses). Plain remarks (no "[ORDER]")
     // so the Orders scenario above is completely untouched.
     ...buildWalkthroughTrips({ stamp, today, yesterday }),
+
+    // ── Scenario matrix: every remaining wizard/UI state as sample data ──────
+    // Box limit reached, single-DC-photo submitted, Pending fully submitted,
+    // Completed with diesel + expenses, Deleted, bare Step-1 draft.
+    ...buildScenarioTrips({ stamp, today, yesterday }),
+  ];
+}
+
+/** Edge/lifecycle scenario samples (ids 9305–9310). New ids only — never
+ *  touches the Orders, Farm-Payment or walkthrough seeds above. */
+function buildScenarioTrips({ stamp, today, yesterday }) {
+  const veh = (id) => VEHICLE_BY_ID.get(id)?.vehicleNumber ?? "";
+  const on = (offset) => iso(addDays(new Date(), offset));
+  const step1 = {
+    startStepSubmitted: true,
+    remarks: "Scenario sample — added by dev-mock-backend",
+  };
+  // Full Step 5 money trail: closing meter, end time, tolls + expense heads.
+  const endDetails = (closing, opening, tolls, date) => ({
+    closingMeter: closing,
+    totalKm: closing - opening,
+    endTime: `${date}T12:40:00`,
+    deliveryTolls: tolls,
+    destinationTolls: tolls,
+    meals: 400,
+    loading: 600,
+    mealsTiffin: 150,
+    vehicleMaintenance: 0,
+    othersRC: 120,
+    others1Amt: 500,
+    others2Amt: 300,
+    endStepSubmitted: true,
+    expensesStepSubmitted: true,
+    expensesStepSubmittedAt: `${date}T12:45:00`,
+  });
+  // Diesel ledger rows exactly as applyDieselCreate would store them.
+  const dieselRow = (id, rowIndex, { litres, rate, meter, bunk, gps, date, withBill }) => ({
+    id,
+    rowIndex,
+    litres,
+    rate,
+    amount: Math.round(litres * rate * 100) / 100,
+    meter,
+    bunkName: bunk,
+    gpsLat: gps[0],
+    gpsLon: gps[1],
+    gpsAccuracy: 7,
+    gpsCapturedAt: `${date}T11:${rowIndex === 0 ? "05" : "35"}:00`,
+    imageData: withBill
+      ? dieselBillSvg({ bunk, litres, rate, amount: Math.round(litres * rate), date, slip: rowIndex + 1 })
+      : null,
+    imageName: withBill ? `BILL-${stamp(date)}-00${rowIndex + 1}.svg` : null,
+    submitted: true,
+    submittedAt: `${date}T11:${rowIndex === 0 ? "10" : "40"}:00`,
+    clientKey: `mock-diesel-${id}`,
+  });
+
+  return [
+    // 9305 · Resume Step 3 with EVERY box already added (capacity 12/12) →
+    // shows the box-limit-reached banner + no add-slot (max-capacity edge).
+    baseTrip({
+      ...step1,
+      id: 9305,
+      tripNo: `TRP-${stamp(today)}-04`,
+      tripDate: today,
+      vehicleId: 7,
+      vehicleNo: veh(7),
+      driverId: 21,
+      driverName: "Imran S",
+      supervisorId: 31,
+      supervisorName: "Ramesh N",
+      openingMeter: 40210,
+      advanceAmount: 1000,
+      helpers: ["Naveen Kumar", "Vinay Reddy"],
+      loaders: ["Malli", "Basha", "Raju"],
+      sourceFarmId: 1,
+      sourceFarm: "Sri Balaji Broiler Farm",
+      birdTypeId: 1,
+      birdType: "Broiler",
+      farmBirdTypeId: 1,
+      farmBirdType: "Broiler",
+      totalBirds: 1200,
+      dcWeight: 1800,
+      ...farmStepDetails({
+        farm: "Sri Balaji Broiler Farm",
+        address: "Survey 42, Keesara Road, Medchal — 501401",
+        destMeter: 40650,
+        reachedTime: "06:30",
+        loadTime: "07:15",
+        tolls: 150,
+        avgBirdWeight: 1.5,
+        gps: [17.4849, 78.6033],
+        tripNo: `TRP-${stamp(today)}-04`,
+        weightKg: 1800,
+        birds: 1200,
+        date: today,
+      }),
+      farmStepSubmitted: true,
+    }),
+    // 9306 · Steps 1–3 submitted with EXACTLY ONE DC photo (single-photo
+    // scenario) → Step 3 locked view shows one slip; resume Step 4.
+    baseTrip({
+      ...step1,
+      id: 9306,
+      tripNo: `TRP-${stamp(yesterday)}-05`,
+      tripDate: yesterday,
+      vehicleId: 8,
+      vehicleNo: veh(8),
+      driverId: 22,
+      driverName: "Kiran P",
+      supervisorId: 32,
+      supervisorName: "Prakash V",
+      openingMeter: 52300,
+      advanceAmount: 600,
+      helpers: ["Sai Teja"],
+      loaders: ["Basha"],
+      sourceFarmId: 3,
+      sourceFarm: "Godavari Broiler Farm",
+      birdTypeId: 1,
+      birdType: "Broiler",
+      farmBirdTypeId: 1,
+      farmBirdType: "Broiler",
+      totalBirds: 380,
+      dcWeight: 570,
+      pickupStepSubmitted: true,
+      ...farmStepDetails({
+        farm: "Godavari Broiler Farm",
+        address: "Near Prattipadu Cross, Guntur District — 522019",
+        destMeter: 52740,
+        reachedTime: "07:00",
+        loadTime: "07:45",
+        tolls: 300,
+        avgBirdWeight: 1.5,
+        gps: [16.3067, 80.4365],
+        tripNo: `TRP-${stamp(yesterday)}-05`,
+        weightKg: 570,
+        birds: 380,
+        date: yesterday,
+      }),
+      // Single-photo variant: strip the second DC slip.
+      dcPhotoKey2: "",
+      dcPhotoMime2: "",
+      dcPhotoData2: "",
+      farmStepSubmitted: true,
+    }),
+    // 9307 · Pending — ALL five steps submitted (money trail complete),
+    // awaiting approval → Pending tab + Farm Payment candidate.
+    baseTrip({
+      ...step1,
+      id: 9307,
+      tripNo: `TRP-${stamp(yesterday)}-06`,
+      tripDate: yesterday,
+      status: "Pending",
+      vehicleId: 9,
+      vehicleNo: veh(9),
+      driverId: 21,
+      driverName: "Imran S",
+      supervisorId: 33,
+      supervisorName: "Anand T",
+      openingMeter: 60100,
+      advanceAmount: 800,
+      helpers: ["Naveen Kumar"],
+      loaders: ["Raju"],
+      sourceFarmId: 2,
+      sourceFarm: "Anand Agro Farms",
+      birdTypeId: 1,
+      birdType: "Broiler",
+      farmBirdTypeId: 1,
+      farmBirdType: "Broiler",
+      totalBirds: 540,
+      dcWeight: 810,
+      pickupStepSubmitted: true,
+      deliveryStepSubmitted: true,
+      ...farmStepDetails({
+        farm: "Anand Agro Farms",
+        address: "Plot 7, Bhongir Road, Yadadri — 508116",
+        destMeter: 60560,
+        reachedTime: "06:40",
+        loadTime: "07:25",
+        tolls: 200,
+        avgBirdWeight: 1.5,
+        gps: [17.5151, 78.6497],
+        tripNo: `TRP-${stamp(yesterday)}-06`,
+        weightKg: 810,
+        birds: 540,
+        date: yesterday,
+      }),
+      farmStepSubmitted: true,
+      deliveries: [
+        planRow(1, 1, 30, 300, {
+          remarks: "",
+          rate: 78,
+          amount: 23400,
+          autoCaptureTime: `${yesterday}T09:20:00`,
+        }),
+        planRow(2, 3, 24, 240, {
+          remarks: "",
+          rate: 77.5,
+          amount: 18600,
+          autoCaptureTime: `${yesterday}T10:30:00`,
+        }),
+      ],
+      ...endDetails(60560 + 470, 60100, 180, yesterday),
+    }),
+    // 9308 · Completed — full lifecycle with diesel bills + expenses and a
+    // SINGLE DC photo → View modal shows the complete Step 5 money trail.
+    baseTrip({
+      ...step1,
+      id: 9308,
+      tripNo: `TRP-${stamp(on(-3))}-01`,
+      tripDate: on(-3),
+      status: "Completed",
+      approvedBy: "Owner",
+      vehicleId: 10,
+      vehicleNo: veh(10),
+      driverId: 22,
+      driverName: "Kiran P",
+      supervisorId: 31,
+      supervisorName: "Ramesh N",
+      openingMeter: 70450,
+      advanceAmount: 900,
+      helpers: ["Sai Teja", "Naveen Kumar"],
+      loaders: ["Malli"],
+      sourceFarmId: 1,
+      sourceFarm: "Sri Balaji Broiler Farm",
+      birdTypeId: 1,
+      birdType: "Broiler",
+      farmBirdTypeId: 1,
+      farmBirdType: "Broiler",
+      totalBirds: 460,
+      dcWeight: 690,
+      pickupStepSubmitted: true,
+      deliveryStepSubmitted: true,
+      ...farmStepDetails({
+        farm: "Sri Balaji Broiler Farm",
+        address: "Survey 42, Keesara Road, Medchal — 501401",
+        destMeter: 70890,
+        reachedTime: "06:25",
+        loadTime: "07:10",
+        tolls: 150,
+        avgBirdWeight: 1.5,
+        gps: [17.4849, 78.6033],
+        tripNo: `TRP-${stamp(on(-3))}-01`,
+        weightKg: 690,
+        birds: 460,
+        date: on(-3),
+      }),
+      // Single-photo completed variant.
+      dcPhotoKey2: "",
+      dcPhotoMime2: "",
+      dcPhotoData2: "",
+      farmStepSubmitted: true,
+      deliveries: [
+        planRow(1, 2, 26, 260, {
+          remarks: "",
+          rate: 78.25,
+          amount: 20345,
+          autoCaptureTime: `${on(-3)}T09:10:00`,
+        }),
+        planRow(2, 4, 20, 200, {
+          remarks: "",
+          rate: 77,
+          amount: 15400,
+          autoCaptureTime: `${on(-3)}T10:20:00`,
+        }),
+      ],
+      dieselEntries: [
+        dieselRow(1, 0, {
+          litres: 42,
+          rate: 95.5,
+          meter: 70700,
+          bunk: "HP Petrol Bunk — Bhongir",
+          gps: [17.5101, 78.6512],
+          date: on(-3),
+          withBill: true,
+        }),
+        dieselRow(2, 1, {
+          litres: 20,
+          rate: 96,
+          meter: 71180,
+          bunk: "IOC Bunk — Keesara",
+          gps: [17.6231, 78.5905],
+          date: on(-3),
+          withBill: false,
+        }),
+      ],
+      ...endDetails(71230, 70450, 150, on(-3)),
+    }),
+    // 9309 · Deleted draft (reason recorded) → Recent-table "Deleted" tab
+    // has real data incl. the delete reason.
+    baseTrip({
+      ...step1,
+      id: 9309,
+      tripNo: `TRP-${stamp(on(-5))}-01`,
+      tripDate: on(-5),
+      status: "Deleted",
+      deleted: true,
+      deletedReason: "Duplicate entry — created by mistake",
+      vehicleId: 11,
+      vehicleNo: veh(11),
+      driverId: 21,
+      driverName: "Imran S",
+      supervisorId: 32,
+      supervisorName: "Prakash V",
+      openingMeter: 88100,
+      remarks: "Deleted scenario sample — duplicate trip",
+    }),
+    // 9310 · Bare Step-1 draft — minimum possible data (no helpers/loaders,
+    // no advance) → KPI fallback placeholders ("--") rendering edge.
+    baseTrip({
+      ...step1,
+      id: 9310,
+      tripNo: `TRP-${stamp(today)}-05`,
+      tripDate: today,
+      vehicleId: 3,
+      vehicleNo: veh(3),
+      driverId: 22,
+      driverName: "Kiran P",
+      supervisorId: 33,
+      supervisorName: "Anand T",
+      openingMeter: 91350,
+      helpers: [],
+      loaders: [],
+      advanceAmount: 0,
+      remarks: "",
+    }),
   ];
 }
 
@@ -1713,5 +2062,5 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`[mock-backend] ${ROWS.length} sample collection rows over the last 45 days`);
   console.log(`[mock-backend] ${VEHICLES.length} sample EMI vehicles — open /fleet?tab=emi in the frontend preview`);
   console.log(`[mock-backend] ${MAINTENANCE.length} sample maintenance records — open /fleet?tab=maintenance in the frontend preview`);
-  console.log(`[mock-backend] Trip-Entry walkthrough Drafts 9301–9304 — Recent Trips → Resume Steps 2/3/4/5 (or start a fresh trip; all 5 wizard steps persist)`);
+  console.log(`[mock-backend] Trip-Entry samples: walkthrough Drafts 9301–9304 (Resume Steps 2/3/4/5) + scenario set 9305–9310 (box-limit, single-DC-photo, Pending all-5, Completed diesel+expenses, Deleted, bare Step-1)`);
 });
