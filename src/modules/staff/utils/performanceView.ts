@@ -1,0 +1,184 @@
+// src/modules/staff/utils/performanceView.ts
+//
+// ============================================================================
+// PERFORMANCE VIEW HELPERS — shared formatting + grade-story composition
+// ============================================================================
+// ONE place that turns a `PerformanceAssessment` into drawer-ready, translated
+// content and turns raw API numbers into EN-IN formatted strings with the
+// correct unit (₹ / km / L / %). Both performance pages and the drawer render
+// exclusively through these helpers, so the same data can never be formatted
+// or explained two different ways in two components.
+// ============================================================================
+
+import type { useI18n } from "../../../i18n";
+import type {
+  DrawerFactor,
+  DrawerImprovement,
+} from "../components/performance/PerformanceDrawer";
+import type {
+  DriverMetricKey,
+  MetricBand,
+  PerformanceAssessment,
+  PerformanceGrade,
+  SupervisorMetricKey,
+} from "./performanceGrading";
+
+type Translate = ReturnType<typeof useI18n>["t"];
+
+/* -------------------------------------------------------------------------- */
+/* Number formatting (EN-IN, tabular-safe)                                    */
+/* -------------------------------------------------------------------------- */
+
+/** 12,345 */
+export const formatCount = (value: number | null | undefined): string =>
+  Number(value ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+
+/** 12,345.5 */
+export const formatDecimal = (value: number | null | undefined, digits = 1): string =>
+  Number(value ?? 0).toLocaleString("en-IN", { maximumFractionDigits: digits });
+
+/** ₹12,345 or ₹12,345.50 */
+export const formatMoney = (value: number | null | undefined, digits = 0): string =>
+  `₹${Number(value ?? 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits,
+  })}`;
+
+/** Derived averages (mileage, cost/km, rates) are meaningless as plain 0. */
+export const isMeasurable = (value: number | null | undefined): boolean =>
+  Number(value ?? 0) > 0;
+
+/** 12,345 km */
+export const formatKm = (value: number | null | undefined): string =>
+  `${formatCount(value)} km`;
+
+/** 1,234.5 L */
+export const formatLitres = (value: number | null | undefined): string =>
+  `${formatDecimal(value, 1)} L`;
+
+/** 5.2 km/L — `—` when no fuel data makes the value unmeasurable. */
+export const formatMileage = (value: number | null | undefined): string =>
+  isMeasurable(value) ? `${formatDecimal(value, 1)} km/L` : "—";
+
+/** ₹17.5/km — `—` when unmeasurable. */
+export const formatCostPerKm = (value: number | null | undefined): string =>
+  isMeasurable(value) ? `${formatMoney(value, 1)}/km` : "—";
+
+/** 0.42% */
+export const formatPercent = (value: number | null | undefined, digits = 2): string =>
+  `${formatDecimal(value, digits)}%`;
+
+/** 123.4 kg */
+export const formatKg = (value: number | null | undefined): string =>
+  `${formatDecimal(value, 1)} kg`;
+
+/** "—" for unmeasurable values, otherwise the unit-correct formatting. */
+export function formatMetric(
+  key: DriverMetricKey | SupervisorMetricKey,
+  value: number | null | undefined,
+): string {
+  switch (key) {
+    case "trips":
+      return formatCount(value);
+    case "distance":
+      return formatKm(value);
+    case "mileage":
+      return formatMileage(value);
+    case "costPerKm":
+      return formatCostPerKm(value);
+    case "shops":
+      return formatCount(value);
+    case "mortalityRate":
+      return formatPercent(value);
+    case "weightLoss":
+      return formatKg(value);
+    default:
+      return formatCount(value);
+  }
+}
+
+/** Whether a factor's "better" direction is higher or lower. */
+export function metricBetter(
+  key: DriverMetricKey | SupervisorMetricKey,
+): "higher" | "lower" {
+  return key === "costPerKm" || key === "mortalityRate" || key === "weightLoss"
+    ? "lower"
+    : "higher";
+}
+
+/* -------------------------------------------------------------------------- */
+/* Grade badge                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Presentation tone per grade. Emerald = brand positive scale, slate =
+ * neutral — drawn from the global semantic palette (no new colors). The label
+ * itself always carries the meaning (never colour alone). `null` (unranked
+ * under the one-Outstanding/one-Excellent/one-Good policy) renders as a quiet
+ * neutral chip so it can never be mistaken for an award.
+ */
+export function gradeBadgeClass(grade: PerformanceGrade | null): string {
+  switch (grade) {
+    case "OUTSTANDING":
+      return "bg-emerald-600 text-white border-emerald-600";
+    case "EXCELLENT":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    case "GOOD":
+      return "bg-slate-100 text-slate-600 border-slate-200";
+    default:
+      return "bg-white text-slate-400 border-slate-200 border-dashed";
+  }
+}
+
+export function translateGrade(grade: PerformanceGrade | null, t: Translate): string {
+  return grade == null ? t("staff.perf.grade.unranked") : t(`staff.perf.grade.${grade}`);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Grade story (drawer)                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Translate every metric factor into one explanation sentence. Unavailable
+ * metrics (no data, or no fleet baseline) state that plainly instead of
+ * inventing a comparison.
+ */
+export function buildDrawerFactors<
+  K extends DriverMetricKey | SupervisorMetricKey,
+>(
+  assessment: PerformanceAssessment<K>,
+  t: Translate,
+): DrawerFactor[] {
+  return assessment.factors.map((factor) => {
+    const band: MetricBand = factor.band;
+    const label = t(`staff.perf.factor.${factor.key}`);
+    let text: string;
+    if (band === "unavailable" || factor.baseline == null || factor.value == null) {
+      text = t("staff.perf.factor.no_baseline");
+    } else {
+      text = t(`staff.perf.factor.${band}.${metricBetter(factor.key)}`, {
+        label,
+        value: formatMetric(factor.key, factor.value),
+        baseline: formatMetric(factor.key, factor.baseline),
+      });
+    }
+    return { key: factor.key, band, text };
+  });
+}
+
+/**
+ * Improvement areas — ONLY weak metrics, each with its practical
+ * recommendation. Unavailable metrics are intentionally excluded.
+ */
+export function buildDrawerImprovements<
+  K extends DriverMetricKey | SupervisorMetricKey,
+>(
+  assessment: PerformanceAssessment<K>,
+  t: Translate,
+): DrawerImprovement[] {
+  return assessment.improvements.map((improvement) => ({
+    key: improvement.metricKey,
+    title: t(`staff.perf.improve.${improvement.metricKey}.title`),
+    recommendation: t(`staff.perf.improve.${improvement.metricKey}.recommend`),
+  }));
+}
