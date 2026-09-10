@@ -19,6 +19,7 @@ import {
   validateEndStep,
 } from "../../../../shared/trip";
 import { translate } from "../../../../i18n";
+import { translateValidationMessage } from "../utils/translateValidation";
 
 type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void;
 
@@ -350,7 +351,7 @@ export function useTripEntry(
     const updatedData = { ...current, ...data };
     const validation = validatePickupStep(updatedData as Trip);
     if (!validation.valid) {
-      notifyRef.current?.(validation.errors[0], "error");
+      notifyRef.current?.(translateValidationMessage(translate, validation.errors[0]), "error");
       return false;
     }
 

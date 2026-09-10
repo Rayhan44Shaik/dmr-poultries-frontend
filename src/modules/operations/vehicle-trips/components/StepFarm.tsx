@@ -9,6 +9,7 @@ import {
 } from "../../../../shared/trip/definitions";
 import { validateFarmStep } from "../../../../shared/trip/validation";
 import { isMeterInvalid, meterMustBeGreaterThan } from "../utils/meterValidation";
+import { translateValidationMessage } from "../utils/translateValidation";
 import { useI18n } from "../../../../i18n";
 
 interface Props {
@@ -215,7 +216,7 @@ export default function StepFarm({
   const handleSubmit = async () => {
     const validation = validateFarmStep(trip);
     if (!validation.valid) {
-      notify(validation.errors[0], "warning");
+      notify(translateValidationMessage(t, validation.errors[0]), "warning");
       return;
     }
     if (destMeterError) {
@@ -261,10 +262,10 @@ export default function StepFarm({
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
+            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
               2
             </span>
-            <h2 className="text-base font-bold text-slate-800 tracking-tight">
+            <h2 className="text-xl font-bold text-slate-800 tracking-tight">
               {t("ops.trip.title.farm").toUpperCase()}
             </h2>
           </div>
@@ -374,10 +375,10 @@ export default function StepFarm({
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
+            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
               2
             </span>
-            <h2 className="text-base font-bold text-slate-800 tracking-tight">
+            <h2 className="text-xl font-bold text-slate-800 tracking-tight">
               {t("ops.trip.title.farm").toUpperCase()}
             </h2>
           </div>

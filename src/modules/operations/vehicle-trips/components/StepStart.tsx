@@ -28,6 +28,7 @@ import {
   formatStartTimeForDisplay,
 } from "../services/tripHeaderApiService";
 import { StepCloseButton, WizardActionBar, WizardStepNotice, type WizardNoticeState } from "./WizardStepUI";
+import { translateValidationMessage } from "../utils/translateValidation";
 import {
   TRIP_FIELD_DEFINITIONS,
 } from "../../../../shared/trip/definitions";
@@ -1125,7 +1126,10 @@ function StepStart({
     const validation = validateStartStep(candidate);
     if (!validation.valid) {
       setShowErrors(true);
-      setNotice({ type: "error", message: validation.errors[0] || t("ops.trip.complete_required_fields") });
+      setNotice({
+        type: "error",
+        message: translateValidationMessage(t, validation.errors[0]) || t("ops.trip.complete_required_fields"),
+      });
       return;
     }
 
@@ -1164,10 +1168,10 @@ function StepStart({
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
+            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
               1
             </span>
-            <h2 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.title.start").toUpperCase()}</h2>
+            <h2 className="text-xl font-bold text-slate-800 tracking-tight">{t("ops.trip.title.start").toUpperCase()}</h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {canEdit && (
@@ -1281,10 +1285,10 @@ function StepStart({
         {headerLoading && <p className="text-xs text-slate-500">{t("ops.trip.loading_trip_header")}</p>}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 text-white w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0">
+            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
               1
             </span>
-            <h2 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.title.start").toUpperCase()}</h2>
+            <h2 className="text-xl font-bold text-slate-800 tracking-tight">{t("ops.trip.title.start").toUpperCase()}</h2>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {/* Part E: no top-right X in first-submit / Edit mode — the bottom
