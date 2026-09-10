@@ -419,16 +419,47 @@ export default function ShopDeliveryForm({
           <div className="space-y-4">
             <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
               <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold">
                   <tr>
-                    <th className="px-3 py-2.5">{t("ops.trip.box_no")}</th>
-                    <th className="px-3 py-2.5">{t("ops.trip.farm_birds")}</th>
                     <th className="px-3 py-2.5">
-                      {t("ops.trip.delivered_birds")} <span className="text-rose-500">*</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-5 w-5 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                          <Tag size={12} />
+                        </span>
+                        {t("ops.trip.box_no")}
+                      </span>
                     </th>
-                    <th className="px-3 py-2.5">{t("ops.trip.farm_weight_kg")}</th>
                     <th className="px-3 py-2.5">
-                      {t("ops.trip.delivered_weight_kg")} <span className="text-rose-500">*</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-5 w-5 rounded-md bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                          <Bird size={12} />
+                        </span>
+                        {t("ops.trip.farm_birds")}
+                      </span>
+                    </th>
+                    <th className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-5 w-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                          <Truck size={12} />
+                        </span>
+                        {t("ops.trip.delivered_birds")} <span className="text-rose-500">*</span>
+                      </span>
+                    </th>
+                    <th className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-5 w-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                          <Scale size={12} />
+                        </span>
+                        {t("ops.trip.farm_weight_kg")}
+                      </span>
+                    </th>
+                    <th className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-5 w-5 rounded-md bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
+                          <Scale size={12} />
+                        </span>
+                        {t("ops.trip.delivered_weight_kg")} <span className="text-rose-500">*</span>
+                      </span>
                     </th>
                   </tr>
                 </thead>
@@ -486,33 +517,76 @@ export default function ShopDeliveryForm({
               </table>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <FormLabel icon={AlertCircle} tone="bg-rose-50 text-rose-600">
-                  {t("ops.trip.mortality_birds")}
-                </FormLabel>
-                <input
-                  type="number"
-                  value={formData.mortality || ""}
-                  onChange={(e) => handleFormChange("mortality", Number(e.target.value))}
-                  placeholder="0"
-                  min="0"
-                  className={neutralInputClass()}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Farm — birds above weight */}
+              <div className="space-y-3">
+                <SimpleMetric
+                  icon={Bird}
+                  tone="bg-sky-50 text-sky-600"
+                  tint="bg-sky-50/50 border-sky-100"
+                  label={t("ops.trip.farm_birds")}
+                  value={farmBirds}
+                />
+                <SimpleMetric
+                  icon={Scale}
+                  tone="bg-blue-50 text-blue-600"
+                  tint="bg-blue-50/50 border-blue-100"
+                  label={t("ops.trip.farm_weight_kg")}
+                  value={farmWeight.toFixed(2)}
                 />
               </div>
-              <div>
-                <FormLabel icon={Scale} tone="bg-amber-50 text-amber-600">
-                  {t("ops.trip.mortality_weight_kg")}
-                </FormLabel>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.mortWeight || ""}
-                  onChange={(e) => handleFormChange("mortWeight", Number(e.target.value))}
-                  placeholder="0.00"
-                  min="0"
-                  className={neutralInputClass()}
+
+              {/* Delivered — birds above weight */}
+              <div className="space-y-3">
+                <SimpleMetric
+                  icon={Truck}
+                  tone="bg-emerald-50 text-emerald-600"
+                  tint="bg-emerald-50/50 border-emerald-100"
+                  label={t("ops.trip.delivered_birds")}
+                  value={deliveredBirds}
                 />
+                <SimpleMetric
+                  icon={Scale}
+                  tone="bg-teal-50 text-teal-600"
+                  tint="bg-teal-50/50 border-teal-100"
+                  label={t("ops.trip.delivered_weight_kg")}
+                  value={deliveredWeight > 0 ? deliveredWeight.toFixed(2) : "0.00"}
+                />
+              </div>
+
+              {/* Mortality — birds above weight (inputs) */}
+              <div className="space-y-3">
+                <MetricTile
+                  icon={AlertCircle}
+                  tone="bg-rose-50 text-rose-600"
+                  tint="bg-rose-50/50 border-rose-100"
+                  label={t("ops.trip.mortality_birds")}
+                >
+                  <input
+                    type="number"
+                    value={formData.mortality || ""}
+                    onChange={(e) => handleFormChange("mortality", Number(e.target.value))}
+                    placeholder="0"
+                    min="0"
+                    className={neutralInputClass()}
+                  />
+                </MetricTile>
+                <MetricTile
+                  icon={Scale}
+                  tone="bg-amber-50 text-amber-600"
+                  tint="bg-amber-50/50 border-amber-100"
+                  label={t("ops.trip.mortality_weight_kg")}
+                >
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.mortWeight || ""}
+                    onChange={(e) => handleFormChange("mortWeight", Number(e.target.value))}
+                    placeholder="0.00"
+                    min="0"
+                    className={neutralInputClass()}
+                  />
+                </MetricTile>
               </div>
             </div>
           </div>
