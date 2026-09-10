@@ -4,6 +4,7 @@ import {
   ShoppingCart,
   Box,
   Scale,
+  Store,
   MessageSquare,
   AlertCircle,
   Clock,
@@ -79,13 +80,22 @@ function FormLabel({ icon: Icon, tone, children, required }: {
   );
 }
 
+/** Uniform metric tile so every box lines up (equal height, vertically centred). */
+function MetricTile({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 min-h-[84px] flex flex-col justify-center">
+      <div className="text-[11px] uppercase font-semibold text-slate-500 mb-1 truncate">{label}</div>
+      {children}
+    </div>
+  );
+}
+
 /** Plain, neutral metric tile — no green/red accents. */
 function SimpleMetric({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
-      <div className="text-[11px] uppercase font-semibold text-slate-500 mb-1 truncate">{label}</div>
+    <MetricTile label={label}>
       <div className="text-sm font-bold text-slate-800 truncate">{value}</div>
-    </div>
+    </MetricTile>
   );
 }
 
@@ -152,8 +162,8 @@ export default function ShopDeliveryForm({
       {/* ─── Header — title · bird type · mode toggle ─────────────────── */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4 border-b border-slate-100">
         <div className="flex items-center gap-3 min-w-0 mr-auto">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-md shadow-purple-200/70 ring-1 ring-slate-900/5 flex items-center justify-center shrink-0">
-            {isEditing ? <CheckCircle2 size={20} /> : <ShoppingCart size={20} />}
+          <div className="h-10 w-10 rounded-xl bg-blue-600 text-white shadow-md shadow-blue-600/20 flex items-center justify-center shrink-0">
+            {isEditing ? <CheckCircle2 size={20} /> : <Store size={20} />}
           </div>
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-slate-800 tracking-tight truncate">
@@ -328,10 +338,7 @@ export default function ShopDeliveryForm({
 
             {/* Mortality — birds above weight */}
             <div className="space-y-3">
-              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
-                <div className="text-[11px] uppercase font-semibold text-slate-500 mb-1 truncate">
-                  {t("ops.trip.mortality_birds")}
-                </div>
+              <MetricTile label={t("ops.trip.mortality_birds")}>
                 <input
                   type="number"
                   value={formData.mortality || ""}
@@ -345,7 +352,7 @@ export default function ShopDeliveryForm({
                     <AlertCircle size={10} /> Max: {farmBirds}
                   </p>
                 )}
-              </div>
+              </MetricTile>
               <SimpleMetric
                 label={t("ops.trip.mortality_weight_kg")}
                 value={mortKg > 0 ? mortKg.toFixed(2) : "0.00"}
