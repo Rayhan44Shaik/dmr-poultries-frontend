@@ -162,7 +162,7 @@ const FieldLabel = React.memo(function FieldLabel({
   required?: boolean;
 }) {
   return (
-    <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+    <label className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
       <span className={`h-5 w-5 rounded-md flex items-center justify-center shrink-0 ${tone}`}>
         <Icon size={12} />
       </span>
@@ -793,7 +793,7 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
           label={t("ops.trip.field.opening_meter")}
           required={TRIP_FIELD_DEFINITIONS.openingMeter.required}
         />
-        <span className="whitespace-nowrap text-[11px] font-medium text-slate-400">
+        <span className="whitespace-nowrap text-xs font-medium text-slate-400">
           {t("ops.trip.enter_manually")}
         </span>
       </div>
@@ -1193,49 +1193,49 @@ function StepStart({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               {t("operations.trip_no")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.tripNo || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Calendar size={12} className="text-sky-500" /> {t("ops.trip.field.trip_date")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.tripDate || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Clock size={12} className="text-blue-500" /> {t("ops.trip.field.start_time")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{formatStartTimeForDisplay(startTime) || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Truck size={12} className="text-blue-500" /> {t("operations.vehicle_no")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.vehicleNo || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <User size={12} className="text-indigo-500" /> {t("common.supervisor")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.supervisorName || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <User size={12} className="text-emerald-500" /> {t("common.driver")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.driverName || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Users size={12} className="text-teal-500" /> {t("ops.trip.field.helpers")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.helpers?.join(", ") || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Users size={12} className="text-amber-500" /> {t("ops.trip.field.loaders")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">
@@ -1243,7 +1243,7 @@ function StepStart({
             </span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Wallet size={12} className="text-orange-500" /> {t("operations.advance")}
             </span>
             <span className="text-xs font-bold text-slate-800">
@@ -1253,7 +1253,7 @@ function StepStart({
             </span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Gauge size={12} className="text-purple-500" /> {t("ops.trip.field.opening_meter")}
             </span>
             <span className="text-xs font-bold text-slate-800">

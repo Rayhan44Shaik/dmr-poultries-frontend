@@ -564,27 +564,27 @@ export default function StepEnd({
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">{t("ops.trip.date_time")}</p>
+              <p className="text-xs text-slate-500 font-medium">{t("ops.trip.date_time")}</p>
               <p className="text-xs font-semibold text-slate-900 mt-0.5">{sheetData.submittedAtTimestamp || (trip as any).expensesStepSubmittedAt || "--"}</p>
             </div>
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">{t("operations.vehicle_no")}</p>
+              <p className="text-xs text-slate-500 font-medium">{t("operations.vehicle_no")}</p>
               <p className="text-xs font-semibold text-slate-900 mt-0.5">{trip.vehicleNo || "--"}</p>
             </div>
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">{t("operations.advance")}</p>
+              <p className="text-xs text-slate-500 font-medium">{t("operations.advance")}</p>
               <p className="text-xs font-semibold text-emerald-700 mt-0.5">₹{Number(trip.advanceAmount || 0).toFixed(2)}</p>
             </div>
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">{t("operations.total_expenses")}</p>
+              <p className="text-xs text-slate-500 font-medium">{t("operations.total_expenses")}</p>
               <p className="text-xs font-semibold text-red-600 mt-0.5">₹{totalAllExpenses.toFixed(2)}</p>
             </div>
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">{t("ops.trip.total_diesel")}</p>
+              <p className="text-xs text-slate-500 font-medium">{t("ops.trip.total_diesel")}</p>
               <p className="text-xs font-semibold text-blue-600 mt-0.5">₹{totalDieselAmount.toFixed(2)}</p>
             </div>
             <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-[11px] text-slate-500 font-medium">{t("ops.trip.remaining_balance")}</p>
+              <p className="text-xs text-slate-500 font-medium">{t("ops.trip.remaining_balance")}</p>
               <p className="text-xs font-semibold text-emerald-600 mt-0.5">₹{remainingBalance.toFixed(2)}</p>
             </div>
           </div>

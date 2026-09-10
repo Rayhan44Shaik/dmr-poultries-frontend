@@ -651,31 +651,31 @@ export default function StepPickup({
         {/* 5 Column Compact Deliveries-Style KPI Cards Grid */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-2">
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Clock size={12} className="text-slate-500" /> {t("ops.trip.time")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{trip.pickupLoadTime || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Scale size={12} className="text-emerald-500" /> {t("ops.trip.dc_wt")}
             </span>
             <span className="text-xs font-bold text-slate-800">{trip.dcWeight ? `${Number(trip.dcWeight).toFixed(2)} Kg` : t("ops.trip.not_entered")}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Bird size={12} className="text-blue-500" /> {t("common.birds")}
             </span>
             <span className="text-xs font-bold text-slate-800">{trip.totalBirds}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Box size={12} className="text-amber-500" /> {t("common.boxes")}
             </span>
             <span className="text-xs font-bold text-slate-800">{trip.boxes} / {maxBoxes}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Gauge size={12} className="text-purple-500" /> {t("ops.trip.avg_wt")}
             </span>
             <span className="text-xs font-bold text-slate-800">{trip.avgWeight ? `${trip.avgWeight} Kg` : "—"}</span>
@@ -886,7 +886,7 @@ export default function StepPickup({
         <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50">
           <div className="flex items-start gap-4">
             <div className="flex-1">
-              <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+              <label className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
                 <Camera size={14} className="text-slate-400" />
                 {t("ops.trip.field.dc_photo")} {TRIP_FIELD_DEFINITIONS.dcPhotoKey.required && <span className="text-red-500">*</span>}
               </label>
@@ -936,7 +936,7 @@ export default function StepPickup({
         {/* Entry Table Container */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-600">
+            <span className="text-sm font-semibold text-slate-600">
               {t("ops.trip.box_entries", { max: maxBoxes || "—" })}
             </span>
           </div>
@@ -1059,25 +1059,25 @@ export default function StepPickup({
         {/* Totals Summary Bar - Deliveries Style KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Box size={12} className="text-amber-500" /> {t("common.boxes")}
             </span>
             <span className="text-xs font-bold text-slate-800">{totals.boxes} / {maxBoxes}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Bird size={12} className="text-blue-500" /> {t("common.birds")}
             </span>
             <span className="text-xs font-bold text-slate-800">{totals.totalBirds}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Scale size={12} className="text-emerald-500" /> {t("ops.trip.dc_wt")}
             </span>
             <span className="text-xs font-bold text-slate-800">{totals.dcWeight.toFixed(2)} Kg</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Gauge size={12} className="text-purple-500" /> {t("ops.trip.avg_wt")}
             </span>
             <span className="text-xs font-bold text-slate-800">

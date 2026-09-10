@@ -290,49 +290,49 @@ export default function StepFarm({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Clock size={12} className="text-slate-500" /> {t("ops.trip.field.reached_time")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{trip.reachedTime || t("ops.trip.not_entered")}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Store size={12} className="text-blue-500" /> {t("common.farm")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{trip.sourceFarm || t("ops.trip.not_entered")}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Layers size={12} className="text-violet-500" /> {t("operations.bird_type")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{trip.birdType || t("ops.trip.not_entered")}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <MapPin size={12} className="text-slate-500" /> {t("ops.trip.field.farm_address")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{trip.farmAddress || t("ops.trip.not_entered")}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Gauge size={12} className="text-purple-500" /> {t("ops.trip.field.farm_meter")}
             </span>
             <span className="text-xs font-bold text-slate-800">{destMeterLabel}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Ticket size={12} className="text-violet-500" /> {t("ops.trip.field.pickup_tolls")}
             </span>
             <span className="text-xs font-bold text-slate-800">{trip.pickupTolls ?? 0}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Scale size={12} className="text-emerald-500" /> {t("ops.trip.field.avg_bird_weight")}
             </span>
             <span className="text-xs font-bold text-slate-800">{avgWeightLabel}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <MapPin size={12} className="text-slate-500" /> GPS
             </span>
             <span
@@ -394,7 +394,7 @@ export default function StepFarm({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 sm:gap-x-6 gap-y-3.5 sm:gap-y-4">
           <div>
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+            <label className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
               <Clock size={14} className="text-slate-400" /> {t("ops.trip.field.reached_time")}{" "}
               {TRIP_FIELD_DEFINITIONS.reachedTime.required && <span className="text-red-500">*</span>}
             </label>
@@ -404,7 +404,7 @@ export default function StepFarm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+            <label className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
               <Store size={14} className="text-slate-400" /> {t("common.farm")}{" "}
               {TRIP_FIELD_DEFINITIONS.sourceFarmId.required && <span className="text-red-500">*</span>}
             </label>
@@ -423,7 +423,7 @@ export default function StepFarm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+            <label className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
               <Layers size={14} className="text-slate-400" /> {t("operations.bird_type")}{" "}
               {TRIP_FIELD_DEFINITIONS.birdTypeId.required && <span className="text-red-500">*</span>}
             </label>
@@ -445,7 +445,7 @@ export default function StepFarm({
           </div>
 
           <div className="sm:col-span-1">
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+            <label className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
               <MapPin size={14} className="text-slate-400" /> {t("ops.trip.field.farm_address")}{" "}
               <span className="text-red-500">*</span>
             </label>
@@ -459,7 +459,7 @@ export default function StepFarm({
           </div>
 
           <div className="sm:col-span-2">
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+            <label className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
               <MapPin size={14} className="text-slate-400" /> GPS
             </label>
             <div className="flex items-center gap-2 mt-1">
@@ -491,7 +491,7 @@ export default function StepFarm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+            <label className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
               <Gauge size={14} className="text-slate-400" /> {t("ops.trip.field.dest_meter")}{" "}
               {TRIP_FIELD_DEFINITIONS.destMeter.required && <span className="text-red-500">*</span>}
             </label>
@@ -520,7 +520,7 @@ export default function StepFarm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+            <label className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
               <Ticket size={14} className="text-slate-400" /> {t("ops.trip.field.pickup_tolls")}
             </label>
             <input
@@ -537,7 +537,7 @@ export default function StepFarm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+            <label className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
               <Scale size={14} className="text-slate-400" /> {t("ops.trip.field.avg_bird_weight")}{" "}
               {TRIP_FIELD_DEFINITIONS.avgBirdWeight.required && <span className="text-red-500">*</span>}
             </label>
@@ -558,7 +558,7 @@ export default function StepFarm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+            <label className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
               <MessageSquare size={14} className="text-slate-400" /> {t("common.remarks")}
             </label>
             <input
