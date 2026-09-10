@@ -43,11 +43,75 @@ import { buildSampleEmiVehicles } from "./fixtures/emi-vehicles.mjs";
 const PORT = Number(process.env.MOCK_BACKEND_PORT ?? 4000);
 
 // ── Sample masters ───────────────────────────────────────────────────────────
+// ── Sample Shops (100) ───────────────────────────────────────────────────────
+// 100 shops so the Step 4 shop dropdown / delivery list can be stress-tested.
+// ids 1–4 are referenced by seeded trips & Orders rows — keep them unchanged.
+const SHOP_BASES = [
+  "Sri Balaji", "Venkatadri", "Annapurna", "Kakatiya", "Sai Ram", "Lakshmi",
+  "Bhavani", "Durga", "Ganesh", "Hanuman", "Maruthi", "Rajarajeshwari",
+  "Om Sri", "Sri Venkateswara", "Lakshmi Narasimha", "Anjaneya", "Raghavendra",
+  "Prasanna", "Manjunatha", "Sitarama",
+];
+const SHOP_KINDS = [
+  "Poultry Traders", "Egg Suppliers", "Farms Outlet", "Poultry Point", "Chicken Center",
+];
+const SHOP_CITIES = [
+  "Hyderabad", "Secunderabad", "Warangal", "Khammam", "Nizamabad", "Karimnagar",
+  "Nalgonda", "Suryapet", "Vijayawada", "Guntur", "Rajahmundry", "Kakinada",
+  "Tirupati", "Nellore", "Ongole", "Eluru", "Visakhapatnam", "Anantapur",
+  "Kurnool", "Kadapa",
+];
+const SHOP_VILLAGES = [
+  "Ameerpet", "Kukatpally", "Begumpet", "Hanamkonda", "Miyapur", "LB Nagar",
+  "Dilsukhnagar", "Uppal", "Charminar", "Kothapet", "Vanastalipuram", "Nacharam",
+  "Balanagar", "Moosapet", "Sanathnagar", "Erragadda", "Madhapur", "Gachibowli",
+  "Shamshabad", "Ramachandrapuram",
+];
+const OWNER_FIRST = [
+  "Ramesh", "Suresh", "Lakshmi", "Prasad", "Kiran", "Anil", "Babu", "Chandra",
+  "Devi", "Eswar", "Gopal", "Hari", "Indira", "Jagan", "Kavya", "Madhu",
+  "Naresh", "Padma", "Ravi", "Satish",
+];
+const OWNER_LAST = [
+  "K", "M", "D", "R", "P", "V", "N", "S", "T", "Y", "Reddy", "Rao", "Naidu",
+  "Goud", "Chary", "Kumar", "Prasad", "Murthy", "Sarma", "Guptha",
+];
+// Combos on the (base, kind) diagonal are the 4 hand-written shops below —
+// skip them so every generated shop name stays unique.
+const SHOP_COMBOS = [];
+for (let b = 0; b < SHOP_BASES.length; b += 1) {
+  for (let k = 0; k < SHOP_KINDS.length; k += 1) {
+    if (b === k && b < 4) continue;
+    SHOP_COMBOS.push([b, k]);
+  }
+}
+const makeShop = (n) => {
+  const idx = n - 5; // generated shops start at id 5
+  const [b, k] = SHOP_COMBOS[idx % SHOP_COMBOS.length];
+  const city = SHOP_CITIES[idx % SHOP_CITIES.length];
+  const village = SHOP_VILLAGES[idx % SHOP_VILLAGES.length];
+  const first = OWNER_FIRST[idx % OWNER_FIRST.length];
+  const last = OWNER_LAST[Math.floor(idx / OWNER_FIRST.length) % OWNER_LAST.length];
+  const mobile = String(9800000000 + idx);
+  return {
+    id: n,
+    shopNo: n,
+    shopNumber: `SHP-${String(n).padStart(3, "0")}`,
+    shopName: `${SHOP_BASES[b]} ${SHOP_KINDS[k]}`,
+    ownerName: `${first} ${last}`,
+    city,
+    village,
+    mobile,
+    phoneNumber: mobile,
+    status: "Active",
+  };
+};
 const SHOPS = [
   { id: 1, shopNo: 1, shopNumber: "SHP-001", shopName: "Sri Balaji Poultry Traders", ownerName: "Ramesh K", city: "Hyderabad", village: "Ameerpet", mobile: "9848012345", phoneNumber: "9848012345", status: "Active" },
   { id: 2, shopNo: 2, shopNumber: "SHP-002", shopName: "Venkatadri Egg Suppliers", ownerName: "Suresh M", city: "Hyderabad", village: "Kukatpally", mobile: "9848023456", phoneNumber: "9848023456", status: "Active" },
   { id: 3, shopNo: 3, shopNumber: "SHP-003", shopName: "Annapurna Farms Outlet", ownerName: "Lakshmi D", city: "Secunderabad", village: "Begumpet", mobile: "9848034567", phoneNumber: "9848034567", status: "Active" },
   { id: 4, shopNo: 4, shopNumber: "SHP-004", shopName: "Kakatiya Poultry Point", ownerName: "Prasad R", city: "Warangal", village: "Hanamkonda", mobile: "9848045678", phoneNumber: "9848045678", status: "Active" },
+  ...Array.from({ length: 96 }, (_, i) => makeShop(i + 5)),
 ];
 
 const EMPLOYEES = [
@@ -1192,8 +1256,8 @@ function buildWalkthroughTrips({ stamp, today, yesterday }) {
       birdType: "Broiler",
       farmBirdTypeId: 1,
       farmBirdType: "Broiler",
-      totalBirds: 520,
-      dcWeight: 780,
+      totalBirds: 8400,
+      dcWeight: 12600,
       pickupStepSubmitted: true,
       ...farmStepDetails({
         farm: "Sri Balaji Broiler Farm",
@@ -1205,12 +1269,13 @@ function buildWalkthroughTrips({ stamp, today, yesterday }) {
         avgBirdWeight: 1.5,
         gps: [17.4849, 78.6033],
         tripNo: `TRP-${stamp(yesterday)}-03`,
-        weightKg: 780,
-        birds: 520,
+        weightKg: 12600,
+        birds: 8400,
         date: yesterday,
       }),
-      // Roomy sample capacity for box-add testing (farmStepDetails default is 12).
-      vehicleBoxCapacity: 30,
+      // 84 pickup boxes — stress-test the Step 4 box multi-select grid and
+      // the 100-shop dropdown end to end.
+      vehicleBoxCapacity: 84,
       farmStepSubmitted: true,
       // Shop list captured from the Orders assignment plan ([ORDER] rows) —
       // Step 4 shows these shops so the supervisor can capture each delivery.
@@ -2150,6 +2215,7 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`[mock-backend] ⚠️  SAMPLE DATA ONLY — listening on http://0.0.0.0:${PORT}`);
   console.log(`[mock-backend] ${ROWS.length} sample collection rows over the last 45 days`);
+  console.log(`[mock-backend] ${SHOPS.length} sample shops + draft 9303 has 84 pickup boxes (Step 4 stress test)`);
   console.log(`[mock-backend] ${VEHICLES.length} sample EMI vehicles — open /fleet?tab=emi in the frontend preview`);
   console.log(`[mock-backend] ${MAINTENANCE.length} sample maintenance records — open /fleet?tab=maintenance in the frontend preview`);
   console.log(`[mock-backend] Trip-Entry samples: walkthrough Drafts 9301–9304 (Resume Steps 2/3/4/5) + scenario set 9305–9310 (box-limit, single-DC-photo, Pending all-5, Completed diesel+expenses, Deleted, bare Step-1)`);
