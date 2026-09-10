@@ -300,7 +300,10 @@ test('Pending display, single row selection, top actions, outside deselection an
   const actions = page.getByRole('group', { name: 'Selected payment actions' });
   await expect(actions).toHaveCount(0);
   await expect(register(page).getByRole('checkbox')).toHaveCount(0);
-  await expect(register(page).getByRole('columnheader')).toHaveCount(10);
+  // Remarks is deliberately not a register column: the table stays scannable and
+  // the note remains available in the payment details sheet.
+  await expect(register(page).getByRole('columnheader')).toHaveCount(9);
+  await expect(register(page).getByRole('columnheader', { name: 'Remarks', exact: true })).toHaveCount(0);
   await rows(page).first().getByText('Sample Green Valley Farm', { exact: true }).click();
   const first = paymentRow(page, 'Pay-07092026-001');
   const second = paymentRow(page, 'Pay-07092026-002');

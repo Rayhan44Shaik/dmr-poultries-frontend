@@ -1,14 +1,34 @@
+// src/modules/accounts/components/payment-book/PaymentViewModal.tsx
+//
+// The read-only twin of the entry sheet: same section rules, same field
+// shells, same type/mode marks — so opening a record and editing it feel like
+// one screen rather than two products.
+
+import type { ReactNode } from 'react';
+import { BadgeCheck, CalendarDays, FileText, IndianRupee, Paperclip, Pencil, ScrollText, UserRound } from 'lucide-react';
 import type { Payment } from '../../types/payment.types';
 import { FarmPaymentService } from '../../services/FarmPaymentService';
 import { Modal } from '../../../../ui/Modal';
 import { Button } from '../../../../ui/Button';
 import { StatusBadge } from '../../../../ui/StatusBadge';
+import { MasterSectionHeading } from '../../../masters/components/MasterForm';
 import { paymentCurrency, paymentStatusLabel } from '../../utils/paymentRegister';
+import { inrInWords } from '../../utils/inrInWords';
+import { PaymentModeMark, PaymentTypeMark } from './PaymentGlyphMarks';
 
 interface PaymentViewModalProps {
   isOpen: boolean;
   payment: Payment | null;
   onClose: () => void;
+  /**
+   * Jump straight from the sheet into the edit dialog. Omitted when the caller
+   * has no edit flow, in which case nothing edit-related is rendered.
+   */
+  onEdit?: () => void;
+  /** False keeps the edit affordances visible but disabled, with `editHint`. */
+  canEdit?: boolean;
+  /** Why editing is unavailable — surfaced as the disabled control's tooltip. */
+  editHint?: string;
 }
 
 const getTripDetails = (payment: Payment): { tripNo: string; amount: number }[] => {
@@ -34,36 +54,139 @@ const timestamp = (value: string) => {
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('en-IN');
 };
 
-export function PaymentViewModal({ isOpen, payment, onClose }: PaymentViewModalProps) {
+/**
+ * Read-only counterpart of the entry sheet's field: label above, value in a
+ * shell. Payment Type and Mode pass no `icon`: their value already carries a
+ * mark, and a field showing two icons for one thing reads as a bug.
+ */
+function DetailField({ label, icon, children }: { label: string; icon?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <p className="mb-1 text-xs font-semibold text-slate-600">{label}</p>
+      <div className="flex min-h-9 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-1.5 text-sm font-medium text-slate-800">
+        {icon ? <span aria-hidden="true" className="shrink-0 text-slate-400">{icon}</span> : null}
+        <span className="min-w-0 flex-1">{children}</span>
+      </div>
+    </div>
+  );
+}
+
+const EMPTY = <span className="font-normal text-slate-400">—</span>;
+
+export function PaymentViewModal({ isOpen, payment, onClose, onEdit, canEdit = false, editHint }: PaymentViewModalProps) {
   if (!isOpen || !payment) return null;
   const tripDetails = getTripDetails(payment);
-  const details = [
-    ['Paid To', payment.paidTo],
-    ['Date', payment.paymentDate.slice(0, 10).split('-').reverse().join('/')],
-    ['Payment Type', payment.paymentType],
-    ['Mode', payment.paymentMode],
-    ['Reference / Bill No', payment.referenceNo],
-    ['Category', payment.category],
-  ];
+  const inWords = inrInWords(Number(payment.amount) || 0);
+  const dateShown = payment.paymentDate.slice(0, 10).split('-').reverse().join('/');
+  // Only a pending (Draft) record can still be edited, so the edit symbol is
+  // tied to that state rather than shown on every sheet.
+  const pending = payment.status === 'Draft';
+  const showEdit = pending && Boolean(onEdit);
+
   return (
-    <Modal isOpen onClose={onClose} title="Payment Details" description={payment.paymentNo || 'Payment number not assigned'} size="lg"
-      footer={<Button variant="secondary" onClick={onClose}>Close</Button>}>
-      <div className="space-y-5">
+    <Modal isOpen onClose={onClose} title="Payment Details" description={payment.paymentNo || 'Payment number not assigned'} size="xl"
+      footer={<>
+        <Button variant="secondary" onClick={onClose}>Close</Button>
+        {showEdit && (
+          <Button icon={<Pencil size={14} />} disabled={!canEdit} title={canEdit ? 'Edit this payment' : editHint} onClick={onEdit}>Edit payment</Button>
+        )}
+      </>}>
+      <div className="space-y-4">
         {payment.id.startsWith('demo-payment-') && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Sample payment · Read-only preview. Not a real transaction.</p>}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-          <div><p className="text-xs text-slate-500">Amount paid</p><p className="text-2xl font-semibold tabular-nums text-slate-900">{paymentCurrency.format(payment.amount)}</p></div>
-          <StatusBadge status={payment.status} label={paymentStatusLabel(payment.status)} tone={payment.status === 'Draft' ? 'warning' : undefined} />
+
+        {/* FIGURE — one accent bar, the amount, and the state it is in. */}
+        <div className="relative overflow-hidden rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 via-white to-white px-4 py-3.5">
+          <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[3px] bg-emerald-400/80" />
+          <div className="flex flex-wrap items-start justify-between gap-3 pl-2">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-800/60">Amount paid</p>
+              <p className="mt-0.5 text-[26px] font-semibold leading-tight tabular-nums text-slate-900">{paymentCurrency.format(payment.amount)}</p>
+              {inWords && <p className="mt-1 text-[11px] italic leading-snug text-emerald-900/70">{inWords}</p>}
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {showEdit && (
+                <Button variant="ghost" size="sm" iconOnly className="bg-white/70 text-emerald-700 ring-1 ring-inset ring-emerald-200/70 hover:bg-white hover:text-emerald-800"
+                  aria-label={canEdit ? 'Edit payment' : `Edit payment — ${editHint ?? 'unavailable'}`} title={canEdit ? 'Edit this payment' : editHint} disabled={!canEdit} onClick={onEdit}>
+                  <Pencil size={15} aria-hidden="true" />
+                </Button>
+              )}
+              <StatusBadge status={payment.status} label={paymentStatusLabel(payment.status)} tone={pending ? 'warning' : undefined} size="md" />
+            </div>
+          </div>
         </div>
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {details.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 break-words text-sm font-medium text-slate-800">{value || '—'}</dd></div>)}
-        </dl>
-        {tripDetails.length > 0 && <section aria-label="Trip details" className="rounded-lg border border-slate-200 p-3">
-          <h3 className="mb-2 text-sm font-semibold">Trip details · {tripDetails.length}</h3>
-          {tripDetails.map((trip, index) => <div key={`${trip.tripNo}-${index}`} className="flex flex-wrap justify-between gap-2 py-2 text-sm"><span>{trip.tripNo}</span><span className="tabular-nums">{paymentCurrency.format(trip.amount)}</span></div>)}
-          <div className="flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-2 text-sm font-semibold"><span>Total trip amount</span><span>{paymentCurrency.format(tripDetails.reduce((sum, trip) => sum + trip.amount, 0))}</span></div>
+
+        {/* PAYMENT — type and mode bring their own mark, so no field icon. */}
+        <section className="space-y-2.5">
+          <MasterSectionHeading>Payment</MasterSectionHeading>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <DetailField label="Date" icon={<CalendarDays size={14} />}><span className="tabular-nums">{dateShown}</span></DetailField>
+            <DetailField label="Payment Type"><PaymentTypeMark type={payment.paymentType} /></DetailField>
+            <DetailField label="Mode">{payment.paymentMode ? <PaymentModeMark mode={payment.paymentMode} /> : EMPTY}</DetailField>
+            <DetailField label="Category" icon={<IndianRupee size={14} />}>{payment.category || EMPTY}</DetailField>
+          </div>
+        </section>
+
+        {/* PAYEE & PAPER TRAIL */}
+        <section className="space-y-2.5">
+          <MasterSectionHeading>Payee &amp; reference</MasterSectionHeading>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+            <div className="md:col-span-5">
+              <DetailField label="Paid To" icon={<UserRound size={14} />}>{payment.paidTo || EMPTY}</DetailField>
+            </div>
+            <div className="md:col-span-4">
+              <DetailField label="Reference / Bill No" icon={<ScrollText size={14} />}>
+                <span className="uppercase tracking-tight">{payment.referenceNo || '—'}</span>
+              </DetailField>
+            </div>
+            <div className="md:col-span-3">
+              <DetailField label="Recorded By" icon={<BadgeCheck size={14} />}>{payment.createdBy || EMPTY}</DetailField>
+            </div>
+          </div>
+        </section>
+
+        {tripDetails.length > 0 && <section className="space-y-2.5">
+          <MasterSectionHeading>{`Trips settled · ${tripDetails.length}`}</MasterSectionHeading>
+          <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
+            {tripDetails.map((trip, index) => <div key={`${trip.tripNo}-${index}`} className="flex flex-wrap items-center justify-between gap-2 bg-white px-3 py-2 text-sm">
+              <span className="font-medium text-slate-700">{trip.tripNo}</span>
+              <span className="tabular-nums text-slate-600">{paymentCurrency.format(trip.amount)}</span>
+            </div>)}
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50/70 px-3 py-2 text-sm font-semibold text-slate-800">
+              <span>Total trip amount</span>
+              <span className="tabular-nums">{paymentCurrency.format(tripDetails.reduce((sum, trip) => sum + trip.amount, 0))}</span>
+            </div>
+          </div>
         </section>}
-        <div><h3 className="text-xs text-slate-500">Remarks / Notes</h3><p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700">{payment.remarks || '—'}</p></div>
-        <div className="flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-4 text-xs text-slate-500"><span>Created: {timestamp(payment.createdAt)}</span><span>Updated: {timestamp(payment.updatedAt)}</span></div>
+
+        {/* NOTE + FILES */}
+        <section className="space-y-2.5">
+          <MasterSectionHeading>Note &amp; files</MasterSectionHeading>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+            <div className="md:col-span-8">
+              <DetailField label="Remarks / Notes" icon={<FileText size={14} />}>
+                {payment.remarks ? <span className="block whitespace-pre-wrap break-words text-sm font-normal text-slate-700">{payment.remarks}</span> : <span className="text-sm font-normal text-slate-400">No note recorded.</span>}
+              </DetailField>
+            </div>
+            <div className="md:col-span-4">
+              <DetailField label="Attachments" icon={<Paperclip size={14} />}>
+                {payment.attachments.length === 0
+                  ? <span className="text-sm font-normal text-slate-400">No files attached.</span>
+                  : (
+                    <ul className="space-y-0.5 text-sm font-normal">
+                      {payment.attachments.map(file => <li key={file.id}>
+                        <a href={file.fileUrl} target="_blank" rel="noreferrer" className="text-emerald-700 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-800">{file.fileName}</a>
+                      </li>)}
+                    </ul>
+                  )}
+              </DetailField>
+            </div>
+          </div>
+        </section>
+
+        <div className="flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-3 text-[11px] text-slate-500">
+          <span>Created: {timestamp(payment.createdAt)}</span>
+          <span>Updated: {timestamp(payment.updatedAt)}</span>
+        </div>
       </div>
     </Modal>
   );

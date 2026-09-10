@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useId } from 'react';
-import { Plus, Search, Pencil, CheckCircle2, Trash2 } from 'lucide-react';
+import { Plus, RefreshCw, RotateCcw, Search, Pencil, CheckCircle2, Trash2 } from 'lucide-react';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { PaymentTable } from '../components/payment-book/PaymentTable';
 import { PaymentViewModal } from '../components/payment-book/PaymentViewModal';
@@ -18,8 +18,7 @@ import MasterDropdown from '../../masters/components/MasterDropdown';
 import '../../masters/styles/masters.css';
 import { Button } from '../../../ui/Button';
 import { SearchInput } from '../../../ui/SearchInput';
-import { RefreshButton, ResetButton } from '../../../ui/ExportActions';
-import { uiBadgeClass } from '../../../shared/ui/uiTokens';
+import { uiActionToneClass, uiBadgeClass } from '../../../shared/ui/uiTokens';
 import { createDemoPayments } from '../utils/paymentRegisterDemo';
 import { EmptyState } from '../../../ui/EmptyState';
 import { Pagination } from '../../../ui/Pagination';
@@ -119,6 +118,21 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
     return () => document.removeEventListener('pointerdown', clearOutsideSelection);
   }, []);
 
+  /* Refresh feedback. The arrows keep turning for as long as a real load runs,
+     and for one short beat on sample data, which makes no request at all — so
+     the click is never silently swallowed. */
+  const [spinBeat, setSpinBeat] = useState(false);
+  const spinTimer = useRef<number | null>(null);
+  const spinning = spinBeat || loading;
+  const handleRefresh = useCallback(() => {
+    setSpinBeat(true);
+    if (spinTimer.current !== null) window.clearTimeout(spinTimer.current);
+    spinTimer.current = window.setTimeout(() => setSpinBeat(false), 700);
+    if (demoRef.current) showNotification('Sample data is up to date. No server request was made.', 'info');
+    else void loadPayments();
+  }, [loadPayments, showNotification]);
+  useEffect(() => () => { if (spinTimer.current !== null) window.clearTimeout(spinTimer.current); }, []);
+
   const toggleDemo = () => {
     if (approvingRef.current) return;
     setSelectedId(null);
@@ -154,7 +168,6 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   }, [matched, status]);
   const types = useMemo(() => [...new Set([...PAYMENT_TYPES, ...payments.map(p => p.paymentType)])].filter(Boolean), [payments]);
   const modes = useMemo(() => [...new Set([...PAYMENT_MODES, ...payments.map(p => p.paymentMode)])].filter(Boolean), [payments]);
-  const total = useMemo(() => filtered.reduce((sum, p) => sum + Number(p.amount || 0), 0), [filtered]);
   const safePage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
   const rows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
   const selectedPayment = rows.find(payment => payment.id === selectedId) ?? null;
@@ -236,17 +249,21 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
           <MasterDropdown label="Payment Type" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-44" value={filters.type} options={types} placeholder="All payment types" onChange={v => changeFilter('type', v)} searchable allowClear />
           <MasterDropdown label="Payment Mode" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-40" value={filters.mode} options={modes} placeholder="All payment modes" onChange={v => changeFilter('mode', v)} searchable allowClear />
           <SearchInput value={filters.search} onChange={v => changeFilter('search', v)} aria-label="Search payments" placeholder="Payment no, payee, reference…" wrapperClassName="w-full sm:flex-1 sm:min-w-44" />
+          {/* Search and Clear carry their words; Refresh stays icon-only and
+              its arrows turn while the register reloads. */}
           <div className="flex items-center gap-1.5">
             <Button size="lg" icon={<Search size={16} />} onClick={applyFilters} disabled={invalidRange}>Search</Button>
-            <ResetButton compact ariaLabel="Clear filters" title="Clear filters" onClick={clearFilters} />
-            <RefreshButton compact loading={loading} onClick={() => { if (demo) showNotification('Sample data is up to date. No server request was made.', 'info'); else void loadPayments(); }} />
+            <Button variant="secondary" size="lg" icon={<RotateCcw size={15} />} aria-label="Clear filters" title="Clear filters" onClick={clearFilters}>Clear</Button>
+            <Button variant="custom" size="lg" iconOnly aria-label="Refresh" title="Refresh records" className={uiActionToneClass.refresh} disabled={spinning} onClick={handleRefresh}>
+              <RefreshCw size={16} strokeWidth={2} aria-hidden="true" className={spinning ? 'animate-spin' : undefined} />
+            </Button>
           </div>
         </div>
         {invalidRange && <p role="alert" className="mt-2 text-xs text-red-600">From Date must be on or before To Date.</p>}
       </section>
-      <section ref={tableRef} aria-label="Payment records" aria-busy={loading} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-white px-5 py-4">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3">
+      <section ref={tableRef} aria-label="Payment records" aria-busy={loading} className="rounded-xl border border-slate-200/80 bg-white shadow-2xs overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-white px-4 py-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
             <h2 className="text-sm font-bold tracking-wide text-slate-800">Payment</h2>
             <span aria-live="polite" className="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600 shadow-sm">
               {loading ? 'Updating…' : status === 'deleted' ? '—' : filtered.length}
@@ -270,7 +287,14 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
             <Button variant="destructiveOutline" size="sm" icon={<Trash2 size={14} />} aria-label="Delete selected payment" disabled={!canDeleteSelected}
               title={readOnlyHint ?? (canDeleteSelected ? 'Delete selected payment' : 'Payments older than 10 days cannot be deleted')}
               onClick={() => { if (canDeleteSelected) requestDelete(selectedPayment.id, { label: `Deleting payment to ${selectedPayment.paidTo}` }); }}>Delete</Button>
-          </div> : status !== 'deleted' && <span className="text-xs text-slate-500">Filtered total <strong className="ml-2 text-sm tabular-nums text-slate-800">{paymentCurrency.format(total)}</strong></span>}
+          </div> : status !== 'deleted' && filtered.length > 0 && (
+            /* Replaces the old "Filtered total" readout: the register is a work
+               list, so the empty slot invites the row action instead of showing
+               an amount that never drives anything. */
+            <p className="text-[11px] text-slate-400">
+              {demo ? 'Sample rows are read-only — select one to view details.' : 'Select a row to edit, approve or delete.'}
+            </p>
+          )}
         </div>
         {error && <p role="alert" className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">Unable to refresh records. {payments.length ? 'Previously loaded records are still shown. ' : ''}Use Refresh to try again.</p>}
         {status === 'deleted' ? <EmptyState title="Deleted payments are unavailable" description="The current payment API does not provide deleted records. Cancelled payments are not treated as deleted." /> : <>
@@ -298,7 +322,12 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
         onConfirm={() => void confirmApproval()} onCancel={() => { if (!approvingRef.current) { setApprovalPayment(null); setApprovalError(''); } }} />
       <NewPaymentModal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} onSave={handleSave} />
       <PaymentEditModal isOpen={!!editingPayment} payment={editingPayment} onClose={() => setEditingPayment(null)} onSave={handleSave} />
-      <PaymentViewModal isOpen={!!viewingPayment} payment={viewingPayment} onClose={() => setViewingPayment(null)} />
+      {/* The sheet hands edit back to the register, which owns the row's
+          eligibility rules; closing first keeps only one dialog mounted. */}
+      <PaymentViewModal isOpen={!!viewingPayment} payment={viewingPayment} onClose={() => setViewingPayment(null)}
+        onEdit={viewingPayment ? () => { const next = viewingPayment; setViewingPayment(null); setEditingPayment(next); } : undefined}
+        canEdit={Boolean(viewingPayment && !demo && !viewingPayment.id.startsWith('demo-payment-') && !isPending(viewingPayment.id) && !approving && canEditItem(viewingPayment.createdAt))}
+        editHint={demo ? 'Sample rows are read-only — switch to real payments to edit.' : 'Payments older than 10 days cannot be edited.'} />
     </div>
   );
 }
