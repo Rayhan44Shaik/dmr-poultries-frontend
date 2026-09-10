@@ -268,6 +268,7 @@ export default {
   'ops.trip.communication_summary': 'Communication Summary',
   'ops.trip.complete_previous_first': 'Complete the previous step first.',
   'ops.trip.complete_required_fields': 'Complete the required fields.',
+  'ops.trip.ready_to_save': 'Ready to save',
   'ops.trip.validate.trip_date_required': 'Trip Date is required.',
   'ops.trip.validate.select_vehicle': 'Please select a Vehicle.',
   'ops.trip.validate.select_driver': 'Please select a Driver.',

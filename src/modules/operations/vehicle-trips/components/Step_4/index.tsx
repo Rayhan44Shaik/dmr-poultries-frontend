@@ -545,7 +545,9 @@ export default function UnLoadingTable({
   const openAddForm = () => {
     setEditingId(null);
     setMode("box");
-    setAutoCaptureTime(new Date().toLocaleString());
+    // Auto-captured time is NOT shown while adding — it is captured at the
+    // moment the delivery is actually saved (see handleSubmit).
+    setAutoCaptureTime("");
     const birdTypeId = tripBirdTypeId || 0;
     const birdType = tripBirdType || "";
     setFormData({ ...EMPTY_DELIVERY_FORM, birdTypeId, birdType });
@@ -704,7 +706,11 @@ export default function UnLoadingTable({
       clientKey: editingId
         ? (safeRows.find((r) => r.id === editingId) as ShopDelivery | undefined)?.clientKey || `ck-${editingId}`
         : (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `ck-${Date.now()}`),
-      autoCaptureTime: autoCaptureTime || undefined,
+      // A NEW delivery captures its time exactly when it is saved; an EDIT
+      // preserves the originally captured time.
+      autoCaptureTime: editingId !== null
+        ? (autoCaptureTime || (safeRows.find((r) => r.id === editingId) as any)?.autoCaptureTime || undefined)
+        : new Date().toLocaleString(),
     };
 
     if (editingId !== null) {

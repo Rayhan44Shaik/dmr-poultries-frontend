@@ -268,6 +268,7 @@ export default {
   'ops.trip.communication_summary': 'కమ్యూనికేషన్ సారాంశం',
   'ops.trip.complete_previous_first': 'ముందుగా మునుపటి దశ పూర్తి చేయండి.',
   'ops.trip.complete_required_fields': 'తప్పనిసరి ఫీల్డ్‌లను పూర్తి చేయండి.',
+  'ops.trip.ready_to_save': 'సేవ్ చేయడానికి సిద్ధంగా ఉంది',
   'ops.trip.validate.trip_date_required': 'ట్రిప్ తేదీ అవసరం.',
   'ops.trip.validate.select_vehicle': 'దయచేసి వాహనాన్ని ఎంచుకోండి.',
   'ops.trip.validate.select_driver': 'దయచేసి డ్రైవర్‌ను ఎంచుకోండి.',

@@ -5,8 +5,7 @@ import {
 } from "lucide-react";
 import type { Trip, BoxDetail } from "../types/trip";
 import { getVehicles } from "../../../masters/vehicles/services/vehicleService";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { generatePickupReportPDF } from "../utils/generatePickupPDF";
 import { StepCloseButton, WizardActionBar, WizardStepNotice } from "./WizardStepUI";
 import { calculatePickupTotals, calculateBoxAvgWeight } from "../../../../shared/trip/calculations";
 import {
@@ -15,7 +14,6 @@ import {
 import { useI18n } from "../../../../i18n";
 import { compressImageFile } from "../../../../utils/compressImage";
 import { formatIstStamp } from "../services/tripHeaderApiService";
-import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
 
 interface Props {
   trip: Trip;
@@ -527,125 +525,17 @@ export default function StepPickup({
   const canSubmit = rows.length > 0 && totals.totalBirds > 0 && totals.dcWeight > 0 && photos.length >= 1;
 
   // ─── PDF Generation ─────────────────────────────────────────────────
-  const generatePDF = () => {
+  const generatePDF = async () => {
     if (!trip.pickupStepSubmitted) return;
     if (!beginAction("pdf")) return;
     try {
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const primaryColor: [number, number, number] = [37, 99, 235];
-      const secondaryColor: [number, number, number] = [71, 85, 105];
-
-      doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.rect(0, 0, pageWidth, 6, 'F');
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(22);
-      doc.setTextColor(15, 23, 42);
-      doc.text('DMR POULTRY', 14, 22);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-      doc.text('Trip Pickup KPI Report', 14, 28);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-      doc.text('TRIP #:', pageWidth - 14, 20, { align: 'right' });
-      doc.setFont('helvetica', 'normal');
-      doc.text(trip.tripNo || 'N/A', pageWidth - 14, 25, { align: 'right' });
-
-      doc.setDrawColor(226, 232, 240);
-      doc.setLineWidth(0.5);
-      doc.line(14, 34, pageWidth - 14, 34);
-
-      const details = [
-        ['Generation Date', trip.tripDate || 'N/A'],
-        ['Farm', trip.sourceFarm || 'N/A'],
-        ['Vehicle', trip.vehicleNo || 'N/A'],
-        ['Driver', trip.driverName || 'N/A'],
-        ['Supervisor', trip.supervisorName || 'N/A'],
-      ];
-      let y = 42;
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(30, 41, 59);
-      details.forEach(([label, value]) => {
-        doc.text(label + ':', 14, y);
-        doc.setFont('helvetica', 'normal');
-        doc.text(String(value), 70, y);
-        y += 7;
-        doc.setFont('helvetica', 'bold');
+      await generatePickupReportPDF(trip, {
+        pickupTime: officialPickupTime || undefined,
+        maxBoxes: maxBoxes || undefined,
       });
-
-      const boxData = trip.boxDetails || [];
-      const tableRows = boxData.map((r) => [
-        r.boxNo,
-        r.birds,
-        Number(r.weight).toFixed(2),
-        formatAvg(Number(r.birds), Number(r.weight), r.avgWeight),
-      ]);
-
-      autoTable(doc, {
-        startY: y + 6,
-        head: [['Box #', 'Birds', 'Weight (Kg)', 'Avg WT (Kg)']],
-        body: tableRows.length > 0 ? tableRows : [['—', '—', '—', '—']],
-        theme: 'grid',
-        styles: { fontSize: 9, cellPadding: 4 },
-        headStyles: {
-          fillColor: primaryColor,
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-        },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        foot: tableRows.length > 0
-          ? [[
-              { content: 'Total', colSpan: 1, styles: { fontStyle: 'bold' } },
-              { content: String(trip.totalBirds || totals.totalBirds), styles: { fontStyle: 'bold' } },
-              { content: Number(trip.dcWeight || totals.dcWeight).toFixed(2), styles: { fontStyle: 'bold' } },
-              { content: formatAvg(Number(trip.totalBirds), Number(trip.dcWeight), trip.avgWeight), styles: { fontStyle: 'bold' } },
-            ]]
-          : undefined,
-      });
-
-      const finalY = (doc as any).lastAutoTable?.finalY || y + 40;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(30, 41, 59);
-      doc.text('SUMMARY', 14, finalY + 10);
-
-      const summaryData = [
-        ['Pickup Time', officialPickupTime || 'Not entered'],
-        ['Total DC Weight', Number(trip.dcWeight || 0).toFixed(2) + ' Kg'],
-        ['Total Birds', trip.totalBirds || 0],
-        ['Loaded Boxes', `${trip.boxes || totals.boxes} / ${maxBoxes || '—'}`],
-        ['Average Weight', formatAvg(Number(trip.totalBirds), Number(trip.dcWeight), trip.avgWeight) + (trip.avgWeight ? ' Kg' : '')],
-      ];
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      let sumY = finalY + 18;
-      summaryData.forEach(([label, value]) => {
-        doc.setFont('helvetica', 'bold');
-        doc.text(label + ':', 14, sumY);
-        doc.setFont('helvetica', 'normal');
-        doc.text(String(value), 70, sumY);
-        sumY += 7;
-      });
-
-      const pageHeight = doc.internal.pageSize.getHeight();
-      doc.setFontSize(8);
-      doc.setTextColor(148, 163, 184);
-      doc.setDrawColor(241, 245, 249);
-      doc.line(14, pageHeight - 15, pageWidth - 14, pageHeight - 15);
-      doc.text('Confidential Business Report • Generated Automatically', 14, pageHeight - 10);
-      doc.text(`Page 1 of 1`, pageWidth - 14, pageHeight - 10, { align: 'right' });
-
-      doc.save(`Trip_${trip.tripNo || 'report'}_PickupKPI.pdf`);
     } catch (error) {
-      console.error('PDF generation error:', error);
-      // Was a blocking window.alert inside a catch block.
-      globalNotify.error(t('ops.trip.pdf_generation_failed'));
+      console.error("PDF generation error:", error);
+      setToast({ message: t("ops.trip.pdf_generation_failed"), type: "error" });
     } finally {
       endAction();
     }

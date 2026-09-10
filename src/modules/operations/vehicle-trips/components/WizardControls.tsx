@@ -54,13 +54,12 @@ export function dropdownTriggerClass(invalid: boolean, disabled: boolean): strin
 
 /**
  * Read-only KPI card for the submitted/locked step views (Steps 1 & 2).
- * Tone-consistent icon chip, coloured top accent bar, uppercase label and a
- * bold truncated value. Purely presentational.
+ * Tone-consistent icon chip, uppercase label and a bold truncated value.
+ * Purely presentational (no coloured top accent bar).
  */
 export const StepKpiCard = React.memo(function StepKpiCard({
   icon: Icon,
   tone,
-  bar,
   label,
   value,
   valueClass,
@@ -69,8 +68,6 @@ export const StepKpiCard = React.memo(function StepKpiCard({
   icon: React.ComponentType<{ size?: number | string; className?: string }>;
   /** Icon chip tone, e.g. "bg-sky-50 text-sky-600". */
   tone: string;
-  /** Top accent bar colour, e.g. "bg-sky-400". */
-  bar: string;
   label: string;
   value: React.ReactNode;
   valueClass?: string;
@@ -81,7 +78,6 @@ export const StepKpiCard = React.memo(function StepKpiCard({
       className="group relative overflow-hidden bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs transition-all duration-200 hover:shadow-sm hover:border-slate-300/80"
       title={title}
     >
-      <span className={`absolute inset-x-0 top-0 h-[3px] ${bar} opacity-80 transition-opacity duration-200 group-hover:opacity-100`} />
       <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
         <span className={`h-5 w-5 rounded-md flex items-center justify-center shrink-0 ${tone}`}>
           <Icon size={12} />

@@ -256,21 +256,18 @@ export default function StepFarm({
           <StepKpiCard
             icon={Clock}
             tone="bg-sky-50 text-sky-600"
-            bar="bg-sky-400"
             label={t("ops.trip.field.reached_time")}
             value={trip.farmStepSubmittedAt ? formatIstStamp(trip.farmStepSubmittedAt) : trip.reachedTime || t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={Store}
             tone="bg-emerald-50 text-emerald-600"
-            bar="bg-emerald-400"
             label={t("common.farm")}
             value={trip.sourceFarm || t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={MapPin}
             tone="bg-cyan-50 text-cyan-600"
-            bar="bg-cyan-400"
             label="GPS"
             value={
               hasGps ? (
@@ -288,35 +285,30 @@ export default function StepFarm({
           <StepKpiCard
             icon={Layers}
             tone="bg-violet-50 text-violet-600"
-            bar="bg-violet-400"
             label={t("operations.bird_type")}
             value={trip.birdType || t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={MapPin}
             tone="bg-rose-50 text-rose-600"
-            bar="bg-rose-400"
             label={t("ops.trip.field.farm_address")}
             value={trip.farmAddress || t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={Gauge}
             tone="bg-purple-50 text-purple-600"
-            bar="bg-purple-400"
             label={t("ops.trip.field.farm_meter")}
             value={destMeterLabel}
           />
           <StepKpiCard
             icon={Ticket}
             tone="bg-amber-50 text-amber-600"
-            bar="bg-amber-400"
             label={t("ops.trip.field.pickup_tolls")}
             value={trip.pickupTolls ?? 0}
           />
           <StepKpiCard
             icon={Scale}
             tone="bg-teal-50 text-teal-600"
-            bar="bg-teal-400"
             label={t("ops.trip.field.avg_bird_weight")}
             value={avgWeightLabel}
           />
