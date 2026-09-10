@@ -235,34 +235,35 @@ export default function ShopDeliveryForm({
           />
         </div>
 
-        {/* Mode toggle — icon only: box icon (Box Mode), balance/scale icon
-            (Weight Mode). Names are removed; titles keep them accessible. */}
+        {/* Mode toggle — shows the NAME (Box Mode / Weight Mode) with its icon. */}
         <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1">
             <button
               type="button"
               onClick={() => setMode("box")}
               title={t("ops.trip.box_mode")}
               aria-label={t("ops.trip.box_mode")}
-              className={`flex items-center justify-center rounded-lg transition-all h-[32px] w-[38px] ${
+              className={`flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-all h-[32px] px-3 whitespace-nowrap ${
                 mode === "box"
                   ? "bg-blue-600 text-white shadow-sm border border-blue-600"
                   : "text-slate-500 hover:text-slate-800 border border-transparent"
               }`}
             >
-              <Box size={16} />
+              <Box size={14} />
+              {t("ops.trip.box_mode")}
             </button>
             <button
               type="button"
               onClick={() => setMode("weight")}
               title={t("ops.trip.weight_mode")}
               aria-label={t("ops.trip.weight_mode")}
-              className={`flex items-center justify-center rounded-lg transition-all h-[32px] w-[38px] ${
+              className={`flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-all h-[32px] px-3 whitespace-nowrap ${
                 mode === "weight"
                   ? "bg-purple-600 text-white shadow-sm border border-purple-600"
                   : "text-slate-500 hover:text-slate-800 border border-transparent"
               }`}
             >
-              <Scale size={16} />
+              <Scale size={14} />
+              {t("ops.trip.weight_mode")}
             </button>
         </div>
 
