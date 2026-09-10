@@ -686,7 +686,7 @@ export default function DieselExpensesTable({
                   if (isEditingActionRow) cancelEdit();
                   else handleClearRow(actionRow);
                 }}
-                className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                className="h-9 px-4 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 inline-flex items-center justify-center shrink-0"
               >
                 {t("common.cancel")}
               </button>
@@ -694,7 +694,7 @@ export default function DieselExpensesTable({
                 type="button"
                 onClick={() => handleRowSubmit(actionRow)}
                 disabled={!canSubmit || busyRow === actionRow}
-                className={`px-4 py-2 rounded-lg text-xs font-bold text-white ${
+                className={`h-9 px-4 rounded-lg text-xs font-bold text-white inline-flex items-center justify-center shrink-0 ${
                   canSubmit && busyRow !== actionRow
                     ? "bg-emerald-600 hover:bg-emerald-700"
                     : "bg-slate-300 cursor-not-allowed"

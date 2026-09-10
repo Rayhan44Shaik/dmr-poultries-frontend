@@ -81,7 +81,7 @@ export function WizardActionBar({
   submitLabel,
 }: WizardActionBarProps) {
   const { t } = useI18n();
-  const base = "w-full sm:w-auto h-10 px-5 rounded-xl text-xs font-semibold transition-[color,background-color,border-color,box-shadow,opacity] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center justify-center gap-1.5";
+  const base = "w-full sm:w-auto h-10 px-5 rounded-xl text-xs font-semibold transition-[color,background-color,border-color,box-shadow,opacity] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center justify-center gap-1.5 shrink-0";
   return (
     <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-slate-100">
       <button type="button" onClick={onCancel} disabled={busy} className={`${base} border border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}>
