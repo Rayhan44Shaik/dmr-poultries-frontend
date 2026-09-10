@@ -436,6 +436,7 @@ export default {
   'ops.trip.max_6_diesel': 'Maximum 6 diesel entries',
   'ops.trip.meter': 'Meter',
   'ops.trip.meter_must_exceed': 'Meter reading cannot be less than the previous reading {meter}{ref}.',
+  'ops.trip.last_trip_reading_hint': 'Last trip: {meter} KM · {no} · {date}',
   'ops.trip.enter_manually': 'Enter manually',
   'ops.trip.meter_must_greater_than': 'Meter reading must be greater than the previous reading.',
   'ops.trip.mileage': 'Mileage',

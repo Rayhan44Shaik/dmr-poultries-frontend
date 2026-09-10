@@ -434,6 +434,7 @@ export default {
   'ops.trip.max_6_diesel': 'గరిష్టంగా 6 డీజిల్ ఎంట్రీలు',
   'ops.trip.meter': 'మీటర్',
   'ops.trip.meter_must_exceed': 'మీటర్ రీడింగ్ {meter} కంటే తక్కువ ఉండకూడదు{ref}.',
+  'ops.trip.last_trip_reading_hint': 'గత ట్రిప్: {meter} KM · {no} · {date}',
   'ops.trip.enter_manually': 'మాన్యువల్‌గా నమోదించండి',
   'ops.trip.meter_must_greater_than': 'మీటర్ రీడింగ్ మునుపటి రీడింగ్ కంటే ఎక్కువ ఉండాలి.',
   'ops.trip.mileage': 'మైలేజ్',

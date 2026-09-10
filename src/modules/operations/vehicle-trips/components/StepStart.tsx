@@ -762,12 +762,14 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
   disabled,
   invalid,
   error,
+  latestMeter,
   onChange,
 }: {
   value: string;
   disabled: boolean;
   invalid?: boolean;
   error?: string | null;
+  latestMeter?: { meter: number; tripNo: string; tripDate: string } | null;
   onChange: (value: string) => void;
 }) {
   const { t } = useI18n();
@@ -812,6 +814,19 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
         <p className="mt-1.5 text-xs font-medium text-red-600 flex items-start gap-1">
           <span aria-hidden>⚠</span>
           <span>{error}</span>
+        </p>
+      ) : latestMeter ? (
+        // While entering: reference line showing the vehicle's last recorded
+        // reading (never auto-filled — the value above is typed by the user).
+        <p className="mt-1.5 text-xs font-medium text-slate-400 flex items-start gap-1">
+          <span aria-hidden>↳</span>
+          <span className="truncate">
+            {t("ops.trip.last_trip_reading_hint", {
+              meter: latestMeter.meter,
+              no: latestMeter.tripNo,
+              date: latestMeter.tripDate,
+            })}
+          </span>
         </p>
       ) : null}
     </div>
@@ -1328,6 +1343,7 @@ function StepStart({
             disabled={inputsLocked}
             invalid={fieldInvalid.openingMeter}
             error={openingMeterError}
+            latestMeter={latestMeter}
             onChange={handleOpeningMeterChange}
           />
           <AdvanceField
