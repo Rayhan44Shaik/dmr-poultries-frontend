@@ -3,19 +3,20 @@
 import React from 'react';
 import { uiInputClass } from '../../../../shared/ui/uiTokens';
 import { DatePicker } from '../../../../components/common/DatePicker';
-import { Search, X, Filter } from 'lucide-react';
+import { Search, X, Filter, RefreshCw } from 'lucide-react';
 
 interface FarmerPaymentFiltersProps {
   dateFrom: string;
   dateTo: string;
   selectedFarm: string;
-  statusFilter: string;
   searchQuery: string;
   farms: string[];
+  /** A trips reload is in flight — the Refresh button shows its spinner. */
+  loading?: boolean;
+  onRefresh: () => void;
   onDateFromChange: (val: string) => void;
   onDateToChange: (val: string) => void;
   onFarmChange: (farm: string) => void;
-  onStatusChange: (status: string) => void;
   onSearchChange: (val: string) => void;
   onApply: () => void;
   onClear: () => void;
@@ -25,13 +26,13 @@ export function FarmerPaymentFilters({
   dateFrom,
   dateTo,
   selectedFarm,
-  statusFilter,
   searchQuery,
   farms,
+  loading = false,
+  onRefresh,
   onDateFromChange,
   onDateToChange,
   onFarmChange,
-  onStatusChange,
   onSearchChange,
   onApply,
   onClear,
@@ -91,26 +92,10 @@ export function FarmerPaymentFilters({
     buttons[next].focus();
   };
 
-  const statusOptions = [
-    { value: 'All', label: 'All Status', color: 'text-slate-600' },
-    { value: 'Unpaid', label: 'Unpaid', color: 'text-red-600' },
-    { value: 'Partially Paid', label: 'Partially Paid', color: 'text-orange-600' },
-    { value: 'Paid', label: 'Paid', color: 'text-emerald-600' },
-  ];
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Unpaid': return 'text-red-600';
-      case 'Partially Paid': return 'text-orange-600';
-      case 'Paid': return 'text-emerald-600';
-      default: return 'text-slate-600';
-    }
-  };
-
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-4">
-      {/* Row 1: Date From, Date To, Farm, Status */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-4">
+      {/* Row 1: Date From, Date To, Farm */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <DatePicker
           label="Date From"
           value={dateFrom}
@@ -196,25 +181,6 @@ export function FarmerPaymentFilters({
           </div>
         </div>
 
-        {/* Status dropdown */}
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Status</label>
-          <select
-            value={statusFilter}
-            onChange={(e) => onStatusChange(e.target.value)}
-            className={`w-full h-10 px-3 rounded-lg border border-slate-300 text-sm font-medium focus:ring-2 focus:ring-blue-400 outline-none bg-white ${getStatusColor(statusFilter)}`}
-          >
-            {statusOptions.map((option) => (
-              <option 
-                key={option.value} 
-                value={option.value}
-                className={option.color}
-              >
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
       {/* Row 2: Global Search + Apply + Clear */}
@@ -253,6 +219,15 @@ export function FarmerPaymentFilters({
           className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition bg-white whitespace-nowrap"
         >
           Clear
+        </button>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          title="Reload completed trips from the backend"
+          className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition whitespace-nowrap"
+        >
+          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+          {loading ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
     </div>
