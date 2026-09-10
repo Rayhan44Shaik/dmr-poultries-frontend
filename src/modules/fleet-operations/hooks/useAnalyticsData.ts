@@ -4,7 +4,15 @@ import { useFleetVehicles } from './useFleetVehicles';
 import { handleApiError, isCanceledError } from '../../../api/errors';
 import analyticsApi from '../services/analyticsApi';
 import { fleetCacheGet, fleetCacheInvalidate, fleetSharedGet } from '../services/fleetSessionCache';
-import type { FleetAnalyticsResponse } from '../types/analytics';
+import type {
+  AnalyticsCostCenter,
+  AnalyticsHighestExpense,
+  AnalyticsKpis,
+  AnalyticsTopPerformer,
+  AnalyticsVehicleStat,
+  AnalyticsWeeklyPoint,
+  FleetAnalyticsResponse,
+} from '../types/analytics';
 
 const dateString = (date: Date) => format(date, 'yyyy-MM-dd');
 
@@ -15,10 +23,14 @@ const getCurrentWeekRange = () => {
   return { start, end };
 };
 
-type AnalyticsView = Pick<
-  FleetAnalyticsResponse,
-  'kpis' | 'weekly' | 'costCenters' | 'topPerformers' | 'highestExpense' | 'vehicleStats'
->;
+type AnalyticsView = {
+  kpis: AnalyticsKpis;
+  weekly: AnalyticsWeeklyPoint[];
+  costCenters: AnalyticsCostCenter[];
+  topPerformers: AnalyticsTopPerformer[];
+  highestExpense: AnalyticsHighestExpense[];
+  vehicleStats: AnalyticsVehicleStat[];
+};
 
 const EMPTY: AnalyticsView = {
   kpis: {
@@ -163,9 +175,12 @@ export function useAnalyticsData() {
 
     const gen = ++loadGen.current;
     inFlight.current = true;
-    setError(null);
-    if (hasData.current) setRefreshing(true);
-    else setLoading(true);
+    void Promise.resolve().then(() => {
+      if (!mounted.current || gen !== loadGen.current) return;
+      setError(null);
+      if (hasData.current) setRefreshing(true);
+      else setLoading(true);
+    });
 
     void fleetSharedGet(key, () =>
       analyticsApi.get({ fromDate, toDate, vehicleId: selectedVehicleId })
