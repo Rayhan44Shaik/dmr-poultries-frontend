@@ -118,13 +118,32 @@ function ConfirmationModal({
 }
 
 // ─── Balance Mismatch Panel ─────────────────────────────────────
-function DeliveryBalanceErrorPanel({ error }: { error: NonNullable<DeliveriesBalanceError> }) {
+function DeliveryBalanceErrorPanel({
+  error,
+  onClose,
+}: {
+  error: NonNullable<DeliveriesBalanceError>;
+  onClose?: () => void;
+}) {
   const { t } = useI18n();
   return (
     <div className="rounded-xl border border-red-300 bg-red-50 p-4 space-y-2">
-      <p className="text-sm font-bold text-red-800 flex items-center gap-1.5">
-        <AlertCircle size={15} className="text-red-600" /> {t("ops.trip.balance_mismatch_fix")}
-      </p>
+      <div className="flex items-start gap-2">
+        <p className="text-sm font-bold text-red-800 flex items-center gap-1.5 flex-1">
+          <AlertCircle size={15} className="text-red-600" /> {t("ops.trip.balance_mismatch_fix")}
+        </p>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="-m-1 rounded-md p-1 text-red-400 transition-colors hover:bg-red-100 hover:text-red-700"
+            aria-label={t("common.close")}
+            title={t("common.close")}
+          >
+            <X size={15} />
+          </button>
+        )}
+      </div>
       {error.birds && (
         <div className="text-xs text-red-800 space-y-0.5">
           <p className="font-semibold">{t("common.birds")}</p>
@@ -1008,7 +1027,10 @@ export default function UnLoadingTable({
         <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xs">
           {showBalanceError && balanceError && (
             <div className="mb-3">
-              <DeliveryBalanceErrorPanel error={balanceError} />
+              <DeliveryBalanceErrorPanel
+                error={balanceError}
+                onClose={() => setShowBalanceError(false)}
+              />
             </div>
           )}
           <WizardStepNotice
