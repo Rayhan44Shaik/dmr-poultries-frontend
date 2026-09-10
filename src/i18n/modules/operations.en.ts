@@ -440,6 +440,7 @@ export default {
   'ops.trip.gps_unable_fetch': 'Unable to fetch your location.',
   'ops.trip.gps_zero_invalid': 'Zero coordinates are invalid.',
   'ops.trip.image_size_5mb': 'Image must be under 5 MB',
+  'ops.trip.photo_auto_compressed': 'Photo optimised: {from} KB → {to} KB',
   'ops.trip.in_progress_step': 'Step {step} — {name}',
   'ops.trip.invalid_meter_reading': 'Invalid meter reading.',
   'ops.trip.km_ltr_efficiency': 'KM/Ltr Efficiency',

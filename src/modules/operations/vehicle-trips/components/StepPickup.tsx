@@ -13,6 +13,7 @@ import {
   TRIP_FIELD_DEFINITIONS,
 } from "../../../../shared/trip/definitions";
 import { useI18n } from "../../../../i18n";
+import { compressImageFile } from "../../../../utils/compressImage";
 import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
 
 interface Props {
@@ -334,19 +335,19 @@ export default function StepPickup({
     }
 
     try {
-      const data = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      // Auto-compress before storing: every photo lands under ~100 KB while
+      // staying clear (quality-first JPEG stepping, dimension floor 640px).
+      // The 5 MB gate above only rejects undecodable monsters — compression
+      // handles everything in between.
+      const result = await compressImageFile(file, { maxBytes: 100 * 1024, maxDimension: 1600 });
+      const data = result.dataUrl;
       if (!data.startsWith("data:image/")) {
         setToast({ message: t("ops.trip.valid_image"), type: "error" });
         return;
       }
       const next: PickupPhoto = {
         key: `dc_photo_${trip.id}_${photos.length + 1}_${Date.now()}`,
-        mime: file.type,
+        mime: result.mime,
         data,
       };
       const nextPhotos = [...photos, next].slice(0, 2);
@@ -359,6 +360,15 @@ export default function StepPickup({
         dcPhotoMime2: nextPhotos[1]?.mime,
         dcPhotoData2: nextPhotos[1]?.data,
       });
+      if (result.compressed) {
+        setToast({
+          message: t("ops.trip.photo_auto_compressed", {
+            from: Math.round(result.originalBytes / 1024),
+            to: Math.round(result.storedBytes / 1024),
+          }),
+          type: "success",
+        });
+      }
     } catch (error) {
       console.error("Failed to read image:", error);
       setToast({ message: t("ops.trip.failed_read_image"), type: "error" });

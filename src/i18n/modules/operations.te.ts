@@ -438,6 +438,7 @@ export default {
   'ops.trip.gps_unable_fetch': 'మీ స్థానాన్ని పొందలేకపోయాము.',
   'ops.trip.gps_zero_invalid': 'సున్నా కోఆర్డినేట్లు చెల్లవు.',
   'ops.trip.image_size_5mb': 'ఇమేజ్ 5 MB కంటే తక్కువ ఉండాలి',
+  'ops.trip.photo_auto_compressed': 'ఫోటో ఆప్టిమైజ్ చేయబడింది: {from} KB → {to} KB',
   'ops.trip.in_progress_step': 'దశ {step} — {name}',
   'ops.trip.invalid_meter_reading': 'తప్పు మీటర్ రీడింగ్.',
   'ops.trip.km_ltr_efficiency': 'KM/లీటర్ సామర్థ్యం',
