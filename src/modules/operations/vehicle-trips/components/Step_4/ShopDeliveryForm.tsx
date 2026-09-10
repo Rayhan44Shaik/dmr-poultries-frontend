@@ -561,7 +561,7 @@ export default function ShopDeliveryForm({
             disabled={!isFormValid}
             className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 ${
               isFormValid
-                ? "bg-slate-800 hover:bg-slate-900 text-white shadow-sm"
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
                 : "bg-slate-200 text-slate-400 cursor-not-allowed"
             }`}
           >
