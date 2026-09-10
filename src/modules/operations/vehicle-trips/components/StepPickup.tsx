@@ -247,6 +247,8 @@ export default function StepPickup({
     } else {
       setRows([makeRow(1)]);
     }
+    // Fresh trip → no pending removals from a previous trip's edit session.
+    setRemovedBoxNos([]);
   }, [trip.id, isLocalEditing, trip.boxDetails?.length]);
 
   const totals = useMemo(() => calculatePickupTotals(rows), [rows]);
@@ -330,19 +332,24 @@ export default function StepPickup({
       : trip.pickupLoadTime || ""
     : "";
 
+  const uploadBusyRef = useRef(false);
+
   const openFilePicker = (slot: number) => {
+    if (uploadBusyRef.current) return;
     slotIndexRef.current = slot;
     fileInputRef.current?.click();
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || uploadBusyRef.current) return;
+    uploadBusyRef.current = true;
 
-    if (!file.type.startsWith("image/")) {
-      setToast({ message: t("ops.trip.valid_image"), type: "error" });
-      return;
-    }
+    try {
+      if (!file.type.startsWith("image/")) {
+        setToast({ message: t("ops.trip.valid_image"), type: "error" });
+        return;
+      }
     if (file.size > 5 * 1024 * 1024) {
       setToast({ message: t("ops.trip.image_size_5mb"), type: "error" });
       return;
@@ -352,8 +359,7 @@ export default function StepPickup({
       return;
     }
 
-    try {
-      // Auto-compress before storing: every photo lands under ~100 KB while
+    // Auto-compress before storing: every photo lands under ~100 KB while
       // staying clear (quality-first JPEG stepping, dimension floor 640px).
       // The 5 MB gate above only rejects undecodable monsters — compression
       // handles everything in between.
@@ -394,9 +400,11 @@ export default function StepPickup({
     } catch (error) {
       console.error("Failed to read image:", error);
       setToast({ message: t("ops.trip.failed_read_image"), type: "error" });
-    }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+    } finally {
+      uploadBusyRef.current = false;
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
