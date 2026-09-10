@@ -252,7 +252,30 @@ export default function StepFarm({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+        {/* GPS — complete reverse-geocoded address on its own full line */}
+        <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs">
+          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
+            <span className="h-5 w-5 rounded-md bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0">
+              <MapPin size={12} />
+            </span>
+            {t("ops.trip.field.gps_address")}
+          </span>
+          {hasGps ? (
+            <>
+              <p className="text-sm font-semibold text-slate-800 break-words leading-relaxed">
+                <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback={t("ops.trip.location_captured")} />
+              </p>
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                {Number(trip.farmGpsLat).toFixed(6)}, {Number(trip.farmGpsLon).toFixed(6)}
+                {trip.farmGpsAccuracy != null ? `  ·  ±${Number(trip.farmGpsAccuracy).toFixed(1)} m` : ""}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm font-semibold text-slate-400">{t("ops.trip.not_captured")}</p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <StepKpiCard
             icon={Clock}
             tone="bg-sky-50 text-sky-600"
@@ -264,23 +287,6 @@ export default function StepFarm({
             tone="bg-emerald-50 text-emerald-600"
             label={t("common.farm")}
             value={trip.sourceFarm || t("ops.trip.not_entered")}
-          />
-          <StepKpiCard
-            icon={MapPin}
-            tone="bg-cyan-50 text-cyan-600"
-            label="GPS"
-            value={
-              hasGps ? (
-                <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback={t("ops.trip.location_captured")} />
-              ) : (
-                t("ops.trip.not_captured")
-              )
-            }
-            title={
-              hasGps
-                ? `${Number(trip.farmGpsLat).toFixed(6)}, ${Number(trip.farmGpsLon).toFixed(6)}`
-                : undefined
-            }
           />
           <StepKpiCard
             icon={Layers}

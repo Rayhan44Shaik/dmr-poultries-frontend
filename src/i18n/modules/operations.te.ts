@@ -414,6 +414,7 @@ export default {
   'ops.trip.field.end_meter': 'ముగింపు మీటర్',
   'ops.trip.field.farm_address': 'ఫారం చిరునామా',
   'ops.trip.field.farm_meter': 'ఫారం మీటర్',
+  'ops.trip.field.gps_address': 'GPS చిరునామా',
   'ops.trip.field.helpers': 'హెల్పర్లు',
   'ops.trip.field.loaders': 'లోడర్లు',
   'ops.trip.field.opening_meter': 'ప్రారంభ మీటర్',

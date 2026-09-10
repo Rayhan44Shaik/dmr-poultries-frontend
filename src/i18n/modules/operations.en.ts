@@ -418,6 +418,7 @@ export default {
   'ops.trip.field.end_meter': 'End Meter',
   'ops.trip.field.farm_address': 'Farm Address',
   'ops.trip.field.farm_meter': 'Farm Meter',
+  'ops.trip.field.gps_address': 'GPS Address',
   'ops.trip.field.helpers': 'Helpers',
   'ops.trip.field.loaders': 'Loaders',
   'ops.trip.field.opening_meter': 'Opening Meter',
