@@ -390,7 +390,6 @@ export default {
   'ops.trip.filters_reset': 'ఫిల్టర్లు రీసెట్ చేయబడ్డాయి.',
   'ops.trip.final_kpi_summary': 'తుది KPI సారాంశం',
   'ops.trip.from_trip': 'ట్రిప్ {no} నుండి',
-  'ops.trip.last_closing_meter_none': 'ఈ వాహనానికి గత రీడింగ్ లేదు',
   'ops.trip.full_trip_total': 'పూర్తి ట్రిప్ మొత్తం',
   'ops.trip.geo_unsupported': 'ఈ పరికరంలో జియోలొకేషన్ మద్దతు లేదు.',
   'ops.trip.get_gps': 'GPS పొందండి',

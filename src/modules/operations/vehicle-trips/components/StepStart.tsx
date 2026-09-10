@@ -278,10 +278,10 @@ const SearchDropdown = React.memo(function SearchDropdown({
             type="button"
             onClick={() => pick("")}
             className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left border-b border-slate-100 hover:bg-slate-50 transition ${
-              !value ? "text-blue-600 bg-blue-50/70" : "text-slate-600"
+              !value ? "text-emerald-600 bg-emerald-50/70" : "text-slate-600"
             }`}
           >
-            <span className="w-3.5 shrink-0">{!value && <Check size={13} className="text-blue-600" />}</span>
+            <span className="w-3.5 shrink-0">{!value && <Check size={13} className="text-emerald-600" />}</span>
             <span className="truncate">{placeholder}</span>
           </button>
 
@@ -297,11 +297,11 @@ const SearchDropdown = React.memo(function SearchDropdown({
                     type="button"
                     onClick={() => pick(option.value)}
                     className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left truncate hover:bg-slate-50 transition ${
-                      isSelected ? "text-blue-600 bg-blue-50/70" : "text-slate-700"
+                      isSelected ? "text-emerald-600 bg-emerald-50/70" : "text-slate-700"
                     }`}
                   >
                     <span className="w-3.5 shrink-0">
-                      {isSelected && <Check size={13} className="text-blue-600" />}
+                      {isSelected && <Check size={13} className="text-emerald-600" />}
                     </span>
                     <span className="truncate">{option.label}</span>
                   </button>
@@ -403,7 +403,7 @@ const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
                 className={`inline-flex max-w-full items-center gap-1 rounded-lg border pl-2 pr-0.5 py-0.5 text-xs font-semibold ${
                   disabled
                     ? "border-slate-200 bg-slate-100 text-slate-500"
-                    : "border-blue-100 bg-blue-50 text-blue-700"
+                    : "border-slate-900 bg-slate-900 text-white"
                 }`}
               >
                 <span className="max-w-[170px] truncate">{label}</span>
@@ -418,7 +418,7 @@ const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
                     className={`rounded-full p-0.5 transition-colors ${
                       disabled
                         ? "text-slate-400"
-                        : "text-blue-400 hover:bg-blue-200/70 hover:text-blue-800"
+                        : "text-slate-400 hover:bg-slate-700 hover:text-white"
                     }`}
                     aria-label={`Remove ${label}`}
                     title={`Remove ${label}`}
@@ -457,11 +457,11 @@ const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
             type="button"
             onClick={() => onChange([])}
             className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left border-b border-slate-100 hover:bg-slate-50 transition ${
-              selectedValues.length === 0 ? "text-blue-600 bg-blue-50/70" : "text-slate-600"
+              selectedValues.length === 0 ? "text-emerald-600 bg-emerald-50/70" : "text-slate-600"
             }`}
           >
             <span className="w-3.5 shrink-0">
-              {selectedValues.length === 0 && <Check size={13} className="text-blue-600" />}
+              {selectedValues.length === 0 && <Check size={13} className="text-emerald-600" />}
             </span>
             <span className="truncate">{placeholder}</span>
           </button>
@@ -478,11 +478,11 @@ const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
                     type="button"
                     onClick={() => toggle(option.value)}
                     className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left truncate hover:bg-slate-50 transition ${
-                      isSelected ? "text-blue-600 bg-blue-50/70" : "text-slate-700"
+                      isSelected ? "text-emerald-600 bg-emerald-50/70" : "text-slate-700"
                     }`}
                   >
                     <span className="w-3.5 shrink-0">
-                      {isSelected && <Check size={13} className="text-blue-600" />}
+                      {isSelected && <Check size={13} className="text-emerald-600" />}
                     </span>
                     <span className="truncate">{option.label}</span>
                   </button>
@@ -540,7 +540,8 @@ const StartTimeField = React.memo(function StartTimeField({ startTime }: { start
   );
 });
 
-/** Read-only reference: the vehicle's latest recorded (closing) meter. */
+/** Read-only reference: the vehicle's latest recorded (closing) meter.
+ *  Displayed exactly like the Opening Meter box — plain reading, or "--". */
 const LastClosingMeterField = React.memo(function LastClosingMeterField({
   latestMeter,
 }: {
@@ -554,18 +555,11 @@ const LastClosingMeterField = React.memo(function LastClosingMeterField({
         tone="bg-fuchsia-50 text-fuchsia-600"
         label={t("ops.trip.field.last_closing_meter")}
       />
-      <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center justify-between gap-2 text-sm font-medium text-slate-800">
+      <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
         {latestMeter ? (
-          <>
-            <span className="shrink-0">{latestMeter.meter} KM</span>
-            {latestMeter.tripNo && (
-              <span className="text-[11px] font-semibold text-slate-400 truncate">
-                {t("ops.trip.from_trip", { no: latestMeter.tripNo })}
-              </span>
-            )}
-          </>
+          latestMeter.meter
         ) : (
-          <span className="text-slate-400 font-normal text-xs">{t("ops.trip.last_closing_meter_none")}</span>
+          <span className="text-slate-400 font-normal">--</span>
         )}
       </div>
     </div>
@@ -1273,7 +1267,7 @@ function StepStart({
               <History size={12} className="text-fuchsia-500" /> {t("ops.trip.field.last_closing_meter")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">
-              {latestMeter ? `${latestMeter.meter} KM` : t("ops.trip.not_entered")}
+              {latestMeter ? `${latestMeter.meter} KM` : "--"}
             </span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">

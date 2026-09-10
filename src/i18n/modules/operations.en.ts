@@ -392,7 +392,6 @@ export default {
   'ops.trip.filters_reset': 'Filters reset.',
   'ops.trip.final_kpi_summary': 'Final KPI Summary',
   'ops.trip.from_trip': 'from trip {no}',
-  'ops.trip.last_closing_meter_none': 'No previous reading for this vehicle',
   'ops.trip.full_trip_total': 'Full Trip Total',
   'ops.trip.geo_unsupported': 'Geolocation is not supported on this device.',
   'ops.trip.get_gps': 'Get GPS',
