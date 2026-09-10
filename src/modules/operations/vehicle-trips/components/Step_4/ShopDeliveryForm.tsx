@@ -173,6 +173,7 @@ export default function ShopDeliveryForm({
   const boxDropdownOptions: DropdownOption[] = availableBoxDetails.map((b: any) => ({
     value: String(b.boxNo),
     label: `#${b.boxNo} · ${b.birds} ${t("common.birds")} · ${Number(b.weight).toFixed(2)} kg`,
+    chipLabel: `#${b.boxNo}`,
   }));
 
   const neutralInputClass = (invalid?: boolean) =>

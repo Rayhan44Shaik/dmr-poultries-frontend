@@ -16,7 +16,7 @@ const VISIBLE_ITEMS = 5;
 const ITEM_HEIGHT = 36; // h-9
 const LIST_MAX_HEIGHT = VISIBLE_ITEMS * ITEM_HEIGHT;
 
-export type DropdownOption = { value: string; label: string };
+export type DropdownOption = { value: string; label: string; chipLabel?: string };
 
 /** Soft-coloured icon chip ("logo") shown beside every field label. */
 export const FieldLabel = React.memo(function FieldLabel({
@@ -313,8 +313,8 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
           <span className="px-1.5 text-slate-400 font-normal">{placeholder}</span>
         ) : (
           selectedValues.map((value) => {
-            const label =
-              options.find((option) => option.value === value)?.label || value;
+            const option = options.find((opt) => opt.value === value);
+            const label = option?.chipLabel ?? option?.label ?? value;
             return (
               <span
                 key={value}
