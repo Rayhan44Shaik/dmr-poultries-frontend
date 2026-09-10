@@ -436,7 +436,7 @@ export default {
   'ops.trip.max_2_photos': 'Maximum 2 photos',
   'ops.trip.max_6_diesel': 'Maximum 6 diesel entries',
   'ops.trip.meter': 'Meter',
-  'ops.trip.meter_must_exceed': 'Meter reading must exceed {meter}{ref}.',
+  'ops.trip.meter_must_exceed': 'Meter reading cannot be less than the previous reading {meter}{ref}.',
   'ops.trip.meter_must_greater_than': 'Meter reading must be greater than the previous reading.',
   'ops.trip.mileage': 'Mileage',
   'ops.trip.mortality_birds': 'Mortality (Birds)',

@@ -400,26 +400,18 @@ const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
             return (
               <span
                 key={value}
-                className={`inline-flex max-w-full items-center gap-1 rounded-lg border pl-2 pr-0.5 py-0.5 text-xs font-semibold ${
-                  disabled
-                    ? "border-slate-200 bg-slate-100 text-slate-500"
-                    : "border-slate-900 bg-slate-900 text-white"
-                }`}
+                className="inline-flex max-w-full items-center gap-1 text-xs font-semibold text-slate-900"
               >
                 <span className="max-w-[170px] truncate">{label}</span>
                 {!disabled && (
                   <button
                     type="button"
                     onClick={(event) => {
-                      // Remove only this chip — never toggle the dropdown.
+                      // Remove only this name — never toggle the dropdown.
                       event.stopPropagation();
                       onChange(selectedValues.filter((v) => v !== value));
                     }}
-                    className={`rounded-full p-0.5 transition-colors ${
-                      disabled
-                        ? "text-slate-400"
-                        : "text-slate-400 hover:bg-slate-700 hover:text-white"
-                    }`}
+                    className="rounded-full p-0.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
                     aria-label={`Remove ${label}`}
                     title={`Remove ${label}`}
                   >
@@ -1057,16 +1049,17 @@ function StepStart({
     const meterValue = Number(form.openingMeterText);
     const meterNumericBad =
       form.openingMeterText.trim() !== "" && (!Number.isFinite(meterValue) || meterValue < 0);
-    // Field-level live rule: the opening reading must be strictly greater than
-    // the vehicle's latest recorded reading (equal is invalid). This is the ONLY
+    // Field-level live rule: the opening reading cannot be LESS than the
+    // vehicle's latest recorded reading (equal is allowed). This is the ONLY
     // field with live validation — all other Step 1 fields only flag after a
     // submit attempt (showErrors), so the user is never shown red borders while
-    // simply filling the form.
+    // simply filling the form. No default is ever pre-filled; the value is
+    // always typed by the user.
     const meterBelowLatest =
       form.openingMeterText.trim() !== "" &&
       latestMeter != null &&
       Number.isFinite(meterValue) &&
-      meterValue <= latestMeter.meter;
+      meterValue < latestMeter.meter;
     return {
       vehicle: showErrors && (!patch.vehicleId || !patch.vehicleNo),
       supervisor: showErrors && (!patch.supervisorId || !patch.supervisorName),
@@ -1094,7 +1087,7 @@ function StepStart({
       form.openingMeterText.trim() !== "" &&
       latestMeter != null &&
       Number.isFinite(meterValue) &&
-      meterValue <= latestMeter.meter
+      meterValue < latestMeter.meter
     ) {
       const ref = latestMeter.tripNo ? ` (${t("ops.trip.from_trip", { no: latestMeter.tripNo })})` : "";
       return t("ops.trip.meter_must_exceed", { meter: latestMeter.meter, ref });
