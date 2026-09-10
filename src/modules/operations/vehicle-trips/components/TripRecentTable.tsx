@@ -230,37 +230,41 @@ function TripRecentTable({
     <>
       <div ref={tableRef} className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden mt-8 transition-all duration-300">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-inner">
-              <History className="w-5 h-5" />
-            </div>
-            <h3 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.recent_trip_activity")}</h3>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input type="text" placeholder={t("ops.trip.search_trips_short")} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-48 pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" />
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-inner">
+                <History className="w-5 h-5" />
+              </div>
+              <h3 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.recent_trip_activity")}</h3>
             </div>
 
+            {/* Status toggle — light colour, beside the table title */}
             <div className="bg-slate-100/80 p-1 rounded-xl flex items-center gap-1 border border-slate-200/60">
               {(["Draft", "Pending", "Deleted"] as const).map((tab) => {
                 const isActive = statusFilter === tab;
                 let count = 0, Icon = FileText;
-                let activeClass = "bg-emerald-600 text-white border-emerald-600";
-                let inactiveIcon = "text-emerald-500";
-                if (tab === "Draft") { count = draftCount; Icon = FileText; activeClass = "bg-emerald-600 text-white border-emerald-600"; inactiveIcon = "text-emerald-500"; }
-                if (tab === "Pending") { count = pendingCount; Icon = Clock; activeClass = "bg-orange-500 text-white border-orange-500"; inactiveIcon = "text-orange-500"; }
-                if (tab === "Deleted") { count = deletedCount; Icon = AlertCircle; activeClass = "bg-red-500 text-white border-red-500"; inactiveIcon = "text-red-500"; }
+                let activeClass = "bg-emerald-100 text-emerald-700 border-emerald-200";
+                let activeIcon = "text-emerald-600";
+                let inactiveIcon = "text-emerald-400";
+                if (tab === "Draft") { count = draftCount; Icon = FileText; activeClass = "bg-emerald-100 text-emerald-700 border-emerald-200"; activeIcon = "text-emerald-600"; inactiveIcon = "text-emerald-400"; }
+                if (tab === "Pending") { count = pendingCount; Icon = Clock; activeClass = "bg-orange-100 text-orange-700 border-orange-200"; activeIcon = "text-orange-500"; inactiveIcon = "text-orange-400"; }
+                if (tab === "Deleted") { count = deletedCount; Icon = AlertCircle; activeClass = "bg-red-100 text-red-700 border-red-200"; activeIcon = "text-red-500"; inactiveIcon = "text-red-400"; }
                 return (
-                  <button key={tab} onClick={() => setStatusFilter(tab)} className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-1 ${isActive ? `${activeClass} shadow-sm border` : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"}`}>
-                    <Icon size={11} className={isActive ? "text-white" : inactiveIcon} />
+                  <button key={tab} onClick={() => setStatusFilter(tab)} className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-1 ${isActive ? `${activeClass} shadow-sm border` : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"}`}>
+                    <Icon size={11} className={isActive ? activeIcon : inactiveIcon} />
                     <span>{(() => { const k = "status." + tab.toLowerCase(); const label = t(k); return label === k ? tab : label; })()}</span>
-                    <span className={`ml-0.5 px-1 py-0.2 rounded-full text-[10px] ${isActive ? "bg-white/25 text-white" : "bg-slate-200/60 text-slate-500"}`}>{count}</span>
+                    <span className={`ml-0.5 px-1 py-0.2 rounded-full text-[10px] ${isActive ? "bg-white/80 text-slate-600" : "bg-slate-200/60 text-slate-500"}`}>{count}</span>
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+            <div className="relative flex-1 sm:flex-none">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input type="text" placeholder={t("ops.trip.search_trips_short")} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full sm:w-64 pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" />
             </div>
 
             <div className="h-5 w-px bg-slate-200 hidden sm:block" />
