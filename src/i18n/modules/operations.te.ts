@@ -245,6 +245,7 @@ export default {
   'ops.trip.box_no': 'బాక్స్ నంబర్',
   'ops.trip.box_nos': 'బాక్స్ నంబర్లు',
   'ops.trip.box_nos_list': 'బాక్స్ నంబర్ల జాబితా',
+  'ops.trip.clear_selected_boxes': 'ఎంచుకున్న అన్ని బాక్సులను తొలగించండి',
   'ops.trip.box_weight_variance': 'బాక్స్ బరువు తేడా',
   'ops.trip.boxes': 'బాక్సులు',
   'ops.trip.boxes_selected': 'బాక్సులు ఎంచుకోబడ్డాయి',

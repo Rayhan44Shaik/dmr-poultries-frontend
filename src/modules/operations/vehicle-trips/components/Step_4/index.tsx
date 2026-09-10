@@ -637,6 +637,19 @@ export default function UnLoadingTable({
         return { value, label, isDisabled: false };
       })
       .filter((opt: { value: number; label: string; isDisabled: boolean }) => opt.value > 0);
+    // Delivery route ordering (priority → alphabetical → delivered sinks down):
+    //   • The FIRST 10 shops in the master list are the priority route — while
+    //     pending they sit at the very top in their listed order, so the next
+    //     shop to deliver is always the next priority shop.
+    //   • The REMAINING pending shops follow, alphabetically.
+    //   • Once a shop is captured (delivered) it moves to the BOTTOM (the
+    //     delivered group), so the queue advances shop by shop.
+    const priorityRank = new Map<number, number>();
+    safeShops.slice(0, 10).forEach((shop: any, idx: number) => {
+      const id = Number(shop.id ?? shop.shopId ?? 0);
+      if (id > 0) priorityRank.set(id, idx);
+    });
+    const rankOf = (value: number) => priorityRank.get(value) ?? null;
     opts.sort(
       (
         a: { value: number; label: string; isDisabled: boolean },
@@ -645,6 +658,13 @@ export default function UnLoadingTable({
         const aDone = deliveredShopIds.has(Number(a.value)) ? 1 : 0;
         const bDone = deliveredShopIds.has(Number(b.value)) ? 1 : 0;
         if (aDone !== bDone) return aDone - bDone;
+        if (!aDone) {
+          const ap = rankOf(Number(a.value));
+          const bp = rankOf(Number(b.value));
+          if (ap != null && bp != null) return ap - bp;
+          if (ap != null) return -1;
+          if (bp != null) return 1;
+        }
         return a.label.localeCompare(b.label);
       }
     );

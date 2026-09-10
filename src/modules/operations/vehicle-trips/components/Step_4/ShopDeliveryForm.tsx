@@ -332,17 +332,39 @@ export default function ShopDeliveryForm({
             <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-indigo-50 px-1.5 text-xs font-bold text-indigo-700 tabular-nums">
               {selectedBoxIds.length}
             </span>
+            {selectedBoxIds.length > 0 && !readOnly && (
+              <button
+                type="button"
+                onClick={() => handleBoxSelection([])}
+                className="ml-auto inline-flex h-6 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+                title={t("ops.trip.clear_selected_boxes")}
+              >
+                <X size={11} />
+                {t("common.clear")}
+              </button>
+            )}
           </div>
           {selectedBoxIds.length > 0 ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
               {selectedBoxIds.map((id, idx) => (
                 <span
                   key={id}
-                  className={`flex h-10 items-center justify-center rounded-lg border px-1.5 text-sm font-bold shadow-xs ${
+                  className={`flex h-10 items-center justify-center gap-1 rounded-lg border px-1.5 text-sm font-bold shadow-xs ${
                     BOX_TILE_PALETTE[idx % BOX_TILE_PALETTE.length]
                   }`}
                 >
-                  #{id}
+                  <span className="tabular-nums">#{id}</span>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => handleBoxSelection(selectedBoxIds.filter((x) => x !== id))}
+                      className="rounded p-0.5 opacity-60 transition-colors hover:opacity-100 hover:bg-black/5"
+                      aria-label={`${t("common.remove")} #${id}`}
+                      title={`${t("common.remove")} #${id}`}
+                    >
+                      <X size={12} strokeWidth={2.75} />
+                    </button>
+                  )}
                 </span>
               ))}
             </div>

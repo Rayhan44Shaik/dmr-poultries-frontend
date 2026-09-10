@@ -245,6 +245,7 @@ export default {
   'ops.trip.box_no': 'Box No.',
   'ops.trip.box_nos': 'Box Nos.',
   'ops.trip.box_nos_list': 'Box numbers list',
+  'ops.trip.clear_selected_boxes': 'Clear all selected boxes',
   'ops.trip.box_weight_variance': 'Box weight variance',
   'ops.trip.boxes': 'Boxes',
   'ops.trip.boxes_selected': 'boxes selected',
