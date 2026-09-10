@@ -959,7 +959,12 @@ export default function UnLoadingTable({
       const shopNameMatch = (r.shopName || "").toLowerCase().includes(query);
       const birdTypeMatch = (r.birdType || "").toLowerCase().includes(query);
       const remarksMatch = (r.remarks || "").toLowerCase().includes(query);
-      return shopNameMatch || birdTypeMatch || remarksMatch;
+      // Searching a box number must match the shop that carries it.
+      const boxIds = Array.isArray(r.selectedBoxIds) ? r.selectedBoxIds : [];
+      const boxNumberMatch =
+        boxIds.some((id) => String(id).includes(query)) ||
+        String(r.boxNo ?? "").includes(query);
+      return shopNameMatch || birdTypeMatch || remarksMatch || boxNumberMatch;
     });
 
     // Route order for the card list: DELIVERED shops first with the most

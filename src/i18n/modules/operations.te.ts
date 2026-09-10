@@ -582,7 +582,7 @@ export default {
   'ops.trip.shops': 'షాపులు',
   'ops.trip.assignment_details_unavailable': 'అసైన్‌మెంట్ వివరాలు అందుబాటులో లేవు',
   'ops.trip.shops_available': 'అందుబాటులో ఉన్న షాపులు',
-  'ops.trip.source_farm': 'మూల ఫారం',
+  'ops.trip.source_farm': 'ఫారం',
   'ops.trip.start_meter': 'ప్రారంభ మీటర్',
   'ops.trip.start_meter_label': 'ప్రారంభ మీటర్ రీడింగ్',
   'ops.trip.start_meter_reading': 'ప్రారంభ మీటర్ రీడింగ్',

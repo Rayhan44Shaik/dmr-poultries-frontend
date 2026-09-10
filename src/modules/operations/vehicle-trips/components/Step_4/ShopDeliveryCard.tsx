@@ -98,9 +98,9 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
         </div>
 
         {(mortalityCount > 0 || mortKg > 0) && (
-          <div className="flex items-center justify-between px-2 py-1 bg-rose-50/70 rounded-md border border-rose-100 text-[10px]">
-            <span className="text-rose-500 font-semibold">{t("operations.mortality_count")}</span>
-            <span className="text-rose-600 font-bold">
+          <div className="flex items-center justify-between px-2 py-1 bg-rose-50/50 rounded-md border border-rose-100/70 text-[10px]">
+            <span className="text-rose-400 font-semibold">{t("operations.mortality_count")}</span>
+            <span className="text-rose-500 font-bold">
               {mortalityCount} {t("common.birds")} · {mortKg ? Number(mortKg).toFixed(2) : "0.00"} kg
             </span>
           </div>
@@ -142,11 +142,12 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
         <div className="flex items-center justify-between gap-2 pt-1 mt-auto text-[10px] font-medium border-t border-slate-100">
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             {mortalityCount > 0 && (
-              <span className="px-1.5 py-px rounded bg-rose-50 text-rose-600 border border-rose-200/60 shrink-0 flex items-center gap-1 text-[10px] font-bold">
-                <AlertCircle size={11} className="text-rose-400 stroke-[2.5]" />
-                <span>
-                  {t("operations.mortality_count")}: {mortalityCount}
-                </span>
+              <span
+                title={t("operations.mortality_count")}
+                className="px-1.5 py-px rounded bg-rose-50/70 text-rose-500 border border-rose-100 shrink-0 flex items-center gap-1 text-[10px] font-bold"
+              >
+                <AlertCircle size={11} className="text-rose-300 stroke-[2.5]" />
+                <span>{mortalityCount}</span>
               </span>
             )}
             {row.birdType ? (
@@ -155,8 +156,8 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
               </span>
             ) : null}
           </div>
-          <div className="flex items-center gap-1 shrink-0 text-slate-400">
-            <Clock size={11} className="text-slate-400 stroke-[2]" />
+          <div className="flex items-center gap-1 shrink-0 text-slate-600">
+            <Clock size={11} className="text-slate-500 stroke-[2]" />
             <span>{t("ops.trip.captured")} {row.autoCaptureTime || "—"}</span>
           </div>
         </div>
