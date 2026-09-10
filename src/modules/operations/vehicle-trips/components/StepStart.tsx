@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import {
   Calendar,
+  ClipboardList,
   Clock,
   Gauge,
   Truck,
@@ -24,7 +25,7 @@ import {
   formatStartTimeForDisplay,
 } from "../services/tripHeaderApiService";
 import { StepCloseButton, WizardActionBar, WizardStepNotice, type WizardNoticeState } from "./WizardStepUI";
-import { FieldLabel, SearchDropdown, MultiSearchDropdown, type DropdownOption } from "./WizardControls";
+import { FieldLabel, SearchDropdown, MultiSearchDropdown, StepKpiCard, type DropdownOption } from "./WizardControls";
 import { translateValidationMessage } from "../utils/translateValidation";
 import {
   TRIP_FIELD_DEFINITIONS,
@@ -838,76 +839,84 @@ function StepStart({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              {t("operations.trip_no")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.tripNo || "--"}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Calendar size={12} className="text-sky-500" /> {t("ops.trip.field.trip_date")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.tripDate || "--"}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Clock size={12} className="text-blue-500" /> {t("ops.trip.field.start_time")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{formatStartTimeForDisplay(startTime) || "--"}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Truck size={12} className="text-blue-500" /> {t("operations.vehicle_no")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.vehicleNo || "--"}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <User size={12} className="text-indigo-500" /> {t("common.supervisor")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.supervisorName || "--"}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <User size={12} className="text-emerald-500" /> {t("common.driver")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.driverName || "--"}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Users size={12} className="text-teal-500" /> {t("ops.trip.field.helpers")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.helpers?.join(", ") || "--"}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Users size={12} className="text-amber-500" /> {t("ops.trip.field.loaders")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">
-              {loadSnapshot.loaders?.join(", ") || "--"}
-            </span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Wallet size={12} className="text-orange-500" /> {t("operations.advance")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">
-              {loadSnapshot.advanceAmount == null
+          <StepKpiCard
+            icon={ClipboardList}
+            tone="bg-slate-100 text-slate-500"
+            bar="bg-slate-400"
+            label={t("operations.trip_no")}
+            value={loadSnapshot.tripNo || "--"}
+          />
+          <StepKpiCard
+            icon={Calendar}
+            tone="bg-sky-50 text-sky-600"
+            bar="bg-sky-400"
+            label={t("ops.trip.field.trip_date")}
+            value={loadSnapshot.tripDate || "--"}
+          />
+          <StepKpiCard
+            icon={Clock}
+            tone="bg-blue-50 text-blue-600"
+            bar="bg-blue-400"
+            label={t("ops.trip.field.start_time")}
+            value={formatStartTimeForDisplay(startTime) || "--"}
+          />
+          <StepKpiCard
+            icon={Truck}
+            tone="bg-blue-50 text-blue-600"
+            bar="bg-blue-400"
+            label={t("operations.vehicle_no")}
+            value={loadSnapshot.vehicleNo || "--"}
+          />
+          <StepKpiCard
+            icon={User}
+            tone="bg-indigo-50 text-indigo-600"
+            bar="bg-indigo-400"
+            label={t("common.supervisor")}
+            value={loadSnapshot.supervisorName || "--"}
+          />
+          <StepKpiCard
+            icon={User}
+            tone="bg-emerald-50 text-emerald-600"
+            bar="bg-emerald-400"
+            label={t("common.driver")}
+            value={loadSnapshot.driverName || "--"}
+          />
+          <StepKpiCard
+            icon={Users}
+            tone="bg-teal-50 text-teal-600"
+            bar="bg-teal-400"
+            label={t("ops.trip.field.helpers")}
+            value={loadSnapshot.helpers?.join(", ") || "--"}
+          />
+          <StepKpiCard
+            icon={Users}
+            tone="bg-amber-50 text-amber-600"
+            bar="bg-amber-400"
+            label={t("ops.trip.field.loaders")}
+            value={loadSnapshot.loaders?.join(", ") || "--"}
+          />
+          <StepKpiCard
+            icon={Gauge}
+            tone="bg-purple-50 text-purple-600"
+            bar="bg-purple-400"
+            label={t("ops.trip.field.opening_meter")}
+            value={
+              loadSnapshot.openingMeter == null
                 ? t("ops.trip.not_entered")
-                : `₹${loadSnapshot.advanceAmount.toLocaleString()}`}
-            </span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Gauge size={12} className="text-purple-500" /> {t("ops.trip.field.opening_meter")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">
-              {loadSnapshot.openingMeter == null
+                : `${loadSnapshot.openingMeter} KM`
+            }
+          />
+          <StepKpiCard
+            icon={Wallet}
+            tone="bg-orange-50 text-orange-600"
+            bar="bg-orange-400"
+            label={t("operations.advance")}
+            value={
+              loadSnapshot.advanceAmount == null
                 ? t("ops.trip.not_entered")
-                : `${loadSnapshot.openingMeter} KM`}
-            </span>
-          </div>
+                : `₹${loadSnapshot.advanceAmount.toLocaleString()}`
+            }
+          />
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-center justify-between">

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Loader2, Scale, Pencil, Layers } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { StepCloseButton, WizardActionBar, WizardStepNotice } from "./WizardStepUI";
-import { FieldLabel, SearchDropdown, type DropdownOption } from "./WizardControls";
+import { FieldLabel, SearchDropdown, StepKpiCard, type DropdownOption } from "./WizardControls";
 import { GpsAddressText } from "./GpsAddressText";
 import {
   TRIP_FIELD_DEFINITIONS,
@@ -252,67 +252,73 @@ export default function StepFarm({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Clock size={12} className="text-sky-500" /> {t("ops.trip.field.reached_time")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{trip.reachedTime || t("ops.trip.not_entered")}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Store size={12} className="text-emerald-500" /> {t("common.farm")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{trip.sourceFarm || t("ops.trip.not_entered")}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Layers size={12} className="text-violet-500" /> {t("operations.bird_type")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{trip.birdType || t("ops.trip.not_entered")}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <MapPin size={12} className="text-rose-500" /> {t("ops.trip.field.farm_address")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{trip.farmAddress || t("ops.trip.not_entered")}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Gauge size={12} className="text-purple-500" /> {t("ops.trip.field.farm_meter")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{destMeterLabel}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Ticket size={12} className="text-amber-500" /> {t("ops.trip.field.pickup_tolls")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{trip.pickupTolls ?? 0}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Scale size={12} className="text-teal-500" /> {t("ops.trip.field.avg_bird_weight")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{avgWeightLabel}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <MapPin size={12} className="text-cyan-500" /> GPS
-            </span>
-            <span
-              className="text-xs font-bold text-slate-800 truncate"
-              title={
-                hasGps
-                  ? `${Number(trip.farmGpsLat).toFixed(6)}, ${Number(trip.farmGpsLon).toFixed(6)}`
-                  : undefined
-              }
-            >
-              {hasGps ? (
+          <StepKpiCard
+            icon={Clock}
+            tone="bg-sky-50 text-sky-600"
+            bar="bg-sky-400"
+            label={t("ops.trip.field.reached_time")}
+            value={trip.reachedTime || t("ops.trip.not_entered")}
+          />
+          <StepKpiCard
+            icon={Store}
+            tone="bg-emerald-50 text-emerald-600"
+            bar="bg-emerald-400"
+            label={t("common.farm")}
+            value={trip.sourceFarm || t("ops.trip.not_entered")}
+          />
+          <StepKpiCard
+            icon={Layers}
+            tone="bg-violet-50 text-violet-600"
+            bar="bg-violet-400"
+            label={t("operations.bird_type")}
+            value={trip.birdType || t("ops.trip.not_entered")}
+          />
+          <StepKpiCard
+            icon={MapPin}
+            tone="bg-rose-50 text-rose-600"
+            bar="bg-rose-400"
+            label={t("ops.trip.field.farm_address")}
+            value={trip.farmAddress || t("ops.trip.not_entered")}
+          />
+          <StepKpiCard
+            icon={Gauge}
+            tone="bg-purple-50 text-purple-600"
+            bar="bg-purple-400"
+            label={t("ops.trip.field.farm_meter")}
+            value={destMeterLabel}
+          />
+          <StepKpiCard
+            icon={Ticket}
+            tone="bg-amber-50 text-amber-600"
+            bar="bg-amber-400"
+            label={t("ops.trip.field.pickup_tolls")}
+            value={trip.pickupTolls ?? 0}
+          />
+          <StepKpiCard
+            icon={Scale}
+            tone="bg-teal-50 text-teal-600"
+            bar="bg-teal-400"
+            label={t("ops.trip.field.avg_bird_weight")}
+            value={avgWeightLabel}
+          />
+          <StepKpiCard
+            icon={MapPin}
+            tone="bg-cyan-50 text-cyan-600"
+            bar="bg-cyan-400"
+            label="GPS"
+            value={
+              hasGps ? (
                 <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback={t("ops.trip.location_captured")} />
               ) : (
                 t("ops.trip.not_captured")
-              )}
-            </span>
-          </div>
+              )
+            }
+            title={
+              hasGps
+                ? `${Number(trip.farmGpsLat).toFixed(6)}, ${Number(trip.farmGpsLon).toFixed(6)}`
+                : undefined
+            }
+          />
         </div>
         {trip.remarks ? (
           <p className="text-xs text-slate-600">
