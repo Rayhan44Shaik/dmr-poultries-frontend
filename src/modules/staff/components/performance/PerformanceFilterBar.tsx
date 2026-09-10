@@ -27,7 +27,7 @@
 //     every icon-only control has an accessible name.
 // ============================================================================
 
-import { memo, useCallback, useId, type FormEvent, type KeyboardEvent } from "react";
+import { memo, useCallback, useId, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { Search } from "lucide-react";
 import MasterDropdown from "../../../masters/components/MasterDropdown";
 import { DatePicker } from "../../../../components/common/DatePicker";
@@ -65,6 +65,8 @@ interface PerformanceFilterBarProps {
   busy: boolean;
   /** Background refresh in progress (Refresh shows its spinner while true). */
   refreshing: boolean;
+  /** Extra controls after the refresh action (e.g. the EN/తెలుగు toggle). */
+  actions?: ReactNode;
 }
 
 function PerformanceFilterBarImpl({
@@ -79,6 +81,7 @@ function PerformanceFilterBarImpl({
   personOptionsError,
   busy,
   refreshing,
+  actions,
 }: PerformanceFilterBarProps) {
   const { t } = useI18n();
   const isDriver = kind === "drivers";
@@ -211,6 +214,12 @@ function PerformanceFilterBarImpl({
             onClick={onRefresh}
             ariaLabel={t("staff.perf.filter.refresh_action")}
           />
+
+          {actions && (
+            <div className="ml-1 flex items-center border-l border-slate-200/80 pl-2.5">
+              {actions}
+            </div>
+          )}
         </div>
       </div>
 

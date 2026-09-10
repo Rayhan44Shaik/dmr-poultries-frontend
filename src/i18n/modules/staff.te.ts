@@ -141,6 +141,12 @@ export default {
   'staff.perf.drawer.vehicles': 'వాహన వివరాలు',
   'staff.perf.drawer.recent_trips': 'ఇటీవలి ట్రిప్‌లు',
   'staff.perf.drawer.close': 'వివరాలు మూసివేయండి',
+  'staff.perf.drawer.rank_of': 'ర్యాంక్ {rank} / {total}',
+  'staff.perf.drawer.prev': 'మునుపటి',
+  'staff.perf.drawer.next': 'తర్వాత',
+  'staff.perf.drawer.detail_loading': 'ట్రిప్ వివరాలు లోడ్ అవుతున్నాయి…',
+  'staff.perf.drawer.detail_error': 'ట్రిప్ వివరాలు లోడ్ చేయబడలేదు.',
+  'staff.perf.language.toggle_aria': 'భాష',
 
   // Grade factor explanations ({value} / {baseline} are formatted numbers) ---
   'staff.perf.factor.trips': 'పూర్తయిన ట్రిప్‌లు',

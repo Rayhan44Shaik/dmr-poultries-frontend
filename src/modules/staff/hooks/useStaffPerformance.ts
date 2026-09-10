@@ -166,6 +166,8 @@ export interface UseStaffPerformanceResult<K extends StaffPerformanceKind> {
   error: string | null;
   refresh: () => void;
   lastRefreshed: string | null;
+  /** Increments on every explicit refresh — lets companion caches drop. */
+  refreshNonce: number;
 }
 
 /** Default (initial + Clear) filters, snapshotted once per mount. */

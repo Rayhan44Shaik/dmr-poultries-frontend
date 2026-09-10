@@ -1,19 +1,26 @@
 // src/modules/staff/components/performance/PerformanceDrawer.tsx
 //
 // ============================================================================
-// PERFORMANCE DETAILS DRAWER — side panel for one driver/supervisor
+// PERFORMANCE DETAILS POP-UP — centered modal for one driver/supervisor
 // ============================================================================
 // Opens from a table row (click / Enter / Space) and shows the grade story:
 // summary metrics → WHY THIS GRADE → AREAS TO IMPROVE → RECOMMENDED
 // IMPROVEMENT, plus the optional detail sections (vehicle breakdown, recent
-// trips) only when the applied selection actually returned them.
+// trips) loaded per person by the page.
 //
 // BEHAVIOUR (all inherited from the global dialog primitives)
 //   • Portal to <body>, shared overlay tokens, shared focus trap: focus moves
 //     in on open, Tab cycles inside, Escape and the × close, focus returns to
 //     the row that opened it.
-//   • Right-side panel ≥ sm; full-width bottom sheet on phones — always fits
-//     the viewport, body scrolls, the page underneath keeps its state.
+//   • Centered pop-up: ≥ sm a wide centered card (max-w-2xl, lg:max-w-4xl)
+//     with a desktop two-column body; full-width sheet on phones — always
+//     fits the viewport, body scrolls, the page underneath keeps its state.
+//   • Person navigation: optional ‹ › arrows + "n / total" position flip
+//     through the loaded ranking without closing (ArrowLeft/ArrowRight work
+//     too). Buttons disable at the ends; hidden when there is nothing to
+//     navigate (single-row dataset).
+//   • `toolbar` slot (e.g. the EN/తెలుగు mini toggle) and `rankBadge`
+//     (position chip) live in the header.
 //   • Renders nothing when closed, so opening/closing never remounts the page
 //     and closing via Escape never discards underlying filter state.
 //   • Purely presentational: every value and every label arrives already
@@ -21,10 +28,11 @@
 //     contains no hardcoded copy (full i18n).
 // ============================================================================
 
-import { useRef, type ReactNode } from "react";
+import { useRef, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useFocusTrap } from "../../../../hooks/useFocusTrap";
+import { cn } from "../../../../utils/cn";
 import {
   uiDialogCloseClass,
   uiOverlayClass,
@@ -54,7 +62,20 @@ export interface DrawerImprovement {
   recommendation: ReactNode;
 }
 
-/** All visible drawer copy, translated by the page. */
+/** Prev/next traversal across the loaded ranking (wired by the page). */
+export interface DrawerNavigation {
+  /** 0-based position in the traversal order. */
+  index: number;
+  /** Traversal size (> 1 — the controls hide themselves otherwise). */
+  total: number;
+  onPrev: () => void;
+  onNext: () => void;
+  /** Already-translated accessible names for the two arrows. */
+  prevLabel: string;
+  nextLabel: string;
+}
+
+/** All visible pop-up copy, translated by the page. */
 export interface DrawerLabels {
   summarySection: string;
   whySection: string;
@@ -73,6 +94,11 @@ const FACTOR_ICON: Record<DrawerFactor["band"], { glyph: string; className: stri
   unavailable: { glyph: "○", className: "text-slate-300" },
 };
 
+const navButtonClass = cn(
+  uiDialogCloseClass,
+  "border border-slate-200/80 disabled:pointer-events-none disabled:opacity-40",
+);
+
 interface PerformanceDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -82,6 +108,12 @@ interface PerformanceDrawerProps {
   subtitle: string;
   /** Grade badge node (translated label + tone). */
   gradeBadge: ReactNode;
+  /** Rank position chip node (e.g. "Rank 2 of 12"). */
+  rankBadge?: ReactNode;
+  /** Extra header controls (e.g. the EN/తెలుగు mini toggle). */
+  toolbar?: ReactNode;
+  /** Optional ‹ › person navigation (hidden when absent). */
+  navigation?: DrawerNavigation;
   /** Short explanation when the grade could not be scored comparatively. */
   unscoredNote?: ReactNode;
   summary: readonly DrawerSummaryMetric[];
@@ -101,6 +133,9 @@ export function PerformanceDrawer({
   title,
   subtitle,
   gradeBadge,
+  rankBadge,
+  toolbar,
+  navigation,
   unscoredNote,
   summary,
   factors,
@@ -117,10 +152,23 @@ export function PerformanceDrawer({
     onEscape: onClose,
   });
 
-  // Escape/Tab/focus are handled by the shared trap. Focus restoration on
-  // close is also owned by the trap (returns to the row that opened us).
-
   if (!open) return null;
+
+  const canPrev = navigation != null && navigation.index > 0;
+  const canNext = navigation != null && navigation.index < navigation.total - 1;
+
+  // Arrow keys flip people while the pop-up is open (no modifiers, so plain
+  // left/right anywhere inside the dialog — Tab/Escape stay with the trap).
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (navigation == null || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key === "ArrowLeft" && canPrev) {
+      event.preventDefault();
+      navigation.onPrev();
+    } else if (event.key === "ArrowRight" && canNext) {
+      event.preventDefault();
+      navigation.onNext();
+    }
+  };
 
   const drawer = (
     <div
@@ -128,6 +176,7 @@ export function PerformanceDrawer({
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
+      onKeyDown={handleKeyDown}
     >
       <div
         ref={panelRef}
@@ -135,7 +184,7 @@ export function PerformanceDrawer({
         aria-modal="true"
         aria-labelledby="performance-drawer-title"
         tabIndex={-1}
-        className="relative flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-overlay animate-scale-in sm:max-w-xl"
+        className="relative flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-overlay animate-scale-in sm:max-w-2xl lg:max-w-4xl"
       >
         {/* Header */}
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5">
@@ -149,20 +198,58 @@ export function PerformanceDrawer({
             <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
               {subtitle}
             </p>
-            <div className="mt-2">{gradeBadge}</div>
+            {(gradeBadge || rankBadge) && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {gradeBadge}
+                {rankBadge}
+              </div>
+            )}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className={uiDialogCloseClass}
-            aria-label={labels.close}
-            title={labels.close}
-          >
-            <X aria-hidden="true" />
-          </button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {toolbar}
+            {navigation && navigation.total > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={navigation.onPrev}
+                  disabled={!canPrev}
+                  className={navButtonClass}
+                  aria-label={navigation.prevLabel}
+                  title={navigation.prevLabel}
+                >
+                  <ChevronLeft aria-hidden="true" />
+                </button>
+                <span
+                  aria-hidden="true"
+                  className="min-w-[3.25rem] text-center text-[11px] font-bold tabular-nums text-slate-400"
+                >
+                  {navigation.index + 1} / {navigation.total}
+                </span>
+                <button
+                  type="button"
+                  onClick={navigation.onNext}
+                  disabled={!canNext}
+                  className={navButtonClass}
+                  aria-label={navigation.nextLabel}
+                  title={navigation.nextLabel}
+                >
+                  <ChevronRight aria-hidden="true" />
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className={uiDialogCloseClass}
+              aria-label={labels.close}
+              title={labels.close}
+            >
+              <X aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
-        {/* Scrollable body */}
+        {/* Scrollable body — two columns on desktop, stacked on phones */}
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
           {unscoredNote && (
             <p className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] font-medium leading-relaxed text-slate-500">
@@ -173,7 +260,7 @@ export function PerformanceDrawer({
           {/* Performance summary */}
           <section aria-label={labels.summarySection}>
             <h3 className={sectionTitleClass}>{labels.summarySection}</h3>
-            <dl className="mt-2 grid grid-cols-2 gap-2">
+            <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {summary.map((metric) => (
                 <div
                   key={metric.label}
@@ -190,66 +277,71 @@ export function PerformanceDrawer({
             </dl>
           </section>
 
-          {/* Why this grade */}
-          <section aria-label={labels.whySection}>
-            <h3 className={sectionTitleClass}>{labels.whySection}</h3>
-            <ul className="mt-2 space-y-2">
-              {factors.map((factor) => {
-                const icon = FACTOR_ICON[factor.band];
-                return (
-                  <li
-                    key={factor.key}
-                    className="flex items-start gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2 text-xs leading-relaxed text-slate-600"
-                  >
-                    <span className={`mt-0.5 shrink-0 text-[9px] ${icon.className}`} aria-hidden="true">
-                      {icon.glyph}
-                    </span>
-                    <span>{factor.text}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-
-          {/* Areas to improve — only metrics the data actually flags */}
-          <section aria-label={labels.improveSection}>
-            <h3 className={sectionTitleClass}>{labels.improveSection}</h3>
-            {improvements.length === 0 ? (
-              <p className="mt-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-2.5 text-xs leading-relaxed text-slate-500">
-                {labels.improveNone}
-              </p>
-            ) : (
-              <ul className="mt-2 list-inside list-disc space-y-1">
-                {improvements.map((improvement) => (
-                  <li key={improvement.key} className="text-xs font-medium text-slate-700">
-                    {improvement.title}
-                  </li>
-                ))}
+          {/* Grade story: why (left) + areas/recommendations (right) on desktop */}
+          <div className="grid gap-5 lg:grid-cols-2 lg:gap-x-6 lg:items-start">
+            {/* Why this grade */}
+            <section aria-label={labels.whySection}>
+              <h3 className={sectionTitleClass}>{labels.whySection}</h3>
+              <ul className="mt-2 space-y-2">
+                {factors.map((factor) => {
+                  const icon = FACTOR_ICON[factor.band];
+                  return (
+                    <li
+                      key={factor.key}
+                      className="flex items-start gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2 text-xs leading-relaxed text-slate-600"
+                    >
+                      <span className={`mt-0.5 shrink-0 text-[9px] ${icon.className}`} aria-hidden="true">
+                        {icon.glyph}
+                      </span>
+                      <span>{factor.text}</span>
+                    </li>
+                  );
+                })}
               </ul>
-            )}
-          </section>
+            </section>
 
-          {/* Recommended improvement — practical next steps for weak metrics */}
-          <section aria-label={labels.recommendSection}>
-            <h3 className={sectionTitleClass}>{labels.recommendSection}</h3>
-            {improvements.length === 0 ? (
-              <p className="mt-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-2.5 text-xs leading-relaxed text-slate-500">
-                {labels.recommendSustain}
-              </p>
-            ) : (
-              <ul className="mt-2 space-y-3">
-                {improvements.map((improvement) => (
-                  <li
-                    key={improvement.key}
-                    className="rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2.5"
-                  >
-                    <p className="text-xs font-bold text-slate-800">{improvement.title}</p>
-                    <p className="mt-1 text-xs font-medium text-amber-800">{improvement.recommendation}</p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+            <div className="space-y-5">
+              {/* Areas to improve — only metrics the data actually flags */}
+              <section aria-label={labels.improveSection}>
+                <h3 className={sectionTitleClass}>{labels.improveSection}</h3>
+                {improvements.length === 0 ? (
+                  <p className="mt-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-2.5 text-xs leading-relaxed text-slate-500">
+                    {labels.improveNone}
+                  </p>
+                ) : (
+                  <ul className="mt-2 list-inside list-disc space-y-1">
+                    {improvements.map((improvement) => (
+                      <li key={improvement.key} className="text-xs font-medium text-slate-700">
+                        {improvement.title}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              {/* Recommended improvement — practical next steps for weak metrics */}
+              <section aria-label={labels.recommendSection}>
+                <h3 className={sectionTitleClass}>{labels.recommendSection}</h3>
+                {improvements.length === 0 ? (
+                  <p className="mt-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-2.5 text-xs leading-relaxed text-slate-500">
+                    {labels.recommendSustain}
+                  </p>
+                ) : (
+                  <ul className="mt-2 space-y-3">
+                    {improvements.map((improvement) => (
+                      <li
+                        key={improvement.key}
+                        className="rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2.5"
+                      >
+                        <p className="text-xs font-bold text-slate-800">{improvement.title}</p>
+                        <p className="mt-1 text-xs font-medium text-amber-800">{improvement.recommendation}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+          </div>
 
           {/* Optional detail sections (already loaded data only) */}
           {children}

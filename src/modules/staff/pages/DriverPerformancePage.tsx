@@ -33,6 +33,7 @@ import type { Locale } from "date-fns";
 
 import { useI18n } from "../../../i18n";
 import { useStaffPerformance } from "../hooks/useStaffPerformance";
+import { usePerformanceDetail } from "../hooks/usePerformanceDetail";
 import { useStaffDirectory } from "../hooks/useStaffDirectory";
 import { rankDriverRows } from "../utils/performanceGrading";
 import SortableHeader, {
@@ -71,6 +72,7 @@ import WeeklyPerformanceChart, {
 } from "../components/performance/WeeklyPerformanceChart";
 import PerformanceDrawer from "../components/performance/PerformanceDrawer";
 import RecentTripsTable from "../components/performance/RecentTripsTable";
+import LanguageMiniToggle from "../components/performance/LanguageMiniToggle";
 import Pagination from "../components/common/Pagination";
 import RefreshToast from "../components/common/RefreshToast";
 import { EmptyState, TableSkeleton } from "../../../ui";
@@ -361,6 +363,38 @@ const DriverPerformancePage = () => {
 
   const closeDrawer = useCallback(() => perf.selectRow(null), [perf]);
 
+  // Per-person detail for the pop-up (vehicles + recent trips): fetched
+  // separately from the list query, so navigating with the ‹ › arrows never
+  // shrinks or reshuffles the loaded ranking. Same read-only GET, cached.
+  const detailQuery = usePerformanceDetail(
+    "drivers",
+    perf.selectedId,
+    { fromDate: applied.fromDate, toDate: applied.toDate },
+    perf.refreshNonce,
+  );
+  const personDetail = detailQuery.detail;
+
+  // ‹ › traversal across the award-ordered rows (rank literal order).
+  const drawerNavigation = useMemo(() => {
+    if (!selectedEntry) return undefined;
+    const index = rowsView.findIndex((entry) => entry.row.driverId === selectedEntry.row.driverId);
+    if (index < 0 || rowsView.length <= 1) return undefined;
+    return {
+      index,
+      total: rowsView.length,
+      onPrev: () => {
+        const prev = rowsView[index - 1];
+        if (prev) perf.selectRow(prev.row.driverId);
+      },
+      onNext: () => {
+        const next = rowsView[index + 1];
+        if (next) perf.selectRow(next.row.driverId);
+      },
+      prevLabel: t("staff.perf.drawer.prev"),
+      nextLabel: t("staff.perf.drawer.next"),
+    };
+  }, [selectedEntry, rowsView, perf, t]);
+
   const drawerSummary = useMemo(() => {
     if (!selectedEntry) return [];
     const row = selectedEntry.row;
@@ -381,12 +415,6 @@ const DriverPerformancePage = () => {
   const drawerImprovements = useMemo(
     () => (selectedEntry?.assessment ? buildDrawerImprovements(selectedEntry.assessment, t) : []),
     [selectedEntry, t],
-  );
-
-  // Vehicle breakdown + recent trips exist only when the applied query asked
-  // for this exact driver and the backend returned its detail section.
-  const detailAvailable = Boolean(
-    selectedEntry && applied.personId === selectedEntry.row.driverId && data.detail,
   );
 
   const selectedDriverName = useMemo(() => {
@@ -442,6 +470,7 @@ const DriverPerformancePage = () => {
         personOptionsError={directory.error}
         busy={perf.loading}
         refreshing={perf.refreshing}
+        actions={<LanguageMiniToggle />}
       />
 
       {/* Error — inline, actionable, raw API text never shown */}
@@ -646,6 +675,15 @@ const DriverPerformancePage = () => {
         onClose={closeDrawer}
         title={selectedEntry?.row.driverName ?? ""}
         subtitle={`${t("staff.perf.drawer.period")}: ${appliedRangeLabel}`}
+        rankBadge={
+          selectedEntry ? (
+            <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold tabular-nums text-slate-600">
+              {t("staff.perf.drawer.rank_of", { rank: selectedEntry.rank, total: rowsView.length })}
+            </span>
+          ) : null
+        }
+        toolbar={<LanguageMiniToggle />}
+        navigation={drawerNavigation}
         gradeBadge={
           selectedEntry ? (
             <span
@@ -675,13 +713,32 @@ const DriverPerformancePage = () => {
           close: t("staff.perf.drawer.close"),
         }}
       >
-        {selectedEntry && detailAvailable && data.detail && (
+        {selectedEntry && detailQuery.loading && (
+          <div className="space-y-3" aria-busy="true">
+            <p className="sr-only">{t("staff.perf.drawer.detail_loading")}</p>
+            <div className="h-16 animate-pulse rounded-xl bg-slate-100" />
+            <div className="h-40 animate-pulse rounded-xl bg-slate-100" />
+          </div>
+        )}
+        {selectedEntry && detailQuery.error && !personDetail && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5">
+            <p className="text-xs font-semibold text-rose-700">{t("staff.perf.drawer.detail_error")}</p>
+            <button
+              type="button"
+              onClick={detailQuery.reload}
+              className="text-xs font-bold text-rose-700 underline decoration-rose-300 underline-offset-2 hover:text-rose-800"
+            >
+              {t("common.retry")}
+            </button>
+          </div>
+        )}
+        {selectedEntry && personDetail && (
           <div className="space-y-5">
             <section aria-label={t("staff.perf.drawer.vehicles")}>
               <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
                 {t("staff.perf.drawer.vehicles")}
               </h3>
-              {data.detail.vehicles.length === 0 ? (
+              {personDetail.vehicles.length === 0 ? (
                 <p className="mt-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-2.5 text-xs font-medium text-slate-400">
                   {t("staff.perf.vehicle.empty")}
                 </p>
@@ -720,7 +777,7 @@ const DriverPerformancePage = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
-                      {data.detail.vehicles.map((vehicle) => (
+                      {personDetail.vehicles.map((vehicle) => (
                         <tr key={vehicle.vehicleNo} className="transition-colors hover:bg-slate-50/70">
                           <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-xs font-bold text-slate-800`}>
                             {vehicle.vehicleNo}
@@ -762,7 +819,7 @@ const DriverPerformancePage = () => {
                 {t("staff.perf.drawer.recent_trips")}
               </h3>
               <RecentTripsTable
-                trips={data.detail.recentTrips}
+                trips={personDetail.recentTrips}
                 paceRow={selectedEntry?.row}
                 paceKind="drivers"
               />

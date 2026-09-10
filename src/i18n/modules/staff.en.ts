@@ -141,6 +141,12 @@ export default {
   'staff.perf.drawer.vehicles': 'Vehicle breakdown',
   'staff.perf.drawer.recent_trips': 'Recent trips',
   'staff.perf.drawer.close': 'Close details',
+  'staff.perf.drawer.rank_of': 'Rank {rank} of {total}',
+  'staff.perf.drawer.prev': 'Previous',
+  'staff.perf.drawer.next': 'Next',
+  'staff.perf.drawer.detail_loading': 'Loading trip details…',
+  'staff.perf.drawer.detail_error': 'Trip details could not be loaded.',
+  'staff.perf.language.toggle_aria': 'Language',
 
   // Grade factor explanations ({value} / {baseline} are formatted numbers) ---
   'staff.perf.factor.trips': 'Completed trips',
