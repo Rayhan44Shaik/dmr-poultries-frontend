@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { createDemoPayments } from '../../src/modules/accounts/utils/paymentRegisterDemo';
 
 const reference = new Date('2026-09-10T12:00:00+05:30');
-const records = createDemoPayments(reference).map((p, index) => ({ ...p, id: index + 1, createdAt: reference.toISOString() }));
+const records = createDemoPayments(reference).map((p, index) => ({ ...p, id: index + 1, status: 'Approved' as const, createdAt: reference.toISOString() }));
 const register = (page: Page) => page.getByRole('region', { name: 'Payment records' });
 const rows = (page: Page) => register(page).locator('tbody tr');
 
@@ -29,6 +29,7 @@ async function setup(page: Page, empty = false) {
   const realPayments = page.getByRole('button', { name: 'Back to real payments' });
   if (await realPayments.isVisible()) await realPayments.click();
   await expect(register(page)).toHaveAttribute('aria-busy', 'false');
+  await page.getByRole('group', { name: 'Payment status' }).getByRole('button', { name: 'Approved', exact: true }).click();
   return state;
 }
 
@@ -37,33 +38,33 @@ async function choose(page: Page, label: string, option: string) {
   await page.getByRole('option', { name: option, exact: true }).click();
 }
 
-test('demo is isolated, read-only, numbered and filterable with global pagination', async ({ page }) => {
+test('demo is isolated, read-only, numbered and searchable within the three views', async ({ page }) => {
   const state = await setup(page);
   const reads = state.reads;
+  const statuses = page.getByRole('group', { name: 'Payment status' });
   await page.getByRole('button', { name: 'Preview sample data' }).click();
   await expect(page.getByText('Sample data', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'New Payment', exact: true })).toBeDisabled();
   await expect(register(page).getByRole('button', { name: /^Edit / })).toHaveCount(0);
   await expect(register(page).getByRole('button', { name: /^Delete / })).toHaveCount(0);
-  await expect(rows(page)).toHaveCount(10);
+  await expect(rows(page)).toHaveCount(5);
   await expect(page.getByLabel('From Date', { exact: true })).toHaveValue('07/09/2026');
   await expect(page.getByLabel('To Date', { exact: true })).toHaveValue('13/09/2026');
-  await page.getByRole('button', { name: 'Next page' }).click();
-  await expect(rows(page)).toHaveCount(8);
+  await statuses.getByRole('button', { name: 'Pending', exact: true }).click();
+  await expect(rows(page)).toHaveCount(4);
   await page.getByRole('searchbox', { name: 'Search payments' }).fill('Fuel');
-  await expect(rows(page)).toHaveCount(8); // Nothing applies while typing.
+  await expect(rows(page)).toHaveCount(4);
   await page.getByRole('button', { name: 'Search', exact: true }).click();
-  await expect(rows(page)).toHaveCount(2);
-  await expect(page.getByRole('button', { name: 'Page 1', exact: true })).toHaveAttribute('aria-current', 'page');
-  await choose(page, 'Payment Mode', 'Bank Transfer');
-  await expect(rows(page)).toHaveCount(2);
+  await expect(rows(page)).toHaveCount(1);
+  await choose(page, 'Payment Mode', 'NEFT');
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect(rows(page)).toHaveCount(1);
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   expect(state.reads).toBe(reads);
   expect(state.writes).toBe(0);
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
-  await expect(rows(page)).toHaveCount(10);
+  await expect(rows(page)).toHaveCount(4);
+  await statuses.getByRole('button', { name: 'Approved', exact: true }).click();
   await page.getByRole('button', { name: 'View Pay-07092026-001' }).click();
   const dialog = page.getByRole('dialog', { name: 'Payment Details' });
   await expect(dialog.getByText('Sample payment · Read-only preview. Not a real transaction.')).toBeVisible();
@@ -227,13 +228,19 @@ test('delete countdown traps focus, Escape cancels without writing, expiry delet
 });
 
 
-test('compact filters apply together only with Search; colored status toggles keep applied filters', async ({ page }) => {
+test('three maintenance-style segments sit beside Payment and retain Search-applied filters', async ({ page }) => {
   const state = await setup(page);
   const filters = page.getByRole('region', { name: 'Payment filters' });
   await expect(filters.locator('label')).toHaveCount(2);
   await expect(filters.locator('label')).toHaveClass([/sr-only/, /sr-only/]);
   await expect(page.getByText('Track outgoing payments and their transaction details.')).toHaveCount(0);
-  await expect(register(page).getByRole('heading', { name: 'Payment', exact: true })).toBeVisible();
+  const heading = register(page).getByRole('heading', { name: 'Payment', exact: true });
+  const statuses = page.getByRole('group', { name: 'Payment status' });
+  await expect(statuses.getByRole('button')).toHaveText(['Pending', 'Approved', 'Deleted']);
+  const headingBox = (await heading.boundingBox())!;
+  const toggleBox = (await statuses.boundingBox())!;
+  expect(toggleBox.x).toBeGreaterThan(headingBox.x + headingBox.width + 16);
+  expect(Math.abs(toggleBox.y + toggleBox.height / 2 - headingBox.y - headingBox.height / 2)).toBeLessThan(4);
   const reads = state.reads;
   await page.getByRole('searchbox', { name: 'Search payments' }).fill('Sample');
   await choose(page, 'Payment Type', 'Fuel Payment');
@@ -241,25 +248,25 @@ test('compact filters apply together only with Search; colored status toggles ke
   await expect(rows(page)).toHaveCount(10);
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect(rows(page)).toHaveCount(1);
-  const statuses = page.getByRole('group', { name: 'Payment status' });
-  await statuses.getByRole('button', { name: /^Approved / }).click();
+  await statuses.getByRole('button', { name: 'Pending', exact: true }).click();
   await expect(page.getByText('No payments found', { exact: true })).toBeVisible();
-  await statuses.getByRole('button', { name: /^Paid / }).click();
+  await expect(statuses.getByRole('button', { name: 'Pending', exact: true })).toHaveClass(/bg-orange-100/);
+  await statuses.getByRole('button', { name: 'Deleted', exact: true }).click();
+  await expect(statuses.getByRole('button', { name: 'Deleted', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(statuses.getByRole('button', { name: 'Deleted', exact: true })).toHaveClass(/bg-rose-100/);
+  await expect(page.getByText('Deleted payments are unavailable', { exact: true })).toBeVisible();
+  await expect(register(page).locator('tbody')).toHaveCount(0);
+  await statuses.getByRole('button', { name: 'Approved', exact: true }).click();
   await expect(rows(page)).toHaveCount(1);
-  await expect(statuses.getByRole('button', { name: /^Paid / })).toHaveAttribute('aria-pressed', 'true');
-  await expect(statuses.getByRole('button', { name: 'Deleted', exact: true })).toBeDisabled();
+  await expect(statuses.getByRole('button', { name: 'Approved', exact: true })).toHaveClass(/bg-emerald-100/);
   expect(state.reads).toBe(reads);
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
-  await expect(rows(page)).toHaveCount(10);
-  await statuses.getByRole('button', { name: /^Pending / }).click();
+  await expect(statuses.getByRole('button', { name: 'Pending', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Preview sample data' }).click();
   await expect(rows(page)).toHaveCount(4);
-  await expect(statuses.getByRole('button', { name: /^Pending / })).toHaveClass(/amber/);
-  await statuses.getByRole('button', { name: /^Cancelled / }).click();
-  await expect(rows(page)).toHaveCount(4);
-  await expect(statuses.getByRole('button', { name: /^Cancelled / })).toHaveClass(/rose/);
-  // Refresh must not commit a half-edited filter form.
+  await statuses.getByRole('button', { name: 'Approved', exact: true }).click();
+  await expect(rows(page)).toHaveCount(5); // Paid/Cancelled samples are not reclassified.
   await page.getByRole('searchbox', { name: 'Search payments' }).fill('no-match');
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
-  await expect(register(page)).toHaveAttribute('aria-busy', 'false');
-  await expect(rows(page)).toHaveCount(4);
+  await expect(rows(page)).toHaveCount(5);
 });

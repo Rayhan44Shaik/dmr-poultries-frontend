@@ -18,17 +18,17 @@ import '../../masters/styles/masters.css';
 import { Button } from '../../../ui/Button';
 import { SearchInput } from '../../../ui/SearchInput';
 import { RefreshButton, ResetButton } from '../../../ui/ExportActions';
-import { uiBadgeClass, type StatusTone } from '../../../shared/ui/uiTokens';
+import { uiBadgeClass } from '../../../shared/ui/uiTokens';
 import { createDemoPayments } from '../utils/paymentRegisterDemo';
+import { EmptyState } from '../../../ui/EmptyState';
 import { Pagination } from '../../../ui/Pagination';
 import { filterPayments, PAYMENT_TYPES, PAYMENT_MODES, paymentCurrency } from '../utils/paymentRegister';
 
-const PAYMENT_STATUS_FILTERS: { value: Payment['status'] | ''; label: string; tone: StatusTone; hint?: string }[] = [
-  { value: '', label: 'All', tone: 'neutral' },
-  { value: 'Draft', label: 'Pending', tone: 'warning', hint: 'Pending shows Draft records. The saved status is unchanged.' },
-  { value: 'Approved', label: 'Approved', tone: 'success' },
-  { value: 'Paid', label: 'Paid', tone: 'success' },
-  { value: 'Cancelled', label: 'Cancelled', tone: 'danger' },
+type PaymentView = 'pending' | 'approved' | 'deleted';
+const PAYMENT_VIEWS: { value: PaymentView; label: string; selectedClass: string; hint?: string }[] = [
+  { value: 'pending', label: 'Pending', selectedClass: 'bg-orange-100 text-orange-700 shadow-sm', hint: 'Shows Draft payments; saved statuses are unchanged.' },
+  { value: 'approved', label: 'Approved', selectedClass: 'bg-emerald-100 text-emerald-700 shadow-sm' },
+  { value: 'deleted', label: 'Deleted', selectedClass: 'bg-rose-100 text-rose-700 shadow-sm' },
 ];
 
 export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
@@ -46,7 +46,7 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const reloadAfterSave = useRef(false);
   const [filters, setFilters] = useState(() => ({ ...weekRange(), type: '', mode: '', search: '' }));
   const [appliedFilters, setAppliedFilters] = useState(filters);
-  const [status, setStatus] = useState<Payment['status'] | ''>('');
+  const [status, setStatus] = useState<PaymentView>('pending');
   const dateId = useId();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -108,7 +108,7 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
     const cleared = { ...weekRange(), type: '', mode: '', search: '' };
     setFilters(cleared);
     setAppliedFilters(cleared);
-    setStatus('');
+    setStatus('pending');
     setPage(1);
     showNotification('Filters cleared. Showing the current week.', 'info');
   };
@@ -119,12 +119,11 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
     setPage(1);
   };
   const matched = useMemo(() => filterPayments(payments, appliedFilters), [payments, appliedFilters]);
-  const filtered = useMemo(() => matched.filter(payment => !status || payment.status === status), [matched, status]);
-  const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { '': matched.length };
-    for (const payment of matched) counts[payment.status] = (counts[payment.status] ?? 0) + 1;
-    return counts;
-  }, [matched]);
+  const filtered = useMemo(() => {
+    // UI views only: do not reclassify Paid/Cancelled as Approved/Deleted.
+    if (status === 'deleted') return [];
+    return matched.filter(payment => payment.status === (status === 'pending' ? 'Draft' : 'Approved'));
+  }, [matched, status]);
   const types = useMemo(() => [...new Set([...PAYMENT_TYPES, ...payments.map(p => p.paymentType)])].filter(Boolean), [payments]);
   const modes = useMemo(() => [...new Set([...PAYMENT_MODES, ...payments.map(p => p.paymentMode)])].filter(Boolean), [payments]);
   const total = useMemo(() => filtered.reduce((sum, p) => sum + Number(p.amount || 0), 0), [filtered]);
@@ -178,29 +177,29 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
         {invalidRange && <p role="alert" className="mt-2 text-xs text-red-600">From Date must be on or before To Date.</p>}
       </section>
       <section aria-label="Payment records" aria-busy={loading} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 text-xs text-slate-500">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-slate-900">Payment</h2>
-            <span aria-live="polite">{loading ? 'Updating…' : `${filtered.length} ${filtered.length === 1 ? 'record' : 'records'}`}</span>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-white px-5 py-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3">
+            <h2 className="text-sm font-bold tracking-wide text-slate-800">Payment</h2>
+            <span aria-live="polite" className="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600 shadow-sm">
+              {loading ? 'Updating…' : status === 'deleted' ? '—' : filtered.length}
+            </span>
+            <div role="group" aria-label="Payment status" className="flex items-center overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50 p-0.5 shadow-sm sm:ml-2">
+              {PAYMENT_VIEWS.map(item => <Button key={item.value} variant="custom" size="sm" aria-pressed={status === item.value} title={item.hint}
+                className={`h-auto rounded-md px-3 py-1.5 text-xs font-semibold ${status === item.value ? item.selectedClass : 'bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-800'}`}
+                onClick={() => { setStatus(item.value); setPage(1); }}>
+                {item.label}
+              </Button>)}
+            </div>
           </div>
-          <span>Filtered total <strong className="ml-2 text-sm tabular-nums text-slate-800">{paymentCurrency.format(total)}</strong></span>
-        </div>
-        <div role="group" aria-label="Payment status" className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-2.5">
-          {PAYMENT_STATUS_FILTERS.map(item => <Button key={item.value} variant="custom" size="sm" aria-pressed={status === item.value} title={item.hint}
-            className={status === item.value ? `${uiBadgeClass(item.tone)} ring-1 ring-inset ring-current` : 'border border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-800'}
-            onClick={() => { setStatus(item.value); setPage(1); }}>
-            <span>{item.label}</span><span className="tabular-nums opacity-75">{statusCounts[item.value] ?? 0}</span>
-          </Button>)}
-          <span title="Deleted records are not available from the current payment API.">
-            <Button variant="custom" size="sm" className={uiBadgeClass('danger')} disabled aria-describedby={`${dateId}-deleted-help`}>Deleted</Button>
-          </span>
-          <span id={`${dateId}-deleted-help`} className="sr-only">Deleted records are not available from the current payment API. Cancelled records are shown separately.</span>
+          {status !== 'deleted' && <span className="text-xs text-slate-500">Filtered total <strong className="ml-2 text-sm tabular-nums text-slate-800">{paymentCurrency.format(total)}</strong></span>}
         </div>
         {error && <p role="alert" className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">Unable to refresh records. {payments.length ? 'Previously loaded records are still shown. ' : ''}Use Refresh to try again.</p>}
+        {status === 'deleted' ? <EmptyState title="Deleted payments are unavailable" description="The current payment API does not provide deleted records. Cancelled payments are not treated as deleted." /> : <>
         <PaymentTable readOnly={demo} emptyVariant={error ? 'error' : !payments.length ? 'no-data' : appliedFilters.search.trim() ? 'no-search' : 'no-filters'} isPending={isPending} payments={rows} loading={loading && !payments.length} error={error && !payments.length} onView={setViewingPayment}
           onEdit={p => { if (!demoRef.current && canEditItem(p.createdAt)) setEditingPayment(p); }}
           onDelete={p => { if (!demoRef.current && canDeleteItem(p.createdAt)) requestDelete(p.id, { label: `Deleting payment to ${p.paidTo}` }); }} />
         <Pagination page={page} pageSize={pageSize} totalItems={filtered.length} onPageChange={setPage} onPageSizeChange={size => { setPageSize(size); setPage(1); }} />
+        </>}
 
       </section>
       <Modal isOpen={pendingItems.length > 0} title="Payment deletion pending" size="md"
