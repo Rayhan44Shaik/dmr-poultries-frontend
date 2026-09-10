@@ -378,7 +378,6 @@ export default {
   'ops.trip.field.farm_meter': 'ఫారం మీటర్',
   'ops.trip.field.helpers': 'హెల్పర్లు',
   'ops.trip.field.loaders': 'లోడర్లు',
-  'ops.trip.field.last_closing_meter': 'ముగింపు మీటర్ (గత ట్రిప్)',
   'ops.trip.field.opening_meter': 'ప్రారంభ మీటర్',
   'ops.trip.field.pickup_tolls': 'పికప్ టోల్లు',
   'ops.trip.field.reached_time': 'చేరుకున్న సమయం',

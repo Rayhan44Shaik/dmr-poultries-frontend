@@ -13,7 +13,6 @@ import {
   ChevronDown,
   Clock,
   Gauge,
-  History,
   Search,
   Truck,
   User,
@@ -526,32 +525,6 @@ const StartTimeField = React.memo(function StartTimeField({ startTime }: { start
           display
         ) : (
           <span className="text-slate-400 font-normal text-xs">{t("ops.trip.will_be_captured")}</span>
-        )}
-      </div>
-    </div>
-  );
-});
-
-/** Read-only reference: the vehicle's latest recorded (closing) meter.
- *  Displayed exactly like the Opening Meter box — plain reading, or "--". */
-const LastClosingMeterField = React.memo(function LastClosingMeterField({
-  latestMeter,
-}: {
-  latestMeter: { meter: number; tripNo: string; tripDate: string } | null;
-}) {
-  const { t } = useI18n();
-  return (
-    <div>
-      <FieldLabel
-        icon={History}
-        tone="bg-fuchsia-50 text-fuchsia-600"
-        label={t("ops.trip.field.last_closing_meter")}
-      />
-      <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
-        {latestMeter ? (
-          latestMeter.meter
-        ) : (
-          <span className="text-slate-400 font-normal">--</span>
         )}
       </div>
     </div>
@@ -1262,14 +1235,6 @@ function StepStart({
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <History size={12} className="text-fuchsia-500" /> {t("ops.trip.field.last_closing_meter")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">
-              {latestMeter ? `${latestMeter.meter} KM` : "--"}
-            </span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Wallet size={12} className="text-orange-500" /> {t("operations.advance")}
             </span>
             <span className="text-xs font-bold text-slate-800">
@@ -1365,7 +1330,6 @@ function StepStart({
             error={openingMeterError}
             onChange={handleOpeningMeterChange}
           />
-          <LastClosingMeterField latestMeter={latestMeter} />
           <AdvanceField
             value={form.advanceText}
             disabled={inputsLocked}

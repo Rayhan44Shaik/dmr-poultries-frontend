@@ -380,7 +380,6 @@ export default {
   'ops.trip.field.farm_meter': 'Farm Meter',
   'ops.trip.field.helpers': 'Helpers',
   'ops.trip.field.loaders': 'Loaders',
-  'ops.trip.field.last_closing_meter': 'Closing Meter (Last Trip)',
   'ops.trip.field.opening_meter': 'Opening Meter',
   'ops.trip.field.pickup_tolls': 'Pickup Tolls',
   'ops.trip.field.reached_time': 'Reached Time',
