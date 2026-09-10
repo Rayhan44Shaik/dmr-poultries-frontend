@@ -3,31 +3,34 @@
 // ============================================================================
 // WEEKLY PERFORMANCE CHART — shared rendering for both performance pages
 // ============================================================================
-// One chart implementation (stable element tree, stable keys, animation off —
-// so filtering can never flicker or remount the SVG) configured per page:
+// One composed chart implementation (stable element tree, stable keys,
+// animation off — so filtering can never flicker or remount the SVG)
+// configured per page:
 //
-//   Driver     → Distance (km) bar · Fuel (L) bar, weekly mileage derived in
-//                the tooltip from the same real values (distance ÷ fuel).
-//   Supervisor → Birds + Weight (kg) bars on the left axis · Mortality +
-//                Weight-loss (kg) bars on the right axis; trips + derived
-//                avg weight per bird in the tooltip.
+//   Driver     → Distance (km) + Fuel (L) grouped bars (left axis); weekly
+//                mileage derived in the tooltip from the same real values.
+//   Supervisor → Birds hero bar (left axis) + Weight (kg) trend line (left);
+//                Mortality + Weight-loss (kg) trend lines (right axis). Loss
+//                metrics are lines so they can never visually overpower the
+//                volume bar they belong to.
 //
-// The chart only ever renders the buckets the API returned, in the order the
-// API returned them, with the API's own numbers — the `week` label is used for
-// DISPLAY only (see `performancePeriods.weeklyBucketLabel`). Nothing is
-// re-bucketed or fabricated.
+// Series carry `kind: "bar" | "line"`; bar-only configs render exactly as a
+// BarChart would. The chart only ever renders the buckets the API returned,
+// in the API's order, with the API's own numbers — the `week` label is used
+// for DISPLAY only. Nothing is re-bucketed or fabricated.
 //
-// Axis label rules: compact EN-IN magnitude abbreviations (k / L); tooltips
-// reuse the page's number formatters. Empty state, loading skeleton and an
-// accessible description are built in.
+// Tooltip: a single polished card for both pages — bold period header over a
+// hairline, one row per series (shape-coded swatch, right-aligned bold
+// tabular value), derived metrics below a dashed divider in muted style.
 // ============================================================================
 
 import { memo, useMemo, type ReactNode } from "react";
 import {
   Bar,
-  BarChart,
   CartesianGrid,
+  ComposedChart,
   Legend,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -42,6 +45,8 @@ export interface WeeklyChartSeries {
   color: string;
   /** Which value axis this series binds to. */
   axis: "left" | "right";
+  /** Visual encoding: bars for volumes, lines for trends/losses. */
+  kind?: "bar" | "line";
   /** Formats one value for the tooltip (already localized by the page). */
   format?: (value: number) => string;
 }
@@ -103,6 +108,7 @@ function WeeklyPerformanceChartImpl({
   const hasData = useMemo(() => rows.length > 0 && hasAnyValue(rows, series), [rows, series]);
 
   const hasRightAxis = series.some((s) => s.axis === "right");
+  const hasLineSeries = series.some((s) => s.kind === "line");
 
   if (loading) {
     return (
@@ -124,16 +130,17 @@ function WeeklyPerformanceChartImpl({
     );
   }
 
+  const barCount = series.filter((s) => (s.kind ?? "bar") === "bar").length;
+
   return (
     <div className="w-full">
       <div className={heightClass} role="img" aria-label={ariaLabel}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart
+          <ComposedChart
             data={rows}
             margin={{ top: 8, right: 8, left: -8, bottom: 4 }}
-            // Two series → grouped side-by-side bars per week.
-            barGap={4}
-            barCategoryGap="24%"
+            barGap={barCount > 1 ? 6 : 0}
+            barCategoryGap={barCount > 1 ? "24%" : "38%"}
           >
             <CartesianGrid strokeDasharray="4 4" stroke="#f1f5f9" vertical={false} />
             <XAxis
@@ -164,49 +171,57 @@ function WeeklyPerformanceChartImpl({
               />
             )}
             <Tooltip
-              cursor={{ fill: "#f8fafc", strokeDasharray: "4 4", stroke: "#e2e8f0" }}
-              contentStyle={{
-                borderRadius: "12px",
-                border: "1px solid #e2e8f0",
-                boxShadow: "0 12px 28px -8px rgba(15, 23, 42, 0.18)",
-                fontSize: "12px",
-                padding: "10px 14px",
-                backgroundColor: "#fff",
-              }}
-              labelStyle={{ fontWeight: 700, color: "#0f172a", fontSize: 12 }}
+              cursor={{ fill: "rgba(15, 23, 42, 0.045)" }}
               content={({ active, payload, label }) => {
                 if (!active || !payload?.length) return null;
                 const point = payload[0]?.payload as WeeklyChartPoint | undefined;
+                const extras = point ? (tooltipExtras?.(point) ?? []) : [];
                 return (
-                  <div className="min-w-[140px] text-xs">
-                    <div className="mb-1.5 font-bold text-slate-900">{String(label ?? "")}</div>
-                    <div className="space-y-1">
+                  <div className="min-w-[190px] rounded-xl border border-slate-200 bg-white/95 px-3.5 py-3 shadow-xl backdrop-blur">
+                    <div className="mb-2 border-b border-slate-100 pb-1.5 text-xs font-bold tracking-tight text-slate-900">
+                      {String(label ?? "")}
+                    </div>
+                    <div className="space-y-1.5">
                       {payload.map((entry) => {
                         const config = series.find((s) => s.key === entry.dataKey);
                         const raw = typeof entry.value === "number" ? entry.value : 0;
+                        const isLine = config?.kind === "line";
                         return (
-                          <div key={String(entry.dataKey)} className="flex items-center justify-between gap-4">
-                            <span className="flex items-center gap-1.5 text-slate-500">
+                          <div
+                            key={String(entry.dataKey)}
+                            className="flex items-center justify-between gap-5"
+                          >
+                            <span className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
                               <span
-                                className="h-2 w-2 rounded-sm"
+                                className={`h-2 w-2 shrink-0 ${
+                                  isLine ? "rounded-full" : "rounded-[3px]"
+                                }`}
                                 style={{ backgroundColor: config?.color ?? "#94a3b8" }}
                                 aria-hidden="true"
                               />
                               {config?.label ?? String(entry.dataKey)}
                             </span>
-                            <span className="font-semibold tabular-nums text-slate-800">
+                            <span className="text-xs font-bold tabular-nums text-slate-900">
                               {config?.format ? config.format(raw) : raw.toLocaleString("en-IN")}
                             </span>
                           </div>
                         );
                       })}
-                      {point &&
-                        tooltipExtras?.(point).map((row) => (
-                          <div key={row.label} className="flex items-center justify-between gap-4 border-t border-slate-100 pt-1">
-                            <span className="text-slate-400">{row.label}</span>
-                            <span className="font-semibold tabular-nums text-slate-600">{row.value}</span>
-                          </div>
-                        ))}
+                      {extras.length > 0 && (
+                        <div className="space-y-1.5 border-t border-dashed border-slate-200 pt-1.5">
+                          {extras.map((row) => (
+                            <div
+                              key={row.label}
+                              className="flex items-center justify-between gap-5"
+                            >
+                              <span className="text-[11px] text-slate-400">{row.label}</span>
+                              <span className="text-[11px] font-semibold tabular-nums text-slate-600">
+                                {row.value}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -222,19 +237,35 @@ function WeeklyPerformanceChartImpl({
                 <span className="text-[11px] font-semibold text-slate-500">{String(value)}</span>
               )}
             />
-            {series.map((config) => (
-              <Bar
-                key={config.key}
-                yAxisId={config.axis}
-                dataKey={config.key}
-                name={config.label}
-                fill={config.color}
-                radius={[4, 4, 0, 0]}
-                maxBarSize={36}
-                isAnimationActive={false}
-              />
-            ))}
-          </BarChart>
+            {series.map((config) =>
+              config.kind === "line" ? (
+                <Line
+                  key={config.key}
+                  yAxisId={config.axis}
+                  type="monotone"
+                  dataKey={config.key}
+                  name={config.label}
+                  stroke={config.color}
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: config.color, strokeWidth: 0 }}
+                  activeDot={{ r: 4.5, fill: config.color, stroke: "#ffffff", strokeWidth: 2 }}
+                  legendType="circle"
+                  isAnimationActive={false}
+                />
+              ) : (
+                <Bar
+                  key={config.key}
+                  yAxisId={config.axis}
+                  dataKey={config.key}
+                  name={config.label}
+                  fill={config.color}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={hasLineSeries ? 44 : 36}
+                  isAnimationActive={false}
+                />
+              ),
+            )}
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
     </div>

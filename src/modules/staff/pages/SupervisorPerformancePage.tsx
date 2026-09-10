@@ -296,8 +296,10 @@ const SupervisorPerformancePage = () => {
     () => toWeeklyAxisRows(data.weekly, dateLocale),
     [data.weekly, dateLocale],
   );
-  // Birds + weight share the left axis (tens of thousands); mortality birds
-  // and weight-loss kg share the right axis (hundreds) — real API buckets only.
+  // Visual hierarchy: the Birds bar carries the weekly volume (left axis,
+  // tens of thousands); Weight is a trend line on the same scale, while
+  // Mortality and Weight-loss are loss trends on the compact right axis —
+  // lines can never visually overpower the volume they belong to.
   const chartSeries = useMemo<WeeklyChartSeries[]>(
     () => [
       {
@@ -305,6 +307,7 @@ const SupervisorPerformancePage = () => {
         label: t("staff.perf.weekly.birds"),
         color: "#10b981",
         axis: "left",
+        kind: "bar",
         format: (value) => formatCount(value),
       },
       {
@@ -312,6 +315,7 @@ const SupervisorPerformancePage = () => {
         label: t("staff.perf.weekly.weight"),
         color: "#f59e0b",
         axis: "left",
+        kind: "line",
         format: (value) => `${formatCount(value)} kg`,
       },
       {
@@ -319,6 +323,7 @@ const SupervisorPerformancePage = () => {
         label: t("staff.perf.weekly.mortality"),
         color: "#ef4444",
         axis: "right",
+        kind: "line",
         format: (value) => formatCount(value),
       },
       {
@@ -326,6 +331,7 @@ const SupervisorPerformancePage = () => {
         label: t("staff.perf.weekly.weight_loss"),
         color: "#8b5cf6",
         axis: "right",
+        kind: "line",
         format: (value) => `${formatDecimal(value, 1)} kg`,
       },
     ],

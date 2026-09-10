@@ -67,7 +67,7 @@ export default {
   'staff.perf.weekly.aria_driver': 'Bar chart of weekly distance and fuel with mileage, {range}',
   'staff.perf.weekly.mortality': 'Mortality',
   'staff.perf.weekly.weight_loss': 'Weight loss (kg)',
-  'staff.perf.weekly.aria_supervisor': 'Bar chart of weekly birds, delivered weight, mortality and weight loss, {range}',
+  'staff.perf.weekly.aria_supervisor': 'Weekly chart of birds delivered, delivered weight, mortality and weight loss, {range}',
 
   // Table -------------------------------------------------------------------
   'staff.perf.table.rank': 'Rank',

@@ -67,7 +67,7 @@ export default {
   'staff.perf.weekly.aria_driver': '{range} కాలానికి వారపు దూరం మరియు ఇంధనం బార్ చార్ట్',
   'staff.perf.weekly.mortality': 'మరణాలు',
   'staff.perf.weekly.weight_loss': 'బరువు తగ్గుదల (కి.గ్రా)',
-  'staff.perf.weekly.aria_supervisor': '{range} కాలానికి వారపు కోళ్లు, పంపిణీ బరువు, మరణాలు మరియు బరువు తగ్గుదల బార్ చార్ట్',
+  'staff.perf.weekly.aria_supervisor': '{range} కాలానికి వారపు కోళ్లు, పంపిణీ బరువు, మరణాలు మరియు బరువు తగ్గుదల చార్ట్',
 
   // Table -------------------------------------------------------------------
   'staff.perf.table.rank': 'ర్యాంక్',
