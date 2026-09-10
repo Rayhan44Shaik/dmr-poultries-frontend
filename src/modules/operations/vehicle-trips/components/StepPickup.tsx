@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
-  Scale, Bird, Box, Gauge, Clock, Pencil,
+  Scale, Bird, Box, Gauge, Clock, Pencil, Package,
   Plus, Trash2, FileText, AlertTriangle, Camera, Download
 } from "lucide-react";
 import type { Trip, BoxDetail } from "../types/trip";
@@ -173,6 +173,8 @@ export default function StepPickup({
   const [photos, setPhotos] = useState<PickupPhoto[]>(() => photosFromTrip(trip));
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Which DC-photo slot (0 or 1) the picker was opened for.
+  const slotIndexRef = useRef(0);
   const savedPhotosRef = useRef<PickupPhoto[]>(photosFromTrip(trip));
 
   // ─── Toast state ────────────────────────────────────────────────────
@@ -317,6 +319,11 @@ export default function StepPickup({
     syncPickupPhotos: true,
   });
 
+  const openFilePicker = (slot: number) => {
+    slotIndexRef.current = slot;
+    fileInputRef.current?.click();
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -350,15 +357,19 @@ export default function StepPickup({
         mime: result.mime,
         data,
       };
-      const nextPhotos = [...photos, next].slice(0, 2);
-      setPhotos(nextPhotos);
+      // Place the photo in the slot the user tapped; keep max 2.
+      const target = Math.min(slotIndexRef.current, photos.length);
+      const nextPhotos = [...photos];
+      nextPhotos.splice(target, 0, next);
+      const capped = nextPhotos.slice(0, 2);
+      setPhotos(capped);
       updateTrip({
-        dcPhotoKey: nextPhotos[0]?.key,
-        dcPhotoMime: nextPhotos[0]?.mime,
-        dcPhotoData: nextPhotos[0]?.data,
-        dcPhotoKey2: nextPhotos[1]?.key,
-        dcPhotoMime2: nextPhotos[1]?.mime,
-        dcPhotoData2: nextPhotos[1]?.data,
+        dcPhotoKey: capped[0]?.key,
+        dcPhotoMime: capped[0]?.mime,
+        dcPhotoData: capped[0]?.data,
+        dcPhotoKey2: capped[1]?.key,
+        dcPhotoMime2: capped[1]?.mime,
+        dcPhotoData2: capped[1]?.data,
       });
       if (result.compressed) {
         setToast({
@@ -661,32 +672,32 @@ export default function StepPickup({
         {/* 5 Column Compact Deliveries-Style KPI Cards Grid */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-2">
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Clock size={12} className="text-slate-500" /> {t("ops.trip.time")}
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
+              <span className="h-5 w-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><Clock size={ 12 } /></span> {t("ops.trip.time")}
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{trip.pickupLoadTime || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Scale size={12} className="text-emerald-500" /> {t("ops.trip.dc_wt")}
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
+              <span className="h-5 w-5 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><Scale size={ 12 } /></span> {t("ops.trip.dc_wt")}
             </span>
             <span className="text-xs font-bold text-slate-800">{trip.dcWeight ? `${Number(trip.dcWeight).toFixed(2)} Kg` : t("ops.trip.not_entered")}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Bird size={12} className="text-blue-500" /> {t("common.birds")}
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
+              <span className="h-5 w-5 rounded-md bg-sky-100 text-sky-600 flex items-center justify-center shrink-0"><Bird size={ 12 } /></span> {t("common.birds")}
             </span>
             <span className="text-xs font-bold text-slate-800">{trip.totalBirds}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Box size={12} className="text-amber-500" /> {t("common.boxes")}
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
+              <span className="h-5 w-5 rounded-md bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><Box size={ 12 } /></span> {t("common.boxes")}
             </span>
             <span className="text-xs font-bold text-slate-800">{trip.boxes} / {maxBoxes}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Gauge size={12} className="text-purple-500" /> {t("ops.trip.avg_wt")}
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
+              <span className="h-5 w-5 rounded-md bg-purple-100 text-purple-600 flex items-center justify-center shrink-0"><Gauge size={ 12 } /></span> {t("ops.trip.avg_wt")}
             </span>
             <span className="text-xs font-bold text-slate-800">{trip.avgWeight ? `${trip.avgWeight} Kg` : "—"}</span>
           </div>
@@ -695,7 +706,7 @@ export default function StepPickup({
         {/* DC Photo Status Card */}
         {photos.length > 0 && (
           <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center gap-3 text-xs font-medium text-slate-700 flex-wrap">
-            <Camera size={16} className="text-slate-400" />
+            <span className="h-5 w-5 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><Camera size={ 16 } /></span>
             <span>{t("ops.trip.photos_uploaded", { count: photos.length })}</span>
             {photos.map((p) => (
               <img key={p.key} src={p.data} alt="Pickup" className="h-12 w-12 object-cover rounded-lg border border-slate-200" />
@@ -888,65 +899,70 @@ export default function StepPickup({
 
         {/* Auto time */}
         <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
-          <Clock size={14} className="text-slate-400" />
+          <span className="h-5 w-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><Clock size={ 14 } /></span>
           <span>{trip.pickupLoadTime || t("ops.trip.auto_time_on_submit")}</span>
         </div>
 
-        {/* Image Upload Section */}
+        {/* Image Upload Section — two DC photo slots */}
         <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50">
-          <div className="flex items-start gap-4">
-            <div className="flex-1">
-              <label className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
-                <Camera size={14} className="text-slate-400" />
-                {t("ops.trip.field.dc_photo")} {TRIP_FIELD_DEFINITIONS.dcPhotoKey.required && <span className="text-red-500">*</span>}
-              </label>
-              <div className="mt-1 flex items-center gap-3 flex-wrap">
-                {photos.length < 2 && (
+          <label className="text-sm font-semibold text-slate-600 flex items-center gap-2 flex-wrap">
+            <span className="h-6 w-6 rounded-md bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
+              <Camera size={14} />
+            </span>
+            {t("ops.trip.field.dc_photo")} {TRIP_FIELD_DEFINITIONS.dcPhotoKey.required && <span className="text-red-500">*</span>}
+            <span className="text-xs font-normal text-slate-400">
+              {t("ops.trip.photos_of_2", { count: photos.length })}
+            </span>
+          </label>
+          <div className="mt-2 flex items-center gap-3 flex-wrap">
+            {[0, 1].map((slot) => {
+              const p = photos[slot];
+              return p ? (
+                <div key={p.key} className="relative">
+                  <img src={p.data} alt={`Pickup ${slot + 1}`} className="h-24 w-24 object-cover rounded-xl border border-slate-200 shadow-xs" />
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-3 py-1.5 text-xs font-semibold bg-white text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-all shadow-xs"
+                    onClick={() => void removeImage(p.key)}
+                    className="absolute -top-1.5 -right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full w-5 h-5 text-[10px] leading-5 shadow-sm transition-all active:scale-90"
+                    title={t("ops.trip.remove_photo")}
                   >
-                    {t("ops.trip.choose_image")}
+                    ×
                   </button>
-                )}
-                <span className="text-xs text-slate-500">
-                  {photos.length ? t("ops.trip.photos_of_2", { count: photos.length }) : t("ops.trip.no_image_selected")}
-                </span>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-              <p className="text-[10px] text-slate-400 mt-1">{t("ops.trip.photo_requirements")}</p>
-            </div>
-            {photos.length > 0 && (
-              <div className="flex-shrink-0 flex gap-2">
-                {photos.map((p) => (
-                  <div key={p.key} className="relative">
-                    <img src={p.data} alt="Pickup" className="h-20 w-20 object-cover rounded-lg border border-slate-200" />
-                    <button
-                      type="button"
-                      onClick={() => void removeImage(p.key)}
-                      className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 text-[10px] leading-5"
-                      title={t("ops.trip.remove_photo")}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+                  <span className="absolute bottom-1 left-1 bg-slate-900/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                    {slot + 1}
+                  </span>
+                </div>
+              ) : (
+                <button
+                  key={`add-slot-${slot}`}
+                  type="button"
+                  onClick={() => openFilePicker(slot)}
+                  className="h-24 w-24 rounded-xl border-2 border-dashed border-slate-300 hover:border-sky-400 hover:bg-sky-50/60 text-slate-400 hover:text-sky-500 flex flex-col items-center justify-center gap-1 transition-all active:scale-95"
+                  title={t("ops.trip.choose_image")}
+                >
+                  <Camera size={18} />
+                  <span className="text-[10px] font-bold uppercase tracking-wide">{t("ops.trip.add_photo")}</span>
+                </button>
+              );
+            })}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <p className="text-[10px] text-slate-400 flex-1 min-w-[140px]">{t("ops.trip.photo_requirements")}</p>
           </div>
         </div>
 
         {/* Entry Table Container */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-slate-600">
+            <span className="text-sm font-semibold text-slate-600 flex items-center gap-2">
+              <span className="h-6 w-6 rounded-md bg-violet-100 text-violet-600 flex items-center justify-center shrink-0">
+                <Package size={14} />
+              </span>
               {t("ops.trip.box_entries", { max: maxBoxes || "—" })}
             </span>
           </div>
@@ -1069,26 +1085,26 @@ export default function StepPickup({
         {/* Totals Summary Bar - Deliveries Style KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Box size={12} className="text-amber-500" /> {t("common.boxes")}
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
+              <span className="h-5 w-5 rounded-md bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><Box size={ 12 } /></span> {t("common.boxes")}
             </span>
             <span className="text-xs font-bold text-slate-800">{totals.boxes} / {maxBoxes}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Bird size={12} className="text-blue-500" /> {t("common.birds")}
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
+              <span className="h-5 w-5 rounded-md bg-sky-100 text-sky-600 flex items-center justify-center shrink-0"><Bird size={ 12 } /></span> {t("common.birds")}
             </span>
             <span className="text-xs font-bold text-slate-800">{totals.totalBirds}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Scale size={12} className="text-emerald-500" /> {t("ops.trip.dc_wt")}
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
+              <span className="h-5 w-5 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><Scale size={ 12 } /></span> {t("ops.trip.dc_wt")}
             </span>
             <span className="text-xs font-bold text-slate-800">{totals.dcWeight.toFixed(2)} Kg</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Gauge size={12} className="text-purple-500" /> {t("ops.trip.avg_wt")}
+            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
+              <span className="h-5 w-5 rounded-md bg-purple-100 text-purple-600 flex items-center justify-center shrink-0"><Gauge size={ 12 } /></span> {t("ops.trip.avg_wt")}
             </span>
             <span className="text-xs font-bold text-slate-800">
               {totals.avgWeight > 0 ? `${totals.avgWeight} Kg` : "—"}
