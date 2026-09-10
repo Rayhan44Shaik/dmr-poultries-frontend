@@ -1244,22 +1244,22 @@ function StepStart({
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Gauge size={12} className="text-purple-500" /> {t("ops.trip.field.opening_meter")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">
-              {loadSnapshot.openingMeter == null
-                ? t("ops.trip.not_entered")
-                : `${loadSnapshot.openingMeter} KM`}
-            </span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Wallet size={12} className="text-orange-500" /> {t("operations.advance")}
             </span>
             <span className="text-xs font-bold text-slate-800">
               {loadSnapshot.advanceAmount == null
                 ? t("ops.trip.not_entered")
                 : `₹${loadSnapshot.advanceAmount.toLocaleString()}`}
+            </span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Gauge size={12} className="text-purple-500" /> {t("ops.trip.field.opening_meter")}
+            </span>
+            <span className="text-xs font-bold text-slate-800">
+              {loadSnapshot.openingMeter == null
+                ? t("ops.trip.not_entered")
+                : `${loadSnapshot.openingMeter} KM`}
             </span>
           </div>
         </div>
@@ -1302,8 +1302,7 @@ function StepStart({
         </div>
 
         {/* Field order: Trip Date, Start Time, Vehicle No., Supervisor, Driver,
-            Helpers, Loaders, then Opening Meter + Closing Meter (last trip
-            reference) and Advance. */}
+            Helpers, Loaders, Advance — Opening Meter LAST. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 sm:gap-x-6 gap-y-4 sm:gap-y-5">
           <TripDateField tripDate={loadSnapshot.tripDate} />
           <StartTimeField startTime={startTime} />
@@ -1342,6 +1341,13 @@ function StepStart({
             invalid={fieldInvalid.loaders}
             onChange={handleLoadersChange}
           />
+          <AdvanceField
+            value={form.advanceText}
+            disabled={inputsLocked}
+            invalid={fieldInvalid.advance}
+            onChange={handleAdvanceChange}
+          />
+          {/* Opening Meter stays LAST in Step 1 (after Loaders and Advance). */}
           <OpeningMeterField
             value={form.openingMeterText}
             disabled={inputsLocked}
@@ -1349,12 +1355,6 @@ function StepStart({
             error={openingMeterError}
             latestMeter={latestMeter}
             onChange={handleOpeningMeterChange}
-          />
-          <AdvanceField
-            value={form.advanceText}
-            disabled={inputsLocked}
-            invalid={fieldInvalid.advance}
-            onChange={handleAdvanceChange}
           />
         </div>
 

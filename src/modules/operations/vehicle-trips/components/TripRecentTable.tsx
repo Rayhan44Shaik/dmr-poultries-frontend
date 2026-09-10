@@ -291,18 +291,18 @@ function TripRecentTable({
           <table className="min-w-full text-sm text-left border-collapse">
             <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
               <tr>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">{t("operations.trip_no")}</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">{t("ops.trip.day")}</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">{t("common.vehicle")}</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">{t("common.driver")}</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">{t("common.supervisor")}</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">{t("ops.trip.source_farm")}</th>
-                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">{t("ops.trip.shops")}</th>
-                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">{t("common.birds")}</th>
-                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">{t("ops.trip.weight_kg")}</th>
-                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">{t("operations.mortality_count")}</th>
-                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">{t("common.status")}</th>
-                <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">{t("common.view")}</th>
+                <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">{t("operations.trip_no")}</th>
+                <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">{t("ops.trip.day")}</th>
+                <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">{t("common.vehicle")}</th>
+                <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">{t("common.driver")}</th>
+                <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">{t("common.supervisor")}</th>
+                <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">{t("ops.trip.source_farm")}</th>
+                <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("ops.trip.shops")}</th>
+                <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("common.birds")}</th>
+                <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("ops.trip.weight_kg")}</th>
+                <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("operations.mortality_count")}</th>
+                <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("common.status")}</th>
+                <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("common.view")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
