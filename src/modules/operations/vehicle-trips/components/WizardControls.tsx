@@ -11,7 +11,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { Check, ChevronDown, Search, X } from "lucide-react";
 
 /** How many option rows are visible before the list scrolls. */
-const VISIBLE_ITEMS = 5;
+const VISIBLE_ITEMS = 8;
 /** Fixed row height so VISIBLE_ITEMS maps to an exact pixel height. */
 const ITEM_HEIGHT = 36; // h-9
 const LIST_MAX_HEIGHT = VISIBLE_ITEMS * ITEM_HEIGHT;
@@ -266,6 +266,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
   invalid,
   onChange,
   chipSummary,
+  renderOptionLabel,
 }: {
   selected: string[];
   options: DropdownOption[];
@@ -279,6 +280,8 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
    *  rendered elsewhere (e.g. a dedicated box-numbers grid) so they don't
    *  appear twice. */
   chipSummary?: (count: number) => string;
+  /** Optional rich label for each list row (e.g. a coloured box-number chip). */
+  renderOptionLabel?: (option: DropdownOption) => React.ReactNode;
 }) {
   const { open, setOpen, query, setQuery, ref, searchRef, filtered } = useDropdownPanel();
 
@@ -398,7 +401,11 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
                     <span className="w-3.5 shrink-0">
                       {isSelected && <Check size={13} className="text-emerald-600" />}
                     </span>
-                    <span className="truncate">{option.label}</span>
+                    {renderOptionLabel ? (
+                      renderOptionLabel(option)
+                    ) : (
+                      <span className="truncate">{option.label}</span>
+                    )}
                   </button>
                 </li>
               );

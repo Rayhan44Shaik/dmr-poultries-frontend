@@ -17,7 +17,7 @@ import { generateShopPDF } from "../../utils/generateShopPDF";
 import { generatePickupReportPDF } from "../../utils/generatePickupPDF";
 import { generateAssignmentSheetPdf } from "../../../orders/pdf/generateAssignmentSheetPdf";
 import type { AssignmentSheetRow } from "../../../orders/ordersUtils";
-import { assignedShopIdsFromRows, pendingBoxesFromRows } from "./remainingBoxes";
+import { pendingBoxesFromRows } from "./remainingBoxes";
 import { computeDeliveryKpiTotals } from "./deliveryKpis";
 import type { DeliveriesBalanceError } from "../../../../../shared/trip/validation";
 import type { ShopDelivery, BoxDetail, Trip } from "../../types/trip";
@@ -314,7 +314,7 @@ export default function UnLoadingTable({
   const safeBoxDetails = boxDetailsRef.current.length > 0 ? boxDetailsRef.current : (boxDetails ?? []);
 
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const itemsPerPage =6;
+  const itemsPerPage = 9;
   const [showForm, setShowForm] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [autoCaptureTime, setAutoCaptureTime] = useState<string>("");
@@ -383,8 +383,6 @@ export default function UnLoadingTable({
   }, [editingShopId, safeRows]);
 
   // ─── Filter Pending Boxes ───────────────────────────────────────
-  const assignedShopIds = useMemo(() => assignedShopIdsFromRows(safeRows), [safeRows]);
-
   // Live route counts for the header buttons: Shops = still-to-deliver shops,
   // Boxes = still-available pickup boxes. Both shrink as deliveries are made.
   const pendingShopsCount = useMemo(() => {
@@ -950,9 +948,24 @@ export default function UnLoadingTable({
       return shopNameMatch || birdTypeMatch || remarksMatch;
     });
 
-    return [...filtered].sort(
-      (a, b) => (Number(a.serialNo) || 0) - (Number(b.serialNo) || 0) || Number(a.id) - Number(b.id)
-    );
+    // Route order for the card list: DELIVERED shops first with the most
+    // recent capture on TOP (older deliveries sink down), then the pending
+    // `[ORDER]` assignment rows in their listed sequence at the bottom.
+    return [...filtered].sort((a, b) => {
+      const aDone = isDeliveredRow(a);
+      const bDone = isDeliveredRow(b);
+      if (aDone !== bDone) return aDone ? -1 : 1;
+      if (aDone) {
+        return (
+          (Number(b.serialNo) || 0) - (Number(a.serialNo) || 0) ||
+          Number(b.id) - Number(a.id)
+        );
+      }
+      return (
+        (Number(a.serialNo) || 0) - (Number(b.serialNo) || 0) ||
+        Number(a.id) - Number(b.id)
+      );
+    });
   }, [safeRows, searchTerm]);
 
   const totalPages = useMemo<number>(() => Math.ceil(displayRows.length / itemsPerPage), [displayRows.length]);
@@ -1185,9 +1198,6 @@ export default function UnLoadingTable({
                     key={row.id}
                     row={row as any}
                     readOnly={readOnly}
-                    unassigned={
-                      assignedShopIds.size > 0 && !assignedShopIds.has(Number(row.shopId))
-                    }
                     onEdit={(selectedRow) => {
                       if (onEditShop) {
                         onEditShop(selectedRow.id);

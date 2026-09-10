@@ -186,6 +186,26 @@ export default function ShopDeliveryForm({
     chipLabel: `#${b.boxNo}`,
   }));
 
+  // Bright, eye-friendly coloured box-number chips for the box dropdown list.
+  const boxTileClass = (boxNo: number) =>
+    BOX_TILE_PALETTE[(boxNo - 1) % BOX_TILE_PALETTE.length];
+  const renderBoxOptionLabel = (opt: DropdownOption) => {
+    const boxNo = Number(opt.value);
+    const box = availableBoxDetails.find((b: any) => String(b.boxNo) === opt.value);
+    return (
+      <span className="flex items-center gap-2 min-w-0">
+        <span
+          className={`inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1.5 text-[11px] font-bold tabular-nums ${boxTileClass(boxNo)}`}
+        >
+          #{boxNo}
+        </span>
+        <span className="truncate text-xs text-slate-600">
+          {box ? `${box.birds} ${t("common.birds")} · ${Number(box.weight).toFixed(2)} kg` : opt.label}
+        </span>
+      </span>
+    );
+  };
+
   const neutralInputClass = (invalid?: boolean) =>
     `w-full rounded-xl border px-3 text-xs font-semibold outline-none transition-all h-[40px] no-spinner ${
       invalid
@@ -315,6 +335,7 @@ export default function ShopDeliveryForm({
                 searchPlaceholder={t("ops.trip.search_box_number")}
                 disabled={readOnly}
                 chipSummary={(count) => t("ops.trip.boxes_selected", { count })}
+                renderOptionLabel={renderBoxOptionLabel}
                 onChange={(values) => handleBoxSelection(values.map(Number))}
               />
             ) : (
