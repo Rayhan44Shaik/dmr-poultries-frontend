@@ -508,7 +508,7 @@ export default {
   'ops.trip.pending_boxes_pdf_ok': 'పెండింగ్ బాక్సుల PDF రూపొందించబడింది.',
   'ops.trip.per_box_allocation': 'ప్రతి బాక్స్ కేటాయింపు',
   'ops.trip.photo_requirements': 'ఫోటో అవసరాలు',
-  'ops.trip.photos_of_2': 'ఫోటోలు: గరిష్టం 2',
+  'ops.trip.photos_of_2': '1 ఫోటో అవసరం • గరిష్టం 2',
   'ops.trip.photos_uploaded': 'ఫోటోలు అప్‌లోడ్ చేయబడ్డాయి',
   'ops.trip.picked_from_farm': 'ఫారం నుండి తీసుకోబడింది',
   'ops.trip.pickup': 'పికప్',

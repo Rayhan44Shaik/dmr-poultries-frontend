@@ -1265,8 +1265,20 @@ function applyPickupStep(trip, body) {
       trip.boxDetails = incoming;
     }
   }
-  for (const key of ["dcPhotoKey", "dcPhotoMime", "dcPhotoData", "dcPhotoKey2", "dcPhotoMime2", "dcPhotoData2"]) {
-    if (body[key] != null && body[key] !== "") trip[key] = body[key];
+  if (body.syncPickupPhotos) {
+    // Full-state sync: the client sends its entire photo set (1 or 2 photos,
+    // or none while drafting) — absent entries mean "removed", so clear them.
+    for (const key of ["dcPhotoKey", "dcPhotoMime", "dcPhotoData", "dcPhotoKey2", "dcPhotoMime2", "dcPhotoData2"]) {
+      trip[key] = body[key] != null && body[key] !== "" ? body[key] : "";
+    }
+    if (!trip.dcPhotoData) trip.dcPhotoKey = "";
+    if (!trip.dcPhotoData) trip.dcPhotoMime = "";
+    if (!trip.dcPhotoData2) trip.dcPhotoKey2 = "";
+    if (!trip.dcPhotoData2) trip.dcPhotoMime2 = "";
+  } else {
+    for (const key of ["dcPhotoKey", "dcPhotoMime", "dcPhotoData", "dcPhotoKey2", "dcPhotoMime2", "dcPhotoData2"]) {
+      if (body[key] != null && body[key] !== "") trip[key] = body[key];
+    }
   }
   if ((trip.boxDetails || []).length) {
     const totals = trip.boxDetails.reduce(

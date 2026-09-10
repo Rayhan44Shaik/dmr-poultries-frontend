@@ -511,7 +511,7 @@ export default {
   'ops.trip.pending_boxes_pdf_ok': 'Pending boxes PDF generated.',
   'ops.trip.per_box_allocation': 'Per-box allocation',
   'ops.trip.photo_requirements': 'Photo requirements',
-  'ops.trip.photos_of_2': 'Photos: 2 max',
+  'ops.trip.photos_of_2': '1 photo required • max 2',
   'ops.trip.photos_uploaded': 'Photos uploaded',
   'ops.trip.picked_from_farm': 'Picked from farm',
   'ops.trip.pickup': 'Pickup',
