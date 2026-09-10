@@ -1452,7 +1452,32 @@ function buildCompletedFarmTrips({ stamp }) {
   ];
 }
 
-const TRIPS = buildTrips();
+const TRIPS = buildTrips().map(decorateSeedStamps);
+
+/** Sample-data official submit stamps: fill the immutable first-submit
+ *  timestamps (IST, seconds) for every seeded trip that lacks them, so the
+ *  whole sample set exercises the time-capture display. ADDITIVE ONLY —
+ *  derives from each trip's own seeded times and never modifies any
+ *  existing field; trips created through the API stamp at real submit time. */
+function decorateSeedStamps(trip) {
+  const secs = String((Number(trip.id) * 13) % 60).padStart(2, "0");
+  const at = (date, hhmm) => `${date}T${hhmm}:${secs}`;
+  const hhmmOf = (value, fallback) => {
+    const m = typeof value === "string" ? value.match(/^(\d{2}:\d{2})/) : null;
+    return m ? m[1] : fallback;
+  };
+  const date = trip.tripDate || iso(new Date());
+  if (trip.startStepSubmitted && !trip.startStepSubmittedAt) {
+    trip.startStepSubmittedAt = at(date, hhmmOf(trip.startTime, "06:05"));
+  }
+  if (trip.farmStepSubmitted && !trip.farmStepSubmittedAt) {
+    trip.farmStepSubmittedAt = at(date, hhmmOf(trip.reachedTime, "06:45"));
+  }
+  if (trip.pickupStepSubmitted && !trip.pickupStepSubmittedAt) {
+    trip.pickupStepSubmittedAt = at(date, hhmmOf(trip.pickupLoadTime, "07:30"));
+  }
+  return trip;
+}
 // 9301–9304 are the seeded walkthrough Drafts; server-created trips start above them.
 let nextTripId = 9400;
 
