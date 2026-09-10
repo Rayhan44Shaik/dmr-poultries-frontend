@@ -33,7 +33,7 @@ export type ShopDeliveryFormState = {
   mortality: number;
   mortWeight: number;
   remarks: string;
-  perBoxData: { boxNo: number; birds: number; weight: number; mortality?: number; mortalityWeight?: number }[];
+  perBoxData: { boxNo: number; birds: number; weight: number }[];
 };
 
 export const EMPTY_DELIVERY_FORM: ShopDeliveryFormState = {
@@ -247,8 +247,6 @@ export function useShopDeliveryForm(
           boxNo,
           birds: 0,
           weight: 0,
-          mortality: 0,
-          mortalityWeight: 0,
         }));
         setFormData((prev) => ({ ...prev, perBoxData: initialData, mortWeight: 0 }));
       }
@@ -264,7 +262,7 @@ export function useShopDeliveryForm(
       if (newBoxNos.length > 0 || removedBoxNos.length > 0) {
         let updated = formData.perBoxData.filter((item: { boxNo: number }) => formData.selectedBoxIds.includes(item.boxNo));
         newBoxNos.forEach((boxNo: number) => {
-          updated.push({ boxNo, birds: 0, weight: 0, mortality: 0, mortalityWeight: 0 });
+          updated.push({ boxNo, birds: 0, weight: 0 });
         });
         updated.sort((a: { boxNo: number }, b: { boxNo: number }) => a.boxNo - b.boxNo);
         setFormData((prev) => ({ ...prev, perBoxData: updated }));

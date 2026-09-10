@@ -570,11 +570,7 @@ export default function UnLoadingTable({
       mortality: row.mortality || 0,
       mortWeight: rowWithExtra.mortKg || 0,
       remarks: row.remarks || "",
-      perBoxData: (rowWithExtra.perBoxData || []).map((item: any) => ({
-        ...item,
-        mortality: item.mortality ?? 0,
-        mortalityWeight: item.mortalityWeight ?? 0,
-      })),
+      perBoxData: rowWithExtra.perBoxData || [],
     });
     setShowForm(true);
   };
@@ -583,23 +579,11 @@ export default function UnLoadingTable({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handlePerBoxChange = (index: number, field: "birds" | "weight" | "mortality" | "mortalityWeight", value: number) => {
+  const handlePerBoxChange = (index: number, field: "birds" | "weight", value: number) => {
     setFormData((prev) => {
       const updated = [...prev.perBoxData];
-      updated[index] = { ...updated[index] };
-      if (field === "birds") updated[index].birds = value;
-      else if (field === "weight") updated[index].weight = value;
-      else if (field === "mortality") updated[index].mortality = value;
-      else updated[index].mortalityWeight = value;
-
-      const next = { ...prev, perBoxData: updated };
-      // Keep the total mortality in sync with the per-box sums (weight mode).
-      if (field === "mortality") {
-        next.mortality = updated.reduce((sum, item) => sum + (Number(item.mortality) || 0), 0);
-      } else if (field === "mortalityWeight") {
-        next.mortWeight = updated.reduce((sum, item) => sum + (Number(item.mortalityWeight) || 0), 0);
-      }
-      return next;
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, perBoxData: updated };
     });
   };
 
