@@ -2,9 +2,11 @@ import React from "react";
 import {
   X,
   ShoppingCart,
+  Bird,
   Box,
   Scale,
   Store,
+  Truck,
   MessageSquare,
   AlertCircle,
   Clock,
@@ -81,19 +83,42 @@ function FormLabel({ icon: Icon, tone, children, required }: {
 }
 
 /** Uniform metric tile so every box lines up (equal height, vertically centred). */
-function MetricTile({ label, children }: { label: string; children: React.ReactNode }) {
+function MetricTile({
+  icon: Icon,
+  tone,
+  tint,
+  label,
+  children,
+}: {
+  icon: React.ComponentType<{ size?: number | string; className?: string }>;
+  tone: string;
+  tint: string;
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 min-h-[84px] flex flex-col justify-center">
-      <div className="text-[11px] uppercase font-semibold text-slate-500 mb-1 truncate">{label}</div>
+    <div className={`rounded-xl border p-3 min-h-[94px] flex flex-col justify-center ${tint}`}>
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <span className={`h-6 w-6 rounded-lg flex items-center justify-center shrink-0 ${tone}`}>
+          <Icon size={13} />
+        </span>
+        <span className="text-[11px] uppercase font-semibold text-slate-500 truncate">{label}</span>
+      </div>
       {children}
     </div>
   );
 }
 
 /** Plain, neutral metric tile — no green/red accents. */
-function SimpleMetric({ label, value }: { label: string; value: React.ReactNode }) {
+function SimpleMetric({ icon, tone, tint, label, value }: {
+  icon: React.ComponentType<{ size?: number | string; className?: string }>;
+  tone: string;
+  tint: string;
+  label: string;
+  value: React.ReactNode;
+}) {
   return (
-    <MetricTile label={label}>
+    <MetricTile icon={icon} tone={tone} tint={tint} label={label}>
       <div className="text-sm font-bold text-slate-800 truncate">{value}</div>
     </MetricTile>
   );
@@ -320,8 +345,17 @@ export default function ShopDeliveryForm({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Farm — birds above weight */}
             <div className="space-y-3">
-              <SimpleMetric label={t("ops.trip.farm_birds")} value={farmBirds} />
               <SimpleMetric
+                icon={Bird}
+                tone="bg-sky-50 text-sky-600"
+                tint="bg-sky-50/50 border-sky-100"
+                label={t("ops.trip.farm_birds")}
+                value={farmBirds}
+              />
+              <SimpleMetric
+                icon={Scale}
+                tone="bg-blue-50 text-blue-600"
+                tint="bg-blue-50/50 border-blue-100"
                 label={t("ops.trip.farm_weight_kg")}
                 value={farmWeight.toFixed(2)}
               />
@@ -329,8 +363,17 @@ export default function ShopDeliveryForm({
 
             {/* Delivered — birds above weight */}
             <div className="space-y-3">
-              <SimpleMetric label={t("ops.trip.delivered_birds")} value={deliveredBirds} />
               <SimpleMetric
+                icon={Truck}
+                tone="bg-emerald-50 text-emerald-600"
+                tint="bg-emerald-50/50 border-emerald-100"
+                label={t("ops.trip.delivered_birds")}
+                value={deliveredBirds}
+              />
+              <SimpleMetric
+                icon={Scale}
+                tone="bg-teal-50 text-teal-600"
+                tint="bg-teal-50/50 border-teal-100"
                 label={t("ops.trip.delivered_weight_kg")}
                 value={deliveredWeight > 0 ? deliveredWeight.toFixed(2) : "0.00"}
               />
@@ -338,7 +381,12 @@ export default function ShopDeliveryForm({
 
             {/* Mortality — birds above weight */}
             <div className="space-y-3">
-              <MetricTile label={t("ops.trip.mortality_birds")}>
+              <MetricTile
+                icon={AlertCircle}
+                tone="bg-rose-50 text-rose-600"
+                tint="bg-rose-50/50 border-rose-100"
+                label={t("ops.trip.mortality_birds")}
+              >
                 <input
                   type="number"
                   value={formData.mortality || ""}
@@ -354,6 +402,9 @@ export default function ShopDeliveryForm({
                 )}
               </MetricTile>
               <SimpleMetric
+                icon={Scale}
+                tone="bg-amber-50 text-amber-600"
+                tint="bg-amber-50/50 border-amber-100"
                 label={t("ops.trip.mortality_weight_kg")}
                 value={mortKg > 0 ? mortKg.toFixed(2) : "0.00"}
               />
