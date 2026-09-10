@@ -579,14 +579,6 @@ export default function UnLoadingTable({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handlePerBoxChange = (index: number, field: "birds" | "weight", value: number) => {
-    setFormData((prev) => {
-      const updated = [...prev.perBoxData];
-      updated[index] = { ...updated[index], [field]: value };
-      return { ...prev, perBoxData: updated };
-    });
-  };
-
   const handleBoxSelection = (newSelectedIds: number[]) => {
     setFormData((prev) => ({ ...prev, selectedBoxIds: newSelectedIds }));
   };
@@ -674,12 +666,10 @@ export default function UnLoadingTable({
       selectedBoxIds = formData.selectedBoxIds;
       farmBirdsVal = farmBirds;
       farmWeightVal = farmWeight;
-      const totalBirds = formData.perBoxData.reduce((sum: number, item: { boxNo: number; birds: number; weight: number }) => sum + item.birds, 0);
-      const totalWeight = formData.perBoxData.reduce((sum: number, item: { boxNo: number; birds: number; weight: number }) => sum + item.weight, 0);
-      finalBirds = totalBirds;
-      finalWeight = totalWeight;
+      finalBirds = Number(formData.birds) || 0;
+      finalWeight = Number(formData.weight) || 0;
       mortKgVal = formData.mortWeight;
-      perBoxData = formData.perBoxData.map((item) => ({ ...item }));
+      perBoxData = [];
     }
 
     const maxSerial = safeRows.reduce((max: number, r: ShopDelivery) => Math.max(max, r.serialNo || 0), 0);
@@ -783,24 +773,18 @@ export default function UnLoadingTable({
         !validationErrors.birdsExceed
       );
     } else {
-      const allBoxesFilled = formData.perBoxData.every(
-        (item: { boxNo: number; birds: number; weight: number }) => item.birds > 0 && item.weight > 0
-      );
-      const noPerBoxErrors =
-        !validationErrors.perBoxBirdsErrors.some((err: boolean) => err) &&
-        !validationErrors.perBoxWeightErrors.some((err: boolean) => err);
       return (
         formData.shopId > 0 &&
         formData.birdTypeId > 0 &&
         formData.selectedBoxIds.length > 0 &&
-        allBoxesFilled &&
+        Number(formData.birds) > 0 &&
+        Number(formData.weight) > 0 &&
         formData.mortality >= 0 &&
         formData.mortWeight >= 0 &&
         !validationErrors.birdsExceed &&
         !validationErrors.birdsMismatch &&
         !validationErrors.birdsExceedFarm &&
-        !validationErrors.weightExceedFarm &&
-        noPerBoxErrors
+        !validationErrors.weightExceedFarm
       );
     }
   }, [mode, formData, farmBirds, validationErrors]);
@@ -1035,7 +1019,6 @@ export default function UnLoadingTable({
           handleBirdSelect={handleBirdSelect}
           handleBoxSelection={handleBoxSelection}
           handleFormChange={handleFormChange}
-          handlePerBoxChange={handlePerBoxChange}
           shopOptions={shopOptions}
           birdOptions={birdOptions}
           isFormValid={isFormValid}

@@ -47,7 +47,6 @@ export interface Props {
   handleBirdSelect: (selected: any) => void;
   handleBoxSelection: (ids: number[]) => void;
   handleFormChange: (field: string, value: any) => void;
-  handlePerBoxChange: (index: number, field: "birds" | "weight", value: number) => void;
 
   shopOptions: any[];
   birdOptions: any[];
@@ -146,7 +145,6 @@ export default function ShopDeliveryForm({
   handleBirdSelect,
   handleBoxSelection,
   handleFormChange,
-  handlePerBoxChange,
   shopOptions,
   birdOptions,
   isFormValid,
@@ -416,142 +414,79 @@ export default function ShopDeliveryForm({
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold">
-                  <tr>
-                    <th className="px-3 py-2.5">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="h-5 w-5 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                          <Tag size={12} />
-                        </span>
-                        {t("ops.trip.box_no")}
-                      </span>
-                    </th>
-                    <th className="px-3 py-2.5">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="h-5 w-5 rounded-md bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-                          <Bird size={12} />
-                        </span>
-                        {t("ops.trip.farm_birds")}
-                      </span>
-                    </th>
-                    <th className="px-3 py-2.5">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="h-5 w-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                          <Truck size={12} />
-                        </span>
-                        {t("ops.trip.delivered_birds")} <span className="text-rose-500">*</span>
-                      </span>
-                    </th>
-                    <th className="px-3 py-2.5">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="h-5 w-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                          <Scale size={12} />
-                        </span>
-                        {t("ops.trip.farm_weight_kg")}
-                      </span>
-                    </th>
-                    <th className="px-3 py-2.5">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="h-5 w-5 rounded-md bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
-                          <Scale size={12} />
-                        </span>
-                        {t("ops.trip.delivered_weight_kg")} <span className="text-rose-500">*</span>
-                      </span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {formData.perBoxData.map((item: any, index: number) => {
-                    const farmBox = safeBoxDetails.find((b) => b.boxNo === item.boxNo);
-                    const birdsError = validationErrors.perBoxBirdsErrors[index] || false;
-                    const weightError = validationErrors.perBoxWeightErrors[index] || false;
-                    return (
-                      <tr key={item.boxNo} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="px-3 py-2 font-bold text-slate-800">#{item.boxNo}</td>
-                        <td className="px-3 py-2 font-medium">{farmBox?.birds || 0}</td>
-                        <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            value={item.birds || ""}
-                            onChange={(e) => {
-                              const raw = e.target.value;
-                              const parsed = raw === "" ? 0 : Number(raw);
-                              handlePerBoxChange(index, "birds", Number.isFinite(parsed) ? parsed : 0);
-                            }}
-                            placeholder="0"
-                            min="0"
-                            className={`w-20 rounded-lg border px-2 py-1.5 text-xs outline-none transition-all no-spinner ${
-                              birdsError
-                                ? "border-rose-400 bg-rose-50 focus:ring-2 focus:ring-rose-300"
-                                : "border-slate-200 focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                            }`}
-                          />
-                        </td>
-                        <td className="px-3 py-2 font-medium">{farmBox?.weight?.toFixed(2) || "0.00"}</td>
-                        <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={item.weight || ""}
-                            onChange={(e) => {
-                              const raw = e.target.value;
-                              const parsed = raw === "" ? 0 : Number(raw);
-                              handlePerBoxChange(index, "weight", Number.isFinite(parsed) ? parsed : 0);
-                            }}
-                            placeholder="0.00"
-                            min="0"
-                            className={`w-24 rounded-lg border px-2 py-1.5 text-xs outline-none transition-all no-spinner ${
-                              weightError
-                                ? "border-rose-400 bg-rose-50 focus:ring-2 focus:ring-rose-300"
-                                : "border-slate-200 focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                            }`}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Farm — cumulative birds above weight */}
+            <div className="space-y-3">
+              <SimpleMetric
+                icon={Bird}
+                tone="bg-sky-50 text-sky-600"
+                tint="bg-sky-50/50 border-sky-100"
+                label={t("ops.trip.farm_birds")}
+                value={farmBirds}
+              />
+              <SimpleMetric
+                icon={Scale}
+                tone="bg-blue-50 text-blue-600"
+                tint="bg-blue-50/50 border-blue-100"
+                label={t("ops.trip.farm_weight_kg")}
+                value={farmWeight.toFixed(2)}
+              />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Farm — birds above weight */}
+              {/* Delivered — birds above weight (editable) */}
               <div className="space-y-3">
-                <SimpleMetric
-                  icon={Bird}
-                  tone="bg-sky-50 text-sky-600"
-                  tint="bg-sky-50/50 border-sky-100"
-                  label={t("ops.trip.farm_birds")}
-                  value={farmBirds}
-                />
-                <SimpleMetric
-                  icon={Scale}
-                  tone="bg-blue-50 text-blue-600"
-                  tint="bg-blue-50/50 border-blue-100"
-                  label={t("ops.trip.farm_weight_kg")}
-                  value={farmWeight.toFixed(2)}
-                />
-              </div>
-
-              {/* Delivered — birds above weight */}
-              <div className="space-y-3">
-                <SimpleMetric
+                <MetricTile
                   icon={Truck}
                   tone="bg-emerald-50 text-emerald-600"
                   tint="bg-emerald-50/50 border-emerald-100"
                   label={t("ops.trip.delivered_birds")}
-                  value={deliveredBirds}
-                />
-                <SimpleMetric
+                >
+                  <input
+                    type="number"
+                    value={formData.birds || ""}
+                    onChange={(e) => handleFormChange("birds", Number(e.target.value))}
+                    placeholder="0"
+                    min="0"
+                    className={neutralInputClass(validationErrors.birdsExceedFarm)}
+                  />
+                  {validationErrors.birdsExceedFarm && (
+                    <p className="text-[10px] text-rose-600 mt-1 flex items-center gap-1 font-medium">
+                      <AlertCircle size={10} /> Max: {farmBirds}
+                    </p>
+                  )}
+                  {validationErrors.birdsMismatch && !validationErrors.birdsExceedFarm && (
+                    <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1 font-medium">
+                      <AlertCircle size={10} />{" "}
+                      {t("ops.trip.validate.birds_mismatch", {
+                        pickup: farmBirds,
+                        delivered: Number(formData.birds) || 0,
+                        mortality: Number(formData.mortality) || 0,
+                        total: (Number(formData.birds) || 0) + (Number(formData.mortality) || 0),
+                      })}
+                    </p>
+                  )}
+                </MetricTile>
+                <MetricTile
                   icon={Scale}
                   tone="bg-teal-50 text-teal-600"
                   tint="bg-teal-50/50 border-teal-100"
                   label={t("ops.trip.delivered_weight_kg")}
-                  value={deliveredWeight > 0 ? deliveredWeight.toFixed(2) : "0.00"}
-                />
+                >
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.weight || ""}
+                    onChange={(e) => handleFormChange("weight", Number(e.target.value))}
+                    placeholder="0.00"
+                    min="0"
+                    className={neutralInputClass(validationErrors.weightExceedFarm)}
+                  />
+                  {validationErrors.weightExceedFarm && (
+                    <p className="text-[10px] text-rose-600 mt-1 flex items-center gap-1 font-medium">
+                      <AlertCircle size={10} /> Max: {farmWeight.toFixed(2)} kg
+                    </p>
+                  )}
+                </MetricTile>
               </div>
 
               {/* Mortality — birds above weight (inputs) */}
@@ -589,7 +524,6 @@ export default function ShopDeliveryForm({
                 </MetricTile>
               </div>
             </div>
-          </div>
         )}
 
         {/* Remarks */}
