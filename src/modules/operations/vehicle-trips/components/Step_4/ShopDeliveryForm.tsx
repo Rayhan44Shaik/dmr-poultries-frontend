@@ -209,7 +209,7 @@ export default function ShopDeliveryForm({
               <p className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
                 <Clock size={11} className="text-slate-400" />
                 {t("ops.trip.auto_captured")}:
-                <span className="font-semibold text-slate-600">{autoCaptureTime}</span>
+                <span className="font-semibold text-slate-600">{autoCaptureTime || "—"}</span>
               </p>
             )}
           </div>

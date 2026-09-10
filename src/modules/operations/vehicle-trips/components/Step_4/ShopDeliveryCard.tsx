@@ -1,4 +1,4 @@
-import { Box, Users, Scale, Clock, Pencil, FileText, Package, AlertCircle, Store } from "lucide-react";
+import { Box, Users, Scale, Clock, Pencil, FileText, Package, AlertCircle } from "lucide-react";
 import type { ShopDelivery } from "../../types/trip";
 import type { ShopDeliveryWithExtra } from "./useShopDeliveryForm";
 import { useI18n } from "../../../../../i18n";
@@ -63,26 +63,17 @@ export default function ShopDeliveryCard({
                   ? "bg-orange-100 text-orange-600 border-orange-200"
                   : isWeightMode
                     ? "bg-purple-50 text-purple-600 border-purple-100"
-                    : "bg-emerald-50 text-emerald-600 border-emerald-100"
+                    : "bg-blue-50 text-blue-600 border-blue-100"
               }`}
+              title={isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}
             >
-              {isWeightMode ? <Scale size={17} /> : <Store size={17} />}
+              {isWeightMode ? <Scale size={17} /> : <Box size={17} />}
             </div>
             <div className="min-w-0">
               <p className="font-bold text-slate-800 text-sm truncate leading-tight" title={row.shopName}>
                 {row.shopName || t("ops.trip.not_entered")}
               </p>
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                <span
-                  title={`${t("ops.trip.delivery_mode")}: ${isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}`}
-                  className={`px-1.5 py-0.5 rounded-md shrink-0 border flex items-center justify-center ${
-                    isWeightMode
-                      ? "bg-purple-50 text-purple-700 border-purple-200/60"
-                      : "bg-blue-50 text-blue-700 border-blue-200/60"
-                  }`}
-                >
-                  {isWeightMode ? <Scale size={12} strokeWidth={2.5} /> : <Box size={12} strokeWidth={2.5} />}
-                </span>
                 {mortalityCount > 0 && (
                   <span
                     title={`${t("operations.mortality_count")}: ${mortalityCount} ${t("common.birds")}`}

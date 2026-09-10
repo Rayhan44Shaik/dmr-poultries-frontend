@@ -504,6 +504,9 @@ export function toStep4Payload(trip: Partial<Trip> & { deliveries?: Trip["delive
         farmBirds: numOrNull(d.farmBirds),
         farmWeight: numOrNull(d.farmWeight),
         serialNo: finiteOrOmit(d.serialNo),
+        // Per-shop capture time — sent so the backend preserves it and never
+        // re-stamps an already-captured delivery on save/edit.
+        autoCaptureTime: typeof d.autoCaptureTime === "string" ? d.autoCaptureTime : undefined,
       };
     }),
   };

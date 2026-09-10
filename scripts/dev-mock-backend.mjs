@@ -1567,11 +1567,11 @@ function applyDeliveriesPayload(tripId, body) {
     TRIPS.push(trip);
   }
   const rows = Array.isArray(body.deliveries) ? body.deliveries : [];
-  // Capture time is stamped ONLY on a SUCCESSFUL SUBMIT (mode === "submit") —
-  // never on a Save Progress, and never guessed before the submit confirmed.
-  // Previously captured times are preserved (keyed by clientKey / shop+serial),
-  // and pure `[ORDER]` plan rows stay un-captured (null).
-  const isSubmit = body.mode === "submit";
+  // Each shop captures its OWN time the moment its delivery is saved — stamped
+  // on BOTH Save Progress and Submit, per row, so different shops get different
+  // times. An already-captured row (client-sent autoCaptureTime, or a previous
+  // capture keyed by clientKey / shop+serial) is never re-stamped. Pure
+  // `[ORDER]` plan rows stay un-captured (null).
   const prev = Array.isArray(trip.deliveries) ? trip.deliveries : [];
   const prevTime = new Map();
   prev.forEach((r) => {
@@ -1594,9 +1594,9 @@ function applyDeliveriesPayload(tripId, body) {
       const key = base.clientKey ?? `${base.shopId}-${base.serialNo}`;
       base.autoCaptureTime = prevTime.has(key)
         ? prevTime.get(key)
-        : isSubmit && !String(base.remarks ?? "").trim().startsWith("[ORDER]")
-          ? istStamp()
-          : null;
+        : String(base.remarks ?? "").trim().startsWith("[ORDER]")
+          ? null
+          : istStamp();
     }
     return base;
   });

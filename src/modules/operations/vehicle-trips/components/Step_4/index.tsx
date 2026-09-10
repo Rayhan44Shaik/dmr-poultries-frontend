@@ -620,7 +620,7 @@ export default function UnLoadingTable({
     const rowWithExtra = row as any;
     setEditingId(row.id);
     setMode(rowWithExtra.deliveryMode || "box");
-    setAutoCaptureTime(rowWithExtra.autoCaptureTime || new Date().toLocaleString());
+    setAutoCaptureTime(rowWithExtra.autoCaptureTime || "");
     setFormData({
       shopId: row.shopId,
       shopName: row.shopName,
@@ -772,12 +772,12 @@ export default function UnLoadingTable({
       clientKey: editingId
         ? (safeRows.find((r) => r.id === editingId) as ShopDelivery | undefined)?.clientKey || `ck-${editingId}`
         : (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `ck-${Date.now()}`),
-      // Capture time is stamped by the BACKEND only on a successful submit —
-      // it is never guessed client-side before the save/submit is confirmed.
-      // An EDIT preserves the originally captured time.
+      // Each shop captures its OWN time at the moment its delivery is saved.
+      // The capture time is IMMUTABLE: an edit preserves the original value
+      // and never re-stamps it.
       autoCaptureTime: editingId !== null
         ? (autoCaptureTime || (safeRows.find((r) => r.id === editingId) as any)?.autoCaptureTime || undefined)
-        : undefined,
+        : new Date().toLocaleString(),
     };
 
     if (editingId !== null) {
@@ -1073,10 +1073,11 @@ export default function UnLoadingTable({
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
             <Building2 size={13} className="text-slate-400" /> {t("ops.trip.shops")}
           </span>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-3 mt-1">
             <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700" title={t("ops.trip.box_mode")}>
               <Box size={13} className="text-blue-600" /> {boxModeCount}
             </span>
+            <span className="h-4 w-px bg-slate-200" aria-hidden />
             <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700" title={t("ops.trip.weight_mode")}>
               <Scale size={13} className="text-purple-600" /> {weightModeCount}
             </span>
