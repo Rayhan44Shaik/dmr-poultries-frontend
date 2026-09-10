@@ -35,6 +35,9 @@ import { useI18n } from "../../../i18n";
 import { useStaffPerformance } from "../hooks/useStaffPerformance";
 import { useStaffDirectory } from "../hooks/useStaffDirectory";
 import { rankSupervisorRows } from "../utils/performanceGrading";
+import SortableHeader, {
+  type SortState,
+} from "../components/performance/PerformanceSortableHeader";
 import {
   formatBusinessDate,
   formatPeriodLabel,
@@ -186,14 +189,63 @@ const SupervisorPerformancePage = () => {
   // everything else follows by output (grade `null` → rendered as a dash).
   const rowsView = useMemo(() => rankSupervisorRows(rows), [rows]);
 
+  /* ------------------------------- sorting ------------------------------- */
+
+  // Click cycle per column: preferred dir → reversed → cleared (award order).
+  // Sorting reorders the loaded rows only — grades and awards never change.
+  const [sort, setSort] = useState<SortState | null>(null);
+  const handleSortChange = useCallback((next: SortState | null) => {
+    setSort(next);
+    setCurrentPage(1);
+  }, []);
+
+  const supervisorSortAccessors = useMemo<
+    Record<string, (entry: (typeof rowsView)[number]) => number | string>
+  >(
+    () => ({
+      supervisor: (entry) => entry.row.supervisorName,
+      status: (entry) => entry.row.employeeStatus,
+      trips: (entry) => entry.row.trips,
+      shops: (entry) => entry.row.shops,
+      birds: (entry) => entry.row.birds,
+      weight: (entry) => entry.row.weight,
+      mortality: (entry) => entry.row.mortality,
+      mortality_rate: (entry) => entry.row.mortalityRate,
+      weight_loss: (entry) => entry.row.weightLoss,
+      grade: (entry) => entry.assessment?.awardRank ?? Number.MAX_SAFE_INTEGER,
+    }),
+    [],
+  );
+
+  const sortedRowsView = useMemo(() => {
+    if (!sort) return rowsView;
+    const accessor = supervisorSortAccessors[sort.key];
+    if (!accessor) return rowsView;
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...rowsView].sort((a, b) => {
+      const av = accessor(a);
+      const bv = accessor(b);
+      if (typeof av === "string" || typeof bv === "string") {
+        const cmp = String(av).localeCompare(String(bv), undefined, {
+          sensitivity: "accent",
+          numeric: true,
+        });
+        if (cmp !== 0) return cmp * dir;
+      } else if (av !== bv) {
+        return ((av as number) - (bv as number)) * dir;
+      }
+      return a.rank - b.rank; // award order as the stable tie-break
+    });
+  }, [rowsView, sort, supervisorSortAccessors]);
+
   /* ----------------------------- pagination ----------------------------- */
 
   const totalPages = Math.max(1, Math.ceil(rowsView.length / ITEMS_PER_PAGE));
   const safePage = Math.min(currentPage, totalPages);
 
   const paginatedRows = useMemo(
-    () => rowsView.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE),
-    [rowsView, safePage],
+    () => sortedRowsView.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE),
+    [sortedRowsView, safePage],
   );
 
   /* ------------------------------- KPIs --------------------------------- */
@@ -244,6 +296,8 @@ const SupervisorPerformancePage = () => {
     () => toWeeklyAxisRows(data.weekly, dateLocale),
     [data.weekly, dateLocale],
   );
+  // Birds + weight share the left axis (tens of thousands); mortality birds
+  // and weight-loss kg share the right axis (hundreds) — real API buckets only.
   const chartSeries = useMemo<WeeklyChartSeries[]>(
     () => [
       {
@@ -257,8 +311,22 @@ const SupervisorPerformancePage = () => {
         key: "weight",
         label: t("staff.perf.weekly.weight"),
         color: "#f59e0b",
-        axis: "right",
+        axis: "left",
         format: (value) => `${formatCount(value)} kg`,
+      },
+      {
+        key: "mortality",
+        label: t("staff.perf.weekly.mortality"),
+        color: "#ef4444",
+        axis: "right",
+        format: (value) => formatCount(value),
+      },
+      {
+        key: "weightLoss",
+        label: t("staff.perf.weekly.weight_loss"),
+        color: "#8b5cf6",
+        axis: "right",
+        format: (value) => `${formatDecimal(value, 1)} kg`,
       },
     ],
     [t],
@@ -417,11 +485,14 @@ const SupervisorPerformancePage = () => {
 
       {/* Supervisor Performance table */}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
-        <header className="border-b border-slate-200 px-4 py-3 sm:px-5">
+        <header className="flex flex-wrap items-baseline gap-x-2 border-b border-slate-200 px-4 py-3 sm:px-5">
           <h2 className="text-[13px] font-bold tracking-tight text-slate-800">
             {t("staff.perf.supervisor_title")}
           </h2>
-          <p className="mt-0.5 text-[11px] font-medium text-slate-500">{summaryLine}</p>
+          <span className="min-w-0 text-[11px] font-medium text-slate-500">
+            <span aria-hidden="true">—&nbsp;</span>
+            {summaryLine}
+          </span>
         </header>
 
         {showTableSkeleton ? (
@@ -462,36 +533,29 @@ const SupervisorPerformancePage = () => {
                     <th scope="col" className={`${uiTableThClass} w-12 text-left`}>
                       {t("staff.perf.table.rank")}
                     </th>
-                    <th scope="col" className={`${uiTableThClass} min-w-[150px] text-left`}>
-                      {t("staff.perf.table.supervisor")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-left`}>
-                      {t("staff.perf.table.status")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-right`}>
-                      {t("staff.perf.table.trips")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-right`}>
-                      {t("staff.perf.table.shops")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-right`}>
-                      {t("staff.perf.table.birds")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-right`}>
-                      {t("staff.perf.table.weight")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-right`}>
-                      {t("staff.perf.table.mortality")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-right`}>
-                      {t("staff.perf.table.mortality_rate")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-right`}>
-                      {t("staff.perf.table.weight_loss")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-center`}>
-                      {t("staff.perf.table.grade")}
-                    </th>
+                    <SortableHeader
+                      label={t("staff.perf.table.supervisor")}
+                      sortKey="supervisor"
+                      sort={sort}
+                      onSortChange={handleSortChange}
+                      firstDir="asc"
+                      className="min-w-[150px]"
+                    />
+                    <SortableHeader
+                      label={t("staff.perf.table.status")}
+                      sortKey="status"
+                      sort={sort}
+                      onSortChange={handleSortChange}
+                      firstDir="asc"
+                    />
+                    <SortableHeader label={t("staff.perf.table.trips")} sortKey="trips" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.shops")} sortKey="shops" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.birds")} sortKey="birds" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.weight")} sortKey="weight" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.mortality")} sortKey="mortality" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.mortality_rate")} sortKey="mortality_rate" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.weight_loss")} sortKey="weight_loss" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.grade")} sortKey="grade" sort={sort} onSortChange={handleSortChange} align="center" firstDir="asc" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">

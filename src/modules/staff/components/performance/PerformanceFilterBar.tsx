@@ -130,7 +130,7 @@ function PerformanceFilterBarImpl({
       aria-busy={busy || refreshing || undefined}
     >
       <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-[1_1_170px] sm:max-w-[230px]">
           <label htmlFor={`${searchFieldId}-from`} className={uiFilterLabelClass}>
             {t("staff.perf.filter.start_date")}
           </label>
@@ -140,11 +140,11 @@ function PerformanceFilterBarImpl({
             onChange={(date) => onChange({ fromDate: date })}
             placeholder="DD/MM/YYYY"
             hideToday={false}
-            className="w-[180px]"
+            className="w-full"
           />
         </div>
 
-        <div className="min-w-0">
+        <div className="min-w-0 flex-[1_1_170px] sm:max-w-[230px]">
           <label htmlFor={`${searchFieldId}-to`} className={uiFilterLabelClass}>
             {t("staff.perf.filter.end_date")}
           </label>
@@ -153,11 +153,11 @@ function PerformanceFilterBarImpl({
             value={value.toDate}
             onChange={(date) => onChange({ toDate: date })}
             placeholder="DD/MM/YYYY"
-            className="w-[180px]"
+            className="w-full"
           />
         </div>
 
-        <div className="min-w-0">
+        <div className="min-w-0 flex-[1_1_190px] sm:max-w-[260px]">
           <MasterDropdown
             label={personLabel}
             value={value.personId != null ? String(value.personId) : ""}
@@ -166,13 +166,13 @@ function PerformanceFilterBarImpl({
             placeholder={allLabel}
             searchable
             allowClear
-            className="w-48"
+            className="w-full"
             error={personOptionsError ? listError : undefined}
           />
         </div>
 
         <div
-          className="min-w-0 flex-1 sm:max-w-xs"
+          className="min-w-0 flex-[2_1_240px]"
           onKeyDown={handleSearchKeyDown}
         >
           <SearchInput
@@ -185,7 +185,7 @@ function PerformanceFilterBarImpl({
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <Button
             type="submit"
             variant="primary"

@@ -8,7 +8,9 @@
 //
 //   Driver     → Distance (km) bar · Fuel (L) bar, weekly mileage derived in
 //                the tooltip from the same real values (distance ÷ fuel).
-//   Supervisor → Birds bar · Weight (kg) bar, trips in the tooltip.
+//   Supervisor → Birds + Weight (kg) bars on the left axis · Mortality +
+//                Weight-loss (kg) bars on the right axis; trips + derived
+//                avg weight per bird in the tooltip.
 //
 // The chart only ever renders the buckets the API returned, in the order the
 // API returned them, with the API's own numbers — the `week` label is used for

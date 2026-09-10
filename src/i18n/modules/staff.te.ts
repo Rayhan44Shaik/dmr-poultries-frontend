@@ -65,7 +65,9 @@ export default {
   'staff.perf.weekly.weight': 'బరువు (కి.గ్రా)',
   'staff.perf.weekly.avg_weight_per_bird': 'సగటు బరువు / కోడి',
   'staff.perf.weekly.aria_driver': '{range} కాలానికి వారపు దూరం మరియు ఇంధనం బార్ చార్ట్',
-  'staff.perf.weekly.aria_supervisor': '{range} కాలానికి వారపు కోళ్లు మరియు పంపిణీ బరువు బార్ చార్ట్',
+  'staff.perf.weekly.mortality': 'మరణాలు',
+  'staff.perf.weekly.weight_loss': 'బరువు తగ్గుదల (కి.గ్రా)',
+  'staff.perf.weekly.aria_supervisor': '{range} కాలానికి వారపు కోళ్లు, పంపిణీ బరువు, మరణాలు మరియు బరువు తగ్గుదల బార్ చార్ట్',
 
   // Table -------------------------------------------------------------------
   'staff.perf.table.rank': 'ర్యాంక్',
@@ -73,6 +75,7 @@ export default {
   'staff.perf.table.supervisor': 'సూపర్వైజర్',
   'staff.perf.table.status': 'స్థితి',
   'staff.perf.table.grade': 'గ్రేడ్',
+  'staff.perf.table.sort_aria': '{column} ద్వారా క్రమబద్ధీకరించండి',
   'staff.perf.table.trips': 'ట్రిప్‌లు',
   'staff.perf.table.distance': 'దూరం (కి.మీ)',
   'staff.perf.table.avg_per_trip': 'సగటు/ట్రిప్ (కి.మీ)',

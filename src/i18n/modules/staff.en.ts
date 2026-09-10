@@ -65,7 +65,9 @@ export default {
   'staff.perf.weekly.weight': 'Weight (kg)',
   'staff.perf.weekly.avg_weight_per_bird': 'Avg weight / bird',
   'staff.perf.weekly.aria_driver': 'Bar chart of weekly distance and fuel with mileage, {range}',
-  'staff.perf.weekly.aria_supervisor': 'Bar chart of weekly birds and delivered weight, {range}',
+  'staff.perf.weekly.mortality': 'Mortality',
+  'staff.perf.weekly.weight_loss': 'Weight loss (kg)',
+  'staff.perf.weekly.aria_supervisor': 'Bar chart of weekly birds, delivered weight, mortality and weight loss, {range}',
 
   // Table -------------------------------------------------------------------
   'staff.perf.table.rank': 'Rank',
@@ -73,6 +75,7 @@ export default {
   'staff.perf.table.supervisor': 'Supervisor',
   'staff.perf.table.status': 'Status',
   'staff.perf.table.grade': 'Grade',
+  'staff.perf.table.sort_aria': 'Sort by {column}',
   'staff.perf.table.trips': 'Trips',
   'staff.perf.table.distance': 'Distance (km)',
   'staff.perf.table.avg_per_trip': 'Avg/Trip (km)',

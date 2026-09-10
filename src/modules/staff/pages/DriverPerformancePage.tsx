@@ -35,6 +35,9 @@ import { useI18n } from "../../../i18n";
 import { useStaffPerformance } from "../hooks/useStaffPerformance";
 import { useStaffDirectory } from "../hooks/useStaffDirectory";
 import { rankDriverRows } from "../utils/performanceGrading";
+import SortableHeader, {
+  type SortState,
+} from "../components/performance/PerformanceSortableHeader";
 import {
   formatBusinessDate,
   formatPeriodLabel,
@@ -192,14 +195,64 @@ const DriverPerformancePage = () => {
   // everything else follows by output (grade `null` → rendered as a dash).
   const rowsView = useMemo(() => rankDriverRows(rows), [rows]);
 
+  /* ------------------------------- sorting ------------------------------- */
+
+  // Click cycle per column: preferred dir → reversed → cleared (award order).
+  // Sorting reorders the loaded rows only — grades and awards never change.
+  const [sort, setSort] = useState<SortState | null>(null);
+  const handleSortChange = useCallback((next: SortState | null) => {
+    setSort(next);
+    setCurrentPage(1);
+  }, []);
+
+  const driverSortAccessors = useMemo<
+    Record<string, (entry: (typeof rowsView)[number]) => number | string>
+  >(
+    () => ({
+      driver: (entry) => entry.row.driverName,
+      status: (entry) => entry.row.employeeStatus,
+      trips: (entry) => entry.row.trips,
+      distance: (entry) => entry.row.distance,
+      avg_per_trip: (entry) => entry.row.avgDistancePerTrip,
+      vehicles: (entry) => entry.row.vehicles,
+      fuel: (entry) => entry.row.fuelLitres,
+      total_cost: (entry) => entry.row.totalCost,
+      cost_per_km: (entry) => entry.row.costPerKm,
+      mileage: (entry) => entry.row.mileage,
+      grade: (entry) => entry.assessment?.awardRank ?? Number.MAX_SAFE_INTEGER,
+    }),
+    [],
+  );
+
+  const sortedRowsView = useMemo(() => {
+    if (!sort) return rowsView;
+    const accessor = driverSortAccessors[sort.key];
+    if (!accessor) return rowsView;
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...rowsView].sort((a, b) => {
+      const av = accessor(a);
+      const bv = accessor(b);
+      if (typeof av === "string" || typeof bv === "string") {
+        const cmp = String(av).localeCompare(String(bv), undefined, {
+          sensitivity: "accent",
+          numeric: true,
+        });
+        if (cmp !== 0) return cmp * dir;
+      } else if (av !== bv) {
+        return ((av as number) - (bv as number)) * dir;
+      }
+      return a.rank - b.rank; // award order as the stable tie-break
+    });
+  }, [rowsView, sort, driverSortAccessors]);
+
   /* ----------------------------- pagination ----------------------------- */
 
   const totalPages = Math.max(1, Math.ceil(rowsView.length / ITEMS_PER_PAGE));
   const safePage = Math.min(currentPage, totalPages);
 
   const paginatedRows = useMemo(
-    () => rowsView.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE),
-    [rowsView, safePage],
+    () => sortedRowsView.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE),
+    [sortedRowsView, safePage],
   );
 
   /* ------------------------------- KPIs --------------------------------- */
@@ -426,11 +479,14 @@ const DriverPerformancePage = () => {
 
       {/* Driver Performance table */}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
-        <header className="border-b border-slate-200 px-4 py-3 sm:px-5">
+        <header className="flex flex-wrap items-baseline gap-x-2 border-b border-slate-200 px-4 py-3 sm:px-5">
           <h2 className="text-[13px] font-bold tracking-tight text-slate-800">
             {t("staff.perf.driver_title")}
           </h2>
-          <p className="mt-0.5 text-[11px] font-medium text-slate-500">{summaryLine}</p>
+          <span className="min-w-0 text-[11px] font-medium text-slate-500">
+            <span aria-hidden="true">—&nbsp;</span>
+            {summaryLine}
+          </span>
         </header>
 
         {showTableSkeleton ? (
@@ -471,39 +527,30 @@ const DriverPerformancePage = () => {
                     <th scope="col" className={`${uiTableThClass} w-12 text-left`}>
                       {t("staff.perf.table.rank")}
                     </th>
-                    <th scope="col" className={`${uiTableThClass} min-w-[150px] text-left`}>
-                      {t("staff.perf.table.driver")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-left`}>
-                      {t("staff.perf.table.status")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-right`}>
-                      {t("staff.perf.table.trips")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-right`}>
-                      {t("staff.perf.table.distance")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-right`}>
-                      {t("staff.perf.table.avg_per_trip")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-right`}>
-                      {t("staff.perf.table.vehicles")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-right`}>
-                      {t("staff.perf.table.fuel")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-right`}>
-                      {t("staff.perf.table.total_cost")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-right`}>
-                      {t("staff.perf.table.cost_per_km")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-right`}>
-                      {t("staff.perf.table.mileage")}
-                    </th>
-                    <th scope="col" className={`${uiTableThClass} text-center`}>
-                      {t("staff.perf.table.grade")}
-                    </th>
+                    <SortableHeader
+                      label={t("staff.perf.table.driver")}
+                      sortKey="driver"
+                      sort={sort}
+                      onSortChange={handleSortChange}
+                      firstDir="asc"
+                      className="min-w-[150px]"
+                    />
+                    <SortableHeader
+                      label={t("staff.perf.table.status")}
+                      sortKey="status"
+                      sort={sort}
+                      onSortChange={handleSortChange}
+                      firstDir="asc"
+                    />
+                    <SortableHeader label={t("staff.perf.table.trips")} sortKey="trips" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.distance")} sortKey="distance" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.avg_per_trip")} sortKey="avg_per_trip" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.vehicles")} sortKey="vehicles" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.fuel")} sortKey="fuel" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.total_cost")} sortKey="total_cost" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.cost_per_km")} sortKey="cost_per_km" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.mileage")} sortKey="mileage" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.grade")} sortKey="grade" sort={sort} onSortChange={handleSortChange} align="center" firstDir="asc" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
