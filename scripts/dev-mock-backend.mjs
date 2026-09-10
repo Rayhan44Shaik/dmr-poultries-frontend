@@ -802,6 +802,9 @@ function buildWalkthroughTrips({ stamp, today, yesterday }) {
       supervisorName: "Prakash V",
       openingMeter: 38120,
       advanceAmount: 750,
+      // Sample capacity so Resume-Step-3 can add boxes without a vehicle-
+      // master cache (0/unknown would show the box-limit-reached blocker).
+      vehicleBoxCapacity: 30,
       helpers: ["Vinay Reddy"],
       loaders: ["Raju"],
       sourceFarmId: 3,
@@ -857,6 +860,8 @@ function buildWalkthroughTrips({ stamp, today, yesterday }) {
         birds: 520,
         date: yesterday,
       }),
+      // Roomy sample capacity for box-add testing (farmStepDetails default is 12).
+      vehicleBoxCapacity: 30,
       farmStepSubmitted: true,
     }),
     // 9304 · Steps 1–4 submitted (shops 1+3 delivered with rates) →
@@ -897,6 +902,7 @@ function buildWalkthroughTrips({ stamp, today, yesterday }) {
         birds: 420,
         date: yesterday,
       }),
+      vehicleBoxCapacity: 30,
       farmStepSubmitted: true,
       deliveries: [
         planRow(1, 1, 30, 300, {
@@ -1169,6 +1175,9 @@ function createTripFromStep1(body) {
     helpers: Array.isArray(body.helpers) ? body.helpers : [],
     loaders: Array.isArray(body.loaders) ? body.loaders : [],
     remarks: String(body.remarks ?? ""),
+    // Sample capacity for Step 3 (Pickup): new trips inherit the vehicle
+    // master's box capacity so box adding never starts at a 0/unknown limit.
+    vehicleBoxCapacity: VEHICLE_BY_ID.get(vehicleId)?.noOfBoxes || 0,
     startStepSubmitted: true,
   });
   TRIPS.push(trip);
@@ -1182,6 +1191,10 @@ function applyStartStep(trip, body) {
   if (vehicleId) trip.vehicleId = vehicleId;
   if (body.vehicleNo) trip.vehicleNo = String(body.vehicleNo);
   else if (vehicleId && VEHICLE_BY_ID.get(vehicleId)) trip.vehicleNo = VEHICLE_BY_ID.get(vehicleId).vehicleNumber;
+  // Keep the sample box capacity in sync when the vehicle changes/re-picks.
+  if (vehicleId && VEHICLE_BY_ID.get(vehicleId)?.noOfBoxes) {
+    trip.vehicleBoxCapacity = VEHICLE_BY_ID.get(vehicleId).noOfBoxes;
+  }
   if (body.driverId != null) trip.driverId = Number(body.driverId) || 0;
   if (body.driverName != null) trip.driverName = String(body.driverName);
   if (body.supervisorId != null) trip.supervisorId = Number(body.supervisorId) || 0;
