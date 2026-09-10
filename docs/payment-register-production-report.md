@@ -2,6 +2,14 @@
 
 Scope: **Payment Register only**. Verification date: 10 September 2026.
 
+### Filter refinement follow-up
+
+- Compact, wrapping filter bar; visible date/type/mode headings removed while accessible labels remain.
+- Date, type, mode and query are staged together and applied only by **Search**. Typing, dropdown selection and Refresh do not commit pending changes. **Clear** explicitly resets both staged/applied filters and the status selection.
+- Removed the supporting description and long demo banner; a small **Sample data** badge keeps fictional records identifiable.
+- Table heading is **Payment**. Counted status toggles use neutral/amber/green/red selected treatments. **Pending** filters stored **Draft** values; Approved, Paid and Cancelled remain distinct. **Deleted** is disabled with an explanation because deleted records are not returned by the existing payment API.
+- Follow-up verification: 9/9 intercepted-API browser tests, 6/6 unit tests, scoped ESLint and production build passed; desktop/mobile screenshots visually inspected. Full-project baseline failures below are historical results from the completion pass, not a fresh whole-repository gate run for this follow-up.
+
 ## 1. Final Status
 
 **PARTIALLY COMPLETE — FRONTEND ONLY**
@@ -37,9 +45,9 @@ Live payment numbers are supplied by the existing API and are displayed unchange
 | --- | --- |
 | Font, typography, colors | Existing application font, shared tokens and semantic status colors; no new font or palette. |
 | Spacing and page layout | Existing Accounts container; responsive filter/form grids; no duplicate page heading or KPI cards. |
-| Search | Shared SearchInput; local combined search across number, type, payee, reference, remarks, mode and amount. |
+| Search | Shared SearchInput with staged text; Search applies all filter fields together across number, type, payee, reference, remarks, mode and amount. |
 | Filters | Shop Register's MasterDropdown with search, clear selection and keyboard interaction; shared DatePicker. |
-| Reset | Shared ResetButton; explicit Clear restores the current week and clears type/mode/search, resets page, and notifies. |
+| Reset | Shared ResetButton; Clear restores the current week, clears staged/applied type/mode/search and status, resets page, and notifies. |
 | Refresh | Shared RefreshButton; request lock, existing rows retained, current filters and page preserved/clamped. |
 | Pagination | Shared Pagination with page sizes and safe parent-state clamping; no requests on page changes. |
 | Buttons and icons | Shared Button and action components; existing Lucide icons; named row actions. |
@@ -110,7 +118,7 @@ No other ERP module is included in this completion claim.
 | Production build | `npm run build`: PASS; existing chunk-size/mixed-import warnings remain. |
 | Design-system tests | `npm run test:design-system`: PASS — 39/39. |
 | Mobile tests | `npm run test:mobile`: 111 PASS / 10 FAIL — identical baseline failures (`Invalid URL`) in unchanged operations tests. |
-| Other tests | Payment Register unit tests: 6/6 PASS. Payment Register browser tests: 8/8 PASS with intercepted API responses. |
+| Other tests | Payment Register unit tests: 6/6 PASS. Payment Register browser tests: 9/9 PASS with intercepted API responses. |
 | ESLint | All changed Payment Register sources/tests: PASS. Full `npm run lint`: FAIL — 748 errors / 49 warnings; baseline was 750 errors / 49 warnings. Two existing Edit-modal lint errors removed. |
 | Diff whitespace | `git diff --check`: PASS. |
 | Backend changes | 0 |
