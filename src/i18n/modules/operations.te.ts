@@ -691,6 +691,9 @@ export default {
   // StepPickup
   'ops.trip.no_image_selected': 'ఇమేజ్ ఎంచుకోబడలేదు',
   'ops.trip.create_pickup': 'పికప్ సృష్టించండి',
+  'ops.trip.submit_pickup': 'పికప్ సమర్పించు',
+  'ops.trip.submit_pickup_kpi': 'పికప్ KPI సమర్పించు',
+  'ops.trip.confirm_submit_pickup': 'ఈ పికప్‌ను సమర్పించాలా?',
   'ops.trip.create_pickup_kpi': 'పికప్ KPI సృష్టించండి',
   'ops.trip.yes_create': 'అవును, సృష్టించండి',
 

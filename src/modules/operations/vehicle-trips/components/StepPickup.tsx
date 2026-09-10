@@ -321,10 +321,14 @@ export default function StepPickup({
     syncPickupPhotos: true,
   });
 
-  // Official Step 3 time capture — frozen at FIRST submit, never changes on edit.
-  const officialPickupTime = trip.pickupStepSubmittedAt
-    ? formatIstStamp(trip.pickupStepSubmittedAt)
-    : trip.pickupLoadTime || "";
+  // Official Step 3 time capture — appears ONLY after the FIRST successful
+  // submit and is then frozen forever (edits never change it). Before that
+  // first submit no time is shown, just the "auto-captured on submit" note.
+  const officialPickupTime = trip.pickupStepSubmitted
+    ? trip.pickupStepSubmittedAt
+      ? formatIstStamp(trip.pickupStepSubmittedAt)
+      : trip.pickupLoadTime || ""
+    : "";
 
   const openFilePicker = (slot: number) => {
     slotIndexRef.current = slot;
@@ -474,10 +478,10 @@ export default function StepPickup({
     // Persisted flag decides Create vs Update: React state (isLocalEditing) is
     // only ever an entry-mode toggle and must NOT drive the label.
     const isEditMode = Boolean(trip.pickupStepSubmitted) && (editable || isLocalEditing);
-    const title = isEditMode ? t("ops.trip.update_pickup_kpi") : t("ops.trip.create_pickup_kpi");
+    const title = isEditMode ? t("ops.trip.update_pickup_kpi") : t("ops.trip.submit_pickup_kpi");
     const message = isEditMode
       ? t("ops.trip.confirm_update_pickup")
-      : t("ops.trip.confirm_create_pickup");
+      : t("ops.trip.confirm_submit_pickup");
 
     setConfirmation({
       isOpen: true,
@@ -1142,7 +1146,7 @@ export default function StepPickup({
           busy={isSaving || isSubmitting}
           saveDisabled={false}
           submitDisabled={!canSubmit || (trip.pickupStepSubmitted && !isEditMode)}
-          submitLabel={isEditMode ? "ops.trip.update_pickup" : "ops.trip.create_pickup"}
+          submitLabel={isEditMode ? "ops.trip.update_pickup" : "ops.trip.submit_pickup"}
         />
       </div>
 
