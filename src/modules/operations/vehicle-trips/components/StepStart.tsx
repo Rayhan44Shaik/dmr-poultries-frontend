@@ -20,6 +20,7 @@ import {
   Users,
   Wallet,
   Pencil,
+  X,
 } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { validateStartStep } from "../../../../shared/trip/validation";
@@ -173,8 +174,7 @@ const FieldLabel = React.memo(function FieldLabel({
 
 function dropdownTriggerClass(invalid: boolean, disabled: boolean): string {
   return [
-    "mt-1 h-[42px] w-full rounded-xl border bg-white px-4 text-sm font-medium outline-none transition-all",
-    "flex items-center justify-between gap-2 text-left",
+    "mt-1 w-full rounded-xl border bg-white text-sm font-medium outline-none transition-all text-left",
     disabled
       ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
       : invalid
@@ -246,7 +246,7 @@ const SearchDropdown = React.memo(function SearchDropdown({
           if (!open) setQuery("");
           setOpen((o) => !o);
         }}
-        className={dropdownTriggerClass(Boolean(invalid), disabled)}
+        className={`${dropdownTriggerClass(Boolean(invalid), disabled)} flex h-[42px] items-center justify-between gap-2 px-4`}
       >
         <span className={`truncate ${selected ? "text-slate-800" : "text-slate-400 font-normal"}`}>
           {selected?.label || placeholder}
@@ -359,13 +359,6 @@ const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
   }, [options, query]);
 
   const selectedSet = useMemo(() => new Set(selectedValues), [selectedValues]);
-  const selectedLabels = useMemo(
-    () =>
-      selectedValues
-        .map((value) => options.find((option) => option.value === value)?.label || value)
-        .join(", "),
-    [selectedValues, options]
-  );
 
   const toggle = useCallback(
     (value: string) => {
@@ -379,28 +372,69 @@ const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
 
   return (
     <div className="relative" ref={ref}>
-      <button
-        type="button"
-        disabled={disabled}
+      <div
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        aria-disabled={disabled}
         onClick={() => {
+          if (disabled) return;
           if (!open) setQuery("");
           setOpen((o) => !o);
         }}
-        className={dropdownTriggerClass(Boolean(invalid), disabled)}
+        onKeyDown={(event) => {
+          if (disabled) return;
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            if (!open) setQuery("");
+            setOpen((o) => !o);
+          }
+        }}
+        className={`${dropdownTriggerClass(Boolean(invalid), disabled)} flex min-h-[42px] flex-wrap items-center gap-1.5 px-2.5 py-1.5`}
       >
-        <span className={`truncate ${selectedValues.length ? "text-slate-800" : "text-slate-400 font-normal"}`}>
-          {selectedLabels || placeholder}
-        </span>
-        {selectedValues.length > 0 && (
-          <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold">
-            {selectedValues.length}
-          </span>
+        {selectedValues.length === 0 ? (
+          <span className="px-1.5 text-slate-400 font-normal">{placeholder}</span>
+        ) : (
+          selectedValues.map((value) => {
+            const label =
+              options.find((option) => option.value === value)?.label || value;
+            return (
+              <span
+                key={value}
+                className={`inline-flex max-w-full items-center gap-1 rounded-lg border pl-2 pr-0.5 py-0.5 text-xs font-semibold ${
+                  disabled
+                    ? "border-slate-200 bg-slate-100 text-slate-500"
+                    : "border-blue-100 bg-blue-50 text-blue-700"
+                }`}
+              >
+                <span className="max-w-[170px] truncate">{label}</span>
+                {!disabled && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      // Remove only this chip — never toggle the dropdown.
+                      event.stopPropagation();
+                      onChange(selectedValues.filter((v) => v !== value));
+                    }}
+                    className={`rounded-full p-0.5 transition-colors ${
+                      disabled
+                        ? "text-slate-400"
+                        : "text-blue-400 hover:bg-blue-200/70 hover:text-blue-800"
+                    }`}
+                    aria-label={`Remove ${label}`}
+                    title={`Remove ${label}`}
+                  >
+                    <X size={11} strokeWidth={2.75} />
+                  </button>
+                )}
+              </span>
+            );
+          })
         )}
         <ChevronDown
           size={16}
-          className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`ml-auto shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
         />
-      </button>
+      </div>
 
       {open && (
         <div className="absolute left-0 top-full z-[80] mt-1 w-full min-w-[230px] bg-white rounded-xl shadow-xl shadow-slate-200/70 border border-slate-200 overflow-hidden">
