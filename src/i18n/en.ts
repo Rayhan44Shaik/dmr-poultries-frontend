@@ -43,7 +43,7 @@ export default {
   'nav.attendance': 'Attendance',
   'nav.deductions': 'Deductions',
   'nav.accountsDashboard': 'Accounts Dashboard',
-  'nav.collectionRegister': 'Collection Register',
+  'nav.collectionRegister': 'Payment Register',
   'nav.farmerPayments': 'Farm Payment',
   'nav.newPaymentEntry': 'New Payment Entry',
   'nav.shopLedger': 'Shop Ledger',
@@ -510,7 +510,7 @@ export default {
   // Accounts
   'accounts.dashboard': 'Accounts Dashboard',
   'accounts.summary': 'Summary',
-  'accounts.collection_register': 'Collection Register',
+  'accounts.collection_register': 'Payment Register',
   'accounts.farmer_payments': 'Farmer Payments',
   'accounts.new_payment': 'New Payment Entry',
   'accounts.market_rates': 'Market Rates',
@@ -889,7 +889,7 @@ export default {
   'page_title.fuel': 'DMR Poultries - Fuel Expenses',
   'page_title.maintenance': 'DMR Poultries - Maintenance',
   'page_title.shop_ledger': 'DMR Poultries - Shop Ledger',
-  'page_title.collection_register': 'DMR Poultries - Collection Register',
+  'page_title.collection_register': 'DMR Poultries - Payment Register',
   'page_title.farmer_payments': 'DMR Poultries - Farmer Payments',
   'page_title.market_rates': 'DMR Poultries - Market Rates',
 
