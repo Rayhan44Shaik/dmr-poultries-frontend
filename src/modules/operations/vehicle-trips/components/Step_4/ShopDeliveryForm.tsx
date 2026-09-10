@@ -2,7 +2,6 @@ import React from "react";
 import {
   X,
   ShoppingCart,
-  Layers,
   Box,
   Scale,
   MessageSquare,
@@ -68,8 +67,8 @@ function FormLabel({ icon: Icon, children, required }: {
   required?: boolean;
 }) {
   return (
-    <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5 mb-1.5">
-      <Icon size={13} className="text-slate-400 shrink-0" />
+    <label className="text-sm font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-1.5 mb-2">
+      <Icon size={15} className="text-slate-500 shrink-0" />
       <span className="truncate">{children}</span>
       {required && <span className="text-rose-500">*</span>}
     </label>
@@ -80,8 +79,8 @@ function FormLabel({ icon: Icon, children, required }: {
 function SimpleMetric({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
-      <div className="text-[10px] uppercase font-semibold text-slate-400 mb-1 truncate">{label}</div>
-      <div className="text-sm font-bold text-slate-800 truncate">{value}</div>
+      <div className="text-xs uppercase font-semibold text-slate-500 mb-1.5 truncate">{label}</div>
+      <div className="text-base font-bold text-slate-800 truncate">{value}</div>
     </div>
   );
 }
@@ -149,16 +148,16 @@ export default function ShopDeliveryForm({
       {/* ─── Header — title + bird type (left) · delivery mode toggle (right) */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4 border-b border-slate-100">
         <div className="flex items-center gap-3 min-w-0 mr-auto">
-          <div className="h-10 w-10 rounded-xl bg-slate-100 text-slate-600 border border-slate-200/60 flex items-center justify-center shrink-0">
-            {isEditing ? <CheckCircle2 size={20} /> : <ShoppingCart size={20} />}
+          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-md shadow-purple-200/70 ring-1 ring-slate-900/5 flex items-center justify-center shrink-0">
+            {isEditing ? <CheckCircle2 size={24} /> : <ShoppingCart size={24} />}
           </div>
           <div className="min-w-0">
-            <h3 className="text-base font-bold text-slate-800 tracking-tight truncate">
+            <h3 className="text-lg font-extrabold text-slate-900 tracking-tight truncate">
               {isEditing ? t("ops.trip.edit_shop_delivery") : t("ops.trip.add_new_shop_delivery")}
             </h3>
             {isEditing && (
-              <p className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                <Clock size={11} className="text-slate-400" />
+              <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
+                <Clock size={12} className="text-slate-400" />
                 {t("ops.trip.auto_captured")}:
                 <span className="font-semibold text-slate-600">{autoCaptureTime}</span>
               </p>
@@ -166,13 +165,8 @@ export default function ShopDeliveryForm({
           </div>
         </div>
 
-        {/* Bird type — beside the delivery mode toggle */}
+        {/* Bird type (unlabeled) — beside the mode toggle */}
         <div className="w-56 shrink-0">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5 mb-1.5">
-            <Layers size={13} className="text-slate-400 shrink-0" />
-            <span className="truncate">{t("operations.bird_type")}</span>
-            <span className="text-rose-500">*</span>
-          </div>
           <SearchDropdown
             value={formData.birdTypeId ? String(formData.birdTypeId) : ""}
             options={birdDropdownOptions}
@@ -190,8 +184,8 @@ export default function ShopDeliveryForm({
           />
         </div>
 
-        {/* Delivery mode toggle — coloured per mode, no label */}
-        <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1 self-end">
+        {/* Mode toggle — coloured per mode, no label */}
+        <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1">
             <button
               type="button"
               onClick={() => setMode("box")}
