@@ -29,6 +29,8 @@ export default {
   'staff.perf.entity.supervisors': 'Supervisors',
   'staff.perf.entity_l.drivers': 'drivers',
   'staff.perf.entity_l.supervisors': 'supervisors',
+  'staff.perf.entity_single.drivers': 'driver',
+  'staff.perf.entity_single.supervisors': 'supervisor',
 
   // KPI cards ---------------------------------------------------------------
   'staff.perf.kpi.active_drivers': 'Active Drivers',
@@ -67,7 +69,7 @@ export default {
   'staff.perf.weekly.aria_driver': 'Bar chart of weekly distance and fuel with mileage, {range}',
   'staff.perf.weekly.mortality': 'Mortality',
   'staff.perf.weekly.weight_loss': 'Weight loss (kg)',
-  'staff.perf.weekly.aria_supervisor': 'Weekly chart of birds delivered, delivered weight, mortality and weight loss, {range}',
+  'staff.perf.weekly.aria_supervisor': 'Weekly chart of birds delivered with mortality and weight-loss trends, {range}',
 
   // Table -------------------------------------------------------------------
   'staff.perf.table.rank': 'Rank',
@@ -76,6 +78,10 @@ export default {
   'staff.perf.table.status': 'Status',
   'staff.perf.table.grade': 'Grade',
   'staff.perf.table.sort_aria': 'Sort by {column}',
+  'staff.perf.trips.lagging_title': 'Lagging trips — worse than their own period average',
+  'staff.perf.trips.col.pace': 'Pace',
+  'staff.perf.trips.pace_off': 'Off pace',
+  'staff.perf.trips.pace_on': 'On pace',
   'staff.perf.table.trips': 'Trips',
   'staff.perf.table.distance': 'Distance (km)',
   'staff.perf.table.avg_per_trip': 'Avg/Trip (km)',
@@ -109,7 +115,7 @@ export default {
   'staff.perf.grade.GOOD': 'Good',
   'staff.perf.grade.aria': 'Performance grade: {grade}',
   'staff.perf.grade.unranked': 'Unranked this period',
-  'staff.perf.grade.unscored': 'Grades honour the top three performers of the period — this {entity_l} is unranked.',
+  'staff.perf.grade.unscored': 'Grades honour the top three performers of the period — this {entity_single} is unranked.',
 
   // Drawer ------------------------------------------------------------------
   'staff.perf.drawer.period': 'Reporting period',

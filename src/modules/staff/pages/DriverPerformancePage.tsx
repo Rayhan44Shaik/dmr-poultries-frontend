@@ -650,7 +650,7 @@ const DriverPerformancePage = () => {
         }
         unscoredNote={
           selectedEntry?.assessment.grade == null
-            ? t("staff.perf.grade.unscored", { entity_l: t("staff.perf.entity_l.drivers") })
+            ? t("staff.perf.grade.unscored", { entity_single: t("staff.perf.entity_single.drivers") })
             : undefined
         }
         summary={drawerSummary}
@@ -752,7 +752,11 @@ const DriverPerformancePage = () => {
               <h3 className="mb-2 text-[11px] font-bold uppercase tracking-widest text-slate-400">
                 {t("staff.perf.drawer.recent_trips")}
               </h3>
-              <RecentTripsTable trips={data.detail.recentTrips} />
+              <RecentTripsTable
+                trips={data.detail.recentTrips}
+                paceRow={selectedEntry?.row}
+                paceKind="drivers"
+              />
             </section>
           </div>
         )}

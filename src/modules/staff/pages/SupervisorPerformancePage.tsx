@@ -296,10 +296,11 @@ const SupervisorPerformancePage = () => {
     () => toWeeklyAxisRows(data.weekly, dateLocale),
     [data.weekly, dateLocale],
   );
-  // Visual hierarchy: the Birds bar carries the weekly volume (left axis,
-  // tens of thousands); Weight is a trend line on the same scale, while
-  // Mortality and Weight-loss are loss trends on the compact right axis —
-  // lines can never visually overpower the volume they belong to.
+  // Three-series view per product decision: the Birds bar carries the weekly
+  // volume (left axis); Mortality and Weight-loss are the two loss trends on
+  // the compact right axis. Lines can never visually overpower the volume
+  // they belong to. (Delivered weight remains in the KPIs, the table and the
+  // tooltip's derived average — it is only dropped as a chart series.)
   const chartSeries = useMemo<WeeklyChartSeries[]>(
     () => [
       {
@@ -309,14 +310,6 @@ const SupervisorPerformancePage = () => {
         axis: "left",
         kind: "bar",
         format: (value) => formatCount(value),
-      },
-      {
-        key: "weight",
-        label: t("staff.perf.weekly.weight"),
-        color: "#f59e0b",
-        axis: "left",
-        kind: "line",
-        format: (value) => `${formatCount(value)} kg`,
       },
       {
         key: "mortality",
@@ -656,7 +649,7 @@ const SupervisorPerformancePage = () => {
         }
         unscoredNote={
           selectedEntry?.assessment.grade == null
-            ? t("staff.perf.grade.unscored", { entity_l: t("staff.perf.entity_l.supervisors") })
+            ? t("staff.perf.grade.unscored", { entity_single: t("staff.perf.entity_single.supervisors") })
             : undefined
         }
         summary={drawerSummary}
@@ -677,7 +670,11 @@ const SupervisorPerformancePage = () => {
             <h3 className="mb-2 text-[11px] font-bold uppercase tracking-widest text-slate-400">
               {t("staff.perf.drawer.recent_trips")}
             </h3>
-            <RecentTripsTable trips={data.detail.recentTrips} />
+            <RecentTripsTable
+              trips={data.detail.recentTrips}
+              paceRow={selectedEntry?.row}
+              paceKind="supervisors"
+            />
           </section>
         )}
       </PerformanceDrawer>

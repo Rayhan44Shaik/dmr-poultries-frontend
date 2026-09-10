@@ -22,6 +22,11 @@ import type {
   PerformanceGrade,
   SupervisorMetricKey,
 } from "./performanceGrading";
+import type {
+  DriverPerformanceRow,
+  PerformanceRecentTrip,
+  SupervisorPerformanceRow,
+} from "../types/performance";
 
 type Translate = ReturnType<typeof useI18n>["t"];
 
@@ -181,4 +186,86 @@ export function buildDrawerImprovements<
     title: t(`staff.perf.improve.${improvement.metricKey}.title`),
     recommendation: t(`staff.perf.improve.${improvement.metricKey}.recommend`),
   }));
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* Trip race — which recent trips lagged the person's own period average      */
+/* -------------------------------------------------------------------------- */
+// Self-relative by design: the drawer's trip detail only loads alongside a
+// person-filtered response, where no fleet peers exist to compare against.
+// A trip is OFF PACE when it is materially worse than the person's OWN period
+// average — never compared to invented thresholds.
+
+export type StaffPerformanceKind = "drivers" | "supervisors";
+
+export interface TripRaceEntry {
+  trip: PerformanceRecentTrip;
+  offPace: boolean;
+  /** Translated headline figures shown on the pace chip card. */
+  headline: string;
+}
+
+function tripMortalityRate(trip: PerformanceRecentTrip): number {
+  return trip.totalBirdsDelivered > 0
+    ? (trip.totalMortality / trip.totalBirdsDelivered) * 100
+    : 0;
+}
+
+function tripWeightLossPct(trip: PerformanceRecentTrip): number {
+  return trip.totalDeliveredWeight > 0
+    ? (trip.weightLoss / trip.totalDeliveredWeight) * 100
+    : 0;
+}
+
+/**
+ * Pace for each recent trip (worst first). Supervisors: mortality rate and
+ * weight-loss % above their own period averages. Drivers: distance below
+ * their own per-trip average (the "short" trips behind a weak distance).
+ */
+export function buildTripRace(
+  kind: StaffPerformanceKind,
+  trips: readonly PerformanceRecentTrip[],
+  row: DriverPerformanceRow | SupervisorPerformanceRow,
+): TripRaceEntry[] {
+  if (trips.length === 0) return [];
+  const entries: TripRaceEntry[] = trips.map((trip) => {
+    if (kind === "supervisors") {
+      const supervisor = row as SupervisorPerformanceRow;
+      const mRate = tripMortalityRate(trip);
+      const lossPct = tripWeightLossPct(trip);
+      const off =
+        (trip.totalBirdsDelivered > 0 &&
+          supervisor.mortalityRate > 0 &&
+          mRate > supervisor.mortalityRate) ||
+        (trip.totalDeliveredWeight > 0 &&
+          supervisor.weightLoss > 0 &&
+          lossPct > supervisor.weightLoss);
+      return {
+        trip,
+        offPace: off,
+        headline: `${formatDecimal(mRate, 2)}% · ${formatDecimal(lossPct, 2)}%`,
+      };
+    }
+    const driver = row as DriverPerformanceRow;
+    const avg = driver.avgDistancePerTrip;
+    return {
+      trip,
+      offPace: avg > 0 && trip.totalKm < avg,
+      headline:
+        avg > 0
+          ? `${formatCount(trip.totalKm)} / ${formatDecimal(avg, 0)} km`
+          : `${formatCount(trip.totalKm)} km`,
+    };
+  });
+  // Off-pace first, then newest first — the lagging trips lead the story.
+  return entries.sort((a, b) => {
+    if (a.offPace !== b.offPace) return a.offPace ? -1 : 1;
+    return b.trip.tripDate.localeCompare(a.trip.tripDate);
+  });
+}
+
+/** Trip numbers that are off pace (worst first, capped). */
+export function offPaceTripNos(entries: readonly TripRaceEntry[]): string[] {
+  return entries.filter((entry) => entry.offPace).map((entry) => entry.trip.tripNo);
 }

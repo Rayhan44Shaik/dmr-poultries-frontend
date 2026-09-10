@@ -47,6 +47,8 @@ function SortableHeaderImpl({
   const active = sort?.key === sortKey;
   const dir = active ? sort!.dir : null;
   const Icon = !active ? ChevronsUpDown : dir === "asc" ? ArrowUp : ArrowDown;
+  // Prominent by request: large, colour-coded sort affordance on every column.
+  const iconSize = 14;
 
   const alignClass =
     align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
@@ -77,14 +79,17 @@ function SortableHeaderImpl({
         type="button"
         onClick={handleClick}
         aria-label={label}
-        className={`group inline-flex w-full min-w-0 items-center gap-1 font-bold uppercase tracking-wide transition-colors hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 ${justifyClass}`}
+        className={`group inline-flex w-full min-w-0 items-center gap-1.5 font-bold uppercase tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 ${
+          active ? "text-emerald-700" : "text-slate-500 hover:text-slate-900"
+        } ${justifyClass}`}
       >
         <span className="truncate">{label}</span>
         <Icon
-          size={11}
+          size={iconSize}
+          strokeWidth={active ? 2.6 : 2.2}
           aria-hidden="true"
           className={`shrink-0 ${
-            active ? "text-emerald-600" : "text-slate-300 group-hover:text-slate-500"
+            active ? "text-emerald-600" : "text-slate-400 group-hover:text-emerald-500"
           }`}
         />
       </button>
