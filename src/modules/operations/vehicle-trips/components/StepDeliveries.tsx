@@ -159,6 +159,7 @@ export default function StepDeliveries({
         shops={shops}
         birdTypes={birdTypes}
         boxDetails={boxDetails}
+        trip={trip}
         readOnly={isLocked}
         isSubmitted={trip.deliveryStepSubmitted}
         editingShopId={editingShopId}

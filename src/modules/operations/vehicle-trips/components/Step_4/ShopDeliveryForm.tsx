@@ -235,31 +235,34 @@ export default function ShopDeliveryForm({
           />
         </div>
 
-        {/* Mode toggle — coloured per mode, no label */}
+        {/* Mode toggle — icon only: box icon (Box Mode), balance/scale icon
+            (Weight Mode). Names are removed; titles keep them accessible. */}
         <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1">
             <button
               type="button"
               onClick={() => setMode("box")}
-              className={`flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-all h-[32px] px-3.5 whitespace-nowrap ${
+              title={t("ops.trip.box_mode")}
+              aria-label={t("ops.trip.box_mode")}
+              className={`flex items-center justify-center rounded-lg transition-all h-[32px] w-[38px] ${
                 mode === "box"
                   ? "bg-blue-600 text-white shadow-sm border border-blue-600"
                   : "text-slate-500 hover:text-slate-800 border border-transparent"
               }`}
             >
-              <Box size={14} />
-              {t("ops.trip.box_mode")}
+              <Box size={16} />
             </button>
             <button
               type="button"
               onClick={() => setMode("weight")}
-              className={`flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-all h-[32px] px-3.5 whitespace-nowrap ${
+              title={t("ops.trip.weight_mode")}
+              aria-label={t("ops.trip.weight_mode")}
+              className={`flex items-center justify-center rounded-lg transition-all h-[32px] w-[38px] ${
                 mode === "weight"
                   ? "bg-purple-600 text-white shadow-sm border border-purple-600"
                   : "text-slate-500 hover:text-slate-800 border border-transparent"
               }`}
             >
-              <Scale size={14} />
-              {t("ops.trip.weight_mode")}
+              <Scale size={16} />
             </button>
         </div>
 

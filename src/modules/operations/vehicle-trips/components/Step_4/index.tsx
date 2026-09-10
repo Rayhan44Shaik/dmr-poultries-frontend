@@ -14,11 +14,13 @@ import { useShopDeliveryForm, EMPTY_DELIVERY_FORM } from "./useShopDeliveryForm"
 import ShopDeliveryForm from "./ShopDeliveryForm";
 import ShopDeliveryCard from "./ShopDeliveryCard";
 import { generateShopPDF } from "../../utils/generateShopPDF";
-import { generateShopsDeliveryReportPDF, generateBoxesDeliveryReportPDF } from "../../utils/generateDeliveryReportsPDF";
+import { generatePickupReportPDF } from "../../utils/generatePickupPDF";
+import { generateAssignmentSheetPdf } from "../../../orders/pdf/generateAssignmentSheetPdf";
+import type { AssignmentSheetRow } from "../../../orders/ordersUtils";
 import { assignedShopIdsFromRows, pendingBoxesFromRows } from "./remainingBoxes";
 import { computeDeliveryKpiTotals } from "./deliveryKpis";
 import type { DeliveriesBalanceError } from "../../../../../shared/trip/validation";
-import type { ShopDelivery, BoxDetail } from "../../types/trip";
+import type { ShopDelivery, BoxDetail, Trip } from "../../types/trip";
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 import { useI18n } from "../../../../../i18n";
 
@@ -28,6 +30,7 @@ interface Props {
   shops: any[];
   birdTypes: any[];
   boxDetails?: BoxDetail[];
+  trip?: Trip;
   readOnly?: boolean;
   isSubmitted?: boolean;
   editingShopId?: string | number | null;
@@ -149,6 +152,66 @@ function buildDeliveredShopKeys(rows: ShopDelivery[]): {
   return { ids, names };
 }
 
+/** Pending (not-yet-delivered) shops in DELIVERY order — the same order the
+ *  dropdown shows (priority route first, then alphabetical) — mapped to
+ *  AssignmentSheetRow so the Step 4 "Shops" PDF is EXACTLY the Order
+ *  Assignment sheet. Assigned boxes/birds come from the shop's `[ORDER]`
+ *  plan row when present. */
+function buildPendingAssignmentRows(
+  shops: any[],
+  rows: ShopDelivery[]
+): AssignmentSheetRow[] {
+  const { ids, names } = buildDeliveredShopKeys(rows);
+  const isDelivered = (shop: any) => {
+    const id = Number(shop.id ?? shop.shopId ?? 0);
+    const name = String(shop.shopName ?? shop.name ?? "").trim().toLowerCase();
+    return (id > 0 && ids.has(id)) || (Boolean(name) && names.has(name));
+  };
+
+  const pending = (shops || []).filter((shop: any) => !isDelivered(shop));
+
+  const priorityRank = new Map<number, number>();
+  (shops || []).slice(0, 10).forEach((shop: any, idx: number) => {
+    const id = Number(shop.id ?? shop.shopId ?? 0);
+    if (id > 0) priorityRank.set(id, idx);
+  });
+  const isPriority = (shop: any) => priorityRank.has(Number(shop.id ?? shop.shopId ?? 0));
+  pending.sort((a: any, b: any) => {
+    const ap = isPriority(a);
+    const bp = isPriority(b);
+    if (ap && bp) {
+      return (
+        (priorityRank.get(Number(a.id ?? a.shopId ?? 0)) ?? 0) -
+        (priorityRank.get(Number(b.id ?? b.shopId ?? 0)) ?? 0)
+      );
+    }
+    if (ap) return -1;
+    if (bp) return 1;
+    return String(a.shopName ?? a.name ?? "").localeCompare(String(b.shopName ?? b.name ?? ""));
+  });
+
+  return pending.map((shop: any, index: number) => {
+    const shopId = Number(shop.id ?? shop.shopId ?? 0);
+    const shopName = shop.shopName ?? shop.name ?? `Shop ${shopId}`;
+    const plan = rows.find(
+      (r) =>
+        Number(r.shopId) === shopId &&
+        String(r.remarks ?? "").trim().startsWith("[ORDER]")
+    );
+    return {
+      serialNo: index + 1,
+      shopId,
+      shopName,
+      village: shop.village ?? shop.city ?? "",
+      mobile: shop.mobile ?? shop.phoneNumber ?? "",
+      boxes: plan
+        ? Number(plan.boxNo) || (plan.selectedBoxIds?.length ?? 0)
+        : 0,
+      birds: plan ? Number(plan.birds) || 0 : 0,
+    };
+  });
+}
+
 function DeliveryBalanceErrorPanel({
   error,
   onClose,
@@ -214,6 +277,7 @@ export default function UnLoadingTable({
   shops,
   birdTypes,
   boxDetails = [],
+  trip,
   readOnly = false,
   isSubmitted = false,
   editingShopId = null,
@@ -240,6 +304,7 @@ export default function UnLoadingTable({
   const safeRows = rows ?? [];
   const safeShops = shops ?? [];
   const safeBirdTypes = birdTypes ?? [];
+  const safeTrip = trip ?? null;
 
   // Cache the last known good boxDetails to prevent stale/empty boxDetails from API responses
   const boxDetailsRef = useRef<BoxDetail[]>([]);
@@ -346,19 +411,38 @@ export default function UnLoadingTable({
   }, [balanceError, safeRows, safeBoxDetails]);
 
   // ─── Step 4 PDF exports (separate Shop + Box reports) ───────────
-  const reportContext = {
-    tripNo,
-    tripDate,
-    vehicleNo,
-    supervisorName,
-  };
+  //   • Shops PDF  = the ORDER ASSIGNMENT sheet (identical format), listing
+  //     the pending shops in delivery order.
+  //   • Boxes PDF  = the PICKUP report (identical format) for the boxes still
+  //     on the truck — delivered boxes are removed, nothing else changes.
 
   const handleDownloadShopsPDF = async () => {
     try {
-      await generateShopsDeliveryReportPDF({
-        rows: safeRows,
-        shops: safeShops,
-        context: reportContext,
+      const sheetRows = buildPendingAssignmentRows(safeShops, safeRows);
+      const capacity =
+        Number((safeTrip as any)?.vehicleBoxCapacity) ||
+        Number((safeTrip as any)?.boxes) ||
+        safeBoxDetails.length;
+      const deliveredBoxes = Math.max(0, safeBoxDetails.length - remainingBoxesCount);
+      const tripForSheet: Trip = safeTrip
+        ? safeTrip
+        : ({
+            tripNo,
+            tripDate,
+            vehicleNo,
+            supervisorName,
+            driverName: "",
+            sourceFarm: "",
+            farmAddress: "",
+          } as unknown as Trip);
+      await generateAssignmentSheetPdf({
+        trip: tripForSheet,
+        supervisorMobile: supervisorPhone,
+        orderTripNo: tripNo,
+        orderDate: tripDate,
+        rows: sheetRows,
+        capacity,
+        alreadyAssignedOther: deliveredBoxes,
       });
       setToast({ message: t("ops.trip.shops_pdf_ok"), type: "success" });
     } catch (error: any) {
@@ -369,10 +453,28 @@ export default function UnLoadingTable({
 
   const handleDownloadBoxesPDF = async () => {
     try {
-      await generateBoxesDeliveryReportPDF({
-        boxDetails: safeBoxDetails,
-        deliveries: safeRows,
-        context: reportContext,
+      // Remaining (undelivered) boxes only — same Pickup Report format.
+      const remaining = pendingBoxesFromRows(safeBoxDetails, safeRows);
+      const totalBirds = remaining.reduce((s, b) => s + Number(b.birds || 0), 0);
+      const dcWeight = Number(
+        remaining.reduce((s, b) => s + Number(b.weight || 0), 0).toFixed(2)
+      );
+      const pickupTrip: Trip = {
+        ...(safeTrip ?? ({} as Trip)),
+        tripNo: tripNo || (safeTrip as any)?.tripNo || "Trip",
+        tripDate: tripDate || (safeTrip as any)?.tripDate || "",
+        vehicleNo: vehicleNo || (safeTrip as any)?.vehicleNo || "",
+        supervisorName: supervisorName || (safeTrip as any)?.supervisorName || "",
+        boxDetails: remaining as BoxDetail[],
+        boxes: remaining.length,
+        totalBirds,
+        dcWeight,
+        avgWeight:
+          totalBirds > 0 ? Number((dcWeight / totalBirds).toFixed(3)) : undefined,
+      } as Trip;
+      await generatePickupReportPDF(pickupTrip, {
+        maxBoxes:
+          Number((safeTrip as any)?.vehicleBoxCapacity) || safeBoxDetails.length,
       });
       setToast({ message: t("ops.trip.boxes_pdf_ok"), type: "success" });
     } catch (error: any) {
@@ -808,6 +910,22 @@ export default function UnLoadingTable({
   // ─── Top KPI Calculations (LIVE from current rows, not persisted) ───
   const topKpiTotals = useMemo(() => computeDeliveryKpiTotals(safeRows), [safeRows]);
 
+  // Delivery-mode split for the KPI cards (delivered rows only).
+  const boxModeCount = useMemo(
+    () =>
+      safeRows.filter(
+        (r) => isDeliveredRow(r) && (r.deliveryMode ?? "box") !== "weight"
+      ).length,
+    [safeRows]
+  );
+  const weightModeCount = useMemo(
+    () =>
+      safeRows.filter(
+        (r) => isDeliveredRow(r) && (r.deliveryMode ?? "box") === "weight"
+      ).length,
+    [safeRows]
+  );
+
   // ─── Filtered Search & Pagination ──────────────────────────────
   const displayRows = useMemo<ShopDelivery[]>(() => {
     // Show fully-entered deliveries, plus Orders assignment plan rows that are
@@ -942,7 +1060,7 @@ export default function UnLoadingTable({
       </div>
 
       {/* ─── TOP KPI SUMMARY CARDS ─── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         <div className="bg-emerald-50/70 border border-emerald-100 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-semibold text-emerald-900 flex items-center gap-1">
             <Clock size={13} className="text-emerald-600" /> {t("ops.trip.captured_time")}
@@ -956,6 +1074,18 @@ export default function UnLoadingTable({
             <Building2 size={13} className="text-slate-400" /> {t("ops.trip.shops")}
           </span>
           <span className="text-base font-bold text-slate-800">{topKpiTotals.shops || "—"}</span>
+        </div>
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
+          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+            <Box size={13} className="text-blue-600" /> {t("ops.trip.box_mode")}
+          </span>
+          <span className="text-base font-bold text-slate-800">{boxModeCount}</span>
+        </div>
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
+          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+            <Scale size={13} className="text-purple-600" /> {t("ops.trip.weight_mode")}
+          </span>
+          <span className="text-base font-bold text-slate-800">{weightModeCount}</span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
