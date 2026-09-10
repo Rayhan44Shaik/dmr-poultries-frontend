@@ -249,9 +249,6 @@ export default function ShopDeliveryForm({
                 handleShopSelect(opt ? { value: opt.value, label: opt.label } : null);
               }}
             />
-            <span className="text-[10px] text-slate-400 mt-1 block">
-              {t("ops.trip.shops_available", { count: shopDropdownOptions.length })}
-            </span>
           </div>
 
           <div>
@@ -310,39 +307,50 @@ export default function ShopDeliveryForm({
 
         {/* Mode-specific breakdown */}
         {mode === "box" ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <SimpleMetric label={t("ops.trip.farm_birds")} value={farmBirds} />
-            <SimpleMetric
-              label={t("ops.trip.farm_weight_kg")}
-              value={farmWeight.toFixed(2)}
-            />
-            <div>
-              <FormLabel icon={AlertCircle} tone="bg-rose-50 text-rose-600">
-                {t("ops.trip.mortality_birds")}
-              </FormLabel>
-              <input
-                type="number"
-                value={formData.mortality || ""}
-                onChange={(e) => handleFormChange("mortality", Number(e.target.value))}
-                placeholder="0"
-                min="0"
-                className={neutralInputClass(validationErrors.birdsExceed)}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Farm — birds above weight */}
+            <div className="space-y-3">
+              <SimpleMetric label={t("ops.trip.farm_birds")} value={farmBirds} />
+              <SimpleMetric
+                label={t("ops.trip.farm_weight_kg")}
+                value={farmWeight.toFixed(2)}
               />
-              {validationErrors.birdsExceed && (
-                <p className="text-[10px] text-rose-600 mt-1 flex items-center gap-1 font-medium">
-                  <AlertCircle size={10} /> Max: {farmBirds}
-                </p>
-              )}
             </div>
-            <SimpleMetric
-              label={t("ops.trip.mortality_weight_kg")}
-              value={mortKg > 0 ? mortKg.toFixed(2) : "0.00"}
-            />
-            <SimpleMetric label={t("ops.trip.delivered_birds")} value={deliveredBirds} />
-            <SimpleMetric
-              label={t("ops.trip.delivered_weight_kg")}
-              value={deliveredWeight > 0 ? deliveredWeight.toFixed(2) : "0.00"}
-            />
+
+            {/* Delivered — birds above weight */}
+            <div className="space-y-3">
+              <SimpleMetric label={t("ops.trip.delivered_birds")} value={deliveredBirds} />
+              <SimpleMetric
+                label={t("ops.trip.delivered_weight_kg")}
+                value={deliveredWeight > 0 ? deliveredWeight.toFixed(2) : "0.00"}
+              />
+            </div>
+
+            {/* Mortality — birds above weight */}
+            <div className="space-y-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+                <div className="text-[11px] uppercase font-semibold text-slate-500 mb-1 truncate">
+                  {t("ops.trip.mortality_birds")}
+                </div>
+                <input
+                  type="number"
+                  value={formData.mortality || ""}
+                  onChange={(e) => handleFormChange("mortality", Number(e.target.value))}
+                  placeholder="0"
+                  min="0"
+                  className={neutralInputClass(validationErrors.birdsExceed)}
+                />
+                {validationErrors.birdsExceed && (
+                  <p className="text-[10px] text-rose-600 mt-1 flex items-center gap-1 font-medium">
+                    <AlertCircle size={10} /> Max: {farmBirds}
+                  </p>
+                )}
+              </div>
+              <SimpleMetric
+                label={t("ops.trip.mortality_weight_kg")}
+                value={mortKg > 0 ? mortKg.toFixed(2) : "0.00"}
+              />
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
