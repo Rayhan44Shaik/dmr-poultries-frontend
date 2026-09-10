@@ -199,7 +199,7 @@ export default function ShopDeliveryForm({
         >
           #{boxNo}
         </span>
-        <span className="truncate text-xs text-slate-600">
+        <span className="truncate text-xs font-medium text-slate-800">
           {box ? `${box.birds} ${t("common.birds")} · ${Number(box.weight).toFixed(2)} kg` : opt.label}
         </span>
       </span>
@@ -336,6 +336,7 @@ export default function ShopDeliveryForm({
                 disabled={readOnly}
                 chipSummary={(count) => t("ops.trip.boxes_selected", { count })}
                 renderOptionLabel={renderBoxOptionLabel}
+                selectAllLabel={t("ops.trip.select_all_boxes")}
                 onChange={(values) => handleBoxSelection(values.map(Number))}
               />
             ) : (
@@ -370,13 +371,19 @@ export default function ShopDeliveryForm({
             )}
           </div>
           {selectedBoxIds.length > 0 ? (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+            <div
+              className={`grid gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3 ${
+                selectedBoxIds.length > 30
+                  ? "grid-cols-[repeat(auto-fill,minmax(40px,1fr))]"
+                  : "grid-cols-[repeat(auto-fill,minmax(64px,1fr))]"
+              }`}
+            >
               {selectedBoxIds.map((id, idx) => (
                 <span
                   key={id}
-                  className={`flex h-10 items-center justify-center gap-1 rounded-lg border px-1.5 text-sm font-bold shadow-xs ${
-                    BOX_TILE_PALETTE[idx % BOX_TILE_PALETTE.length]
-                  }`}
+                  className={`flex items-center justify-center gap-1 rounded-lg border px-1 font-bold shadow-xs ${
+                    selectedBoxIds.length > 30 ? "h-7 text-[11px]" : "h-10 text-sm"
+                  } ${BOX_TILE_PALETTE[idx % BOX_TILE_PALETTE.length]}`}
                 >
                   <span className="tabular-nums">#{id}</span>
                   {!readOnly && (
@@ -387,7 +394,7 @@ export default function ShopDeliveryForm({
                       aria-label={`${t("common.remove")} #${id}`}
                       title={`${t("common.remove")} #${id}`}
                     >
-                      <X size={12} strokeWidth={2.75} />
+                      <X size={10} strokeWidth={2.75} />
                     </button>
                   )}
                 </span>

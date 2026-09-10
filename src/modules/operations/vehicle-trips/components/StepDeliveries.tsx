@@ -144,11 +144,11 @@ export default function StepDeliveries({
                 <Lock size={12} className="text-slate-500" /> {t("ops.trip.submitted_locked")}
               </span>
             </div>
-          ) : (
+          ) : trip.deliveryStepSubmitted || editingShopId ? (
             <span className="text-xs text-blue-700 font-semibold bg-blue-50 px-3 py-1 rounded-full border border-blue-200 whitespace-nowrap">
-              {editingShopId ? t("ops.trip.editing_shop_details") : isStepEditing ? t("ops.trip.editing_trip", { no: trip.tripNo }) : t("ops.trip.step_unlocked")}
+              {editingShopId ? t("ops.trip.editing_shop_details") : t("ops.trip.step_unlocked")}
             </span>
-          )}
+          ) : null}
         </div>
       </div>
 

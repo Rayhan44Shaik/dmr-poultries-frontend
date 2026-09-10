@@ -11,7 +11,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { Check, ChevronDown, Search, X } from "lucide-react";
 
 /** How many option rows are visible before the list scrolls. */
-const VISIBLE_ITEMS = 8;
+const VISIBLE_ITEMS = 5;
 /** Fixed row height so VISIBLE_ITEMS maps to an exact pixel height. */
 const ITEM_HEIGHT = 36; // h-9
 const LIST_MAX_HEIGHT = VISIBLE_ITEMS * ITEM_HEIGHT;
@@ -225,7 +225,7 @@ export const SearchDropdown = React.memo(function SearchDropdown({
           </button>
 
           <ul
-            className="overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
+            className="overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-200"
             style={{ maxHeight: `${LIST_MAX_HEIGHT}px` }}
           >
             {filtered(options).map((option) => {
@@ -267,6 +267,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
   onChange,
   chipSummary,
   renderOptionLabel,
+  selectAllLabel,
 }: {
   selected: string[];
   options: DropdownOption[];
@@ -282,6 +283,8 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
   chipSummary?: (count: number) => string;
   /** Optional rich label for each list row (e.g. a coloured box-number chip). */
   renderOptionLabel?: (option: DropdownOption) => React.ReactNode;
+  /** When provided, a pinned "select all" row appears above the options. */
+  selectAllLabel?: string;
 }) {
   const { open, setOpen, query, setQuery, ref, searchRef, filtered } = useDropdownPanel();
 
@@ -369,6 +372,26 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
             searchPlaceholder={searchPlaceholder}
           />
 
+          {/* Pinned "select all" row */}
+          {selectAllLabel && (
+            <button
+              type="button"
+              onClick={() => onChange(options.map((opt) => opt.value))}
+              className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-semibold text-left border-b border-slate-100 hover:bg-slate-50 transition ${
+                selectedValues.length === options.length && options.length > 0
+                  ? "text-blue-700 bg-blue-50/70"
+                  : "text-slate-700"
+              }`}
+            >
+              <span className="w-3.5 shrink-0">
+                {selectedValues.length === options.length && options.length > 0 && (
+                  <Check size={13} className="text-blue-600" />
+                )}
+              </span>
+              <span className="truncate">{selectAllLabel}</span>
+            </button>
+          )}
+
           {/* Pinned "clear all" row */}
           <button
             type="button"
@@ -384,7 +407,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
           </button>
 
           <ul
-            className="overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
+            className="overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-200"
             style={{ maxHeight: `${LIST_MAX_HEIGHT}px` }}
           >
             {filtered(options).map((option) => {

@@ -10,10 +10,21 @@ interface Props {
   onPDF: (row: ShopDeliveryWithExtra) => void;
 }
 
+/** Soft, low-eye-strain tints for box-number chips in the card. */
+const BOX_CHIP_PALETTE = [
+  "bg-slate-100 text-slate-700 border-slate-200",
+  "bg-sky-50 text-sky-700 border-sky-100",
+  "bg-indigo-50 text-indigo-700 border-indigo-100",
+  "bg-teal-50 text-teal-700 border-teal-100",
+  "bg-amber-50 text-amber-700 border-amber-100",
+  "bg-rose-50 text-rose-700 border-rose-100",
+];
+
 export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props) {
   const { t } = useI18n();
   const isWeightMode = row.deliveryMode === "weight";
   const selectedBoxes = row.selectedBoxIds || [];
+  const manyBoxes = selectedBoxes.length > 30;
   const mortalityCount = row.mortality ?? 0;
   const mortKg = row.mortKg ?? 0;
   const display = (value: string | number | null | undefined) => {
@@ -23,16 +34,7 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
 
   return (
     <div className="group relative overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm hover:shadow-md transition-all duration-200 flex flex-col">
-      {/* Top accent strip — box (blue) / weight (purple) */}
-      <span
-        className={`absolute inset-x-0 top-0 h-1 ${
-          isWeightMode
-            ? "bg-gradient-to-r from-purple-500 to-fuchsia-500"
-            : "bg-gradient-to-r from-blue-500 to-sky-500"
-        }`}
-      />
-
-      <div className="p-3 flex flex-col gap-2.5 flex-1 pt-4">
+      <div className="p-3 flex flex-col gap-2.5 flex-1">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
@@ -123,15 +125,21 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
         )}
 
         {selectedBoxes.length > 0 && (
-          <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-100/70 rounded-md border border-slate-200/40 text-[10px] overflow-x-auto no-scrollbar">
+          <div
+            className={`flex items-center gap-1.5 px-2 py-1.5 bg-slate-100/70 rounded-md border border-slate-200/40 overflow-x-auto no-scrollbar ${
+              manyBoxes ? "text-[9px]" : "text-[10px]"
+            }`}
+          >
             <span className="text-slate-400 font-semibold flex items-center gap-1 shrink-0 text-[9px] uppercase">
               <Package size={11} className="text-slate-500" /> {t("ops.trip.box_nos")}:
             </span>
-            <div className="flex items-center gap-1 flex-wrap">
-              {selectedBoxes.map((id) => (
+            <div className={`flex items-center flex-wrap ${manyBoxes ? "gap-0.5" : "gap-1"}`}>
+              {selectedBoxes.map((id, idx) => (
                 <span
                   key={id}
-                  className="px-1.5 py-0.5 bg-white text-slate-700 font-bold rounded border border-slate-200/80 text-[10px] shrink-0"
+                  className={`rounded border font-bold shrink-0 ${
+                    manyBoxes ? "px-1 py-px text-[9px]" : "px-1.5 py-0.5 text-[10px]"
+                  } ${BOX_CHIP_PALETTE[idx % BOX_CHIP_PALETTE.length]}`}
                 >
                   #{id}
                 </span>
