@@ -182,18 +182,18 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   }, [location.search, loadTripFromApi, trip.id]);
 
   useEffect(() => {
+    // Success toast is now emitted centrally in useTripEntry (every submit/update).
     registerStep2SuccessCallback(() => {
-      showNotification(t("ops.trip.step2_submitted"), "success");
       // Trip ID is already in URL. Stay on the form; maxAllowedStep advances to Step 3.
     });
-  }, [registerStep2SuccessCallback, showNotification]);
+  }, [registerStep2SuccessCallback]);
 
   useEffect(() => {
+    // Success toast is now emitted centrally in useTripEntry (every submit/update).
     registerStep3SuccessCallback(() => {
-      showNotification(t("ops.trip.step3_submitted"), "success");
       // Trip ID is already in URL. Stay on the form; maxAllowedStep advances to Step 4.
     });
-  }, [registerStep3SuccessCallback, showNotification]);
+  }, [registerStep3SuccessCallback]);
 
   useEffect(() => {
     registerStep4SuccessCallback(() => {
@@ -339,11 +339,11 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   // and let Recent Trips pick up the saved trip (onTripsChanged). Resume
   // from Recent to continue Farm / Pickup / Delivery / Diesel.
   useEffect(() => {
+    // Success toast is now emitted centrally in useTripEntry (every submit/update).
     registerStep1SuccessCallback(() => {
-      showNotification(t("ops.trip.step1_submitted"), "success");
       clearForm();
     });
-  }, [registerStep1SuccessCallback, showNotification, t, clearForm]);
+  }, [registerStep1SuccessCallback, clearForm]);
 
   /**
    * Bottom "Cancel" on any step = DISCARD unsaved local edits only.

@@ -161,6 +161,7 @@ export function useTripEntry(
       // form before Create New Trip. Recent is refreshed via onTripsChanged.
       // Working fields stay as typed until the success callback resets them.
       onTripsChangedRef.current?.();
+      notifyRef.current?.(translate("ops.trip.step1_submitted"), "success");
       onStep1SuccessRef.current?.(submitted);
       return true;
     } catch (error) {
@@ -197,6 +198,7 @@ export function useTripEntry(
         startStepSubmitted: true,
       });
       applySavedTrip(submitted);
+      notifyRef.current?.(translate("ops.trip.step1_submitted"), "success");
       return true;
     } catch (error) {
       notifyRef.current?.(handleApiError(error), "error");
@@ -234,6 +236,7 @@ export function useTripEntry(
         farmStepSubmitted: true,
       });
       applySavedTrip(submitted);
+      notifyRef.current?.(translate("ops.trip.step2_submitted"), "success");
       if (!wasSubmitted) {
         onStep2SuccessRef.current?.(submitted);
       }
@@ -359,6 +362,7 @@ export function useTripEntry(
     try {
       const submitted = await submitTripStep(current.id, "pickup", updatedData);
       applySavedTrip(submitted);
+      notifyRef.current?.(translate("ops.trip.step3_submitted"), "success");
       if (!wasSubmitted) {
         onStep3SuccessRef.current?.(submitted);
       }
@@ -396,6 +400,7 @@ export function useTripEntry(
     try {
       const submitted = await submitTripStep(current.id, "deliveries", current);
       applySavedTrip(submitted);
+      notifyRef.current?.(translate("ops.trip.step4_submitted"), "success");
       if (!wasSubmitted) {
         onStep4SuccessRef.current?.(submitted);
       }
@@ -473,6 +478,7 @@ export function useTripEntry(
       });
       applySavedTrip(submitted);
       setEndStepSubmitted(true);
+      notifyRef.current?.(translate("ops.trip.step5_submitted"), "success");
       return true;
     } catch (error) {
       console.error("Unable to submit end details:", error);

@@ -36,6 +36,8 @@ function TripRecentTable({
 }: Props) {
   const { t } = useI18n();
   const safeTrips = uniqueTripsById(Array.isArray(trips) ? trips : []);
+  /** Total record count shown as its own badge, outside the status toggle. */
+  const totalRecords = safeTrips.length;
 
   /** Translate, but never surface a raw i18n key: returns "" when the key is missing. */
   const tSafe = (key: string, params?: Record<string, string | number>) => {
@@ -112,10 +114,6 @@ function TripRecentTable({
   const allDraft = sortedTrips.filter((t) => !t.deleted && t.status === "Draft");
   const allPending = sortedTrips.filter((t) => !t.deleted && t.status === "Pending");
   const allDeleted = sortedTrips.filter((t) => t.deleted === true || t.status === "Deleted");
-
-  const draftCount = allDraft.length;
-  const pendingCount = allPending.length;
-  const deletedCount = allDeleted.length;
 
   let filteredTrips: Trip[] = [];
   if (statusFilter === "Draft") filteredTrips = allDraft;
@@ -239,22 +237,28 @@ function TripRecentTable({
               <h3 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.recent_trip_activity")}</h3>
             </div>
 
-            {/* Status toggle — light colour, beside the table title */}
-            <div className="bg-slate-100/80 p-1 rounded-xl flex items-center gap-1 border border-slate-200/60">
+            {/* Total record count — its own badge, before the status toggle */}
+            <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-full shadow-sm">
+              {totalRecords}
+            </span>
+
+            {/* Status toggle — segmented control matching LatestMaintenanceTable */}
+            <div className="flex items-center p-0.5 ml-2 border border-slate-200/80 rounded-lg overflow-hidden bg-slate-50 shadow-sm">
               {(["Draft", "Pending", "Deleted"] as const).map((tab) => {
                 const isActive = statusFilter === tab;
-                let count = 0, Icon = FileText;
-                let activeClass = "bg-emerald-100 text-emerald-700 border-emerald-200";
-                let activeIcon = "text-emerald-600";
-                let inactiveIcon = "text-emerald-400";
-                if (tab === "Draft") { count = draftCount; Icon = FileText; activeClass = "bg-emerald-100 text-emerald-700 border-emerald-200"; activeIcon = "text-emerald-600"; inactiveIcon = "text-emerald-400"; }
-                if (tab === "Pending") { count = pendingCount; Icon = Clock; activeClass = "bg-orange-100 text-orange-700 border-orange-200"; activeIcon = "text-orange-500"; inactiveIcon = "text-orange-400"; }
-                if (tab === "Deleted") { count = deletedCount; Icon = AlertCircle; activeClass = "bg-red-100 text-red-700 border-red-200"; activeIcon = "text-red-500"; inactiveIcon = "text-red-400"; }
+                const activeClass =
+                  tab === "Draft"
+                    ? "bg-emerald-100 text-emerald-700 shadow-sm"
+                    : tab === "Pending"
+                    ? "bg-orange-100 text-orange-700 shadow-sm"
+                    : "bg-rose-100 text-rose-700 shadow-sm";
                 return (
-                  <button key={tab} onClick={() => setStatusFilter(tab)} className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-1 ${isActive ? `${activeClass} shadow-sm border` : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"}`}>
-                    <Icon size={11} className={isActive ? activeIcon : inactiveIcon} />
-                    <span>{(() => { const k = "status." + tab.toLowerCase(); const label = t(k); return label === k ? tab : label; })()}</span>
-                    <span className={`ml-0.5 px-1 py-0.2 rounded-full text-[10px] ${isActive ? "bg-white/80 text-slate-600" : "bg-slate-200/60 text-slate-500"}`}>{count}</span>
+                  <button
+                    key={tab}
+                    onClick={() => setStatusFilter(tab)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${isActive ? activeClass : "bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"}`}
+                  >
+                    {(() => { const k = "status." + tab.toLowerCase(); const label = t(k); return label === k ? tab : label; })()}
                   </button>
                 );
               })}
