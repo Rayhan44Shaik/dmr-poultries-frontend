@@ -6,17 +6,16 @@ import { useRef } from "react";
 import React, { useState, useEffect, useMemo } from "react";
 import { 
   Plus, Clock, Building2, Users, Scale, AlertCircle, Search, X, 
-  LayoutGrid, BarChart2,
-  AlertTriangle, Package
+  AlertTriangle, FileText, Box
 } from "lucide-react";
-import jsPDF from "jspdf";
 import TripPagination from "../TripPagination";
 import { shouldShowPagination } from "../../../../../shared/ui/paginationStyles";
 import { useShopDeliveryForm, EMPTY_DELIVERY_FORM } from "./useShopDeliveryForm";
 import ShopDeliveryForm from "./ShopDeliveryForm";
 import ShopDeliveryCard from "./ShopDeliveryCard";
 import { generateShopPDF } from "../../utils/generateShopPDF";
-import { assignedShopIdsFromRows, pendingBoxesFromRows, pendingShopsFromRows } from "./remainingBoxes";
+import { generateShopsDeliveryReportPDF, generateBoxesDeliveryReportPDF } from "../../utils/generateDeliveryReportsPDF";
+import { assignedShopIdsFromRows } from "./remainingBoxes";
 import { computeDeliveryKpiTotals } from "./deliveryKpis";
 import type { DeliveriesBalanceError } from "../../../../../shared/trip/validation";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
@@ -40,8 +39,6 @@ interface Props {
   supervisorName?: string;
   supervisorPhone?: string;
   tripDate?: string;
-  viewMode?: "shop" | "box";
-  onViewModeChange?: (mode: "shop" | "box") => void;
   stepNumber?: number | string;
   updateDeliveries?: (rows: ShopDelivery[], persist?: boolean, silent?: boolean) => void;
   saveDeliveries?: () => Promise<boolean>;
@@ -178,8 +175,6 @@ export default function UnLoadingTable({
   supervisorName = "",
   supervisorPhone = "",
   tripDate = "",
-  viewMode = "shop",
-  onViewModeChange,
   stepNumber: _stepNumber = 4,
   updateDeliveries,
   saveDeliveries,
@@ -273,11 +268,6 @@ export default function UnLoadingTable({
   }, [editingShopId, safeRows]);
 
   // ─── Filter Pending Boxes ───────────────────────────────────────
-  const pendingBoxes = useMemo(
-    () => pendingBoxesFromRows(safeBoxDetails, safeRows),
-    [safeRows, safeBoxDetails]
-  );
-  const pendingShops = useMemo(() => pendingShopsFromRows(safeRows), [safeRows]);
   const assignedShopIds = useMemo(() => assignedShopIdsFromRows(safeRows), [safeRows]);
 
   // ─── Balance Error Panel visibility (shown after a blocked submit) ──
@@ -287,138 +277,40 @@ export default function UnLoadingTable({
     if (balanceError == null) setShowBalanceError(false);
   }, [balanceError, safeRows, safeBoxDetails]);
 
-  // ─── PDF Export for Pending Boxes ─────────────────────────────
-  const handleDownloadPendingBoxesPDF = () => {
-    if (pendingBoxes.length === 0) {
-      setToast({ message: t("ops.trip.no_pending_boxes_pdf"), type: "warning" });
-      return;
-    }
+  // ─── Step 4 PDF exports (separate Shop + Box reports) ───────────
+  const reportContext = {
+    tripNo,
+    tripDate,
+    vehicleNo,
+    supervisorName,
+  };
 
-    const doc = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
-    const totalWeight = pendingBoxes.reduce((sum, box: any) => sum + Number(box.weight ?? box.netWeight ?? 0), 0);
-    const totalBirds = pendingBoxes.reduce((sum, box: any) => sum + Number(box.birds ?? box.birdsCount ?? 0), 0);
-
-    const startX = 10;
-    const totalWidth = 190;
-    const blockGap = 4;
-    const blockWidth = (totalWidth - blockGap * 2) / 3;
-
-    const colBoxW = 16;
-    const colBirdsW = 18;
-
-    const headerTopY = 29;
-    const headerHeight = 7;
-    const headerBottomY = headerTopY + headerHeight;
-    const rowHeight = 6.8;
-    const maxRowsPerPage = 33;
-    const maxItemsPerPage = maxRowsPerPage * 3;
-
-    const totalPages = Math.ceil(pendingBoxes.length / maxItemsPerPage);
-
-    const drawPageHeader = (pageNumber: number) => {
-      const titleX = 10;
-      doc.setTextColor(15, 23, 42);
-      doc.setFont("Helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text("PENDING BOXES FOR DELIVERY", titleX, 14);
-
-      doc.setFont("Helvetica", "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(71, 85, 105);
-      doc.text(`Trip: ${tripNo || "N/A"}  |  Vehicle: ${vehicleNo || "N/A"}  |  Date: ${tripDate || new Date().toLocaleDateString()}`, titleX, 20);
-
-      doc.setFont("Helvetica", "bold");
-      doc.setFontSize(8.5);
-      doc.setTextColor(15, 23, 42);
-      doc.text(`Total: ${pendingBoxes.length} Boxes | ${totalBirds} Birds | ${totalWeight.toFixed(2)} kg`, 200, 14, { align: "right" });
-
-      doc.setFont("Helvetica", "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`Page ${pageNumber} of ${totalPages}`, 200, 20, { align: "right" });
-
-      doc.setDrawColor(203, 213, 225);
-      doc.setLineWidth(0.4);
-      doc.line(10, 26, 200, 26);
-
-      for (let b = 0; b < 3; b++) {
-        const bX = startX + b * (blockWidth + blockGap);
-        doc.setFillColor(241, 245, 249);
-        doc.rect(bX, headerTopY, blockWidth, headerHeight, "F");
-
-        doc.setFont("Helvetica", "bold");
-        doc.setFontSize(8);
-        doc.setTextColor(51, 65, 85);
-
-        const labelY = headerTopY + 4.8;
-        doc.text("BOX", bX + colBoxW / 2, labelY, { align: "center" });
-        doc.text("BIRDS", bX + colBoxW + colBirdsW / 2, labelY, { align: "center" });
-        doc.text("WT(KG)", bX + blockWidth - 4, labelY, { align: "right" });
-      }
-
-      doc.setDrawColor(203, 213, 225);
-      doc.setLineWidth(0.3);
-      doc.line(10, headerBottomY, 200, headerBottomY);
-    };
-
-    for (let page = 0; page < totalPages; page++) {
-      if (page > 0) doc.addPage();
-      drawPageHeader(page + 1);
-
-      const pageItems = pendingBoxes.slice(page * maxItemsPerPage, (page + 1) * maxItemsPerPage);
-      const totalRowsOnPage = Math.ceil(pageItems.length / 3);
-      const contentEndY = headerBottomY + totalRowsOnPage * rowHeight;
-
-      pageItems.forEach((box: any, i: number) => {
-        const r = Math.floor(i / 3);
-        const b = i % 3;
-
-        const bX = startX + b * (blockWidth + blockGap);
-        const rowTopY = headerBottomY + r * rowHeight;
-        const textY = rowTopY + 4.6;
-
-        if (r % 2 === 1) {
-          doc.setFillColor(248, 250, 252);
-          doc.rect(bX, rowTopY, blockWidth, rowHeight, "F");
-        }
-
-        doc.setDrawColor(241, 245, 249);
-        doc.setLineWidth(0.2);
-        doc.line(bX, rowTopY + rowHeight, bX + blockWidth, rowTopY + rowHeight);
-
-        doc.setDrawColor(226, 232, 240);
-        doc.setLineWidth(0.15);
-        doc.line(bX + colBoxW, rowTopY, bX + colBoxW, rowTopY + rowHeight);
-        doc.line(bX + colBoxW + colBirdsW, rowTopY, bX + colBoxW + colBirdsW, rowTopY + rowHeight);
-
-        const boxNo = String(box.boxNo ?? box.id ?? i + 1);
-        const birdsVal = String(box.birds ?? box.birdsCount ?? "-");
-        const weightVal = Number(box.weight ?? box.netWeight ?? 0).toFixed(2);
-
-        doc.setFont("Helvetica", "normal");
-        doc.setFontSize(8.5);
-        doc.setTextColor(51, 65, 85);
-        doc.text(boxNo, bX + colBoxW / 2, textY, { align: "center" });
-
-        doc.setFont("Helvetica", "normal");
-        doc.setTextColor(51, 65, 85);
-        doc.text(birdsVal, bX + colBoxW + colBirdsW / 2, textY, { align: "center" });
-
-        doc.setFont("Helvetica", "bold");
-        doc.setTextColor(15, 23, 42);
-        doc.text(weightVal, bX + blockWidth - 4, textY, { align: "right" });
+  const handleDownloadShopsPDF = async () => {
+    try {
+      await generateShopsDeliveryReportPDF({
+        rows: safeRows,
+        shops: safeShops,
+        context: reportContext,
       });
-
-      doc.setDrawColor(148, 163, 184);
-      doc.setLineWidth(0.6);
-      const sep1X = startX + blockWidth + blockGap / 2;
-      const sep2X = startX + 2 * blockWidth + (1.5 * blockGap);
-      doc.line(sep1X, headerTopY, sep1X, contentEndY);
-      doc.line(sep2X, headerTopY, sep2X, contentEndY);
+      setToast({ message: t("ops.trip.shops_pdf_ok"), type: "success" });
+    } catch (error: any) {
+      console.error("Shops report failed:", error);
+      setToast({ message: t("ops.trip.failed_pdf_report"), type: "error" });
     }
+  };
 
-    doc.save(`Pending_Boxes_${tripNo || "Report"}.pdf`);
-    setToast({ message: t("ops.trip.pending_boxes_pdf_ok"), type: "success" });
+  const handleDownloadBoxesPDF = async () => {
+    try {
+      await generateBoxesDeliveryReportPDF({
+        boxDetails: safeBoxDetails,
+        deliveries: safeRows,
+        context: reportContext,
+      });
+      setToast({ message: t("ops.trip.boxes_pdf_ok"), type: "success" });
+    } catch (error: any) {
+      console.error("Boxes report failed:", error);
+      setToast({ message: t("ops.trip.failed_pdf_report"), type: "error" });
+    }
   };
 
   // ─── Manual Save Progress Handler ──────────────────────────────
@@ -870,33 +762,6 @@ export default function UnLoadingTable({
       {/* ─── SEARCH & ACTION HEADER ─── */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pb-3 border-b border-slate-100">
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto flex-1">
-          {onViewModeChange && (
-            <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200/80 shrink-0">
-              <button
-                onClick={() => onViewModeChange("shop")}
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                  viewMode === "shop"
-                    ? "bg-white text-emerald-700 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <LayoutGrid size={13} />
-                {t("ops.trip.shop_view")}
-              </button>
-              <button
-                onClick={() => onViewModeChange("box")}
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                  viewMode === "box"
-                    ? "bg-white text-emerald-700 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <BarChart2 size={13} />
-                {t("ops.trip.box_analysis")}
-              </button>
-            </div>
-          )}
-
           {/* Search Bar */}
           <div className="relative w-full sm:w-64 max-w-xs">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -923,14 +788,21 @@ export default function UnLoadingTable({
         {/* Right Side Header Actions */}
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
           <button
-            onClick={handleDownloadPendingBoxesPDF}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 text-emerald-800 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
-            title={t("ops.trip.download_pending_boxes_pdf")}
+            onClick={handleDownloadShopsPDF}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 text-blue-800 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
+            title={t("ops.trip.shops_pdf_title")}
           >
-            <Package size={15} className="text-emerald-600" />
-            <span>{t("ops.trip.shops")} ({pendingShops})</span>
-            <span className="text-emerald-400">·</span>
-            <span>{t("ops.trip.boxes")} ({pendingBoxes.length})</span>
+            <FileText size={15} className="text-blue-600" />
+            <span>{t("ops.trip.shops")} ({safeRows.length})</span>
+          </button>
+
+          <button
+            onClick={handleDownloadBoxesPDF}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 text-emerald-800 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
+            title={t("ops.trip.boxes_pdf_title")}
+          >
+            <Box size={15} className="text-emerald-600" />
+            <span>{t("ops.trip.boxes")} ({safeBoxDetails.length})</span>
           </button>
 
           {!readOnly && !showForm && (

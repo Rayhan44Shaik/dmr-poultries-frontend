@@ -1,11 +1,8 @@
 import React, { useState, useMemo } from "react";
 import {
   Lock,
-  LayoutGrid,
-  BarChart3,
   Pencil } from "lucide-react";
 import UnLoadingTable from "./Step_4";
-import BoxWeightAnalysis from "./Step_4/BoxWeightAnalysis";
 import type { ShopDelivery, Trip, BoxDetail } from "../types/trip";
 import { getDeliveriesBalanceError } from "../../../../shared/trip/validation";
 import { StepCloseButton } from "./WizardStepUI";
@@ -47,8 +44,6 @@ export default function StepDeliveries({
   persistedDeliveries,
 }: Props) {
   const { t } = useI18n();
-  // Toggle view mode: 'shops' | 'analysis'
-  const [viewMode, setViewMode] = useState<"shops" | "analysis">("shops");
 
   // Step-level edit mode
   const [isStepEditing, setIsStepEditing] = useState(false);
@@ -132,32 +127,6 @@ export default function StepDeliveries({
         <div className="flex items-center gap-2 flex-wrap shrink-0">
           {/* Part E: no top-right X — the bottom action bar Cancel is the only
               cancel affordance in first-submit / Edit mode. */}
-          {/* VIEW MODE TOGGLE BUTTONS */}
-          <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200/60">
-            <button
-              type="button"
-              onClick={() => setViewMode("shops")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                viewMode === "shops"
-                  ? "bg-white text-blue-700 shadow-xs font-bold"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <LayoutGrid size={13} /> {t("ops.trip.shop_view")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("analysis")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                viewMode === "analysis"
-                  ? "bg-white text-blue-700 shadow-xs font-bold"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <BarChart3 size={13} /> {t("ops.trip.box_analysis")}
-            </button>
-          </div>
-
           {isLocked ? (
             <div className="flex items-center gap-2">
               {canEdit && (
@@ -184,45 +153,32 @@ export default function StepDeliveries({
       </div>
 
       {/* Main Content View */}
-      {viewMode === "shops" ? (
-        <UnLoadingTable
-          rows={rows}
-          setRows={setRows}
-          shops={shops}
-          birdTypes={birdTypes}
-          boxDetails={boxDetails}
-          readOnly={isLocked}
-          isSubmitted={trip.deliveryStepSubmitted}
-          editingShopId={editingShopId}
-          onEditShop={handleStartEditShop}
-          onCancelEdit={handleCancelStepEdit}
-          onSaveRow={handleSaveRow}
-          tripNo={trip.tripNo}
-          vehicleNo={trip.vehicleNo}
-          supervisorName={trip.supervisorName}
-          supervisorPhone=""
-          tripDate={trip.tripDate}
-          updateDeliveries={updateDeliveries}
-          saveDeliveries={saveDeliveriesProgress ? async () => saveDeliveriesProgress(rows) : undefined}
-          submitDeliveries={handleLockDeliveries}
-          onClose={handleCancelWizard}
-          persistedRows={persistedDeliveries ?? []}
-          balanceError={validationResult.balanceError}
-          tripBirdTypeId={trip.birdTypeId}
-          tripBirdType={trip.birdType}
-        />
-      ) : (
-        <BoxWeightAnalysis
-          boxDetails={boxDetails}
-          deliveries={rows}
-          dcWeight={trip.dcWeight}
-          totalFarmBirds={trip.totalBirds}
-          tripNo={trip.tripNo}
-          vehicleNo={trip.vehicleNo}
-          supervisorName={trip.supervisorName}
-          tripDate={trip.tripDate}
-        />
-      )}
+      <UnLoadingTable
+        rows={rows}
+        setRows={setRows}
+        shops={shops}
+        birdTypes={birdTypes}
+        boxDetails={boxDetails}
+        readOnly={isLocked}
+        isSubmitted={trip.deliveryStepSubmitted}
+        editingShopId={editingShopId}
+        onEditShop={handleStartEditShop}
+        onCancelEdit={handleCancelStepEdit}
+        onSaveRow={handleSaveRow}
+        tripNo={trip.tripNo}
+        vehicleNo={trip.vehicleNo}
+        supervisorName={trip.supervisorName}
+        supervisorPhone=""
+        tripDate={trip.tripDate}
+        updateDeliveries={updateDeliveries}
+        saveDeliveries={saveDeliveriesProgress ? async () => saveDeliveriesProgress(rows) : undefined}
+        submitDeliveries={handleLockDeliveries}
+        onClose={handleCancelWizard}
+        persistedRows={persistedDeliveries ?? []}
+        balanceError={validationResult.balanceError}
+        tripBirdTypeId={trip.birdTypeId}
+        tripBirdType={trip.birdType}
+      />
     </div>
   );
 }

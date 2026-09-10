@@ -44,10 +44,10 @@ const PORT = Number(process.env.MOCK_BACKEND_PORT ?? 4000);
 
 // ── Sample masters ───────────────────────────────────────────────────────────
 const SHOPS = [
-  { id: 1, shopNo: 1, shopNumber: "SHP-001", shopName: "Sri Balaji Poultry Traders", ownerName: "Ramesh K", city: "Hyderabad", status: "Active" },
-  { id: 2, shopNo: 2, shopNumber: "SHP-002", shopName: "Venkatadri Egg Suppliers", ownerName: "Suresh M", city: "Hyderabad", status: "Active" },
-  { id: 3, shopNo: 3, shopNumber: "SHP-003", shopName: "Annapurna Farms Outlet", ownerName: "Lakshmi D", city: "Secunderabad", status: "Active" },
-  { id: 4, shopNo: 4, shopNumber: "SHP-004", shopName: "Kakatiya Poultry Point", ownerName: "Prasad R", city: "Warangal", status: "Active" },
+  { id: 1, shopNo: 1, shopNumber: "SHP-001", shopName: "Sri Balaji Poultry Traders", ownerName: "Ramesh K", city: "Hyderabad", village: "Ameerpet", mobile: "9848012345", phoneNumber: "9848012345", status: "Active" },
+  { id: 2, shopNo: 2, shopNumber: "SHP-002", shopName: "Venkatadri Egg Suppliers", ownerName: "Suresh M", city: "Hyderabad", village: "Kukatpally", mobile: "9848023456", phoneNumber: "9848023456", status: "Active" },
+  { id: 3, shopNo: 3, shopNumber: "SHP-003", shopName: "Annapurna Farms Outlet", ownerName: "Lakshmi D", city: "Secunderabad", village: "Begumpet", mobile: "9848034567", phoneNumber: "9848034567", status: "Active" },
+  { id: 4, shopNo: 4, shopNumber: "SHP-004", shopName: "Kakatiya Poultry Point", ownerName: "Prasad R", city: "Warangal", village: "Hanamkonda", mobile: "9848045678", phoneNumber: "9848045678", status: "Active" },
 ];
 
 const EMPLOYEES = [
@@ -1212,6 +1212,13 @@ function buildWalkthroughTrips({ stamp, today, yesterday }) {
       // Roomy sample capacity for box-add testing (farmStepDetails default is 12).
       vehicleBoxCapacity: 30,
       farmStepSubmitted: true,
+      // Shop list captured from the Orders assignment plan ([ORDER] rows) —
+      // Step 4 shows these shops so the supervisor can capture each delivery.
+      deliveries: [
+        planRow(1, 1, 15, 260),
+        planRow(2, 2, 10, 170),
+        planRow(3, 3, 5, 90),
+      ],
     }),
     // 9304 · Steps 1–4 submitted (shops 1+3 delivered with rates) →
     // "Resume: End Trip / Expenses (Step 5)" — closing meter, tolls, meals.
@@ -1495,18 +1502,37 @@ function applyDeliveriesPayload(tripId, body) {
     TRIPS.push(trip);
   }
   const rows = Array.isArray(body.deliveries) ? body.deliveries : [];
-  trip.deliveries = rows.map((row, index) => ({
-    mortality: 0,
-    mortKg: 0,
-    amount: 0,
-    deliveryMode: "box",
-    autoCaptureTime: null,
-    ...row,
-    id: index + 1,
-    serialNo: Number(row.serialNo) || index + 1,
-    boxNo: Number(row.boxNo) || 0,
-    selectedBoxIds: Array.isArray(row.selectedBoxIds) ? row.selectedBoxIds : [],
-  }));
+  // Preserve previously captured times (keyed by clientKey / shop+serial), and
+  // stamp newly captured deliveries the same way the real backend would — at
+  // first capture. Pure `[ORDER]` plan rows stay un-captured (null).
+  const prev = Array.isArray(trip.deliveries) ? trip.deliveries : [];
+  const prevTime = new Map();
+  prev.forEach((r) => {
+    if (!r.autoCaptureTime) return;
+    prevTime.set(r.clientKey ?? `${r.shopId}-${r.serialNo}`, r.autoCaptureTime);
+  });
+  trip.deliveries = rows.map((row, index) => {
+    const base = {
+      mortality: 0,
+      mortKg: 0,
+      amount: 0,
+      deliveryMode: "box",
+      ...row,
+      id: index + 1,
+      serialNo: Number(row.serialNo) || index + 1,
+      boxNo: Number(row.boxNo) || 0,
+      selectedBoxIds: Array.isArray(row.selectedBoxIds) ? row.selectedBoxIds : [],
+    };
+    if (!base.autoCaptureTime) {
+      const key = base.clientKey ?? `${base.shopId}-${base.serialNo}`;
+      base.autoCaptureTime = prevTime.has(key)
+        ? prevTime.get(key)
+        : String(base.remarks ?? "").trim().startsWith("[ORDER]")
+          ? null
+          : istStamp();
+    }
+    return base;
+  });
   if (body.startStepSubmitted === true) trip.startStepSubmitted = true;
   if (body.mode === "submit") trip.deliveryStepSubmitted = true;
   if (typeof body.remarks === "string") trip.remarks = body.remarks;
