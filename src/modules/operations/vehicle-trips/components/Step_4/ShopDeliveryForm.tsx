@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
+  ChevronLeft,
+  ChevronRight,
   ShoppingCart,
   Bird,
   Box,
@@ -47,7 +49,7 @@ export interface Props {
   handleBirdSelect: (selected: any) => void;
   handleBoxSelection: (ids: number[]) => void;
   handleFormChange: (field: string, value: any) => void;
-  handlePerBoxChange: (index: number, field: "birds" | "weight", value: number) => void;
+  handlePerBoxChange: (index: number, field: "birds" | "weight" | "mortality" | "mortalityWeight", value: number) => void;
 
   shopOptions: any[];
   birdOptions: any[];
@@ -154,6 +156,16 @@ export default function ShopDeliveryForm({
   const { t } = useI18n();
   const selectedBoxIds: number[] = formData.selectedBoxIds || [];
   const isEditing = editingId !== null;
+
+  // Weight-mode per-box table pagination — 5 boxes per page.
+  const BOXES_PER_PAGE = 5;
+  const [boxPage, setBoxPage] = useState(0);
+  const perBoxData = formData.perBoxData || [];
+  const totalBoxPages = Math.max(1, Math.ceil(perBoxData.length / BOXES_PER_PAGE));
+  const pageBoxData = perBoxData.slice(boxPage * BOXES_PER_PAGE, (boxPage + 1) * BOXES_PER_PAGE);
+  useEffect(() => {
+    if (boxPage >= totalBoxPages) setBoxPage(Math.max(0, totalBoxPages - 1));
+  }, [boxPage, totalBoxPages]);
 
   // Wizard-native (Salary-Register / Shop-Register style) dropdown options —
   // the same searchable dropdowns used by Step 1 / Step 2.
@@ -461,10 +473,27 @@ export default function ShopDeliveryForm({
                         {t("ops.trip.delivered_weight_kg")} <span className="text-rose-500">*</span>
                       </span>
                     </th>
+                    <th className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-5 w-5 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                          <AlertCircle size={12} />
+                        </span>
+                        {t("ops.trip.mortality_birds")}
+                      </span>
+                    </th>
+                    <th className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-5 w-5 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                          <Scale size={12} />
+                        </span>
+                        {t("ops.trip.mortality_weight_kg")}
+                      </span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {formData.perBoxData.map((item: any, index: number) => {
+                  {pageBoxData.map((item: any, i: number) => {
+                    const index = boxPage * BOXES_PER_PAGE + i;
                     const farmBox = safeBoxDetails.find((b) => b.boxNo === item.boxNo);
                     const birdsError = validationErrors.perBoxBirdsErrors[index] || false;
                     const weightError = validationErrors.perBoxWeightErrors[index] || false;
@@ -510,6 +539,35 @@ export default function ShopDeliveryForm({
                             }`}
                           />
                         </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number"
+                            value={item.mortality || ""}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              const parsed = raw === "" ? 0 : Number(raw);
+                              handlePerBoxChange(index, "mortality", Number.isFinite(parsed) ? parsed : 0);
+                            }}
+                            placeholder="0"
+                            min="0"
+                            className="w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none transition-all no-spinner focus:border-rose-400 focus:ring-2 focus:ring-rose-200"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.mortalityWeight || ""}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              const parsed = raw === "" ? 0 : Number(raw);
+                              handlePerBoxChange(index, "mortalityWeight", Number.isFinite(parsed) ? parsed : 0);
+                            }}
+                            placeholder="0.00"
+                            min="0"
+                            className="w-24 rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none transition-all no-spinner focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+                          />
+                        </td>
                       </tr>
                     );
                   })}
@@ -517,78 +575,32 @@ export default function ShopDeliveryForm({
               </table>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Farm — birds above weight */}
-              <div className="space-y-3">
-                <SimpleMetric
-                  icon={Bird}
-                  tone="bg-sky-50 text-sky-600"
-                  tint="bg-sky-50/50 border-sky-100"
-                  label={t("ops.trip.farm_birds")}
-                  value={farmBirds}
-                />
-                <SimpleMetric
-                  icon={Scale}
-                  tone="bg-blue-50 text-blue-600"
-                  tint="bg-blue-50/50 border-blue-100"
-                  label={t("ops.trip.farm_weight_kg")}
-                  value={farmWeight.toFixed(2)}
-                />
-              </div>
-
-              {/* Delivered — birds above weight */}
-              <div className="space-y-3">
-                <SimpleMetric
-                  icon={Truck}
-                  tone="bg-emerald-50 text-emerald-600"
-                  tint="bg-emerald-50/50 border-emerald-100"
-                  label={t("ops.trip.delivered_birds")}
-                  value={deliveredBirds}
-                />
-                <SimpleMetric
-                  icon={Scale}
-                  tone="bg-teal-50 text-teal-600"
-                  tint="bg-teal-50/50 border-teal-100"
-                  label={t("ops.trip.delivered_weight_kg")}
-                  value={deliveredWeight > 0 ? deliveredWeight.toFixed(2) : "0.00"}
-                />
-              </div>
-
-              {/* Mortality — birds above weight (inputs) */}
-              <div className="space-y-3">
-                <MetricTile
-                  icon={AlertCircle}
-                  tone="bg-rose-50 text-rose-600"
-                  tint="bg-rose-50/50 border-rose-100"
-                  label={t("ops.trip.mortality_birds")}
+            {/* Pagination — 5 boxes per page */}
+            {perBoxData.length > BOXES_PER_PAGE && (
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setBoxPage((p) => Math.max(0, p - 1))}
+                  disabled={boxPage === 0}
+                  className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  aria-label="Previous"
                 >
-                  <input
-                    type="number"
-                    value={formData.mortality || ""}
-                    onChange={(e) => handleFormChange("mortality", Number(e.target.value))}
-                    placeholder="0"
-                    min="0"
-                    className={neutralInputClass()}
-                  />
-                </MetricTile>
-                <MetricTile
-                  icon={Scale}
-                  tone="bg-amber-50 text-amber-600"
-                  tint="bg-amber-50/50 border-amber-100"
-                  label={t("ops.trip.mortality_weight_kg")}
+                  <ChevronLeft size={15} />
+                </button>
+                <span className="text-xs font-semibold text-slate-500 tabular-nums">
+                  {boxPage + 1} / {totalBoxPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setBoxPage((p) => Math.min(totalBoxPages - 1, p + 1))}
+                  disabled={boxPage >= totalBoxPages - 1}
+                  className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  aria-label="Next"
                 >
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.mortWeight || ""}
-                    onChange={(e) => handleFormChange("mortWeight", Number(e.target.value))}
-                    placeholder="0.00"
-                    min="0"
-                    className={neutralInputClass()}
-                  />
-                </MetricTile>
+                  <ChevronRight size={15} />
+                </button>
               </div>
-            </div>
+            )}
           </div>
         )}
 
