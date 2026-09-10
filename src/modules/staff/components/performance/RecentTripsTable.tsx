@@ -1,20 +1,22 @@
 // src/modules/staff/components/performance/RecentTripsTable.tsx
 //
-// Recent trips table for the performance detail drawer. Data comes verbatim
-// from the API's `detail.recentTrips`; this component is presentation-only and
-// fully localised (en/te) via the shared dictionary.
+// Recent trips for the performance detail drawer. Data comes verbatim from
+// the API's `detail.recentTrips`; this component is presentation-only and
+// fully localised (en/te).
 //
 // Trip race: when the page passes the selected person's row, each trip is
 // paced against that person's OWN period average (never invented thresholds):
 //   Supervisors → mortality rate / weight-loss % above their own average.
 //   Drivers     → distance below their own per-trip average.
-// Off-pace trips lead a callout strip above the table and carry an amber chip
-// in the Pace column, so the drawer answers "which trips lagged".
+// Off-pace trips lead as full DETAIL CARDS — trip number, date, vehicle,
+// complete metric tiles and a translated explanation — followed by the
+// complete table (with Pace chips) for every trip.
 
 import { memo } from 'react';
 import { format } from 'date-fns';
 import { te as teLocale } from 'date-fns/locale';
 import type { Locale } from 'date-fns';
+import { AlertTriangle } from 'lucide-react';
 import { useI18n } from '../../../../i18n';
 import { parseBusinessDate } from '../../../../utils/businessDate';
 import {
@@ -30,11 +32,12 @@ import type {
 } from '../../types/performance';
 import {
   buildTripRace,
+  formatDecimal,
   type StaffPerformanceKind,
   type TripRaceEntry,
 } from '../../utils/performanceView';
 
-const formatNumber = (value: number, digits = 0) =>
+const fmt = (value: number, digits = 0) =>
   Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: digits });
 
 interface RecentTripsTableProps {
@@ -44,17 +47,119 @@ interface RecentTripsTableProps {
   paceKind?: StaffPerformanceKind;
 }
 
-function PaceChip({ offPace, label }: { offPace: boolean; label: string }) {
+type Translate = ReturnType<typeof useI18n>['t'];
+
+function PaceChip({ offPace }: { offPace: boolean }) {
+  const { t } = useI18n();
   return (
     <span
-      className={`inline-flex items-center whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-bold ${
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-bold ${
         offPace
           ? 'border-amber-200 bg-amber-50 text-amber-700'
           : 'border-slate-200 bg-slate-50 text-slate-500'
       }`}
     >
-      {label}
+      {offPace && <AlertTriangle size={10} aria-hidden="true" />}
+      {t(offPace ? 'staff.perf.trips.pace_off' : 'staff.perf.trips.pace_on')}
     </span>
+  );
+}
+
+function tripRateTiles(trip: PerformanceRecentTrip) {
+  const mRate =
+    trip.totalBirdsDelivered > 0
+      ? (trip.totalMortality / trip.totalBirdsDelivered) * 100
+      : 0;
+  const lossPct =
+    trip.totalDeliveredWeight > 0
+      ? (trip.weightLoss / trip.totalDeliveredWeight) * 100
+      : 0;
+  return { mRate, lossPct };
+}
+
+/** Full-detail card for one off-pace trip — the "why" behind the lag. */
+function LaggingTripCard({
+  entry,
+  paceKind,
+  locale,
+  t,
+}: {
+  entry: TripRaceEntry;
+  paceKind: StaffPerformanceKind;
+  locale: Locale | undefined;
+  t: Translate;
+}) {
+  const { trip } = entry;
+  const parsed = parseBusinessDate(trip.tripDate);
+  const { mRate, lossPct } = tripRateTiles(trip);
+  const isDriver = paceKind === 'drivers';
+
+  // Five metric tiles; the lagging dimension is accent-tinted and its sub
+  // line carries the direct comparison (headline = "actual / own average").
+  const tiles: Array<{ label: string; value: string; sub?: string; accent?: boolean }> = [
+    { label: t('staff.perf.trips.col.shops'), value: fmt(trip.totalShops) },
+    { label: t('staff.perf.trips.col.birds'), value: fmt(trip.totalBirdsDelivered) },
+    {
+      label: t('staff.perf.trips.col.mortality'),
+      value: fmt(trip.totalMortality),
+      sub: `${formatDecimal(mRate, 2)}%`,
+      accent: paceKind === 'supervisors',
+    },
+    {
+      label: t('staff.perf.trips.col.weight_loss'),
+      value: `${fmt(trip.weightLoss, 1)} kg`,
+      sub: `${formatDecimal(lossPct, 2)}%`,
+      accent: paceKind === 'supervisors',
+    },
+    {
+      label: t('staff.perf.trips.col.km'),
+      value: `${fmt(trip.totalKm)} km`,
+      sub: isDriver ? entry.headline : undefined,
+      accent: isDriver,
+    },
+  ];
+
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="font-mono text-[11px] font-bold text-slate-900">{trip.tripNo}</span>
+          <span aria-hidden="true" className="text-slate-300">·</span>
+          <span className="text-[11px] font-medium text-slate-500">
+            {parsed ? format(parsed, 'dd MMM yyyy', { locale }) : '—'}
+          </span>
+          <span aria-hidden="true" className="text-slate-300">·</span>
+          <span className="text-[11px] font-semibold text-slate-600">{trip.vehicleNo}</span>
+        </div>
+        <PaceChip offPace />
+      </div>
+
+      <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-5">
+        {tiles.map((tile) => (
+          <div
+            key={tile.label}
+            className={`rounded-lg border px-2 py-1.5 ${
+              tile.accent
+                ? 'border-amber-200 bg-white'
+                : 'border-slate-100 bg-white/80'
+            }`}
+          >
+            <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+              {tile.label}
+            </div>
+            <div className="text-xs font-bold tabular-nums text-slate-900">{tile.value}</div>
+            {tile.sub && (
+              <div className="text-[10px] font-medium tabular-nums text-slate-500">{tile.sub}</div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-2 flex items-start gap-1.5 text-[11px] font-medium leading-relaxed text-amber-800">
+        <AlertTriangle size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
+        {entry.story}
+      </p>
+    </div>
   );
 }
 
@@ -63,7 +168,7 @@ const RecentTripsTable = ({ trips, paceRow, paceKind }: RecentTripsTableProps) =
   const locale: Locale | undefined = language === 'te' ? teLocale : undefined;
 
   const raceEntries: TripRaceEntry[] =
-    paceRow && paceKind ? buildTripRace(paceKind, trips, paceRow) : [];
+    paceRow && paceKind ? buildTripRace(paceKind, trips, paceRow, t) : [];
   const paceByTripNo = new Map(raceEntries.map((entry) => [entry.trip.tripNo, entry.offPace]));
   const lagging = raceEntries.filter((entry) => entry.offPace);
 
@@ -76,25 +181,22 @@ const RecentTripsTable = ({ trips, paceRow, paceKind }: RecentTripsTableProps) =
   }
 
   return (
-    <div className="space-y-2">
-      {lagging.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2.5">
+    <div className="space-y-3">
+      {paceRow && paceKind && lagging.length > 0 && (
+        <section aria-label={t('staff.perf.trips.lagging_title')} className="space-y-2">
           <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
             {t('staff.perf.trips.lagging_title')}
           </p>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {lagging.map(({ trip, headline }) => (
-              <span
-                key={trip.tripNo}
-                title={headline}
-                className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700"
-              >
-                <span className="font-mono text-[10px]">{trip.tripNo}</span>
-                <span className="text-amber-700">{headline}</span>
-              </span>
-            ))}
-          </div>
-        </div>
+          {lagging.map((entry) => (
+            <LaggingTripCard
+              key={entry.trip.tripNo}
+              entry={entry}
+              paceKind={paceKind}
+              locale={locale}
+              t={t}
+            />
+          ))}
+        </section>
       )}
 
       <div className="overflow-x-auto rounded-xl border border-slate-200">
@@ -131,15 +233,15 @@ const RecentTripsTable = ({ trips, paceRow, paceKind }: RecentTripsTableProps) =
                   <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-xs font-medium text-slate-700`}>{trip.vehicleNo}</td>
                   {paceRow && (
                     <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-center`}>
-                      <PaceChip offPace={Boolean(pace)} label={t(pace ? 'staff.perf.trips.pace_off' : 'staff.perf.trips.pace_on')} />
+                      <PaceChip offPace={Boolean(pace)} />
                     </td>
                   )}
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{formatNumber(trip.totalShops)}</td>
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{formatNumber(trip.totalBirdsDelivered)}</td>
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{formatNumber(trip.totalDeliveredWeight)}</td>
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{formatNumber(trip.totalMortality)}</td>
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{formatNumber(trip.weightLoss, 1)}</td>
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{formatNumber(trip.totalKm)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.totalShops)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.totalBirdsDelivered)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.totalDeliveredWeight)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.totalMortality)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.weightLoss, 1)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.totalKm)}</td>
                 </tr>
               );
             })}

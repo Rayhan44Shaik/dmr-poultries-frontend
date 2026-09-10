@@ -477,6 +477,7 @@ const SupervisorPerformancePage = () => {
             tooltipExtras={chartTooltipExtras}
             emptyText={t("staff.perf.weekly.empty")}
             loading={initialLoading}
+            variant="panels"
             ariaLabel={t("staff.perf.weekly.aria_supervisor", { range: appliedRangeLabel })}
           />
         </div>

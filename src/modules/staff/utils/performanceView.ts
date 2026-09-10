@@ -202,8 +202,10 @@ export type StaffPerformanceKind = "drivers" | "supervisors";
 export interface TripRaceEntry {
   trip: PerformanceRecentTrip;
   offPace: boolean;
-  /** Translated headline figures shown on the pace chip card. */
+  /** Translated headline figures shown on the pace chip. */
   headline: string;
+  /** Translated one-line explanation for the lagging-trip card. */
+  story: string;
 }
 
 function tripMortalityRate(trip: PerformanceRecentTrip): number {
@@ -222,11 +224,13 @@ function tripWeightLossPct(trip: PerformanceRecentTrip): number {
  * Pace for each recent trip (worst first). Supervisors: mortality rate and
  * weight-loss % above their own period averages. Drivers: distance below
  * their own per-trip average (the "short" trips behind a weak distance).
+ * `t` produces the translated explanation shown on the lagging-trip card.
  */
 export function buildTripRace(
   kind: StaffPerformanceKind,
   trips: readonly PerformanceRecentTrip[],
   row: DriverPerformanceRow | SupervisorPerformanceRow,
+  t: Translate,
 ): TripRaceEntry[] {
   if (trips.length === 0) return [];
   const entries: TripRaceEntry[] = trips.map((trip) => {
@@ -234,28 +238,45 @@ export function buildTripRace(
       const supervisor = row as SupervisorPerformanceRow;
       const mRate = tripMortalityRate(trip);
       const lossPct = tripWeightLossPct(trip);
+      // The row's weightLoss is an ABSOLUTE kg figure — derive the person's
+      // own loss PERCENTAGE so trip % is compared against a like-for-like %.
+      const ownLossPct =
+        supervisor.weight > 0 ? (supervisor.weightLoss / supervisor.weight) * 100 : 0;
       const off =
         (trip.totalBirdsDelivered > 0 &&
           supervisor.mortalityRate > 0 &&
           mRate > supervisor.mortalityRate) ||
         (trip.totalDeliveredWeight > 0 &&
-          supervisor.weightLoss > 0 &&
-          lossPct > supervisor.weightLoss);
+          ownLossPct > 0 &&
+          lossPct > ownLossPct);
       return {
         trip,
         offPace: off,
         headline: `${formatDecimal(mRate, 2)}% · ${formatDecimal(lossPct, 2)}%`,
+        story: t("staff.perf.trips.sup_story", {
+          m: formatDecimal(mRate, 2),
+          pm: formatDecimal(supervisor.mortalityRate, 2),
+          l: formatDecimal(lossPct, 2),
+          pl: formatDecimal(ownLossPct, 2),
+        }),
       };
     }
     const driver = row as DriverPerformanceRow;
     const avg = driver.avgDistancePerTrip;
+    const off = avg > 0 && trip.totalKm < avg;
+    const pct = off ? Math.round((1 - trip.totalKm / avg) * 100) : 0;
     return {
       trip,
-      offPace: avg > 0 && trip.totalKm < avg,
+      offPace: off,
       headline:
         avg > 0
           ? `${formatCount(trip.totalKm)} / ${formatDecimal(avg, 0)} km`
           : `${formatCount(trip.totalKm)} km`,
+      story: t("staff.perf.trips.driver_story", {
+        km: formatCount(trip.totalKm),
+        avg: formatDecimal(avg, 0),
+        pct,
+      }),
     };
   });
   // Off-pace first, then newest first — the lagging trips lead the story.

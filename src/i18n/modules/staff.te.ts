@@ -82,6 +82,8 @@ export default {
   'staff.perf.trips.col.pace': 'పేస్',
   'staff.perf.trips.pace_off': 'వేగం తక్కువ',
   'staff.perf.trips.pace_on': 'సరిగా ఉంది',
+  'staff.perf.trips.driver_story': 'ఈ ట్రిప్ {km} కి.మీ ప్రయాణించింది — వ్యక్తిగత సగటు {avg} కి.మీ కంటే {pct}% తక్కువ.',
+  'staff.perf.trips.sup_story': 'ట్రిప్ మరణాలు {m}% — వ్యక్తిగత {pm}% తో పోల్తే · బరువు తగ్గుదల {l}% — {pl}% తో పోల్తే.',
   'staff.perf.table.trips': 'ట్రిప్‌లు',
   'staff.perf.table.distance': 'దూరం (కి.మీ)',
   'staff.perf.table.avg_per_trip': 'సగటు/ట్రిప్ (కి.మీ)',

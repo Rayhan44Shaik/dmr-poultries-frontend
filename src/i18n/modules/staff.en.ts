@@ -82,6 +82,8 @@ export default {
   'staff.perf.trips.col.pace': 'Pace',
   'staff.perf.trips.pace_off': 'Off pace',
   'staff.perf.trips.pace_on': 'On pace',
+  'staff.perf.trips.driver_story': 'Trip covered {km} km against a {avg} km personal average — {pct}% short.',
+  'staff.perf.trips.sup_story': 'Trip mortality {m}% vs personal {pm}% · weight loss {l}% vs personal {pl}%.',
   'staff.perf.table.trips': 'Trips',
   'staff.perf.table.distance': 'Distance (km)',
   'staff.perf.table.avg_per_trip': 'Avg/Trip (km)',
