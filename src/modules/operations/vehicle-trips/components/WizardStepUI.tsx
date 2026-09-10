@@ -81,19 +81,45 @@ export function WizardActionBar({
   submitLabel,
 }: WizardActionBarProps) {
   const { t } = useI18n();
-  const base = "w-full sm:w-auto h-10 px-5 rounded-xl text-xs font-semibold transition-[color,background-color,border-color,box-shadow,opacity] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center justify-center gap-1.5 shrink-0";
+  const base =
+    "group w-full sm:w-auto h-10 px-5 rounded-xl text-[13px] font-semibold transition-all duration-200 ease-out active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center justify-center gap-2 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-1";
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-slate-100">
-      <button type="button" onClick={onCancel} disabled={busy} className={`${base} border border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}>
-        <X size={14} /> {t("common.cancel")}
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5 sm:gap-3 pt-4 border-t border-slate-100">
+      <button
+        type="button"
+        onClick={onCancel}
+        disabled={busy}
+        className={`${base} border border-slate-200 bg-white text-slate-700 shadow-xs hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm`}
+      >
+        <X size={15} className="shrink-0 transition-transform duration-200 group-hover:rotate-90" /> {t("common.cancel")}
       </button>
       {onSave && (
-        <button type="button" onClick={() => void onSave()} disabled={busy || saveDisabled} className={`${base} border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100`}>
-          {busy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} {t(saveLabel)}
+        <button
+          type="button"
+          onClick={() => void onSave()}
+          disabled={busy || saveDisabled}
+          className={`${base} border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300 hover:shadow-sm`}
+        >
+          {busy ? (
+            <Loader2 size={15} className="animate-spin shrink-0" />
+          ) : (
+            <Save size={15} className="shrink-0 transition-transform duration-200 group-hover:-translate-y-0.5" />
+          )}{" "}
+          {t(saveLabel)}
         </button>
       )}
-      <button type="button" onClick={() => void onSubmit()} disabled={busy || submitDisabled} className={`${base} bg-blue-600 text-white hover:bg-blue-700 shadow-sm`}>
-        {busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} {t(submitLabel)}
+      <button
+        type="button"
+        onClick={() => void onSubmit()}
+        disabled={busy || submitDisabled}
+        className={`${base} bg-blue-600 text-white shadow-sm shadow-blue-500/25 hover:bg-blue-700 hover:shadow-md hover:shadow-blue-500/30 hover:-translate-y-0.5 disabled:hover:translate-y-0 disabled:hover:shadow-sm`}
+      >
+        {busy ? (
+          <Loader2 size={15} className="animate-spin shrink-0" />
+        ) : (
+          <Send size={15} className="shrink-0 transition-transform duration-200 group-hover:translate-x-0.5" />
+        )}{" "}
+        {t(submitLabel)}
       </button>
     </div>
   );
