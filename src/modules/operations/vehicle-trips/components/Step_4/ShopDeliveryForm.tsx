@@ -61,14 +61,18 @@ export interface Props {
 
 /* ─── Small presentational helpers (local only, no logic changes) ─────── */
 
-function FormLabel({ icon: Icon, children, required }: {
+/** Field heading with a small coloured logo chip, matching the wizard style. */
+function FormLabel({ icon: Icon, tone, children, required }: {
   icon: React.ComponentType<{ size?: number | string; className?: string }>;
+  tone: string;
   children: React.ReactNode;
   required?: boolean;
 }) {
   return (
-    <label className="text-sm font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-1.5 mb-2">
-      <Icon size={15} className="text-slate-500 shrink-0" />
+    <label className="text-xs font-semibold text-slate-600 flex items-center gap-2 mb-1.5">
+      <span className={`h-6 w-6 rounded-lg flex items-center justify-center shrink-0 ${tone}`}>
+        <Icon size={13} />
+      </span>
       <span className="truncate">{children}</span>
       {required && <span className="text-rose-500">*</span>}
     </label>
@@ -79,8 +83,8 @@ function FormLabel({ icon: Icon, children, required }: {
 function SimpleMetric({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
-      <div className="text-xs uppercase font-semibold text-slate-500 mb-1.5 truncate">{label}</div>
-      <div className="text-base font-bold text-slate-800 truncate">{value}</div>
+      <div className="text-[11px] uppercase font-semibold text-slate-500 mb-1 truncate">{label}</div>
+      <div className="text-sm font-bold text-slate-800 truncate">{value}</div>
     </div>
   );
 }
@@ -145,19 +149,19 @@ export default function ShopDeliveryForm({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      {/* ─── Header — title + bird type (left) · delivery mode toggle (right) */}
+      {/* ─── Header — title · bird type · mode toggle ─────────────────── */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4 border-b border-slate-100">
         <div className="flex items-center gap-3 min-w-0 mr-auto">
-          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-md shadow-purple-200/70 ring-1 ring-slate-900/5 flex items-center justify-center shrink-0">
-            {isEditing ? <CheckCircle2 size={24} /> : <ShoppingCart size={24} />}
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-md shadow-purple-200/70 ring-1 ring-slate-900/5 flex items-center justify-center shrink-0">
+            {isEditing ? <CheckCircle2 size={20} /> : <ShoppingCart size={20} />}
           </div>
           <div className="min-w-0">
-            <h3 className="text-lg font-extrabold text-slate-900 tracking-tight truncate">
+            <h3 className="text-base font-semibold text-slate-800 tracking-tight truncate">
               {isEditing ? t("ops.trip.edit_shop_delivery") : t("ops.trip.add_new_shop_delivery")}
             </h3>
             {isEditing && (
-              <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
-                <Clock size={12} className="text-slate-400" />
+              <p className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                <Clock size={11} className="text-slate-400" />
                 {t("ops.trip.auto_captured")}:
                 <span className="font-semibold text-slate-600">{autoCaptureTime}</span>
               </p>
@@ -227,7 +231,7 @@ export default function ShopDeliveryForm({
         {/* Shop name + select boxes (side by side) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <FormLabel icon={ShoppingCart} required>
+            <FormLabel icon={ShoppingCart} tone="bg-sky-50 text-sky-600" required>
               {t("operations.shop_name")}
             </FormLabel>
             <SearchDropdown
@@ -251,7 +255,9 @@ export default function ShopDeliveryForm({
           </div>
 
           <div>
-            <FormLabel icon={PackageCheck}>{t("ops.trip.select_available_boxes")}</FormLabel>
+            <FormLabel icon={PackageCheck} tone="bg-emerald-50 text-emerald-600">
+              {t("ops.trip.select_available_boxes")}
+            </FormLabel>
             {safeBoxDetails.length > 0 ? (
               <MultiSearchDropdown
                 selected={formData.selectedBoxIds.map(String)}
@@ -273,14 +279,18 @@ export default function ShopDeliveryForm({
         {/* Selected boxes + box list (side by side) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <FormLabel icon={Box}>{t("ops.trip.selected_boxes")}</FormLabel>
+            <FormLabel icon={Box} tone="bg-blue-50 text-blue-600">
+              {t("ops.trip.selected_boxes")}
+            </FormLabel>
             <div className="flex h-[42px] items-center rounded-xl border border-slate-200 bg-slate-50/60 px-4 text-sm font-bold text-slate-800">
               {boxCount}
             </div>
           </div>
 
           <div>
-            <FormLabel icon={Tag}>{t("ops.trip.box_nos_list")}</FormLabel>
+            <FormLabel icon={Tag} tone="bg-indigo-50 text-indigo-600">
+              {t("ops.trip.box_nos_list")}
+            </FormLabel>
             <div className="flex min-h-[42px] flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2">
               {selectedBoxIds.length > 0 ? (
                 selectedBoxIds.map((id) => (
@@ -307,7 +317,9 @@ export default function ShopDeliveryForm({
               value={farmWeight.toFixed(2)}
             />
             <div>
-              <FormLabel icon={AlertCircle}>{t("ops.trip.mortality_birds")}</FormLabel>
+              <FormLabel icon={AlertCircle} tone="bg-rose-50 text-rose-600">
+                {t("ops.trip.mortality_birds")}
+              </FormLabel>
               <input
                 type="number"
                 value={formData.mortality || ""}
@@ -405,7 +417,9 @@ export default function ShopDeliveryForm({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <FormLabel icon={AlertCircle}>{t("ops.trip.mortality_birds")}</FormLabel>
+                <FormLabel icon={AlertCircle} tone="bg-rose-50 text-rose-600">
+                  {t("ops.trip.mortality_birds")}
+                </FormLabel>
                 <input
                   type="number"
                   value={formData.mortality || ""}
@@ -416,7 +430,9 @@ export default function ShopDeliveryForm({
                 />
               </div>
               <div>
-                <FormLabel icon={Scale}>{t("ops.trip.mortality_weight_kg")}</FormLabel>
+                <FormLabel icon={Scale} tone="bg-amber-50 text-amber-600">
+                  {t("ops.trip.mortality_weight_kg")}
+                </FormLabel>
                 <input
                   type="number"
                   step="0.01"
@@ -433,7 +449,9 @@ export default function ShopDeliveryForm({
 
         {/* Remarks */}
         <div>
-          <FormLabel icon={MessageSquare}>{t("common.remarks")}</FormLabel>
+          <FormLabel icon={MessageSquare} tone="bg-violet-50 text-violet-600">
+            {t("common.remarks")}
+          </FormLabel>
           <input
             value={formData.remarks || ""}
             onChange={(e) => handleFormChange("remarks", e.target.value)}
