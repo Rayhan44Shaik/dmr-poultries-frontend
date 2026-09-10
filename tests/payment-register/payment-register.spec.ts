@@ -35,7 +35,7 @@ async function setup(page: Page, empty = false, initialStatus: Payment['status']
       state.records = state.records.map(record => record.id === id ? saved : record);
       return route.fulfill({ json: saved });
     }
-    const saved = { ...records[0], ...state.payload, id: 100, paymentNo: 'Pay-10092026-100' };
+    const saved = { ...records[0], ...state.payload, id: 100, paymentNo: 'Pay-20260910-100' };
     state.records = [...state.records, saved];
     return route.fulfill({ json: saved });
   });
@@ -81,12 +81,12 @@ test('demo is isolated, read-only, numbered and searchable within the three view
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
   await expect(rows(page)).toHaveCount(4);
   await statuses.getByRole('button', { name: 'Approved', exact: true }).click();
-  await page.getByRole('button', { name: 'View Pay-07092026-001' }).click();
+  await page.getByRole('button', { name: 'View Pay-20260907-001' }).click();
   const dialog = page.getByRole('dialog', { name: 'Payment Details' });
   await expect(dialog.getByText('Sample payment · Read-only preview. Not a real transaction.')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'View Pay-07092026-001' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'View Pay-20260907-001' })).toBeFocused();
   await page.getByRole('button', { name: 'Back to real payments' }).click();
   await expect(page.getByRole('button', { name: 'New Payment', exact: true })).toBeEnabled();
 });
@@ -147,7 +147,7 @@ test('new payment uses nested Escape, trapped focus, validation and one failed s
 test('edit preserves values on failure, locks submission, and keeps existing payload fields', async ({ page }) => {
   const state = await setup(page);
   state.failWrites = true;
-  await paymentRow(page, 'Pay-07092026-001').click();
+  await paymentRow(page, 'Pay-20260907-001').click();
   await page.getByRole('button', { name: 'Edit selected payment' }).click();
   const dialog = page.getByRole('dialog', { name: 'Edit Payment' });
   await expect(dialog.getByLabel('Paid To', { exact: false })).toHaveValue('Sample Green Valley Farm');
@@ -219,7 +219,7 @@ test('successful create and edit notify once, refresh once and close their dialo
   await expect(page.getByText('Payment saved successfully', { exact: true })).toHaveCount(1);
   expect(state.writes).toBe(1);
   expect(state.reads).toBe(reads + 1);
-  await paymentRow(page, 'Pay-07092026-001').click();
+  await paymentRow(page, 'Pay-20260907-001').click();
   await page.getByRole('button', { name: 'Edit selected payment' }).click();
   await page.getByRole('dialog', { name: 'Edit Payment' }).getByRole('button', { name: 'Update Payment' }).click();
   await expect(page.getByRole('dialog', { name: 'Edit Payment' })).toHaveCount(0);
@@ -228,7 +228,7 @@ test('successful create and edit notify once, refresh once and close their dialo
 
 test('delete countdown traps focus, Escape cancels without writing, expiry deletes once', async ({ page }) => {
   const state = await setup(page);
-  await paymentRow(page, 'Pay-07092026-001').click();
+  await paymentRow(page, 'Pay-20260907-001').click();
   const remove = page.getByRole('button', { name: 'Delete selected payment' });
   await remove.click();
   const dialog = page.getByRole('dialog', { name: 'Payment deletion pending' });
@@ -305,8 +305,8 @@ test('Pending display, single row selection, top actions, outside deselection an
   await expect(register(page).getByRole('columnheader')).toHaveCount(9);
   await expect(register(page).getByRole('columnheader', { name: 'Remarks', exact: true })).toHaveCount(0);
   await rows(page).first().getByText('Sample Green Valley Farm', { exact: true }).click();
-  const first = paymentRow(page, 'Pay-07092026-001');
-  const second = paymentRow(page, 'Pay-07092026-002');
+  const first = paymentRow(page, 'Pay-20260907-001');
+  const second = paymentRow(page, 'Pay-20260907-002');
   await expect(first).toHaveAttribute('aria-selected', 'true');
   await expect(rows(page).first()).toHaveAttribute('aria-selected', 'true');
   await expect(actions.getByRole('button')).toHaveText(['Edit', 'Approve', 'Delete']);
@@ -342,7 +342,7 @@ test('approval confirms once through the existing update API and moves the payme
   const state = await setup(page, false, 'Draft');
   const statuses = page.getByRole('group', { name: 'Payment status' });
   await statuses.getByRole('button', { name: 'Pending', exact: true }).click();
-  await paymentRow(page, 'Pay-07092026-001').click();
+  await paymentRow(page, 'Pay-20260907-001').click();
   await page.getByRole('button', { name: 'Approve selected payment' }).click();
   const confirmation = page.getByRole('dialog', { name: 'Approve Payment', exact: true });
   await expect(confirmation).toBeVisible();
@@ -355,11 +355,11 @@ test('approval confirms once through the existing update API and moves the payme
   expect(state.writes).toBe(1);
   expect(state.payload).toEqual({ status: 'Approved' });
   await expect(page.getByText('Payment approved successfully', { exact: true })).toHaveCount(1);
-  await expect(register(page).getByText('Pay-07092026-001', { exact: true })).toHaveCount(0);
+  await expect(register(page).getByText('Pay-20260907-001', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('group', { name: 'Selected payment actions' })).toHaveCount(0);
   await statuses.getByRole('button', { name: 'Approved', exact: true }).click();
   await expect(rows(page)).toHaveCount(1);
-  await paymentRow(page, 'Pay-07092026-001').click();
+  await paymentRow(page, 'Pay-20260907-001').click();
   await expect(page.getByRole('button', { name: 'Approve selected payment' })).toBeDisabled();
 });
 
@@ -367,14 +367,14 @@ test('failed approval preserves the pending record and selection, and can be ret
   const state = await setup(page, false, 'Draft');
   state.failWrites = true;
   await page.getByRole('group', { name: 'Payment status' }).getByRole('button', { name: 'Pending', exact: true }).click();
-  await paymentRow(page, 'Pay-07092026-001').click();
+  await paymentRow(page, 'Pay-20260907-001').click();
   await page.getByRole('button', { name: 'Approve selected payment' }).click();
   const confirmation = page.getByRole('dialog', { name: 'Approve Payment', exact: true });
   await confirmation.getByRole('button', { name: 'Approve Payment', exact: true }).click();
   await expect(confirmation.getByRole('alert')).toBeVisible();
   expect(state.writes).toBe(1);
   expect(state.records[0].status).toBe('Draft');
-  await expect(paymentRow(page, 'Pay-07092026-001')).toHaveAttribute('aria-selected', 'true');
+  await expect(paymentRow(page, 'Pay-20260907-001')).toHaveAttribute('aria-selected', 'true');
   state.failWrites = false;
   await confirmation.getByRole('button', { name: 'Approve Payment', exact: true }).click();
   await expect(confirmation).toHaveCount(0);
@@ -386,12 +386,12 @@ test('sample and older payments cannot be approved, and Pending is shown in deta
   const state = await setup(page, false, 'Draft');
   const statuses = page.getByRole('group', { name: 'Payment status' });
   await statuses.getByRole('button', { name: 'Pending', exact: true }).click();
-  await paymentRow(page, 'Pay-07092026-001').click();
+  await paymentRow(page, 'Pay-20260907-001').click();
   await page.getByRole('button', { name: 'Edit selected payment' }).click();
   const edit = page.getByRole('dialog', { name: 'Edit Payment' });
   await expect(edit.getByRole('combobox', { name: 'Status', exact: true })).toContainText('Pending');
   await edit.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await page.getByRole('button', { name: 'View Pay-07092026-001' }).click();
+  await page.getByRole('button', { name: 'View Pay-20260907-001' }).click();
   const details = page.getByRole('dialog', { name: 'Payment Details' });
   await expect(details.getByText('Pending', { exact: true })).toBeVisible();
   await expect(details.getByText('Draft', { exact: true })).toHaveCount(0);
@@ -399,7 +399,7 @@ test('sample and older payments cannot be approved, and Pending is shown in deta
   state.records[0].createdAt = '2026-08-01T10:00:00+05:30';
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect(register(page)).toHaveAttribute('aria-busy', 'false');
-  await paymentRow(page, 'Pay-07092026-001').click();
+  await paymentRow(page, 'Pay-20260907-001').click();
   await expect(page.getByRole('button', { name: 'Approve selected payment' })).toBeDisabled();
   await page.getByRole('button', { name: 'Preview sample data' }).click();
   await rows(page).first().click();

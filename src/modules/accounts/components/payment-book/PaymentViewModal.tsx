@@ -86,6 +86,9 @@ export function PaymentViewModal({ isOpen, payment, onClose, onEdit, canEdit = f
   return (
     <Modal isOpen onClose={onClose} title="Payment Details" description={payment.paymentNo || 'Payment number not assigned'} size="xl"
       footer={<>
+        {/* A disabled button alone reads as a bug, so the reason is stated next
+            to it: the row simply is not in an editable state. */}
+        {showEdit && !canEdit && <p className="mr-auto text-[11px] leading-4 text-slate-500">{editHint}</p>}
         <Button variant="secondary" onClick={onClose}>Close</Button>
         {showEdit && (
           <Button icon={<Pencil size={14} />} disabled={!canEdit} title={canEdit ? 'Edit this payment' : editHint} onClick={onEdit}>Edit payment</Button>
@@ -94,7 +97,8 @@ export function PaymentViewModal({ isOpen, payment, onClose, onEdit, canEdit = f
       <div className="space-y-4">
         {payment.id.startsWith('demo-payment-') && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Sample payment · Read-only preview. Not a real transaction.</p>}
 
-        {/* FIGURE — one accent bar, the amount, and the state it is in. */}
+        {/* FIGURE — accent bar, the amount, and the state it is in. Editing lives
+            in the footer, next to Close, so there is exactly one edit control. */}
         <div className="relative overflow-hidden rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 via-white to-white px-4 py-3.5">
           <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[3px] bg-emerald-400/80" />
           <div className="flex flex-wrap items-start justify-between gap-3 pl-2">
@@ -103,15 +107,7 @@ export function PaymentViewModal({ isOpen, payment, onClose, onEdit, canEdit = f
               <p className="mt-0.5 text-[26px] font-semibold leading-tight tabular-nums text-slate-900">{paymentCurrency.format(payment.amount)}</p>
               {inWords && <p className="mt-1 text-[11px] italic leading-snug text-emerald-900/70">{inWords}</p>}
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              {showEdit && (
-                <Button variant="ghost" size="sm" iconOnly className="bg-white/70 text-emerald-700 ring-1 ring-inset ring-emerald-200/70 hover:bg-white hover:text-emerald-800"
-                  aria-label={canEdit ? 'Edit payment' : `Edit payment — ${editHint ?? 'unavailable'}`} title={canEdit ? 'Edit this payment' : editHint} disabled={!canEdit} onClick={onEdit}>
-                  <Pencil size={15} aria-hidden="true" />
-                </Button>
-              )}
-              <StatusBadge status={payment.status} label={paymentStatusLabel(payment.status)} tone={pending ? 'warning' : undefined} size="md" />
-            </div>
+            <StatusBadge status={payment.status} label={paymentStatusLabel(payment.status)} tone={pending ? 'warning' : undefined} size="md" className="shrink-0" />
           </div>
         </div>
 

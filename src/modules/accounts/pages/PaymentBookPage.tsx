@@ -278,6 +278,9 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
           </div>
           {selectedPayment ? <div role="group" aria-label="Selected payment actions" title={readOnlyHint} className="flex flex-wrap items-center gap-2">
             <span className="sr-only">Selected payment: {selectedPayment.paymentNo || selectedPayment.paidTo}</span>
+            {/* Sample rows are read-only by design; said in words next to the
+                buttons rather than hidden in a tooltip nobody discovers. */}
+            {demo && <span className={uiBadgeClass('warning')}>Sample row · read-only</span>}
             <Button variant="secondary" size="sm" icon={<Pencil size={14} />} aria-label="Edit selected payment" disabled={!canEditSelected}
               title={readOnlyHint ?? (canEditSelected ? 'Edit selected payment' : 'Payments older than 10 days cannot be edited')}
               onClick={() => { if (canEditSelected) setEditingPayment(selectedPayment); }}>Edit</Button>
@@ -326,8 +329,8 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
           eligibility rules; closing first keeps only one dialog mounted. */}
       <PaymentViewModal isOpen={!!viewingPayment} payment={viewingPayment} onClose={() => setViewingPayment(null)}
         onEdit={viewingPayment ? () => { const next = viewingPayment; setViewingPayment(null); setEditingPayment(next); } : undefined}
-        canEdit={Boolean(viewingPayment && !demo && !viewingPayment.id.startsWith('demo-payment-') && !isPending(viewingPayment.id) && !approving && canEditItem(viewingPayment.createdAt))}
-        editHint={demo ? 'Sample rows are read-only — switch to real payments to edit.' : 'Payments older than 10 days cannot be edited.'} />
+        canEdit={Boolean(viewingPayment && !demo && !isPending(viewingPayment.id) && !approving && canEditItem(viewingPayment.createdAt))}
+        editHint={demo ? readOnlyHint : 'Payments older than 10 days cannot be edited.'} />
     </div>
   );
 }
