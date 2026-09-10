@@ -75,13 +75,13 @@ export default function ShopDeliveryCard({
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                 <span
                   title={`${t("ops.trip.delivery_mode")}: ${isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}`}
-                  className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold shrink-0 border ${
+                  className={`px-1.5 py-0.5 rounded-md shrink-0 border flex items-center justify-center ${
                     isWeightMode
                       ? "bg-purple-50 text-purple-700 border-purple-200/60"
-                      : "bg-amber-50 text-amber-700 border-amber-200/60"
+                      : "bg-blue-50 text-blue-700 border-blue-200/60"
                   }`}
                 >
-                  {isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}
+                  {isWeightMode ? <Scale size={12} strokeWidth={2.5} /> : <Box size={12} strokeWidth={2.5} />}
                 </span>
                 {mortalityCount > 0 && (
                   <span

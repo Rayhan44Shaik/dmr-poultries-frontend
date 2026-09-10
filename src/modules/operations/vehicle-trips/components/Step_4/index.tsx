@@ -1060,7 +1060,7 @@ export default function UnLoadingTable({
       </div>
 
       {/* ─── TOP KPI SUMMARY CARDS ─── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-emerald-50/70 border border-emerald-100 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-semibold text-emerald-900 flex items-center gap-1">
             <Clock size={13} className="text-emerald-600" /> {t("ops.trip.captured_time")}
@@ -1073,19 +1073,15 @@ export default function UnLoadingTable({
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
             <Building2 size={13} className="text-slate-400" /> {t("ops.trip.shops")}
           </span>
-          <span className="text-base font-bold text-slate-800">{topKpiTotals.shops || "—"}</span>
-        </div>
-        <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
-          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <Box size={13} className="text-blue-600" /> {t("ops.trip.box_mode")}
-          </span>
-          <span className="text-base font-bold text-slate-800">{boxModeCount}</span>
-        </div>
-        <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
-          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <Scale size={13} className="text-purple-600" /> {t("ops.trip.weight_mode")}
-          </span>
-          <span className="text-base font-bold text-slate-800">{weightModeCount}</span>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700" title={t("ops.trip.box_mode")}>
+              <Box size={13} className="text-blue-600" /> {boxModeCount}
+            </span>
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700" title={t("ops.trip.weight_mode")}>
+              <Scale size={13} className="text-purple-600" /> {weightModeCount}
+            </span>
+            <span className="text-base font-bold text-slate-800 ml-auto">{boxModeCount + weightModeCount}</span>
+          </div>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
