@@ -120,6 +120,16 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
    *  and re-hydrate every field from the last saved trip state. */
   const [stepRemountNonce, setStepRemountNonce] = useState(0);
 
+  /** Trip id whose URL resume must be suppressed for one close cycle.
+   *
+   *  Closing the wizard (`clearForm` / `createNewTrip`) resets `trip.id` to 0
+   *  immediately, but the router transition that removes `tripId` from the URL
+   *  (react-router wraps `navigate` in `startTransition`) lands a beat later.
+   *  In that window the URL-resume effect below would see a stale `tripId`
+   *  together with `trip.id === 0` and re-open the trip we just closed — the
+   *  "closes for a fraction, then comes back to the same step" bug. */
+  const suppressUrlResumeRef = useRef<number | null>(null);
+
   /** Set tripId in URL so refresh can resume the active wizard. */
   const setTripIdInUrl = useCallback((tripId: number) => {
     const params = new URLSearchParams(location.search);
@@ -150,17 +160,24 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const urlTripId = params.get("tripId");
-    if (urlTripId && !trip.id) {
-      const id = Number(urlTripId);
-      if (Number.isFinite(id) && id > 0) {
-        void loadTripFromApi(id).then((loaded) => {
-          if (!loaded) return;
-          setRows(loaded.deliveries || []);
-          setEntryScreen("form");
-          setEditingSubmittedStep(null);
-          setViewStepIndex(getNextIncompleteTripStep(loaded));
-        });
+    const id = urlTripId ? Number(urlTripId) : null;
+    if (id != null && Number.isFinite(id) && id > 0 && !trip.id) {
+      if (suppressUrlResumeRef.current === id) {
+        // The app just closed this trip and the router transition that removes
+        // `tripId` from the URL is still in flight — do NOT re-open it.
+        return;
       }
+      void loadTripFromApi(id).then((loaded) => {
+        if (!loaded) return;
+        setRows(loaded.deliveries || []);
+        setEntryScreen("form");
+        setEditingSubmittedStep(null);
+        setViewStepIndex(getNextIncompleteTripStep(loaded));
+      });
+    }
+    if (!urlTripId) {
+      // URL no longer points at a trip — the close transition completed.
+      suppressUrlResumeRef.current = null;
     }
   }, [location.search, loadTripFromApi, trip.id]);
 
@@ -304,6 +321,10 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   ]);
 
   const clearForm = useCallback(() => {
+    const urlTripId = Number(new URLSearchParams(location.search).get("tripId"));
+    if (Number.isFinite(urlTripId) && urlTripId > 0) {
+      suppressUrlResumeRef.current = urlTripId;
+    }
     clearTrip();
     setRows([]);
     setEntryScreen("prompt");
@@ -312,7 +333,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setEditingSubmittedStep(null);
     setTrip((prev) => ({ ...prev, tripDate: getTripEntryDate() }));
     clearTripIdFromUrl();
-  }, [clearTrip, clearTripIdFromUrl, setIsEditing, setTrip]);
+  }, [clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, location.search]);
 
   // After first Step 1 submit: toast, reset the wizard to Create New Trip,
   // and let Recent Trips pick up the saved trip (onTripsChanged). Resume
@@ -350,6 +371,10 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   }, [trip.id, savedTrip, setTrip, clearForm]);
 
   const createNewTrip = useCallback(() => {
+    const urlTripId = Number(new URLSearchParams(location.search).get("tripId"));
+    if (Number.isFinite(urlTripId) && urlTripId > 0) {
+      suppressUrlResumeRef.current = urlTripId;
+    }
     clearTrip();
     setRows([]);
     setViewStepIndex(0);
@@ -358,7 +383,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setIsEditing(true);
     setEditingSubmittedStep(null);
     setEntryScreen("form");
-  }, [clearTrip, clearTripIdFromUrl, setIsEditing, setTrip]);
+  }, [clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, location.search]);
 
   const isStartCompleted = Boolean(trip.startStepSubmitted);
   const isFarmCompleted = Boolean(trip.farmStepSubmitted);
