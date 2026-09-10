@@ -10,20 +10,20 @@ import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { useFleetFuelKmGuard } from "../hooks/useFleetFuelKmGuard";
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import MaintenanceForm from '../components/maintenance/MaintenanceForm';
-import LatestMaintenanceTable, { ViewMode } from '../components/maintenance/LatestMaintenanceTable';
+import LatestMaintenanceTable, { type ViewMode } from '../components/maintenance/LatestMaintenanceTable';
 import ViewModal from '../components/maintenance/ViewModal';
 import { MAINTENANCE_TYPES } from '../utils/constants';
 import type { MaintenanceEvent } from '../types';
 import { RotateCcw, Save, Wrench, X, AlertCircle, CheckCircle2 } from 'lucide-react';
 
-const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
+const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
   const { t } = useI18n();
   const { employees } = useEmployees();
   const { showNotification } = useSafeNotification();
   const { vehicles, maintenance, approvedMaintenance, deletedRecords, loading: recordsLoading, error: recordsError, refresh: refreshMaintenance } = useMaintenanceData('entry');
   const [loading, setLoading] = useState(false);
   const [selectKey, setSelectKey] = useState(0);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [, setSelectedId] = useState<string | null>(null);
   
   // Updated view mode to support Pending, Approved, and Deleted
   const [viewMode, setViewMode] = useState<ViewMode>('pending');
@@ -51,16 +51,8 @@ const MaintenanceEntryPage = ({ embedded = false }: { embedded?: boolean }) => {
     handleSubmit: submitForm,
     resetForm,
     setVehicleId,
-    setDate,
-    setBillNumber,
-    setCurrentKM,
     setMaintenanceType,
-    setServiceType,
-    setGarage,
-    setMechanic,
     setDriverId,
-    setNextServiceKM,
-    setRemarks,
     documents,
     addDocumentFiles,
     removeDocument,

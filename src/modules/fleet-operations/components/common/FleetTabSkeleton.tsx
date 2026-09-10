@@ -1,5 +1,3 @@
-import React from 'react';
-
 /** Immediate Fleet content placeholder — shown before a lazy tab chunk paints. */
 export default function FleetTabSkeleton() {
   return (

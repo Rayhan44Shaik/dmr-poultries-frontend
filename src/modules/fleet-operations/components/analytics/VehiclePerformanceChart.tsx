@@ -102,8 +102,6 @@ const VehiclePerformanceChart = ({ stats }: VehiclePerformanceChartProps) => {
 
   const hasData = rows.length > 0;
 
-  const maxValue = hasData ? Math.max(...rows.map((r) => r.value)) : 0;
-
   return (
     <div className="flex h-full flex-col">
       <div className="mb-3 flex flex-wrap items-center justify-end gap-1">

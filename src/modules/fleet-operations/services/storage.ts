@@ -1,4 +1,4 @@
-import { VehicleDocument, DocumentType } from '../types';
+import type { VehicleDocument, DocumentType } from '../types';
 
 const generateId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;

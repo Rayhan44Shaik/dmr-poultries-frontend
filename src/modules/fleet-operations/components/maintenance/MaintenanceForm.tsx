@@ -6,7 +6,6 @@ import { Car, User, Gauge, Wrench, Cog, Building2, UserCog, FileText, Paperclip,
 import PartsTable from './PartsTable';
 import type { PartItem } from '../../types';
 import { maintenanceApi } from '../../services/maintenanceApi';
-import { useSafeNotification } from '../../../../hooks/useSafeNotification';
 
 export interface FormDocumentItem {
   key: string;
@@ -72,7 +71,6 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
   validateKM,
 }) => {
   const { t } = useI18n();
-  const { showNotification } = useSafeNotification();
   const [kmError, setKmError] = useState<string | null>(null);
 
   const inputClass =
