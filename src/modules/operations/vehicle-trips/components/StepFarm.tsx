@@ -267,6 +267,24 @@ export default function StepFarm({
             value={trip.sourceFarm || t("ops.trip.not_entered")}
           />
           <StepKpiCard
+            icon={MapPin}
+            tone="bg-cyan-50 text-cyan-600"
+            bar="bg-cyan-400"
+            label="GPS"
+            value={
+              hasGps ? (
+                <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback={t("ops.trip.location_captured")} />
+              ) : (
+                t("ops.trip.not_captured")
+              )
+            }
+            title={
+              hasGps
+                ? `${Number(trip.farmGpsLat).toFixed(6)}, ${Number(trip.farmGpsLon).toFixed(6)}`
+                : undefined
+            }
+          />
+          <StepKpiCard
             icon={Layers}
             tone="bg-violet-50 text-violet-600"
             bar="bg-violet-400"
@@ -300,24 +318,6 @@ export default function StepFarm({
             bar="bg-teal-400"
             label={t("ops.trip.field.avg_bird_weight")}
             value={avgWeightLabel}
-          />
-          <StepKpiCard
-            icon={MapPin}
-            tone="bg-cyan-50 text-cyan-600"
-            bar="bg-cyan-400"
-            label="GPS"
-            value={
-              hasGps ? (
-                <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback={t("ops.trip.location_captured")} />
-              ) : (
-                t("ops.trip.not_captured")
-              )
-            }
-            title={
-              hasGps
-                ? `${Number(trip.farmGpsLat).toFixed(6)}, ${Number(trip.farmGpsLon).toFixed(6)}`
-                : undefined
-            }
           />
         </div>
         {trip.remarks ? (
@@ -391,44 +391,8 @@ export default function StepFarm({
             />
           </div>
 
-          <div>
-            <FieldLabel
-              icon={Layers}
-              tone="bg-violet-50 text-violet-600"
-              label={t("operations.bird_type")}
-              required={TRIP_FIELD_DEFINITIONS.birdTypeId.required}
-            />
-            <SearchDropdown
-              value={trip.birdTypeId ? String(trip.birdTypeId) : ""}
-              options={birdTypeOptions}
-              placeholder={t("ops.trip.search_bird_type")}
-              searchPlaceholder={t("ops.trip.search_bird_type")}
-              disabled={false}
-              onChange={handleBirdChange}
-            />
-            {birdTypeOptions.length <= 1 && (
-              <p className="text-[11px] text-slate-400 mt-1">{t("ops.trip.no_active_bird_types")}</p>
-            )}
-          </div>
-
-          <div className="sm:col-span-1">
-            <FieldLabel
-              icon={MapPin}
-              tone="bg-rose-50 text-rose-600"
-              label={t("ops.trip.field.farm_address")}
-              required
-            />
-            <input
-              type="text"
-              value={farmAddress}
-              onChange={(e) => updateTrip({ farmAddress: e.target.value })}
-              className="w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-400"
-              placeholder={t("ops.trip.farm_address_placeholder")}
-            />
-          </div>
-
           <div className="sm:col-span-2">
-            <FieldLabel icon={MapPin} tone="bg-cyan-50 text-cyan-600" label="GPS" />
+            <FieldLabel icon={MapPin} tone="bg-cyan-50 text-cyan-600" label="GPS" required />
             <div className="flex items-center gap-2 mt-1">
               <div className="flex-1 min-w-0 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 flex items-center">
                 {hasGps ? (
@@ -455,6 +419,41 @@ export default function StepFarm({
             ) : (
               <p className="text-[11px] text-slate-400 mt-1">{t("ops.trip.gps_stays_empty")}</p>
             )}
+          </div>
+
+          <div>
+            <FieldLabel
+              icon={Layers}
+              tone="bg-violet-50 text-violet-600"
+              label={t("operations.bird_type")}
+              required={TRIP_FIELD_DEFINITIONS.birdTypeId.required}
+            />
+            <SearchDropdown
+              value={trip.birdTypeId ? String(trip.birdTypeId) : ""}
+              options={birdTypeOptions}
+              placeholder={t("ops.trip.search_bird_type")}
+              searchPlaceholder={t("ops.trip.search_bird_type")}
+              disabled={false}
+              onChange={handleBirdChange}
+            />
+            {birdTypeOptions.length <= 1 && (
+              <p className="text-[11px] text-slate-400 mt-1">{t("ops.trip.no_active_bird_types")}</p>
+            )}
+          </div>
+
+          <div className="sm:col-span-1">
+            <FieldLabel
+              icon={MapPin}
+              tone="bg-rose-50 text-rose-600"
+              label={t("ops.trip.field.farm_address")}
+            />
+            <input
+              type="text"
+              value={farmAddress}
+              onChange={(e) => updateTrip({ farmAddress: e.target.value })}
+              className="w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-400"
+              placeholder={t("ops.trip.farm_address_placeholder")}
+            />
           </div>
 
           <div>

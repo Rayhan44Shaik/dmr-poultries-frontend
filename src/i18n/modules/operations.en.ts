@@ -281,6 +281,7 @@ export default {
   'ops.trip.validate.select_farm': 'Please select a Farm.',
   'ops.trip.validate.select_bird_type': 'Please select a Bird Type.',
   'ops.trip.validate.farm_address_required': 'Farm address is required.',
+  'ops.trip.validate.gps_required': 'Please capture the farm GPS location before submitting.',
   'ops.trip.validate.farm_meter_required': 'Valid Farm Meter reading is required.',
   'ops.trip.validate.farm_meter_gt_start': 'Farm meter ({dest} KM) must be strictly greater than the Step 1 starting meter ({start} KM).',
   'ops.trip.validate.tolls_non_negative': 'Tolls cannot be negative.',

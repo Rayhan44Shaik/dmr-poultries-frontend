@@ -26,6 +26,7 @@ const FIXED: Record<string, string> = {
   "Please select a Farm.": "ops.trip.validate.select_farm",
   "Please select a Bird Type.": "ops.trip.validate.select_bird_type",
   "Farm address is required.": "ops.trip.validate.farm_address_required",
+  "Please capture the farm GPS location.": "ops.trip.validate.gps_required",
   "Valid Farm Meter reading is required.": "ops.trip.validate.farm_meter_required",
   "Tolls cannot be negative.": "ops.trip.validate.tolls_non_negative",
   "Please enter a valid Average Bird Weight.": "ops.trip.validate.avg_bird_weight_required",

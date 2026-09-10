@@ -281,6 +281,7 @@ export default {
   'ops.trip.validate.select_farm': 'దయచేసి ఫారాన్ని ఎంచుకోండి.',
   'ops.trip.validate.select_bird_type': 'దయచేసి పక్షి రకాన్ని ఎంచుకోండి.',
   'ops.trip.validate.farm_address_required': 'ఫారం చిరునామా అవసరం.',
+  'ops.trip.validate.gps_required': 'సమర్పించే ముందు దయచేసి ఫారం GPS స్థానాన్ని క్యాప్చర్ చేయండి.',
   'ops.trip.validate.farm_meter_required': 'సరైన ఫారం మీటర్ రీడింగ్ అవసరం.',
   'ops.trip.validate.farm_meter_gt_start': 'ఫారం మీటర్ ({dest} KM) స్టెప్ 1 ప్రారంభ మీటర్ ({start} KM) కంటే ఎక్కువగా ఉండాలి.',
   'ops.trip.validate.tolls_non_negative': 'టోల్లు ప్రతికూలంగా ఉండకూడదు.',
