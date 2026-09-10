@@ -810,12 +810,17 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
 
   return (
     <div>
-      <FieldLabel
-        icon={Gauge}
-        tone="bg-purple-50 text-purple-600"
-        label={t("ops.trip.field.opening_meter")}
-        required={TRIP_FIELD_DEFINITIONS.openingMeter.required}
-      />
+      <div className="flex items-center justify-between gap-2">
+        <FieldLabel
+          icon={Gauge}
+          tone="bg-purple-50 text-purple-600"
+          label={t("ops.trip.field.opening_meter")}
+          required={TRIP_FIELD_DEFINITIONS.openingMeter.required}
+        />
+        <span className="whitespace-nowrap text-[11px] font-medium text-slate-400">
+          {t("ops.trip.enter_manually")}
+        </span>
+      </div>
       <input
         type="text"
         inputMode="decimal"
