@@ -13,10 +13,11 @@ Scope: **Payment Register only**. Verification date: 10 September 2026.
 ### Selection and approval follow-up
 
 - Table/details status badges and the Edit status option now display **Pending** in place of Draft. A single frontend label helper preserves the existing `Draft` API value.
-- A row click or its accessible checkbox selects one payment, highlights it, and exposes **Edit / Approve / Delete** in the table header. Selecting another row replaces the selection; clicking the selected row again or clicking outside the table clears it. Dialog interactions preserve the captured payment. Page/view/filter changes and completed refreshes clear stale selections.
+- A row click selects one payment, highlights it, and exposes **Edit / Approve / Delete** in the table header. Selecting another row replaces the selection; clicking the selected row again or clicking outside the table clears it. Dialog interactions preserve the captured payment. Page/view/filter changes and completed refreshes clear stale selections.
 - Approval uses the existing `updatePayment(id, { status: 'Approved' })` contract after shared confirmation. It follows the existing edit-age restriction, rejects demo/already-approved records, prevents double submission, and checks the returned payment identity and status before reporting success.
 - Successful approval removes the record from Pending and makes it visible in Approved after refresh. Failed approval leaves the pending record unchanged and shows a retryable inline error. No approval endpoint or backend workflow was introduced.
 - Sample records remain read-only: selection is available, but mutation buttons are disabled with a read-only explanation.
+- The separate checkbox/selection column has been removed. Rows themselves are keyboard-focusable: Enter/Space toggles selection and Escape deselects. Nested View buttons keep their native behavior. Tests verify there are no checkboxes, exactly ten table columns, row-click and repeat-click behavior, and removal of header actions after an outside click.
 - Latest scoped verification: **13/13 browser tests**, **7/7 unit tests**, scoped ESLint and production build passed. Browser APIs were intercepted; real-server approval/persistence is still not verified. Desktop and mobile selected-row/header-action layouts were visually inspected.
 
 ## 1. Final Status

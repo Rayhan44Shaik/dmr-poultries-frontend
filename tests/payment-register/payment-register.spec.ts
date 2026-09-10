@@ -6,6 +6,7 @@ const reference = new Date('2026-09-10T12:00:00+05:30');
 const records: (Omit<Payment, 'id'> & { id: number })[] = createDemoPayments(reference).map((p, index) => ({ ...p, id: index + 1, status: 'Approved' as const, createdAt: reference.toISOString() }));
 const register = (page: Page) => page.getByRole('region', { name: 'Payment records' });
 const rows = (page: Page) => register(page).locator('tbody tr');
+const paymentRow = (page: Page, number: string) => register(page).getByRole('row', { name: `Payment ${number}`, exact: true });
 
 async function setup(page: Page, empty = false, initialStatus: Payment['status'] = 'Approved') {
   const state = { records: records.map(record => ({ ...record, status: initialStatus })), reads: 0, writes: 0, failReads: false, failWrites: false, holdReads: false, release: () => {}, payload: {} as Record<string, unknown> };
@@ -146,7 +147,7 @@ test('new payment uses nested Escape, trapped focus, validation and one failed s
 test('edit preserves values on failure, locks submission, and keeps existing payload fields', async ({ page }) => {
   const state = await setup(page);
   state.failWrites = true;
-  await page.getByRole('checkbox', { name: 'Select Pay-07092026-001' }).check();
+  await paymentRow(page, 'Pay-07092026-001').click();
   await page.getByRole('button', { name: 'Edit selected payment' }).click();
   const dialog = page.getByRole('dialog', { name: 'Edit Payment' });
   await expect(dialog.getByLabel('Paid To', { exact: false })).toHaveValue('Sample Green Valley Farm');
@@ -218,7 +219,7 @@ test('successful create and edit notify once, refresh once and close their dialo
   await expect(page.getByText('Payment saved successfully', { exact: true })).toHaveCount(1);
   expect(state.writes).toBe(1);
   expect(state.reads).toBe(reads + 1);
-  await page.getByRole('checkbox', { name: 'Select Pay-07092026-001' }).check();
+  await paymentRow(page, 'Pay-07092026-001').click();
   await page.getByRole('button', { name: 'Edit selected payment' }).click();
   await page.getByRole('dialog', { name: 'Edit Payment' }).getByRole('button', { name: 'Update Payment' }).click();
   await expect(page.getByRole('dialog', { name: 'Edit Payment' })).toHaveCount(0);
@@ -227,7 +228,7 @@ test('successful create and edit notify once, refresh once and close their dialo
 
 test('delete countdown traps focus, Escape cancels without writing, expiry deletes once', async ({ page }) => {
   const state = await setup(page);
-  await page.getByRole('checkbox', { name: 'Select Pay-07092026-001' }).check();
+  await paymentRow(page, 'Pay-07092026-001').click();
   const remove = page.getByRole('button', { name: 'Delete selected payment' });
   await remove.click();
   const dialog = page.getByRole('dialog', { name: 'Payment deletion pending' });
@@ -298,29 +299,39 @@ test('Pending display, single row selection, top actions, outside deselection an
   await expect(rows(page).first().getByText('Pending', { exact: true })).toBeVisible();
   const actions = page.getByRole('group', { name: 'Selected payment actions' });
   await expect(actions).toHaveCount(0);
+  await expect(register(page).getByRole('checkbox')).toHaveCount(0);
+  await expect(register(page).getByRole('columnheader')).toHaveCount(10);
   await rows(page).first().getByText('Sample Green Valley Farm', { exact: true }).click();
-  const first = page.getByRole('checkbox', { name: 'Select Pay-07092026-001' });
-  const second = page.getByRole('checkbox', { name: 'Select Pay-07092026-002' });
-  await expect(first).toBeChecked();
+  const first = paymentRow(page, 'Pay-07092026-001');
+  const second = paymentRow(page, 'Pay-07092026-002');
+  await expect(first).toHaveAttribute('aria-selected', 'true');
   await expect(rows(page).first()).toHaveAttribute('aria-selected', 'true');
   await expect(actions.getByRole('button')).toHaveText(['Edit', 'Approve', 'Delete']);
   expect((await actions.boundingBox())!.y).toBeLessThan((await rows(page).first().boundingBox())!.y);
-  await second.check();
-  await expect(first).not.toBeChecked();
-  await expect(second).toBeChecked();
+  await second.click();
+  await expect(first).toHaveAttribute('aria-selected', 'false');
+  await expect(second).toHaveAttribute('aria-selected', 'true');
   await page.getByRole('searchbox', { name: 'Search payments' }).click();
-  await expect(second).not.toBeChecked();
+  await expect(second).toHaveAttribute('aria-selected', 'false');
+  await expect(actions).toHaveCount(0);
+  await first.click();
+  await expect(actions).toBeVisible();
+  await first.click();
   await expect(actions).toHaveCount(0);
   await first.focus();
+  await page.keyboard.press('Enter');
+  await expect(first).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Escape');
+  await expect(actions).toHaveCount(0);
   await page.keyboard.press('Space');
-  await expect(first).toBeChecked();
+  await expect(first).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('Space');
-  await expect(first).not.toBeChecked();
-  await first.check();
+  await expect(first).toHaveAttribute('aria-selected', 'false');
+  await first.click();
   await page.getByRole('button', { name: 'Next page' }).click();
   await expect(actions).toHaveCount(0);
   await page.getByRole('button', { name: 'Previous page' }).click();
-  await expect(first).not.toBeChecked();
+  await expect(first).toHaveAttribute('aria-selected', 'false');
   expect(state.writes).toBe(0);
 });
 
@@ -328,7 +339,7 @@ test('approval confirms once through the existing update API and moves the payme
   const state = await setup(page, false, 'Draft');
   const statuses = page.getByRole('group', { name: 'Payment status' });
   await statuses.getByRole('button', { name: 'Pending', exact: true }).click();
-  await page.getByRole('checkbox', { name: 'Select Pay-07092026-001' }).check();
+  await paymentRow(page, 'Pay-07092026-001').click();
   await page.getByRole('button', { name: 'Approve selected payment' }).click();
   const confirmation = page.getByRole('dialog', { name: 'Approve Payment', exact: true });
   await expect(confirmation).toBeVisible();
@@ -345,7 +356,7 @@ test('approval confirms once through the existing update API and moves the payme
   await expect(page.getByRole('group', { name: 'Selected payment actions' })).toHaveCount(0);
   await statuses.getByRole('button', { name: 'Approved', exact: true }).click();
   await expect(rows(page)).toHaveCount(1);
-  await page.getByRole('checkbox', { name: 'Select Pay-07092026-001' }).check();
+  await paymentRow(page, 'Pay-07092026-001').click();
   await expect(page.getByRole('button', { name: 'Approve selected payment' })).toBeDisabled();
 });
 
@@ -353,14 +364,14 @@ test('failed approval preserves the pending record and selection, and can be ret
   const state = await setup(page, false, 'Draft');
   state.failWrites = true;
   await page.getByRole('group', { name: 'Payment status' }).getByRole('button', { name: 'Pending', exact: true }).click();
-  await page.getByRole('checkbox', { name: 'Select Pay-07092026-001' }).check();
+  await paymentRow(page, 'Pay-07092026-001').click();
   await page.getByRole('button', { name: 'Approve selected payment' }).click();
   const confirmation = page.getByRole('dialog', { name: 'Approve Payment', exact: true });
   await confirmation.getByRole('button', { name: 'Approve Payment', exact: true }).click();
   await expect(confirmation.getByRole('alert')).toBeVisible();
   expect(state.writes).toBe(1);
   expect(state.records[0].status).toBe('Draft');
-  await expect(page.getByRole('checkbox', { name: 'Select Pay-07092026-001' })).toBeChecked();
+  await expect(paymentRow(page, 'Pay-07092026-001')).toHaveAttribute('aria-selected', 'true');
   state.failWrites = false;
   await confirmation.getByRole('button', { name: 'Approve Payment', exact: true }).click();
   await expect(confirmation).toHaveCount(0);
@@ -372,7 +383,7 @@ test('sample and older payments cannot be approved, and Pending is shown in deta
   const state = await setup(page, false, 'Draft');
   const statuses = page.getByRole('group', { name: 'Payment status' });
   await statuses.getByRole('button', { name: 'Pending', exact: true }).click();
-  await page.getByRole('checkbox', { name: 'Select Pay-07092026-001' }).check();
+  await paymentRow(page, 'Pay-07092026-001').click();
   await page.getByRole('button', { name: 'Edit selected payment' }).click();
   const edit = page.getByRole('dialog', { name: 'Edit Payment' });
   await expect(edit.getByRole('combobox', { name: 'Status', exact: true })).toContainText('Pending');
@@ -385,10 +396,10 @@ test('sample and older payments cannot be approved, and Pending is shown in deta
   state.records[0].createdAt = '2026-08-01T10:00:00+05:30';
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect(register(page)).toHaveAttribute('aria-busy', 'false');
-  await page.getByRole('checkbox', { name: 'Select Pay-07092026-001' }).check();
+  await paymentRow(page, 'Pay-07092026-001').click();
   await expect(page.getByRole('button', { name: 'Approve selected payment' })).toBeDisabled();
   await page.getByRole('button', { name: 'Preview sample data' }).click();
-  await register(page).getByRole('checkbox').first().check();
+  await rows(page).first().click();
   const actions = page.getByRole('group', { name: 'Selected payment actions' });
   for (const label of ['Edit selected payment', 'Approve selected payment', 'Delete selected payment']) {
     await expect(actions.getByRole('button', { name: label })).toBeDisabled();
