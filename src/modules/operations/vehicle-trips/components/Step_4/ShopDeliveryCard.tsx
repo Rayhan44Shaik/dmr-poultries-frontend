@@ -129,7 +129,7 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
                     manyBoxes ? "px-1 py-px text-[9px]" : "px-1.5 py-0.5 text-[10px]"
                   } ${BOX_CHIP_PALETTE[idx % BOX_CHIP_PALETTE.length]}`}
                 >
-                  {id}
+                  {String(id).padStart(2, "0")}
                 </span>
               ))}
             </div>

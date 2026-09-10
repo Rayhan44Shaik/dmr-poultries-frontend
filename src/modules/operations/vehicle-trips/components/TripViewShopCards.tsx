@@ -358,7 +358,7 @@ export function TripViewShopCards({
                           key={id}
                           className="px-1.5 py-0.5 bg-white text-slate-700 font-bold rounded border border-slate-200/80 text-[10px] shrink-0"
                         >
-                          #{id}
+                          {String(id).padStart(2, "0")}
                         </span>
                       ))}
                     </div>

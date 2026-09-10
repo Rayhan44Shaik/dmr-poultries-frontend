@@ -182,8 +182,8 @@ export default function ShopDeliveryForm({
   );
   const boxDropdownOptions: DropdownOption[] = availableBoxDetails.map((b: any) => ({
     value: String(b.boxNo),
-    label: `${b.boxNo} · ${b.birds} ${t("common.birds")} · ${Number(b.weight).toFixed(2)} kg`,
-    chipLabel: `${b.boxNo}`,
+    label: `${String(b.boxNo).padStart(2, "0")} · ${b.birds} ${t("common.birds")} · ${Number(b.weight).toFixed(2)} kg`,
+    chipLabel: `${String(b.boxNo).padStart(2, "0")}`,
   }));
 
   // Bright, eye-friendly coloured box-number chips for the box dropdown list.
@@ -197,7 +197,7 @@ export default function ShopDeliveryForm({
         <span
           className={`inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1.5 text-[11px] font-bold tabular-nums ${boxTileClass(boxNo)}`}
         >
-          {boxNo}
+          {String(boxNo).padStart(2, "0")}
         </span>
         <span className="truncate text-xs font-medium text-slate-800">
           {box ? `${box.birds} ${t("common.birds")} · ${Number(box.weight).toFixed(2)} kg` : opt.label}
@@ -385,14 +385,14 @@ export default function ShopDeliveryForm({
                     selectedBoxIds.length > 30 ? "h-7 text-[11px]" : "h-10 text-sm"
                   } ${BOX_TILE_PALETTE[idx % BOX_TILE_PALETTE.length]}`}
                 >
-                  <span className="tabular-nums">{id}</span>
+                  <span className="tabular-nums">{String(id).padStart(2, "0")}</span>
                   {!readOnly && (
                     <button
                       type="button"
                       onClick={() => handleBoxSelection(selectedBoxIds.filter((x) => x !== id))}
                       className="rounded p-0.5 opacity-60 transition-colors hover:opacity-100 hover:bg-black/5"
-                      aria-label={`${t("common.remove")} ${id}`}
-                      title={`${t("common.remove")} ${id}`}
+                      aria-label={`${t("common.remove")} ${String(id).padStart(2, "0")}`}
+                      title={`${t("common.remove")} ${String(id).padStart(2, "0")}`}
                     >
                       <X size={10} strokeWidth={2.75} />
                     </button>

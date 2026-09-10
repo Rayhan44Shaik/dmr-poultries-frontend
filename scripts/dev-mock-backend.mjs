@@ -1277,9 +1277,15 @@ function buildWalkthroughTrips({ stamp, today, yesterday }) {
       // the 100-shop dropdown end to end.
       vehicleBoxCapacity: 84,
       farmStepSubmitted: true,
-      // No pre-assigned shops — the supervisor captures deliveries manually
-      // (the sample must not invent shops the user never entered).
-      deliveries: [],
+      // Order-assignment plan ([ORDER] rows) — the shops that still NEED a
+      // delivery in Step 4. They are NOT user-entered deliveries: the card
+      // list hides `[ORDER]` rows, and the Add-Shop dropdown offers exactly
+      // these shops (route order first, completed shops afterwards).
+      deliveries: [
+        planRow(1, 1, 15, 260),
+        planRow(2, 2, 10, 170),
+        planRow(3, 3, 5, 90),
+      ],
     }),
     // 9304 · Steps 1–4 submitted (shops 1+3 delivered with rates) →
     // "Resume: End Trip / Expenses (Step 5)" — closing meter, tolls, meals.

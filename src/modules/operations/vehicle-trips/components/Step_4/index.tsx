@@ -839,8 +839,8 @@ export default function UnLoadingTable({
       .filter((opt: { value: number; label: string; isDisabled: boolean }) => opt.value > 0);
 
     // Delivery queue ordering: pending assignment shops first in their route
-    // (`serialNo`) order, then already-delivered shops (kept selectable so a
-    // shop can be captured again in the other mode), also in route order.
+    // (`serialNo`) order; then already-delivered shops (kept selectable so a
+    // shop can be captured again in the other mode), sorted ALPHABETICALLY.
     const isPendingPriority = (o: { value: number; label: string }) => {
       const id = Number(o.value);
       const shop = source.find((s: any) => Number(s.id ?? s.shopId ?? 0) === id);
@@ -857,10 +857,14 @@ export default function UnLoadingTable({
         const aPrio = isPendingPriority(a);
         const bPrio = isPendingPriority(b);
         if (aPrio !== bPrio) return aPrio ? -1 : 1;
-        const aOrder = orderOf(a);
-        const bOrder = orderOf(b);
-        if (aOrder !== undefined && bOrder !== undefined && aOrder !== bOrder) {
-          return aOrder - bOrder;
+        // Only PENDING shops follow route order; completed shops fall back to
+        // a stable alphabetical order below.
+        if (aPrio && bPrio) {
+          const aOrder = orderOf(a);
+          const bOrder = orderOf(b);
+          if (aOrder !== undefined && bOrder !== undefined && aOrder !== bOrder) {
+            return aOrder - bOrder;
+          }
         }
         return a.label.localeCompare(b.label);
       }
@@ -940,17 +944,12 @@ export default function UnLoadingTable({
 
   // ─── Filtered Search & Pagination ──────────────────────────────
   const displayRows = useMemo<ShopDelivery[]>(() => {
-    // Show fully-entered deliveries, plus Orders assignment plan rows that are
-    // still awaiting their Step 4 delivery. Those carry the `[ORDER]` marker
-    // and land here with weight 0 / no box selection until the supervisor
-    // delivers them — they must be visible so the assigned route can be
-    // fulfilled shop by shop (they persist regardless; this filter is only
-    // what the card list renders).
+    // Only CAPTURED deliveries render as cards. Pending `[ORDER]` assignment
+    // rows (the shops that still need a delivery) are NOT user-entered data,
+    // so they stay hidden here — the Add-Shop dropdown is where those shops
+    // are offered (route order first, completed shops afterwards).
     const saved = safeRows.filter(
-      (r: ShopDelivery) =>
-        r.shopId > 0 &&
-        ((r.birds > 0 && r.weight > 0) ||
-          String(r.remarks ?? "").trim().startsWith("[ORDER]"))
+      (r: ShopDelivery) => r.shopId > 0 && r.birds > 0 && r.weight > 0
     );
 
     const filtered = saved.filter((r: ShopDelivery) => {
