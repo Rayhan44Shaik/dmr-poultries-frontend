@@ -7,11 +7,26 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { Clock, User, Truck, Gauge, Wallet, Pencil } from "lucide-react";
-import Select from "react-select";
+import {
+  Calendar,
+  Check,
+  ChevronDown,
+  Clock,
+  Gauge,
+  History,
+  Search,
+  Truck,
+  User,
+  Users,
+  Wallet,
+  Pencil,
+} from "lucide-react";
 import type { Trip } from "../types/trip";
 import { validateStartStep } from "../../../../shared/trip/validation";
-import { fetchLastClosingMeter } from "../services/tripHeaderApiService";
+import {
+  fetchLastClosingMeter,
+  formatStartTimeForDisplay,
+} from "../services/tripHeaderApiService";
 import { StepCloseButton, WizardActionBar, WizardStepNotice, type WizardNoticeState } from "./WizardStepUI";
 import {
   TRIP_FIELD_DEFINITIONS,
@@ -56,8 +71,6 @@ type Step1FormState = {
   openingMeterText: string;
   advanceText: string;
 };
-
-const MENU_PORTAL_TARGET = typeof document !== "undefined" ? document.body : null;
 
 const EMPTY_FORM: Step1FormState = {
   vehicleId: 0,
@@ -125,78 +138,366 @@ function formToTripPatch(form: Step1FormState): Partial<Trip> {
   };
 }
 
-const getVehicleLabel = (option: VehicleOption) => option.vehicleNumber || "";
-const getVehicleValue = (option: VehicleOption) => String(option.id ?? "");
-const getEmployeeLabel = (option: EmployeeOption) => option.employeeName || "";
-const getEmployeeValue = (option: EmployeeOption) => option.employeeName || "";
+// ── Shared dropdown panel constants (Salary-Register-style control) ──────────
+// Mirrors src/components/common/SearchableSelect.tsx: labelled trigger, an
+// in-panel search box, a pinned "clear" row and a scrollable list that shows
+// exactly VISIBLE_ITEMS rows at a time.
+const VISIBLE_ITEMS = 5;
+const ITEM_HEIGHT = 36; // h-9 rows, same as SearchableSelect
+const LIST_MAX_HEIGHT = VISIBLE_ITEMS * ITEM_HEIGHT;
 
-const selectStyles: any = {
-  menuPortal: (base: Record<string, unknown>) => ({ ...base, zIndex: 9999 }),
-  control: (base: any, state: any) => ({
-    ...base,
-    minHeight: 42,
-    borderRadius: "0.75rem",
-    borderColor: state.isFocused ? "#2563eb" : "#e2e8f0",
-    backgroundColor: "#ffffff",
-    boxShadow: state.isFocused ? "0 0 0 2px rgba(37, 99, 235, 0.15)" : "none",
-    "&:hover": { borderColor: "#cbd5e1" },
-  }),
-  singleValue: (base: Record<string, unknown>) => ({
-    ...base,
-    color: "#0f172a",
-    fontWeight: "500",
-    fontSize: "14px",
-  }),
-  multiValue: (base: Record<string, unknown>) => ({
-    ...base,
-    backgroundColor: "#f1f5f9",
-    borderRadius: "0.375rem",
-  }),
-  multiValueLabel: (base: Record<string, unknown>) => ({
-    ...base,
-    color: "#0f172a",
-    fontSize: "13px",
-    paddingLeft: "6px",
-    paddingRight: "6px",
-  }),
-  multiValueRemove: (base: Record<string, unknown>) => ({
-    ...base,
-    color: "#64748b",
-    "&:hover": { backgroundColor: "#e2e8f0", color: "#0f172a" },
-  }),
-  placeholder: (base: Record<string, unknown>) => ({
-    ...base,
-    color: "#94a3b8",
-    fontSize: "14px",
-  }),
-  option: (base: any, { isFocused, isSelected }: any) => ({
-    ...base,
-    backgroundColor: isSelected ? "#2563eb" : isFocused ? "#f8fafc" : "#ffffff",
-    color: isSelected ? "#ffffff" : "#1e293b",
-    fontSize: "13px",
-    cursor: "pointer",
-  }),
-  menu: (base: Record<string, unknown>) => ({
-    ...base,
-    backgroundColor: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: "0.75rem",
-    maxHeight: 180,
-    overflowY: "auto",
-    scrollbarWidth: "none",
-  }),
-};
+type DropdownOption = { value: string; label: string };
 
-const StartTimeField = React.memo(function StartTimeField({ startTime }: { startTime: string }) {
+/** Soft-coloured icon chip ("logo") shown beside every field label. */
+const FieldLabel = React.memo(function FieldLabel({
+  icon: Icon,
+  tone,
+  label,
+  required,
+}: {
+  icon: React.ComponentType<{ size?: number | string; className?: string }>;
+  tone: string;
+  label: string;
+  required?: boolean;
+}) {
+  return (
+    <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+      <span className={`h-5 w-5 rounded-md flex items-center justify-center shrink-0 ${tone}`}>
+        <Icon size={12} />
+      </span>
+      <span className="truncate">{label}</span>
+      {required && <span className="text-red-500">*</span>}
+    </label>
+  );
+});
+
+function dropdownTriggerClass(invalid: boolean, disabled: boolean): string {
+  return [
+    "mt-1 h-[42px] w-full rounded-xl border bg-white px-4 text-sm font-medium outline-none transition-all",
+    "flex items-center justify-between gap-2 text-left",
+    disabled
+      ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+      : invalid
+        ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
+        : "border-slate-200 hover:border-slate-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10",
+  ].join(" ");
+}
+
+const SearchDropdown = React.memo(function SearchDropdown({
+  value,
+  options,
+  placeholder,
+  searchPlaceholder,
+  disabled,
+  invalid,
+  onChange,
+}: {
+  value: string;
+  options: DropdownOption[];
+  placeholder: string;
+  searchPlaceholder: string;
+  disabled: boolean;
+  invalid?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onDocClick = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  useEffect(() => {
+    if (open) requestAnimationFrame(() => searchRef.current?.focus());
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((option) => option.label.toLowerCase().includes(q));
+  }, [options, query]);
+
+  const selected = useMemo(
+    () => options.find((option) => option.value === value) || null,
+    [options, value]
+  );
+
+  const pick = useCallback(
+    (next: string) => {
+      onChange(next);
+      setOpen(false);
+      setQuery("");
+    },
+    [onChange]
+  );
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          if (!open) setQuery("");
+          setOpen((o) => !o);
+        }}
+        className={dropdownTriggerClass(Boolean(invalid), disabled)}
+      >
+        <span className={`truncate ${selected ? "text-slate-800" : "text-slate-400 font-normal"}`}>
+          {selected?.label || placeholder}
+        </span>
+        <ChevronDown
+          size={16}
+          className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-[80] mt-1 w-full min-w-[230px] bg-white rounded-xl shadow-xl shadow-slate-200/70 border border-slate-200 overflow-hidden">
+          <div className="p-1.5 border-b border-slate-100 bg-slate-50/60">
+            <div className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-white border border-slate-200">
+              <Search size={12} className="text-slate-400 shrink-0" />
+              <input
+                ref={searchRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
+              />
+            </div>
+          </div>
+
+          {/* Pinned "clear" row — same affordance as the Salary Register filter. */}
+          <button
+            type="button"
+            onClick={() => pick("")}
+            className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left border-b border-slate-100 hover:bg-slate-50 transition ${
+              !value ? "text-blue-600 bg-blue-50/70" : "text-slate-600"
+            }`}
+          >
+            <span className="w-3.5 shrink-0">{!value && <Check size={13} className="text-blue-600" />}</span>
+            <span className="truncate">{placeholder}</span>
+          </button>
+
+          <ul
+            className="overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
+            style={{ maxHeight: `${LIST_MAX_HEIGHT}px` }}
+          >
+            {filtered.map((option) => {
+              const isSelected = value === option.value;
+              return (
+                <li key={option.value}>
+                  <button
+                    type="button"
+                    onClick={() => pick(option.value)}
+                    className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left truncate hover:bg-slate-50 transition ${
+                      isSelected ? "text-blue-600 bg-blue-50/70" : "text-slate-700"
+                    }`}
+                  >
+                    <span className="w-3.5 shrink-0">
+                      {isSelected && <Check size={13} className="text-blue-600" />}
+                    </span>
+                    <span className="truncate">{option.label}</span>
+                  </button>
+                </li>
+              );
+            })}
+            {filtered.length === 0 && (
+              <li className="px-3 h-9 flex items-center text-xs text-slate-400">No matches</li>
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+});
+
+const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
+  selected: selectedValues,
+  options,
+  placeholder,
+  searchPlaceholder,
+  disabled,
+  invalid,
+  onChange,
+}: {
+  selected: string[];
+  options: DropdownOption[];
+  placeholder: string;
+  searchPlaceholder: string;
+  disabled: boolean;
+  invalid?: boolean;
+  onChange: (selected: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onDocClick = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  useEffect(() => {
+    if (open) requestAnimationFrame(() => searchRef.current?.focus());
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((option) => option.label.toLowerCase().includes(q));
+  }, [options, query]);
+
+  const selectedSet = useMemo(() => new Set(selectedValues), [selectedValues]);
+  const selectedLabels = useMemo(
+    () =>
+      selectedValues
+        .map((value) => options.find((option) => option.value === value)?.label || value)
+        .join(", "),
+    [selectedValues, options]
+  );
+
+  const toggle = useCallback(
+    (value: string) => {
+      const next = selectedSet.has(value)
+        ? selectedValues.filter((v) => v !== value)
+        : [...selectedValues, value];
+      onChange(next);
+    },
+    [selectedSet, selectedValues, onChange]
+  );
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          if (!open) setQuery("");
+          setOpen((o) => !o);
+        }}
+        className={dropdownTriggerClass(Boolean(invalid), disabled)}
+      >
+        <span className={`truncate ${selectedValues.length ? "text-slate-800" : "text-slate-400 font-normal"}`}>
+          {selectedLabels || placeholder}
+        </span>
+        {selectedValues.length > 0 && (
+          <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold">
+            {selectedValues.length}
+          </span>
+        )}
+        <ChevronDown
+          size={16}
+          className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-[80] mt-1 w-full min-w-[230px] bg-white rounded-xl shadow-xl shadow-slate-200/70 border border-slate-200 overflow-hidden">
+          <div className="p-1.5 border-b border-slate-100 bg-slate-50/60">
+            <div className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-white border border-slate-200">
+              <Search size={12} className="text-slate-400 shrink-0" />
+              <input
+                ref={searchRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
+              />
+            </div>
+          </div>
+
+          {/* Pinned "clear all" row */}
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left border-b border-slate-100 hover:bg-slate-50 transition ${
+              selectedValues.length === 0 ? "text-blue-600 bg-blue-50/70" : "text-slate-600"
+            }`}
+          >
+            <span className="w-3.5 shrink-0">
+              {selectedValues.length === 0 && <Check size={13} className="text-blue-600" />}
+            </span>
+            <span className="truncate">{placeholder}</span>
+          </button>
+
+          <ul
+            className="overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
+            style={{ maxHeight: `${LIST_MAX_HEIGHT}px` }}
+          >
+            {filtered.map((option) => {
+              const isSelected = selectedSet.has(option.value);
+              return (
+                <li key={option.value}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(option.value)}
+                    className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left truncate hover:bg-slate-50 transition ${
+                      isSelected ? "text-blue-600 bg-blue-50/70" : "text-slate-700"
+                    }`}
+                  >
+                    <span className="w-3.5 shrink-0">
+                      {isSelected && <Check size={13} className="text-blue-600" />}
+                    </span>
+                    <span className="truncate">{option.label}</span>
+                  </button>
+                </li>
+              );
+            })}
+            {filtered.length === 0 && (
+              <li className="px-3 h-9 flex items-center text-xs text-slate-400">No matches</li>
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+});
+
+// ── Read-only computed fields ────────────────────────────────────────────────
+
+const TripDateField = React.memo(function TripDateField({ tripDate }: { tripDate: string }) {
   const { t } = useI18n();
   return (
     <div>
-      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <Clock size={14} className="text-slate-400" /> {t("ops.trip.field.start_time")} {TRIP_FIELD_DEFINITIONS.startTime.required && <span className="text-red-500">*</span>}
-      </label>
+      <FieldLabel
+        icon={Calendar}
+        tone="bg-sky-50 text-sky-600"
+        label={t("ops.trip.field.trip_date")}
+        required={TRIP_FIELD_DEFINITIONS.tripDate.required}
+      />
       <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
-        {startTime ? (
-          startTime
+        {tripDate || <span className="text-slate-400 font-normal text-xs">--</span>}
+      </div>
+    </div>
+  );
+});
+
+const StartTimeField = React.memo(function StartTimeField({ startTime }: { startTime: string }) {
+  const { t } = useI18n();
+  const display = useMemo(() => formatStartTimeForDisplay(startTime), [startTime]);
+  return (
+    <div>
+      <FieldLabel
+        icon={Clock}
+        tone="bg-blue-50 text-blue-600"
+        label={t("ops.trip.field.start_time")}
+        required={TRIP_FIELD_DEFINITIONS.startTime.required}
+      />
+      <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
+        {display ? (
+          display
         ) : (
           <span className="text-slate-400 font-normal text-xs">{t("ops.trip.will_be_captured")}</span>
         )}
@@ -205,24 +506,39 @@ const StartTimeField = React.memo(function StartTimeField({ startTime }: { start
   );
 });
 
-function buildSelectStyles(invalid: boolean): any {
-  return {
-    ...selectStyles,
-    control: (base: any, state: any) => ({
-      ...selectStyles.control(base, state),
-      borderColor: invalid
-        ? "#ef4444"
-        : state.isFocused
-          ? "#2563eb"
-          : "#e2e8f0",
-      boxShadow: invalid
-        ? "0 0 0 2px rgba(239, 68, 68, 0.1)"
-        : state.isFocused
-          ? "0 0 0 2px rgba(37, 99, 235, 0.15)"
-          : "none",
-    }),
-  };
-}
+/** Read-only reference: the vehicle's latest recorded (closing) meter. */
+const LastClosingMeterField = React.memo(function LastClosingMeterField({
+  latestMeter,
+}: {
+  latestMeter: { meter: number; tripNo: string; tripDate: string } | null;
+}) {
+  const { t } = useI18n();
+  return (
+    <div>
+      <FieldLabel
+        icon={History}
+        tone="bg-fuchsia-50 text-fuchsia-600"
+        label={t("ops.trip.field.last_closing_meter")}
+      />
+      <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center justify-between gap-2 text-sm font-medium text-slate-800">
+        {latestMeter ? (
+          <>
+            <span className="shrink-0">{latestMeter.meter} KM</span>
+            {latestMeter.tripNo && (
+              <span className="text-[11px] font-semibold text-slate-400 truncate">
+                {t("ops.trip.from_trip", { no: latestMeter.tripNo })}
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="text-slate-400 font-normal text-xs">{t("ops.trip.last_closing_meter_none")}</span>
+        )}
+      </div>
+    </div>
+  );
+});
+
+// ── Select fields (Salary-Register-style searchable dropdowns) ───────────────
 
 const VehicleField = React.memo(function VehicleField({
   vehicleId,
@@ -238,131 +554,211 @@ const VehicleField = React.memo(function VehicleField({
   onSelect: (vehicleId: number, vehicleNo: string) => void;
 }) {
   const { t } = useI18n();
-  const value = useMemo(
-    () => options.find((option) => option.id === vehicleId) || null,
-    [options, vehicleId]
+  const dropdownOptions = useMemo<DropdownOption[]>(
+    () => options.map((option) => ({ value: String(option.id), label: option.vehicleNumber || "" })),
+    [options]
   );
   const handleChange = useCallback(
-    (option: VehicleOption | null) => {
-      onSelect(option?.id || 0, option?.vehicleNumber || "");
+    (value: string) => {
+      const id = Number(value) || 0;
+      const option = options.find((o) => o.id === id);
+      onSelect(id, option?.vehicleNumber || "");
     },
-    [onSelect]
+    [options, onSelect]
   );
-  const styles = useMemo(() => buildSelectStyles(Boolean(invalid)), [invalid]);
 
   return (
     <div>
-      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <Truck size={14} className="text-slate-400" /> {t("operations.vehicle_no")} {TRIP_FIELD_DEFINITIONS.vehicleId.required && <span className="text-red-500">*</span>}
-      </label>
-      <Select<VehicleOption, false>
-        options={options}
-        getOptionLabel={getVehicleLabel}
-        getOptionValue={getVehicleValue}
-        value={value}
-        onChange={handleChange}
-        className="mt-1 text-sm"
+      <FieldLabel
+        icon={Truck}
+        tone="bg-blue-50 text-blue-600"
+        label={t("operations.vehicle_no")}
+        required={TRIP_FIELD_DEFINITIONS.vehicleId.required}
+      />
+      <SearchDropdown
+        value={vehicleId ? String(vehicleId) : ""}
+        options={dropdownOptions}
         placeholder={t("ops.trip.search_vehicle")}
-        isSearchable
-        isDisabled={disabled}
-        styles={styles}
-        menuPortalTarget={MENU_PORTAL_TARGET}
+        searchPlaceholder={t("ops.trip.search_vehicle")}
+        disabled={disabled}
+        invalid={invalid}
+        onChange={handleChange}
       />
     </div>
   );
 });
 
 const SupervisorField = React.memo(function SupervisorField({
-  supervisorName,
+  supervisorId,
   options,
   disabled,
   invalid,
   onSelect,
 }: {
-  supervisorName: string;
+  supervisorId: number;
   options: EmployeeOption[];
   disabled: boolean;
   invalid?: boolean;
   onSelect: (supervisorId: number, supervisorName: string) => void;
 }) {
   const { t } = useI18n();
-  const value = useMemo(
-    () => options.find((option) => option.employeeName === supervisorName) || null,
-    [options, supervisorName]
+  const dropdownOptions = useMemo<DropdownOption[]>(
+    () => options.map((option) => ({ value: String(option.id), label: option.employeeName || "" })),
+    [options]
   );
   const handleChange = useCallback(
-    (option: EmployeeOption | null) => {
-      onSelect(option?.id || 0, option?.employeeName || "");
+    (value: string) => {
+      const id = Number(value) || 0;
+      const option = options.find((o) => o.id === id);
+      onSelect(id, option?.employeeName || "");
     },
-    [onSelect]
+    [options, onSelect]
   );
-  const styles = useMemo(() => buildSelectStyles(Boolean(invalid)), [invalid]);
 
   return (
     <div>
-      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-slate-400" /> {t("common.supervisor")} {TRIP_FIELD_DEFINITIONS.supervisorId.required && <span className="text-red-500">*</span>}
-      </label>
-      <Select<EmployeeOption, false>
-        options={options}
-        getOptionLabel={getEmployeeLabel}
-        getOptionValue={getEmployeeValue}
-        value={value}
-        onChange={handleChange}
-        className="mt-1 text-sm"
+      <FieldLabel
+        icon={User}
+        tone="bg-indigo-50 text-indigo-600"
+        label={t("common.supervisor")}
+        required={TRIP_FIELD_DEFINITIONS.supervisorId.required}
+      />
+      <SearchDropdown
+        value={supervisorId ? String(supervisorId) : ""}
+        options={dropdownOptions}
         placeholder={t("ops.trip.search_supervisor")}
-        isSearchable
-        isDisabled={disabled}
-        styles={styles}
-        menuPortalTarget={MENU_PORTAL_TARGET}
+        searchPlaceholder={t("ops.trip.search_supervisor")}
+        disabled={disabled}
+        invalid={invalid}
+        onChange={handleChange}
       />
     </div>
   );
 });
 
 const DriverField = React.memo(function DriverField({
-  driverName,
+  driverId,
   options,
   disabled,
   invalid,
   onSelect,
 }: {
-  driverName: string;
+  driverId: number;
   options: EmployeeOption[];
   disabled: boolean;
   invalid?: boolean;
   onSelect: (driverId: number, driverName: string) => void;
 }) {
   const { t } = useI18n();
-  const value = useMemo(
-    () => options.find((option) => option.employeeName === driverName) || null,
-    [options, driverName]
+  const dropdownOptions = useMemo<DropdownOption[]>(
+    () => options.map((option) => ({ value: String(option.id), label: option.employeeName || "" })),
+    [options]
   );
   const handleChange = useCallback(
-    (option: EmployeeOption | null) => {
-      onSelect(option?.id || 0, option?.employeeName || "");
+    (value: string) => {
+      const id = Number(value) || 0;
+      const option = options.find((o) => o.id === id);
+      onSelect(id, option?.employeeName || "");
     },
-    [onSelect]
+    [options, onSelect]
   );
-  const styles = useMemo(() => buildSelectStyles(Boolean(invalid)), [invalid]);
 
   return (
     <div>
-      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-slate-400" /> {t("common.driver")} {TRIP_FIELD_DEFINITIONS.driverId.required && <span className="text-red-500">*</span>}
-      </label>
-      <Select<EmployeeOption, false>
-        options={options}
-        getOptionLabel={getEmployeeLabel}
-        getOptionValue={getEmployeeValue}
-        value={value}
-        onChange={handleChange}
-        className="mt-1 text-sm"
+      <FieldLabel
+        icon={User}
+        tone="bg-emerald-50 text-emerald-600"
+        label={t("common.driver")}
+        required={TRIP_FIELD_DEFINITIONS.driverId.required}
+      />
+      <SearchDropdown
+        value={driverId ? String(driverId) : ""}
+        options={dropdownOptions}
         placeholder={t("ops.trip.search_driver")}
-        isSearchable
-        isDisabled={disabled}
-        styles={styles}
-        menuPortalTarget={MENU_PORTAL_TARGET}
+        searchPlaceholder={t("ops.trip.search_driver")}
+        disabled={disabled}
+        invalid={invalid}
+        onChange={handleChange}
+      />
+    </div>
+  );
+});
+
+const HelpersField = React.memo(function HelpersField({
+  helpers,
+  options,
+  disabled,
+  invalid,
+  onChange,
+}: {
+  helpers: string[];
+  options: EmployeeOption[];
+  disabled: boolean;
+  invalid?: boolean;
+  onChange: (helpers: string[]) => void;
+}) {
+  const { t } = useI18n();
+  const dropdownOptions = useMemo<DropdownOption[]>(
+    () => options.map((option) => ({ value: option.employeeName, label: option.employeeName || "" })),
+    [options]
+  );
+
+  return (
+    <div>
+      <FieldLabel
+        icon={Users}
+        tone="bg-teal-50 text-teal-600"
+        label={t("ops.trip.field.helpers")}
+        required={TRIP_FIELD_DEFINITIONS.helpers.required}
+      />
+      <MultiSearchDropdown
+        selected={helpers}
+        options={dropdownOptions}
+        placeholder={t("ops.trip.select_helpers")}
+        searchPlaceholder={t("ops.trip.select_helpers")}
+        disabled={disabled}
+        invalid={invalid}
+        onChange={onChange}
+      />
+    </div>
+  );
+});
+
+const LoadersField = React.memo(function LoadersField({
+  loaders,
+  options,
+  disabled,
+  invalid,
+  onChange,
+}: {
+  loaders: string[];
+  options: EmployeeOption[];
+  disabled: boolean;
+  invalid?: boolean;
+  onChange: (loaders: string[]) => void;
+}) {
+  const { t } = useI18n();
+  const dropdownOptions = useMemo<DropdownOption[]>(
+    () => options.map((option) => ({ value: option.employeeName, label: option.employeeName || "" })),
+    [options]
+  );
+
+  return (
+    <div>
+      <FieldLabel
+        icon={Users}
+        tone="bg-amber-50 text-amber-600"
+        label={t("ops.trip.field.loaders")}
+        required={TRIP_FIELD_DEFINITIONS.loaders.required}
+      />
+      <MultiSearchDropdown
+        selected={loaders}
+        options={dropdownOptions}
+        placeholder={t("ops.trip.select_loaders")}
+        searchPlaceholder={t("ops.trip.select_loaders")}
+        disabled={disabled}
+        invalid={invalid}
+        onChange={onChange}
       />
     </div>
   );
@@ -394,9 +790,12 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
 
   return (
     <div>
-      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <Gauge size={14} className="text-slate-400" /> {t("ops.trip.field.opening_meter")} {TRIP_FIELD_DEFINITIONS.openingMeter.required && <span className="text-red-500">*</span>}
-      </label>
+      <FieldLabel
+        icon={Gauge}
+        tone="bg-purple-50 text-purple-600"
+        label={t("ops.trip.field.opening_meter")}
+        required={TRIP_FIELD_DEFINITIONS.openingMeter.required}
+      />
       <input
         type="text"
         inputMode="decimal"
@@ -445,9 +844,12 @@ const AdvanceField = React.memo(function AdvanceField({
 
   return (
     <div>
-      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <Wallet size={14} className="text-slate-400" /> {t("operations.advance")} {TRIP_FIELD_DEFINITIONS.advanceAmount.required && <span className="text-red-500">*</span>}
-      </label>
+      <FieldLabel
+        icon={Wallet}
+        tone="bg-orange-50 text-orange-600"
+        label={t("operations.advance")}
+        required={TRIP_FIELD_DEFINITIONS.advanceAmount.required}
+      />
       <input
         type="text"
         inputMode="decimal"
@@ -461,104 +863,6 @@ const AdvanceField = React.memo(function AdvanceField({
             : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
         }`}
         placeholder="0.00"
-      />
-    </div>
-  );
-});
-
-const HelpersField = React.memo(function HelpersField({
-  helpers,
-  options,
-  disabled,
-  invalid,
-  onChange,
-}: {
-  helpers: string[];
-  options: EmployeeOption[];
-  disabled: boolean;
-  invalid?: boolean;
-  onChange: (helpers: string[]) => void;
-}) {
-  const { t } = useI18n();
-  const value = useMemo(
-    () => options.filter((option) => helpers.includes(option.employeeName)),
-    [options, helpers]
-  );
-  const handleChange = useCallback(
-    (selected: readonly EmployeeOption[] | null) => {
-      onChange(selected ? selected.map((option) => option.employeeName) : []);
-    },
-    [onChange]
-  );
-  const styles = useMemo(() => buildSelectStyles(Boolean(invalid)), [invalid]);
-
-  return (
-    <div>
-      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-slate-400" /> {t("ops.trip.field.helpers")} {TRIP_FIELD_DEFINITIONS.helpers.required && <span className="text-red-500">*</span>}
-      </label>
-      <Select<EmployeeOption, true>
-        options={options}
-        getOptionLabel={getEmployeeLabel}
-        getOptionValue={getEmployeeValue}
-        value={value}
-        onChange={handleChange}
-        className="mt-1 text-sm"
-        placeholder={t("ops.trip.select_helpers")}
-        isMulti
-        isSearchable
-        isDisabled={disabled}
-        styles={styles}
-        menuPortalTarget={MENU_PORTAL_TARGET}
-      />
-    </div>
-  );
-});
-
-const LoadersField = React.memo(function LoadersField({
-  loaders,
-  options,
-  disabled,
-  invalid,
-  onChange,
-}: {
-  loaders: string[];
-  options: EmployeeOption[];
-  disabled: boolean;
-  invalid?: boolean;
-  onChange: (loaders: string[]) => void;
-}) {
-  const { t } = useI18n();
-  const value = useMemo(
-    () => options.filter((option) => loaders.includes(option.employeeName)),
-    [options, loaders]
-  );
-  const handleChange = useCallback(
-    (selected: readonly EmployeeOption[] | null) => {
-      onChange(selected ? selected.map((option) => option.employeeName) : []);
-    },
-    [onChange]
-  );
-  const styles = useMemo(() => buildSelectStyles(Boolean(invalid)), [invalid]);
-
-  return (
-    <div>
-      <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-        <User size={14} className="text-amber-500" /> {t("ops.trip.field.loaders")} {TRIP_FIELD_DEFINITIONS.loaders.required && <span className="text-red-500">*</span>}
-      </label>
-      <Select<EmployeeOption, true>
-        options={options}
-        getOptionLabel={getEmployeeLabel}
-        getOptionValue={getEmployeeValue}
-        value={value}
-        onChange={handleChange}
-        className="mt-1 text-sm"
-        placeholder={t("ops.trip.select_loaders")}
-        isMulti
-        isSearchable
-        isDisabled={disabled}
-        styles={styles}
-        menuPortalTarget={MENU_PORTAL_TARGET}
       />
     </div>
   );
@@ -878,9 +1182,15 @@ function StepStart({
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Clock size={12} className="text-slate-500" /> {t("ops.trip.field.start_time")}
+              <Calendar size={12} className="text-sky-500" /> {t("ops.trip.field.trip_date")}
             </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{startTime || "--"}</span>
+            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.tripDate || "--"}</span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Clock size={12} className="text-blue-500" /> {t("ops.trip.field.start_time")}
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{formatStartTimeForDisplay(startTime) || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
@@ -900,6 +1210,20 @@ function StepStart({
             </span>
             <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.driverName || "--"}</span>
           </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Users size={12} className="text-teal-500" /> {t("ops.trip.field.helpers")}
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.helpers?.join(", ") || "--"}</span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Users size={12} className="text-amber-500" /> {t("ops.trip.field.loaders")}
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">
+              {loadSnapshot.loaders?.join(", ") || "--"}
+            </span>
+          </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
               <Gauge size={12} className="text-purple-500" /> {t("ops.trip.field.opening_meter")}
@@ -912,26 +1236,20 @@ function StepStart({
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <Wallet size={12} className="text-amber-500" /> {t("operations.advance")}
+              <History size={12} className="text-fuchsia-500" /> {t("ops.trip.field.last_closing_meter")}
+            </span>
+            <span className="text-xs font-bold text-slate-800 truncate">
+              {latestMeter ? `${latestMeter.meter} KM` : t("ops.trip.not_entered")}
+            </span>
+          </div>
+          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+              <Wallet size={12} className="text-orange-500" /> {t("operations.advance")}
             </span>
             <span className="text-xs font-bold text-slate-800">
               {loadSnapshot.advanceAmount == null
                 ? t("ops.trip.not_entered")
                 : `₹${loadSnapshot.advanceAmount.toLocaleString()}`}
-            </span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <User size={12} className="text-slate-500" /> {t("ops.trip.field.helpers")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{loadSnapshot.helpers?.join(", ") || "--"}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs sm:col-span-1">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
-              <User size={12} className="text-amber-500" /> {t("ops.trip.field.loaders")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">
-              {loadSnapshot.loaders?.join(", ") || "--"}
             </span>
           </div>
         </div>
@@ -973,7 +1291,11 @@ function StepStart({
           </div>
         </div>
 
+        {/* Field order: Trip Date, Start Time, Vehicle No., Supervisor, Driver,
+            Helpers, Loaders, then Opening Meter + Closing Meter (last trip
+            reference) and Advance. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 sm:gap-x-6 gap-y-4 sm:gap-y-5">
+          <TripDateField tripDate={loadSnapshot.tripDate} />
           <StartTimeField startTime={startTime} />
           <VehicleField
             vehicleId={form.vehicleId}
@@ -983,18 +1305,32 @@ function StepStart({
             onSelect={handleVehicleSelect}
           />
           <SupervisorField
-            supervisorName={form.supervisorName}
+            supervisorId={form.supervisorId}
             options={supervisorOptions}
             disabled={inputsLocked}
             invalid={fieldInvalid.supervisor}
             onSelect={handleSupervisorSelect}
           />
           <DriverField
-            driverName={form.driverName}
+            driverId={form.driverId}
             options={driverOptions}
             disabled={inputsLocked}
             invalid={fieldInvalid.driver}
             onSelect={handleDriverSelect}
+          />
+          <HelpersField
+            helpers={form.helpers}
+            options={helperOptions}
+            disabled={inputsLocked}
+            invalid={fieldInvalid.helpers}
+            onChange={handleHelpersChange}
+          />
+          <LoadersField
+            loaders={form.loaders}
+            options={loaderOptions}
+            disabled={inputsLocked}
+            invalid={fieldInvalid.loaders}
+            onChange={handleLoadersChange}
           />
           <OpeningMeterField
             value={form.openingMeterText}
@@ -1003,30 +1339,13 @@ function StepStart({
             error={openingMeterError}
             onChange={handleOpeningMeterChange}
           />
+          <LastClosingMeterField latestMeter={latestMeter} />
           <AdvanceField
             value={form.advanceText}
             disabled={inputsLocked}
             invalid={fieldInvalid.advance}
             onChange={handleAdvanceChange}
           />
-          <div className="col-span-1 sm:col-span-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <HelpersField
-                helpers={form.helpers}
-                options={helperOptions}
-                disabled={inputsLocked}
-                invalid={fieldInvalid.helpers}
-                onChange={handleHelpersChange}
-              />
-              <LoadersField
-                loaders={form.loaders}
-                options={loaderOptions}
-                disabled={inputsLocked}
-                invalid={fieldInvalid.loaders}
-                onChange={handleLoadersChange}
-              />
-            </div>
-          </div>
         </div>
 
         <WizardStepNotice notice={notice} dirty={hasUnsavedChanges} />
