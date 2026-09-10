@@ -4,6 +4,7 @@ import type { Trip } from "../types/trip";
 import { StepCloseButton, WizardActionBar, WizardStepNotice } from "./WizardStepUI";
 import { FieldLabel, SearchDropdown, StepKpiCard, type DropdownOption } from "./WizardControls";
 import { GpsAddressText } from "./GpsAddressText";
+import { formatIstStamp } from "../services/tripHeaderApiService";
 import {
   TRIP_FIELD_DEFINITIONS,
 } from "../../../../shared/trip/definitions";
@@ -257,7 +258,7 @@ export default function StepFarm({
             tone="bg-sky-50 text-sky-600"
             bar="bg-sky-400"
             label={t("ops.trip.field.reached_time")}
-            value={trip.reachedTime || t("ops.trip.not_entered")}
+            value={trip.farmStepSubmittedAt ? formatIstStamp(trip.farmStepSubmittedAt) : trip.reachedTime || t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={Store}
@@ -370,7 +371,11 @@ export default function StepFarm({
               required={TRIP_FIELD_DEFINITIONS.reachedTime.required}
             />
             <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
-              {trip.reachedTime ? trip.reachedTime : <span className="text-slate-400 font-normal text-xs">{t("ops.trip.auto_captured_on_submit")}</span>}
+              {trip.farmStepSubmittedAt
+                ? formatIstStamp(trip.farmStepSubmittedAt)
+                : trip.reachedTime
+                  ? trip.reachedTime
+                  : <span className="text-slate-400 font-normal text-xs">{t("ops.trip.auto_captured_on_submit")}</span>}
             </div>
           </div>
 

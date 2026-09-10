@@ -440,6 +440,8 @@ export default {
   'ops.trip.image_size_5mb': 'ఇమేజ్ 5 MB కంటే తక్కువ ఉండాలి',
   'ops.trip.photo_auto_compressed': 'ఫోటో ఆప్టిమైజ్ చేయబడింది: {from} KB → {to} KB',
   'ops.trip.add_photo': 'ఫోటో జోడించు',
+  'ops.trip.time_locked': 'లాక్',
+  'ops.trip.time_locked_hint': 'మొదటి సమర్పణలో స్వయంచాలకంగా క్యాప్చర్ చేయబడింది — మార్చలేరు',
   'ops.trip.in_progress_step': 'దశ {step} — {name}',
   'ops.trip.invalid_meter_reading': 'తప్పు మీటర్ రీడింగ్.',
   'ops.trip.km_ltr_efficiency': 'KM/లీటర్ సామర్థ్యం',

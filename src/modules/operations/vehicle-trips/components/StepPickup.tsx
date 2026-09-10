@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
-  Scale, Bird, Box, Gauge, Clock, Pencil, Package,
+  Scale, Bird, Box, Gauge, Clock, Pencil, Package, Lock,
   Plus, Trash2, FileText, AlertTriangle, Camera, Download
 } from "lucide-react";
 import type { Trip, BoxDetail } from "../types/trip";
@@ -14,6 +14,7 @@ import {
 } from "../../../../shared/trip/definitions";
 import { useI18n } from "../../../../i18n";
 import { compressImageFile } from "../../../../utils/compressImage";
+import { formatIstStamp } from "../services/tripHeaderApiService";
 import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
 
 interface Props {
@@ -272,16 +273,17 @@ export default function StepPickup({
     setRows((prev) => [...prev, makeRow(prev.length + 1)]);
   };
 
+  // ANY box can be deleted. Remaining boxes automatically shift into the
+  // freed slot and renumber contiguously (1..n), so entries stay compact.
   const removeRow = (uid: string) => {
     setRows((prev) => {
       if (prev.length <= 1) return prev;
-      const last = prev[prev.length - 1];
-      if (last.uid !== uid) {
-        setToast({ message: t("ops.trip.remove_last_box"), type: "error" });
-        return prev;
-      }
-      setRemovedBoxNos((ids) => [...ids, last.boxNo]);
-      return prev.slice(0, -1);
+      const victim = prev.find((r) => r.uid === uid);
+      if (!victim) return prev;
+      setRemovedBoxNos((ids) => [...ids, victim.boxNo]);
+      return prev
+        .filter((r) => r.uid !== uid)
+        .map((r, i) => ({ ...r, boxNo: i + 1 }));
     });
   };
 
@@ -318,6 +320,11 @@ export default function StepPickup({
     dcPhotoData2: photos[1]?.data,
     syncPickupPhotos: true,
   });
+
+  // Official Step 3 time capture — frozen at FIRST submit, never changes on edit.
+  const officialPickupTime = trip.pickupStepSubmittedAt
+    ? formatIstStamp(trip.pickupStepSubmittedAt)
+    : trip.pickupLoadTime || "";
 
   const openFilePicker = (slot: number) => {
     slotIndexRef.current = slot;
@@ -597,7 +604,7 @@ export default function StepPickup({
       doc.text('SUMMARY', 14, finalY + 10);
 
       const summaryData = [
-        ['Pickup Time', trip.pickupLoadTime || 'Not entered'],
+        ['Pickup Time', officialPickupTime || 'Not entered'],
         ['Total DC Weight', Number(trip.dcWeight || 0).toFixed(2) + ' Kg'],
         ['Total Birds', trip.totalBirds || 0],
         ['Loaded Boxes', `${trip.boxes || totals.boxes} / ${maxBoxes || '—'}`],
@@ -675,7 +682,7 @@ export default function StepPickup({
             <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
               <span className="h-5 w-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><Clock size={ 12 } /></span> {t("ops.trip.time")}
             </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{trip.pickupLoadTime || "--"}</span>
+            <span className="text-xs font-bold text-slate-800 truncate">{officialPickupTime || "--"}</span>
           </div>
           <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
             <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
@@ -897,10 +904,22 @@ export default function StepPickup({
           </div>
         </div>
 
-        {/* Auto time */}
+        {/* Official time capture — set once at submit, cannot be edited */}
         <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
           <span className="h-5 w-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><Clock size={ 14 } /></span>
-          <span>{trip.pickupLoadTime || t("ops.trip.auto_time_on_submit")}</span>
+          {officialPickupTime ? (
+            <>
+              <span className="font-semibold text-slate-700">{officialPickupTime}</span>
+              <span
+                className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400 bg-slate-100 border border-slate-200 rounded-full px-2 py-0.5"
+                title={t("ops.trip.time_locked_hint")}
+              >
+                <Lock size={9} /> {t("ops.trip.time_locked")}
+              </span>
+            </>
+          ) : (
+            <span>{t("ops.trip.auto_time_on_submit")}</span>
+          )}
         </div>
 
         {/* Image Upload Section — two DC photo slots */}
@@ -1040,7 +1059,7 @@ export default function StepPickup({
                             <button
                               type="button"
                               onClick={() => removeRow(row.uid)}
-                              disabled={rows.length === 1 || row.uid !== rows[rows.length - 1]?.uid}
+                              disabled={rows.length === 1}
                               className="mini-delete shrink-0"
                               title={t("ops.trip.delete_box")}
                             >

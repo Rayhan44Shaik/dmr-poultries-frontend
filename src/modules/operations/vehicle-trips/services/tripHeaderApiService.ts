@@ -73,6 +73,29 @@ export function formatStartTimeForDisplay(value: unknown): string {
   return raw;
 }
 
+/**
+ * Official submit-stamp formatter — always INDIAN STANDARD TIME with seconds:
+ * "10-09-2026 14:05:33 IST". Unparseable values pass through untouched so
+ * legacy HH:MM seed data still renders.
+ */
+export function formatIstStamp(value: unknown): string {
+  if (!value) return "";
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(parsed);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("day")}-${get("month")}-${get("year")} ${get("hour")}:${get("minute")}:${get("second")} IST`;
+}
+
 function mapDeliveriesForDisplay(value: unknown, fallback: Trip["deliveries"]): Trip["deliveries"] {
   if (!Array.isArray(value)) return fallback;
   return value.map((row) => {

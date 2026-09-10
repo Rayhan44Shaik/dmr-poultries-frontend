@@ -73,6 +73,9 @@ export interface Trip {
   loaders?: string[];
   openingMeter: number | null;
   startStepSubmitted: boolean;
+  /** Official Step 1 submit timestamp (IST, with seconds) — set once at first
+   *  submit, never modified by later edits/saves. Display/audit only. */
+  startStepSubmittedAt?: string | null;
 
   sourceFarmId: number;
   sourceFarm: string;
@@ -82,6 +85,8 @@ export interface Trip {
   destMeter: number;
   pickupTolls: number;
   farmStepSubmitted: boolean;
+  /** Official Step 2 submit timestamp (IST, with seconds) — first submit only. */
+  farmStepSubmittedAt?: string | null;
   farmAddress?: string;
   avgBirdWeight?: number;
   farmGpsLat?: number | null;
@@ -95,6 +100,8 @@ export interface Trip {
   avgWeight: number;
   pickupLoadTime: string;
   pickupStepSubmitted: boolean;
+  /** Official Step 3 submit timestamp (IST, with seconds) — first submit only. */
+  pickupStepSubmittedAt?: string | null;
   vehicleBoxCapacity?: number;
   boxNo: number;
   birds: number;

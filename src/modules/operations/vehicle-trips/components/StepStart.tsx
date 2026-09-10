@@ -23,6 +23,7 @@ import { validateStartStep } from "../../../../shared/trip/validation";
 import {
   fetchLastClosingMeter,
   formatStartTimeForDisplay,
+  formatIstStamp,
 } from "../services/tripHeaderApiService";
 import { StepCloseButton, WizardActionBar, WizardStepNotice, type WizardNoticeState } from "./WizardStepUI";
 import { FieldLabel, SearchDropdown, MultiSearchDropdown, StepKpiCard, type DropdownOption } from "./WizardControls";
@@ -858,7 +859,7 @@ function StepStart({
             tone="bg-blue-50 text-blue-600"
             bar="bg-blue-400"
             label={t("ops.trip.field.start_time")}
-            value={formatStartTimeForDisplay(startTime) || "--"}
+            value={loadSnapshot.startStepSubmittedAt ? formatIstStamp(loadSnapshot.startStepSubmittedAt) : formatStartTimeForDisplay(startTime) || "--"}
           />
           <StepKpiCard
             icon={Truck}

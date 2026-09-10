@@ -1500,6 +1500,24 @@ const numOrNull = (v) => {
 };
 const nowHm = () => new Date().toTimeString().slice(0, 5);
 
+/** Official submit timestamp — INDIAN STANDARD TIME, to the second:
+ *  "2026-09-10T14:05:33" (IST wall clock). Captured ONCE at first submit
+ *  and never rewritten by later saves/edits. */
+const istStamp = (when = new Date()) => {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(when);
+  const g = (t) => parts.find((p) => p.type === t)?.value || "";
+  return `${g("year")}-${g("month")}-${g("day")}T${g("hour")}:${g("minute")}:${g("second")}`;
+};
+
 /** Step 1 — create the trip (POST /api/trips/steps/start). */
 function createTripFromStep1(body) {
   const now = new Date();
@@ -1512,7 +1530,7 @@ function createTripFromStep1(body) {
     id: nextTripId++,
     tripNo: `TRP-${tripDate.replaceAll("-", "")}-${String(seq).padStart(2, "0")}`,
     tripDate,
-    startTime: `${tripDate}T${nowHm()}:00`,
+    startTime: istStamp(),
     vehicleId,
     vehicleNo: body.vehicleNo || VEHICLE_BY_ID.get(vehicleId)?.vehicleNumber || "",
     driverId: Number(body.driverId) || 0,
@@ -1529,6 +1547,8 @@ function createTripFromStep1(body) {
     vehicleBoxCapacity: VEHICLE_BY_ID.get(vehicleId)?.noOfBoxes || 0,
     startStepSubmitted: true,
   });
+  // Official Step 1 time capture — created+submitted in one call, so stamp now.
+  trip.startStepSubmittedAt = trip.startTime;
   TRIPS.push(trip);
   return decorateTrip(trip);
 }
@@ -1556,8 +1576,13 @@ function applyStartStep(trip, body) {
   if (Array.isArray(body.loaders)) trip.loaders = body.loaders;
   if (body.remarks != null) trip.remarks = String(body.remarks);
   if (body.mode === "submit" || body.startStepSubmitted === true) {
+    // Official Step 1 time capture: stamped at FIRST submit only — edits and
+    // re-submits can never modify it.
+    if (!trip.startStepSubmitted) {
+      trip.startStepSubmittedAt = istStamp();
+      if (!trip.startTime) trip.startTime = trip.startStepSubmittedAt;
+    }
     trip.startStepSubmitted = true;
-    if (!trip.startTime) trip.startTime = `${trip.tripDate}T${nowHm()}:00`;
   }
   return trip;
 }
@@ -1592,7 +1617,14 @@ function applyFarmStep(trip, body) {
     trip.farmGpsAccuracy = numOrNull(body.farmGpsAccuracy);
     trip.farmGpsTime = body.farmGpsTime || null;
   }
-  if (body.mode === "submit") trip.farmStepSubmitted = true;
+  if (body.mode === "submit") {
+    // Official Step 2 time capture: FIRST submit only, immutable afterwards.
+    if (!trip.farmStepSubmitted) {
+      trip.farmStepSubmittedAt = istStamp();
+      if (!trip.reachedTime) trip.reachedTime = trip.farmStepSubmittedAt;
+    }
+    trip.farmStepSubmitted = true;
+  }
   return trip;
 }
 
@@ -1639,7 +1671,14 @@ function applyPickupStep(trip, body) {
     trip.dcWeight = Math.round(totals.weight * 100) / 100;
     trip.avgWeight = totals.birds > 0 ? Math.round((totals.weight / totals.birds) * 1000) / 1000 : 0;
   }
-  if (body.mode === "submit") trip.pickupStepSubmitted = true;
+  if (body.mode === "submit") {
+    // Official Step 3 time capture: FIRST submit only, immutable afterwards.
+    if (!trip.pickupStepSubmitted) {
+      trip.pickupStepSubmittedAt = istStamp();
+      if (!trip.pickupLoadTime) trip.pickupLoadTime = trip.pickupStepSubmittedAt;
+    }
+    trip.pickupStepSubmitted = true;
+  }
   return trip;
 }
 
