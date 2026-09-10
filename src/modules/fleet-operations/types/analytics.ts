@@ -77,9 +77,9 @@ export interface FleetAnalyticsResponse {
   vehicleId: number | null;
   safe: true;
   kpis: AnalyticsKpis;
-  weekly: AnalyticsWeeklyPoint[];
+  weeklyFuelConsumption: Array<{ week: string; weekLabel: string; litres: number }>;
+  weeklyMileage: Array<{ week: string; weekLabel: string; litres: number; distance: number; mileage: number }>;
   costCenters: AnalyticsCostCenter[];
-  vehicleStats: AnalyticsVehicleStat[];
   topPerformers: AnalyticsTopPerformer[];
   highestExpense: AnalyticsHighestExpense[];
 }

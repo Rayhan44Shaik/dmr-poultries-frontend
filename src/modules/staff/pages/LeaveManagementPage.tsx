@@ -1,12 +1,14 @@
 // src/modules/staff/pages/LeaveManagementPage.tsx
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { CheckCircle2, X } from 'lucide-react';
 import { useLeaveManagement } from '../hooks/useLeaveManagement';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import LeaveFilters from '../components/leave/LeaveFilters';
 import LeaveRequestForm from '../components/leave/LeaveRequestForm';
+import type { LeaveRequestInput } from '../components/leave/LeaveRequestForm';
 import LeaveTable from '../components/leave/LeaveTable';
+import Pagination from '../components/common/Pagination';
 
 const REFRESH_TOAST_DURATION = 5000;
 
@@ -28,8 +30,14 @@ function LeaveManagementPage() {
     approveLeave,
     rejectLeave,
     deleteLeave,
+    cancelLeave,
     refresh,
     stats,
+    page,
+    pageSize,
+    total,
+    totalPages,
+    setPage,
   } = useLeaveManagement(showNotification);
 
   // Auto-hide the refresh toast
@@ -45,13 +53,12 @@ function LeaveManagementPage() {
   }, [refresh]);
 
   const handleAddLeave = useCallback(
-    async (data: { employeeId: number; type: string; fromDate: string; toDate: string; days?: number; reason?: string }) => {
+    async (data: LeaveRequestInput) => {
       const success = await addLeave({
         employeeId: data.employeeId,
-        type: data.type as 'Casual' | 'Sick' | 'Emergency' | 'Annual',
+        type: data.type,
         fromDate: data.fromDate,
         toDate: data.toDate,
-        days: data.days,
         reason: data.reason,
       });
       if (success) setShowForm(false);
@@ -75,7 +82,7 @@ function LeaveManagementPage() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 max-w-full space-y-4">
       {/* Filters — includes Reset, New Request, Refresh inside the filter box */}
       <LeaveFilters
         filters={filters}
@@ -117,12 +124,16 @@ function LeaveManagementPage() {
           <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or create a new request.</p>
         </div>
       ) : (
-        <LeaveTable
-          leaves={leaves}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          onDelete={handleDelete}
-        />
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <LeaveTable
+            leaves={leaves}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onDelete={handleDelete}
+            onCancel={(id) => { void cancelLeave(id); }}
+          />
+          <Pagination currentPage={page} totalPages={totalPages} totalItems={total} itemsPerPage={pageSize} onPageChange={setPage} />
+        </div>
       )}
 
       {/* Refresh Toast — top right notification with close X */}

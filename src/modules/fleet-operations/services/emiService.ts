@@ -1,6 +1,6 @@
-import { getVehiclesRevision, loadVehicles } from '../../masters/vehicles/services/vehicleService';
 import type { EmiOverview, EmiInstallment } from '../types';
-import { computeEmiOverview, computeVehicleEmiSchedule, getEmiToday } from './emiModel';
+import { getEmiToday } from './emiModel';
+import { emiApi } from './emiApi';
 
 export { computeKpis } from './emiModel';
 
@@ -33,11 +33,10 @@ export function loadEmiSnapshot(scope: unknown = null): Promise<EmiSnapshot> {
     // Known changes coalesce into a sequential fresh GET; no mutation is replayed.
     for (;;) {
       const revision = job.revision;
-      const masterRevision = getVehiclesRevision();
-      const invalidated = () => revision !== job.revision || masterRevision !== getVehiclesRevision();
-      let vehicles;
+      const invalidated = () => revision !== job.revision;
+      let records;
       try {
-        vehicles = await loadVehicles();
+        records = await emiApi.list();
       } catch (error) {
         if (invalidated()) continue;
         throw error;
@@ -46,7 +45,18 @@ export function loadEmiSnapshot(scope: unknown = null): Promise<EmiSnapshot> {
       const now = new Date();
       const asOfDate = getEmiToday(now);
       return Object.freeze({
-        rows: Object.freeze(computeEmiOverview(vehicles, asOfDate).map((row) => Object.freeze(row))),
+        rows: Object.freeze(records.map((record) => Object.freeze({
+          vehicleId: record.vehicleId,
+          vehicleNo: record.vehicleNo,
+          vehicleNumber: record.vehicleNo,
+          purchaseAmount: record.loanAmount,
+          totalEMIs: record.totalEMIs,
+          completedEMIs: record.paidEMIs,
+          pendingEMIs: record.pendingEMIs,
+          emiDay: record.nextEMIDate ? Number(record.nextEMIDate.slice(8, 10)) : null,
+          emiStartDate: record.startDate,
+          status: record.status === 'paid' ? 'COMPLETED' as const : 'PENDING' as const,
+        }))),
         asOfDate,
         fetchedAt: now.toISOString(),
       });
@@ -66,6 +76,13 @@ export async function buildEmiOverview(scope: unknown = null): Promise<EmiOvervi
 
 /** Schedule details are generated only when explicitly requested, not per row. */
 export async function getEmiSchedule(vehicleId: number): Promise<EmiInstallment[]> {
-  const vehicle = (await loadVehicles()).find((row) => row.id === vehicleId);
-  return vehicle ? computeVehicleEmiSchedule(vehicle) : [];
+  const record = (await emiApi.list({ vehicleId }))[0];
+  if (!record) return [];
+  const schedule = await emiApi.listSchedule(record.id);
+  return schedule.map((item) => ({
+    installmentNo: item.installmentNo,
+    dueDate: item.dueDate,
+    amount: item.amount,
+    status: item.status === 'paid' ? 'COMPLETED' : 'PENDING',
+  }));
 }

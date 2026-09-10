@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { toBusinessDate } from '../../../utils/businessDate';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import {
@@ -78,6 +78,8 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
   ]);
 
   const [documents, setDocuments] = useState<MaintenanceDocItem[]>([]);
+  const submitInFlight = useRef(false);
+  const createRequestId = useRef(crypto.randomUUID());
 
   const totalCost = useMemo(() => {
     return parts.reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -182,6 +184,7 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
   }, [resetDocuments]);
 
   const handleSubmit = useCallback(async () => {
+    if (submitInFlight.current) return;
     if (!validateForm()) return;
 
     const newFiles = documents.filter((d) => d.file);
@@ -234,6 +237,7 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
 
     formData.append('maintenanceType', JSON.stringify(form.maintenanceType));
     formData.append('serviceType', form.serviceType);
+    if (!form.id) formData.append('idempotencyKey', createRequestId.current);
     if (form.garage) formData.append('garage', form.garage);
     if (form.mechanic) formData.append('mechanic', form.mechanic);
     formData.append('parts', JSON.stringify(cleanedParts));
@@ -243,8 +247,9 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
       if (item.file) formData.append('documents', item.file, item.fileName);
     }
 
+    submitInFlight.current = true;
     try {
-      let saved: any;
+      let saved: unknown;
       if (form.id) {
         saved = await maintenanceApi.update(form.id, formData);
         showNotification('Maintenance record updated successfully!', 'success');
@@ -256,8 +261,11 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
       mapMaintenanceToEvent(saved);
       onSuccess();
       resetToFresh();
+      createRequestId.current = crypto.randomUUID();
     } catch (err) {
       showNotification(handleApiError(err), 'error');
+    } finally {
+      submitInFlight.current = false;
     }
   }, [form, parts, documents, validateForm, showNotification, onSuccess, resetToFresh]);
 

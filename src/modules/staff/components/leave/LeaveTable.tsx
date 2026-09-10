@@ -1,24 +1,20 @@
 // src/modules/staff/components/leave/LeaveTable.tsx
 
-import { memo, useState, useMemo, useEffect } from 'react';
+import { memo, useState, useMemo } from 'react';
 import { CheckCircle, XCircle, Trash2, Eye, X, Calendar } from 'lucide-react';
 import type { LeaveRequest } from '../../types/staffDashboard';
 import { usePendingDelete } from '../../../../hooks/usePendingDelete';
 import { PendingDeleteNotification } from '../../../../components/common/PendingDeleteNotification';
-import {
-  getOrAssignLeaveNumber,
-  loadLeaveNumberMap,
-  saveLeaveNumberMap,
-} from './leaveNumber';
 
 interface LeaveTableProps {
   leaves: LeaveRequest[];
   onApprove: (id: string) => void;
   onReject: (id: string, reason: string) => void;
   onDelete: (id: string) => void;
+  onCancel: (id: string) => void;
 }
 
-function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) {
+function LeaveTable({ leaves, onApprove, onReject, onDelete, onCancel }: LeaveTableProps) {
   const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
   const [viewEmployeeModal, setViewEmployeeModal] = useState<{
     employeeName: string;
@@ -28,31 +24,18 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) 
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
 
-  // Persistent leave number map — assigned once per leave id, never reused.
-  const [leaveNumberMap, setLeaveNumberMap] = useState<Map<string, string>>(() => loadLeaveNumberMap());
-
-  // Assign leave numbers for any new leaves we haven't seen before.
-  useEffect(() => {
-    let changed = false;
-    const updated = new Map(leaveNumberMap);
-    for (const leave of leaves) {
-      if (!updated.has(leave.id)) {
-        const num = getOrAssignLeaveNumber(leave.id, leave.createdAt, updated);
-        updated.set(leave.id, num);
-        changed = true;
-      }
-    }
-    if (changed) {
-      setLeaveNumberMap(updated);
-      saveLeaveNumberMap(updated);
-    }
-  }, [leaves]); // eslint-disable-line react-hooks/exhaustive-deps
+  const leaveNumber = (leave: LeaveRequest) => {
+    const month = leave.createdAt.slice(0, 7).replace('-', '') || 'UNKNOWN';
+    const compactId = leave.id.replace(/-/g, '');
+    return `LEV-${month}-${compactId.slice(-12).toUpperCase()}`;
+  };
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       Pending: 'bg-amber-100 text-amber-700 border-amber-200',
       Approved: 'bg-emerald-100 text-emerald-700 border-emerald-200',
       Rejected: 'bg-rose-100 text-rose-700 border-rose-200',
+      Cancelled: 'bg-slate-100 text-slate-600 border-slate-200',
     };
     return styles[status] || 'bg-slate-100 text-slate-700 border-slate-200';
   };
@@ -120,7 +103,7 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) 
               {leaves.map((leave) => (
                 <tr key={leave.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-3 py-3 text-xs font-mono font-semibold text-slate-700 whitespace-nowrap">
-                    {leaveNumberMap.get(leave.id) || '—'}
+                    {leaveNumber(leave)}
                   </td>
                   <td className="px-3 py-3 text-sm font-medium text-slate-800 whitespace-nowrap">{leave.employeeName}</td>
                   <td className="px-3 py-3 text-sm text-slate-600 whitespace-nowrap">{leave.department || '—'}</td>
@@ -159,6 +142,16 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete }: LeaveTableProps) 
                       {leave.status === 'Pending' && (
                         <button onClick={() => onApprove(leave.id)} className="p-1 text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition" title="Approve">
                           <CheckCircle size={16} />
+                        </button>
+                      )}
+                      {leave.status === 'Approved' && (
+                        <button
+                          onClick={() => { if (window.confirm(`Cancel approved leave for ${leave.employeeName}?`)) onCancel(leave.id); }}
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                          aria-label={`Cancel leave for ${leave.employeeName}`}
+                          title="Cancel leave"
+                        >
+                          <XCircle size={16} />
                         </button>
                       )}
                       {leave.status === 'Pending' && (

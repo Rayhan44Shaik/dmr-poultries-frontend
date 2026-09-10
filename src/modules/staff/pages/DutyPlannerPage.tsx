@@ -24,6 +24,7 @@ function DutyPlannerPage() {
     employees,
     weekDays,
     loading,
+    error: loadError,
     saving,
     usingSampleData,
     filters,
@@ -283,7 +284,12 @@ function DutyPlannerPage() {
             )}
           </>
         )}
-        feedback={automaticSaveError ? (
+        feedback={loadError ? (
+          <div role="alert" className="flex flex-wrap items-center gap-2 text-xs text-rose-600">
+            <AlertCircle size={14} />{loadError}
+            <button type="button" onClick={refreshDuties} className="rounded-md border border-rose-200 px-2 py-1 font-semibold">{t('retry')}</button>
+          </div>
+        ) : automaticSaveError ? (
           <div role="alert" className="flex flex-wrap items-center gap-2 text-xs text-rose-600">
             <AlertCircle size={14} />{t('autoSaveFailed')}
             <button type="button" onClick={refreshDuties} className="rounded-md border border-rose-200 px-2 py-1 font-semibold">{t('retrySave')}</button>
@@ -293,7 +299,7 @@ function DutyPlannerPage() {
         ) : reportError ? (
           <div role="alert" className="flex flex-wrap items-center gap-2 text-xs text-rose-600">
             <AlertCircle size={14} />{t('loadFailed')}
-            <button onClick={() => setRefreshKey((key) => key + 1)} className="inline-flex items-center gap-1 rounded-md border border-rose-200 px-2 py-1 font-semibold hover:bg-rose-50">
+            <button onClick={() => { refreshDuties(); setRefreshKey((key) => key + 1); }} className="inline-flex items-center gap-1 rounded-md border border-rose-200 px-2 py-1 font-semibold hover:bg-rose-50">
               <RefreshCw size={12} />{t('retry')}
             </button>
           </div>

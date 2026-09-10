@@ -23,6 +23,10 @@ const weekTable = (page: Page) => page.getByRole('table', { name: 'Duty Planner 
 const matrix = (page: Page) => page.getByRole('table', { name: 'Duty Planner date matrix' });
 const row = (page: Page, name: string) => page.locator('tbody tr').filter({ hasText: name });
 const dayCell = (page: Page, name: string, date: string) => row(page, name).locator(`td[data-date="${date}"]`);
+async function closeNotificationIfVisible(page: Page) {
+  const close = page.getByRole('button', { name: 'Close notification' });
+  if (await close.isVisible()) await close.click();
+}
 
 function automaticWeek(monday: string): DutyPlannerWeek {
   return testWeek(monday, {
@@ -51,7 +55,7 @@ async function downloadWorkbook(page: Page, telugu = false) {
   expect(download.suggestedFilename()).toMatch(/\.xlsx$/);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile((await download.path())!);
-  await page.getByRole('button', { name: 'Close notification' }).click();
+  await closeNotificationIfVisible(page);
   return { workbook, filename: download.suggestedFilename() };
 }
 async function changeLeaveStatus(page: Page, id: string, status: 'Approved' | 'Rejected') {
@@ -340,7 +344,7 @@ test('Excel uses the active table roster and role filters, not hidden historical
 test('download reflects the latest saved editable duty', async ({ page }) => {
   await dayCell(page, 'Ravi Kumar', TEST_TODAY).getByRole('button').click();
   await page.getByRole('dialog', { name: 'Ravi Kumar', exact: true }).getByRole('button', { name: 'Leave', exact: true }).click();
-  await page.getByRole('button', { name: 'Close notification' }).click();
+  await closeNotificationIfVisible(page);
   await expect(dayCell(page, 'Ravi Kumar', TEST_TODAY)).toHaveText('Leave');
   const sheet = (await downloadWorkbook(page)).workbook.getWorksheet('Duty Planner')!;
   expect(sheet.getCell('E7').value).toBe('Leave');
@@ -356,7 +360,7 @@ test('a failed range cannot export partial data and Retry loads the right month'
   await expect(downloadButton(page)).toBeDisabled();
   await expect(filterBar(page)).toContainText('Could not load the full report.');
   await expect(matrix(page)).toHaveCount(0);
-  await page.getByRole('button', { name: 'Close notification' }).click();
+  await closeNotificationIfVisible(page);
   backend.failWeek = undefined;
   await filterBar(page).getByRole('button', { name: 'Retry report', exact: true }).click();
   await expect(matrix(page)).toBeVisible();
@@ -383,19 +387,17 @@ test('a late response cannot overwrite a newly selected month', async ({ page })
   expect((await downloadWorkbook(page)).filename).toBe('Duty-Planner-2026-11-01-to-2026-11-30.xlsx');
 });
 
-test('sample fallback is labelled and automatic sample staff never write to the API', async ({ page }) => {
+test('backend failure is explicit, retryable and never replaced by sample staff', async ({ page }) => {
   const backend = backends.get(page)!;
   backend.offline = true;
   await page.reload();
-  await expect(page.getByText('Sample data', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Close notification' }).click();
-  await allRoles(page);
-  await expect(dayCell(page, 'Lakshmi Rao', TEST_TODAY)).toHaveText('Office');
-  await expect(dayCell(page, 'Sai Kumar', TEST_TODAY)).toHaveText('Collection');
-  const { workbook, filename } = await downloadWorkbook(page);
-  expect(filename).toContain('-SAMPLE.xlsx');
-  expect(String(workbook.getWorksheet('Duty Planner')!.getCell('A1').value)).toMatch(/^SAMPLE DATA/);
+  await expect(page.getByRole('alert')).toContainText('Test week unavailable');
+  await expect(page.getByText('Sample data', { exact: true })).toHaveCount(0);
+  await expect(downloadButton(page)).toBeDisabled();
   expect(backend.writes).toHaveLength(0);
+  backend.offline = false;
+  await page.getByRole('button', { name: /Retry/, exact: false }).click();
+  await expect(downloadButton(page)).toBeEnabled();
 });
 
 test('Telugu follows the language switch across filters, table, picker, calendar and Excel', async ({ page }) => {

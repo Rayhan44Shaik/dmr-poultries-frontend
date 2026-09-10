@@ -5,7 +5,7 @@
 //   - Leave report:   leaveService -> GET /api/staff/leaves/report
 //   - Employees:      masters employeeService -> GET /api/masters/employees
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   listLeaves,
   createLeave,
@@ -25,7 +25,7 @@ import type {
 type NotificationFn = (message: string, type?: 'success' | 'error' | 'info') => void;
 
 export interface LeaveFilters {
-  status: 'All' | 'Pending' | 'Approved' | 'Rejected';
+  status: 'All' | 'Pending' | 'Approved' | 'Rejected' | 'Cancelled';
   month: string;
   department: string;
   employeeId: number | null;
@@ -51,11 +51,14 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filters, setFilters] = useState<LeaveFilters>(DEFAULT_FILTERS);
   const [list, setList] = useState<LeaveListResult>({ items: [], total: 0, page: 1, limit: 100, totalPages: 0 });
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
   const [report, setReport] = useState<LeaveReport>({ month: DEFAULT_FILTERS.month, items: [] });
   const [loading, setLoading] = useState(true);
   const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
+  const mutations = useRef(new Set<string>());
 
   // Authoritative Employee Master from the backend.
   useEffect(() => {
@@ -81,10 +84,10 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
       employeeId: filters.employeeId ?? undefined,
       leaveType: filters.leaveType === 'All' ? undefined : filters.leaveType,
       search: filters.search || undefined,
-      page: 1,
-      limit: 200,
+      page,
+      limit: pageSize,
     });
-  }, [filters.status, filters.month, filters.department, filters.employeeId, filters.leaveType, filters.search]);
+  }, [filters.status, filters.month, filters.department, filters.employeeId, filters.leaveType, filters.search, page]);
 
   const fetchReport = useCallback(async () => {
     return getLeaveReport({
@@ -105,7 +108,7 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : 'Failed to load leave requests.');
-          setList({ items: [], total: 0, page: 1, limit: 200, totalPages: 0 });
+          setList({ items: [], total: 0, page, limit: pageSize, totalPages: 0 });
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -114,7 +117,7 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
     return () => {
       cancelled = true;
     };
-  }, [fetchList]);
+  }, [fetchList, page]);
 
   useEffect(() => {
     let cancelled = false;
@@ -164,7 +167,7 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
       .then((data) => setList(data))
       .catch((e) => {
         setError(e instanceof Error ? e.message : 'Failed to load leave requests.');
-        setList({ items: [], total: 0, page: 1, limit: 200, totalPages: 0 });
+        setList({ items: [], total: 0, page, limit: pageSize, totalPages: 0 });
       })
       .finally(() => setLoading(false));
     fetchReport()
@@ -174,13 +177,15 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
         setReport({ month: filters.month, items: [] });
       })
       .finally(() => setReportLoading(false));
-  }, [fetchList, fetchReport, filters.month]);
+  }, [fetchList, fetchReport, filters.month, page]);
 
   const setFilter = useCallback(<K extends keyof LeaveFilters>(key: K, value: LeaveFilters[K]) => {
+    setPage(1);
     setFilters((f) => ({ ...f, [key]: value }));
   }, []);
 
   const resetFilters = useCallback(() => {
+    setPage(1);
     setFilters(DEFAULT_FILTERS);
   }, []);
 
@@ -208,12 +213,18 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
 
   const approveLeave = useCallback(
     async (id: string, approvedBy?: string) => {
+      if (mutations.current.has(id)) return false;
+      mutations.current.add(id);
       try {
-        await updateLeaveStatus(id, 'Approved', { approvedBy: approvedBy || 'Admin' });
+        await updateLeaveStatus(id, 'Approved', approvedBy ? { approvedBy } : {});
         notify('Leave approved!', 'success');
         refresh();
+        return true;
       } catch (e) {
         notify(e instanceof Error ? e.message : 'Could not approve leave.', 'error');
+        return false;
+      } finally {
+        mutations.current.delete(id);
       }
     },
     [notify, refresh]
@@ -223,14 +234,20 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
     async (id: string, rejectionReason: string) => {
       if (!rejectionReason.trim()) {
         notify('Please provide a rejection reason.', 'error');
-        return;
+        return false;
       }
+      if (mutations.current.has(id)) return false;
+      mutations.current.add(id);
       try {
         await updateLeaveStatus(id, 'Rejected', { rejectionReason });
         notify('Leave rejected.', 'info');
         refresh();
+        return true;
       } catch (e) {
         notify(e instanceof Error ? e.message : 'Could not reject leave.', 'error');
+        return false;
+      } finally {
+        mutations.current.delete(id);
       }
     },
     [notify, refresh]
@@ -238,16 +255,38 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
 
   const deleteLeave = useCallback(
     async (id: string) => {
+      if (mutations.current.has(id)) return false;
+      mutations.current.add(id);
       try {
         await deleteLeaveApi(id);
         notify('Leave request deleted.', 'info');
         refresh();
+        return true;
       } catch (e) {
         notify(e instanceof Error ? e.message : 'Could not delete leave.', 'error');
+        return false;
+      } finally {
+        mutations.current.delete(id);
       }
     },
     [notify, refresh]
   );
+
+  const cancelLeave = useCallback(async (id: string) => {
+    if (mutations.current.has(id)) return false;
+    mutations.current.add(id);
+    try {
+      await updateLeaveStatus(id, 'Cancelled');
+      notify('Leave cancelled.', 'info');
+      refresh();
+      return true;
+    } catch (e) {
+      notify(e instanceof Error ? e.message : 'Could not cancel leave.', 'error');
+      return false;
+    } finally {
+      mutations.current.delete(id);
+    }
+  }, [notify, refresh]);
 
   return {
     leaves: list.items,
@@ -267,7 +306,13 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
     approveLeave,
     rejectLeave,
     deleteLeave,
+    cancelLeave,
     refresh,
+    page: list.page,
+    pageSize: list.limit,
+    total: list.total,
+    totalPages: list.totalPages,
+    setPage,
   };
 }
 

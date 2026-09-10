@@ -34,6 +34,7 @@
     "smoke": "node scripts/ssr-smoke.mjs",
     "test:duty-planner": "tsx --test src/modules/staff/services/dutyReport.test.ts src/modules/staff/services/dutyReportExcel.test.ts src/modules/staff/services/dutyRules.test.ts",
     "test:e2e:duty-planner": "playwright test --config tests/duty-planner/playwright.config.ts",
+    "test:e2e:leave-management": "playwright test --config tests/leave-management/playwright.config.ts",
     "test:e2e:masters": "playwright test --config tests/masters/playwright.config.ts"
   },
   "dependencies": {

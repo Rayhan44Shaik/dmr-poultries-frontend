@@ -132,12 +132,12 @@ describe('Fleet Operations active scope', () => {
   });
 
   it('EMI Retry is a single controlled list GET with in-flight protection', () => {
-    const source = read('hooks/useEmiData.ts');
-    assert.match(source, /listInFlight/);
-    assert.match(source, /if \(listInFlight\.current\) return/);
-    assert.match(source, /emiApi/);
-    assert.match(source, /\.overview\(/);
-    assert.doesNotMatch(source, /setInterval/);
+    const hook = read('hooks/useEmiData.ts');
+    const service = read('services/emiService.ts');
+    assert.match(hook, /listInFlight/);
+    assert.match(hook, /listInFlight\.current\) return/);
+    assert.match(service, /emiApi\.list\(/);
+    assert.doesNotMatch(hook, /setInterval/);
   });
 
   it('EMI data hook is read-only — no schedule or payment path', () => {
@@ -174,9 +174,9 @@ describe('Fleet Operations active scope', () => {
     const source = read('pages/FastagDashboardPage.tsx');
     const live = source.split('export default memo(FastagDashboardPage);')[1] || source.slice(source.lastIndexOf('UNDER CONSTRUCTION'));
     assert.match(source, /Under Construction/);
-    assert.match(source, /Coming Soon/);
-    assert.match(source, /FASTAG Management/);
-    assert.match(source, /future release/i);
+    assert.match(live, /fleet\.fastag\.coming_soon_desc/);
+    assert.match(live, /fleet\.fastag\.management_title/);
+    assert.match(live, /coming_soon/);
     assert.doesNotMatch(live, /useFastagData\(/);
     assert.doesNotMatch(live, /useVehicles\(/);
     assert.doesNotMatch(live, /getFastags/);
@@ -243,7 +243,7 @@ describe('Fleet Operations active scope', () => {
       path.join(here, '../../routes/AppRoutes.tsx'),
       'utf8'
     );
-    assert.match(appRoutes, /React\.lazy\(\(\) => import\("\.\.\/modules\/fleet-operations\/pages\/FleetPages"\)\)/);
-    assert.match(appRoutes, /fleetFallback/);
+    assert.match(appRoutes, /React\.lazy\(lazyShell\(\(\) => import\("\.\.\/modules\/fleet-operations\/pages\/FleetPages"\)\)\)/);
+    assert.match(appRoutes, /<Suspense fallback=\{<PageLoading \/>\}>/);
   });
 });

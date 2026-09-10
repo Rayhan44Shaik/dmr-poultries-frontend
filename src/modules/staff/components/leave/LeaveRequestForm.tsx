@@ -4,12 +4,18 @@ import { memo, useState, useEffect, useRef } from 'react';
 import { Plus, X, ChevronDown, User, Briefcase, FileText, Layers, Hash, Search } from 'lucide-react';
 import { useSafeNotification } from '../../../../hooks/useSafeNotification';
 import { DatePicker } from '../../../../components/common/DatePicker';
-import { getEmployees } from '../../../masters/employees/services/employeeService';
 import type { Employee } from '../../../masters/employees/types/employee';
 
+export interface LeaveRequestInput {
+  employeeId: number;
+  type: 'Casual' | 'Sick' | 'Emergency' | 'Annual';
+  fromDate: string;
+  toDate: string;
+  reason?: string;
+}
 interface LeaveRequestFormProps {
   employees?: Employee[];
-  onSubmit: (data: any) => void;
+  onSubmit: (data: LeaveRequestInput) => Promise<void | boolean> | void;
   onCancel: () => void;
 }
 
@@ -54,6 +60,10 @@ function FormDropdown({
       </label>
       <button
         type="button"
+        role="combobox"
+        aria-label={label}
+        aria-expanded={open}
+        aria-haspopup="listbox"
         onClick={() => { setOpen(!open); setSearch(''); }}
         className="w-full h-11 px-3.5 rounded-xl border border-slate-200 text-sm bg-slate-50/50 hover:bg-slate-50 transition text-left flex items-center justify-between text-slate-700 font-medium"
       >
@@ -71,6 +81,7 @@ function FormDropdown({
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search..."
+                  aria-label={`Search ${label}`}
                   autoFocus
                   className="w-full h-8 pl-7 pr-2 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-slate-50/50 text-slate-700 placeholder-slate-400"
                 />
@@ -85,6 +96,8 @@ function FormDropdown({
                 <button
                   key={o.value}
                   type="button"
+                  role="option"
+                  aria-selected={value === o.value}
                   onClick={() => {
                     onChange(o.value);
                     setOpen(false);
@@ -110,19 +123,18 @@ function FormDropdown({
 function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: LeaveRequestFormProps) {
   const { showNotification } = useSafeNotification();
 
-  // Fallback to service if props are empty
-  const employees: any[] = propEmployees && propEmployees.length > 0 ? propEmployees : getEmployees();
+  const employees = propEmployees ?? [];
 
-  const getEmpDepartment = (emp: any): string => {
-    return emp?.department || emp?.dept || emp?.departmentName || 'General';
+  const getEmpDepartment = (emp: Employee): string => {
+    return emp.department || 'General';
   };
 
-  const getEmpName = (emp: any): string => {
-    return emp?.employeeName || emp?.name || emp?.fullName || emp?.firstName || 'Unnamed Employee';
+  const getEmpName = (emp: Employee): string => {
+    return emp.employeeName || 'Unnamed Employee';
   };
 
-  const getEmpId = (emp: any): number | string => {
-    return emp?.id ?? emp?.employeeId ?? emp?.employeeNo ?? 0;
+  const getEmpId = (emp: Employee): number => {
+    return emp.id;
   };
 
   const uniqueDepartments = Array.from(
@@ -138,16 +150,19 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
 
   const [selectedDepartment, setSelectedDepartment] = useState<string>(initialDept);
   
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<LeaveRequestInput & { employeeName: string; department: string; reason: string }>({
     employeeId: initialEmp ? getEmpId(initialEmp) : 0,
     employeeName: initialEmp ? getEmpName(initialEmp) : '',
     department: initialDept,
-    type: 'Casual' as const,
+    type: 'Casual',
     fromDate: '',
     toDate: '',
-    days: 0,
     reason: '',
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const days = form.fromDate && form.toDate && form.toDate >= form.fromDate
+    ? Math.floor((Date.parse(`${form.toDate}T00:00:00Z`) - Date.parse(`${form.fromDate}T00:00:00Z`)) / 86_400_000) + 1
+    : 0;
 
   const [employeeSearch, setEmployeeSearch] = useState(initialEmp ? getEmpName(initialEmp) : '');
   const [isEmployeeDropdownOpen, setIsEmployeeDropdownOpen] = useState(false);
@@ -170,17 +185,6 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    if (form.fromDate && form.toDate) {
-      const from = new Date(form.fromDate + 'T00:00:00');
-      const to = new Date(form.toDate + 'T00:00:00');
-      const diff = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      setForm((prev) => ({ ...prev, days: diff > 0 ? diff : 0 }));
-    } else {
-      setForm((prev) => ({ ...prev, days: 0 }));
-    }
-  }, [form.fromDate, form.toDate]);
 
   const handleDepartmentChange = (dept: string) => {
     setSelectedDepartment(dept);
@@ -219,13 +223,13 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
     setForm((prev) => ({ ...prev, toDate: date }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.fromDate || !form.toDate) {
       showNotification('Please select both from and to dates.', 'error');
       return;
     }
-    if (form.days <= 0 || form.toDate < form.fromDate) {
+    if (days <= 0 || form.toDate < form.fromDate) {
       showNotification('Invalid date range. To date cannot be earlier than from date.', 'error');
       return;
     }
@@ -233,7 +237,13 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
       showNotification('Please select a valid employee.', 'error');
       return;
     }
-    onSubmit(form);
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onSubmit(form);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const departmentOptions = uniqueDepartments.map((d) => ({ value: d, label: d }));
@@ -259,6 +269,8 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
         <button
           type="button"
           onClick={onCancel}
+          disabled={isSubmitting}
+          aria-label="Close leave request form"
           className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition"
         >
           <X size={18} />
@@ -299,10 +311,12 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
                 }
               }}
               placeholder={`Search in ${selectedDepartment}...`}
+              aria-label="Employee"
               className="w-full h-11 px-3.5 pr-10 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-slate-50/50 hover:bg-slate-50 transition text-slate-700 font-medium"
             />
             <button
               type="button"
+              aria-label="Show employees"
               onClick={() => {
                 setEmployeeSearch('');
                 setIsEmployeeDropdownOpen(!isEmployeeDropdownOpen);
@@ -377,7 +391,7 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
           icon={<Layers size={13} className="text-blue-500" />}
           value={form.type}
           options={leaveTypeOptions}
-          onChange={(val) => setForm((prev) => ({ ...prev, type: val as any }))}
+          onChange={(val) => setForm((prev) => ({ ...prev, type: val as LeaveRequestInput['type'] }))}
         />
 
         {/* Line 3 - Days Counter */}
@@ -388,8 +402,9 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
           <div className="relative">
             <input
               type="number"
-              value={form.days}
+              value={days}
               readOnly
+              aria-label="Calculated days"
               className="w-full h-11 px-3.5 rounded-xl border border-slate-200 text-sm bg-blue-50/40 text-blue-900 font-bold cursor-not-allowed"
             />
             <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-blue-600">
@@ -409,6 +424,7 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
             rows={2.5}
             className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-slate-50/50 hover:bg-slate-50 transition text-slate-700 placeholder-slate-400 font-medium resize-none"
             placeholder="Provide a brief explanation for your leave request..."
+            aria-label="Reason"
           />
         </div>
       </div>
@@ -423,10 +439,11 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
         </button>
         <button
           type="submit"
+          disabled={isSubmitting}
           className="px-5 py-2.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm transition active:scale-95 flex items-center gap-1.5"
         >
           <Plus size={15} />
-          Submit Request
+          {isSubmitting ? 'Submitting…' : 'Submit Request'}
         </button>
       </div>
     </form>

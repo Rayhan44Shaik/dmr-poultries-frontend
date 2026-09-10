@@ -7,11 +7,12 @@ import {
   addDays,
 } from 'date-fns';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
-import { Vehicle } from '../../masters/vehicles/types/vehicle';
+import type { Vehicle } from '../../masters/vehicles/types/vehicle';
 import permitApi from '../services/permitApi';
 import { fleetCacheInvalidate, fleetSharedGet } from '../services/fleetSessionCache';
 import type { PermitDocument } from '../types';
-import { DocumentTypeEnum, VehicleDocument, DocumentType } from '../types';
+import { DocumentTypeEnum } from '../types';
+import type { VehicleDocument, DocumentType } from '../types';
 
 type DocumentTypeKey = 'insurance' | 'fitness' | 'permit' | 'puc' | 'rc';
 type Counts = Record<DocumentTypeKey, number>;

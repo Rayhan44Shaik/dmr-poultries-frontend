@@ -16,10 +16,8 @@ import {
   type DutyPlannerValidation,
   type DutyPlannerWeek,
 } from '../services/dutyPlannerService';
-import { buildSampleLeaves, localDeleteAssignment, localUpsertAssignment, markSampleWeekClosed } from '../services/staffSampleData';
-import { getDutyReportWeekStarts, loadDutyReportLeaves, loadDutyReportRange, todayStr, type DutyReportRange } from '../services/dutyReport';
+import { loadDutyReportLeaves, loadDutyReportRange, todayStr, type DutyReportRange } from '../services/dutyReport';
 import { listLeaves } from '../services/leaveService';
-import { buildDutyPlannerSampleWeek } from '../services/dutyPlannerSampleData';
 import { AutomaticDutySyncError, getAutomaticDuty, hasApprovedDutyLeave, resolveDutyCell, syncAutomaticDuties } from '../services/dutyRules';
 import { STAFF_LEAVES_CHANGED } from '../services/staffEvents';
 import { useDutyPlannerText } from './useDutyPlannerText';
@@ -74,6 +72,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
   const [allRoles, setAllRoles] = useState<string[]>(DEFAULT_ROLES);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const mutationInFlight = useRef(false);
 
   // Backend-authoritative week state
   const [weekStart, setWeekStart] = useState(filters.weekStart);
@@ -94,9 +93,6 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
   // after that previous week has been closed (Submitted/Locked/Closed).
   const [prevWeekStatus, setPrevWeekStatus] = useState<string | null>(null);
   const [prevWeekStart, setPrevWeekStart] = useState('');
-  // Non-null while the page is showing the local sample roster (backend
-  // unavailable). Edits then apply in-memory instead of hitting the API.
-  const [sampleWeek, setSampleWeek] = useState<DutyPlannerWeek | null>(null);
   // Authoritative leave API in live mode. Only APPROVED requests affect duties.
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
 
@@ -136,19 +132,17 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
 
   useEffect(() => {
     const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
-    window.addEventListener('focus', refresh);
     window.addEventListener(STAFF_LEAVES_CHANGED, refresh);
     document.addEventListener('visibilitychange', onVisible);
     const midnight = new Date();
     midnight.setHours(24, 0, 0, 0);
     const timer = window.setTimeout(refresh, Math.max(1000, midnight.getTime() - Date.now() + 100));
     return () => {
-      window.removeEventListener('focus', refresh);
       window.removeEventListener(STAFF_LEAVES_CHANGED, refresh);
       document.removeEventListener('visibilitychange', onVisible);
       window.clearTimeout(timer);
     };
-  }, [refresh, reloadKey]);
+  }, [refresh]);
 
   useEffect(() => {
     let cancelled = false;
@@ -164,24 +158,16 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
           getDutyPlannerWeek(filters.weekStart),
           getDutyPlannerWeek(prevMonday).catch(() => null),
         ]);
-      } catch {
+      } catch (cause) {
         if (cancelled) return;
-        let sample = buildDutyPlannerSampleWeek(filters.weekStart);
-        const sampleLeaves = buildSampleLeaves(sample.weekStart);
-        sample = await syncAutomaticDuties(sample, sampleLeaves, todayStr(), async (input) => {
-          sample = localUpsertAssignment(sample, input.employeeId, input.date, input.dutyType);
-          return sample;
-        }, controller.signal).catch(() => sample);
-        if (cancelled) return;
-        applyWeek(sample);
-        setSampleWeek(sample);
-        setLeaves(sampleLeaves);
-        const prev = buildDutyPlannerSampleWeek(prevMonday);
-        setPrevWeekStatus(prev.status);
-        setPrevWeekStart(prev.weekStart);
-        setError(null);
+        setEmployees([]);
+        setAssignments([]);
+        setWeekDays([]);
+        setLeaves([]);
+        setPrevWeekStatus(null);
+        setPrevWeekStart(prevMonday);
+        setError(localizeDutyError(new Error(handleApiError(cause)), languageRef.current));
         setLoading(false);
-        notifyRef.current?.(text('sampleNotice'), 'info');
         return;
       }
       if (cancelled) return;
@@ -200,7 +186,6 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
       }
       if (cancelled) return;
       applyWeek(loaded);
-      setSampleWeek(null);
       setLeaves(approved);
       setPrevWeekStatus(previous?.status ?? null);
       setPrevWeekStart(previous?.weekStart ?? prevMonday);
@@ -260,13 +245,12 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
    * A failed live report is never padded with sample data. */
   const getRangeDuties = useCallback(
     (range: DutyReportRange, signal?: AbortSignal) => loadDutyReportRange(range, {
-      usingSampleData: sampleWeek !== null,
+      usingSampleData: false,
       loadWeek: async (monday) => {
         if (monday === weekStart) return { weekStart, employees, assignments };
-        return sampleWeek ? buildDutyPlannerSampleWeek(monday) : getDutyPlannerWeek(monday);
+        return getDutyPlannerWeek(monday);
       },
       loadLeaves: async () => {
-        if (sampleWeek) return getDutyReportWeekStarts(range).flatMap(buildSampleLeaves);
         const approvedLeaves = await loadDutyReportLeaves(range, listLeaves, signal);
         signal?.throwIfAborted();
         // Keep the editable week in sync with the same approved-leave source
@@ -275,7 +259,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         return approvedLeaves;
       },
     }, signal),
-    [sampleWeek, weekStart, weekEnd, employees, assignments],
+    [weekStart, weekEnd, employees, assignments],
   );
 
   const updateAssignment = useCallback(
@@ -291,15 +275,8 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         return false;
       }
 
-      // Sample mode: apply the change in-memory (the backend is down).
-      if (sampleWeek) {
-        const next = localUpsertAssignment(sampleWeek, employeeId, date, dutyType);
-        applyWeek(next);
-        setSampleWeek(next);
-        showNotification?.(text('updateSample'), 'success');
-        return true;
-      }
-
+      if (mutationInFlight.current) return false;
+      mutationInFlight.current = true;
       setSaving(true);
       setError(null);
       try {
@@ -319,10 +296,11 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         showNotification?.(message, 'error');
         return false;
       } finally {
+        mutationInFlight.current = false;
         setSaving(false);
       }
     },
-    [getAssignment, applyWeek, showNotification, canEditWeek, weekStatus, sampleWeek, isOnApprovedLeave, text]
+    [getAssignment, applyWeek, showNotification, canEditWeek, weekStatus, isOnApprovedLeave, text]
   );
 
   const deleteAssignment = useCallback(
@@ -344,15 +322,8 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         return false;
       }
 
-      // Sample mode: remove in-memory (the backend is down).
-      if (sampleWeek) {
-        const next = localDeleteAssignment(sampleWeek, existing.id);
-        applyWeek(next);
-        setSampleWeek(next);
-        showNotification?.(text('removeSample'), 'success');
-        return true;
-      }
-
+      if (mutationInFlight.current) return false;
+      mutationInFlight.current = true;
       setSaving(true);
       setError(null);
       try {
@@ -369,10 +340,11 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         showNotification?.(message, 'error');
         return false;
       } finally {
+        mutationInFlight.current = false;
         setSaving(false);
       }
     },
-    [getAssignment, applyWeek, showNotification, canEditWeek, weekStatus, sampleWeek, isOnApprovedLeave, text]
+    [getAssignment, applyWeek, showNotification, canEditWeek, weekStatus, isOnApprovedLeave, text]
   );
 
   const autoAssignAll = useCallback(async (): Promise<{ ok: boolean; plan?: AutoPlan; message?: string }> => {
@@ -381,6 +353,8 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
       return { ok: false, message: `This week is ${weekStatus.toLowerCase()}.` };
     }
 
+    if (mutationInFlight.current) return { ok: false, message: 'Another planner update is already in progress.' };
+    mutationInFlight.current = true;
     setSaving(true);
     setError(null);
     try {
@@ -405,6 +379,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
       showNotification?.(message, 'error');
       return { ok: false, message };
     } finally {
+      mutationInFlight.current = false;
       setSaving(false);
     }
   }, [canEditWeek, weekStatus, weekStart, applyWeek, showNotification, text]);
@@ -430,16 +405,8 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
       );
       return false;
     }
-    // Sample mode: close the week in-memory (the backend is down).
-    if (sampleWeek) {
-      const closed: DutyPlannerWeek = { ...sampleWeek, status: 'Submitted' };
-      markSampleWeekClosed(weekStart);
-      applyWeek(closed);
-      setSampleWeek(closed);
-      showNotification?.(text('submitSample'), 'success');
-      return true;
-    }
-
+    if (mutationInFlight.current) return false;
+    mutationInFlight.current = true;
     setSaving(true);
     setError(null);
     try {
@@ -458,9 +425,10 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
       showNotification?.(message, 'error');
       return false;
     } finally {
+      mutationInFlight.current = false;
       setSaving(false);
     }
-  }, [weekStatus, weekStart, unassignedCount, prevWeekClosed, sampleWeek, applyWeek, showNotification, text]);
+  }, [weekStatus, weekStart, unassignedCount, prevWeekClosed, applyWeek, showNotification, text]);
 
   return {
     employees,
@@ -479,7 +447,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
     loading,
     saving,
     error,
-    usingSampleData: sampleWeek !== null,
+    usingSampleData: false,
     filters,
     setFilters,
     getAssignment,

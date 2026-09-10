@@ -46,6 +46,7 @@ const STATUS_TABS: { label: LeaveFilterState['status']; icon: React.ReactNode }[
   { label: 'Pending', icon: <Clock size={13} /> },
   { label: 'Approved', icon: <CheckCircle2 size={13} /> },
   { label: 'Rejected', icon: <XCircle size={13} /> },
+  { label: 'Cancelled', icon: <X size={13} /> },
 ];
 
 const LEAVE_TYPES = ['All', 'Casual', 'Sick', 'Emergency', 'Annual'] as const;
@@ -79,10 +80,6 @@ function MonthPicker({
   const selectedYear = value ? Number(value.slice(0, 4)) : new Date().getFullYear();
   const selectedMonth = value ? value.slice(5, 7) : '';
   const [viewYear, setViewYear] = useState(selectedYear);
-
-  useEffect(() => {
-    if (value) setViewYear(Number(value.slice(0, 4)));
-  }, [value]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -346,7 +343,7 @@ function LeaveFilters({
       </div>
 
       {/* Row 2 — Search + Status (perfect single line) */}
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 flex-col items-stretch gap-3 lg:flex-row lg:items-center">
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
           <input
@@ -368,7 +365,7 @@ function LeaveFilters({
           )}
         </div>
 
-        <div className="flex items-center flex-nowrap shrink-0 gap-0.5 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 h-10">
+        <div className="flex max-w-full items-center flex-nowrap gap-0.5 overflow-x-auto bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 min-h-10 lg:shrink-0">
           {STATUS_TABS.map((tab) => {
             const isActive = filters.status === tab.label;
             return (
@@ -391,7 +388,7 @@ function LeaveFilters({
       </div>
 
       {/* Row 3 — KPI stats (left) + Action buttons (right) */}
-      <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100">
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100">
         {/* KPI stats */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-xs font-semibold text-slate-700">
@@ -409,7 +406,7 @@ function LeaveFilters({
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex max-w-full flex-wrap items-center gap-2 sm:shrink-0">
           <button
             type="button"
             onClick={onReset}

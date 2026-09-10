@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, FlaskConical, Search, Truck } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Search, Truck } from 'lucide-react';
 import { useI18n, translateStatus } from '../../../i18n';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import EmiFilterBar from '../components/emi/EmiFilterBar';
@@ -50,7 +50,6 @@ const CompletedCell = ({ completed, total }: { completed: number; total: number 
 const EmiLoansPage = ({ embedded = false, active = true }: EmiLoansPageProps) => {
   const { t, language } = useI18n();
   const { allRecords, kpis, loading, refreshing, error, hasSnapshot, refresh, refreshStatus, refreshEventId, clearRefreshStatus, lastRefreshed } = useEmiData(active);
-  const sampleCount = useMemo(() => allRecords.filter((record) => record.isSample).length, [allRecords]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<EmiOverview['status'] | 'all'>('all');
   const [sortKey, setSortKey] = useState<EmiSortKey>('vehicleNumber');
@@ -127,16 +126,6 @@ const EmiLoansPage = ({ embedded = false, active = true }: EmiLoansPageProps) =>
                 <h3 className="text-base font-semibold tracking-tight text-slate-800">{t('fleet.emi.schedule_title')}</h3>
                 <span className="hidden rounded-md bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-500 sm:inline">{t('fleet.emi.read_only')}</span>
               </div>
-              {sampleCount > 0 && (
-                <aside
-                  aria-label={t('fleet.emi.sample_title')}
-                  title={`${t('fleet.emi.sample_description', { count: sampleCount })} ${t('fleet.emi.sample_status_note')}`}
-                  className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800"
-                >
-                  <FlaskConical size={12} aria-hidden="true" className="shrink-0" />
-                  <span className="truncate">{t('fleet.emi.sample_title')}</span>
-                </aside>
-              )}
             </div>
             <div className="mt-1 flex h-6 items-center gap-2">
               <p role="status" aria-label={t('fleet.emi.data_status')} aria-live={refreshStatus === 'success' ? 'off' : 'polite'} aria-atomic="true" title={info} className={`min-w-0 flex-1 truncate text-xs ${error ? 'text-amber-700' : 'text-slate-500'}`}>

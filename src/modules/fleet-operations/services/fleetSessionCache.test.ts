@@ -5,7 +5,7 @@ import {
   fleetCacheInvalidate,
   fleetCacheSet,
   fleetSharedGet,
-} from './fleetSessionCache';
+} from './fleetSessionCache.ts';
 
 describe('fleetSessionCache', () => {
   it('stores and returns a value until invalidated', () => {

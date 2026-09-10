@@ -46,13 +46,42 @@ function filterKey(fromDate: string, toDate: string, vehicleId: number | null) {
 }
 
 function toView(payload: FleetAnalyticsResponse): AnalyticsView {
+  const weeklyMileage = payload.weeklyMileage ?? [];
+  const expenses = payload.highestExpense ?? [];
+  const performers = payload.topPerformers ?? [];
+  const expenseByVehicle = new Map(expenses.map((row) => [row.vehicleId, row]));
   return {
-    kpis: payload.kpis,
-    weekly: payload.weekly,
-    costCenters: payload.costCenters,
-    topPerformers: payload.topPerformers,
-    highestExpense: payload.highestExpense,
-    vehicleStats: payload.vehicleStats,
+    kpis: {
+      ...EMPTY.kpis,
+      ...payload.kpis,
+    },
+    weekly: weeklyMileage.map((row) => ({
+      week: row.week,
+      weekLabel: row.weekLabel,
+      fuel: row.litres,
+      distance: row.distance,
+      mileage: row.mileage,
+    })),
+    costCenters: payload.costCenters ?? [],
+    topPerformers: performers.map((row) => ({ ...row, trips: 0 })),
+    highestExpense: expenses.map((row) => ({ ...row, emiCost: 0 })),
+    vehicleStats: performers.map((row) => {
+      const expense = expenseByVehicle.get(row.vehicleId);
+      return {
+        vehicleId: row.vehicleId,
+        vehicleNumber: row.vehicleNumber,
+        trips: 0,
+        distance: row.distance,
+        fuelLitres: row.fuelLitres,
+        fuelCost: expense?.fuelCost ?? 0,
+        maintenanceCost: expense?.maintenanceCost ?? 0,
+        emiCost: 0,
+        tollCost: expense?.tollCost ?? 0,
+        otherCost: expense?.otherCost ?? 0,
+        totalExpense: expense?.totalExpense ?? 0,
+        mileage: row.mileage,
+      };
+    }),
   };
 }
 
