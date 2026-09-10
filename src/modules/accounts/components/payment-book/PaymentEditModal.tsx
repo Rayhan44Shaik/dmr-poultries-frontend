@@ -10,7 +10,7 @@ import { Field } from '../../../../ui/Field';
 import { uiTextareaClass } from '../../../../shared/ui/uiTokens';
 import { DatePicker } from '../../../../components/common/DatePicker';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
-import { PAYMENT_TYPES, PAYMENT_MODES } from '../../utils/paymentRegister';
+import { PAYMENT_TYPES, PAYMENT_MODES, paymentStatusLabel } from '../../utils/paymentRegister';
 
 interface PaymentEditModalProps {
   isOpen: boolean;
@@ -19,7 +19,7 @@ interface PaymentEditModalProps {
   onSave: (payment: Payment) => void;
 }
 const CATEGORIES = ['Farmer', 'Fuel', 'Maintenance', 'Salary', 'Loan', 'Office', 'Tax', 'Other'];
-const STATUSES: Payment['status'][] = ['Draft', 'Approved', 'Paid', 'Cancelled'];
+const STATUSES = (['Draft', 'Approved', 'Paid', 'Cancelled'] as const).map(value => ({ value, label: paymentStatusLabel(value) }));
 
 export function PaymentEditModal(props: PaymentEditModalProps) {
   return props.isOpen ? <EditForm key={props.payment?.id ?? 'new'} {...props} /> : null;

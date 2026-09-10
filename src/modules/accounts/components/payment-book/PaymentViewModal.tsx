@@ -3,7 +3,7 @@ import { FarmPaymentService } from '../../services/FarmPaymentService';
 import { Modal } from '../../../../ui/Modal';
 import { Button } from '../../../../ui/Button';
 import { StatusBadge } from '../../../../ui/StatusBadge';
-import { paymentCurrency } from '../../utils/paymentRegister';
+import { paymentCurrency, paymentStatusLabel } from '../../utils/paymentRegister';
 
 interface PaymentViewModalProps {
   isOpen: boolean;
@@ -52,7 +52,7 @@ export function PaymentViewModal({ isOpen, payment, onClose }: PaymentViewModalP
         {payment.id.startsWith('demo-payment-') && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Sample payment · Read-only preview. Not a real transaction.</p>}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
           <div><p className="text-xs text-slate-500">Amount paid</p><p className="text-2xl font-semibold tabular-nums text-slate-900">{paymentCurrency.format(payment.amount)}</p></div>
-          <StatusBadge status={payment.status} />
+          <StatusBadge status={payment.status} label={paymentStatusLabel(payment.status)} tone={payment.status === 'Draft' ? 'warning' : undefined} />
         </div>
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {details.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 break-words text-sm font-medium text-slate-800">{value || '—'}</dd></div>)}

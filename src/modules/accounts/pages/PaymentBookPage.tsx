@@ -1,16 +1,17 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useId } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Pencil, CheckCircle2, Trash2 } from 'lucide-react';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { PaymentTable } from '../components/payment-book/PaymentTable';
 import { PaymentViewModal } from '../components/payment-book/PaymentViewModal';
 import { PaymentEditModal } from '../components/payment-book/PaymentEditModal';
 import { NewPaymentModal } from '../components/payment-book/NewPaymentModal';
-import { deletePayment, listPayments } from '../services/paymentApiService';
+import { deletePayment, listPayments, updatePayment } from '../services/paymentApiService';
 import type { Payment } from '../types/payment.types';
 import { DatePicker } from '../../../components/common/DatePicker';
 import { canEditItem, canDeleteItem } from '../../../utils/dateUtils';
 import { weekRange } from '../../../utils/businessDate';
 import { usePendingDelete } from '../../../hooks/usePendingDelete';
+import { ConfirmDialog } from '../../../ui/ConfirmDialog';
 import { Modal } from '../../../ui/Modal';
 import { pendingDeleteCountdownLabel } from '../../../shared/ui/pendingDelete';
 import MasterDropdown from '../../masters/components/MasterDropdown';
@@ -26,7 +27,7 @@ import { filterPayments, PAYMENT_TYPES, PAYMENT_MODES, paymentCurrency } from '.
 
 type PaymentView = 'pending' | 'approved' | 'deleted';
 const PAYMENT_VIEWS: { value: PaymentView; label: string; selectedClass: string; hint?: string }[] = [
-  { value: 'pending', label: 'Pending', selectedClass: 'bg-orange-100 text-orange-700 shadow-sm', hint: 'Shows Draft payments; saved statuses are unchanged.' },
+  { value: 'pending', label: 'Pending', selectedClass: 'bg-orange-100 text-orange-700 shadow-sm', hint: 'Payments awaiting approval.' },
   { value: 'approved', label: 'Approved', selectedClass: 'bg-emerald-100 text-emerald-700 shadow-sm' },
   { value: 'deleted', label: 'Deleted', selectedClass: 'bg-rose-100 text-rose-700 shadow-sm' },
 ];
@@ -35,6 +36,13 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const { showNotification } = useSafeNotification();
   // Show the isolated examples immediately in the development preview.
   // Production continues to open with real API data; demo remains opt-in there.
+  const tableRef = useRef<HTMLElement>(null);
+  const statusGroupRef = useRef<HTMLDivElement>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [approvalPayment, setApprovalPayment] = useState<Payment | null>(null);
+  const [approving, setApproving] = useState(false);
+  const [approvalError, setApprovalError] = useState('');
+  const approvingRef = useRef(false);
   const [demo, setDemo] = useState(import.meta.env.DEV);
   const [demoPayments] = useState(() => createDemoPayments());
   const demoRef = useRef(demo);
@@ -73,7 +81,10 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
       do {
         reloadAfterSave.current = false;
         const data = await listPayments();
-        if (mounted.current && !reloadAfterSave.current) setPayments(data);
+        if (mounted.current && !reloadAfterSave.current) {
+          setPayments(data);
+          setSelectedId(null);
+        }
       } while (reloadAfterSave.current);
       if (mounted.current) setError(false);
     } catch {
@@ -95,7 +106,22 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
     return () => { mounted.current = false; window.clearTimeout(initialLoad); document.removeEventListener('visibilitychange', sync); };
   }, [loadPayments]);
 
+  useEffect(() => {
+    const clearOutsideSelection = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      // Shared dialogs are portalled outside the table. Their controls must
+      // retain the captured transaction and opener while a form is active.
+      if (target.closest('[role="dialog"], [role="alertdialog"]')) return;
+      if (!tableRef.current?.contains(target)) setSelectedId(null);
+    };
+    document.addEventListener('pointerdown', clearOutsideSelection);
+    return () => document.removeEventListener('pointerdown', clearOutsideSelection);
+  }, []);
+
   const toggleDemo = () => {
+    if (approvingRef.current) return;
+    setSelectedId(null);
     demoRef.current = !demo;
     setDemo(!demo);
     if (demo) void loadPayments();
@@ -105,6 +131,7 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
     setFilters(previous => ({ ...previous, [key]: value }));
   };
   const clearFilters = () => {
+    setSelectedId(null);
     const cleared = { ...weekRange(), type: '', mode: '', search: '' };
     setFilters(cleared);
     setAppliedFilters(cleared);
@@ -115,6 +142,7 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const invalidRange = Boolean(filters.from && filters.to && filters.from > filters.to);
   const applyFilters = () => {
     if (invalidRange) return;
+    setSelectedId(null);
     setAppliedFilters({ ...filters });
     setPage(1);
   };
@@ -129,7 +157,9 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const total = useMemo(() => filtered.reduce((sum, p) => sum + Number(p.amount || 0), 0), [filtered]);
   const safePage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
   const rows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const selectedPayment = rows.find(payment => payment.id === selectedId) ?? null;
   const handleSave = () => {
+    setSelectedId(null);
     showNotification('Payment saved successfully', 'success');
     void loadPayments(true);
   };
@@ -144,12 +174,50 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
     }
   });
 
+  const selectedBusy = Boolean(selectedPayment && (isPending(selectedPayment.id) || approving));
+  const canEditSelected = Boolean(selectedPayment && !demo && !selectedBusy && canEditItem(selectedPayment.createdAt));
+  const canDeleteSelected = Boolean(selectedPayment && !demo && !selectedBusy && canDeleteItem(selectedPayment.createdAt));
+  const canApproveSelected = Boolean(canEditSelected && selectedPayment?.status === 'Draft');
+  const readOnlyHint = demo ? 'Sample data is read-only. Switch to real payments to make changes.' : undefined;
+
+  const confirmApproval = async () => {
+    const payment = approvalPayment;
+    if (!payment || approvingRef.current || demoRef.current || payment.id.startsWith('demo-payment-')) return;
+    const current = realPayments.find(item => item.id === payment.id);
+    if (!current || current.status !== 'Draft' || !canEditItem(current.createdAt) || isPending(payment.id)) {
+      setApprovalError('This payment is no longer eligible for approval. Refresh the register and try again.');
+      return;
+    }
+    approvingRef.current = true;
+    setApproving(true);
+    setApprovalError('');
+    try {
+      // Reuse the existing partial-update contract; never synthesize success.
+      const saved = await updatePayment(payment.id, { status: 'Approved' });
+      if (saved.id !== payment.id || saved.status !== 'Approved') {
+        throw new Error('The server did not confirm approval. Refresh the register to check this payment.');
+      }
+      if (!mounted.current) return;
+      setPayments(previous => previous.map(item => item.id === saved.id ? saved : item));
+      setSelectedId(null);
+      setApprovalPayment(null);
+      showNotification('Payment approved successfully', 'success');
+      void loadPayments(true);
+      requestAnimationFrame(() => statusGroupRef.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus({ preventScroll: true }));
+    } catch (error) {
+      if (mounted.current) setApprovalError(error instanceof Error ? error.message : 'Unable to approve payment. Please try again.');
+    } finally {
+      approvingRef.current = false;
+      if (mounted.current) setApproving(false);
+    }
+  };
+
   return (
     <div className={`master-page w-full min-w-0 space-y-3 text-slate-700 ${embedded ? '' : 'p-4 sm:p-6'}`}>
       {/* The application header owns Accounts > Payment Register. */}
       <div className="flex flex-wrap items-center justify-end gap-2">
         {demo && <span className={uiBadgeClass('warning')}>Sample data</span>}
-        <Button variant="secondary" aria-pressed={demo} disabled={!!pendingItems.length} onClick={toggleDemo}>{demo ? 'Back to real payments' : 'Preview sample data'}</Button>
+        <Button variant="secondary" aria-pressed={demo} disabled={!!pendingItems.length || approving} onClick={toggleDemo}>{demo ? 'Back to real payments' : 'Preview sample data'}</Button>
         <Button icon={<Plus size={16} />} disabled={demo} title={demo ? 'Return to real payments to create a payment' : undefined} onClick={() => { if (!demoRef.current) setIsNewModalOpen(true); }}>New Payment</Button>
       </div>
       <section aria-label="Payment filters" className="rounded-xl border border-slate-200 bg-white p-3">
@@ -176,29 +244,42 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
         </div>
         {invalidRange && <p role="alert" className="mt-2 text-xs text-red-600">From Date must be on or before To Date.</p>}
       </section>
-      <section aria-label="Payment records" aria-busy={loading} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+      <section ref={tableRef} aria-label="Payment records" aria-busy={loading} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-white px-5 py-4">
           <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3">
             <h2 className="text-sm font-bold tracking-wide text-slate-800">Payment</h2>
             <span aria-live="polite" className="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600 shadow-sm">
               {loading ? 'Updating…' : status === 'deleted' ? '—' : filtered.length}
             </span>
-            <div role="group" aria-label="Payment status" className="flex items-center overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50 p-0.5 shadow-sm sm:ml-2">
+            <div ref={statusGroupRef} role="group" aria-label="Payment status" className="flex items-center overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50 p-0.5 shadow-sm sm:ml-2">
               {PAYMENT_VIEWS.map(item => <Button key={item.value} variant="custom" size="sm" aria-pressed={status === item.value} title={item.hint}
                 className={`h-auto rounded-md px-3 py-1.5 text-xs font-semibold ${status === item.value ? item.selectedClass : 'bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-800'}`}
-                onClick={() => { setStatus(item.value); setPage(1); }}>
+                onClick={() => { setSelectedId(null); setStatus(item.value); setPage(1); }}>
                 {item.label}
               </Button>)}
             </div>
           </div>
-          {status !== 'deleted' && <span className="text-xs text-slate-500">Filtered total <strong className="ml-2 text-sm tabular-nums text-slate-800">{paymentCurrency.format(total)}</strong></span>}
+          {selectedPayment ? <div role="group" aria-label="Selected payment actions" title={readOnlyHint} className="flex flex-wrap items-center gap-2">
+            <span className="sr-only">Selected payment: {selectedPayment.paymentNo || selectedPayment.paidTo}</span>
+            <Button variant="secondary" size="sm" icon={<Pencil size={14} />} aria-label="Edit selected payment" disabled={!canEditSelected}
+              title={readOnlyHint ?? (canEditSelected ? 'Edit selected payment' : 'Payments older than 10 days cannot be edited')}
+              onClick={() => { if (canEditSelected) setEditingPayment(selectedPayment); }}>Edit</Button>
+            <Button variant="success" size="sm" icon={<CheckCircle2 size={14} />} aria-label="Approve selected payment" disabled={!canApproveSelected}
+              title={readOnlyHint ?? (selectedPayment.status !== 'Draft' ? 'This payment is already approved' : !canEditItem(selectedPayment.createdAt) ? 'Payments older than 10 days cannot be approved' : 'Approve selected pending payment')}
+              onClick={() => { if (canApproveSelected) { setApprovalError(''); setApprovalPayment(selectedPayment); } }}>Approve</Button>
+            <Button variant="destructiveOutline" size="sm" icon={<Trash2 size={14} />} aria-label="Delete selected payment" disabled={!canDeleteSelected}
+              title={readOnlyHint ?? (canDeleteSelected ? 'Delete selected payment' : 'Payments older than 10 days cannot be deleted')}
+              onClick={() => { if (canDeleteSelected) requestDelete(selectedPayment.id, { label: `Deleting payment to ${selectedPayment.paidTo}` }); }}>Delete</Button>
+          </div> : status !== 'deleted' && <span className="text-xs text-slate-500">Filtered total <strong className="ml-2 text-sm tabular-nums text-slate-800">{paymentCurrency.format(total)}</strong></span>}
         </div>
         {error && <p role="alert" className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">Unable to refresh records. {payments.length ? 'Previously loaded records are still shown. ' : ''}Use Refresh to try again.</p>}
         {status === 'deleted' ? <EmptyState title="Deleted payments are unavailable" description="The current payment API does not provide deleted records. Cancelled payments are not treated as deleted." /> : <>
-        <PaymentTable readOnly={demo} emptyVariant={error ? 'error' : !payments.length ? 'no-data' : appliedFilters.search.trim() ? 'no-search' : 'no-filters'} isPending={isPending} payments={rows} loading={loading && !payments.length} error={error && !payments.length} onView={setViewingPayment}
-          onEdit={p => { if (!demoRef.current && canEditItem(p.createdAt)) setEditingPayment(p); }}
-          onDelete={p => { if (!demoRef.current && canDeleteItem(p.createdAt)) requestDelete(p.id, { label: `Deleting payment to ${p.paidTo}` }); }} />
-        <Pagination page={page} pageSize={pageSize} totalItems={filtered.length} onPageChange={setPage} onPageSizeChange={size => { setPageSize(size); setPage(1); }} />
+        <PaymentTable selectedId={selectedPayment?.id ?? null} onSelect={setSelectedId}
+          emptyVariant={error ? 'error' : !payments.length ? 'no-data' : appliedFilters.search.trim() ? 'no-search' : 'no-filters'}
+          payments={rows} loading={loading && !payments.length} error={error && !payments.length} onView={setViewingPayment} />
+        <Pagination page={page} pageSize={pageSize} totalItems={filtered.length}
+          onPageChange={next => { setSelectedId(null); setPage(next); }}
+          onPageSizeChange={size => { setSelectedId(null); setPageSize(size); setPage(1); }} />
         </>}
 
       </section>
@@ -211,6 +292,10 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
           <p className="mt-2 text-sm text-slate-500" role="status">{item.committing ? 'Deleting payment…' : `${pendingDeleteCountdownLabel(item.secondsLeft)}. Cancel to keep this payment.`}</p>
         </div>)}</div>
       </Modal>
+      <ConfirmDialog isOpen={!!approvalPayment} title="Approve Payment" tone="primary" confirmLabel="Approve Payment" loading={approving}
+        record={approvalPayment ? `${approvalPayment.paymentNo} · ${approvalPayment.paidTo} · ${paymentCurrency.format(approvalPayment.amount)}` : undefined}
+        message={<>Mark this pending payment as approved?{approvalError && <span role="alert" className="mt-2 block text-rose-700">{approvalError}</span>}</>}
+        onConfirm={() => void confirmApproval()} onCancel={() => { if (!approvingRef.current) { setApprovalPayment(null); setApprovalError(''); } }} />
       <NewPaymentModal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} onSave={handleSave} />
       <PaymentEditModal isOpen={!!editingPayment} payment={editingPayment} onClose={() => setEditingPayment(null)} onSave={handleSave} />
       <PaymentViewModal isOpen={!!viewingPayment} payment={viewingPayment} onClose={() => setViewingPayment(null)} />

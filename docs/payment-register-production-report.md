@@ -10,6 +10,15 @@ Scope: **Payment Register only**. Verification date: 10 September 2026.
 - Table header is **Payment**, followed by its current record count, a clear gap, and exactly **Pending | Approved | Deleted** in the same compact segmented container as Latest Maintenance. Selected colors match that reference: orange, emerald and rose. All/Paid/Cancelled buttons are removed. Pending filters stored Draft values; Approved filters stored Approved values. Paid and Cancelled records are not reclassified. Deleted is selectable and presents an unavailable-data explanation because the payment API does not supply deleted records. No backend lifecycle was added. Clear restores the Pending view.
 - Follow-up verification: 9/9 intercepted-API browser tests, 6/6 unit tests, scoped ESLint and production build passed; desktop/mobile screenshots visually inspected. Tests also assert exactly three segments, their colors, and desktop alignment beside Payment. Full-project baseline failures below are historical results from the completion pass, not a fresh whole-repository gate run for this follow-up.
 
+### Selection and approval follow-up
+
+- Table/details status badges and the Edit status option now display **Pending** in place of Draft. A single frontend label helper preserves the existing `Draft` API value.
+- A row click or its accessible checkbox selects one payment, highlights it, and exposes **Edit / Approve / Delete** in the table header. Selecting another row replaces the selection; clicking the selected row again or clicking outside the table clears it. Dialog interactions preserve the captured payment. Page/view/filter changes and completed refreshes clear stale selections.
+- Approval uses the existing `updatePayment(id, { status: 'Approved' })` contract after shared confirmation. It follows the existing edit-age restriction, rejects demo/already-approved records, prevents double submission, and checks the returned payment identity and status before reporting success.
+- Successful approval removes the record from Pending and makes it visible in Approved after refresh. Failed approval leaves the pending record unchanged and shows a retryable inline error. No approval endpoint or backend workflow was introduced.
+- Sample records remain read-only: selection is available, but mutation buttons are disabled with a read-only explanation.
+- Latest scoped verification: **13/13 browser tests**, **7/7 unit tests**, scoped ESLint and production build passed. Browser APIs were intercepted; real-server approval/persistence is still not verified. Desktop and mobile selected-row/header-action layouts were visually inspected.
+
 ## 1. Final Status
 
 **PARTIALLY COMPLETE — FRONTEND ONLY**
@@ -118,7 +127,7 @@ No other ERP module is included in this completion claim.
 | Production build | `npm run build`: PASS; existing chunk-size/mixed-import warnings remain. |
 | Design-system tests | `npm run test:design-system`: PASS — 39/39. |
 | Mobile tests | `npm run test:mobile`: 111 PASS / 10 FAIL — identical baseline failures (`Invalid URL`) in unchanged operations tests. |
-| Other tests | Payment Register unit tests: 6/6 PASS. Payment Register browser tests: 9/9 PASS with intercepted API responses. |
+| Other tests | Payment Register unit tests: 7/7 PASS. Payment Register browser tests: 13/13 PASS with intercepted API responses. |
 | ESLint | All changed Payment Register sources/tests: PASS. Full `npm run lint`: FAIL — 748 errors / 49 warnings; baseline was 750 errors / 49 warnings. Two existing Edit-modal lint errors removed. |
 | Diff whitespace | `git diff --check`: PASS. |
 | Backend changes | 0 |
@@ -150,7 +159,7 @@ Real server persistence, real bank-master availability/mapping, multi-user payme
 1. Resolve the 53 repository TypeScript errors outside this change before a clean full-project typecheck can be claimed.
 2. Resolve the remaining 748 ESLint errors and 49 warnings outside the scoped files.
 3. Repair the ten existing mobile/operations `Invalid URL` test failures; no related service logic was changed here.
-4. QA real payment creation/update/delete, bank-method mapping, linked-trip detail lookup and backend number issuance in an authorized staging environment.
+4. QA real payment creation/update/approval/delete, bank-method mapping, linked-trip detail lookup and backend number issuance in an authorized staging environment.
 5. Perform screen-reader and Firefox/Safari/touch-device checks. At narrow widths the unchanged application header has very limited title space; register controls and dialogs remain usable, but the shell requires its own responsive review.
 6. Confirm performance with the expected real dataset size. This page uses the existing list API and local combined filtering; no server-pagination contract was invented.
 
@@ -164,6 +173,7 @@ Current pass:
 - `src/modules/accounts/components/payment-book/PaymentEditModal.tsx`
 - `src/modules/accounts/components/payment-book/PaymentViewModal.tsx`
 - `src/modules/accounts/utils/paymentRegisterDemo.ts`
+- `src/modules/accounts/utils/paymentRegister.ts`
 - `src/modules/accounts/utils/paymentRegister.test.ts`
 - `tests/payment-register/payment-register.spec.ts`
 - `tests/payment-register/playwright.config.ts`

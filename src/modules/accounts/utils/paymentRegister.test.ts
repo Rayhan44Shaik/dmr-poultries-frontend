@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { weekRange } from '../../../utils/businessDate';
-import { filterPayments, paymentCurrency } from './paymentRegister';
+import { filterPayments, paymentCurrency, paymentStatusLabel } from './paymentRegister';
 import type { Payment } from '../types/payment.types';
 
 const base: Payment = {
@@ -53,4 +53,13 @@ test('demo fixtures have unique sequential numbers, supported statuses and valid
     assert.equal(payment.attachments.length, 0);
   }
   assert.deepEqual(createDemoPayments(new Date(2026, 8, 10)), samples);
+});
+
+
+test('Pending is a display label only; existing API statuses remain unchanged', () => {
+  assert.equal(paymentStatusLabel('Draft'), 'Pending');
+  for (const status of ['Approved', 'Paid', 'Cancelled'] as const) assert.equal(paymentStatusLabel(status), status);
+  const pending: Payment = { ...base, status: 'Draft' };
+  assert.equal(paymentStatusLabel(pending.status), 'Pending');
+  assert.equal(pending.status, 'Draft');
 });
