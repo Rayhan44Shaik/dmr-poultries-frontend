@@ -3,6 +3,7 @@ export {
   I18nProvider,
   useI18n,
   STORAGE_KEY,
+  makeT,
   translate,
   getLanguage,
   translateStatus,

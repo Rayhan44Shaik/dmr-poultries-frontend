@@ -1,417 +1,683 @@
 // src/modules/staff/pages/SupervisorPerformancePage.tsx
+//
+// ============================================================================
+// SUPERVISOR PERFORMANCE — production rebuild (frontend only)
+// ============================================================================
+// Data: the existing real endpoint GET /api/staff/performance/supervisors via
+// `useStaffPerformance` — no sample data, no changed contracts.
+//
+// BEHAVIOUR (mirrors the Driver Performance page — shared components)
+//   • Explicit search: dates / supervisor / search text are DRAFTS; exactly
+//     one request runs on Search (or Enter). Clear restores the default
+//     period (last four Mon–Sat weeks, ~1 month) and re-applies once.
+//   • Refresh: single-flight, icon-only, keeps the loaded dataset on screen.
+//   • Weekly chart renders the API's weekly buckets (birds / delivered
+//     weight; trips in the tooltip). Mortality per week is NOT fabricated —
+//     the weekly API payload does not carry it.
+//   • Row click / Enter / Space opens the details drawer (no extra requests).
+//   • Grades (Outstanding / Excellent / Good) come from the shared
+//     deterministic presentation scorer in `utils/performanceGrading`.
+// ============================================================================
 
-import { memo, useMemo, useState, useEffect, useCallback } from 'react';
-import { uiSearchInputWithClearClass } from '../../../shared/ui/uiTokens';
+import { memo, useCallback, useMemo, useState } from "react";
 import {
-  AlertCircle,
+  AlertTriangle,
   ClipboardCheck,
-  RefreshCw,
   Scale,
   Store,
   TrendingUp,
   Users,
-  X,
-  Award,
-  Target,
-  ArrowUpRight,
-  ArrowDownRight,
-  Search,
-} from 'lucide-react';
-import { useStaffPerformance } from '../hooks/useStaffPerformance';
-import WeeklyActivityChart from '../components/performance/WeeklyActivityChart';
-import RecentTripsTable from '../components/performance/RecentTripsTable';
-import DateRangePicker from '../components/common/DateRangePicker';
-import Pagination from '../components/common/Pagination';
-import RefreshToast from '../components/common/RefreshToast';
-import type { SupervisorPerformanceResponse } from '../types/performance';
+} from "lucide-react";
+import { te as teDateLocale } from "date-fns/locale";
+import type { Locale } from "date-fns";
 
-const number = (value: number, digits = 0) =>
-  Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: digits });
-
-function Kpi({
-  label,
-  value,
-  sub,
-  icon,
-  tone,
-  trend,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  icon: React.ReactNode;
-  tone: string;
-  trend?: 'up' | 'down' | 'neutral';
-}) {
-  return (
-    <div className="bg-white rounded-lg border border-slate-200 p-3 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow min-h-[72px]">
-      <div className="flex-1 min-w-0">
-        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{label}</div>
-        <div className="text-xl font-extrabold text-slate-900 mt-0.5 truncate">{value}</div>
-        {sub && (
-          <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-500">
-            {trend === 'up' && <ArrowUpRight size={10} className="text-emerald-600" />}
-            {trend === 'down' && <ArrowDownRight size={10} className="text-rose-600" />}
-            {trend === 'neutral' && <span className="w-2 h-2 rounded-full bg-slate-300" />}
-            <span>{sub}</span>
-          </div>
-        )}
-      </div>
-      <div className={`p-2 rounded-lg ${tone} flex-shrink-0 ml-2`}>{icon}</div>
-    </div>
-  );
-}
-
-function PerformanceBadge({ rating }: { rating: 'Excellent' | 'Good' | 'Needs Attention' }) {
-  const styles = {
-    Excellent: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    Good: 'bg-blue-50 text-blue-700 border-blue-200',
-    'Needs Attention': 'bg-rose-50 text-rose-700 border-rose-200',
-  };
-  const icons = {
-    Excellent: <Award size={10} className="text-emerald-600" />,
-    Good: <Target size={10} className="text-blue-600" />,
-    'Needs Attention': <AlertCircle size={10} className="text-rose-600" />,
-  };
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold border ${styles[rating]}`}>
-      {icons[rating]} {rating}
-    </span>
-  );
-}
-
-function RankBadge({ rank }: { rank: number }) {
-  if (rank === 1) return <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 font-bold text-xs"><Award size={12} /></span>;
-  if (rank === 2) return <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs">{rank}</span>;
-  if (rank === 3) return <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-50 text-amber-700 font-bold text-xs">{rank}</span>;
-  return <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-100 text-slate-600 font-medium text-xs">{rank}</span>;
-}
+import { makeT, useI18n, type Language } from "../../../i18n";
+import { useStaffPerformance } from "../hooks/useStaffPerformance";
+import { useStaffDirectory } from "../hooks/useStaffDirectory";
+import { usePerformanceDetail } from "../hooks/usePerformanceDetail";
+import { rankSupervisorRows } from "../utils/performanceGrading";
+import SortableHeader, {
+  type SortState,
+} from "../components/performance/PerformanceSortableHeader";
+import {
+  formatBusinessDate,
+  formatPeriodLabel,
+  periodsForRange,
+  toWeeklyAxisRows,
+} from "../utils/performancePeriods";
+import {
+  buildDrawerFactors,
+  buildDrawerImprovements,
+  recentTripsForWeek,
+  formatCount,
+  formatDecimal,
+  formatKg,
+  formatMetric,
+  formatPercent,
+  gradeBadgeClass,
+  translateGrade,
+} from "../utils/performanceView";
+import PerformanceFilterBar, {
+  type PerformanceDraftFilters,
+} from "../components/performance/PerformanceFilterBar";
+import PerformanceKpiCards, {
+  type PerformanceKpi,
+} from "../components/performance/PerformanceKpiCards";
+import WeeklyPerformanceChart, {
+  type WeeklyChartPoint,
+  type WeeklyChartSeries,
+} from "../components/performance/WeeklyPerformanceChart";
+import PerformanceDrawer from "../components/performance/PerformanceDrawer";
+import RecentTripsTable from "../components/performance/RecentTripsTable";
+import Pagination from "../components/common/Pagination";
+import RefreshToast from "../components/common/RefreshToast";
+import { EmptyState, TableSkeleton } from "../../../ui";
+import { cn } from "../../../utils/cn";
+import {
+  uiTableHeadClass,
+  uiTableRowClass,
+  uiTableRowFocusableClass,
+  uiTableRowSelectedClass,
+  uiTableTdClass,
+  uiTableTdNumericClass,
+  uiTableThClass,
+} from "../../../shared/ui/uiTokens";
 
 const ITEMS_PER_PAGE = 10;
 
 const SupervisorPerformancePage = () => {
-  const perf = useStaffPerformance('supervisors');
-  const data = perf.data as SupervisorPerformanceResponse;
+  const { t, language } = useI18n();
+  const dateLocale: Locale | undefined = language === "te" ? teDateLocale : undefined;
 
-  const kpis = data.kpis;
-  const weekly = useMemo(
-    () =>
-      (data.weekly || []).map((point) => ({
-        week: point.week,
-        trips: point.trips,
-        birds: point.birds,
-        weight: point.weight,
-      })),
-    [data.weekly]
-  );
+  const perf = useStaffPerformance("supervisors");
+  const directory = useStaffDirectory("Supervisor");
+  const data = perf.data;
+  const applied = perf.filters;
 
-  // Mortality data for chart summary
-  const mortalityWeekly = useMemo(
-    () =>
-      (data.weekly || []).map((w) => ({
-        week: w.week,
-        mortalityRate: kpis.mortalityRate,
-        mortality: Math.round((w.birds * kpis.mortalityRate) / 100),
-      })),
-    [data.weekly, kpis.mortalityRate]
-  );
+  /* ---------------------- draft filters (explicit search) --------------- */
 
-  const selectedRow = useMemo(
-    () =>
-      perf.selectedId != null
-        ? data.rows.find((r) => r.supervisorId === perf.selectedId) ?? null
-        : null,
-    [data.rows, perf.selectedId]
-  );
+  const [draft, setDraft] = useState<PerformanceDraftFilters>(() => ({
+    fromDate: applied.fromDate,
+    toDate: applied.toDate,
+    personId: applied.personId,
+    search: applied.search,
+  }));
 
-  // Local search state - only submits on explicit search action
-  const [searchValue, setSearchValue] = useState(perf.searchInput);
-  const [searchSubmitted, setSearchSubmitted] = useState(false);
-
-  // Pagination state
+  // Re-seed the draft + reset pagination when the applied set changes
+  // (Search / Clear). Render-phase adjustment pattern — `applied` identity
+  // changes exactly once per apply/clear, never while typing.
   const [currentPage, setCurrentPage] = useState(1);
-
-  // Refresh toast state
-  const [showRefreshToast, setShowRefreshToast] = useState(false);
-  const [refreshMessage, setRefreshMessage] = useState('Supervisor Performance refreshed');
-  const [refreshError, setRefreshError] = useState(false);
-
-  // Compute performance rating for each supervisor based on mortality rate and delivery efficiency
-  const rowsWithRating = useMemo(() => {
-    if (!data.rows.length) return [];
-    const mortalityRates = data.rows.map(r => r.mortalityRate).filter(m => m > 0);
-    const trips = data.rows.map(r => r.trips).filter(t => t > 0);
-    const avgMortalityRate = mortalityRates.length ? mortalityRates.reduce((a, b) => a + b, 0) / mortalityRates.length : 0;
-    const avgTrips = trips.length ? trips.reduce((a, b) => a + b, 0) / trips.length : 0;
-
-    return data.rows.map((row, index) => {
-      let rating: 'Excellent' | 'Good' | 'Needs Attention' = 'Good';
-      // Lower mortality is better, higher trips is better
-      if (row.mortalityRate < avgMortalityRate * 0.8 && row.trips > avgTrips * 1.1) rating = 'Excellent';
-      else if (row.mortalityRate > avgMortalityRate * 1.2 || row.trips < avgTrips * 0.8) rating = 'Needs Attention';
-      return { ...row, rating, rank: index + 1 };
+  const [lastApplied, setLastApplied] = useState(applied);
+  if (lastApplied !== applied) {
+    setLastApplied(applied);
+    setDraft({
+      fromDate: applied.fromDate,
+      toDate: applied.toDate,
+      personId: applied.personId,
+      search: applied.search,
     });
-  }, [data.rows]);
-
-  // Paginated rows
-  const paginatedRows = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return rowsWithRating.slice(start, start + ITEMS_PER_PAGE);
-  }, [rowsWithRating, currentPage]);
-
-  const totalPages = Math.ceil(rowsWithRating.length / ITEMS_PER_PAGE);
-
-  // Reset pagination when filters change
-  useEffect(() => {
     setCurrentPage(1);
-  }, [perf.fromDate, perf.toDate, searchSubmitted]);
+  }
 
-  // Handle search submit - only trigger on explicit action
-  const handleSearchSubmit = useCallback((e?: React.FormEvent | React.KeyboardEvent) => {
-    if (e) e.preventDefault();
-    perf.setSearchInput(searchValue);
-    setSearchSubmitted(true);
-    setCurrentPage(1);
-  }, [perf, searchValue]);
-
-  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearchSubmit(e);
-    }
-  }, [handleSearchSubmit]);
-
-  // Handle refresh with toast notification - wait for data to actually refresh
-  const handleRefresh = useCallback(async () => {
-    if (perf.loading || perf.refreshing) return;
-    
-    const currentNonce = perf.refreshNonce;
-    setRefreshMessage('Supervisor Performance refreshed');
-    setRefreshError(false);
-    setShowRefreshToast(true);
-    perf.refresh();
-
-    // Poll for refresh completion
-    const checkRefresh = setInterval(() => {
-      if (perf.refreshNonce !== currentNonce && !perf.refreshing) {
-        clearInterval(checkRefresh);
-        setTimeout(() => {
-          if (!perf.error) {
-            setRefreshMessage('Supervisor Performance refreshed');
-            setRefreshError(false);
-          } else {
-            setRefreshMessage('Unable to refresh Supervisor Performance');
-            setRefreshError(true);
-          }
-        }, 100);
+  const updateDraft = useCallback((patch: Partial<PerformanceDraftFilters>) => {
+    setDraft((current) => {
+      const next = { ...current, ...patch };
+      if (next.fromDate && next.toDate && next.fromDate > next.toDate) {
+        if (patch.fromDate) next.toDate = next.fromDate;
+        else next.fromDate = next.toDate;
       }
-    }, 200);
+      return next;
+    });
+  }, []);
 
-    setTimeout(() => clearInterval(checkRefresh), 10000);
+  const handleApply = useCallback(() => {
+    perf.applyFilters({
+      fromDate: draft.fromDate,
+      toDate: draft.toDate,
+      personId: draft.personId,
+      search: draft.search,
+    });
+  }, [perf, draft]);
+
+  const handleClear = useCallback(() => {
+    perf.clearFilters();
   }, [perf]);
 
-  // 4 meaningful supervisor KPIs - different from Driver KPIs
-  const performanceKpis = useMemo(() => [
-    {
-      label: 'Active Supervisors',
-      value: perf.loading ? '—' : number(kpis.supervisors),
-      sub: 'Participating',
-      icon: <Users size={16} />,
-      tone: 'bg-blue-50 text-blue-600',
+  const handleRefresh = useCallback(() => {
+    perf.refresh();
+  }, [perf]);
+
+  /* ---------------------------- refresh toast --------------------------- */
+
+  const [refreshToast, setRefreshToast] = useState<{
+    message: string;
+    isError: boolean;
+  } | null>(null);
+  // Fire exactly once per completed refresh (true → false transition),
+  // detected with the render-phase adjustment pattern.
+  const [prevRefreshing, setPrevRefreshing] = useState(perf.refreshing);
+  if (prevRefreshing !== perf.refreshing) {
+    setPrevRefreshing(perf.refreshing);
+    if (!perf.refreshing) {
+      setRefreshToast({
+        message: perf.error
+          ? t("staff.perf.toast.supervisor_refresh_failed")
+          : t("staff.perf.toast.supervisor_refreshed"),
+        isError: Boolean(perf.error),
+      });
+    }
+  }
+
+  /* ------------------------------ periods ------------------------------- */
+
+  const periods = useMemo(
+    () => periodsForRange(applied.fromDate, applied.toDate, 6),
+    [applied.fromDate, applied.toDate],
+  );
+  const appliedRangeLabel = useMemo(
+    () =>
+      `${formatBusinessDate(applied.fromDate, "d MMM yyyy", dateLocale)} – ${formatBusinessDate(applied.toDate, "d MMM yyyy", dateLocale)}`,
+    [applied.fromDate, applied.toDate, dateLocale],
+  );
+  const periodsLine = useMemo(
+    () => periods.map((period) => formatPeriodLabel(period, dateLocale)).join("  ·  "),
+    [periods, dateLocale],
+  );
+
+  /* --------------------------- rows + grading --------------------------- */
+
+  const rows = data.rows;
+  // Award-ordered view: ranks 1-3 hold the single Outstanding/Excellent/Good,
+  // everything else follows by output (grade `null` → rendered as a dash).
+  const rowsView = useMemo(() => rankSupervisorRows(rows), [rows]);
+
+  /* ------------------------------- sorting ------------------------------- */
+
+  // Click cycle per column: preferred dir → reversed → cleared (award order).
+  // Sorting reorders the loaded rows only — grades and awards never change.
+  const [sort, setSort] = useState<SortState | null>(null);
+  const handleSortChange = useCallback((next: SortState | null) => {
+    setSort(next);
+    setCurrentPage(1);
+  }, []);
+
+  const supervisorSortAccessors = useMemo<
+    Record<string, (entry: (typeof rowsView)[number]) => number | string>
+  >(
+    () => ({
+      supervisor: (entry) => entry.row.supervisorName,
+      status: (entry) => entry.row.employeeStatus,
+      trips: (entry) => entry.row.trips,
+      shops: (entry) => entry.row.shops,
+      birds: (entry) => entry.row.birds,
+      weight: (entry) => entry.row.weight,
+      mortality: (entry) => entry.row.mortality,
+      mortality_rate: (entry) => entry.row.mortalityRate,
+      weight_loss: (entry) => entry.row.weightLoss,
+      grade: (entry) => entry.assessment?.awardRank ?? Number.MAX_SAFE_INTEGER,
+    }),
+    [],
+  );
+
+  const sortedRowsView = useMemo(() => {
+    if (!sort) return rowsView;
+    const accessor = supervisorSortAccessors[sort.key];
+    if (!accessor) return rowsView;
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...rowsView].sort((a, b) => {
+      const av = accessor(a);
+      const bv = accessor(b);
+      if (typeof av === "string" || typeof bv === "string") {
+        const cmp = String(av).localeCompare(String(bv), undefined, {
+          sensitivity: "accent",
+          numeric: true,
+        });
+        if (cmp !== 0) return cmp * dir;
+      } else if (av !== bv) {
+        return ((av as number) - (bv as number)) * dir;
+      }
+      return a.rank - b.rank; // award order as the stable tie-break
+    });
+  }, [rowsView, sort, supervisorSortAccessors]);
+
+  /* ----------------------------- pagination ----------------------------- */
+
+  const totalPages = Math.max(1, Math.ceil(rowsView.length / ITEMS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+
+  const paginatedRows = useMemo(
+    () => sortedRowsView.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE),
+    [sortedRowsView, safePage],
+  );
+
+  /* ------------------------------- KPIs --------------------------------- */
+
+  const kpis = data.kpis;
+  const initialLoading = perf.loading && rowsView.length === 0 && !perf.error;
+  const kpiCards = useMemo<PerformanceKpi[]>(
+    () => [
+      {
+        label: t("staff.perf.kpi.active_supervisors"),
+        value: initialLoading ? null : formatCount(kpis.supervisors),
+        sub: t("staff.perf.kpi.sub.participating"),
+        icon: <Users size={14} />,
+      },
+      {
+        label: t("staff.perf.kpi.shops_delivered"),
+        value: initialLoading ? null : formatCount(kpis.shops),
+        sub: t("staff.perf.kpi.sub.shops"),
+        icon: <Store size={14} />,
+      },
+      {
+        label: t("staff.perf.kpi.total_birds"),
+        value: initialLoading ? null : formatCount(kpis.birds),
+        sub: t("staff.perf.kpi.sub.birds"),
+        icon: <ClipboardCheck size={14} />,
+      },
+      {
+        label: t("staff.perf.kpi.mortality_rate"),
+        value: initialLoading
+          ? null
+          : formatMetric("mortalityRate", kpis.mortalityRate),
+        sub: t("staff.perf.kpi.sub.mortality"),
+        icon: <Scale size={14} />,
+      },
+      {
+        label: t("staff.perf.kpi.weight_loss"),
+        value: initialLoading ? null : formatKg(kpis.weightLoss),
+        sub: t("staff.perf.kpi.sub.weight_loss"),
+        icon: <TrendingUp size={14} />,
+      },
+    ],
+    [t, kpis, initialLoading],
+  );
+
+  /* ------------------------------- chart -------------------------------- */
+
+  const chartRows = useMemo(
+    () => toWeeklyAxisRows(data.weekly, dateLocale),
+    [data.weekly, dateLocale],
+  );
+  // Three-series view per product decision: the Birds bar carries the weekly
+  // volume (left axis); Mortality and Weight-loss are the two loss trends on
+  // the compact right axis. Lines can never visually overpower the volume
+  // they belong to. (Delivered weight remains in the KPIs, the table and the
+  // tooltip's derived average — it is only dropped as a chart series.)
+  const chartSeries = useMemo<WeeklyChartSeries[]>(
+    () => [
+      {
+        key: "birds",
+        label: t("staff.perf.weekly.birds"),
+        color: "#10b981",
+        axis: "left",
+        kind: "bar",
+        format: (value) => formatCount(value),
+      },
+      {
+        key: "mortality",
+        label: t("staff.perf.weekly.mortality"),
+        color: "#ef4444",
+        axis: "right",
+        kind: "line",
+        format: (value) => formatCount(value),
+      },
+      {
+        key: "weightLoss",
+        label: t("staff.perf.weekly.weight_loss"),
+        color: "#8b5cf6",
+        axis: "right",
+        kind: "line",
+        format: (value) => `${formatDecimal(value, 1)} kg`,
+      },
+    ],
+    [t],
+  );
+  const chartTooltipExtras = useCallback(
+    (point: WeeklyChartPoint) => {
+      const extraRows: Array<{ label: string; value: string }> = [
+        { label: t("staff.perf.weekly.trips"), value: formatCount(Number(point.trips ?? 0)) },
+      ];
+      // Derived from the same real values — never fabricated.
+      const birds = Number(point.birds ?? 0);
+      const weight = Number(point.weight ?? 0);
+      if (birds > 0 && weight > 0) {
+        extraRows.push({
+          label: t("staff.perf.weekly.avg_weight_per_bird"),
+          value: `${formatDecimal(weight / birds, 2)} kg`,
+        });
+      }
+      return extraRows;
     },
-    {
-      label: 'Trip Participation',
-      value: perf.loading ? '—' : number(kpis.trips),
-      sub: 'Total trips',
-      icon: <ClipboardCheck size={16} />,
-      tone: 'bg-indigo-50 text-indigo-600',
-    },
-    {
-      label: 'Shop Coverage',
-      value: perf.loading ? '—' : number(kpis.shops),
-      sub: 'Unique shops',
-      icon: <Store size={16} />,
-      tone: 'bg-cyan-50 text-cyan-600',
-    },
-    {
-      label: 'Mortality Rate',
-      value: perf.loading ? '—' : `${number(kpis.mortalityRate, 2)}%`,
-      sub: 'Delivery quality',
-      icon: <Scale size={16} />,
-      tone: 'bg-rose-50 text-rose-600',
-    },
-  ], [kpis, perf.loading]);
+    [t],
+  );
+
+  // Respective trip details for the chart tooltip: the API's own recent
+  // trips (loaded only with a person filter) mapped into their Mon–Sat
+  // buckets. Empty when no detail is loaded — never fabricated.
+  const chartWeekTrips = useCallback(
+    (point: WeeklyChartPoint) =>
+      recentTripsForWeek(point.week, data.detail?.recentTrips ?? [], "supervisors"),
+    [data.detail],
+  );
+
+  /* --------------------------- drawer state ----------------------------- */
+
+  const selectedEntry = useMemo(
+    () =>
+      perf.selectedId != null
+        ? rowsView.find((entry) => entry.row.supervisorId === perf.selectedId) ?? null
+        : null,
+    [rowsView, perf.selectedId],
+  );
+
+  const closeDrawer = useCallback(() => perf.selectRow(null), [perf]);
+
+  // Pop-up language is SCOPED to the pop-up only: it re-syncs with the app
+  // language when the pop-up opens, then the in-header EN/తెలుగు toggle
+  // changes it locally. Nothing is written to the global store, so the page
+  // behind and the rest of the project keep their language.
+  const [drawerLang, setDrawerLang] = useState<Language>(language);
+  const [prevDrawerOpen, setPrevDrawerOpen] = useState(false);
+  const drawerOpen = selectedEntry != null;
+  if (prevDrawerOpen !== drawerOpen) {
+    setPrevDrawerOpen(drawerOpen);
+    if (drawerOpen) setDrawerLang(language);
+  }
+  const drawerT = useMemo(() => makeT(drawerLang), [drawerLang]);
+  const drawerDateLocale: Locale | undefined = drawerLang === "te" ? teDateLocale : undefined;
+  const drawerRangeLabel = useMemo(
+    () =>
+      `${formatBusinessDate(applied.fromDate, "d MMM yyyy", drawerDateLocale)} – ${formatBusinessDate(applied.toDate, "d MMM yyyy", drawerDateLocale)}`,
+    [applied.fromDate, applied.toDate, drawerDateLocale],
+  );
+
+  // Per-person detail for the pop-up (recent trips): fetched separately from
+  // the list query, so navigating with the ‹ › arrows never shrinks or
+  // reshuffles the loaded ranking. Same read-only GET, cached.
+  const detailQuery = usePerformanceDetail(
+    "supervisors",
+    perf.selectedId,
+    { fromDate: applied.fromDate, toDate: applied.toDate },
+    perf.refreshNonce,
+  );
+  const personDetail = detailQuery.detail;
+
+  // ‹ › traversal across the award-ordered rows (rank literal order).
+  const drawerNavigation = useMemo(() => {
+    if (!selectedEntry) return undefined;
+    const index = rowsView.findIndex((entry) => entry.row.supervisorId === selectedEntry.row.supervisorId);
+    if (index < 0 || rowsView.length <= 1) return undefined;
+    return {
+      index,
+      total: rowsView.length,
+      onPrev: () => {
+        const prev = rowsView[index - 1];
+        if (prev) perf.selectRow(prev.row.supervisorId);
+      },
+      onNext: () => {
+        const next = rowsView[index + 1];
+        if (next) perf.selectRow(next.row.supervisorId);
+      },
+      prevLabel: drawerT("staff.perf.drawer.prev"),
+      nextLabel: drawerT("staff.perf.drawer.next"),
+    };
+  }, [selectedEntry, rowsView, perf, drawerT]);
+
+
+
+  const drawerSummary = useMemo(() => {
+    if (!selectedEntry) return [];
+    const row = selectedEntry.row;
+    return [
+      { label: drawerT("staff.perf.drawer.shops"), value: formatCount(row.shops) },
+      { label: drawerT("staff.perf.drawer.trips"), value: formatCount(row.trips) },
+      { label: drawerT("staff.perf.drawer.birds"), value: formatCount(row.birds) },
+      { label: drawerT("staff.perf.drawer.weight"), value: `${formatCount(row.weight)} kg` },
+      { label: drawerT("staff.perf.drawer.mortality"), value: formatCount(row.mortality) },
+      { label: drawerT("staff.perf.drawer.mortality_rate"), value: formatPercent(row.mortalityRate) },
+      { label: drawerT("staff.perf.drawer.weight_loss"), value: formatKg(row.weightLoss) },
+    ];
+  }, [selectedEntry, drawerT]);
+
+  const drawerFactors = useMemo(
+    () => (selectedEntry?.assessment ? buildDrawerFactors(selectedEntry.assessment, drawerT) : []),
+    [selectedEntry, drawerT],
+  );
+  const drawerImprovements = useMemo(
+    () => (selectedEntry?.assessment ? buildDrawerImprovements(selectedEntry.assessment, drawerT) : []),
+    [selectedEntry, drawerT],
+  );
+
+  const selectedSupervisorName = useMemo(() => {
+    if (applied.personId == null) return null;
+    return (
+      directory.options.find((option) => option.id === applied.personId)?.name ??
+      `#${applied.personId}`
+    );
+  }, [applied.personId, directory.options]);
+
+  const summaryLine = useMemo(() => {
+    const parts = [
+      appliedRangeLabel,
+      selectedSupervisorName ?? t("staff.perf.filter.all_supervisors"),
+    ];
+    if (applied.search.trim()) {
+      parts.push(`${t("staff.perf.summary.search_prefix")} “${applied.search.trim()}”`);
+    }
+    return parts.join("  ·  ");
+  }, [appliedRangeLabel, applied.search, selectedSupervisorName, t]);
+
+  /* ---------------------------- empty states ---------------------------- */
+
+  const hasNarrowingFilter =
+    applied.personId != null || applied.search.trim().length > 0;
+  const showTableSkeleton = perf.loading && rowsView.length === 0;
+  const showNoMatch =
+    !showTableSkeleton && rowsView.length === 0 && hasNarrowingFilter;
+  const showNoData =
+    !showTableSkeleton && rowsView.length === 0 && !hasNarrowingFilter;
+
+  /* ------------------------------ render -------------------------------- */
 
   return (
-    <div className="w-full space-y-4 bg-slate-50/30 min-h-screen pb-8">
-      {/* Refresh Toast */}
+    <div className="w-full space-y-4">
       <RefreshToast
-        message={refreshMessage}
-        isVisible={showRefreshToast}
-        onClose={() => setShowRefreshToast(false)}
+        message={refreshToast?.message ?? ""}
+        isVisible={refreshToast != null}
+        onClose={() => setRefreshToast(null)}
         duration={5000}
-        isError={refreshError}
+        isError={refreshToast?.isError}
       />
 
-      {/* Filters Toolbar */}
-      <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="flex flex-col lg:flex-row items-start lg:items-center gap-3 flex-1 min-w-0">
-            {/* Date Range - Wider date fields */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap">Date Range</span>
-              <DateRangePicker
-                fromDate={perf.fromDate}
-                toDate={perf.toDate}
-                onFromDateChange={perf.setFromDate}
-                onToDateChange={perf.setToDate}
-                className="flex-shrink-0"
-                disabled={perf.loading}
-              />
-            </div>
+      <PerformanceFilterBar
+        kind="supervisors"
+        value={draft}
+        onChange={updateDraft}
+        onApply={handleApply}
+        onClear={handleClear}
+        onRefresh={handleRefresh}
+        personOptions={directory.options}
+        personOptionsLoading={directory.loading}
+        personOptionsError={directory.error}
+        busy={perf.loading}
+        refreshing={perf.refreshing}
+      />
 
-            {/* Search - Moderately sized */}
-            <div className="w-full lg:w-auto lg:max-w-[280px] lg:flex-1">
-              <form onSubmit={handleSearchSubmit} className="w-full">
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <Search className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    value={searchValue}
-                    onChange={(e) => setSearchValue(e.target.value)}
-                    onKeyDown={handleSearchKeyDown}
-                    placeholder="Search supervisor name…"
-                    className={uiSearchInputWithClearClass}
-                    disabled={perf.loading}
-                  />
-                  {searchValue && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchValue('')}
-                      className="absolute inset-y-0 right-0 flex items-center pr-3"
-                    >
-                      <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-                    </button>
-                  )}
-                </div>
-              </form>
-            </div>
-          </div>
-
-          {/* Search + Refresh - Same row */}
-          <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap">
-            <button
-              type="button"
-              onClick={handleSearchSubmit}
-              disabled={perf.loading || !searchValue.trim()}
-              className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50 flex-shrink-0"
-            >
-              <Search size={13} className="text-slate-400" /> Search
-            </button>
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={perf.loading || perf.refreshing}
-              className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-xs transition-colors hover:bg-slate-50 disabled:opacity-50 flex-shrink-0"
-            >
-              <RefreshCw size={13} className={perf.refreshing ? 'animate-spin text-emerald-600' : 'text-slate-400'} />
-              Refresh
-            </button>
-          </div>
-        </div>
-      </div>
-
+      {/* Error — inline, actionable, raw API text never shown */}
       {perf.error && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          <span className="flex items-center gap-2"><AlertCircle size={16} />{perf.error}</span>
-          <button type="button" onClick={perf.refresh} className="font-bold underline">Retry</button>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+          <p className="flex items-center gap-2 text-sm font-medium text-rose-700">
+            <AlertTriangle size={16} aria-hidden="true" />
+            {t("staff.perf.error.title")}
+          </p>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className="text-sm font-bold text-rose-700 underline decoration-rose-300 underline-offset-2 hover:text-rose-800"
+          >
+            {t("common.retry")}
+          </button>
         </div>
       )}
 
-      {/* Supervisor Overview - 4 Compact KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-        {performanceKpis.map((kpi, idx) => (
-          <Kpi key={idx} {...kpi} />
-        ))}
-      </div>
+      {/* KPI cards — reflect the applied dataset */}
+      <PerformanceKpiCards kpis={kpiCards} columns={5} />
 
-      {/* Weekly Operational Activity Chart - Birds + Weight with mortality summary */}
-      <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm">
-        <WeeklyActivityChart
-          data={weekly}
-          bars={[
-            { key: 'birds', label: 'Birds', color: '#10b981' },
-            { key: 'weight', label: 'Weight (kg)', color: '#f59e0b' },
-          ]}
-          emptyText="No weekly activity for the selected filters."
-          chartType="mixed"
-          supervisorMode={true}
-          mortalityData={mortalityWeekly}
-          totalTrips={kpis.trips}
-        />
-      </div>
-
-      {/* Supervisor Ranking Table */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-200">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">Supervisor Performance</h3>
+      {/* Supervisor Weekly Performance */}
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
+        <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-slate-200 px-4 py-3 sm:px-5">
+          <h2 className="text-[13px] font-bold tracking-tight text-slate-800">
+            {t("staff.perf.weekly.supervisor_header")}
+          </h2>
+          <p className="text-[11px] font-medium tabular-nums text-slate-500">
+            <span className="text-slate-400">{t("staff.perf.weekly.reporting_weeks")}: </span>
+            {periodsLine || appliedRangeLabel}
+          </p>
+        </header>
+        <div className="p-4 sm:p-5">
+          <WeeklyPerformanceChart
+            rows={chartRows}
+            series={chartSeries}
+            tooltipExtras={chartTooltipExtras}
+            weekTrips={chartWeekTrips}
+            emptyText={t("staff.perf.weekly.empty")}
+            loading={initialLoading}
+            heightClass="h-72 sm:h-80"
+            ariaLabel={t("staff.perf.weekly.aria_supervisor", { range: appliedRangeLabel })}
+          />
         </div>
+      </section>
 
-        {perf.loading && !selectedRow ? (
-          <div className="p-5 space-y-3">
-            {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="h-12 animate-pulse rounded-lg bg-slate-100" />
-            ))}
+      {/* Supervisor Performance table */}
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
+        <header className="flex flex-wrap items-baseline gap-x-2 border-b border-slate-200 px-4 py-3 sm:px-5">
+          <h2 className="text-[13px] font-bold tracking-tight text-slate-800">
+            {t("staff.perf.supervisor_title")}
+          </h2>
+          <span className="min-w-0 text-[11px] font-medium text-slate-500">
+            <span aria-hidden="true">—&nbsp;</span>
+            {summaryLine}
+          </span>
+        </header>
+
+        {showTableSkeleton ? (
+          <div className="p-4 sm:p-5">
+            <TableSkeleton rows={6} columns={6} label={t("common.loading")} />
           </div>
-        ) : rowsWithRating.length === 0 ? (
-          <div className="flex flex-col items-center py-12 text-center px-6">
-            <ClipboardCheck className="mx-auto mb-3 text-slate-300" size={42} />
-            <p className="font-bold text-slate-700">No supervisor activity</p>
-            <p className="mt-1 text-sm text-slate-400">No completed trips found for the selected period.</p>
-          </div>
+        ) : showNoMatch ? (
+          <EmptyState
+            variant="no-search"
+            title={t("staff.perf.table.no_match_title", {
+              entity_l: t("staff.perf.entity_l.supervisors"),
+            })}
+            description={t("staff.perf.table.no_match_desc", {
+              entity_l: t("staff.perf.entity_l.supervisors"),
+            })}
+            action={
+              <button
+                type="button"
+                onClick={handleClear}
+                className="text-xs font-bold text-emerald-700 underline underline-offset-2 hover:text-emerald-800"
+              >
+                {t("staff.perf.filter.clear_action")}
+              </button>
+            }
+          />
+        ) : showNoData ? (
+          <EmptyState
+            variant="no-data"
+            title={t("staff.perf.table.empty_supervisor_title")}
+            description={t("staff.perf.table.empty_supervisor_desc")}
+          />
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-100">
-                <thead className="bg-slate-50/80">
+            <div className="overflow-x-auto overscroll-x-contain">
+              <table className="min-w-full border-collapse text-left">
+                <thead className={uiTableHeadClass}>
                   <tr>
-                    <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 w-10">Rank</th>
-                    <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-[140px]">Supervisor</th>
-                    <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 w-24">Status</th>
-                    <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500 w-18">Trips</th>
-                    <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500 w-18">Shops</th>
-                    <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500 w-22">Birds</th>
-                    <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500 w-24">Weight (kg)</th>
-                    <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500 w-18">Mortality</th>
-                    <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500 w-22">Mortality %</th>
-                    <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500 w-22">Weight Loss</th>
-                    <th className="px-3 py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500 w-28">Performance</th>
+                    <th scope="col" className={`${uiTableThClass} w-12 text-left`}>
+                      {t("staff.perf.table.rank")}
+                    </th>
+                    <SortableHeader
+                      label={t("staff.perf.table.supervisor")}
+                      sortKey="supervisor"
+                      sort={sort}
+                      onSortChange={handleSortChange}
+                      firstDir="asc"
+                      className="min-w-[150px]"
+                    />
+                    <SortableHeader
+                      label={t("staff.perf.table.status")}
+                      sortKey="status"
+                      sort={sort}
+                      onSortChange={handleSortChange}
+                      firstDir="asc"
+                    />
+                    <SortableHeader label={t("staff.perf.table.trips")} sortKey="trips" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.shops")} sortKey="shops" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.birds")} sortKey="birds" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.weight")} sortKey="weight" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.mortality")} sortKey="mortality" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.mortality_rate")} sortKey="mortality_rate" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.weight_loss")} sortKey="weight_loss" sort={sort} onSortChange={handleSortChange} align="right" />
+                    <SortableHeader label={t("staff.perf.table.grade")} sortKey="grade" sort={sort} onSortChange={handleSortChange} align="center" firstDir="asc" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {paginatedRows.map((row) => {
+                  {paginatedRows.map(({ row, rank, assessment }) => {
                     const selected = row.supervisorId === perf.selectedId;
+                    const grade = assessment?.grade ?? null;
+                    const toggle = () => perf.selectRow(selected ? null : row.supervisorId);
                     return (
                       <tr
                         key={row.supervisorId}
-                        onClick={() => perf.selectRow(selected ? null : row.supervisorId)}
-                        className={`cursor-pointer transition-colors ${selected ? 'bg-emerald-50/70' : 'hover:bg-slate-50/50'}`}
+                        tabIndex={0}
+                        aria-label={t("staff.perf.table.row_aria", { name: row.supervisorName })}
+                        onClick={toggle}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault(); // exactly one activation
+                            toggle();
+                          }
+                        }}
+                        className={cn(
+                          "cursor-pointer",
+                          uiTableRowClass,
+                          uiTableRowFocusableClass,
+                          selected && uiTableRowSelectedClass,
+                        )}
                       >
-                        <td className="whitespace-nowrap px-3 py-2.5 text-center">
-                          <RankBadge rank={row.rank} />
+                        <td className={`${uiTableTdClass} text-center text-xs font-bold tabular-nums text-slate-500`}>
+                          {rank}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-sm font-semibold text-slate-900">{row.supervisorName}</td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-sm text-slate-600">{row.employeeStatus}</td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm tabular-nums text-slate-600">{number(row.trips)}</td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm tabular-nums text-slate-600">{number(row.shops)}</td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm tabular-nums text-slate-600">{number(row.birds)}</td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm tabular-nums text-slate-700">{number(row.weight)}</td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm tabular-nums text-slate-600">{number(row.mortality)}</td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm tabular-nums text-slate-600">{number(row.mortalityRate, 2)}%</td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm tabular-nums text-slate-600">{number(row.weightLoss, 1)}</td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-center">
-                          <PerformanceBadge rating={row.rating} />
+                        <td className={`${uiTableTdClass} whitespace-nowrap text-[13px] font-semibold text-slate-900`}>
+                          {row.supervisorName}
+                        </td>
+                        <td className={`${uiTableTdClass} whitespace-nowrap text-xs text-slate-500`}>
+                          {row.employeeStatus}
+                        </td>
+                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.trips)}</td>
+                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.shops)}</td>
+                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.birds)}</td>
+                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.weight)}</td>
+                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.mortality)}</td>
+                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatPercent(row.mortalityRate)}</td>
+                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatDecimal(row.weightLoss, 1)}</td>
+                        <td className={`${uiTableTdClass} text-center`}>
+                          {grade == null ? (
+                            <span
+                              title={t("staff.perf.grade.unranked")}
+                              className="text-xs font-semibold text-slate-300"
+                            >
+                              —
+                            </span>
+                          ) : (
+                            <span
+                              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${gradeBadgeClass(grade)}`}
+                            >
+                              {translateGrade(grade, t)}
+                            </span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -420,63 +686,93 @@ const SupervisorPerformancePage = () => {
               </table>
             </div>
             <Pagination
-              currentPage={currentPage}
+              currentPage={safePage}
               totalPages={totalPages}
-              totalItems={rowsWithRating.length}
+              totalItems={rowsView.length}
               itemsPerPage={ITEMS_PER_PAGE}
               onPageChange={setCurrentPage}
             />
           </>
         )}
-      </div>
+      </section>
 
-      {/* Detail Panel */}
-      {perf.selectedId != null && (
-        <div className="bg-white rounded-xl border border-emerald-200 shadow-sm overflow-hidden animate-fadeIn">
-          <div className="p-4 border-b border-emerald-200 bg-emerald-50/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600"><TrendingUp size={16} /></div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">{selectedRow?.supervisorName ?? 'Supervisor detail'}</h3>
-                <p className="text-[10px] font-medium text-slate-500">
-                  {selectedRow
-                    ? `${number(selectedRow.shops)} shops • ${number(selectedRow.birds)} birds • ${number(selectedRow.mortalityRate, 2)}% mortality`
-                    : 'Loading detail…'}
-                </p>
-              </div>
-            </div>
+      {/* Details drawer — opens from a row; no API calls, no page remount */}
+      <PerformanceDrawer
+        open={selectedEntry != null}
+        onClose={closeDrawer}
+        title={selectedEntry?.row.supervisorName ?? ""}
+        subtitle={`${drawerT("staff.perf.drawer.period")}: ${drawerRangeLabel}`}
+        rankBadge={
+          selectedEntry ? (
+            <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold tabular-nums text-slate-600">
+              {drawerT("staff.perf.drawer.rank_of", { rank: selectedEntry.rank, total: rowsView.length })}
+            </span>
+          ) : null
+        }
+        navigation={drawerNavigation}
+        language={drawerLang}
+        onLanguageChange={setDrawerLang}
+        gradeBadge={
+          selectedEntry ? (
+            <span
+              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${gradeBadgeClass(
+                selectedEntry.assessment.grade,
+              )}`}
+            >
+              {translateGrade(selectedEntry.assessment.grade, t)}
+            </span>
+          ) : null
+        }
+        unscoredNote={
+          selectedEntry?.assessment.grade == null
+            ? drawerT("staff.perf.grade.unscored", { entity_single: drawerT("staff.perf.entity_single.supervisors") })
+            : undefined
+        }
+        summary={drawerSummary}
+        factors={drawerFactors}
+        improvements={drawerImprovements}
+        labels={{
+          summarySection: drawerT("staff.perf.drawer.summary"),
+          whySection: drawerT("staff.perf.drawer.why"),
+          improveSection: drawerT("staff.perf.drawer.improve"),
+          improveNone: drawerT("staff.perf.drawer.improve_none"),
+          recommendSection: drawerT("staff.perf.drawer.recommend"),
+          recommendSustain: drawerT("staff.perf.drawer.recommend_sustain"),
+          close: drawerT("staff.perf.drawer.close"),
+        }}
+      >
+        {selectedEntry && detailQuery.loading && (
+          <div className="space-y-3" aria-busy="true">
+            <p className="sr-only">{drawerT("staff.perf.drawer.detail_loading")}</p>
+            <div className="h-16 animate-pulse rounded-xl bg-slate-100" />
+            <div className="h-40 animate-pulse rounded-xl bg-slate-100" />
+          </div>
+        )}
+        {selectedEntry && detailQuery.error && !personDetail && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5">
+            <p className="text-xs font-semibold text-rose-700">{drawerT("staff.perf.drawer.detail_error")}</p>
             <button
               type="button"
-              onClick={() => perf.selectRow(null)}
-              className="flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+              onClick={detailQuery.reload}
+              className="text-xs font-bold text-rose-700 underline decoration-rose-300 underline-offset-2 hover:text-rose-800"
             >
-              <X size={13} /> Close
+              {drawerT("common.retry")}
             </button>
           </div>
-
-          {perf.loading ? (
-            <div className="p-5 space-y-3">
-              {Array.from({ length: 3 }).map((_, index) => (
-                <div key={index} className="h-10 animate-pulse rounded-lg bg-slate-100" />
-              ))}
-            </div>
-          ) : data.detail ? (
-            <div className="p-4 space-y-5">
-              {/* Recent Trips */}
-              <div>
-                <h4 className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                  <ClipboardCheck size={12} /> Recent Trips
-                </h4>
-                <RecentTripsTable trips={data.detail.recentTrips} />
-              </div>
-            </div>
-          ) : (
-            <div className="p-5 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-center text-sm font-medium text-slate-400">
-              No detail available for the selected period.
-            </div>
-          )}
-        </div>
-      )}
+        )}
+        {selectedEntry && personDetail && (
+          <section aria-label={drawerT("staff.perf.drawer.recent_trips")}>
+            <h3 className="mb-2 text-[11px] font-bold uppercase tracking-widest text-slate-400">
+              {drawerT("staff.perf.drawer.recent_trips")}
+            </h3>
+            <RecentTripsTable
+              trips={personDetail.recentTrips}
+              paceRow={selectedEntry?.row}
+              paceKind="supervisors"
+            />
+          </section>
+        )}
+      </PerformanceDrawer>
     </div>
   );
 };

@@ -109,7 +109,19 @@ export interface SupervisorPerformanceResponse {
   fromDate: string;
   toDate: string;
   kpis: SupervisorPerformanceKpis;
-  weekly: { week: string; trips: number; birds: number; weight: number }[];
+  /**
+   * Weekly Mon–Sat buckets. `mortality` (birds) and `weightLoss` (kg) are
+   * part of the agreed chart contract — the endpoint must aggregate them per
+   * week from the same trip sources used for the KPIs.
+   */
+  weekly: {
+    week: string;
+    trips: number;
+    birds: number;
+    weight: number;
+    mortality: number;
+    weightLoss: number;
+  }[];
   rows: SupervisorPerformanceRow[];
   detail: SupervisorPerformanceDetail | null;
 }
