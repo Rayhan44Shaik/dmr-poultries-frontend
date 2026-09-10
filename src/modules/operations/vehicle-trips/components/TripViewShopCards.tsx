@@ -279,20 +279,12 @@ export function TripViewShopCards({
                 key={delivery.id}
                 className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-2.5"
               >
-                {/* Header: Shop number, name, email, delivery mode badge */}
+                {/* Header: Shop name, email, delivery mode badge */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span
-                        className="shrink-0 rounded-md bg-slate-100 border border-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 tabular-nums"
-                        title={t("ops.trip.shop_number")}
-                      >
-                        {String(delivery.serialNo || 0).padStart(2, "0")}
-                      </span>
-                      <p className="text-sm font-bold text-slate-800 truncate" title={delivery.shopName}>
-                        {delivery.shopName || t("ops.trip.not_entered")}
-                      </p>
-                    </div>
+                    <p className="text-sm font-bold text-slate-800 truncate" title={delivery.shopName}>
+                      {delivery.shopName || t("ops.trip.not_entered")}
+                    </p>
                     <p className="text-xs text-slate-500 truncate mt-0.5">
                       {shopEmailFor(delivery)}
                     </p>

@@ -35,15 +35,9 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
   return (
     <div className="group relative overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm hover:shadow-md transition-all duration-200 flex flex-col">
       <div className="p-3 flex flex-col gap-2.5 flex-1">
-        {/* Header — shop number + mode tile + shop name vertically centred on the logo */}
+        {/* Header — mode tile + shop name vertically centred on the logo */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span
-              className="shrink-0 rounded-md bg-slate-100 border border-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 tabular-nums"
-              title={t("ops.trip.shop_number")}
-            >
-              {String(row.serialNo || 0).padStart(2, "0")}
-            </span>
             <div
               className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${
                 isWeightMode
