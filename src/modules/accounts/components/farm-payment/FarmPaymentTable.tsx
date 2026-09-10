@@ -1,9 +1,10 @@
 // src/modules/accounts/components/farm-payment/FarmPaymentTable.tsx
 
-import React, { useState } from 'react';
+import React from 'react';
 import type { Trip } from '../../../operations/vehicle-trips/types/trip';
 import type { FarmPayment } from '../../types/farmPayment.types';
-import { BadgeCheck, AlertTriangle, Clock, Lock, Eye } from 'lucide-react';
+import { Lock, Eye } from 'lucide-react';
+import { formatINR, formatINRExact, formatCount } from './farmPaymentFormat';
 
 interface FarmPaymentTableProps {
   trips: Trip[];
@@ -25,92 +26,13 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
   onViewTrip,
   emptyMessage = 'No completed trips found',
 }) => {
-  const [tooltipTripId, setTooltipTripId] = useState<string | null>(null);
-
   const formatDate = (dateString: string) => {
-    if (!dateString) return '-';
+    if (!dateString) return '\u2014';
     return new Date(dateString).toLocaleDateString('en-IN', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
-  };
-
-  const formatCurrency = (amount: number): string => {
-    if (amount >= 10000000) {
-      return `₹${(amount / 10000000).toFixed(2)} Cr`;
-    }
-    if (amount >= 100000) {
-      return `₹${(amount / 100000).toFixed(2)} L`;
-    }
-    return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
-
-  const getPaymentStatusBadge = (tripId: string, totalAmount: number, paidAmount: number, balance: number) => {
-    const payment = paymentData[String(tripId)];
-    const status = payment?.paymentStatus || 'Unpaid';
-
-    switch (status) {
-      case 'Paid':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold border border-emerald-200">
-            <BadgeCheck size={12} /> Paid
-          </span>
-        );
-      case 'Partially Paid':
-        return (
-          <div className="relative inline-block">
-            <span
-              className="inline-flex items-center gap-1 px-2 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-semibold border border-orange-200 cursor-help"
-              tabIndex={0}
-              onMouseEnter={() => setTooltipTripId(tripId)}
-              onMouseLeave={() => setTooltipTripId(null)}
-              onFocus={() => setTooltipTripId(tripId)}
-              onBlur={() => setTooltipTripId(null)}
-            >
-              <AlertTriangle size={12} /> Partial
-            </span>
-            {tooltipTripId === tripId && (
-              <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg shadow-lg whitespace-nowrap pointer-events-none">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-slate-300">Total:</span>
-                    <span className="font-semibold">{formatCurrency(totalAmount)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-slate-300">Paid:</span>
-                    <span className="font-semibold text-emerald-400">{formatCurrency(paidAmount)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 border-t border-slate-600 pt-1">
-                    <span className="text-slate-300">Balance:</span>
-                    <span className="font-semibold text-orange-400">{formatCurrency(balance)}</span>
-                  </div>
-                </div>
-                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
-                  <div className="border-4 border-transparent border-t-slate-800"></div>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 rounded-full text-xs font-semibold border border-red-200">
-            <Clock size={12} /> Unpaid
-          </span>
-        );
-    }
-  };
-
-  const getAmountColorClass = (status: string) => {
-    switch (status) {
-      case 'Paid':
-        return 'text-emerald-600';
-      case 'Partially Paid':
-        return 'text-orange-600';
-      default:
-        return 'text-red-600';
-    }
   };
 
   const isPaymentLocked = (tripId: string): boolean => {
@@ -163,11 +85,10 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
               <th scope="col" className="px-3 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Rate/Kg (₹)</th>
               <th scope="col" className="px-3 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Total Amount</th>
               <th scope="col" className="px-3 py-2.5 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Trip</th>
-              <th scope="col" className="px-3 py-2.5 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {trips.map((trip) => {
+            {trips.map((trip, index) => {
               const payment = paymentData[String(trip.id)] || {};
               
               const totalBirdsLoaded = trip.totalBirds || 0;
@@ -175,16 +96,20 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
               const ratePerKg = payment.ratePerKg || 0;
               // Weight-based pricing: Rate/Kg × DC weight.
               const totalAmount = payment.totalAmount || dcWeight * ratePerKg;
-              const paidAmount = payment.amountPaid || 0;
-              const balance = totalAmount - paidAmount;
-              const paymentStatus = payment.paymentStatus || 
-                                   (paidAmount > 0 ? (paidAmount >= totalAmount ? 'Paid' : 'Partially Paid') : 'Unpaid');
+              // Rows whose settlement is already recorded stay read-only. The
+              // page shows no paid/unpaid status: this table is about the rate
+              // and the amount, nothing else.
               const locked = isPaymentLocked(String(trip.id));
-
-              const amountColorClass = getAmountColorClass(paymentStatus);
+              // One background per row: locked rows keep their tint, otherwise the
+              // rows alternate — so hover and the stripe never fight over the same
+              // utility and resolve by CSS source order.
+              const rowTone = locked ? 'bg-slate-50/60' : index % 2 ? 'bg-slate-50/25' : '';
 
               return (
-                <tr key={trip.id} className={`hover:bg-slate-50/50 transition-colors ${locked ? 'bg-slate-50/30' : ''}`}>
+                <tr
+                  key={trip.id}
+                  className={`transition-colors duration-150 hover:bg-indigo-50/60 ${rowTone}`}
+                >
                   <td className="px-3 py-2.5 text-sm font-medium text-slate-800 whitespace-nowrap">
                     {trip.tripNo}
                   </td>
@@ -198,10 +123,10 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
                     {trip.vehicleNo}
                   </td>
                   <td className="px-3 py-2.5 text-sm text-right text-slate-800 font-bold whitespace-nowrap">
-                    {totalBirdsLoaded.toLocaleString('en-IN')}
+                    {formatCount(totalBirdsLoaded)}
                   </td>
                   <td className="px-3 py-2.5 text-sm text-right text-slate-700 font-medium whitespace-nowrap">
-                    {dcWeight > 0 ? dcWeight.toFixed(2) : '-'}
+                    {dcWeight > 0 ? dcWeight.toFixed(2) : '—'}
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="flex justify-end">
@@ -236,8 +161,8 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
                       )}
                     </div>
                   </td>
-                  <td className={`px-3 py-2.5 text-sm text-right font-bold whitespace-nowrap ${amountColorClass}`}>
-                    {formatCurrency(totalAmount)}
+                  <td className="px-3 py-2.5 text-sm text-right font-bold whitespace-nowrap text-slate-800" title={formatINRExact(totalAmount)}>
+                    {formatINR(totalAmount)}
                   </td>
                   <td className="px-3 py-2.5 text-center">
                     <button
@@ -249,9 +174,6 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
                     >
                       <Eye size={14} />
                     </button>
-                  </td>
-                  <td className="px-3 py-2.5 text-center">
-                    {getPaymentStatusBadge(String(trip.id), totalAmount, paidAmount, balance)}
                   </td>
                 </tr>
               );

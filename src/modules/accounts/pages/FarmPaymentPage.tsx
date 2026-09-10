@@ -8,10 +8,60 @@ import { FarmPaymentTripViewModal } from '../components/farm-payment/FarmPayment
 import { FarmPaymentService } from '../services/FarmPaymentService';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { FarmPayment } from '../types/farmPayment.types';
-import { Save, RotateCcw, RefreshCw } from 'lucide-react';
+import { Save, RotateCcw, RefreshCw, Bird, Gauge, Banknote } from 'lucide-react';
+import { formatINR, formatINRExact, formatCount } from '../components/farm-payment/farmPaymentFormat';
 import Pagination from '../../../ui/Pagination';
 
 type FarmerPaymentPageProps = { embedded?: boolean };
+
+type KpiTone = 'indigo' | 'lime' | 'emerald';
+
+// Full class strings (never assembled from a template) so Tailwind's scanner keeps them.
+const KPI_TONE: Record<KpiTone, { tile: string; rule: string }> = {
+  indigo: { tile: 'bg-indigo-50 text-indigo-700 ring-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-500/20', rule: 'from-indigo-500/25' },
+  lime: { tile: 'bg-lime-50 text-lime-700 ring-lime-100 dark:bg-lime-500/10 dark:text-lime-300 dark:ring-lime-500/20', rule: 'from-lime-500/25' },
+  emerald: { tile: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20', rule: 'from-emerald-500/25' },
+};
+
+/** Same card shell as the Accounts Dashboard KPIs: accent rule, icon tile,
+    compact figure on screen with the exact rupees in its hover tip. */
+function FarmKpiCard({
+  tone,
+  icon: Icon,
+  label,
+  sub,
+  value,
+  valueExact,
+  footer,
+}: {
+  tone: KpiTone;
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  label: string;
+  sub?: string;
+  value: string;
+  valueExact?: string;
+  footer?: string;
+}) {
+  const t = KPI_TONE[tone];
+  return (
+    <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700">
+      <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${t.rule} to-transparent`} />
+      <div className="flex items-start gap-2.5">
+        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ring-1 ${t.tile}`}>
+          <Icon size={16} strokeWidth={2} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{label}</p>
+          {sub && <p className="mt-0.5 truncate text-[11px] leading-none text-slate-400 dark:text-slate-500">{sub}</p>}
+        </div>
+      </div>
+      <p className="mt-3 text-[22px] font-bold leading-none tracking-tight text-slate-900 dark:text-white" title={valueExact}>
+        {value}
+      </p>
+      {footer && <p className="mt-2 text-[10px] font-semibold text-slate-500 dark:text-slate-400">{footer}</p>}
+    </div>
+  );
+}
 
 export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) {
   const { showNotification } = useSafeNotification();
@@ -35,7 +85,6 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [selectedFarm, setSelectedFarm] = useState('All');
-  const [statusFilter, setStatusFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Pagination (global <Pagination /> bar — page size is user-selectable)
@@ -147,7 +196,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   // narrowed result set would be a stranded empty page). Done as a render-
   // phase adjustment — the React-documented pattern for resetting derived
   // state — instead of an extra cascading render from an effect.
-  const filterSignature = `${dateFrom}|${dateTo}|${selectedFarm}|${statusFilter}|${searchQuery}`;
+  const filterSignature = `${dateFrom}|${dateTo}|${selectedFarm}|${searchQuery}`;
   const [lastFilterSignature, setLastFilterSignature] = useState(filterSignature);
   if (filterSignature !== lastFilterSignature) {
     setLastFilterSignature(filterSignature);
@@ -167,13 +216,6 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
       if (dateTo && trip.tripDate > dateTo) return false;
       if (selectedFarm !== 'All' && trip.sourceFarm !== selectedFarm) return false;
 
-      const tripPayment = paymentData[String(trip.id)];
-      const paymentStatus = tripPayment?.paymentStatus || 'Unpaid';
-      
-      if (statusFilter === 'Paid' && paymentStatus !== 'Paid') return false;
-      if (statusFilter === 'Partially Paid' && paymentStatus !== 'Partially Paid') return false;
-      if (statusFilter === 'Unpaid' && paymentStatus !== 'Unpaid') return false;
-
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const match =
@@ -187,7 +229,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
 
       return true;
     });
-  }, [allTrips, dateFrom, dateTo, selectedFarm, statusFilter, searchQuery, paymentData]);
+  }, [allTrips, dateFrom, dateTo, selectedFarm, searchQuery]);
 
   // ----- compute KPI totals (based on filtered trips) -----
   const totalBirdsKPI = useMemo(() => {
@@ -201,20 +243,15 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   const totalAmountKPI = useMemo(() => {
     return filteredTrips.reduce((sum, trip) => {
       const payment = paymentData[String(trip.id)];
-      return sum + (payment?.totalAmount || 0);
+      const ratePerKg = payment?.ratePerKg || 0;
+      // Same weight-based pricing the table shows live, so the card and the
+      // column it adds up can never disagree.
+      return sum + (payment?.totalAmount || (trip.dcWeight || 0) * ratePerKg);
     }, 0);
   }, [filteredTrips, paymentData]);
 
-  const totalPaidKPI = useMemo(() => {
-    return filteredTrips.reduce((sum, trip) => {
-      const payment = paymentData[String(trip.id)];
-      return sum + (payment?.amountPaid || 0);
-    }, 0);
-  }, [filteredTrips, paymentData]);
-
-  const totalBalanceKPI = useMemo(() => {
-    return totalAmountKPI - totalPaidKPI;
-  }, [totalAmountKPI, totalPaidKPI]);
+  // Per-trip / per-kg context for the cards (never divide by zero).
+  const tripCount = Math.max(1, filteredTrips.length);
 
   // ----- pagination -----
   // ----- pagination (global <Pagination /> handles clamping + windows) -----
@@ -262,7 +299,6 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
 
     try {
       let savedCount = 0;
-      let partialCount = 0;
 
       for (const [tripId, paymentDataItem] of paymentsToSave) {
         const trip = allTrips.find(t => String(t.id) === tripId);
@@ -273,10 +309,6 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
         const ratePerKg = paymentDataItem.ratePerKg || 0;
         // Weight-based pricing: Rate/Kg × DC weight.
         const totalAmount = paymentDataItem.totalAmount || dcWeight * ratePerKg;
-        const paidAmount = paymentDataItem.amountPaid || 0;
-        const paymentStatus = paidAmount > 0 
-          ? (paidAmount >= totalAmount ? 'Paid' : 'Partially Paid')
-          : (paymentDataItem.paymentStatus || 'Unpaid');
 
         const finalPayment: FarmPayment = {
           ...paymentDataItem,
@@ -284,9 +316,12 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
           totalBirds: totalBirdsLoaded,
           dcWeight: dcWeight,
           totalAmount,
-          amountPaid: paidAmount,
-          balance: totalAmount - paidAmount,
-          paymentStatus,
+          amountPaid: paymentDataItem.amountPaid || 0,
+          balance: totalAmount - (paymentDataItem.amountPaid || 0),
+          // The record keeps whatever status it already had (Payment Book owns
+          // settlements); this page only sets the rate, so it never labels a
+          // row paid/unpaid.
+          paymentStatus: paymentDataItem.paymentStatus || 'Unpaid',
           paidDate: paymentDataItem.paidDate || toBusinessDate(new Date()),
           paymentMode: paymentDataItem.paymentMode || 'Cash',
           createdAt: paymentDataItem.createdAt || new Date().toISOString(),
@@ -301,7 +336,6 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
         }
 
         savedCount++;
-        if (paymentStatus === 'Partially Paid') partialCount++;
       }
 
       // Instant local sync — no refetch, no loading spinner. Saving payments
@@ -311,11 +345,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
       clearDirty();
 
       const paymentWord = savedCount === 1 ? 'payment' : 'payments';
-      const partialWord = partialCount === 1 ? 'partial payment' : 'partial payments';
-      const message = partialCount > 0
-        ? `Saved ${savedCount} ${paymentWord} (${partialCount} ${partialWord})`
-        : `${savedCount} ${paymentWord} saved successfully`;
-      showNotification(message, 'success');
+      showNotification(`${savedCount} ${paymentWord} saved successfully`, 'success');
 
     } catch (error) {
       console.error('Failed to save payments:', error);
@@ -355,7 +385,6 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     setDateFrom('');
     setDateTo('');
     setSelectedFarm('All');
-    setStatusFilter('All');
     setSearchQuery('');
     setCurrentPage(1);
     showNotification('Filters cleared', 'info');
@@ -371,84 +400,61 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     }).length;
   }, [paymentData, dirtyTripIds]);
 
-  // Format number with L, Cr notation
-  const formatNumber = (num: number): string => {
-    if (num >= 10000000) {
-      return `${(num / 10000000).toFixed(2)} Cr`;
-    }
-    if (num >= 100000) {
-      return `${(num / 100000).toFixed(2)} L`;
-    }
-    return num.toLocaleString('en-IN');
-  };
-
-  // Format currency with L, Cr notation
-  const formatCurrency = (amount: number): string => {
-    if (amount >= 10000000) {
-      return `₹${(amount / 10000000).toFixed(2)} Cr`;
-    }
-    if (amount >= 100000) {
-      return `₹${(amount / 100000).toFixed(2)} L`;
-    }
-    return `₹${amount.toLocaleString('en-IN')}`;
-  };
-
   // Check if any filter is active
-  const isFilterActive = dateFrom || dateTo || selectedFarm !== 'All' || statusFilter !== 'All' || searchQuery;
+  const isFilterActive = dateFrom || dateTo || selectedFarm !== 'All' || searchQuery;
 
   // ----- render -----
   const content = (
     <div className={`w-full space-y-5 animate-in fade-in duration-500 ${
       embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
     }`}>
-      {/* KPI Cards - Only show when filters are active */}
-      {isFilterActive && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm">
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Total Birds</p>
-            <p className="text-lg font-bold text-slate-800">{formatNumber(totalBirdsKPI)}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm">
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Total Weight</p>
-            <p className="text-lg font-bold text-slate-800">{formatNumber(totalWeightKPI)} Kg</p>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm">
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Total Amount</p>
-            <p className="text-lg font-bold text-red-600">{formatCurrency(totalAmountKPI)}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm">
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Total Paid</p>
-            <p className="text-lg font-bold text-emerald-600">{formatCurrency(totalPaidKPI)}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-3 shadow-sm">
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Balance Due</p>
-            <p className="text-lg font-bold text-orange-600">{formatCurrency(totalBalanceKPI)}</p>
-          </div>
-        </div>
-      )}
-
       {/* Filters */}
       <FarmerPaymentFilters
         dateFrom={dateFrom}
         dateTo={dateTo}
         selectedFarm={selectedFarm}
-        statusFilter={statusFilter}
         searchQuery={searchQuery}
         farms={farms}
         onDateFromChange={setDateFrom}
         onDateToChange={setDateTo}
         onFarmChange={setSelectedFarm}
-        onStatusChange={setStatusFilter}
         onSearchChange={setSearchQuery}
         onApply={() => setCurrentPage(1)}
         onClear={handleClearFilters}
       />
 
+      {/* KPIs — the three totals this page is actually about */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <FarmKpiCard
+          tone="indigo" icon={Bird} label="Total Birds"
+          sub={`${filteredTrips.length} ${filteredTrips.length === 1 ? 'trip' : 'trips'} in view`}
+          value={formatCount(totalBirdsKPI)}
+          footer={`${formatCount(totalBirdsKPI / tripCount)} birds / trip`}
+        />
+        <FarmKpiCard
+          tone="lime" icon={Gauge} label="Total Weight"
+          sub={`${(totalWeightKPI / (totalBirdsKPI || 1)).toFixed(1)} kg avg per bird`}
+          value={`${totalWeightKPI.toFixed(1)} kg`}
+          footer={`${(totalWeightKPI / tripCount).toFixed(1)} kg / trip`}
+        />
+        <FarmKpiCard
+          tone="emerald" icon={Banknote} label="Total Amount"
+          sub={`₹${(totalAmountKPI / (totalWeightKPI || 1)).toFixed(2)} per kg`}
+          value={formatINR(totalAmountKPI)} valueExact={formatINRExact(totalAmountKPI)}
+          footer={`${formatINR(totalAmountKPI / tripCount)} / trip`}
+        />
+      </div>
+
       {/* Table Card */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         {/* Header with Save button */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-gradient-to-r from-slate-50/80 to-white border-b border-slate-200/60">
-          <h2 className="text-sm font-bold text-slate-800">Farm Payments</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-bold text-slate-800">Farm Payments</h2>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+              {filteredTrips.length} {filteredTrips.length === 1 ? 'trip' : 'trips'}
+            </span>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handleRefresh}

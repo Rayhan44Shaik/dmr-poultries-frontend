@@ -141,7 +141,7 @@ async function main() {
   const bodyOverflow = await page.evaluate(() => document.body.style.overflow);
   note("Body scroll restored after close", bodyOverflow === "", `overflow="${bodyOverflow}"`);
 
-  // ── 6. Filters: farm dropdown keyboard, status, empty state ──────────────
+  // ── 6. Filters: farm dropdown keyboard, empty state ───────────────────────
   // Go to page 2 first so we can verify filters reset pagination
   await page.locator('button', { hasText: "2", exact: true }).first().click();
   await page.waitForTimeout(200);
@@ -199,12 +199,25 @@ async function main() {
   await page.waitForTimeout(800);
   note("Rapid refresh clicks produce one request", tripApiCalls === 1, `calls=${tripApiCalls}`);
 
-  // ── 8. Status filter ──────────────────────────────────────────────────────
-  await page.locator("select").first().selectOption("Unpaid");
-  await page.waitForTimeout(300);
-  const unpaidRows = await rows.count();
-  note("Status filter applies", unpaidRows >= 0, `${unpaidRows} rows`);
-  await page.getByRole("button", { name: "Clear", exact: true }).click();
+  // ── 8. Status-free UI: no paid/unpaid column or filter, KPI totals present ─
+  // Payment status was removed from this page on purpose — the table is about
+  // the rate and the amount, so a stray "Status" label anywhere is a regression.
+  const statusLabels = await page.locator("text=/\\bStatus\\b/").count();
+  note("No status label anywhere on the page", statusLabels === 0, `matches=${statusLabels}`);
+  const headerTexts = await page.locator("table thead th").allTextContents();
+  note(
+    "Table columns: 9, no Status",
+    headerTexts.length === 9 && !headerTexts.some((h) => /status/i.test(h)),
+    headerTexts.join(" | ")
+  );
+  const kpiCount = await page.locator("text=/^Total (Birds|Weight|Amount)$/").count();
+  note("KPI row shows exactly the three totals", kpiCount === 3, `${kpiCount} cards`);
+  note(
+    "No paid/balance KPI left",
+    (await page.locator("text=/^(Total Paid|Balance Due)$/").count()) === 0
+  );
+  const tip = await page.locator('td[title^="\u20b9"]').first().getAttribute("title").catch(() => null);
+  note("Amount cell exposes exact rupees", /^\u20b9[\d,]+\.\d\d$/.test(tip ?? ""), tip ?? "");
 
   // ── 9. Responsive: mobile viewport, no horizontal page overflow ──────────
   await page.setViewportSize({ width: 375, height: 812 });
