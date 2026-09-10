@@ -205,7 +205,8 @@ export default function ShopDeliveryForm({
           </div>
         </div>
 
-        {/* Bird type (unlabeled) — beside the mode toggle */}
+        {/* Bird type + mode toggle + close — grouped on the right */}
+        <div className="flex items-center gap-3 shrink-0">
         <div className="w-56 shrink-0">
           <SearchDropdown
             value={formData.birdTypeId ? String(formData.birdTypeId) : ""}
@@ -260,6 +261,7 @@ export default function ShopDeliveryForm({
         >
           <X size={16} />
         </button>
+        </div>
       </div>
 
       {/* ─── Body ────────────────────────────────────────────────────── */}
@@ -309,35 +311,41 @@ export default function ShopDeliveryForm({
           </div>
         </div>
 
-        {/* Selected boxes + box list (side by side) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <FormLabel icon={Box} tone="bg-blue-50 text-blue-600">
-              {t("ops.trip.selected_boxes")}
-            </FormLabel>
-            <div className="flex h-[42px] items-center rounded-xl border border-slate-200 bg-slate-50/60 px-4 text-sm font-bold text-slate-800">
+        {/* Selected boxes count + box numbers list (full width, neat at any count) */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="h-6 w-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <Box size={13} />
+            </span>
+            <span className="text-xs font-semibold text-slate-600">{t("ops.trip.selected_boxes")}</span>
+            <span className="ml-auto rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">
               {boxCount}
-            </div>
+            </span>
           </div>
 
           <div>
-            <FormLabel icon={Tag} tone="bg-indigo-50 text-indigo-600">
-              {t("ops.trip.box_nos_list")}
-            </FormLabel>
-            <div className="flex min-h-[42px] flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2">
-              {selectedBoxIds.length > 0 ? (
-                selectedBoxIds.map((id) => (
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="h-6 w-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <Tag size={13} />
+              </span>
+              <span className="text-xs font-semibold text-slate-600">{t("ops.trip.box_nos_list")}</span>
+            </div>
+            {selectedBoxIds.length > 0 ? (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(56px,1fr))] gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                {selectedBoxIds.map((id) => (
                   <span
                     key={id}
-                    className="px-2 py-0.5 bg-white text-slate-700 border border-slate-200 rounded-md text-[10px] font-semibold shrink-0"
+                    className="flex h-7 items-center justify-center rounded-md border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700"
                   >
                     #{id}
                   </span>
-                ))
-              ) : (
-                <span className="text-xs text-slate-400 italic">{t("ops.trip.none_selected")}</span>
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-3 text-xs text-slate-400 italic">
+                {t("ops.trip.none_selected")}
+              </div>
+            )}
           </div>
         </div>
 
