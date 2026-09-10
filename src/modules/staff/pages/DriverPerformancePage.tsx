@@ -31,7 +31,7 @@ import {
 import { te as teDateLocale } from "date-fns/locale";
 import type { Locale } from "date-fns";
 
-import { useI18n } from "../../../i18n";
+import { makeT, useI18n, type Language } from "../../../i18n";
 import { useStaffPerformance } from "../hooks/useStaffPerformance";
 import { usePerformanceDetail } from "../hooks/usePerformanceDetail";
 import { useStaffDirectory } from "../hooks/useStaffDirectory";
@@ -72,7 +72,6 @@ import WeeklyPerformanceChart, {
 } from "../components/performance/WeeklyPerformanceChart";
 import PerformanceDrawer from "../components/performance/PerformanceDrawer";
 import RecentTripsTable from "../components/performance/RecentTripsTable";
-import LanguageMiniToggle from "../components/performance/LanguageMiniToggle";
 import Pagination from "../components/common/Pagination";
 import RefreshToast from "../components/common/RefreshToast";
 import { EmptyState, TableSkeleton } from "../../../ui";
@@ -363,6 +362,25 @@ const DriverPerformancePage = () => {
 
   const closeDrawer = useCallback(() => perf.selectRow(null), [perf]);
 
+  // Pop-up language is SCOPED to the pop-up only: it re-syncs with the app
+  // language when the pop-up opens, then the in-header EN/తెలుగు toggle
+  // changes it locally. Nothing is written to the global store, so the page
+  // behind and the rest of the project keep their language.
+  const [drawerLang, setDrawerLang] = useState<Language>(language);
+  const [prevDrawerOpen, setPrevDrawerOpen] = useState(false);
+  const drawerOpen = selectedEntry != null;
+  if (prevDrawerOpen !== drawerOpen) {
+    setPrevDrawerOpen(drawerOpen);
+    if (drawerOpen) setDrawerLang(language);
+  }
+  const drawerT = useMemo(() => makeT(drawerLang), [drawerLang]);
+  const drawerDateLocale: Locale | undefined = drawerLang === "te" ? teDateLocale : undefined;
+  const drawerRangeLabel = useMemo(
+    () =>
+      `${formatBusinessDate(applied.fromDate, "d MMM yyyy", drawerDateLocale)} – ${formatBusinessDate(applied.toDate, "d MMM yyyy", drawerDateLocale)}`,
+    [applied.fromDate, applied.toDate, drawerDateLocale],
+  );
+
   // Per-person detail for the pop-up (vehicles + recent trips): fetched
   // separately from the list query, so navigating with the ‹ › arrows never
   // shrinks or reshuffles the loaded ranking. Same read-only GET, cached.
@@ -390,31 +408,33 @@ const DriverPerformancePage = () => {
         const next = rowsView[index + 1];
         if (next) perf.selectRow(next.row.driverId);
       },
-      prevLabel: t("staff.perf.drawer.prev"),
-      nextLabel: t("staff.perf.drawer.next"),
+      prevLabel: drawerT("staff.perf.drawer.prev"),
+      nextLabel: drawerT("staff.perf.drawer.next"),
     };
-  }, [selectedEntry, rowsView, perf, t]);
+  }, [selectedEntry, rowsView, perf, drawerT]);
+
+
 
   const drawerSummary = useMemo(() => {
     if (!selectedEntry) return [];
     const row = selectedEntry.row;
     return [
-      { label: t("staff.perf.drawer.trips"), value: formatCount(row.trips) },
-      { label: t("staff.perf.drawer.distance"), value: formatKm(row.distance) },
-      { label: t("staff.perf.drawer.fuel"), value: formatLitres(row.fuelLitres) },
-      { label: t("staff.perf.drawer.mileage"), value: formatMileage(row.mileage) },
-      { label: t("staff.perf.drawer.cost_per_km"), value: formatCostPerKm(row.costPerKm) },
-      { label: t("staff.perf.table.total_cost"), value: formatMoney(row.totalCost) },
+      { label: drawerT("staff.perf.drawer.trips"), value: formatCount(row.trips) },
+      { label: drawerT("staff.perf.drawer.distance"), value: formatKm(row.distance) },
+      { label: drawerT("staff.perf.drawer.fuel"), value: formatLitres(row.fuelLitres) },
+      { label: drawerT("staff.perf.drawer.mileage"), value: formatMileage(row.mileage) },
+      { label: drawerT("staff.perf.drawer.cost_per_km"), value: formatCostPerKm(row.costPerKm) },
+      { label: drawerT("staff.perf.table.total_cost"), value: formatMoney(row.totalCost) },
     ];
-  }, [selectedEntry, t]);
+  }, [selectedEntry, drawerT]);
 
   const drawerFactors = useMemo(
-    () => (selectedEntry?.assessment ? buildDrawerFactors(selectedEntry.assessment, t) : []),
-    [selectedEntry, t],
+    () => (selectedEntry?.assessment ? buildDrawerFactors(selectedEntry.assessment, drawerT) : []),
+    [selectedEntry, drawerT],
   );
   const drawerImprovements = useMemo(
-    () => (selectedEntry?.assessment ? buildDrawerImprovements(selectedEntry.assessment, t) : []),
-    [selectedEntry, t],
+    () => (selectedEntry?.assessment ? buildDrawerImprovements(selectedEntry.assessment, drawerT) : []),
+    [selectedEntry, drawerT],
   );
 
   const selectedDriverName = useMemo(() => {
@@ -470,7 +490,6 @@ const DriverPerformancePage = () => {
         personOptionsError={directory.error}
         busy={perf.loading}
         refreshing={perf.refreshing}
-        actions={<LanguageMiniToggle />}
       />
 
       {/* Error — inline, actionable, raw API text never shown */}
@@ -674,16 +693,17 @@ const DriverPerformancePage = () => {
         open={selectedEntry != null}
         onClose={closeDrawer}
         title={selectedEntry?.row.driverName ?? ""}
-        subtitle={`${t("staff.perf.drawer.period")}: ${appliedRangeLabel}`}
+        subtitle={`${drawerT("staff.perf.drawer.period")}: ${drawerRangeLabel}`}
         rankBadge={
           selectedEntry ? (
             <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold tabular-nums text-slate-600">
-              {t("staff.perf.drawer.rank_of", { rank: selectedEntry.rank, total: rowsView.length })}
+              {drawerT("staff.perf.drawer.rank_of", { rank: selectedEntry.rank, total: rowsView.length })}
             </span>
           ) : null
         }
-        toolbar={<LanguageMiniToggle />}
         navigation={drawerNavigation}
+        language={drawerLang}
+        onLanguageChange={setDrawerLang}
         gradeBadge={
           selectedEntry ? (
             <span
@@ -697,50 +717,50 @@ const DriverPerformancePage = () => {
         }
         unscoredNote={
           selectedEntry?.assessment.grade == null
-            ? t("staff.perf.grade.unscored", { entity_single: t("staff.perf.entity_single.drivers") })
+            ? drawerT("staff.perf.grade.unscored", { entity_single: drawerT("staff.perf.entity_single.drivers") })
             : undefined
         }
         summary={drawerSummary}
         factors={drawerFactors}
         improvements={drawerImprovements}
         labels={{
-          summarySection: t("staff.perf.drawer.summary"),
-          whySection: t("staff.perf.drawer.why"),
-          improveSection: t("staff.perf.drawer.improve"),
-          improveNone: t("staff.perf.drawer.improve_none"),
-          recommendSection: t("staff.perf.drawer.recommend"),
-          recommendSustain: t("staff.perf.drawer.recommend_sustain"),
-          close: t("staff.perf.drawer.close"),
+          summarySection: drawerT("staff.perf.drawer.summary"),
+          whySection: drawerT("staff.perf.drawer.why"),
+          improveSection: drawerT("staff.perf.drawer.improve"),
+          improveNone: drawerT("staff.perf.drawer.improve_none"),
+          recommendSection: drawerT("staff.perf.drawer.recommend"),
+          recommendSustain: drawerT("staff.perf.drawer.recommend_sustain"),
+          close: drawerT("staff.perf.drawer.close"),
         }}
       >
         {selectedEntry && detailQuery.loading && (
           <div className="space-y-3" aria-busy="true">
-            <p className="sr-only">{t("staff.perf.drawer.detail_loading")}</p>
+            <p className="sr-only">{drawerT("staff.perf.drawer.detail_loading")}</p>
             <div className="h-16 animate-pulse rounded-xl bg-slate-100" />
             <div className="h-40 animate-pulse rounded-xl bg-slate-100" />
           </div>
         )}
         {selectedEntry && detailQuery.error && !personDetail && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5">
-            <p className="text-xs font-semibold text-rose-700">{t("staff.perf.drawer.detail_error")}</p>
+            <p className="text-xs font-semibold text-rose-700">{drawerT("staff.perf.drawer.detail_error")}</p>
             <button
               type="button"
               onClick={detailQuery.reload}
               className="text-xs font-bold text-rose-700 underline decoration-rose-300 underline-offset-2 hover:text-rose-800"
             >
-              {t("common.retry")}
+              {drawerT("common.retry")}
             </button>
           </div>
         )}
         {selectedEntry && personDetail && (
           <div className="space-y-5">
-            <section aria-label={t("staff.perf.drawer.vehicles")}>
+            <section aria-label={drawerT("staff.perf.drawer.vehicles")}>
               <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
-                {t("staff.perf.drawer.vehicles")}
+                {drawerT("staff.perf.drawer.vehicles")}
               </h3>
               {personDetail.vehicles.length === 0 ? (
                 <p className="mt-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-2.5 text-xs font-medium text-slate-400">
-                  {t("staff.perf.vehicle.empty")}
+                  {drawerT("staff.perf.vehicle.empty")}
                 </p>
               ) : (
                 <div className="mt-2 overflow-x-auto rounded-xl border border-slate-200">
@@ -748,31 +768,31 @@ const DriverPerformancePage = () => {
                     <thead className="bg-slate-50/80">
                       <tr>
                         <th scope="col" className={`${uiTableThClass} px-3 py-2 text-left`}>
-                          {t("staff.perf.vehicle.col.vehicle_no")}
+                          {drawerT("staff.perf.vehicle.col.vehicle_no")}
                         </th>
                         <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
-                          {t("staff.perf.vehicle.col.trips")}
+                          {drawerT("staff.perf.vehicle.col.trips")}
                         </th>
                         <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
-                          {t("staff.perf.vehicle.col.distance")}
+                          {drawerT("staff.perf.vehicle.col.distance")}
                         </th>
                         <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
-                          {t("staff.perf.vehicle.col.avg_per_trip")}
+                          {drawerT("staff.perf.vehicle.col.avg_per_trip")}
                         </th>
                         <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
-                          {t("staff.perf.vehicle.col.fuel")}
+                          {drawerT("staff.perf.vehicle.col.fuel")}
                         </th>
                         <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
-                          {t("staff.perf.vehicle.col.fuel_cost")}
+                          {drawerT("staff.perf.vehicle.col.fuel_cost")}
                         </th>
                         <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
-                          {t("staff.perf.vehicle.col.maintenance_cost")}
+                          {drawerT("staff.perf.vehicle.col.maintenance_cost")}
                         </th>
                         <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
-                          {t("staff.perf.vehicle.col.total_cost")}
+                          {drawerT("staff.perf.vehicle.col.total_cost")}
                         </th>
                         <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
-                          {t("staff.perf.vehicle.col.mileage")}
+                          {drawerT("staff.perf.vehicle.col.mileage")}
                         </th>
                       </tr>
                     </thead>
@@ -814,9 +834,9 @@ const DriverPerformancePage = () => {
               )}
             </section>
 
-            <section aria-label={t("staff.perf.drawer.recent_trips")}>
+            <section aria-label={drawerT("staff.perf.drawer.recent_trips")}>
               <h3 className="mb-2 text-[11px] font-bold uppercase tracking-widest text-slate-400">
-                {t("staff.perf.drawer.recent_trips")}
+                {drawerT("staff.perf.drawer.recent_trips")}
               </h3>
               <RecentTripsTable
                 trips={personDetail.recentTrips}

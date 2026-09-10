@@ -3,16 +3,16 @@
 // ============================================================================
 // EN / తెలుగు MINI LANGUAGE TOGGLE
 // ============================================================================
-// Compact segmented control for checking a page in Telugu or English with one
-// click. Drives the SAME global i18n context as the header language menu
-// (preference persisted under `dmr-language`), so it never creates a second
-// source of truth — it just puts the switch where the content is.
-//
-// Used at the top of the Driver/Supervisor Performance pages (filter bar
-// actions slot) and inside the details pop-up header.
+// Compact segmented control with two modes:
+//   • Controlled (language + onChange given): flips ONLY the content it is
+//     attached to — used inside the performance details pop-up, where Telugu
+//     must apply to the pop-up alone, never the whole project. Calls back
+//     with the chosen language; does NOT touch the global store.
+//   • Uncontrolled (no props): drives the global i18n context exactly like
+//     the header language menu (persisted under `dmr-language`).
 // ============================================================================
 
-import { useI18n } from "../../../../i18n";
+import { useI18n, type Language } from "../../../../i18n";
 import { cn } from "../../../../utils/cn";
 
 const OPTIONS = [
@@ -20,8 +20,18 @@ const OPTIONS = [
   { code: "te", label: "తెలుగు" },
 ] as const;
 
-export function LanguageMiniToggle({ className }: { className?: string }) {
-  const { language, setLanguage, t } = useI18n();
+interface LanguageMiniToggleProps {
+  className?: string;
+  /** Controlled language (pop-up scope). Omit to drive the global store. */
+  language?: Language;
+  /** Controlled change handler. Omit to drive the global store. */
+  onChange?: (language: Language) => void;
+}
+
+export function LanguageMiniToggle({ className, language, onChange }: LanguageMiniToggleProps) {
+  const { language: globalLanguage, setLanguage, t } = useI18n();
+  const active = language ?? globalLanguage;
+  const choose = (code: Language) => (onChange ?? setLanguage)(code);
 
   return (
     <div
@@ -33,17 +43,17 @@ export function LanguageMiniToggle({ className }: { className?: string }) {
       )}
     >
       {OPTIONS.map((option) => {
-        const active = language === option.code;
+        const activeOption = active === option.code;
         return (
           <button
             key={option.code}
             type="button"
-            aria-pressed={active}
-            onClick={() => setLanguage(option.code)}
+            aria-pressed={activeOption}
+            onClick={() => choose(option.code)}
             title={option.code === "en" ? "English" : "తెలుగు"}
             className={cn(
               "whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-bold leading-none transition-colors",
-              active
+              activeOption
                 ? "bg-white text-brand-700 shadow-sm"
                 : "text-slate-500 hover:text-slate-700",
             )}

@@ -158,6 +158,16 @@ const interpolate = (
   return out;
 };
 
+/** Build a standalone translator for an EXPLICIT language — reads the same
+ *  dictionaries but never touches global state or persistence. Used for
+ *  language-SCOPED UI (e.g. the performance pop-up toggle, which must
+ *  translate only the pop-up, not the whole project). */
+export const makeT = (language: Language) => {
+  const dict = dictionaries[language] ?? dictionaries.en;
+  return (key: string, params?: Record<string, string | number>): string =>
+    interpolate(dict[key] ?? dictionaries.en[key] ?? key, params);
+};
+
 /** Translate outside React components (services, utils, PDF generation). */
 export const translate = (
   key: string,

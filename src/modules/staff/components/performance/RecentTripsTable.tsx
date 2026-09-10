@@ -17,7 +17,7 @@ import { format } from 'date-fns';
 import { te as teLocale } from 'date-fns/locale';
 import type { Locale } from 'date-fns';
 import { AlertTriangle } from 'lucide-react';
-import { useI18n } from '../../../../i18n';
+import { usePerformanceI18n } from './performanceI18nScope';
 import { parseBusinessDate } from '../../../../utils/businessDate';
 import {
   uiTableHeadClass,
@@ -47,10 +47,10 @@ interface RecentTripsTableProps {
   paceKind?: StaffPerformanceKind;
 }
 
-type Translate = ReturnType<typeof useI18n>['t'];
+type Translate = ReturnType<typeof usePerformanceI18n>['t'];
 
 function PaceChip({ offPace }: { offPace: boolean }) {
-  const { t } = useI18n();
+  const { t } = usePerformanceI18n();
   return (
     <span
       className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-bold ${
@@ -164,7 +164,9 @@ function LaggingTripCard({
 }
 
 const RecentTripsTable = ({ trips, paceRow, paceKind }: RecentTripsTableProps) => {
-  const { t, language } = useI18n();
+  // Pop-up-scoped: inside the details pop-up this is the pop-up's language
+  // (toggle in its header); standalone it falls back to the global language.
+  const { t, language } = usePerformanceI18n();
   const locale: Locale | undefined = language === 'te' ? teLocale : undefined;
 
   const raceEntries: TripRaceEntry[] =
