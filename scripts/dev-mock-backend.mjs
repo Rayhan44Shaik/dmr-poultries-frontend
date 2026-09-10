@@ -9,12 +9,24 @@
 //
 //   npm run mock:backend        # serves sample JSON on port 4000 (all interfaces)
 //
-// Served today: /api/health, /api/masters/{shops,employees,vehicles},
-// /api/trips (+ /api/trips/:id, POST /api/trips/:id/steps/deliveries for the
-// Orders Collection / Assignment / Delivery Tracking page, and
+// Served today: /api/health, /api/masters/{shops,employees,vehicles,farms,
+// bird-types}, /api/trips (+ /api/trips/:id, POST /api/trips/:id/steps/deliveries
+// for the Orders Collection / Assignment / Delivery Tracking page, and
 // PATCH /api/trips/:id/status for the Draft→Pending→Completed lifecycle),
 // and the /api/operations/collection-entry/* report endpoints. Vehicle
 // responses also include 12 fictional EMI schedules for /fleet?tab=emi.
+//
+// FULL TRIP-ENTRY WIZARD (all 5 steps, in-memory persistence):
+//   GET  /api/trips/available-resources        — Step 1 staff/vehicle dropdowns
+//   GET  /api/trips/vehicle/:id/last-meter     — opening-KM hint
+//   POST /api/trips/steps/start                — Step 1 submit (creates the trip)
+//   POST /api/trips/:id/steps/start|farm|pickup|expenses
+//                                              — Steps 1(re-edit)/2/3/5 save+submit
+//   PUT  /api/trips/:id/deliveries             — Step 4 save (TripEditModal)
+//   POST /api/trips/:id/diesel (+ PATCH/DELETE /:entryId) — Step 5 diesel rows
+//   DELETE /api/trips/:id                      — Recent-table soft delete
+// Trips 9301–9304 are Drafts parked right after steps 1/2/3/4 so the Recent
+// Trips table shows a "Resume <step>" badge for every remaining step.
 // The seeded trips include several COMPLETED ones with farm details
 // (sourceFarm / totalBirds / dcWeight), full Step 2 farm data (address, meter,
 // GPS) and DC weighbridge photos, so the Accounts → Farm Payment page and its
@@ -45,10 +57,36 @@ const EMPLOYEES = [
   { id: 14, employeeNo: 14, employeeName: "Anil Chand", department: "Collection", role: "Collector", status: "Active" },
   { id: 21, employeeNo: 21, employeeName: "Imran S", department: "Driver", role: "Driver", status: "Active" },
   { id: 22, employeeNo: 22, employeeName: "Kiran P", department: "Driver", role: "Driver", status: "Active" },
+  // Trip Entry Step 1 staff dropdowns (available-resources groups by department).
+  { id: 31, employeeNo: 31, employeeName: "Ramesh N", department: "Supervisor", role: "Supervisor", status: "Active" },
+  { id: 32, employeeNo: 32, employeeName: "Prakash V", department: "Supervisor", role: "Supervisor", status: "Active" },
+  { id: 33, employeeNo: 33, employeeName: "Anand T", department: "Supervisor", role: "Supervisor", status: "Active" },
+  { id: 41, employeeNo: 41, employeeName: "Naveen Kumar", department: "Helper", role: "Helper", status: "Active" },
+  { id: 42, employeeNo: 42, employeeName: "Vinay Reddy", department: "Helper", role: "Helper", status: "Active" },
+  { id: 43, employeeNo: 43, employeeName: "Mahesh Y", department: "Helper", role: "Helper", status: "Active" },
+  { id: 51, employeeNo: 51, employeeName: "Malli", department: "Loader", role: "Loader", status: "Active" },
+  { id: 52, employeeNo: 52, employeeName: "Basha", department: "Loader", role: "Loader", status: "Active" },
+  { id: 53, employeeNo: 53, employeeName: "Raju", department: "Loader", role: "Loader", status: "Active" },
 ].map((e) => ({ phoneNumber: "", email: "", address: "", joiningDate: "2024-04-01", salary: 0, ...e }));
 
 const COLLECTORS = EMPLOYEES.filter((e) => e.department === "Collection").map((e) => e.employeeName);
 const MODES = ["Cash", "Union Bank", "HDFC Bank"]; // matches KNOWN_MODES display order
+
+// ── Sample Farms + Bird Types (Trip Entry Step 2 dropdowns) ──────────────────
+// ids 1–3 are the farms already referenced by the seeded trips below — do not
+// renumber them. Shapes match mapFarm()/mapBirdType() in the masters services.
+const FARMS = [
+  { id: 1, farmNo: 1, farmName: "Sri Balaji Broiler Farm", ownerName: "Chandraiah M", supervisorName: "Ramesh N", phoneNumber: "9848011001", village: "Medchal", address: "Survey 42, Keesara Road, Medchal — 501401", capacity: 5000, status: "Active" },
+  { id: 2, farmNo: 2, farmName: "Anand Agro Farms", ownerName: "Anand Rao K", supervisorName: "Prakash V", phoneNumber: "9848011002", village: "Yadadri", address: "Plot 7, Bhongir Road, Yadadri — 508116", capacity: 4000, status: "Active" },
+  { id: 3, farmNo: 3, farmName: "Godavari Broiler Farm", ownerName: "Venkatanarayana P", supervisorName: "Anand T", phoneNumber: "9848011003", village: "Prattipadu", address: "Near Prattipadu Cross, Guntur District — 522019", capacity: 8000, status: "Active" },
+  { id: 4, farmNo: 4, farmName: "Venkateswara Hatchery Farm", ownerName: "Subba Rao D", supervisorName: "Ramesh N", phoneNumber: "9848011004", village: "Keesara", address: "Plot 21, Keesara Gutta Road, Keesara — 501301", capacity: 3000, status: "Active" },
+];
+
+const BIRD_TYPES = [
+  { id: 1, birdTypeNo: 1, birdType: "Broiler", averageWeight: 1.5, description: "Commercial broiler — standard catch", status: "Active" },
+  { id: 2, birdTypeNo: 2, birdType: "Country Chicken", averageWeight: 1.8, description: "Nati / country chicken", status: "Active" },
+  { id: 3, birdTypeNo: 3, birdType: "Layer", averageWeight: 1.6, description: "Spent layer hen", status: "Active" },
+];
 
 // ── Date helpers (local time, YYYY-MM-DD) ────────────────────────────────────
 const iso = (d) => {
@@ -714,6 +752,167 @@ function buildTrips() {
     // not deleted, pickup step submitted. Plain delivery rows (no `[ORDER]`
     // remarks) so the Orders scenario above is unaffected.
     ...buildCompletedFarmTrips({ stamp }),
+
+    // ── Trip-Entry walkthrough: one Draft parked right after each wizard step ─
+    // 9301 → resume Step 2 (Farm), 9302 → Step 3 (Pickup), 9303 → Step 4
+    // (Deliveries), 9304 → Step 5 (End/Expenses). Plain remarks (no "[ORDER]")
+    // so the Orders scenario above is completely untouched.
+    ...buildWalkthroughTrips({ stamp, today, yesterday }),
+  ];
+}
+
+/** Draft trips parked after each submitted wizard step (Step 2 → Step 5 resume
+ *  badges in the Recent Trips table). New ids only — never touches the seeded
+ *  Orders/Farm-Payment trips above. */
+function buildWalkthroughTrips({ stamp, today, yesterday }) {
+  const veh = (id) => VEHICLE_BY_ID.get(id)?.vehicleNumber ?? "";
+  const step1Defaults = {
+    startStepSubmitted: true,
+    helpers: ["Naveen Kumar"],
+    loaders: ["Malli", "Basha"],
+    advanceAmount: 500,
+    remarks: "Walkthrough sample — resume the next wizard step",
+  };
+  return [
+    // 9301 · Step 1 submitted → Recent badge "Resume: Farm Details (Step 2)"
+    baseTrip({
+      ...step1Defaults,
+      id: 9301,
+      tripNo: `TRP-${stamp(today)}-02`,
+      tripDate: today,
+      vehicleId: 6,
+      vehicleNo: veh(6),
+      driverId: 21,
+      driverName: "Imran S",
+      supervisorId: 31,
+      supervisorName: "Ramesh N",
+      openingMeter: 29150,
+    }),
+    // 9302 · Steps 1–2 submitted → "Resume: Pickup Details (Step 3)"
+    baseTrip({
+      ...step1Defaults,
+      id: 9302,
+      tripNo: `TRP-${stamp(today)}-03`,
+      tripDate: today,
+      vehicleId: 5,
+      vehicleNo: veh(5),
+      driverId: 22,
+      driverName: "Kiran P",
+      supervisorId: 32,
+      supervisorName: "Prakash V",
+      openingMeter: 38120,
+      advanceAmount: 750,
+      helpers: ["Vinay Reddy"],
+      loaders: ["Raju"],
+      sourceFarmId: 3,
+      sourceFarm: "Godavari Broiler Farm",
+      birdTypeId: 1,
+      birdType: "Broiler",
+      farmBirdTypeId: 1,
+      farmBirdType: "Broiler",
+      farmAddress: "Near Prattipadu Cross, Guntur District — 522019",
+      destMeter: 38610,
+      pickupTolls: 240,
+      avgBirdWeight: 1.52,
+      farmGpsLat: 16.3067,
+      farmGpsLon: 80.4365,
+      farmGpsAccuracy: 9,
+      farmGpsTime: `${today}T06:55:00`,
+      farmStepSubmitted: true,
+    }),
+    // 9303 · Steps 1–3 submitted (boxes + DC photos loaded) →
+    // "Resume: Deliveries (Step 4)" — Step 4 can allocate these boxes to shops.
+    baseTrip({
+      ...step1Defaults,
+      id: 9303,
+      tripNo: `TRP-${stamp(yesterday)}-03`,
+      tripDate: yesterday,
+      vehicleId: 4,
+      vehicleNo: veh(4),
+      driverId: 21,
+      driverName: "Imran S",
+      supervisorId: 31,
+      supervisorName: "Ramesh N",
+      openingMeter: 41100,
+      sourceFarmId: 1,
+      sourceFarm: "Sri Balaji Broiler Farm",
+      birdTypeId: 1,
+      birdType: "Broiler",
+      farmBirdTypeId: 1,
+      farmBirdType: "Broiler",
+      totalBirds: 520,
+      dcWeight: 780,
+      pickupStepSubmitted: true,
+      ...farmStepDetails({
+        farm: "Sri Balaji Broiler Farm",
+        address: "Survey 42, Keesara Road, Medchal — 501401",
+        destMeter: 41510,
+        reachedTime: "06:45",
+        loadTime: "07:30",
+        tolls: 160,
+        avgBirdWeight: 1.5,
+        gps: [17.4849, 78.6033],
+        tripNo: `TRP-${stamp(yesterday)}-03`,
+        weightKg: 780,
+        birds: 520,
+        date: yesterday,
+      }),
+      farmStepSubmitted: true,
+    }),
+    // 9304 · Steps 1–4 submitted (shops 1+3 delivered with rates) →
+    // "Resume: End Trip / Expenses (Step 5)" — closing meter, tolls, meals.
+    baseTrip({
+      ...step1Defaults,
+      id: 9304,
+      tripNo: `TRP-${stamp(yesterday)}-04`,
+      tripDate: yesterday,
+      vehicleId: 12,
+      vehicleNo: veh(12),
+      driverId: 22,
+      driverName: "Kiran P",
+      supervisorId: 33,
+      supervisorName: "Anand T",
+      openingMeter: 16150,
+      sourceFarmId: 2,
+      sourceFarm: "Anand Agro Farms",
+      birdTypeId: 1,
+      birdType: "Broiler",
+      farmBirdTypeId: 1,
+      farmBirdType: "Broiler",
+      totalBirds: 420,
+      dcWeight: 640,
+      pickupStepSubmitted: true,
+      deliveryStepSubmitted: true,
+      ...farmStepDetails({
+        farm: "Anand Agro Farms",
+        address: "Plot 7, Bhongir Road, Yadadri — 508116",
+        destMeter: 16560,
+        reachedTime: "07:05",
+        loadTime: "07:50",
+        tolls: 180,
+        avgBirdWeight: 1.5,
+        gps: [17.5151, 78.6497],
+        tripNo: `TRP-${stamp(yesterday)}-04`,
+        weightKg: 640,
+        birds: 420,
+        date: yesterday,
+      }),
+      farmStepSubmitted: true,
+      deliveries: [
+        planRow(1, 1, 30, 300, {
+          remarks: "",
+          rate: 78.5,
+          amount: 35325,
+          autoCaptureTime: `${yesterday}T09:05:00`,
+        }),
+        planRow(2, 3, 18, 120, {
+          remarks: "",
+          rate: 77,
+          amount: 13860,
+          autoCaptureTime: `${yesterday}T10:15:00`,
+        }),
+      ],
+    }),
   ];
 }
 
@@ -899,7 +1098,8 @@ function buildCompletedFarmTrips({ stamp }) {
 }
 
 const TRIPS = buildTrips();
-let nextTripId = 9200;
+// 9301–9304 are the seeded walkthrough Drafts; server-created trips start above them.
+let nextTripId = 9400;
 
 /** Persist a Step-4-shaped deliveries payload onto a trip (creates a container
  *  when id is 0 — the Orders Collection "Save Progress" first write). */
@@ -931,6 +1131,226 @@ function applyDeliveriesPayload(tripId, body) {
   if (body.mode === "submit") trip.deliveryStepSubmitted = true;
   if (typeof body.remarks === "string") trip.remarks = body.remarks;
   return trip;
+}
+
+// ── Trip Entry wizard helpers (Steps 1–5) ────────────────────────────────────
+// Every setter tolerates missing/blank body fields, so a Save Progress call
+// never blanks previously stored data (COALESCE-like, same contract idea as
+// the ERP backend).
+
+const numOrNull = (v) => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+const nowHm = () => new Date().toTimeString().slice(0, 5);
+
+/** Step 1 — create the trip (POST /api/trips/steps/start). */
+function createTripFromStep1(body) {
+  const now = new Date();
+  const tripDate =
+    typeof body.tripDate === "string" && body.tripDate ? body.tripDate.slice(0, 10) : iso(now);
+  const seq =
+    TRIPS.filter((t) => t.tripDate === tripDate && String(t.tripNo || "").startsWith("TRP-")).length + 1;
+  const vehicleId = Number(body.vehicleId) || 0;
+  const trip = baseTrip({
+    id: nextTripId++,
+    tripNo: `TRP-${tripDate.replaceAll("-", "")}-${String(seq).padStart(2, "0")}`,
+    tripDate,
+    startTime: `${tripDate}T${nowHm()}:00`,
+    vehicleId,
+    vehicleNo: body.vehicleNo || VEHICLE_BY_ID.get(vehicleId)?.vehicleNumber || "",
+    driverId: Number(body.driverId) || 0,
+    driverName: String(body.driverName ?? ""),
+    supervisorId: Number(body.supervisorId) || 0,
+    supervisorName: String(body.supervisorName ?? ""),
+    openingMeter: numOrNull(body.openingMeter),
+    advanceAmount: numOrNull(body.advanceAmount),
+    helpers: Array.isArray(body.helpers) ? body.helpers : [],
+    loaders: Array.isArray(body.loaders) ? body.loaders : [],
+    remarks: String(body.remarks ?? ""),
+    startStepSubmitted: true,
+  });
+  TRIPS.push(trip);
+  return decorateTrip(trip);
+}
+
+/** Step 1 re-edit on an existing trip (POST /api/trips/:id/steps/start). */
+function applyStartStep(trip, body) {
+  if (typeof body.tripDate === "string" && body.tripDate) trip.tripDate = body.tripDate.slice(0, 10);
+  const vehicleId = Number(body.vehicleId) || 0;
+  if (vehicleId) trip.vehicleId = vehicleId;
+  if (body.vehicleNo) trip.vehicleNo = String(body.vehicleNo);
+  else if (vehicleId && VEHICLE_BY_ID.get(vehicleId)) trip.vehicleNo = VEHICLE_BY_ID.get(vehicleId).vehicleNumber;
+  if (body.driverId != null) trip.driverId = Number(body.driverId) || 0;
+  if (body.driverName != null) trip.driverName = String(body.driverName);
+  if (body.supervisorId != null) trip.supervisorId = Number(body.supervisorId) || 0;
+  if (body.supervisorName != null) trip.supervisorName = String(body.supervisorName);
+  const opening = numOrNull(body.openingMeter);
+  if (opening !== null) trip.openingMeter = opening;
+  const advance = numOrNull(body.advanceAmount);
+  if (advance !== null) trip.advanceAmount = advance;
+  if (Array.isArray(body.helpers)) trip.helpers = body.helpers;
+  if (Array.isArray(body.loaders)) trip.loaders = body.loaders;
+  if (body.remarks != null) trip.remarks = String(body.remarks);
+  if (body.mode === "submit" || body.startStepSubmitted === true) {
+    trip.startStepSubmitted = true;
+    if (!trip.startTime) trip.startTime = `${trip.tripDate}T${nowHm()}:00`;
+  }
+  return trip;
+}
+
+/** Step 2 — Farm details (POST /api/trips/:id/steps/farm, mode save|submit). */
+function applyFarmStep(trip, body) {
+  const farmId = Number(body.sourceFarmId) || 0;
+  const farm = FARMS.find((f) => f.id === farmId);
+  if (farmId) {
+    trip.sourceFarmId = farmId;
+    trip.sourceFarm = body.sourceFarm || farm?.farmName || trip.sourceFarm;
+  }
+  if (body.farmAddress != null && body.farmAddress !== "") trip.farmAddress = String(body.farmAddress);
+  else if (farm && !trip.farmAddress) trip.farmAddress = farm.address;
+  const destMeter = numOrNull(body.destMeter);
+  if (destMeter !== null) trip.destMeter = destMeter;
+  if (body.pickupTolls != null && body.pickupTolls !== "") trip.pickupTolls = Number(body.pickupTolls) || 0;
+  const avg = numOrNull(body.avgBirdWeight);
+  if (avg !== null) trip.avgBirdWeight = avg;
+  if (body.farmBirdTypeId) {
+    trip.birdTypeId = Number(body.farmBirdTypeId);
+    trip.birdType = body.farmBirdType || BIRD_TYPES.find((b) => b.id === Number(body.farmBirdTypeId))?.birdType || "";
+    trip.farmBirdTypeId = trip.birdTypeId;
+    trip.farmBirdType = trip.birdType;
+  }
+  if (body.remarks != null && body.remarks !== "") trip.remarks = String(body.remarks);
+  const lat = numOrNull(body.farmGpsLat);
+  const lon = numOrNull(body.farmGpsLon);
+  if (lat !== null && lon !== null) {
+    trip.farmGpsLat = lat;
+    trip.farmGpsLon = lon;
+    trip.farmGpsAccuracy = numOrNull(body.farmGpsAccuracy);
+    trip.farmGpsTime = body.farmGpsTime || null;
+  }
+  if (body.mode === "submit") trip.farmStepSubmitted = true;
+  return trip;
+}
+
+/** Step 3 — Pickup boxes + DC photos (POST /api/trips/:id/steps/pickup). */
+function applyPickupStep(trip, body) {
+  if (Array.isArray(body.removedBoxNos) && body.removedBoxNos.length) {
+    const removed = new Set(body.removedBoxNos.map(Number));
+    trip.boxDetails = (trip.boxDetails || []).filter((b) => !removed.has(Number(b.boxNo)));
+  }
+  if (Array.isArray(body.boxDetails)) {
+    const incoming = body.boxDetails
+      .map((b) => ({ boxNo: Number(b.boxNo) || 0, birds: Number(b.birds) || 0, weight: Number(b.weight) || 0 }))
+      .sort((a, b) => a.boxNo - b.boxNo);
+    if (body.pickupBoxWrite === "upsert") {
+      const byNo = new Map((trip.boxDetails || []).map((b) => [Number(b.boxNo), b]));
+      for (const b of incoming) byNo.set(b.boxNo, { ...(byNo.get(b.boxNo) || {}), ...b });
+      trip.boxDetails = [...byNo.values()].sort((a, b) => a.boxNo - b.boxNo);
+    } else {
+      trip.boxDetails = incoming;
+    }
+  }
+  for (const key of ["dcPhotoKey", "dcPhotoMime", "dcPhotoData", "dcPhotoKey2", "dcPhotoMime2", "dcPhotoData2"]) {
+    if (body[key] != null && body[key] !== "") trip[key] = body[key];
+  }
+  if ((trip.boxDetails || []).length) {
+    const totals = trip.boxDetails.reduce(
+      (acc, b) => ({ birds: acc.birds + (Number(b.birds) || 0), weight: acc.weight + (Number(b.weight) || 0) }),
+      { birds: 0, weight: 0 }
+    );
+    trip.boxes = trip.boxDetails.length;
+    trip.totalBirds = totals.birds;
+    trip.dcWeight = Math.round(totals.weight * 100) / 100;
+    trip.avgWeight = totals.birds > 0 ? Math.round((totals.weight / totals.birds) * 1000) / 1000 : 0;
+  }
+  if (body.mode === "submit") trip.pickupStepSubmitted = true;
+  return trip;
+}
+
+/** Step 5 — End Trip / expenses (POST /api/trips/:id/steps/expenses). */
+function applyExpensesStep(trip, body) {
+  if (body.remarks != null && body.remarks !== "") trip.remarks = String(body.remarks);
+  for (const key of ["meals", "loading", "mealsTiffin", "vehicleMaintenance", "othersRC", "others1Amt", "others2Amt", "others3Amt", "others4Amt", "others5Amt"]) {
+    if (body[key] != null && body[key] !== "") trip[key] = Number(body[key]) || 0;
+  }
+  const endMeter = numOrNull(body.endMeter ?? body.closingMeter);
+  if (endMeter !== null) trip.closingMeter = endMeter;
+  const tolls = numOrNull(body.destinationTolls ?? body.deliveryTolls);
+  if (tolls !== null) {
+    trip.deliveryTolls = tolls;
+    trip.destinationTolls = tolls;
+  }
+  if (body.endTime != null && body.endTime !== "") trip.endTime = String(body.endTime);
+  if (body.mode === "submit") {
+    if (!trip.endTime) trip.endTime = `${trip.tripDate}T${nowHm()}:00`;
+    if (!trip.closingMeter && trip.destMeter) trip.closingMeter = trip.destMeter;
+    trip.endStepSubmitted = true;
+    trip.expensesStepSubmitted = true;
+    trip.expensesStepSubmittedAt = new Date().toISOString();
+    trip.submittedAtTimestamp = trip.expensesStepSubmittedAt;
+  }
+  return trip;
+}
+
+/** Step 5 diesel ledger (POST /api/trips/:id/diesel). */
+function applyDieselCreate(trip, body) {
+  const litres = numOrNull(body.litres);
+  const rate = numOrNull(body.rate);
+  const entry = {
+    id: (trip.dieselEntries || []).reduce((m, e) => Math.max(m, Number(e.id) || 0), 0) + 1,
+    rowIndex: (trip.dieselEntries || []).length,
+    litres,
+    rate,
+    amount: litres != null && rate != null ? Math.round(litres * rate * 100) / 100 : null,
+    meter: numOrNull(body.meter),
+    bunkName: body.bunkName || null,
+    gpsLat: numOrNull(body.gpsLat),
+    gpsLon: numOrNull(body.gpsLon),
+    gpsAccuracy: numOrNull(body.gpsAccuracy),
+    gpsCapturedAt: body.gpsCapturedAt || null,
+    imageData: body.imageData || null,
+    imageName: body.imageName || null,
+    submitted: true,
+    submittedAt: new Date().toISOString(),
+    clientKey: body.clientKey || null,
+  };
+  trip.dieselEntries = [...(trip.dieselEntries || []), entry];
+  return trip;
+}
+
+/** Fill the derived summary columns the ERP backend computes on read. Never
+ *  mutates stored state — used only for GET/step responses. */
+function decorateTrip(trip) {
+  const deliveries = Array.isArray(trip.deliveries) ? trip.deliveries : [];
+  const delivered = deliveries.filter((d) => d.autoCaptureTime);
+  const totalDeliveredWeight = delivered.reduce((s, d) => s + (Number(d.weight) || 0), 0);
+  const totalMortalityCount = delivered.reduce((s, d) => s + (Number(d.mortality) || 0), 0);
+  const totalMortalityWeight = delivered.reduce((s, d) => s + (Number(d.mortKg) || 0), 0);
+  const meters = [trip.openingMeter, trip.destMeter, trip.closingMeter]
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const kmSpread = meters.length >= 2 ? Math.max(...meters) - Math.min(...meters) : 0;
+  return {
+    ...trip,
+    totalKm: Number(trip.totalKm) || kmSpread,
+    totalShops: Number(trip.totalShops) || new Set(delivered.map((d) => d.shopId)).size,
+    totalWeight: Number(trip.totalWeight) || Number(trip.dcWeight) || 0,
+    totalDeliveredWeight: Number(trip.totalDeliveredWeight) || totalDeliveredWeight,
+    totalBirdsDelivered:
+      Number(trip.totalBirdsDelivered) || delivered.reduce((s, d) => s + (Number(d.birds) || 0), 0),
+    totalMortality: Number(trip.totalMortality) || totalMortalityWeight,
+    totalMortalityCount,
+    totalMortalityWeight,
+    weightLoss: Number(trip.weightLoss) || (delivered.length ? Math.max(0, (Number(trip.dcWeight) || 0) - totalDeliveredWeight) : 0),
+    survivalRate:
+      Number(trip.survivalRate) ||
+      (trip.totalBirds ? Math.round(((trip.totalBirds - totalMortalityCount) / trip.totalBirds) * 1000) / 10 : 0),
+    lastShop: trip.lastShop || (delivered.length ? delivered[delivered.length - 1].shopName : ""),
+    updatedAt: trip.updatedAt || new Date().toISOString(),
+    _mock: true,
+  };
 }
 
 function readJsonBody(req) {
@@ -965,7 +1385,7 @@ const server = http.createServer((req, res) => {
   // (id 0 = create the day's collection container; mode save | submit)
   const stepMatch = url.pathname.match(/^\/api\/trips\/(\d+)\/steps\/deliveries$/);
   if (stepMatch && req.method === "POST") {
-    readJsonBody(req).then((body) => send(200, applyDeliveriesPayload(stepMatch[1], body)));
+    readJsonBody(req).then((body) => send(200, decorateTrip(applyDeliveriesPayload(stepMatch[1], body))));
     return;
   }
 
@@ -994,11 +1414,92 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── Trip Entry wizard (Steps 1–5) ─────────────────────────────────────────
+  // POST /api/trips/steps/start — Step 1 submit; creates the trip and returns
+  // the new record (the wizard continues with Steps 2–5 against this id).
+  if (url.pathname === "/api/trips/steps/start" && req.method === "POST") {
+    readJsonBody(req).then((body) => send(200, createTripFromStep1(body)));
+    return;
+  }
+
+  // POST /api/trips/available-resources is read-only; served in the GET section
+  // below (Step 1 staff/vehicle dropdowns). Steps 2/3/5 + Step 1 re-edit:
+  const wizardStepMatch = url.pathname.match(/^\/api\/trips\/(\d+)\/steps\/(start|farm|pickup|expenses)$/);
+  if (wizardStepMatch && req.method === "POST") {
+    readJsonBody(req).then((body) => {
+      const trip = TRIPS.find((t) => t.id === Number(wizardStepMatch[1]));
+      if (!trip) {
+        return send(404, { error: "trip_not_found", id: Number(wizardStepMatch[1]), mock: true });
+      }
+      if (wizardStepMatch[2] === "start") applyStartStep(trip, body);
+      else if (wizardStepMatch[2] === "farm") applyFarmStep(trip, body);
+      else if (wizardStepMatch[2] === "pickup") applyPickupStep(trip, body);
+      else applyExpensesStep(trip, body);
+      trip.updatedAt = new Date().toISOString();
+      return send(200, decorateTrip(trip));
+    });
+    return;
+  }
+
+  // Step 5 diesel ledger: POST /api/trips/:id/diesel (+ PATCH/DELETE entry).
+  const dieselMatch = url.pathname.match(/^\/api\/trips\/(\d+)\/diesel$/);
+  if (dieselMatch && req.method === "POST") {
+    readJsonBody(req).then((body) => {
+      const trip = TRIPS.find((t) => t.id === Number(dieselMatch[1]));
+      if (!trip) return send(404, { error: "trip_not_found", id: Number(dieselMatch[1]), mock: true });
+      applyDieselCreate(trip, body);
+      trip.updatedAt = new Date().toISOString();
+      return send(200, decorateTrip(trip));
+    });
+    return;
+  }
+  const dieselEntryMatch = url.pathname.match(/^\/api\/trips\/(\d+)\/diesel\/(\d+)$/);
+  if (dieselEntryMatch && (req.method === "PATCH" || req.method === "DELETE")) {
+    readJsonBody(req).then((body) => {
+      const trip = TRIPS.find((t) => t.id === Number(dieselEntryMatch[1]));
+      const entryId = Number(dieselEntryMatch[2]);
+      if (!trip) return send(404, { error: "trip_not_found", id: Number(dieselEntryMatch[1]), mock: true });
+      const entries = trip.dieselEntries || [];
+      const existing = entries.find((e) => Number(e.id) === entryId);
+      if (!existing) return send(404, { error: "diesel_entry_not_found", id: entryId, mock: true });
+      if (req.method === "DELETE") {
+        trip.dieselEntries = entries.filter((e) => Number(e.id) !== entryId);
+      } else {
+        Object.assign(existing, body, { id: existing.id });
+      }
+      trip.updatedAt = new Date().toISOString();
+      return send(200, decorateTrip(trip));
+    });
+    return;
+  }
+
+  // PUT /api/trips/:id/deliveries — Step 4 save from TripEditModal.
+  const deliveriesPutMatch = url.pathname.match(/^\/api\/trips\/(\d+)\/deliveries$/);
+  if (deliveriesPutMatch && req.method === "PUT") {
+    readJsonBody(req).then((body) => {
+      const trip = TRIPS.find((t) => t.id === Number(deliveriesPutMatch[1]));
+      if (!trip) return send(404, { error: "trip_not_found", id: Number(deliveriesPutMatch[1]), mock: true });
+      applyDeliveriesPayload(trip.id, body);
+      trip.updatedAt = new Date().toISOString();
+      return send(200, decorateTrip(trip));
+    });
+    return;
+  }
+
+  // DELETE /api/trips/:id — Recent-table soft delete (reason via query/body).
   const singleTrip = url.pathname.match(/^\/api\/trips\/(\d+)$/);
+  if (singleTrip && req.method === "DELETE") {
+    const trip = TRIPS.find((t) => t.id === Number(singleTrip[1]));
+    if (!trip) return send(404, { error: "trip_not_found", id: Number(singleTrip[1]), mock: true });
+    trip.deleted = true;
+    trip.status = "Deleted";
+    trip.deletedReason = url.searchParams.get("reason") || "";
+    return send(200, { id: trip.id, deleted: true, mock: true });
+  }
   if (singleTrip && req.method === "GET") {
     const trip = TRIPS.find((t) => t.id === Number(singleTrip[1]));
     return trip
-      ? send(200, trip)
+      ? send(200, decorateTrip(trip))
       : send(404, { error: "trip_not_found", id: Number(singleTrip[1]), mock: true });
   }
 
@@ -1094,8 +1595,27 @@ const server = http.createServer((req, res) => {
       return send(200, VEHICLES.map((v) => ({ ...v, _mock: true })));
     case "/api/masters/employees":
       return send(200, EMPLOYEES.map((e) => ({ ...e, _mock: true })));
+    case "/api/masters/farms":
+      return send(200, FARMS.map((f) => ({ ...f, _mock: true })));
+    case "/api/masters/bird-types":
+      return send(200, BIRD_TYPES.map((b) => ({ ...b, _mock: true })));
     case "/api/trips":
-      return send(200, TRIPS);
+      return send(200, TRIPS.map(decorateTrip));
+    case "/api/trips/available-resources": {
+      // Step 1 dropdowns (AvailableTripResources contract).
+      const byDept = (dept) =>
+        EMPLOYEES.filter((e) => e.department === dept && e.status === "Active").map(
+          ({ id, employeeName, department }) => ({ id, employeeName, department })
+        );
+      return send(200, {
+        vehicles: VEHICLES.map((v) => ({ id: v.id, vehicleNumber: v.vehicleNumber })),
+        drivers: byDept("Driver"),
+        supervisors: byDept("Supervisor"),
+        helpers: byDept("Helper"),
+        loaders: byDept("Loader"),
+        _mock: true,
+      });
+    }
 
     case "/api/operations/collection-entry/week-bounds": {
       const today = new Date();
@@ -1135,8 +1655,31 @@ const server = http.createServer((req, res) => {
         }));
       return send(200, rows);
     }
-    default:
+    default: {
+      // GET /api/trips/vehicle/:id/last-meter — opening-KM validation hint
+      // (highest known odometer reading for the vehicle across all trips).
+      const lastMeterMatch = url.pathname.match(/^\/api\/trips\/vehicle\/(\d+)\/last-meter$/);
+      if (lastMeterMatch) {
+        const vehicleId = Number(lastMeterMatch[1]);
+        const excludeTripId = Number(url.searchParams.get("excludeTripId")) || 0;
+        let best = null;
+        for (const t of TRIPS) {
+          if (t.vehicleId !== vehicleId || t.id === excludeTripId) continue;
+          for (const [meter, source] of [
+            [t.closingMeter, "TRIP_END"],
+            [t.destMeter, "TRIP_END"],
+            [t.openingMeter, "TRIP_START"],
+          ]) {
+            const n = Number(meter);
+            if (Number.isFinite(n) && n > 0 && (!best || n > best.closingMeter)) {
+              best = { closingMeter: n, tripNo: t.tripNo, tripDate: t.tripDate, source };
+            }
+          }
+        }
+        return send(200, best);
+      }
       return send(404, { error: "not_found", path: url.pathname, mock: true });
+    }
   }
 });
 
@@ -1145,4 +1688,5 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`[mock-backend] ${ROWS.length} sample collection rows over the last 45 days`);
   console.log(`[mock-backend] ${VEHICLES.length} sample EMI vehicles — open /fleet?tab=emi in the frontend preview`);
   console.log(`[mock-backend] ${MAINTENANCE.length} sample maintenance records — open /fleet?tab=maintenance in the frontend preview`);
+  console.log(`[mock-backend] Trip-Entry walkthrough Drafts 9301–9304 — Recent Trips → Resume Steps 2/3/4/5 (or start a fresh trip; all 5 wizard steps persist)`);
 });
