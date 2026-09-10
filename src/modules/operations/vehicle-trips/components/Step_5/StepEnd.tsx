@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Pencil,
-  AlertTriangle } from "lucide-react";
+  AlertTriangle,
+  Receipt
+} from "lucide-react";
 import type { Trip } from "../../types/trip";
 import { StepCloseButton, WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 import GeneralExpensesTable from "./GeneralExpensesTable";
@@ -148,10 +150,33 @@ export default function StepEnd({
       destinationTolls: (tripData as any).destinationTolls ?? (tripData as any).deliveryTolls ?? "",
       remarks: (tripData as any).remarks ?? "",
     };
-    // Copy all diesel fields from trip
+    // Copy any already-flattened diesel* fields from the trip record.
     Object.keys(tripData).forEach(key => {
       if (key.startsWith("diesel")) {
         (data as any)[key] = (tripData as any)[key];
+      }
+    });
+    // Hydrate dieselEntries[] → dieselLtr1 / dieselRate1 / … so the diesel
+    // table shows sample fuel bills without a prior submit.
+    const entries = Array.isArray(tripData.dieselEntries) ? tripData.dieselEntries : [];
+    entries.forEach((entry, idx) => {
+      const n = Math.min(6, Math.max(1, Number(entry.rowIndex) > 0 ? Number(entry.rowIndex) : idx + 1));
+      const d = data as Record<string, unknown>;
+      if (d[`dieselLtr${n}`] == null || d[`dieselLtr${n}`] === "") {
+        d[`dieselLtr${n}`] = entry.litres ?? "";
+        d[`dieselRate${n}`] = entry.rate ?? "";
+        d[`dieselMeter${n}`] = entry.meter ?? "";
+        d[`dieselBunk${n}`] = entry.bunkName ?? "";
+        d[`dieselGpsLat${n}`] = entry.gpsLat ?? "";
+        d[`dieselGpsLon${n}`] = entry.gpsLon ?? "";
+        d[`dieselGpsAccuracy${n}`] = entry.gpsAccuracy ?? "";
+        d[`dieselGpsCapturedAt${n}`] = entry.gpsCapturedAt ?? "";
+        d[`dieselImage${n}`] = entry.imageData ?? "";
+        d[`dieselImageName${n}`] = entry.imageName ?? "";
+        d[`dieselId${n}`] = entry.id ?? "";
+        d[`dieselClientKey${n}`] = entry.clientKey ?? `diesel-${n}`;
+        d[`dieselSubmitted${n}`] = entry.submitted !== false;
+        d[`dieselSubmittedAt${n}`] = entry.submittedAt ?? "";
       }
     });
     return data;
@@ -542,8 +567,10 @@ export default function StepEnd({
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-3">
             <div className="flex items-center gap-2">
-              <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">5</span>
-              <h2 className="text-xl font-bold text-slate-800 tracking-tight">{t("ops.trip.title.expenses").toUpperCase()} ({t("ops.trip.submitted").toUpperCase()})</h2>
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <Receipt size={15} className="text-orange-600" />
+                {t("ops.trip.title.expenses")}
+              </h3>
             </div>
             <div className="flex items-center gap-2 shrink-0">
 
@@ -619,8 +646,10 @@ export default function StepEnd({
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
             <div className="flex items-center gap-2">
-              <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">5</span>
-              <h2 className="text-xl font-bold text-slate-800 tracking-tight">{t("ops.trip.title.expenses").toUpperCase()}</h2>
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <Receipt size={15} className="text-orange-600" />
+                {t("ops.trip.title.expenses")}
+              </h3>
             </div>
             <div className="flex items-center gap-2">
 

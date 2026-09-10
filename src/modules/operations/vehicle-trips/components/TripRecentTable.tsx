@@ -36,7 +36,7 @@ function TripRecentTable({
 }: Props) {
   const { t } = useI18n();
   const safeTrips = uniqueTripsById(Array.isArray(trips) ? trips : []);
-  /** Total record count shown as its own badge, outside the status toggle. */
+  /** Total record count — kept for header context; per-tab counts drive the toggle. */
   const totalRecords = safeTrips.length;
 
   /** Translate, but never surface a raw i18n key: returns "" when the key is missing. */
@@ -242,23 +242,49 @@ function TripRecentTable({
               {totalRecords}
             </span>
 
-            {/* Status toggle — segmented control matching LatestMaintenanceTable */}
+            {/* Status toggle — same height as before, only wider; live per-tab counts */}
             <div className="flex items-center p-0.5 ml-2 border border-slate-200/80 rounded-lg overflow-hidden bg-slate-50 shadow-sm">
               {(["Draft", "Pending", "Deleted"] as const).map((tab) => {
                 const isActive = statusFilter === tab;
+                const count =
+                  tab === "Draft"
+                    ? allDraft.length
+                    : tab === "Pending"
+                    ? allPending.length
+                    : allDeleted.length;
                 const activeClass =
                   tab === "Draft"
                     ? "bg-emerald-100 text-emerald-700 shadow-sm"
                     : tab === "Pending"
                     ? "bg-orange-100 text-orange-700 shadow-sm"
                     : "bg-rose-100 text-rose-700 shadow-sm";
+                const label = (() => {
+                  const k = "status." + tab.toLowerCase();
+                  const v = t(k);
+                  return v === k ? tab : v;
+                })();
                 return (
                   <button
                     key={tab}
+                    type="button"
                     onClick={() => setStatusFilter(tab)}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${isActive ? activeClass : "bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"}`}
+                    aria-pressed={isActive}
+                    className={`inline-flex items-center gap-1.5 px-5 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                      isActive
+                        ? activeClass
+                        : "bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"
+                    }`}
                   >
-                    {(() => { const k = "status." + tab.toLowerCase(); const label = t(k); return label === k ? tab : label; })()}
+                    <span>{label}</span>
+                    <span
+                      className={`inline-flex items-center justify-center min-w-[1.25rem] h-4 px-1 rounded text-[10px] font-bold tabular-nums ${
+                        isActive
+                          ? "bg-white/70 text-inherit"
+                          : "bg-slate-200/80 text-slate-600"
+                      }`}
+                    >
+                      {count}
+                    </span>
                   </button>
                 );
               })}

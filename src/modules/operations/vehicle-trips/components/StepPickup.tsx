@@ -553,12 +553,10 @@ export default function StepPickup({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
-              3
-            </span>
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">
-              {t("ops.trip.title.pickup").toUpperCase()}
-            </h2>
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <Package size={15} className="text-amber-600" />
+              {t("ops.trip.title.pickup")}
+            </h3>
           </div>
           <div className="flex items-center gap-2 shrink-0">
 
@@ -789,12 +787,10 @@ export default function StepPickup({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
-              3
-            </span>
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">
-              {t("ops.trip.title.pickup").toUpperCase()}
-            </h2>
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <Package size={15} className="text-amber-600" />
+              {t("ops.trip.title.pickup")}
+            </h3>
           </div>
           <div className="flex items-center gap-3">
 

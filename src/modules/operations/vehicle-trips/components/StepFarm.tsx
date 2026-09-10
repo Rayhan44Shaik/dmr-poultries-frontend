@@ -226,12 +226,10 @@ export default function StepFarm({
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
-              2
-            </span>
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">
-              {t("ops.trip.title.farm").toUpperCase()}
-            </h2>
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <MapPin size={15} className="text-indigo-600" />
+              {t("ops.trip.title.farm")}
+            </h3>
           </div>
           <div className="flex items-center gap-2 shrink-0">
 
@@ -337,12 +335,10 @@ export default function StepFarm({
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
-              2
-            </span>
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">
-              {t("ops.trip.title.farm").toUpperCase()}
-            </h2>
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <MapPin size={15} className="text-indigo-600" />
+              {t("ops.trip.title.farm")}
+            </h3>
           </div>
           <div className="flex items-center gap-2 shrink-0">
 

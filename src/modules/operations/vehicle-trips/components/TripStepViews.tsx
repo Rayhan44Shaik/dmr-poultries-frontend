@@ -5,10 +5,11 @@
 //   • the Accounts → Farm Payment trip view (Step 2 + Step 3 only).
 // Extracted so both surfaces render byte-identical step detail.
 //
-// All step views share the SAME "View Farm Details" layout: a full-width
-// address block (where a step has one) on top, then colour-coded KPI cards
-// below. No raw latitude/longitude/accuracy rows and no DC-photo gallery on
-// Step 2 (DC photos belong to Step 3, where they are captured).
+// All step views share the SAME "Farm Details" layout: a plain title
+// (no "View" prefix, no numbered badge), optional full-width address block
+// on top, then colour-coded KPI cards below. No raw latitude/longitude/
+// accuracy rows and no DC-photo gallery on Step 2 (DC photos belong to
+// Step 3, where they are captured).
 
 import { Box, Bird, Clock, MapPin, Gauge, Store, Ticket, Scale, Layers, Package, ShieldCheck } from "lucide-react";
 import type { Trip } from "../types/trip";
@@ -67,7 +68,7 @@ export function FarmStepView({ trip }: { trip: Trip }) {
     <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
       <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
         <MapPin size={15} className="text-indigo-600" />
-        {t("ops.trip.view_step2")}
+        {t("ops.trip.title.farm")}
       </h3>
 
       <GpsAddressBlock trip={trip} />
@@ -128,7 +129,7 @@ export function PickupStepView({ trip }: { trip: Trip }) {
     <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
       <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
         <Package size={15} className="text-amber-600" />
-        {t("ops.trip.view_step3")}
+        {t("ops.trip.title.pickup")}
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <StepKpiCard

@@ -5,7 +5,7 @@
 // step presentation. Email status (Send All Mail → Total / Sent / Failed)
 // is per-shop and stays visible after the batch finishes.
 
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import {
   FileText,
   Mail,
@@ -47,12 +47,7 @@ import { StepKpiCard } from "./WizardControls";
 import { getNextIncompleteTripStep } from "../../../../shared/trip";
 import { useI18n } from "../../../../i18n";
 
-// --- Read-only step presentation (incomplete trips only) ---
 import TripWizardStepper from "./TripWizardStepper";
-import StepStart from "./StepStart";
-import StepPickup from "./StepPickup";
-import StepDeliveries from "./StepDeliveries";
-import StepEnd from "./Step_5/StepEnd";
 import TripFinalKPI from "./TripFinalKPI";
 
 interface Props {
@@ -67,14 +62,14 @@ interface Props {
   initialStep?: number;
 }
 
-/** Read-only Step 1 (Trip Start) details — same "View Farm Details" format. */
+/** Read-only Step 1 (Trip Start) details — same "Farm Details" format. */
 function Step1View({ trip }: { trip: Trip }) {
   const { t } = useI18n();
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
       <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
         <Clock size={15} className="text-indigo-600" />
-        {t("ops.trip.view_step1")}
+        {t("ops.trip.title.start")}
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <StepKpiCard
@@ -175,7 +170,7 @@ function Step5View({ trip }: { trip: Trip }) {
     <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
       <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
         <Receipt size={15} className="text-orange-600" />
-        {t("ops.trip.view_step5")}
+        {t("ops.trip.title.expenses")}
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <StepKpiCard
@@ -303,9 +298,6 @@ function TripViewModal({ open, trip, onClose, shops, initialStep }: Props) {
     setViewStepIndex(initialViewStep(trip));
   }
 
-  const noopSubscribeSaveStatus = useCallback(() => () => {}, []);
-  const getIdleSaveStatus = useCallback(() => "idle" as const, []);
-
   const emailState = useTripDeliveryEmails(trip, shops);
   const whatsappState = useTripDeliveryWhatsApps(trip, shops);
 
@@ -361,73 +353,30 @@ function TripViewModal({ open, trip, onClose, shops, initialStep }: Props) {
     await generateTripReportPDF(trip, emailInfo);
   };
 
-  // ─── Dummy functions for read‑only steps (incomplete trips) ───
-  const noop = () => {};
-  const noopDispatch = () => {};
-
-  const renderViewStep = () => {
-    if (safeViewStepIndex === 0 && isStartCompleted) {
-      return (
-        <StepStart
-          tripId={trip.id}
-          tripNo={trip.tripNo}
-          startTime={trip.startTime}
-          startStepSubmitted={trip.startStepSubmitted}
-          loadSnapshot={trip}
-          updateTrip={noop}
-          submitStartStep={async () => false}
-          vehicleOptions={[]}
-          employeeOptions={[]}
-          subscribeHeaderSaveStatus={noopSubscribeSaveStatus}
-          getHeaderSaveStatus={getIdleSaveStatus}
-        />
-      );
-    }
-    if (safeViewStepIndex === 1) {
-      return <FarmStepView trip={trip} />;
-    }
-    if (safeViewStepIndex === 2) {
-      return (
-        <StepPickup
-          trip={trip}
-          setTrip={noopDispatch}
-          updateTrip={noop}
-          submitPickupStep={() => false}
-          updateBoxDetails={noop}
-        />
-      );
-    }
-    if (safeViewStepIndex === 3 && isDeliveryCompleted) {
-      return <StepDeliveries rows={trip.deliveries || []} setRows={noopDispatch} shops={shops} birdTypes={[]} trip={trip} updateDeliveries={noop} submitDeliveriesStep={() => false} clearForm={noop} readOnly={true} canEdit={false} />;
-    }
-    if (safeViewStepIndex === 4 && isEndCompleted) {
-      return (
-        <StepEnd
-          trip={trip}
-          setTrip={noopDispatch}
-          updateTrip={noop}
-          submitExpensesStep={() => false}
-          submitStartStep={() => false}
-          editable={false}
-          canEdit={false}
-          onCancel={noop}
-          clearForm={noop}
-        />
-      );
-    }
-    return <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">{t("ops.trip.select_completed_step")}</div>;
-  };
-
-  /** Completed trips: show ONLY the selected step's own persisted data. */
-  const renderCompletedStep = () => {
+  /**
+   * Every step (complete or incomplete) uses the same plain "Farm Details"
+   * style: icon + title-case label, KPI cards — never the numbered
+   * "1 TRIP DETAILS" wizard header. Steps that have not been submitted yet
+   * show a gentle empty-state instead of the editable form.
+   */
+  const renderStepContent = () => {
     switch (safeViewStepIndex) {
       case 0:
-        return <Step1View trip={trip} />;
+        return isStartCompleted
+          ? <Step1View trip={trip} />
+          : <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">{t("ops.trip.select_completed_step")}</div>;
       case 1:
         return <FarmStepView trip={trip} />;
       case 2:
-        return <PickupStepView trip={trip} />;
+        return trip.pickupStepSubmitted
+          ? <PickupStepView trip={trip} />
+          : <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">{t("ops.trip.select_completed_step")}</div>;
       case 3:
+        if (!isDeliveryCompleted) {
+          return <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">{t("ops.trip.select_completed_step")}</div>;
+        }
+        // Completed trips get the email/WhatsApp shop cards; incomplete keep
+        // the same shop cards without bulk-send chrome when counts are zero.
         return (
           <TripViewShopCards
             trip={trip}
@@ -441,7 +390,6 @@ function TripViewModal({ open, trip, onClose, shops, initialStep }: Props) {
             onSendOne={(delivery) => void emailState.sendOne(delivery)}
             onDownloadPdf={(delivery) => void downloadShopPDF(delivery)}
             emailCounts={emailCounts}
-            // WhatsApp props
             whatsappEffectiveStatus={whatsappState.effectiveStatus}
             whatsappBusyIds={whatsappState.busyIds}
             whatsappIsBulkSending={whatsappState.isBulkSending}
@@ -452,7 +400,9 @@ function TripViewModal({ open, trip, onClose, shops, initialStep }: Props) {
           />
         );
       case 4:
-        return <Step5View trip={trip} />;
+        return isEndCompleted
+          ? <Step5View trip={trip} />
+          : <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">{t("ops.trip.select_completed_step")}</div>;
       default:
         return null;
     }
@@ -622,7 +572,7 @@ function TripViewModal({ open, trip, onClose, shops, initialStep }: Props) {
             }}
           />
           <div key={`${trip.id}-step-${safeViewStepIndex}`} className="animate-fade-in-up">
-            {isCompleted ? renderCompletedStep() : renderViewStep()}
+            {renderStepContent()}
           </div>
           <TripFinalKPI trip={trip} deliveries={trip.deliveries} />
         </div>
