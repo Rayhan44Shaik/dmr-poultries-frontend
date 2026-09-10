@@ -265,6 +265,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
   disabled,
   invalid,
   onChange,
+  chipSummary,
 }: {
   selected: string[];
   options: DropdownOption[];
@@ -273,6 +274,11 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
   disabled: boolean;
   invalid?: boolean;
   onChange: (selected: string[]) => void;
+  /** When provided, the trigger shows this compact summary instead of one
+   *  chip per selected value — use when the selected values are already
+   *  rendered elsewhere (e.g. a dedicated box-numbers grid) so they don't
+   *  appear twice. */
+  chipSummary?: (count: number) => string;
 }) {
   const { open, setOpen, query, setQuery, ref, searchRef, filtered } = useDropdownPanel();
 
@@ -311,6 +317,11 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
       >
         {selectedValues.length === 0 ? (
           <span className="px-1.5 text-slate-400 font-normal">{placeholder}</span>
+        ) : chipSummary ? (
+          <span className="inline-flex items-center gap-1.5 px-1.5 text-xs font-semibold text-slate-800">
+            <Check size={13} className="text-emerald-600 shrink-0" />
+            {chipSummary(selectedValues.length)}
+          </span>
         ) : (
           selectedValues.map((value) => {
             const option = options.find((opt) => opt.value === value);

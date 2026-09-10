@@ -18,6 +18,19 @@ import { SearchDropdown, MultiSearchDropdown, type DropdownOption } from "../Wiz
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
 import { useI18n } from "../../../../../i18n";
 
+/** Soft, eye-friendly tile palette cycled across the selected-box grid so each
+ *  box number is easy to tell apart without harsh/bright colours. */
+const BOX_TILE_PALETTE = [
+  "bg-sky-50 border-sky-200 text-sky-700",
+  "bg-emerald-50 border-emerald-200 text-emerald-700",
+  "bg-violet-50 border-violet-200 text-violet-700",
+  "bg-amber-50 border-amber-200 text-amber-800",
+  "bg-rose-50 border-rose-200 text-rose-700",
+  "bg-teal-50 border-teal-200 text-teal-700",
+  "bg-indigo-50 border-indigo-200 text-indigo-700",
+  "bg-cyan-50 border-cyan-200 text-cyan-700",
+];
+
 export interface Props {
   mode: "box" | "weight";
   setMode: (mode: "box" | "weight") => void;
@@ -130,7 +143,6 @@ export default function ShopDeliveryForm({
   validationErrors,
   farmBirds,
   farmWeight,
-  boxCount,
   mortKg,
   deliveredBirds,
   deliveredWeight,
@@ -251,14 +263,6 @@ export default function ShopDeliveryForm({
             </button>
         </div>
 
-        {/* Selected boxes count — just the number */}
-        <span
-          className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 tabular-nums"
-          title={t("ops.trip.selected_boxes")}
-        >
-          {boxCount}
-        </span>
-
         <button
           type="button"
           onClick={onClose}
@@ -306,6 +310,7 @@ export default function ShopDeliveryForm({
                 placeholder={t("ops.trip.select_boxes_from_pickup")}
                 searchPlaceholder={t("ops.trip.search_box_number")}
                 disabled={readOnly}
+                chipSummary={(count) => t("ops.trip.boxes_selected", { count })}
                 onChange={(values) => handleBoxSelection(values.map(Number))}
               />
             ) : (
@@ -324,13 +329,18 @@ export default function ShopDeliveryForm({
               <Tag size={13} />
             </span>
             <span className="text-xs font-semibold text-slate-600">{t("ops.trip.box_nos_list")}</span>
+            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-indigo-50 px-1.5 text-xs font-bold text-indigo-700 tabular-nums">
+              {selectedBoxIds.length}
+            </span>
           </div>
           {selectedBoxIds.length > 0 ? (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(56px,1fr))] gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-              {selectedBoxIds.map((id) => (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+              {selectedBoxIds.map((id, idx) => (
                 <span
                   key={id}
-                  className="flex h-7 items-center justify-center rounded-md border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700"
+                  className={`flex h-10 items-center justify-center rounded-lg border px-1.5 text-sm font-bold shadow-xs ${
+                    BOX_TILE_PALETTE[idx % BOX_TILE_PALETTE.length]
+                  }`}
                 >
                   #{id}
                 </span>
