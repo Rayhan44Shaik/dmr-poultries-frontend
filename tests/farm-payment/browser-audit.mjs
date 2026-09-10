@@ -65,6 +65,27 @@ async function main() {
   const summary = await page.locator("text=/Showing 1–10 of \\d+/").first().textContent().catch(() => null);
   note("Pagination summary shows correct range", Boolean(summary), summary?.trim());
 
+  // ── 1b. Default window: last Monday -> last Sunday ────────────────────────
+  // Today's week is still running (its Sunday has not happened), so the page
+  // must not open on it. Recomputed here independently of the app.
+  const isoLocal = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const today = new Date();
+  const thisMonday = new Date(today);
+  thisMonday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  const lastMon = new Date(thisMonday); lastMon.setDate(thisMonday.getDate() - 7);
+  const lastSun = new Date(thisMonday); lastSun.setDate(thisMonday.getDate() - 1);
+  const dmy = (d) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  const fromVal = await page.getByLabel("Date From").inputValue();
+  const toVal = await page.getByLabel("Date To").inputValue();
+  note("Opens on the last complete week (Mon-Sun)",
+    fromVal === dmy(lastMon) && toVal === dmy(lastSun),
+    `from=${fromVal} (want ${dmy(lastMon)} = ${isoLocal(lastMon)}) to=${toVal} (want ${dmy(lastSun)} = ${isoLocal(lastSun)})`);
+
+  // Totals bar is a *filtered* affordance: quiet on the default window.
+  note("Totals bar hidden on the default window",
+    (await page.locator("text=/Totals for all \\d+ filtered/").count()) === 0);
+
   // ── 2. No console/page errors on load ────────────────────────────────────
   note("No console errors on load (page-scoped)", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
   note("No uncaught page errors on load", pageErrors.length === 0, pageErrors.slice(0, 2).join(" | "));
@@ -142,9 +163,13 @@ async function main() {
   note("Body scroll restored after close", bodyOverflow === "", `overflow="${bodyOverflow}"`);
 
   // ── 6. Filters: farm dropdown keyboard, empty state ───────────────────────
-  // Go to page 2 first so we can verify filters reset pagination
-  await page.locator('button', { hasText: "2", exact: true }).first().click();
-  await page.waitForTimeout(200);
+  // Go to page 2 first so we can verify filters reset pagination — the default
+  // window can easily hold fewer than one page of trips, so this is best-effort.
+  const page2 = page.locator('button', { hasText: "2", exact: true }).first();
+  if (await page2.isVisible().catch(() => false)) {
+    await page2.click();
+    await page.waitForTimeout(200);
+  }
 
   const farmTrigger = page.locator('button[aria-haspopup="listbox"]');
   await farmTrigger.focus();
@@ -159,6 +184,10 @@ async function main() {
   note("Keyboard farm selection works (Enter)", /godavari/i.test(farmValue ?? ""), farmValue?.trim());
   const filteredRows = await rows.count();
   note("Farm filter narrows the table", filteredRows > 0 && filteredRows < rowCount, `${filteredRows} rows`);
+  const bar = page.locator("text=/Totals for all \\d+ filtered/");
+  note("Totals bar appears at the end of the table once filtered", await bar.first().isVisible().catch(() => false));
+  const barText = (await page.locator("text=/Totals for all/").first().textContent().catch(() => "")) ?? "";
+  note("Totals bar names the three figures only", !/Total Paid|Balance/.test(barText), barText.trim());
   const activePage = await page.locator("text=/Showing 1–\\d+/").first().textContent().catch(() => null);
   note("Filtering resets to page 1", Boolean(activePage), activePage?.trim());
 
@@ -178,9 +207,22 @@ async function main() {
   await page.getByRole("button", { name: "Clear", exact: true }).click();
   await page.waitForTimeout(300);
   const clearedRows = await rows.count();
-  note("Clear restores full list", clearedRows === rowCount, `${clearedRows} rows`);
+  note("Clear returns to the default week", clearedRows === rowCount, `${clearedRows} rows`);
+  const fromAfterClear = await page.getByLabel("Date From").inputValue();
+  note("Clear resets dates to last Monday, not to empty", fromAfterClear === dmy(lastMon), `value=${fromAfterClear}`);
+  note("Totals bar hides again on the default window",
+    (await page.locator("text=/Totals for all \\d+ filtered/").count()) === 0);
 
-  // ── 7. Refresh: one request, no flicker (rows stay attached) ─────────────
+  // ── 7. Refresh (now beside Clear in the filter row): one request, no flicker ─
+  const refreshBtnRow = await page.getByRole("button", { name: "Refresh", exact: true })
+    .evaluate((el) => ({ inFilterCard: !el.closest("table") && !el.closest('[class*="justify-between"] > h2') }))
+    .catch(() => ({ inFilterCard: false }));
+  note("Refresh lives in the filter row, not the table header", refreshBtnRow.inFilterCard);
+  const spinnerVisibleDuringLoad = await page.evaluate(() => {
+    const b = [...document.querySelectorAll("button")].find((x) => /Refresh/.test(x.textContent ?? ""));
+    return Boolean(b && b.querySelector("svg[class*='animate-spin'], svg.animate-spin"));
+  });
+  note("Spinner icon only while a load is running", !spinnerVisibleDuringLoad);
   const beforeRefresh = await rows.first().evaluate((el) => el.tagName);
   tripApiCalls = 0;
   await page.getByRole("button", { name: "Refresh", exact: true }).click();

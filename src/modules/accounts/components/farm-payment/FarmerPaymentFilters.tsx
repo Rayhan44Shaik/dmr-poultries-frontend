@@ -3,7 +3,7 @@
 import React from 'react';
 import { uiInputClass } from '../../../../shared/ui/uiTokens';
 import { DatePicker } from '../../../../components/common/DatePicker';
-import { Search, X, Filter } from 'lucide-react';
+import { Search, X, Filter, RefreshCw } from 'lucide-react';
 
 interface FarmerPaymentFiltersProps {
   dateFrom: string;
@@ -11,6 +11,9 @@ interface FarmerPaymentFiltersProps {
   selectedFarm: string;
   searchQuery: string;
   farms: string[];
+  /** A trips reload is in flight — the Refresh button shows its spinner. */
+  loading?: boolean;
+  onRefresh: () => void;
   onDateFromChange: (val: string) => void;
   onDateToChange: (val: string) => void;
   onFarmChange: (farm: string) => void;
@@ -25,6 +28,8 @@ export function FarmerPaymentFilters({
   selectedFarm,
   searchQuery,
   farms,
+  loading = false,
+  onRefresh,
   onDateFromChange,
   onDateToChange,
   onFarmChange,
@@ -214,6 +219,15 @@ export function FarmerPaymentFilters({
           className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition bg-white whitespace-nowrap"
         >
           Clear
+        </button>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          title="Reload completed trips from the backend"
+          className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition whitespace-nowrap"
+        >
+          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+          {loading ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
     </div>

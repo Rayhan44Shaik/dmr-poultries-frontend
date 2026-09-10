@@ -13,6 +13,7 @@ const inrGrouped = new Intl.NumberFormat('en-IN', {
 });
 
 const countGrouped = new Intl.NumberFormat('en-IN');
+const kgGrouped = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 /** Full precision, Indian digit grouping: ₹2,34,500.00 */
 export const formatINRExact = (amount: number): string => inrGrouped.format(amount || 0);
@@ -32,6 +33,9 @@ export const formatINR = (amount: number): string => {
   if (abs >= 1_00_000) return `${sign}₹${(abs / 1_00_000).toFixed(2)}L`;
   return `${sign}${inrGrouped.format(abs)}`;
 };
+
+/** Weight with Indian grouping and one decimal: 6,543.2 */
+export const formatKg = (num: number): string => kgGrouped.format(Number(num) || 0);
 
 /** Whole-number count with Indian grouping: 1,23,456 */
 export const formatCount = (num: number): string => countGrouped.format(Math.round(Number(num) || 0));

@@ -8,58 +8,40 @@ import { FarmPaymentTripViewModal } from '../components/farm-payment/FarmPayment
 import { FarmPaymentService } from '../services/FarmPaymentService';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { FarmPayment } from '../types/farmPayment.types';
-import { Save, RotateCcw, RefreshCw, Bird, Gauge, Banknote } from 'lucide-react';
-import { formatINR, formatINRExact, formatCount } from '../components/farm-payment/farmPaymentFormat';
+import { Save, RotateCcw } from 'lucide-react';
+import { formatINR, formatINRExact, formatCount, formatKg } from '../components/farm-payment/farmPaymentFormat';
 import Pagination from '../../../ui/Pagination';
 
 type FarmerPaymentPageProps = { embedded?: boolean };
 
-type KpiTone = 'indigo' | 'lime' | 'emerald';
+/**
+ * The window this page opens with: the last COMPLETE week, Monday to Sunday.
+ * "This week" is still running — its Sunday has not happened yet — so a
+ * current-week total always reads as a shortfall. Starting one week back means
+ * the table, the totals bar and every trip in it cover the same seven days.
+ */
+function lastCompleteWeek(): { from: string; to: string } {
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const today = new Date();
+  const thisMonday = new Date(today);
+  thisMonday.setDate(today.getDate() - ((today.getDay() + 6) % 7)); // getDay: 0=Sun
+  const from = new Date(thisMonday);
+  from.setDate(thisMonday.getDate() - 7);
+  const to = new Date(thisMonday);
+  to.setDate(thisMonday.getDate() - 1); // the Sunday that just closed
+  return { from: iso(from), to: iso(to) };
+}
 
-// Full class strings (never assembled from a template) so Tailwind's scanner keeps them.
-const KPI_TONE: Record<KpiTone, { tile: string; rule: string }> = {
-  indigo: { tile: 'bg-indigo-50 text-indigo-700 ring-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-500/20', rule: 'from-indigo-500/25' },
-  lime: { tile: 'bg-lime-50 text-lime-700 ring-lime-100 dark:bg-lime-500/10 dark:text-lime-300 dark:ring-lime-500/20', rule: 'from-lime-500/25' },
-  emerald: { tile: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20', rule: 'from-emerald-500/25' },
-};
-
-/** Same card shell as the Accounts Dashboard KPIs: accent rule, icon tile,
-    compact figure on screen with the exact rupees in its hover tip. */
-function FarmKpiCard({
-  tone,
-  icon: Icon,
-  label,
-  sub,
-  value,
-  valueExact,
-  footer,
-}: {
-  tone: KpiTone;
-  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
-  label: string;
-  sub?: string;
-  value: string;
-  valueExact?: string;
-  footer?: string;
-}) {
-  const t = KPI_TONE[tone];
+/** One figure in the totals bar under the table — a compact caption/value pair
+    that stays on one line, with the exact rupees in its hover tip. */
+function TotalStat({ label, value, exact, dot }: { label: string; value: string; exact?: string; dot: string }) {
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700">
-      <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${t.rule} to-transparent`} />
-      <div className="flex items-start gap-2.5">
-        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ring-1 ${t.tile}`}>
-          <Icon size={16} strokeWidth={2} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{label}</p>
-          {sub && <p className="mt-0.5 truncate text-[11px] leading-none text-slate-400 dark:text-slate-500">{sub}</p>}
-        </div>
-      </div>
-      <p className="mt-3 text-[22px] font-bold leading-none tracking-tight text-slate-900 dark:text-white" title={valueExact}>
-        {value}
-      </p>
-      {footer && <p className="mt-2 text-[10px] font-semibold text-slate-500 dark:text-slate-400">{footer}</p>}
-    </div>
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap" title={exact}>
+      <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
+      <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{value}</span>
+    </span>
   );
 }
 
@@ -82,8 +64,10 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   const [savingPayments, setSavingPayments] = useState(false);
 
   // Filter states
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  // Opens on the last complete week (Mon-Sun); see lastCompleteWeek().
+  const [defaultRange] = useState(lastCompleteWeek);
+  const [dateFrom, setDateFrom] = useState(defaultRange.from);
+  const [dateTo, setDateTo] = useState(defaultRange.to);
   const [selectedFarm, setSelectedFarm] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -250,9 +234,6 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     }, 0);
   }, [filteredTrips, paymentData]);
 
-  // Per-trip / per-kg context for the cards (never divide by zero).
-  const tripCount = Math.max(1, filteredTrips.length);
-
   // ----- pagination -----
   // ----- pagination (global <Pagination /> handles clamping + windows) -----
   const paginatedTrips = useMemo(
@@ -382,8 +363,9 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   };
 
   const handleClearFilters = () => {
-    setDateFrom('');
-    setDateTo('');
+    // Clear means "back to the default week", not "every trip ever".
+    setDateFrom(defaultRange.from);
+    setDateTo(defaultRange.to);
     setSelectedFarm('All');
     setSearchQuery('');
     setCurrentPage(1);
@@ -400,8 +382,14 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     }).length;
   }, [paymentData, dirtyTripIds]);
 
-  // Check if any filter is active
-  const isFilterActive = dateFrom || dateTo || selectedFarm !== 'All' || searchQuery;
+  // The page always opens on a real week, so "filtered" means: something the
+  // user changed. Only then does the totals bar appear under the table.
+  const isFilterActive = Boolean(
+    (dateFrom && dateFrom !== defaultRange.from) ||
+      (dateTo && dateTo !== defaultRange.to) ||
+      selectedFarm !== 'All' ||
+      searchQuery.trim()
+  );
 
   // ----- render -----
   const content = (
@@ -419,31 +407,11 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
         onDateToChange={setDateTo}
         onFarmChange={setSelectedFarm}
         onSearchChange={setSearchQuery}
+        loading={loading}
+        onRefresh={handleRefresh}
         onApply={() => setCurrentPage(1)}
         onClear={handleClearFilters}
       />
-
-      {/* KPIs — the three totals this page is actually about */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <FarmKpiCard
-          tone="indigo" icon={Bird} label="Total Birds"
-          sub={`${filteredTrips.length} ${filteredTrips.length === 1 ? 'trip' : 'trips'} in view`}
-          value={formatCount(totalBirdsKPI)}
-          footer={`${formatCount(totalBirdsKPI / tripCount)} birds / trip`}
-        />
-        <FarmKpiCard
-          tone="lime" icon={Gauge} label="Total Weight"
-          sub={`${(totalWeightKPI / (totalBirdsKPI || 1)).toFixed(1)} kg avg per bird`}
-          value={`${totalWeightKPI.toFixed(1)} kg`}
-          footer={`${(totalWeightKPI / tripCount).toFixed(1)} kg / trip`}
-        />
-        <FarmKpiCard
-          tone="emerald" icon={Banknote} label="Total Amount"
-          sub={`₹${(totalAmountKPI / (totalWeightKPI || 1)).toFixed(2)} per kg`}
-          value={formatINR(totalAmountKPI)} valueExact={formatINRExact(totalAmountKPI)}
-          footer={`${formatINR(totalAmountKPI / tripCount)} / trip`}
-        />
-      </div>
 
       {/* Table Card */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
@@ -456,14 +424,6 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleRefresh}
-              disabled={loading}
-              className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-1.5"
-              title="Reload completed trips from the backend"
-            >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
-            </button>
             <button
               onClick={handleResetPayments}
               disabled={modifiedCount === 0}
@@ -529,6 +489,26 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
                   : 'No completed trips found'
               }
             />
+
+            {/* Totals bar — the last strip of the table, only once the view is
+                narrowed away from the default week. */}
+            {isFilterActive && filteredTrips.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-t border-slate-200/70 bg-slate-50/80 px-4 py-2">
+                <p className="text-[11px] font-semibold text-slate-500">
+                  Totals for all {filteredTrips.length} filtered {filteredTrips.length === 1 ? 'trip' : 'trips'}
+                </p>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+                  <TotalStat label="Total Birds" value={formatCount(totalBirdsKPI)} dot="bg-indigo-500" />
+                  <TotalStat label="Total Weight" value={`${formatKg(totalWeightKPI)} kg`} dot="bg-lime-500" />
+                  <TotalStat
+                    label="Total Amount"
+                    value={formatINR(totalAmountKPI)}
+                    exact={formatINRExact(totalAmountKPI)}
+                    dot="bg-emerald-500"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Global pagination bar — identical appearance/behaviour app-wide */}
             <Pagination
