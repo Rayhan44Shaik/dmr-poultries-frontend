@@ -613,6 +613,17 @@ export default function UnLoadingTable({
     if (!safeShops || safeShops.length === 0) {
       return [{ value: 0, label: t("ops.trip.no_shops_available"), isDisabled: true }];
     }
+    // Shops that have already been captured (delivered) are pushed to the
+    // BOTTOM of the dropdown so the NEXT shop to deliver always sits on top.
+    // Pending (not-yet-delivered) shops stay first, alphabetically. A shop is
+    // "delivered" once it has a captured row (autoCaptureTime), so `[ORDER]`
+    // assignment-plan rows — which carry ordered birds/weight but no capture —
+    // still count as pending (same rule as pendingShopsFromRows).
+    const deliveredShopIds = new Set<number>(
+      safeRows
+        .filter((r: any) => Number(r.shopId) > 0 && Boolean(r.autoCaptureTime))
+        .map((r: any) => Number(r.shopId))
+    );
     const opts = safeShops
       .filter((shop: any) => {
         const status = String(shop.status ?? "Active");
@@ -626,7 +637,17 @@ export default function UnLoadingTable({
         return { value, label, isDisabled: false };
       })
       .filter((opt: { value: number; label: string; isDisabled: boolean }) => opt.value > 0);
-    opts.sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
+    opts.sort(
+      (
+        a: { value: number; label: string; isDisabled: boolean },
+        b: { value: number; label: string; isDisabled: boolean }
+      ) => {
+        const aDone = deliveredShopIds.has(Number(a.value)) ? 1 : 0;
+        const bDone = deliveredShopIds.has(Number(b.value)) ? 1 : 0;
+        if (aDone !== bDone) return aDone - bDone;
+        return a.label.localeCompare(b.label);
+      }
+    );
     return opts;
   }, [safeShops, safeRows]);
 
@@ -793,7 +814,7 @@ export default function UnLoadingTable({
             title={t("ops.trip.shops_pdf_title")}
           >
             <FileText size={15} className="text-blue-600" />
-            <span>{t("ops.trip.shops")} ({safeRows.length})</span>
+            <span>{t("ops.trip.shops")} ({safeShops.length})</span>
           </button>
 
           <button
