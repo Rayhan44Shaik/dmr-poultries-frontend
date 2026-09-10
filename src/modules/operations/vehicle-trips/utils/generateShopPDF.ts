@@ -29,9 +29,9 @@ const COLOR = {
   tableAltRow: [248, 248, 248] as RGB,
   totalBg: [235, 235, 235] as RGB,
   white: [255, 255, 255] as RGB,
-  finalDarkBlue: [22, 38, 66] as RGB,
-  finalDarkRed: [142, 30, 30] as RGB,
-  accentRed: [142, 30, 30] as RGB,
+  finalDarkBlue: [52, 68, 115] as RGB,
+  finalDarkRed: [222, 96, 110] as RGB,
+  accentRed: [222, 96, 110] as RGB,
 };
 
 const setFill = (doc: jsPDF, c: RGB) => doc.setFillColor(c[0], c[1], c[2]);

@@ -190,11 +190,18 @@ export function TripViewShopCards({
 
   const filteredDeliveries = useMemo(() => {
     if (!query) return deliveries;
-    return deliveries.filter(
-      (delivery) =>
-        (delivery.shopName || "").toLowerCase().includes(query) ||
-        (delivery.birdType || "").toLowerCase().includes(query)
-    );
+    return deliveries.filter((delivery) => {
+      const shopNameMatch = (delivery.shopName || "").toLowerCase().includes(query);
+      const birdTypeMatch = (delivery.birdType || "").toLowerCase().includes(query);
+      // Searching a box number shows which shop carries that box.
+      const boxIds = Array.isArray(delivery.selectedBoxIds)
+        ? delivery.selectedBoxIds
+        : delivery.boxNo != null && delivery.boxNo > 0
+          ? [delivery.boxNo]
+          : [];
+      const boxNumberMatch = boxIds.some((id) => String(id).includes(query));
+      return shopNameMatch || birdTypeMatch || boxNumberMatch;
+    });
   }, [deliveries, query]);
 
   if (deliveries.length === 0) return null;
@@ -343,7 +350,7 @@ export function TripViewShopCards({
                           key={id}
                           className="px-1.5 py-0.5 bg-white text-slate-700 font-bold rounded border border-slate-200/80 text-[10px] shrink-0"
                         >
-                          #{id}
+                          {String(id).padStart(2, "0")}
                         </span>
                       ))}
                     </div>
@@ -353,7 +360,9 @@ export function TripViewShopCards({
                 {/* Capture info + bird type */}
                 <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium pt-0.5">
                   <div className="flex items-center gap-1">
-                    <Clock size={12} className="text-slate-400" />
+                    <span className="h-4 w-4 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                      <Clock size={12} />
+                    </span>
                     <span>{t("ops.trip.captured")} {delivery.autoCaptureTime || "—"}</span>
                   </div>
                   {delivery.birdType ? (

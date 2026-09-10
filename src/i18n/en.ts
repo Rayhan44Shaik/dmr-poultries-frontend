@@ -478,7 +478,7 @@ export default {
   'operations.amount': 'Amount',
   'operations.advance': 'Advance',
   'operations.balance': 'Balance',
-  'operations.mortality_count': 'Mortality Count',
+  'operations.mortality_count': 'Mortality',
   'operations.mortality_reason': 'Reason',
   'operations.mortality_date': 'Date',
   'operations.fuel_date': 'Fuel Date',

@@ -16,6 +16,16 @@ import {
   UserCheck,
   Receipt,
   FileDown,
+  Calendar,
+  Truck,
+  User,
+  Gauge,
+  Ticket,
+  Wallet,
+  Users,
+  Package,
+  MapPin,
+  Fuel,
 } from "lucide-react";
 import { WhatsAppIcon } from "../../../../ui/WhatsAppIcon";
 import type { Trip, ShopDelivery } from "../types/trip";
@@ -33,6 +43,7 @@ import { useTripDeliveryEmails } from "../hooks/useTripDeliveryEmails";
 import { useTripDeliveryWhatsApps } from "../hooks/useTripDeliveryWhatsApps";
 import TripViewShopCards from "./TripViewShopCards";
 import { FarmStepView, PickupStepView } from "./TripStepViews";
+import { StepKpiCard } from "./WizardControls";
 import { getNextIncompleteTripStep } from "../../../../shared/trip";
 import { useI18n } from "../../../../i18n";
 
@@ -56,7 +67,7 @@ interface Props {
   initialStep?: number;
 }
 
-/** Read-only Step 1 (Trip Start) details. */
+/** Read-only Step 1 (Trip Start) details — same "View Farm Details" format. */
 function Step1View({ trip }: { trip: Trip }) {
   const { t } = useI18n();
   return (
@@ -65,54 +76,68 @@ function Step1View({ trip }: { trip: Trip }) {
         <Clock size={15} className="text-indigo-600" />
         {t("ops.trip.view_step1")}
       </h3>
-      <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.field.trip_date")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.tripDate || "—"}</dd>
-        </div>
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.field.start_time")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.startTime || "—"}</dd>
-        </div>
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("common.vehicle")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.vehicleNo || "—"}</dd>
-        </div>
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("common.supervisor")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.supervisorName || "—"}</dd>
-        </div>
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("common.driver")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.driverName || "—"}</dd>
-        </div>
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.field.opening_meter")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {trip.openingMeter != null ? `${trip.openingMeter} KM` : t("ops.trip.not_entered")}
-          </dd>
-        </div>
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("operations.advance")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {trip.advanceAmount != null ? `₹ ${trip.advanceAmount.toLocaleString()}` : t("ops.trip.not_entered")}
-          </dd>
-        </div>
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.field.helpers")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.helpers?.join(", ") || "—"}</dd>
-        </div>
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.field.loaders")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{trip.loaders?.join(", ") || "—"}</dd>
-        </div>
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("common.status")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {trip.startStepSubmitted ? t("ops.trip.submitted") : t("ops.trip.not_submitted")}
-          </dd>
-        </div>
-      </dl>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <StepKpiCard
+          icon={Calendar}
+          tone="bg-blue-50 text-blue-600"
+          label={t("ops.trip.field.trip_date")}
+          value={trip.tripDate || "—"}
+        />
+        <StepKpiCard
+          icon={Clock}
+          tone="bg-sky-50 text-sky-600"
+          label={t("ops.trip.field.start_time")}
+          value={trip.startTime || "—"}
+        />
+        <StepKpiCard
+          icon={Truck}
+          tone="bg-emerald-50 text-emerald-600"
+          label={t("common.vehicle")}
+          value={trip.vehicleNo || "—"}
+        />
+        <StepKpiCard
+          icon={UserCheck}
+          tone="bg-violet-50 text-violet-600"
+          label={t("common.supervisor")}
+          value={trip.supervisorName || "—"}
+        />
+        <StepKpiCard
+          icon={User}
+          tone="bg-indigo-50 text-indigo-600"
+          label={t("common.driver")}
+          value={trip.driverName || "—"}
+        />
+        <StepKpiCard
+          icon={Gauge}
+          tone="bg-purple-50 text-purple-600"
+          label={t("ops.trip.field.opening_meter")}
+          value={trip.openingMeter != null ? `${trip.openingMeter} KM` : t("ops.trip.not_entered")}
+        />
+        <StepKpiCard
+          icon={Wallet}
+          tone="bg-amber-50 text-amber-600"
+          label={t("operations.advance")}
+          value={trip.advanceAmount != null ? `₹ ${trip.advanceAmount.toLocaleString()}` : t("ops.trip.not_entered")}
+        />
+        <StepKpiCard
+          icon={Users}
+          tone="bg-teal-50 text-teal-600"
+          label={t("ops.trip.field.helpers")}
+          value={trip.helpers?.join(", ") || "—"}
+        />
+        <StepKpiCard
+          icon={Package}
+          tone="bg-cyan-50 text-cyan-600"
+          label={t("ops.trip.field.loaders")}
+          value={trip.loaders?.join(", ") || "—"}
+        />
+        <StepKpiCard
+          icon={ShieldCheck}
+          tone="bg-rose-50 text-rose-600"
+          label={t("common.status")}
+          value={trip.startStepSubmitted ? t("ops.trip.submitted") : t("ops.trip.not_submitted")}
+        />
+      </div>
     </section>
   );
 }
@@ -152,48 +177,54 @@ function Step5View({ trip }: { trip: Trip }) {
         <Receipt size={15} className="text-orange-600" />
         {t("ops.trip.view_step5")}
       </h3>
-      <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.field.end_meter")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {trip.closingMeter != null ? `${trip.closingMeter} KM` : t("ops.trip.not_entered")}
-          </dd>
-        </div>
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.delivery_tolls")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {trip.deliveryTolls != null ? String(trip.deliveryTolls) : t("ops.trip.not_entered")}
-          </dd>
-        </div>
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.total_distance")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">{Math.max(0, totalKm)} KM</dd>
-        </div>
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.mileage")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {trip.mileageKmL != null && Number.isFinite(Number(trip.mileageKmL))
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <StepKpiCard
+          icon={Gauge}
+          tone="bg-purple-50 text-purple-600"
+          label={t("ops.trip.field.end_meter")}
+          value={trip.closingMeter != null ? `${trip.closingMeter} KM` : t("ops.trip.not_entered")}
+        />
+        <StepKpiCard
+          icon={Ticket}
+          tone="bg-amber-50 text-amber-600"
+          label={t("ops.trip.delivery_tolls")}
+          value={trip.deliveryTolls != null ? String(trip.deliveryTolls) : t("ops.trip.not_entered")}
+        />
+        <StepKpiCard
+          icon={MapPin}
+          tone="bg-cyan-50 text-cyan-600"
+          label={t("ops.trip.total_distance")}
+          value={`${Math.max(0, totalKm)} KM`}
+        />
+        <StepKpiCard
+          icon={Fuel}
+          tone="bg-teal-50 text-teal-600"
+          label={t("ops.trip.mileage")}
+          value={
+            trip.mileageKmL != null && Number.isFinite(Number(trip.mileageKmL))
               ? `${Number(trip.mileageKmL).toFixed(2)} km/L`
-              : t("ops.trip.not_available")}
-          </dd>
-        </div>
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("operations.total_expenses")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">₹ {totalExpenses.toFixed(2)}</dd>
-        </div>
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("ops.trip.total_diesel")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {totalDieselLitres} Ltrs · ₹ {totalDieselAmount.toFixed(2)}
-          </dd>
-        </div>
-        <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/40">
-          <dt className="text-[10px] uppercase font-semibold text-slate-400">{t("common.status")}</dt>
-          <dd className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
-            {isTripWizardComplete(trip) ? t("ops.trip.submitted") : t("ops.trip.not_submitted")}
-          </dd>
-        </div>
-      </dl>
+              : t("ops.trip.not_available")
+          }
+        />
+        <StepKpiCard
+          icon={Receipt}
+          tone="bg-rose-50 text-rose-600"
+          label={t("operations.total_expenses")}
+          value={`₹ ${totalExpenses.toFixed(2)}`}
+        />
+        <StepKpiCard
+          icon={Fuel}
+          tone="bg-orange-50 text-orange-600"
+          label={t("ops.trip.total_diesel")}
+          value={`${totalDieselLitres} Ltrs · ₹ ${totalDieselAmount.toFixed(2)}`}
+        />
+        <StepKpiCard
+          icon={ShieldCheck}
+          tone="bg-indigo-50 text-indigo-600"
+          label={t("common.status")}
+          value={isTripWizardComplete(trip) ? t("ops.trip.submitted") : t("ops.trip.not_submitted")}
+        />
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>

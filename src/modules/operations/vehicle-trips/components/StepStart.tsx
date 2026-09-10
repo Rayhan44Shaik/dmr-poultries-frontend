@@ -843,63 +843,54 @@ function StepStart({
           <StepKpiCard
             icon={ClipboardList}
             tone="bg-slate-100 text-slate-500"
-            bar="bg-slate-400"
             label={t("operations.trip_no")}
             value={loadSnapshot.tripNo || "--"}
           />
           <StepKpiCard
             icon={Calendar}
             tone="bg-sky-50 text-sky-600"
-            bar="bg-sky-400"
             label={t("ops.trip.field.trip_date")}
             value={loadSnapshot.tripDate || "--"}
           />
           <StepKpiCard
             icon={Clock}
             tone="bg-blue-50 text-blue-600"
-            bar="bg-blue-400"
             label={t("ops.trip.field.start_time")}
             value={loadSnapshot.startStepSubmittedAt ? formatIstStamp(loadSnapshot.startStepSubmittedAt) : formatStartTimeForDisplay(startTime) || "--"}
           />
           <StepKpiCard
             icon={Truck}
             tone="bg-blue-50 text-blue-600"
-            bar="bg-blue-400"
             label={t("operations.vehicle_no")}
             value={loadSnapshot.vehicleNo || "--"}
           />
           <StepKpiCard
             icon={User}
             tone="bg-indigo-50 text-indigo-600"
-            bar="bg-indigo-400"
             label={t("common.supervisor")}
             value={loadSnapshot.supervisorName || "--"}
           />
           <StepKpiCard
             icon={User}
             tone="bg-emerald-50 text-emerald-600"
-            bar="bg-emerald-400"
             label={t("common.driver")}
             value={loadSnapshot.driverName || "--"}
           />
           <StepKpiCard
             icon={Users}
             tone="bg-teal-50 text-teal-600"
-            bar="bg-teal-400"
             label={t("ops.trip.field.helpers")}
             value={loadSnapshot.helpers?.join(", ") || "--"}
           />
           <StepKpiCard
             icon={Users}
             tone="bg-amber-50 text-amber-600"
-            bar="bg-amber-400"
             label={t("ops.trip.field.loaders")}
             value={loadSnapshot.loaders?.join(", ") || "--"}
           />
           <StepKpiCard
             icon={Gauge}
             tone="bg-purple-50 text-purple-600"
-            bar="bg-purple-400"
             label={t("ops.trip.field.opening_meter")}
             value={
               loadSnapshot.openingMeter == null
@@ -910,7 +901,6 @@ function StepStart({
           <StepKpiCard
             icon={Wallet}
             tone="bg-orange-50 text-orange-600"
-            bar="bg-orange-400"
             label={t("operations.advance")}
             value={
               loadSnapshot.advanceAmount == null

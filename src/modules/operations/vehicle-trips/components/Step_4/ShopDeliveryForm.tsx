@@ -1,20 +1,35 @@
 import React from "react";
-import Select from "react-select";
 import {
   X,
   ShoppingCart,
-  Layers,
+  Bird,
   Box,
   Scale,
+  Store,
+  Truck,
   MessageSquare,
   AlertCircle,
   Clock,
   PackageCheck,
   Tag,
+  CheckCircle2,
 } from "lucide-react";
-import BoxSelector from "./BoxSelector";
+import { SearchDropdown, MultiSearchDropdown, type DropdownOption } from "../WizardControls";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
 import { useI18n } from "../../../../../i18n";
+
+/** Soft, eye-friendly tile palette cycled across the selected-box grid so each
+ *  box number is easy to tell apart without harsh/bright colours. */
+const BOX_TILE_PALETTE = [
+  "bg-sky-50 border-sky-200 text-sky-700",
+  "bg-emerald-50 border-emerald-200 text-emerald-700",
+  "bg-violet-50 border-violet-200 text-violet-700",
+  "bg-amber-50 border-amber-200 text-amber-800",
+  "bg-rose-50 border-rose-200 text-rose-700",
+  "bg-teal-50 border-teal-200 text-teal-700",
+  "bg-indigo-50 border-indigo-200 text-indigo-700",
+  "bg-cyan-50 border-cyan-200 text-cyan-700",
+];
 
 export interface Props {
   mode: "box" | "weight";
@@ -45,7 +60,6 @@ export interface Props {
   handleBirdSelect: (selected: any) => void;
   handleBoxSelection: (ids: number[]) => void;
   handleFormChange: (field: string, value: any) => void;
-  handlePerBoxChange: (index: number, field: "birds" | "weight", value: number) => void;
 
   shopOptions: any[];
   birdOptions: any[];
@@ -60,6 +74,68 @@ export interface Props {
   [key: string]: any;
 }
 
+/* ─── Small presentational helpers (local only, no logic changes) ─────── */
+
+/** Field heading with a small coloured logo chip, matching the wizard style. */
+function FormLabel({ icon: Icon, tone, children, required }: {
+  icon: React.ComponentType<{ size?: number | string; className?: string }>;
+  tone: string;
+  children: React.ReactNode;
+  required?: boolean;
+}) {
+  return (
+    <label className="text-xs font-semibold text-slate-600 flex items-center gap-2 mb-1.5">
+      <span className={`h-6 w-6 rounded-lg flex items-center justify-center shrink-0 ${tone}`}>
+        <Icon size={13} />
+      </span>
+      <span className="truncate">{children}</span>
+      {required && <span className="text-rose-500">*</span>}
+    </label>
+  );
+}
+
+/** Uniform metric tile so every box lines up (equal height, vertically centred). */
+function MetricTile({
+  icon: Icon,
+  tone,
+  tint,
+  label,
+  children,
+}: {
+  icon: React.ComponentType<{ size?: number | string; className?: string }>;
+  tone: string;
+  tint: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`rounded-xl border p-3 min-h-[94px] flex flex-col justify-center ${tint}`}>
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <span className={`h-6 w-6 rounded-lg flex items-center justify-center shrink-0 ${tone}`}>
+          <Icon size={13} />
+        </span>
+        <span className="text-[11px] uppercase font-semibold text-slate-500 truncate">{label}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** Plain, neutral metric tile — no green/red accents. */
+function SimpleMetric({ icon, tone, tint, label, value }: {
+  icon: React.ComponentType<{ size?: number | string; className?: string }>;
+  tone: string;
+  tint: string;
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <MetricTile icon={icon} tone={tone} tint={tint} label={label}>
+      <div className="text-sm font-bold text-slate-800 truncate">{value}</div>
+    </MetricTile>
+  );
+}
+
 export default function ShopDeliveryForm({
   mode,
   setMode,
@@ -67,7 +143,6 @@ export default function ShopDeliveryForm({
   validationErrors,
   farmBirds,
   farmWeight,
-  boxCount,
   mortKg,
   deliveredBirds,
   deliveredWeight,
@@ -82,448 +157,482 @@ export default function ShopDeliveryForm({
   handleBirdSelect,
   handleBoxSelection,
   handleFormChange,
-  handlePerBoxChange,
   shopOptions,
   birdOptions,
   isFormValid,
 }: Props) {
   const { t } = useI18n();
   const selectedBoxIds: number[] = formData.selectedBoxIds || [];
+  const isEditing = editingId !== null;
 
-  // Compact & Clean React-Select Styles
-  const customSelectStyles = {
-    control: (base: any, state: any) => ({
-      ...base,
-      minHeight: 38,
-      height: 38,
-      borderRadius: 8,
-      borderColor: state.isFocused ? "#3b82f6" : "#e2e8f0",
-      backgroundColor: "#ffffff",
-      boxShadow: "none",
-      "&:hover": {
-        borderColor: "#cbd5e1",
-      },
-    }),
-    valueContainer: (base: any) => ({
-      ...base,
-      padding: "0 10px",
-    }),
-    input: (base: any) => ({
-      ...base,
-      margin: 0,
-      padding: 0,
-    }),
-    menu: (base: any) => ({
-      ...base,
-      zIndex: 9999,
-      borderRadius: 8,
-      overflow: "hidden",
-      border: "1px solid #e2e8f0",
-      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
-    }),
-    option: (base: any, state: any) => ({
-      ...base,
-      backgroundColor: state.isSelected
-        ? "#eff6ff"
-        : state.isFocused
-        ? "#f8fafc"
-        : "white",
-      color: state.isSelected ? "#1d4ed8" : "#1e293b",
-      cursor: "pointer",
-      fontSize: "13px",
-      padding: "6px 12px",
-    }),
+  // Wizard-native (Salary-Register / Shop-Register style) dropdown options —
+  // the same searchable dropdowns used by Step 1 / Step 2.
+  const shopDropdownOptions: DropdownOption[] = shopOptions
+    .filter((o: any) => o && Number(o.value) > 0 && !o.isDisabled)
+    .map((o: any) => ({ value: String(o.value), label: o.label }));
+
+  const birdDropdownOptions: DropdownOption[] = birdOptions
+    .filter((o: any) => o && Number(o.value) > 0 && !o.isDisabled)
+    .map((o: any) => ({ value: String(o.value), label: o.label }));
+
+  // Same availability rule as the old BoxSelector: boxes already consumed by
+  // another delivery stay hidden unless they are currently selected.
+  const availableBoxDetails = (safeBoxDetails || []).filter(
+    (b: any) => !usedBoxIds.includes(b.boxNo) || selectedBoxIds.includes(b.boxNo)
+  );
+  const boxDropdownOptions: DropdownOption[] = availableBoxDetails.map((b: any) => ({
+    value: String(b.boxNo),
+    label: `${String(b.boxNo).padStart(2, "0")} · ${b.birds} ${t("common.birds")} · ${Number(b.weight).toFixed(2)} kg`,
+    chipLabel: `${String(b.boxNo).padStart(2, "0")}`,
+  }));
+
+  // Bright, eye-friendly coloured box-number chips for the box dropdown list.
+  const boxTileClass = (boxNo: number) =>
+    BOX_TILE_PALETTE[(boxNo - 1) % BOX_TILE_PALETTE.length];
+  const renderBoxOptionLabel = (opt: DropdownOption) => {
+    const boxNo = Number(opt.value);
+    const box = availableBoxDetails.find((b: any) => String(b.boxNo) === opt.value);
+    return (
+      <span className="flex items-center gap-2 min-w-0">
+        <span
+          className={`inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1.5 text-[11px] font-bold tabular-nums ${boxTileClass(boxNo)}`}
+        >
+          {String(boxNo).padStart(2, "0")}
+        </span>
+        <span className="truncate text-xs font-medium text-slate-800">
+          {box ? `${box.birds} ${t("common.birds")} · ${Number(box.weight).toFixed(2)} kg` : opt.label}
+        </span>
+      </span>
+    );
   };
 
+  const neutralInputClass = (invalid?: boolean) =>
+    `w-full rounded-xl border px-3 text-xs font-semibold outline-none transition-all h-[40px] no-spinner ${
+      invalid
+        ? "border-rose-400 bg-rose-50 text-rose-900 focus:ring-2 focus:ring-rose-300"
+        : "border-slate-200 bg-white text-slate-800 focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+    }`;
+
   return (
-    <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs space-y-4">
-      {/* Form Header */}
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 border-b border-slate-100 pb-3">
-        <div className="flex flex-wrap items-start gap-x-6 gap-y-3 flex-1 min-w-0">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {/* ─── Header — title · bird type · mode toggle ─────────────────── */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4 border-b border-slate-100">
+        <div className="flex items-center gap-3 min-w-0 mr-auto">
+          <div className="h-10 w-10 rounded-xl bg-blue-600 text-white shadow-md shadow-blue-600/20 flex items-center justify-center shrink-0">
+            {isEditing ? <CheckCircle2 size={20} /> : <Store size={20} />}
+          </div>
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-slate-800">
-              {editingId !== null ? t("ops.trip.edit_shop_delivery") : t("ops.trip.add_new_shop_delivery")}
+            <h3 className="text-base font-semibold text-slate-800 tracking-tight truncate">
+              {isEditing ? t("ops.trip.edit_shop_delivery") : t("ops.trip.add_new_shop_delivery")}
             </h3>
-            <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-              <Clock size={12} className="text-slate-400" />
-              {t("ops.trip.auto_captured")}: <span className="font-medium text-slate-600">{autoCaptureTime}</span>
-            </p>
+            {isEditing && (
+              <p className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                <Clock size={11} className="text-slate-400" />
+                {t("ops.trip.auto_captured")}:
+                <span className="font-semibold text-slate-600">{autoCaptureTime || "—"}</span>
+              </p>
+            )}
           </div>
+        </div>
 
-          {/* Delivery Mode Toggle (header) */}
-          <div className="shrink-0">
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-              {t("ops.trip.delivery_mode")}
-            </label>
-            <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200/60 min-w-[260px]">
-              <button
-                type="button"
-                onClick={() => setMode("box")}
-                className={`flex items-center justify-center gap-1.5 rounded-md text-xs transition-colors h-[34px] whitespace-nowrap ${
-                  mode === "box"
-                    ? "bg-white text-blue-700 shadow-sm font-semibold"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <Box size={13} />
-                {t("ops.trip.box_mode")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("weight")}
-                className={`flex items-center justify-center gap-1.5 rounded-md text-xs transition-colors h-[34px] whitespace-nowrap ${
-                  mode === "weight"
-                    ? "bg-white text-blue-700 shadow-sm font-semibold"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <Scale size={13} />
-                {t("ops.trip.weight_mode")}
-              </button>
-            </div>
-          </div>
-
-          {/* Bird Type Select (header) */}
-          <div className="w-full sm:w-56 shrink-0">
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
-              <Layers size={13} className="text-slate-400" />
-              {t("operations.bird_type")} <span className="text-rose-500">*</span>
-            </label>
-            <Select
-              key={`bird-${birdOptions.length}`}
-              value={
-                formData.birdTypeId
-                  ? { value: formData.birdTypeId, label: formData.birdType }
-                  : null
+        {/* Bird type + mode toggle + close — grouped on the right */}
+        <div className="flex items-center gap-3 shrink-0">
+        <div className="w-64 shrink-0">
+          <SearchDropdown
+            value={formData.birdTypeId ? String(formData.birdTypeId) : ""}
+            options={birdDropdownOptions}
+            placeholder={birdOptions.length > 0 ? t("ops.trip.select_bird") : t("ops.trip.no_bird_types_available")}
+            searchPlaceholder={t("ops.trip.search_bird_type")}
+            disabled={birdOptions.length === 0 || birdOptions[0]?.isDisabled}
+            onChange={(value) => {
+              if (!value) {
+                handleBirdSelect(null);
+                return;
               }
-              options={birdOptions}
-              placeholder={birdOptions.length > 0 ? t("ops.trip.select_bird") : t("ops.trip.no_bird_types_available")}
-              isSearchable
-              isDisabled={birdOptions.length === 0 || birdOptions[0]?.isDisabled}
-              onChange={handleBirdSelect}
-              maxMenuHeight={150}
-              styles={customSelectStyles}
-            />
-          </div>
+              const opt = birdOptions.find((o: any) => String(o.value) === value);
+              handleBirdSelect(opt ? { value: opt.value, label: opt.label } : null);
+            }}
+          />
+        </div>
+
+        {/* Mode toggle — shows the NAME (Box Mode / Weight Mode) with its icon. */}
+        <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1">
+            <button
+              type="button"
+              onClick={() => setMode("box")}
+              title={t("ops.trip.box_mode")}
+              aria-label={t("ops.trip.box_mode")}
+              className={`flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-all h-[32px] px-3 whitespace-nowrap ${
+                mode === "box"
+                  ? "bg-blue-600 text-white shadow-sm border border-blue-600"
+                  : "text-slate-500 hover:text-slate-800 border border-transparent"
+              }`}
+            >
+              <Box size={14} />
+              {t("ops.trip.box_mode")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("weight")}
+              title={t("ops.trip.weight_mode")}
+              aria-label={t("ops.trip.weight_mode")}
+              className={`flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-all h-[32px] px-3 whitespace-nowrap ${
+                mode === "weight"
+                  ? "bg-purple-600 text-white shadow-sm border border-purple-600"
+                  : "text-slate-500 hover:text-slate-800 border border-transparent"
+              }`}
+            >
+              <Scale size={14} />
+              {t("ops.trip.weight_mode")}
+            </button>
         </div>
 
         <button
           type="button"
           onClick={onClose}
-          className="h-7 w-7 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors shrink-0"
+          className="h-8 w-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors shrink-0"
+          aria-label={t("common.close")}
         >
           <X size={16} />
         </button>
-      </div>
-
-      {/* Row 1: Shop Name */}
-      <div className="grid grid-cols-1 gap-3 items-start">
-        <div>
-          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
-            <ShoppingCart size={13} className="text-slate-400" />
-            {t("operations.shop_name")} <span className="text-rose-500">*</span>
-          </label>
-          <Select
-            key={`shop-${shopOptions.length}`}
-            value={
-              formData.shopId
-                ? { value: formData.shopId, label: formData.shopName }
-                : null
-            }
-            options={shopOptions}
-            placeholder={shopOptions.length > 0 ? t("ops.trip.select_shop_ellipsis") : t("ops.trip.no_shops_available")}
-            isSearchable
-            isDisabled={shopOptions.length === 0 || shopOptions[0]?.isDisabled}
-            onChange={handleShopSelect}
-            maxMenuHeight={150}
-            styles={customSelectStyles}
-          />
-          <span className="text-[10px] text-slate-400 mt-0.5 block">
-            {t("ops.trip.shops_available", { count: shopOptions.length })}
-          </span>
         </div>
       </div>
 
-      {/* Row 2: Box Selector */}
-      <div className="grid grid-cols-1 gap-3 items-start">
-        <div>
-          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
-            <PackageCheck size={13} className="text-slate-400" />
-            {t("ops.trip.select_available_boxes")}
-          </label>
-          {safeBoxDetails.length > 0 ? (
-            <div className="bg-slate-50/50 p-2 border border-slate-200 rounded-lg">
-              <BoxSelector
-                boxes={safeBoxDetails}
-                selectedIds={formData.selectedBoxIds}
-                onSelectionChange={handleBoxSelection}
+      {/* ─── Body ────────────────────────────────────────────────────── */}
+      <div className="p-5 space-y-5">
+        {/* Shop name + select boxes (side by side) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <FormLabel icon={ShoppingCart} tone="bg-sky-50 text-sky-600" required>
+              {t("operations.shop_name")}
+            </FormLabel>
+            <SearchDropdown
+              value={formData.shopId ? String(formData.shopId) : ""}
+              options={shopDropdownOptions}
+              placeholder={shopOptions.length > 0 ? t("ops.trip.select_shop_ellipsis") : t("ops.trip.no_shops_available")}
+              searchPlaceholder={t("ops.trip.search_shop_bird")}
+              disabled={shopOptions.length === 0 || shopOptions[0]?.isDisabled}
+              onChange={(value) => {
+                if (!value) {
+                  handleShopSelect(null);
+                  return;
+                }
+                const opt = shopOptions.find((o: any) => String(o.value) === value);
+                handleShopSelect(opt ? { value: opt.value, label: opt.label } : null);
+              }}
+            />
+          </div>
+
+          <div>
+            <FormLabel icon={PackageCheck} tone="bg-emerald-50 text-emerald-600">
+              {t("ops.trip.select_available_boxes")}
+            </FormLabel>
+            {safeBoxDetails.length > 0 ? (
+              <MultiSearchDropdown
+                selected={formData.selectedBoxIds.map(String)}
+                options={boxDropdownOptions}
+                placeholder={t("ops.trip.select_boxes_from_pickup")}
+                searchPlaceholder={t("ops.trip.search_box_number")}
                 disabled={readOnly}
-                usedBoxIds={usedBoxIds}
+                chipSummary={(count) => t("ops.trip.boxes_selected", { count })}
+                renderOptionLabel={renderBoxOptionLabel}
+                selectAllLabel={t("ops.trip.select_all_boxes")}
+                onChange={(values) => handleBoxSelection(values.map(Number))}
               />
+            ) : (
+              <div className="border border-slate-200 rounded-xl p-2 bg-slate-50 text-center flex items-center justify-center gap-1.5 h-[42px]">
+                <AlertCircle size={14} className="text-slate-400" />
+                <p className="text-xs text-slate-500">{t("ops.trip.no_boxes_from_pickup")}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Box numbers list (full width, neat at any count) */}
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="h-6 w-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <Tag size={13} />
+            </span>
+            <span className="text-xs font-semibold text-slate-600">{t("ops.trip.box_nos_list")}</span>
+            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-indigo-50 px-1.5 text-xs font-bold text-indigo-700 tabular-nums">
+              {selectedBoxIds.length}
+            </span>
+            {selectedBoxIds.length > 0 && !readOnly && (
+              <button
+                type="button"
+                onClick={() => handleBoxSelection([])}
+                className="ml-auto inline-flex h-6 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+                title={t("ops.trip.clear_selected_boxes")}
+              >
+                <X size={11} />
+                {t("common.clear")}
+              </button>
+            )}
+          </div>
+          {selectedBoxIds.length > 0 ? (
+            <div
+              className={`grid gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3 ${
+                selectedBoxIds.length > 30
+                  ? "grid-cols-[repeat(auto-fill,minmax(40px,1fr))]"
+                  : "grid-cols-[repeat(auto-fill,minmax(64px,1fr))]"
+              }`}
+            >
+              {selectedBoxIds.map((id, idx) => (
+                <span
+                  key={id}
+                  className={`flex items-center justify-center gap-1 rounded-lg border px-1 font-bold shadow-xs ${
+                    selectedBoxIds.length > 30 ? "h-7 text-[11px]" : "h-10 text-sm"
+                  } ${BOX_TILE_PALETTE[idx % BOX_TILE_PALETTE.length]}`}
+                >
+                  <span className="tabular-nums">{String(id).padStart(2, "0")}</span>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => handleBoxSelection(selectedBoxIds.filter((x) => x !== id))}
+                      className="rounded p-0.5 opacity-60 transition-colors hover:opacity-100 hover:bg-black/5"
+                      aria-label={`${t("common.remove")} ${String(id).padStart(2, "0")}`}
+                      title={`${t("common.remove")} ${String(id).padStart(2, "0")}`}
+                    >
+                      <X size={10} strokeWidth={2.75} />
+                    </button>
+                  )}
+                </span>
+              ))}
             </div>
           ) : (
-            <div className="border border-slate-200 rounded-lg p-2 bg-slate-50 text-center flex items-center justify-center gap-1.5 h-[38px]">
-              <AlertCircle size={14} className="text-slate-400" />
-              <p className="text-xs text-slate-500">{t("ops.trip.no_boxes_from_pickup")}</p>
+            <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-3 text-xs text-slate-400 italic">
+              {t("ops.trip.none_selected")}
             </div>
           )}
         </div>
-      </div>
 
-      {/* Conditional Delivery Mode Breakdown Section */}
-      {mode === "box" ? (
-        <div className="bg-slate-50/60 border border-slate-200/80 p-3.5 rounded-xl space-y-3">
-          {/* Top Metric Inputs Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            {/* 1. Selected Boxes Count Box */}
-            <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                {t("ops.trip.selected_boxes")}
-              </label>
-              <div className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-800 flex items-center h-[38px]">
-                {boxCount}
-              </div>
-            </div>
-
-            {/* 2. Farm Birds */}
-            <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                {t("ops.trip.farm_birds")}
-              </label>
-              <div className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 flex items-center h-[38px]">
-                {farmBirds}
-              </div>
-            </div>
-
-            {/* 3. Mortality Birds */}
-            <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                {t("ops.trip.mortality_birds")}
-              </label>
-              <input
-                type="number"
-                value={formData.mortality || ""}
-                onChange={(e) => handleFormChange("mortality", Number(e.target.value))}
-                placeholder="0"
-                min="0"
-                className={`w-full rounded-lg border px-3 text-xs font-medium outline-none transition-all h-[38px] ${
-                  validationErrors.birdsExceed
-                    ? "border-rose-500 bg-rose-50 text-rose-900 focus:ring-1 focus:ring-rose-300"
-                    : "border-slate-200 bg-white text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-                }`}
+        {/* Mode-specific breakdown */}
+        {mode === "box" ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Farm — birds above weight */}
+            <div className="space-y-3">
+              <SimpleMetric
+                icon={Bird}
+                tone="bg-sky-50 text-sky-600"
+                tint="bg-sky-50/50 border-sky-100"
+                label={t("ops.trip.farm_birds")}
+                value={farmBirds}
               />
-              {validationErrors.birdsExceed && (
-                <p className="text-[10px] text-rose-600 mt-0.5 flex items-center gap-1">
-                  <AlertCircle size={10} /> Max: {farmBirds}
-                </p>
-              )}
+              <SimpleMetric
+                icon={Scale}
+                tone="bg-blue-50 text-blue-600"
+                tint="bg-blue-50/50 border-blue-100"
+                label={t("ops.trip.farm_weight_kg")}
+                value={farmWeight.toFixed(2)}
+              />
             </div>
 
-            {/* 4. Delivered Birds */}
-            <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                {t("ops.trip.delivered_birds")}
-              </label>
-              <div className="w-full rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 text-xs font-bold text-emerald-700 flex items-center h-[38px]">
-                {deliveredBirds}
-              </div>
+            {/* Delivered — birds above weight */}
+            <div className="space-y-3">
+              <SimpleMetric
+                icon={Truck}
+                tone="bg-emerald-50 text-emerald-600"
+                tint="bg-emerald-50/50 border-emerald-100"
+                label={t("ops.trip.delivered_birds")}
+                value={deliveredBirds}
+              />
+              <SimpleMetric
+                icon={Scale}
+                tone="bg-teal-50 text-teal-600"
+                tint="bg-teal-50/50 border-teal-100"
+                label={t("ops.trip.delivered_weight_kg")}
+                value={deliveredWeight > 0 ? deliveredWeight.toFixed(2) : "0.00"}
+              />
             </div>
-          </div>
 
-          {/* Bottom Weights & Selected Box Nos Tags Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-start">
-            {/* Box Numbers Tag List (Placed directly in lower-left space) */}
-            <div className="flex flex-col justify-start">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                {t("ops.trip.box_nos_list")}
-              </label>
-              <div className="p-2 bg-white border border-slate-200 rounded-lg min-h-[38px] max-h-[85px] overflow-y-auto flex flex-wrap gap-1">
-                {selectedBoxIds.length > 0 ? (
-                  selectedBoxIds.map((id) => (
-                    <span
-                      key={id}
-                      className="px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded text-[10px] font-semibold flex items-center gap-0.5 shrink-0"
-                    >
-                      <Tag size={9} className="text-blue-500" />
-                      #{id}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-xs text-slate-400 italic">{t("ops.trip.none_selected")}</span>
+            {/* Mortality — birds above weight */}
+            <div className="space-y-3">
+              <MetricTile
+                icon={AlertCircle}
+                tone="bg-rose-50 text-rose-600"
+                tint="bg-rose-50/50 border-rose-100"
+                label={t("ops.trip.mortality_birds")}
+              >
+                <input
+                  type="number"
+                  value={formData.mortality || ""}
+                  onChange={(e) => handleFormChange("mortality", Number(e.target.value))}
+                  placeholder="0"
+                  min="0"
+                  className={neutralInputClass(validationErrors.birdsExceed)}
+                />
+                {validationErrors.birdsExceed && (
+                  <p className="text-[10px] text-rose-600 mt-1 flex items-center gap-1 font-medium">
+                    <AlertCircle size={10} /> {t("ops.trip.max")}: {farmBirds}
+                  </p>
                 )}
-              </div>
-            </div>
-
-            {/* Farm Weight */}
-            <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                {t("ops.trip.farm_weight_kg")}
-              </label>
-              <div className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 flex items-center h-[38px]">
-                {farmWeight.toFixed(2)}
-              </div>
-            </div>
-
-            {/* Mortality Weight */}
-            <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                {t("ops.trip.mortality_weight_kg")}
-              </label>
-              <div className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 flex items-center h-[38px]">
-                {mortKg > 0 ? mortKg.toFixed(2) : "0.00"}
-              </div>
-            </div>
-
-            {/* Delivered Weight */}
-            <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                {t("ops.trip.delivered_weight_kg")}
-              </label>
-              <div className="w-full rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 text-xs font-bold text-emerald-700 flex items-center h-[38px]">
-                {deliveredWeight > 0 ? deliveredWeight.toFixed(2) : "0.00"}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* Weight Mode Breakdown Table */
-        <div className="space-y-3">
-          <div className="overflow-x-auto border border-slate-200 rounded-lg bg-white">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase">
-                <tr>
-                  <th className="px-3 py-2">{t("ops.trip.box_no")}</th>
-                  <th className="px-3 py-2">{t("ops.trip.farm_birds")}</th>
-                  <th className="px-3 py-2">
-                    {t("ops.trip.delivered_birds")} <span className="text-rose-500">*</span>
-                  </th>
-                  <th className="px-3 py-2">{t("ops.trip.farm_weight_kg")}</th>
-                  <th className="px-3 py-2">
-                    {t("ops.trip.delivered_weight_kg")} <span className="text-rose-500">*</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
-                {formData.perBoxData.map((item: any, index: number) => {
-                  const farmBox = safeBoxDetails.find((b) => b.boxNo === item.boxNo);
-                  const birdsError = validationErrors.perBoxBirdsErrors[index] || false;
-                  const weightError = validationErrors.perBoxWeightErrors[index] || false;
-                  return (
-                    <tr key={item.boxNo}>
-                      <td className="px-3 py-1.5 font-bold text-slate-800">#{item.boxNo}</td>
-                      <td className="px-3 py-1.5">{farmBox?.birds || 0}</td>
-                      <td className="px-3 py-1.5">
-                        <input
-                          type="number"
-                          value={item.birds || ""}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            const parsed = raw === "" ? 0 : Number(raw);
-                            handlePerBoxChange(index, "birds", Number.isFinite(parsed) ? parsed : 0);
-                          }}
-                          placeholder="0"
-                          min="0"
-                          className={`w-20 rounded border px-2 py-1 text-xs outline-none ${
-                            birdsError
-                              ? "border-rose-500 bg-rose-50"
-                              : "border-slate-200 focus:border-blue-500"
-                          }`}
-                        />
-                      </td>
-                      <td className="px-3 py-1.5">{farmBox?.weight?.toFixed(2) || "0.00"}</td>
-                      <td className="px-3 py-1.5">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={item.weight || ""}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            const parsed = raw === "" ? 0 : Number(raw);
-                            handlePerBoxChange(index, "weight", Number.isFinite(parsed) ? parsed : 0);
-                          }}
-                          placeholder="0.00"
-                          min="0"
-                          className={`w-24 rounded border px-2 py-1 text-xs outline-none ${
-                            weightError
-                              ? "border-rose-500 bg-rose-50"
-                              : "border-slate-200 focus:border-blue-500"
-                          }`}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 bg-slate-50/60 p-2.5 rounded-lg border border-slate-200">
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                {t("ops.trip.mortality_birds")}
-              </label>
-              <input
-                type="number"
-                value={formData.mortality || ""}
-                onChange={(e) => handleFormChange("mortality", Number(e.target.value))}
-                placeholder="0"
-                min="0"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs outline-none focus:border-blue-500 h-[38px]"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                {t("ops.trip.mortality_weight_kg")}
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.mortWeight || ""}
-                onChange={(e) => handleFormChange("mortWeight", Number(e.target.value))}
-                placeholder="0.00"
-                min="0"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs outline-none focus:border-blue-500 h-[38px]"
+              </MetricTile>
+              <SimpleMetric
+                icon={Scale}
+                tone="bg-amber-50 text-amber-600"
+                tint="bg-amber-50/50 border-amber-100"
+                label={t("ops.trip.mortality_weight_kg")}
+                value={mortKg > 0 ? mortKg.toFixed(2) : "0.00"}
               />
             </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Farm — cumulative birds above weight */}
+            <div className="space-y-3">
+              <SimpleMetric
+                icon={Bird}
+                tone="bg-sky-50 text-sky-600"
+                tint="bg-sky-50/50 border-sky-100"
+                label={t("ops.trip.farm_birds")}
+                value={farmBirds}
+              />
+              <SimpleMetric
+                icon={Scale}
+                tone="bg-blue-50 text-blue-600"
+                tint="bg-blue-50/50 border-blue-100"
+                label={t("ops.trip.farm_weight_kg")}
+                value={farmWeight.toFixed(2)}
+              />
+            </div>
 
-      {/* Remarks */}
-      <div>
-        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
-          <MessageSquare size={13} className="text-slate-400" />
-          {t("common.remarks")}
-        </label>
-        <input
-          value={formData.remarks || ""}
-          onChange={(e) => handleFormChange("remarks", e.target.value)}
-          placeholder={t("ops.trip.optional_delivery_notes")}
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-800 outline-none focus:border-blue-500 h-[38px]"
-        />
+              {/* Delivered — birds above weight (editable) */}
+              <div className="space-y-3">
+                <MetricTile
+                  icon={Truck}
+                  tone="bg-emerald-50 text-emerald-600"
+                  tint="bg-emerald-50/50 border-emerald-100"
+                  label={t("ops.trip.delivered_birds")}
+                >
+                  <input
+                    type="number"
+                    value={formData.birds || ""}
+                    onChange={(e) => handleFormChange("birds", Number(e.target.value))}
+                    placeholder="0"
+                    min="0"
+                    className={neutralInputClass(validationErrors.birdsExceedFarm)}
+                  />
+                  {validationErrors.birdsExceedFarm && (
+                    <p className="text-[10px] text-rose-600 mt-1 flex items-center gap-1 font-medium">
+                      <AlertCircle size={10} /> {t("ops.trip.max")}: {farmBirds}
+                    </p>
+                  )}
+                  {validationErrors.birdsMismatch && !validationErrors.birdsExceedFarm && (
+                    <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1 font-medium">
+                      <AlertCircle size={10} />{" "}
+                      {t("ops.trip.validate.birds_mismatch", {
+                        pickup: farmBirds,
+                        delivered: Number(formData.birds) || 0,
+                        mortality: Number(formData.mortality) || 0,
+                        total: (Number(formData.birds) || 0) + (Number(formData.mortality) || 0),
+                      })}
+                    </p>
+                  )}
+                </MetricTile>
+                <MetricTile
+                  icon={Scale}
+                  tone="bg-teal-50 text-teal-600"
+                  tint="bg-teal-50/50 border-teal-100"
+                  label={t("ops.trip.delivered_weight_kg")}
+                >
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.weight || ""}
+                    onChange={(e) => handleFormChange("weight", Number(e.target.value))}
+                    placeholder="0.00"
+                    min="0"
+                    className={neutralInputClass(validationErrors.weightExceedFarm)}
+                  />
+                  {validationErrors.weightExceedFarm && (
+                    <p className="text-[10px] text-rose-600 mt-1 flex items-center gap-1 font-medium">
+                      <AlertCircle size={10} /> {t("ops.trip.max")}: {farmWeight.toFixed(2)} kg
+                    </p>
+                  )}
+                </MetricTile>
+              </div>
+
+              {/* Mortality — birds above weight (inputs) */}
+              <div className="space-y-3">
+                <MetricTile
+                  icon={AlertCircle}
+                  tone="bg-rose-50 text-rose-600"
+                  tint="bg-rose-50/50 border-rose-100"
+                  label={t("ops.trip.mortality_birds")}
+                >
+                  <input
+                    type="number"
+                    value={formData.mortality || ""}
+                    onChange={(e) => handleFormChange("mortality", Number(e.target.value))}
+                    placeholder="0"
+                    min="0"
+                    className={neutralInputClass()}
+                  />
+                </MetricTile>
+                <MetricTile
+                  icon={Scale}
+                  tone="bg-amber-50 text-amber-600"
+                  tint="bg-amber-50/50 border-amber-100"
+                  label={t("ops.trip.mortality_weight_kg")}
+                >
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.mortWeight || ""}
+                    onChange={(e) => handleFormChange("mortWeight", Number(e.target.value))}
+                    placeholder="0.00"
+                    min="0"
+                    className={neutralInputClass()}
+                  />
+                </MetricTile>
+              </div>
+            </div>
+        )}
+
+        {/* Remarks */}
+        <div>
+          <FormLabel icon={MessageSquare} tone="bg-violet-50 text-violet-600">
+            {t("common.remarks")}
+          </FormLabel>
+          <input
+            value={formData.remarks || ""}
+            onChange={(e) => handleFormChange("remarks", e.target.value)}
+            placeholder={t("ops.trip.optional_delivery_notes")}
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200 h-[40px] transition-all placeholder:text-slate-400"
+          />
+        </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-colors"
-        >
-          {t("common.cancel")}
-        </button>
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={!isFormValid}
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${
-            isFormValid
-              ? "bg-blue-600 hover:bg-blue-700 text-white"
-              : "bg-slate-200 text-slate-400 cursor-not-allowed"
-          }`}
-        >
-          {editingId !== null ? t("ops.trip.update_delivery") : t("ops.trip.save_delivery")}
-        </button>
+      {/* ─── Footer actions ──────────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-slate-100 bg-slate-50/60">
+        <span className="text-[11px] text-slate-400 hidden sm:block">
+          {isFormValid
+            ? t("ops.trip.ready_to_save")
+            : t("ops.trip.complete_required_fields")}
+        </span>
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-800 text-xs font-semibold transition-all active:scale-95"
+          >
+            {t("common.cancel")}
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={!isFormValid}
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+              isFormValid
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                : "bg-slate-200 text-slate-400 cursor-not-allowed"
+            }`}
+          >
+            <CheckCircle2 size={15} />
+            {isEditing ? t("ops.trip.update_delivery") : t("ops.trip.save_delivery")}
+          </button>
+        </div>
       </div>
     </div>
   );

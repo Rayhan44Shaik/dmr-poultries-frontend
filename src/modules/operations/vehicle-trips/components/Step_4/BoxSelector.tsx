@@ -147,7 +147,7 @@ export default function BoxSelector({
                   />
                   <span className="text-xs font-medium text-slate-700 flex-1 flex items-center gap-2 flex-wrap">
                     <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold">
-                      #{box.boxNo}
+                      {box.boxNo}
                     </span>
                     <span className="text-slate-600">{box.birds} {t("common.birds")}</span>
                     <span className="text-slate-300">·</span>

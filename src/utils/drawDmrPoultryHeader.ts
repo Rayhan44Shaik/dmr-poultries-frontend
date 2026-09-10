@@ -51,9 +51,9 @@ export const DMR_POULTRY_DETAILS = {
     "Madhira Rd, Peddapuram, Andhra Pradesh 521181",
 } as const;
 
-const NAVY: RGB = [15, 35, 79];
-const RED: RGB = [178, 20, 34];
-const MUTED: RGB = [75, 85, 99];
+const NAVY: RGB = [52, 68, 115];
+const RED: RGB = [222, 96, 110];
+const MUTED: RGB = [110, 118, 132];
 
 /**
  * Creates a compressed ISO A4 PDF using millimetres.
@@ -982,9 +982,9 @@ function drawHenFallback(
   );
 
   doc.setFillColor(
-    242,
-    243,
-    246,
+    251,
+    226,
+    229,
   );
 
   doc.ellipse(

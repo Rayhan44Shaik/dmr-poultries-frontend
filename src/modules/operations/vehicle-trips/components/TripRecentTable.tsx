@@ -1,7 +1,7 @@
 // src/modules/operations/vehicle-trips/components/TripRecentTable.tsx
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Eye, Pencil, RefreshCw, History, Trash2, Clock, Layers, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
+import { Eye, Pencil, RefreshCw, History, Trash2, Clock, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
 import { formatTripRecentDateWithDay } from "../utils/formatTripListDay";
@@ -9,7 +9,7 @@ import TripPagination from "./TripPagination";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
-import { getNextIncompleteTripStep, isTripWizardComplete, TRIP_STEP_LABELS, isValidTripStatusTransition, getValidNextStatuses, type TripStatus } from "../../../../shared/trip";
+import { getNextIncompleteTripStep, isTripWizardComplete, isValidTripStatusTransition, getValidNextStatuses, type TripStatus } from "../../../../shared/trip";
 import { useI18n } from "../../../../i18n";
 import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
 import { uniqueTripsById } from "../services/tripHeaderApiService";
@@ -36,6 +36,8 @@ function TripRecentTable({
 }: Props) {
   const { t } = useI18n();
   const safeTrips = uniqueTripsById(Array.isArray(trips) ? trips : []);
+  /** Total record count shown as its own badge, outside the status toggle. */
+  const totalRecords = safeTrips.length;
 
   /** Translate, but never surface a raw i18n key: returns "" when the key is missing. */
   const tSafe = (key: string, params?: Record<string, string | number>) => {
@@ -45,7 +47,7 @@ function TripRecentTable({
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTripId, setSelectedTripId] = useState<number | null>(null);
-  const [statusFilter, setStatusFilter] = useState<"All" | "Draft" | "Pending" | "Deleted">("Draft");
+  const [statusFilter, setStatusFilter] = useState<"Draft" | "Pending" | "Deleted">("Draft");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
@@ -111,17 +113,10 @@ function TripRecentTable({
 
   const allDraft = sortedTrips.filter((t) => !t.deleted && t.status === "Draft");
   const allPending = sortedTrips.filter((t) => !t.deleted && t.status === "Pending");
-  const allApproved = sortedTrips.filter((t) => !t.deleted && t.status === "Completed");
   const allDeleted = sortedTrips.filter((t) => t.deleted === true || t.status === "Deleted");
 
-  const draftCount = allDraft.length;
-  const pendingCount = allPending.length;
-  const approvedCount = allApproved.length;
-  const deletedCount = allDeleted.length;
-
   let filteredTrips: Trip[] = [];
-  if (statusFilter === "All") filteredTrips = [...allDraft, ...allPending, ...allApproved, ...allDeleted];
-  else if (statusFilter === "Draft") filteredTrips = allDraft;
+  if (statusFilter === "Draft") filteredTrips = allDraft;
   else if (statusFilter === "Pending") filteredTrips = allPending;
   else filteredTrips = allDeleted;
 
@@ -197,15 +192,12 @@ function TripRecentTable({
       return { label: t("status.completed"), color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={12} />, resume: false };
     }
     // A Draft trip always has Step 1 submitted (trips are created on Step 1
-    // submit), so it is always mid-workflow: show which step is pending next.
+    // submit), so it is always mid-workflow: show ONLY which step is pending
+    // next — no step name / farm detail.
     const nextStep = getNextIncompleteTripStep(trip);
-    const stepLabel =
-      tSafe(`ops.trip.step${nextStep + 1}_label`) ||
-      TRIP_STEP_LABELS[nextStep] ||
-      t("ops.trip.step_label", { step: nextStep + 1 });
     return {
-      label: t("ops.trip.in_progress_step", { step: nextStep + 1, name: stepLabel }),
-      color: "bg-blue-50 text-blue-700 border-blue-200",
+      label: t("ops.trip.step_label", { step: nextStep + 1 }),
+      color: "bg-emerald-50 text-emerald-700 border-emerald-200",
       icon: <FileText size={12} />,
       resume: true,
     };
@@ -236,36 +228,47 @@ function TripRecentTable({
     <>
       <div ref={tableRef} className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden mt-8 transition-all duration-300">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-inner">
-              <History className="w-5 h-5" />
-            </div>
-            <h3 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.recent_trip_activity")}</h3>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input type="text" placeholder={t("ops.trip.search_trips_short")} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-48 pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" />
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-inner">
+                <History className="w-5 h-5" />
+              </div>
+              <h3 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.recent_trip_activity")}</h3>
             </div>
 
-            <div className="bg-slate-100/80 p-1 rounded-xl flex items-center gap-1 border border-slate-200/60">
-              {(["Draft", "Pending", "Deleted", "All"] as const).map((tab) => {
+            {/* Total record count — its own badge, before the status toggle */}
+            <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-full shadow-sm">
+              {totalRecords}
+            </span>
+
+            {/* Status toggle — segmented control matching LatestMaintenanceTable */}
+            <div className="flex items-center p-0.5 ml-2 border border-slate-200/80 rounded-lg overflow-hidden bg-slate-50 shadow-sm">
+              {(["Draft", "Pending", "Deleted"] as const).map((tab) => {
                 const isActive = statusFilter === tab;
-                let count = 0, Icon = Layers;
-                if (tab === "Draft") { count = draftCount; Icon = FileText; }
-                if (tab === "Pending") { count = pendingCount; Icon = Clock; }
-                if (tab === "Deleted") { count = deletedCount; Icon = AlertCircle; }
-                if (tab === "All") { count = draftCount + pendingCount + approvedCount + deletedCount; Icon = Layers; }
+                const activeClass =
+                  tab === "Draft"
+                    ? "bg-emerald-100 text-emerald-700 shadow-sm"
+                    : tab === "Pending"
+                    ? "bg-orange-100 text-orange-700 shadow-sm"
+                    : "bg-rose-100 text-rose-700 shadow-sm";
                 return (
-                  <button key={tab} onClick={() => setStatusFilter(tab)} className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-1 ${isActive ? "bg-white text-blue-700 shadow-sm border border-slate-200/50" : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"}`}>
-                    <Icon size={11} className={isActive ? (tab === "Deleted" ? "text-rose-500" : "text-blue-500") : "text-slate-400"} />
-                    <span>{(() => { const k = "status." + tab.toLowerCase(); const label = t(k); return label === k ? tab : label; })()}</span>
-                    <span className={`ml-0.5 px-1 py-0.2 rounded-full text-[10px] ${isActive ? "bg-slate-100 text-slate-700" : "bg-slate-200/60 text-slate-500"}`}>{count}</span>
+                  <button
+                    key={tab}
+                    onClick={() => setStatusFilter(tab)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${isActive ? activeClass : "bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"}`}
+                  >
+                    {(() => { const k = "status." + tab.toLowerCase(); const label = t(k); return label === k ? tab : label; })()}
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+            <div className="relative flex-1 sm:flex-none">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input type="text" placeholder={t("ops.trip.search_trips_short")} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full sm:w-64 pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" />
             </div>
 
             <div className="h-5 w-px bg-slate-200 hidden sm:block" />

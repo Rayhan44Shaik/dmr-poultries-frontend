@@ -62,15 +62,10 @@ function str(value: unknown, fallback = ""): string {
   return value == null ? fallback : String(value);
 }
 
-/** Shared user-facing timestamp formatter for Step 1–5 View (locale/timezone as-is). */
+/** Shared user-facing timestamp formatter for Step 1–5 View — one uniform
+ *  Indian Standard Time format (\"dd-MM-yyyy HH:mm:ss IST\"). */
 export function formatStartTimeForDisplay(value: unknown): string {
-  if (!value) return "";
-  const raw = String(value);
-  const parsed = new Date(raw);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toLocaleString();
-  }
-  return raw;
+  return formatIstStamp(value);
 }
 
 /**
@@ -80,8 +75,11 @@ export function formatStartTimeForDisplay(value: unknown): string {
  */
 export function formatIstStamp(value: unknown): string {
   if (!value) return "";
-  const parsed = new Date(String(value));
-  if (Number.isNaN(parsed.getTime())) return String(value);
+  const raw = String(value).trim();
+  // Already in the canonical IST form — pass through untouched (idempotent).
+  if (/^\d{2}-\d{2}-\d{4} \d{2}:\d{2}(:\d{2})? IST$/.test(raw)) return raw;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return raw;
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Kolkata",
     hourCycle: "h23",
@@ -111,7 +109,7 @@ function mapDeliveriesForDisplay(value: unknown, fallback: Trip["deliveries"]): 
       selectedBoxIds,
       boxNo: boxNoRaw ?? selectedBoxIds.length,
       autoCaptureTime:
-        formatStartTimeForDisplay(rec.autoCaptureTime) || rec.autoCaptureTime,
+        formatIstStamp(rec.autoCaptureTime) || rec.autoCaptureTime,
     };
   });
 }
@@ -504,6 +502,9 @@ export function toStep4Payload(trip: Partial<Trip> & { deliveries?: Trip["delive
         farmBirds: numOrNull(d.farmBirds),
         farmWeight: numOrNull(d.farmWeight),
         serialNo: finiteOrOmit(d.serialNo),
+        // Per-shop capture time — sent so the backend preserves it and never
+        // re-stamps an already-captured delivery on save/edit.
+        autoCaptureTime: typeof d.autoCaptureTime === "string" ? d.autoCaptureTime : undefined,
       };
     }),
   };

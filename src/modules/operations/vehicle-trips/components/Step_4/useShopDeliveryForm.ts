@@ -186,12 +186,11 @@ export function useShopDeliveryForm(
   const boxCount = formData.selectedBoxIds.length;
 
   // ─── Weight mode totals ──────────────────────────────────────
+  // Cumulative delivered birds/weight entered directly (no per-box split).
   const weightModeTotals = useMemo<{ birds: number; weight: number }>(() => {
     if (mode !== "weight") return { birds: 0, weight: 0 };
-    const totalBirds = formData.perBoxData.reduce((sum: number, item: { boxNo: number; birds: number; weight: number }) => sum + item.birds, 0);
-    const totalWeight = formData.perBoxData.reduce((sum: number, item: { boxNo: number; birds: number; weight: number }) => sum + item.weight, 0);
-    return { birds: totalBirds, weight: totalWeight };
-  }, [formData.perBoxData, mode]);
+    return { birds: Number(formData.birds) || 0, weight: Number(formData.weight) || 0 };
+  }, [mode, formData.birds, formData.weight]);
 
   // ─── Mortality weight ──────────────────────────────────────────
   const mortKg = useMemo<number>(() => {

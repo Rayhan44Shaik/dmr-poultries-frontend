@@ -16,7 +16,7 @@ const VISIBLE_ITEMS = 5;
 const ITEM_HEIGHT = 36; // h-9
 const LIST_MAX_HEIGHT = VISIBLE_ITEMS * ITEM_HEIGHT;
 
-export type DropdownOption = { value: string; label: string };
+export type DropdownOption = { value: string; label: string; chipLabel?: string };
 
 /** Soft-coloured icon chip ("logo") shown beside every field label. */
 export const FieldLabel = React.memo(function FieldLabel({
@@ -54,13 +54,12 @@ export function dropdownTriggerClass(invalid: boolean, disabled: boolean): strin
 
 /**
  * Read-only KPI card for the submitted/locked step views (Steps 1 & 2).
- * Tone-consistent icon chip, coloured top accent bar, uppercase label and a
- * bold truncated value. Purely presentational.
+ * Tone-consistent icon chip, uppercase label and a bold truncated value.
+ * Purely presentational (no coloured top accent bar).
  */
 export const StepKpiCard = React.memo(function StepKpiCard({
   icon: Icon,
   tone,
-  bar,
   label,
   value,
   valueClass,
@@ -69,8 +68,6 @@ export const StepKpiCard = React.memo(function StepKpiCard({
   icon: React.ComponentType<{ size?: number | string; className?: string }>;
   /** Icon chip tone, e.g. "bg-sky-50 text-sky-600". */
   tone: string;
-  /** Top accent bar colour, e.g. "bg-sky-400". */
-  bar: string;
   label: string;
   value: React.ReactNode;
   valueClass?: string;
@@ -81,7 +78,6 @@ export const StepKpiCard = React.memo(function StepKpiCard({
       className="group relative overflow-hidden bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs transition-all duration-200 hover:shadow-sm hover:border-slate-300/80"
       title={title}
     >
-      <span className={`absolute inset-x-0 top-0 h-[3px] ${bar} opacity-80 transition-opacity duration-200 group-hover:opacity-100`} />
       <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
         <span className={`h-5 w-5 rounded-md flex items-center justify-center shrink-0 ${tone}`}>
           <Icon size={12} />
@@ -229,7 +225,7 @@ export const SearchDropdown = React.memo(function SearchDropdown({
           </button>
 
           <ul
-            className="overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
+            className="overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-200"
             style={{ maxHeight: `${LIST_MAX_HEIGHT}px` }}
           >
             {filtered(options).map((option) => {
@@ -269,6 +265,9 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
   disabled,
   invalid,
   onChange,
+  chipSummary,
+  renderOptionLabel,
+  selectAllLabel,
 }: {
   selected: string[];
   options: DropdownOption[];
@@ -277,6 +276,15 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
   disabled: boolean;
   invalid?: boolean;
   onChange: (selected: string[]) => void;
+  /** When provided, the trigger shows this compact summary instead of one
+   *  chip per selected value — use when the selected values are already
+   *  rendered elsewhere (e.g. a dedicated box-numbers grid) so they don't
+   *  appear twice. */
+  chipSummary?: (count: number) => string;
+  /** Optional rich label for each list row (e.g. a coloured box-number chip). */
+  renderOptionLabel?: (option: DropdownOption) => React.ReactNode;
+  /** When provided, a pinned "select all" row appears above the options. */
+  selectAllLabel?: string;
 }) {
   const { open, setOpen, query, setQuery, ref, searchRef, filtered } = useDropdownPanel();
 
@@ -315,10 +323,15 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
       >
         {selectedValues.length === 0 ? (
           <span className="px-1.5 text-slate-400 font-normal">{placeholder}</span>
+        ) : chipSummary ? (
+          <span className="inline-flex items-center gap-1.5 px-1.5 text-xs font-semibold text-slate-800">
+            <Check size={13} className="text-emerald-600 shrink-0" />
+            {chipSummary(selectedValues.length)}
+          </span>
         ) : (
           selectedValues.map((value) => {
-            const label =
-              options.find((option) => option.value === value)?.label || value;
+            const option = options.find((opt) => opt.value === value);
+            const label = option?.chipLabel ?? option?.label ?? value;
             return (
               <span
                 key={value}
@@ -359,6 +372,26 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
             searchPlaceholder={searchPlaceholder}
           />
 
+          {/* Pinned "select all" row */}
+          {selectAllLabel && (
+            <button
+              type="button"
+              onClick={() => onChange(options.map((opt) => opt.value))}
+              className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-semibold text-left border-b border-slate-100 hover:bg-slate-50 transition ${
+                selectedValues.length === options.length && options.length > 0
+                  ? "text-blue-700 bg-blue-50/70"
+                  : "text-slate-700"
+              }`}
+            >
+              <span className="w-3.5 shrink-0">
+                {selectedValues.length === options.length && options.length > 0 && (
+                  <Check size={13} className="text-blue-600" />
+                )}
+              </span>
+              <span className="truncate">{selectAllLabel}</span>
+            </button>
+          )}
+
           {/* Pinned "clear all" row */}
           <button
             type="button"
@@ -374,7 +407,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
           </button>
 
           <ul
-            className="overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
+            className="overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-200"
             style={{ maxHeight: `${LIST_MAX_HEIGHT}px` }}
           >
             {filtered(options).map((option) => {
@@ -391,7 +424,11 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
                     <span className="w-3.5 shrink-0">
                       {isSelected && <Check size={13} className="text-emerald-600" />}
                     </span>
-                    <span className="truncate">{option.label}</span>
+                    {renderOptionLabel ? (
+                      renderOptionLabel(option)
+                    ) : (
+                      <span className="truncate">{option.label}</span>
+                    )}
                   </button>
                 </li>
               );

@@ -6,20 +6,22 @@ import { useRef } from "react";
 import React, { useState, useEffect, useMemo } from "react";
 import { 
   Plus, Clock, Building2, Users, Scale, AlertCircle, Search, X, 
-  LayoutGrid, BarChart2,
-  AlertTriangle, Package
+  AlertTriangle, FileText, Box
 } from "lucide-react";
-import jsPDF from "jspdf";
 import TripPagination from "../TripPagination";
 import { shouldShowPagination } from "../../../../../shared/ui/paginationStyles";
 import { useShopDeliveryForm, EMPTY_DELIVERY_FORM } from "./useShopDeliveryForm";
 import ShopDeliveryForm from "./ShopDeliveryForm";
 import ShopDeliveryCard from "./ShopDeliveryCard";
 import { generateShopPDF } from "../../utils/generateShopPDF";
-import { assignedShopIdsFromRows, pendingBoxesFromRows, pendingShopsFromRows } from "./remainingBoxes";
+import { generatePickupReportPDF } from "../../utils/generatePickupPDF";
+import { generateAssignmentSheetPdf } from "../../../orders/pdf/generateAssignmentSheetPdf";
+import type { AssignmentSheetRow } from "../../../orders/ordersUtils";
+import { pendingBoxesFromRows, shopIdsFromRows } from "./remainingBoxes";
 import { computeDeliveryKpiTotals } from "./deliveryKpis";
+import { formatIstStamp } from "../../services/tripHeaderApiService";
 import type { DeliveriesBalanceError } from "../../../../../shared/trip/validation";
-import type { ShopDelivery, BoxDetail } from "../../types/trip";
+import type { ShopDelivery, BoxDetail, Trip } from "../../types/trip";
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 import { useI18n } from "../../../../../i18n";
 
@@ -29,6 +31,7 @@ interface Props {
   shops: any[];
   birdTypes: any[];
   boxDetails?: BoxDetail[];
+  trip?: Trip;
   readOnly?: boolean;
   isSubmitted?: boolean;
   editingShopId?: string | number | null;
@@ -40,8 +43,6 @@ interface Props {
   supervisorName?: string;
   supervisorPhone?: string;
   tripDate?: string;
-  viewMode?: "shop" | "box";
-  onViewModeChange?: (mode: "shop" | "box") => void;
   stepNumber?: number | string;
   updateDeliveries?: (rows: ShopDelivery[], persist?: boolean, silent?: boolean) => void;
   saveDeliveries?: () => Promise<boolean>;
@@ -121,13 +122,129 @@ function ConfirmationModal({
 }
 
 // ─── Balance Mismatch Panel ─────────────────────────────────────
-function DeliveryBalanceErrorPanel({ error }: { error: NonNullable<DeliveriesBalanceError> }) {
+
+/** A delivery row is "captured / delivered" once it stops being a pending
+ *  `[ORDER]` assignment row and carries actual delivery data (selected boxes,
+ *  birds, weight), or the backend already recorded its capture time. */
+function isDeliveredRow(row: ShopDelivery): boolean {
+  const extra = row as ShopDelivery & { autoCaptureTime?: string };
+  if (extra.autoCaptureTime) return true;
+  const remarks = String(row.remarks ?? "").trim();
+  if (remarks.startsWith("[ORDER]")) return false;
+  const boxes = Array.isArray(row.selectedBoxIds) ? row.selectedBoxIds.length : 0;
+  return boxes > 0 || Number(row.birds) > 0 || Number(row.weight) > 0;
+}
+
+/** Delivered-shop identity keyed by BOTH shop id and shop name, so a row whose
+ *  id does not resolve still matches by name (and vice versa). */
+function buildDeliveredShopKeys(rows: ShopDelivery[]): {
+  ids: Set<number>;
+  names: Set<string>;
+} {
+  const ids = new Set<number>();
+  const names = new Set<string>();
+  rows.forEach((row) => {
+    if (!isDeliveredRow(row)) return;
+    const id = Number(row.shopId);
+    if (id > 0) ids.add(id);
+    const name = String(row.shopName ?? "").trim().toLowerCase();
+    if (name) names.add(name);
+  });
+  return { ids, names };
+}
+
+/** Pending (not-yet-delivered) shops in DELIVERY order — the same order the
+ *  dropdown shows (priority route first, then alphabetical) — mapped to
+ *  AssignmentSheetRow so the Step 4 "Shops" PDF is EXACTLY the Order
+ *  Assignment sheet. Assigned boxes/birds come from the shop's `[ORDER]`
+ *  plan row when present. */
+function buildPendingAssignmentRows(
+  shops: any[],
+  rows: ShopDelivery[]
+): AssignmentSheetRow[] {
+  const { ids, names } = buildDeliveredShopKeys(rows);
+  const { ids: assignedIds, order: assignedOrder } = shopIdsFromRows(rows);
+
+  // Only order-assignment shops belong on the sheet. When a trip has no
+  // assignment rows yet (plain manual trip), fall back to the full list.
+  const source =
+    assignedIds.size > 0
+      ? (shops || []).filter((shop: any) =>
+          assignedIds.has(Number(shop.id ?? shop.shopId ?? 0))
+        )
+      : (shops || []);
+
+  const isDelivered = (shop: any) => {
+    const id = Number(shop.id ?? shop.shopId ?? 0);
+    const name = String(shop.shopName ?? shop.name ?? "").trim().toLowerCase();
+    return (id > 0 && ids.has(id)) || (Boolean(name) && names.has(name));
+  };
+
+  const pending = source.filter((shop: any) => !isDelivered(shop));
+
+  const isPriority = (shop: any) => assignedOrder.has(Number(shop.id ?? shop.shopId ?? 0));
+  pending.sort((a: any, b: any) => {
+    const ap = isPriority(a);
+    const bp = isPriority(b);
+    if (ap && bp) {
+      return (
+        (assignedOrder.get(Number(a.id ?? a.shopId ?? 0)) ?? 0) -
+        (assignedOrder.get(Number(b.id ?? b.shopId ?? 0)) ?? 0)
+      );
+    }
+    if (ap) return -1;
+    if (bp) return 1;
+    return String(a.shopName ?? a.name ?? "").localeCompare(String(b.shopName ?? b.name ?? ""));
+  });
+
+  return pending.map((shop: any, index: number) => {
+    const shopId = Number(shop.id ?? shop.shopId ?? 0);
+    const shopName = shop.shopName ?? shop.name ?? `Shop ${shopId}`;
+    const plan = rows.find(
+      (r) =>
+        Number(r.shopId) === shopId &&
+        String(r.remarks ?? "").trim().startsWith("[ORDER]")
+    );
+    return {
+      serialNo: index + 1,
+      shopId,
+      shopName,
+      village: shop.village ?? shop.city ?? "",
+      mobile: shop.mobile ?? shop.phoneNumber ?? "",
+      boxes: plan
+        ? Number(plan.boxNo) || (plan.selectedBoxIds?.length ?? 0)
+        : 0,
+      birds: plan ? Number(plan.birds) || 0 : 0,
+    };
+  });
+}
+
+function DeliveryBalanceErrorPanel({
+  error,
+  onClose,
+}: {
+  error: NonNullable<DeliveriesBalanceError>;
+  onClose?: () => void;
+}) {
   const { t } = useI18n();
   return (
     <div className="rounded-xl border border-red-300 bg-red-50 p-4 space-y-2">
-      <p className="text-sm font-bold text-red-800 flex items-center gap-1.5">
-        <AlertCircle size={15} className="text-red-600" /> {t("ops.trip.balance_mismatch_fix")}
-      </p>
+      <div className="flex items-start gap-2">
+        <p className="text-sm font-bold text-red-800 flex items-center gap-1.5 flex-1">
+          <AlertCircle size={15} className="text-red-600" /> {t("ops.trip.balance_mismatch_fix")}
+        </p>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="-m-1 rounded-md p-1 text-red-400 transition-colors hover:bg-red-100 hover:text-red-700"
+            aria-label={t("common.close")}
+            title={t("common.close")}
+          >
+            <X size={15} />
+          </button>
+        )}
+      </div>
       {error.birds && (
         <div className="text-xs text-red-800 space-y-0.5">
           <p className="font-semibold">{t("common.birds")}</p>
@@ -167,6 +284,7 @@ export default function UnLoadingTable({
   shops,
   birdTypes,
   boxDetails = [],
+  trip,
   readOnly = false,
   isSubmitted = false,
   editingShopId = null,
@@ -178,8 +296,6 @@ export default function UnLoadingTable({
   supervisorName = "",
   supervisorPhone = "",
   tripDate = "",
-  viewMode = "shop",
-  onViewModeChange,
   stepNumber: _stepNumber = 4,
   updateDeliveries,
   saveDeliveries,
@@ -195,6 +311,7 @@ export default function UnLoadingTable({
   const safeRows = rows ?? [];
   const safeShops = shops ?? [];
   const safeBirdTypes = birdTypes ?? [];
+  const safeTrip = trip ?? null;
 
   // Cache the last known good boxDetails to prevent stale/empty boxDetails from API responses
   const boxDetailsRef = useRef<BoxDetail[]>([]);
@@ -204,7 +321,7 @@ export default function UnLoadingTable({
   const safeBoxDetails = boxDetailsRef.current.length > 0 ? boxDetailsRef.current : (boxDetails ?? []);
 
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const itemsPerPage =6;
+  const itemsPerPage = 9;
   const [showForm, setShowForm] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [autoCaptureTime, setAutoCaptureTime] = useState<string>("");
@@ -273,12 +390,32 @@ export default function UnLoadingTable({
   }, [editingShopId, safeRows]);
 
   // ─── Filter Pending Boxes ───────────────────────────────────────
-  const pendingBoxes = useMemo(
-    () => pendingBoxesFromRows(safeBoxDetails, safeRows),
-    [safeRows, safeBoxDetails]
+  // Live route counts for the header buttons: Shops = still-to-deliver shops,
+  // Boxes = still-available pickup boxes. Both shrink as deliveries are made.
+  const pendingShopsCount = useMemo(() => {
+    if (!safeShops || safeShops.length === 0) return 0;
+    const { ids, names } = buildDeliveredShopKeys(safeRows);
+    const { ids: assignedIds } = shopIdsFromRows(safeRows);
+    // Only order-assignment shops are counted. When there are no assignment
+    // rows yet, fall back to the full master list.
+    const source =
+      assignedIds.size > 0
+        ? safeShops.filter((shop: any) =>
+            assignedIds.has(Number(shop.id ?? shop.shopId ?? 0))
+          )
+        : safeShops;
+    return source.filter((shop: any) => {
+      const id = Number(shop.id ?? shop.shopId ?? 0);
+      const name = String(shop.shopName ?? shop.name ?? "").trim().toLowerCase();
+      const delivered = (id > 0 && ids.has(id)) || (Boolean(name) && names.has(name));
+      return !delivered;
+    }).length;
+  }, [safeShops, safeRows]);
+
+  const remainingBoxesCount = useMemo(
+    () => pendingBoxesFromRows(safeBoxDetails, safeRows).length,
+    [safeBoxDetails, safeRows]
   );
-  const pendingShops = useMemo(() => pendingShopsFromRows(safeRows), [safeRows]);
-  const assignedShopIds = useMemo(() => assignedShopIdsFromRows(safeRows), [safeRows]);
 
   // ─── Balance Error Panel visibility (shown after a blocked submit) ──
   const [showBalanceError, setShowBalanceError] = useState<boolean>(balanceErrorShown);
@@ -287,138 +424,77 @@ export default function UnLoadingTable({
     if (balanceError == null) setShowBalanceError(false);
   }, [balanceError, safeRows, safeBoxDetails]);
 
-  // ─── PDF Export for Pending Boxes ─────────────────────────────
-  const handleDownloadPendingBoxesPDF = () => {
-    if (pendingBoxes.length === 0) {
-      setToast({ message: t("ops.trip.no_pending_boxes_pdf"), type: "warning" });
-      return;
-    }
+  // ─── Step 4 PDF exports (separate Shop + Box reports) ───────────
+  //   • Shops PDF  = the ORDER ASSIGNMENT sheet (identical format), listing
+  //     the pending shops in delivery order.
+  //   • Boxes PDF  = the PICKUP report (identical format) for the boxes still
+  //     on the truck — delivered boxes are removed, nothing else changes.
 
-    const doc = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
-    const totalWeight = pendingBoxes.reduce((sum, box: any) => sum + Number(box.weight ?? box.netWeight ?? 0), 0);
-    const totalBirds = pendingBoxes.reduce((sum, box: any) => sum + Number(box.birds ?? box.birdsCount ?? 0), 0);
-
-    const startX = 10;
-    const totalWidth = 190;
-    const blockGap = 4;
-    const blockWidth = (totalWidth - blockGap * 2) / 3;
-
-    const colBoxW = 16;
-    const colBirdsW = 18;
-
-    const headerTopY = 29;
-    const headerHeight = 7;
-    const headerBottomY = headerTopY + headerHeight;
-    const rowHeight = 6.8;
-    const maxRowsPerPage = 33;
-    const maxItemsPerPage = maxRowsPerPage * 3;
-
-    const totalPages = Math.ceil(pendingBoxes.length / maxItemsPerPage);
-
-    const drawPageHeader = (pageNumber: number) => {
-      const titleX = 10;
-      doc.setTextColor(15, 23, 42);
-      doc.setFont("Helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text("PENDING BOXES FOR DELIVERY", titleX, 14);
-
-      doc.setFont("Helvetica", "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(71, 85, 105);
-      doc.text(`Trip: ${tripNo || "N/A"}  |  Vehicle: ${vehicleNo || "N/A"}  |  Date: ${tripDate || new Date().toLocaleDateString()}`, titleX, 20);
-
-      doc.setFont("Helvetica", "bold");
-      doc.setFontSize(8.5);
-      doc.setTextColor(15, 23, 42);
-      doc.text(`Total: ${pendingBoxes.length} Boxes | ${totalBirds} Birds | ${totalWeight.toFixed(2)} kg`, 200, 14, { align: "right" });
-
-      doc.setFont("Helvetica", "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`Page ${pageNumber} of ${totalPages}`, 200, 20, { align: "right" });
-
-      doc.setDrawColor(203, 213, 225);
-      doc.setLineWidth(0.4);
-      doc.line(10, 26, 200, 26);
-
-      for (let b = 0; b < 3; b++) {
-        const bX = startX + b * (blockWidth + blockGap);
-        doc.setFillColor(241, 245, 249);
-        doc.rect(bX, headerTopY, blockWidth, headerHeight, "F");
-
-        doc.setFont("Helvetica", "bold");
-        doc.setFontSize(8);
-        doc.setTextColor(51, 65, 85);
-
-        const labelY = headerTopY + 4.8;
-        doc.text("BOX", bX + colBoxW / 2, labelY, { align: "center" });
-        doc.text("BIRDS", bX + colBoxW + colBirdsW / 2, labelY, { align: "center" });
-        doc.text("WT(KG)", bX + blockWidth - 4, labelY, { align: "right" });
-      }
-
-      doc.setDrawColor(203, 213, 225);
-      doc.setLineWidth(0.3);
-      doc.line(10, headerBottomY, 200, headerBottomY);
-    };
-
-    for (let page = 0; page < totalPages; page++) {
-      if (page > 0) doc.addPage();
-      drawPageHeader(page + 1);
-
-      const pageItems = pendingBoxes.slice(page * maxItemsPerPage, (page + 1) * maxItemsPerPage);
-      const totalRowsOnPage = Math.ceil(pageItems.length / 3);
-      const contentEndY = headerBottomY + totalRowsOnPage * rowHeight;
-
-      pageItems.forEach((box: any, i: number) => {
-        const r = Math.floor(i / 3);
-        const b = i % 3;
-
-        const bX = startX + b * (blockWidth + blockGap);
-        const rowTopY = headerBottomY + r * rowHeight;
-        const textY = rowTopY + 4.6;
-
-        if (r % 2 === 1) {
-          doc.setFillColor(248, 250, 252);
-          doc.rect(bX, rowTopY, blockWidth, rowHeight, "F");
-        }
-
-        doc.setDrawColor(241, 245, 249);
-        doc.setLineWidth(0.2);
-        doc.line(bX, rowTopY + rowHeight, bX + blockWidth, rowTopY + rowHeight);
-
-        doc.setDrawColor(226, 232, 240);
-        doc.setLineWidth(0.15);
-        doc.line(bX + colBoxW, rowTopY, bX + colBoxW, rowTopY + rowHeight);
-        doc.line(bX + colBoxW + colBirdsW, rowTopY, bX + colBoxW + colBirdsW, rowTopY + rowHeight);
-
-        const boxNo = String(box.boxNo ?? box.id ?? i + 1);
-        const birdsVal = String(box.birds ?? box.birdsCount ?? "-");
-        const weightVal = Number(box.weight ?? box.netWeight ?? 0).toFixed(2);
-
-        doc.setFont("Helvetica", "normal");
-        doc.setFontSize(8.5);
-        doc.setTextColor(51, 65, 85);
-        doc.text(boxNo, bX + colBoxW / 2, textY, { align: "center" });
-
-        doc.setFont("Helvetica", "normal");
-        doc.setTextColor(51, 65, 85);
-        doc.text(birdsVal, bX + colBoxW + colBirdsW / 2, textY, { align: "center" });
-
-        doc.setFont("Helvetica", "bold");
-        doc.setTextColor(15, 23, 42);
-        doc.text(weightVal, bX + blockWidth - 4, textY, { align: "right" });
+  const handleDownloadShopsPDF = async () => {
+    try {
+      const sheetRows = buildPendingAssignmentRows(safeShops, safeRows);
+      const capacity =
+        Number((safeTrip as any)?.vehicleBoxCapacity) ||
+        Number((safeTrip as any)?.boxes) ||
+        safeBoxDetails.length;
+      const deliveredBoxes = Math.max(0, safeBoxDetails.length - remainingBoxesCount);
+      const tripForSheet: Trip = safeTrip
+        ? safeTrip
+        : ({
+            tripNo,
+            tripDate,
+            vehicleNo,
+            supervisorName,
+            driverName: "",
+            sourceFarm: "",
+            farmAddress: "",
+          } as unknown as Trip);
+      await generateAssignmentSheetPdf({
+        trip: tripForSheet,
+        supervisorMobile: supervisorPhone,
+        orderTripNo: tripNo,
+        orderDate: tripDate,
+        rows: sheetRows,
+        capacity,
+        alreadyAssignedOther: deliveredBoxes,
       });
-
-      doc.setDrawColor(148, 163, 184);
-      doc.setLineWidth(0.6);
-      const sep1X = startX + blockWidth + blockGap / 2;
-      const sep2X = startX + 2 * blockWidth + (1.5 * blockGap);
-      doc.line(sep1X, headerTopY, sep1X, contentEndY);
-      doc.line(sep2X, headerTopY, sep2X, contentEndY);
+      setToast({ message: t("ops.trip.shops_pdf_ok"), type: "success" });
+    } catch (error: any) {
+      console.error("Shops report failed:", error);
+      setToast({ message: t("ops.trip.failed_pdf_report"), type: "error" });
     }
+  };
 
-    doc.save(`Pending_Boxes_${tripNo || "Report"}.pdf`);
-    setToast({ message: t("ops.trip.pending_boxes_pdf_ok"), type: "success" });
+  const handleDownloadBoxesPDF = async () => {
+    try {
+      // Remaining (undelivered) boxes only — same Pickup Report format.
+      const remaining = pendingBoxesFromRows(safeBoxDetails, safeRows);
+      const totalBirds = remaining.reduce((s, b) => s + Number(b.birds || 0), 0);
+      const dcWeight = Number(
+        remaining.reduce((s, b) => s + Number(b.weight || 0), 0).toFixed(2)
+      );
+      const pickupTrip: Trip = {
+        ...(safeTrip ?? ({} as Trip)),
+        tripNo: tripNo || (safeTrip as any)?.tripNo || "Trip",
+        tripDate: tripDate || (safeTrip as any)?.tripDate || "",
+        vehicleNo: vehicleNo || (safeTrip as any)?.vehicleNo || "",
+        supervisorName: supervisorName || (safeTrip as any)?.supervisorName || "",
+        boxDetails: remaining as BoxDetail[],
+        boxes: remaining.length,
+        totalBirds,
+        dcWeight,
+        avgWeight:
+          totalBirds > 0 ? Number((dcWeight / totalBirds).toFixed(2)) : undefined,
+      } as Trip;
+      await generatePickupReportPDF(pickupTrip, {
+        maxBoxes:
+          Number((safeTrip as any)?.vehicleBoxCapacity) || safeBoxDetails.length,
+      });
+      setToast({ message: t("ops.trip.boxes_pdf_ok"), type: "success" });
+    } catch (error: any) {
+      console.error("Boxes report failed:", error);
+      setToast({ message: t("ops.trip.failed_pdf_report"), type: "error" });
+    }
   };
 
   // ─── Manual Save Progress Handler ──────────────────────────────
@@ -545,7 +621,9 @@ export default function UnLoadingTable({
   const openAddForm = () => {
     setEditingId(null);
     setMode("box");
-    setAutoCaptureTime(new Date().toLocaleString());
+    // Auto-captured time is NOT shown while adding — it is captured at the
+    // moment the delivery is actually saved (see handleSubmit).
+    setAutoCaptureTime("");
     const birdTypeId = tripBirdTypeId || 0;
     const birdType = tripBirdType || "";
     setFormData({ ...EMPTY_DELIVERY_FORM, birdTypeId, birdType });
@@ -556,7 +634,7 @@ export default function UnLoadingTable({
     const rowWithExtra = row as any;
     setEditingId(row.id);
     setMode(rowWithExtra.deliveryMode || "box");
-    setAutoCaptureTime(rowWithExtra.autoCaptureTime || new Date().toLocaleString());
+    setAutoCaptureTime(rowWithExtra.autoCaptureTime || "");
     setFormData({
       shopId: row.shopId,
       shopName: row.shopName,
@@ -575,14 +653,6 @@ export default function UnLoadingTable({
 
   const handleFormChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handlePerBoxChange = (index: number, field: "birds" | "weight", value: number) => {
-    setFormData((prev) => {
-      const updated = [...prev.perBoxData];
-      updated[index] = { ...updated[index], [field]: value };
-      return { ...prev, perBoxData: updated };
-    });
   };
 
   const handleBoxSelection = (newSelectedIds: number[]) => {
@@ -645,6 +715,9 @@ export default function UnLoadingTable({
       return;
     }
 
+    // The same shop MAY be captured more than once — e.g. one Box Mode and one
+    // Weight Mode delivery for the same shop. Duplicates are accepted.
+
     let finalBirds = formData.birds;
     let finalWeight = formData.weight;
     let selectedBoxIds: number[] = [];
@@ -672,13 +745,15 @@ export default function UnLoadingTable({
       selectedBoxIds = formData.selectedBoxIds;
       farmBirdsVal = farmBirds;
       farmWeightVal = farmWeight;
-      const totalBirds = formData.perBoxData.reduce((sum: number, item: { boxNo: number; birds: number; weight: number }) => sum + item.birds, 0);
-      const totalWeight = formData.perBoxData.reduce((sum: number, item: { boxNo: number; birds: number; weight: number }) => sum + item.weight, 0);
-      finalBirds = totalBirds;
-      finalWeight = totalWeight;
+      finalBirds = Number(formData.birds) || 0;
+      finalWeight = Number(formData.weight) || 0;
       mortKgVal = formData.mortWeight;
-      perBoxData = formData.perBoxData.map((item) => ({ ...item }));
+      perBoxData = [];
     }
+
+    // Weights are always stored rounded to two decimals.
+    finalWeight = Number((Number(finalWeight) || 0).toFixed(2));
+    mortKgVal = Number((Number(mortKgVal) || 0).toFixed(2));
 
     const maxSerial = safeRows.reduce((max: number, r: ShopDelivery) => Math.max(max, r.serialNo || 0), 0);
     const newRow: any = {
@@ -704,7 +779,12 @@ export default function UnLoadingTable({
       clientKey: editingId
         ? (safeRows.find((r) => r.id === editingId) as ShopDelivery | undefined)?.clientKey || `ck-${editingId}`
         : (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `ck-${Date.now()}`),
-      autoCaptureTime: autoCaptureTime || undefined,
+      // Each shop captures its OWN time at the moment its delivery is saved.
+      // The capture time is IMMUTABLE: an edit preserves the original value
+      // and never re-stamps it.
+      autoCaptureTime: editingId !== null
+        ? (autoCaptureTime || (safeRows.find((r) => r.id === editingId) as any)?.autoCaptureTime || undefined)
+        : formatIstStamp(new Date().toISOString()),
     };
 
     if (editingId !== null) {
@@ -725,7 +805,26 @@ export default function UnLoadingTable({
     if (!safeShops || safeShops.length === 0) {
       return [{ value: 0, label: t("ops.trip.no_shops_available"), isDisabled: true }];
     }
-    const opts = safeShops
+    // Delivered shops are matched by BOTH shop id and shop name.
+    const { ids: deliveredIds, names: deliveredNames } = buildDeliveredShopKeys(safeRows);
+    const { ids: assignedIds, order: assignedOrder } = shopIdsFromRows(safeRows);
+
+    // Only the ORDER-ASSIGNMENT shops are offered — not the whole master list.
+    // Fall back to all shops when there are no assignment rows yet.
+    const source =
+      assignedIds.size > 0
+        ? safeShops.filter((shop: any) =>
+            assignedIds.has(Number(shop.id ?? shop.shopId ?? 0))
+          )
+        : safeShops;
+
+    const isDeliveredShop = (shop: any) => {
+      const id = Number(shop.id ?? shop.shopId ?? 0);
+      const name = String(shop.shopName ?? shop.name ?? "").trim().toLowerCase();
+      return (id > 0 && deliveredIds.has(id)) || (Boolean(name) && deliveredNames.has(name));
+    };
+
+    const opts = source
       .filter((shop: any) => {
         const status = String(shop.status ?? "Active");
         const id = shop.id ?? shop.shopId ?? 0;
@@ -738,7 +837,38 @@ export default function UnLoadingTable({
         return { value, label, isDisabled: false };
       })
       .filter((opt: { value: number; label: string; isDisabled: boolean }) => opt.value > 0);
-    opts.sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
+
+    // Delivery queue ordering: pending assignment shops first in their route
+    // (`serialNo`) order; then already-delivered shops (kept selectable so a
+    // shop can be captured again in the other mode), sorted ALPHABETICALLY.
+    const isPendingPriority = (o: { value: number; label: string }) => {
+      const id = Number(o.value);
+      const shop = source.find((s: any) => Number(s.id ?? s.shopId ?? 0) === id);
+      if (!shop) return false;
+      return assignedOrder.has(id) && !isDeliveredShop(shop);
+    };
+    const orderOf = (o: { value: number; label: string }) =>
+      assignedOrder.get(Number(o.value));
+    opts.sort(
+      (
+        a: { value: number; label: string; isDisabled: boolean },
+        b: { value: number; label: string; isDisabled: boolean }
+      ) => {
+        const aPrio = isPendingPriority(a);
+        const bPrio = isPendingPriority(b);
+        if (aPrio !== bPrio) return aPrio ? -1 : 1;
+        // Only PENDING shops follow route order; completed shops fall back to
+        // a stable alphabetical order below.
+        if (aPrio && bPrio) {
+          const aOrder = orderOf(a);
+          const bOrder = orderOf(b);
+          if (aOrder !== undefined && bOrder !== undefined && aOrder !== bOrder) {
+            return aOrder - bOrder;
+          }
+        }
+        return a.label.localeCompare(b.label);
+      }
+    );
     return opts;
   }, [safeShops, safeRows]);
 
@@ -777,24 +907,18 @@ export default function UnLoadingTable({
         !validationErrors.birdsExceed
       );
     } else {
-      const allBoxesFilled = formData.perBoxData.every(
-        (item: { boxNo: number; birds: number; weight: number }) => item.birds > 0 && item.weight > 0
-      );
-      const noPerBoxErrors =
-        !validationErrors.perBoxBirdsErrors.some((err: boolean) => err) &&
-        !validationErrors.perBoxWeightErrors.some((err: boolean) => err);
       return (
         formData.shopId > 0 &&
         formData.birdTypeId > 0 &&
         formData.selectedBoxIds.length > 0 &&
-        allBoxesFilled &&
+        Number(formData.birds) > 0 &&
+        Number(formData.weight) > 0 &&
         formData.mortality >= 0 &&
         formData.mortWeight >= 0 &&
         !validationErrors.birdsExceed &&
         !validationErrors.birdsMismatch &&
         !validationErrors.birdsExceedFarm &&
-        !validationErrors.weightExceedFarm &&
-        noPerBoxErrors
+        !validationErrors.weightExceedFarm
       );
     }
   }, [mode, formData, farmBirds, validationErrors]);
@@ -802,19 +926,30 @@ export default function UnLoadingTable({
   // ─── Top KPI Calculations (LIVE from current rows, not persisted) ───
   const topKpiTotals = useMemo(() => computeDeliveryKpiTotals(safeRows), [safeRows]);
 
+  // Delivery-mode split for the KPI cards (delivered rows only).
+  const boxModeCount = useMemo(
+    () =>
+      safeRows.filter(
+        (r) => isDeliveredRow(r) && (r.deliveryMode ?? "box") !== "weight"
+      ).length,
+    [safeRows]
+  );
+  const weightModeCount = useMemo(
+    () =>
+      safeRows.filter(
+        (r) => isDeliveredRow(r) && (r.deliveryMode ?? "box") === "weight"
+      ).length,
+    [safeRows]
+  );
+
   // ─── Filtered Search & Pagination ──────────────────────────────
   const displayRows = useMemo<ShopDelivery[]>(() => {
-    // Show fully-entered deliveries, plus Orders assignment plan rows that are
-    // still awaiting their Step 4 delivery. Those carry the `[ORDER]` marker
-    // and land here with weight 0 / no box selection until the supervisor
-    // delivers them — they must be visible so the assigned route can be
-    // fulfilled shop by shop (they persist regardless; this filter is only
-    // what the card list renders).
+    // Only CAPTURED deliveries render as cards. Pending `[ORDER]` assignment
+    // rows (the shops that still need a delivery) are NOT user-entered data,
+    // so they stay hidden here — the Add-Shop dropdown is where those shops
+    // are offered (route order first, completed shops afterwards).
     const saved = safeRows.filter(
-      (r: ShopDelivery) =>
-        r.shopId > 0 &&
-        ((r.birds > 0 && r.weight > 0) ||
-          String(r.remarks ?? "").trim().startsWith("[ORDER]"))
+      (r: ShopDelivery) => r.shopId > 0 && r.birds > 0 && r.weight > 0
     );
 
     const filtered = saved.filter((r: ShopDelivery) => {
@@ -823,12 +958,32 @@ export default function UnLoadingTable({
       const shopNameMatch = (r.shopName || "").toLowerCase().includes(query);
       const birdTypeMatch = (r.birdType || "").toLowerCase().includes(query);
       const remarksMatch = (r.remarks || "").toLowerCase().includes(query);
-      return shopNameMatch || birdTypeMatch || remarksMatch;
+      // Searching a box number must match the shop that carries it.
+      const boxIds = Array.isArray(r.selectedBoxIds) ? r.selectedBoxIds : [];
+      const boxNumberMatch =
+        boxIds.some((id) => String(id).includes(query)) ||
+        String(r.boxNo ?? "").includes(query);
+      return shopNameMatch || birdTypeMatch || remarksMatch || boxNumberMatch;
     });
 
-    return [...filtered].sort(
-      (a, b) => (Number(a.serialNo) || 0) - (Number(b.serialNo) || 0) || Number(a.id) - Number(b.id)
-    );
+    // Route order for the card list: DELIVERED shops first with the most
+    // recent capture on TOP (older deliveries sink down), then the pending
+    // `[ORDER]` assignment rows in their listed sequence at the bottom.
+    return [...filtered].sort((a, b) => {
+      const aDone = isDeliveredRow(a);
+      const bDone = isDeliveredRow(b);
+      if (aDone !== bDone) return aDone ? -1 : 1;
+      if (aDone) {
+        return (
+          (Number(b.serialNo) || 0) - (Number(a.serialNo) || 0) ||
+          Number(b.id) - Number(a.id)
+        );
+      }
+      return (
+        (Number(a.serialNo) || 0) - (Number(b.serialNo) || 0) ||
+        Number(a.id) - Number(b.id)
+      );
+    });
   }, [safeRows, searchTerm]);
 
   const totalPages = useMemo<number>(() => Math.ceil(displayRows.length / itemsPerPage), [displayRows.length]);
@@ -880,35 +1035,8 @@ export default function UnLoadingTable({
       {/* ─── SEARCH & ACTION HEADER ─── */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pb-3 border-b border-slate-100">
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto flex-1">
-          {onViewModeChange && (
-            <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200/80 shrink-0">
-              <button
-                onClick={() => onViewModeChange("shop")}
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                  viewMode === "shop"
-                    ? "bg-white text-emerald-700 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <LayoutGrid size={13} />
-                {t("ops.trip.shop_view")}
-              </button>
-              <button
-                onClick={() => onViewModeChange("box")}
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                  viewMode === "box"
-                    ? "bg-white text-emerald-700 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <BarChart2 size={13} />
-                {t("ops.trip.box_analysis")}
-              </button>
-            </div>
-          )}
-
           {/* Search Bar */}
-          <div className="relative w-full sm:w-64 max-w-xs">
+          <div className="relative w-full sm:w-80 max-w-sm">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
               <Search size={14} />
             </div>
@@ -933,14 +1061,21 @@ export default function UnLoadingTable({
         {/* Right Side Header Actions */}
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
           <button
-            onClick={handleDownloadPendingBoxesPDF}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 text-emerald-800 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
-            title={t("ops.trip.download_pending_boxes_pdf")}
+            onClick={handleDownloadShopsPDF}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 text-blue-800 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
+            title={t("ops.trip.shops_pdf_title")}
           >
-            <Package size={15} className="text-emerald-600" />
-            <span>{t("ops.trip.shops")} ({pendingShops})</span>
-            <span className="text-emerald-400">·</span>
-            <span>{t("ops.trip.boxes")} ({pendingBoxes.length})</span>
+            <FileText size={15} className="text-blue-600" />
+            <span>{t("ops.trip.shops")} ({pendingShopsCount})</span>
+          </button>
+
+          <button
+            onClick={handleDownloadBoxesPDF}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 text-emerald-800 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
+            title={t("ops.trip.boxes_pdf_title")}
+          >
+            <Box size={15} className="text-emerald-600" />
+            <span>{t("ops.trip.boxes")} ({remainingBoxesCount})</span>
           </button>
 
           {!readOnly && !showForm && (
@@ -957,19 +1092,34 @@ export default function UnLoadingTable({
 
       {/* ─── TOP KPI SUMMARY CARDS ─── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-emerald-50/70 border border-emerald-100 p-3 rounded-xl flex flex-col justify-between shadow-xs">
-          <span className="text-xs font-semibold text-emerald-900 flex items-center gap-1">
-            <Clock size={13} className="text-emerald-600" /> {t("ops.trip.captured_time")}
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
+          <span className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+            <span className="h-5 w-5 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <Clock size={12} />
+            </span>
+            {t("ops.trip.captured_time")}
           </span>
           <span className="text-xs font-bold text-slate-800 mt-1 truncate" title={topKpiTotals.lastCaptureTime}>
             {topKpiTotals.lastCaptureTime}
           </span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
-          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <Building2 size={13} className="text-slate-400" /> {t("ops.trip.shops")}
+          <span className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+            <span className="h-5 w-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <Building2 size={12} />
+            </span>
+            {t("ops.trip.shops")}
           </span>
-          <span className="text-base font-bold text-slate-800">{topKpiTotals.shops || "—"}</span>
+          <div className="flex items-center gap-3 mt-1">
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700" title={t("ops.trip.box_mode")}>
+              <Box size={13} className="text-blue-600" /> {boxModeCount}
+            </span>
+            <span className="h-4 w-px bg-slate-200" aria-hidden />
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700" title={t("ops.trip.weight_mode")}>
+              <Scale size={13} className="text-purple-600" /> {weightModeCount}
+            </span>
+            <span className="text-base font-bold text-slate-800 ml-auto">{boxModeCount + weightModeCount}</span>
+          </div>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
           <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
@@ -990,7 +1140,7 @@ export default function UnLoadingTable({
             <AlertCircle size={13} className="text-rose-500" /> {t("operations.mortality_count")}
           </span>
           <span className="text-base font-bold text-slate-800">
-            {topKpiTotals.mortality > 0 ? `${topKpiTotals.mortality} bird${topKpiTotals.mortality === 1 ? "" : "s"}` : "—"}
+            {topKpiTotals.mortality > 0 ? `${topKpiTotals.mortality} ${t("common.birds")}` : "—"}
           </span>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
@@ -1029,7 +1179,6 @@ export default function UnLoadingTable({
           handleBirdSelect={handleBirdSelect}
           handleBoxSelection={handleBoxSelection}
           handleFormChange={handleFormChange}
-          handlePerBoxChange={handlePerBoxChange}
           shopOptions={shopOptions}
           birdOptions={birdOptions}
           isFormValid={isFormValid}
@@ -1073,9 +1222,6 @@ export default function UnLoadingTable({
                     key={row.id}
                     row={row as any}
                     readOnly={readOnly}
-                    unassigned={
-                      assignedShopIds.size > 0 && !assignedShopIds.has(Number(row.shopId))
-                    }
                     onEdit={(selectedRow) => {
                       if (onEditShop) {
                         onEditShop(selectedRow.id);
@@ -1106,7 +1252,10 @@ export default function UnLoadingTable({
         <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xs">
           {showBalanceError && balanceError && (
             <div className="mb-3">
-              <DeliveryBalanceErrorPanel error={balanceError} />
+              <DeliveryBalanceErrorPanel
+                error={balanceError}
+                onClose={() => setShowBalanceError(false)}
+              />
             </div>
           )}
           <WizardStepNotice

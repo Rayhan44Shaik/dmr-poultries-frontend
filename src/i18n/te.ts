@@ -473,7 +473,7 @@ export default {
   'operations.amount': 'మొత్తం',
   'operations.advance': 'అడ్వాన్స్',
   'operations.balance': 'బకాయి',
-  'operations.mortality_count': 'మరణాల సంఖ్య',
+  'operations.mortality_count': 'మరణాలు',
   'operations.mortality_reason': 'కారణం',
   'operations.mortality_date': 'తేదీ',
   'operations.fuel_date': 'ఇంధన తేదీ',

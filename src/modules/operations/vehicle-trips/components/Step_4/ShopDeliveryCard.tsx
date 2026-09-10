@@ -1,4 +1,4 @@
-import { Check, Box, Users, Scale, Clock, Pencil, FileText, Package, AlertCircle } from "lucide-react";
+import { Box, Users, Scale, Clock, Pencil, FileText, Package, AlertCircle } from "lucide-react";
 import type { ShopDelivery } from "../../types/trip";
 import type { ShopDeliveryWithExtra } from "./useShopDeliveryForm";
 import { useI18n } from "../../../../../i18n";
@@ -8,25 +8,23 @@ interface Props {
   readOnly: boolean;
   onEdit: (row: ShopDelivery) => void;
   onPDF: (row: ShopDeliveryWithExtra) => void;
-  supervisorName?: string;
-  supervisorPhone?: string;
-  vehicleNo?: string;
-  tripDate?: string;
-  /** Delivered outside the assignment plan — keep visible, never invent qty. */
-  unassigned?: boolean;
 }
 
-export default function ShopDeliveryCard({
-  row,
-  readOnly,
-  onEdit,
-  onPDF,
-  unassigned = false,
-}: Props) {
+/** Soft, low-eye-strain tints for box-number chips in the card. */
+const BOX_CHIP_PALETTE = [
+  "bg-slate-100 text-slate-700 border-slate-200",
+  "bg-sky-50 text-sky-700 border-sky-100",
+  "bg-indigo-50 text-indigo-700 border-indigo-100",
+  "bg-teal-50 text-teal-700 border-teal-100",
+  "bg-amber-50 text-amber-700 border-amber-100",
+  "bg-rose-50 text-rose-600 border-rose-100",
+];
+
+export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props) {
   const { t } = useI18n();
   const isWeightMode = row.deliveryMode === "weight";
   const selectedBoxes = row.selectedBoxIds || [];
-  const perBox = row.perBoxData || [];
+  const manyBoxes = selectedBoxes.length > 30;
   const mortalityCount = row.mortality ?? 0;
   const mortKg = row.mortKg ?? 0;
   const display = (value: string | number | null | undefined) => {
@@ -35,159 +33,136 @@ export default function ShopDeliveryCard({
   };
 
   return (
-    <div className={`rounded-2xl p-3.5 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between gap-2.5 ${
-      unassigned
-        ? "bg-orange-50/80 border border-orange-200"
-        : "bg-white border border-slate-200/80"
-    }`}>
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-2">
-        <div className="flex items-center gap-2 overflow-hidden">
-          <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200/50">
-            <Check size={16} className="stroke-[2.5]" />
+    <div className="group relative overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm hover:shadow-md transition-all duration-200 flex flex-col">
+      <div className="p-3 flex flex-col gap-2.5 flex-1">
+        {/* Header — mode tile + shop name vertically centred on the logo */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div
+              className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${
+                isWeightMode
+                  ? "bg-purple-50 text-purple-600 border-purple-100"
+                  : "bg-blue-50 text-blue-600 border-blue-100"
+              }`}
+              title={isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}
+            >
+              {isWeightMode ? <Scale size={15} /> : <Box size={15} />}
+            </div>
+            <p className="font-bold text-slate-800 text-[13px] truncate leading-tight" title={row.shopName}>
+              {row.shopName || t("ops.trip.not_entered")}
+            </p>
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-hidden">
-            <span className="font-bold text-slate-800 text-sm truncate" title={row.shopName}>
-              {row.shopName || t("ops.trip.not_entered")}
-            </span>
-
-            <span
-              title={`${t("ops.trip.delivery_mode")}: ${isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}`}
-              className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold shrink-0 border ${
-                isWeightMode
-                  ? "bg-purple-50 text-purple-700 border-purple-200/60"
-                  : "bg-amber-50 text-amber-700 border-amber-200/60"
-              }`}
+          <div className="flex items-center gap-1 shrink-0">
+            {!readOnly && (
+              <button
+                onClick={() => onEdit(row)}
+                className="p-1.5 rounded-lg bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 border border-slate-200/60 transition-colors flex items-center justify-center"
+                title={t("ops.trip.edit_shop_delivery")}
+              >
+                <Pencil size={13} className="stroke-[2]" />
+              </button>
+            )}
+            <button
+              onClick={() => onPDF(row)}
+              className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200/60 transition-colors flex items-center justify-center"
+              title={t("ops.trip.download_pdf")}
             >
-              {isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}
-            </span>
+              <FileText size={13} className="stroke-[2]" />
+            </button>
+          </div>
+        </div>
 
+        {/* KPI trio */}
+        <div className="grid grid-cols-3 gap-1.5 bg-slate-50/70 p-1.5 rounded-lg border border-slate-100">
+          <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-md border border-slate-200/50">
+            <span className="text-[9px] uppercase font-semibold text-slate-400 flex items-center gap-0.5 mb-0.5">
+              <Box size={10} className="text-slate-500 stroke-[2]" /> {t("common.boxes")}
+            </span>
+            <span className="text-[13px] font-bold text-slate-800">{display(selectedBoxes.length || row.boxNo)}</span>
+          </div>
+          <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-md border border-slate-200/50">
+            <span className="text-[9px] uppercase font-semibold text-slate-400 flex items-center gap-0.5 mb-0.5">
+              <Users size={10} className="text-blue-500 stroke-[2]" /> {t("common.birds")}
+            </span>
+            <span className="text-[13px] font-bold text-slate-800">{row.birds ? row.birds : t("ops.trip.not_entered")}</span>
+          </div>
+          <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-md border border-slate-200/50">
+            <span className="text-[9px] uppercase font-semibold text-slate-400 flex items-center gap-0.5 mb-0.5">
+              <Scale size={10} className="text-emerald-500 stroke-[2]" /> {t("common.weight")}
+            </span>
+            <span className="text-[13px] font-bold text-slate-800">
+              {row.weight ? `${Number(row.weight).toFixed(2)} kg` : t("ops.trip.not_entered")}
+            </span>
+          </div>
+        </div>
+
+        {(mortalityCount > 0 || mortKg > 0) && (
+          <div className="flex items-center justify-between px-2 py-1 bg-rose-50/50 rounded-md border border-rose-100/70 text-[10px]">
+            <span className="text-rose-400 font-semibold">{t("operations.mortality_count")}</span>
+            <span className="text-rose-500 font-bold">
+              {mortalityCount} {t("common.birds")} · {mortKg ? Number(mortKg).toFixed(2) : "0.00"} kg
+            </span>
+          </div>
+        )}
+
+        {selectedBoxes.length > 0 && (
+          <div
+            className={`flex items-center gap-1.5 px-2 py-1.5 bg-slate-100/70 rounded-md border border-slate-200/40 overflow-x-auto no-scrollbar ${
+              manyBoxes ? "text-[9px]" : "text-[10px]"
+            }`}
+          >
+            <span className="text-slate-400 font-semibold flex items-center gap-1 shrink-0 text-[9px] uppercase">
+              <Package size={11} className="text-slate-500" /> {t("ops.trip.box_nos")}:
+            </span>
+            <div className={`flex items-center flex-wrap ${manyBoxes ? "gap-0.5" : "gap-1"}`}>
+              {selectedBoxes.map((id, idx) => (
+                <span
+                  key={id}
+                  className={`rounded border font-bold shrink-0 ${
+                    manyBoxes ? "px-1 py-px text-[9px]" : "px-1.5 py-0.5 text-[10px]"
+                  } ${BOX_CHIP_PALETTE[idx % BOX_CHIP_PALETTE.length]}`}
+                >
+                  {String(id).padStart(2, "0")}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {row.remarks ? (
+          <p className="text-[10px] text-slate-500 px-0.5 truncate" title={row.remarks}>
+            <span className="font-semibold text-slate-400 uppercase text-[9px]">{t("common.remarks")}: </span>
+            {row.remarks}
+          </p>
+        ) : null}
+
+        {/* Footer — mortality + bird type take the old "time" slot (left),
+            captured time moves to the right */}
+        <div className="flex items-center justify-between gap-2 pt-1 mt-auto text-[10px] font-medium border-t border-slate-100">
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             {mortalityCount > 0 && (
               <span
-                title={`${t("operations.mortality_count")}: ${mortalityCount} ${t("common.birds")}`}
-                className="px-1.5 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-200/60 shrink-0 flex items-center gap-1 text-[10px] font-bold"
+                title={t("operations.mortality_count")}
+                className="px-1.5 py-px rounded bg-rose-50/70 text-rose-500 border border-rose-100 shrink-0 flex items-center gap-1 text-[10px] font-bold"
               >
-                <AlertCircle size={13} className="text-rose-500 stroke-[2.5]" />
+                <AlertCircle size={11} className="text-rose-300 stroke-[2.5]" />
                 <span>{mortalityCount}</span>
               </span>
             )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1 shrink-0">
-          {!readOnly && (
-            <button
-              onClick={() => onEdit(row)}
-              className="p-1.5 rounded-lg bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 border border-slate-200/60 transition-colors flex items-center justify-center"
-              title={t("ops.trip.edit_shop_delivery")}
-            >
-              <Pencil size={14} className="stroke-[2]" />
-            </button>
-          )}
-
-          <button
-            onClick={() => onPDF(row)}
-            className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200/60 transition-colors flex items-center justify-center"
-            title={t("ops.trip.download_pdf")}
-          >
-            <FileText size={14} className="stroke-[2]" />
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2 bg-slate-50/70 p-2 rounded-xl border border-slate-100">
-        <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-lg border border-slate-200/50 shadow-2xs">
-          <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-0.5">
-            <Box size={11} className="text-slate-500 stroke-[2]" /> {t("common.boxes")}
-          </span>
-          <span className="text-xs font-bold text-slate-800">{display(selectedBoxes.length || row.boxNo)}</span>
-        </div>
-
-        <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-lg border border-slate-200/50 shadow-2xs">
-          <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-0.5">
-            <Users size={11} className="text-blue-500 stroke-[2]" /> {t("common.birds")}
-          </span>
-          <span className="text-xs font-bold text-slate-800">{row.birds ? row.birds : t("ops.trip.not_entered")}</span>
-        </div>
-
-        <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-lg border border-slate-200/50 shadow-2xs">
-          <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-0.5">
-            <Scale size={11} className="text-emerald-500 stroke-[2]" /> {t("common.weight")}
-          </span>
-          <span className="text-xs font-bold text-slate-800">
-            {row.weight ? `${row.weight.toFixed(2)} kg` : t("ops.trip.not_entered")}
-          </span>
-        </div>
-      </div>
-
-      {(mortalityCount > 0 || mortKg > 0) && (
-        <div className="flex items-center justify-between px-2 py-1.5 bg-red-50/60 rounded-lg border border-red-100 text-[11px]">
-          <span className="text-red-600 font-semibold">{t("operations.mortality_count")}</span>
-          <span className="text-red-700 font-bold">
-            {mortalityCount} {t("common.birds")} · {mortKg ? mortKg.toFixed(2) : "0.00"} kg
-          </span>
-        </div>
-      )}
-
-      {selectedBoxes.length > 0 && (
-        <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-100/60 rounded-lg border border-slate-200/40 text-[11px] overflow-x-auto no-scrollbar">
-          <span className="text-slate-400 font-semibold flex items-center gap-1 shrink-0 text-[10px] uppercase">
-            <Package size={12} className="text-slate-500" /> {t("ops.trip.box_nos")}:
-          </span>
-          <div className="flex items-center gap-1 flex-wrap">
-            {selectedBoxes.map((id) => (
-              <span
-                key={id}
-                className="px-1.5 py-0.2 bg-white text-slate-700 font-bold rounded border border-slate-200/80 text-[10px] shadow-2xs shrink-0"
-              >
-                #{id}
+            {row.birdType ? (
+              <span className="px-1.5 py-px rounded bg-blue-50 text-blue-700 font-semibold text-[10px] border border-blue-100 shrink-0">
+                {row.birdType}
               </span>
-            ))}
+            ) : null}
+          </div>
+          <div className="flex items-center gap-1 shrink-0 text-slate-600">
+            <span className="h-4 w-4 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <Clock size={11} className="stroke-[2]" />
+            </span>
+            <span>{t("ops.trip.captured")} {row.autoCaptureTime || "—"}</span>
           </div>
         </div>
-      )}
-
-      {perBox.length > 0 && (
-        <div className="rounded-lg border border-slate-200/60 bg-white px-2 py-1.5 text-[11px]">
-          <span className="text-slate-400 font-semibold uppercase text-[10px]">{t("ops.trip.per_box_allocation")}</span>
-          <div className="mt-1 space-y-0.5">
-            {perBox.map((pb) => (
-              <div key={pb.boxNo} className="flex justify-between text-slate-700">
-                <span className="font-bold">#{pb.boxNo}</span>
-                <span>
-                  {pb.birds} {t("common.birds")} · {Number(pb.weight || 0).toFixed(2)} kg
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {unassigned ? (
-        <p className="rounded-lg border border-orange-200 bg-orange-100/80 px-2 py-1 text-[11px] font-semibold text-orange-800">
-          {t("ops.trip.assignment_details_unavailable")}
-        </p>
-      ) : null}
-
-      {row.remarks ? (
-        <p className="text-[11px] text-slate-500 px-1">
-          <span className="font-semibold text-slate-400 uppercase text-[10px]">{t("common.remarks")} </span>
-          {row.remarks}
-        </p>
-      ) : null}
-
-      <div className="flex items-center justify-between pt-0.5 text-[11px] text-slate-400 font-medium">
-        <div className="flex items-center gap-1">
-          <Clock size={12} className="text-slate-400 stroke-[2]" />
-          <span>{t("ops.trip.captured")} {row.autoCaptureTime || "—"}</span>
-        </div>
-        {row.birdType ? (
-          <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded-md text-[10px] border border-blue-100">
-            {row.birdType}
-          </span>
-        ) : (
-          <span className="text-[10px]">{t("ops.trip.not_entered")}</span>
-        )}
       </div>
     </div>
   );

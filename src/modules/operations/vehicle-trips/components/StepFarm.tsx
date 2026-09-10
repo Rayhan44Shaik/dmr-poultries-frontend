@@ -252,71 +252,63 @@ export default function StepFarm({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+        {/* GPS — complete reverse-geocoded address on its own full line */}
+        <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs">
+          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
+            <span className="h-5 w-5 rounded-md bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0">
+              <MapPin size={12} />
+            </span>
+            {t("ops.trip.field.gps_address")}
+          </span>
+          {hasGps ? (
+            <p className="text-sm font-semibold text-slate-800 break-words leading-relaxed">
+              <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback={t("ops.trip.location_captured")} />
+            </p>
+          ) : (
+            <p className="text-sm font-semibold text-slate-400">{t("ops.trip.not_captured")}</p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <StepKpiCard
             icon={Clock}
             tone="bg-sky-50 text-sky-600"
-            bar="bg-sky-400"
             label={t("ops.trip.field.reached_time")}
             value={trip.farmStepSubmittedAt ? formatIstStamp(trip.farmStepSubmittedAt) : trip.reachedTime || t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={Store}
             tone="bg-emerald-50 text-emerald-600"
-            bar="bg-emerald-400"
             label={t("common.farm")}
             value={trip.sourceFarm || t("ops.trip.not_entered")}
           />
           <StepKpiCard
-            icon={MapPin}
-            tone="bg-cyan-50 text-cyan-600"
-            bar="bg-cyan-400"
-            label="GPS"
-            value={
-              hasGps ? (
-                <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback={t("ops.trip.location_captured")} />
-              ) : (
-                t("ops.trip.not_captured")
-              )
-            }
-            title={
-              hasGps
-                ? `${Number(trip.farmGpsLat).toFixed(6)}, ${Number(trip.farmGpsLon).toFixed(6)}`
-                : undefined
-            }
-          />
-          <StepKpiCard
             icon={Layers}
             tone="bg-violet-50 text-violet-600"
-            bar="bg-violet-400"
             label={t("operations.bird_type")}
             value={trip.birdType || t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={MapPin}
             tone="bg-rose-50 text-rose-600"
-            bar="bg-rose-400"
             label={t("ops.trip.field.farm_address")}
             value={trip.farmAddress || t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={Gauge}
             tone="bg-purple-50 text-purple-600"
-            bar="bg-purple-400"
             label={t("ops.trip.field.farm_meter")}
             value={destMeterLabel}
           />
           <StepKpiCard
             icon={Ticket}
             tone="bg-amber-50 text-amber-600"
-            bar="bg-amber-400"
             label={t("ops.trip.field.pickup_tolls")}
             value={trip.pickupTolls ?? 0}
           />
           <StepKpiCard
             icon={Scale}
             tone="bg-teal-50 text-teal-600"
-            bar="bg-teal-400"
             label={t("ops.trip.field.avg_bird_weight")}
             value={avgWeightLabel}
           />

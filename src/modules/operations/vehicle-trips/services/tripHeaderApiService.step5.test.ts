@@ -48,5 +48,8 @@ test("View maps Step 5 submitted timestamps with the same formatter as Step 1–
   assert.equal(mapped.submittedAtTimestamp, formatted);
   assert.equal(mapped.dieselEntries?.[0]?.submittedAt, formatted);
   assert.equal((mapped as any).dieselSubmittedAt1, formatted);
-  assert.equal(String(mapped.expensesStepSubmittedAt).includes("T"), false);
+  assert.equal(
+    /^\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2} IST$/.test(String(mapped.expensesStepSubmittedAt)),
+    true,
+  );
 });
