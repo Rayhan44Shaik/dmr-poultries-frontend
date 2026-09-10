@@ -1567,9 +1567,11 @@ function applyDeliveriesPayload(tripId, body) {
     TRIPS.push(trip);
   }
   const rows = Array.isArray(body.deliveries) ? body.deliveries : [];
-  // Preserve previously captured times (keyed by clientKey / shop+serial), and
-  // stamp newly captured deliveries the same way the real backend would — at
-  // first capture. Pure `[ORDER]` plan rows stay un-captured (null).
+  // Capture time is stamped ONLY on a SUCCESSFUL SUBMIT (mode === "submit") —
+  // never on a Save Progress, and never guessed before the submit confirmed.
+  // Previously captured times are preserved (keyed by clientKey / shop+serial),
+  // and pure `[ORDER]` plan rows stay un-captured (null).
+  const isSubmit = body.mode === "submit";
   const prev = Array.isArray(trip.deliveries) ? trip.deliveries : [];
   const prevTime = new Map();
   prev.forEach((r) => {
@@ -1592,9 +1594,9 @@ function applyDeliveriesPayload(tripId, body) {
       const key = base.clientKey ?? `${base.shopId}-${base.serialNo}`;
       base.autoCaptureTime = prevTime.has(key)
         ? prevTime.get(key)
-        : String(base.remarks ?? "").trim().startsWith("[ORDER]")
-          ? null
-          : istStamp();
+        : isSubmit && !String(base.remarks ?? "").trim().startsWith("[ORDER]")
+          ? istStamp()
+          : null;
     }
     return base;
   });

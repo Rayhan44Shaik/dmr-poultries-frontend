@@ -585,6 +585,7 @@ export default {
   'ops.trip.sending': 'Sending…',
   'ops.trip.shop_deliveries_count': '{count} shop deliveries',
   'ops.trip.shop_saved': 'Shop delivery saved.',
+  'ops.trip.shop_already_delivered': 'This shop has already been delivered. Edit the existing delivery instead.',
   'ops.trip.shops_available': 'Shops available',
   'ops.trip.source_farm': 'Source Farm',
   'ops.trip.start_meter': 'Start Meter',

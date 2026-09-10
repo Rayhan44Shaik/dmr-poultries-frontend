@@ -577,6 +577,7 @@ export default {
   'ops.trip.sending': 'పంపబడుతోంది…',
   'ops.trip.shop_deliveries_count': '{count} షాప్ డెలివరీలు',
   'ops.trip.shop_saved': 'షాప్ డెలివరీ సేవ్ చేయబడింది.',
+  'ops.trip.shop_already_delivered': 'ఈ షాప్ ఇప్పటికే డెలివరీ చేయబడింది. బదులుగా ఉన్న డెలివరీని సవరించండి.',
   'ops.trip.shops': 'షాపులు',
   'ops.trip.assignment_details_unavailable': 'అసైన్‌మెంట్ వివరాలు అందుబాటులో లేవు',
   'ops.trip.shops_available': 'అందుబాటులో ఉన్న షాపులు',

@@ -15,7 +15,7 @@ import ShopDeliveryForm from "./ShopDeliveryForm";
 import ShopDeliveryCard from "./ShopDeliveryCard";
 import { generateShopPDF } from "../../utils/generateShopPDF";
 import { generateShopsDeliveryReportPDF, generateBoxesDeliveryReportPDF } from "../../utils/generateDeliveryReportsPDF";
-import { assignedShopIdsFromRows } from "./remainingBoxes";
+import { assignedShopIdsFromRows, pendingBoxesFromRows } from "./remainingBoxes";
 import { computeDeliveryKpiTotals } from "./deliveryKpis";
 import type { DeliveriesBalanceError } from "../../../../../shared/trip/validation";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
@@ -118,6 +118,37 @@ function ConfirmationModal({
 }
 
 // ─── Balance Mismatch Panel ─────────────────────────────────────
+
+/** A delivery row is "captured / delivered" once it stops being a pending
+ *  `[ORDER]` assignment row and carries actual delivery data (selected boxes,
+ *  birds, weight), or the backend already recorded its capture time. */
+function isDeliveredRow(row: ShopDelivery): boolean {
+  const extra = row as ShopDelivery & { autoCaptureTime?: string };
+  if (extra.autoCaptureTime) return true;
+  const remarks = String(row.remarks ?? "").trim();
+  if (remarks.startsWith("[ORDER]")) return false;
+  const boxes = Array.isArray(row.selectedBoxIds) ? row.selectedBoxIds.length : 0;
+  return boxes > 0 || Number(row.birds) > 0 || Number(row.weight) > 0;
+}
+
+/** Delivered-shop identity keyed by BOTH shop id and shop name, so a row whose
+ *  id does not resolve still matches by name (and vice versa). */
+function buildDeliveredShopKeys(rows: ShopDelivery[]): {
+  ids: Set<number>;
+  names: Set<string>;
+} {
+  const ids = new Set<number>();
+  const names = new Set<string>();
+  rows.forEach((row) => {
+    if (!isDeliveredRow(row)) return;
+    const id = Number(row.shopId);
+    if (id > 0) ids.add(id);
+    const name = String(row.shopName ?? "").trim().toLowerCase();
+    if (name) names.add(name);
+  });
+  return { ids, names };
+}
+
 function DeliveryBalanceErrorPanel({
   error,
   onClose,
@@ -288,6 +319,24 @@ export default function UnLoadingTable({
 
   // ─── Filter Pending Boxes ───────────────────────────────────────
   const assignedShopIds = useMemo(() => assignedShopIdsFromRows(safeRows), [safeRows]);
+
+  // Live route counts for the header buttons: Shops = still-to-deliver shops,
+  // Boxes = still-available pickup boxes. Both shrink as deliveries are made.
+  const pendingShopsCount = useMemo(() => {
+    if (!safeShops || safeShops.length === 0) return 0;
+    const { ids, names } = buildDeliveredShopKeys(safeRows);
+    return safeShops.filter((shop: any) => {
+      const id = Number(shop.id ?? shop.shopId ?? 0);
+      const name = String(shop.shopName ?? shop.name ?? "").trim().toLowerCase();
+      const delivered = (id > 0 && ids.has(id)) || (Boolean(name) && names.has(name));
+      return !delivered;
+    }).length;
+  }, [safeShops, safeRows]);
+
+  const remainingBoxesCount = useMemo(
+    () => pendingBoxesFromRows(safeBoxDetails, safeRows).length,
+    [safeBoxDetails, safeRows]
+  );
 
   // ─── Balance Error Panel visibility (shown after a blocked submit) ──
   const [showBalanceError, setShowBalanceError] = useState<boolean>(balanceErrorShown);
@@ -550,6 +599,20 @@ export default function UnLoadingTable({
       return;
     }
 
+    // A shop can only be delivered once: block a NEW capture for a shop that
+    // already has a delivered row — matched by shop id AND shop name.
+    if (editingId === null) {
+      const { ids, names } = buildDeliveredShopKeys(safeRows);
+      const selId = Number(formData.shopId);
+      const selName = String(formData.shopName ?? "").trim().toLowerCase();
+      const alreadyDelivered =
+        (selId > 0 && ids.has(selId)) || (Boolean(selName) && names.has(selName));
+      if (alreadyDelivered) {
+        setToast({ message: t("ops.trip.shop_already_delivered"), type: "warning" });
+        return;
+      }
+    }
+
     let finalBirds = formData.birds;
     let finalWeight = formData.weight;
     let selectedBoxIds: number[] = [];
@@ -607,11 +670,12 @@ export default function UnLoadingTable({
       clientKey: editingId
         ? (safeRows.find((r) => r.id === editingId) as ShopDelivery | undefined)?.clientKey || `ck-${editingId}`
         : (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `ck-${Date.now()}`),
-      // A NEW delivery captures its time exactly when it is saved; an EDIT
-      // preserves the originally captured time.
+      // Capture time is stamped by the BACKEND only on a successful submit —
+      // it is never guessed client-side before the save/submit is confirmed.
+      // An EDIT preserves the originally captured time.
       autoCaptureTime: editingId !== null
         ? (autoCaptureTime || (safeRows.find((r) => r.id === editingId) as any)?.autoCaptureTime || undefined)
-        : new Date().toLocaleString(),
+        : undefined,
     };
 
     if (editingId !== null) {
@@ -632,17 +696,20 @@ export default function UnLoadingTable({
     if (!safeShops || safeShops.length === 0) {
       return [{ value: 0, label: t("ops.trip.no_shops_available"), isDisabled: true }];
     }
-    // Shops that have already been captured (delivered) are pushed to the
-    // BOTTOM of the dropdown so the NEXT shop to deliver always sits on top.
-    // Pending (not-yet-delivered) shops stay first, alphabetically. A shop is
-    // "delivered" once it has a captured row (autoCaptureTime), so `[ORDER]`
-    // assignment-plan rows — which carry ordered birds/weight but no capture —
-    // still count as pending (same rule as pendingShopsFromRows).
-    const deliveredShopIds = new Set<number>(
-      safeRows
-        .filter((r: any) => Number(r.shopId) > 0 && Boolean(r.autoCaptureTime))
-        .map((r: any) => Number(r.shopId))
-    );
+    // Delivered shops are matched by BOTH shop id and shop name.
+    const { ids: deliveredIds, names: deliveredNames } = buildDeliveredShopKeys(safeRows);
+    const isDeliveredShop = (shop: any) => {
+      const id = Number(shop.id ?? shop.shopId ?? 0);
+      const name = String(shop.shopName ?? shop.name ?? "").trim().toLowerCase();
+      return (id > 0 && deliveredIds.has(id)) || (Boolean(name) && deliveredNames.has(name));
+    };
+    // Priority route = the FIRST 10 shops in the master list, in listed order.
+    const priorityRank = new Map<number, number>();
+    safeShops.slice(0, 10).forEach((shop: any, idx: number) => {
+      const id = Number(shop.id ?? shop.shopId ?? 0);
+      if (id > 0) priorityRank.set(id, idx);
+    });
+
     const opts = safeShops
       .filter((shop: any) => {
         const status = String(shop.status ?? "Active");
@@ -656,34 +723,31 @@ export default function UnLoadingTable({
         return { value, label, isDisabled: false };
       })
       .filter((opt: { value: number; label: string; isDisabled: boolean }) => opt.value > 0);
-    // Delivery route ordering (priority → alphabetical → delivered sinks down):
-    //   • The FIRST 10 shops in the master list are the priority route — while
-    //     pending they sit at the very top in their listed order, so the next
-    //     shop to deliver is always the next priority shop.
-    //   • The REMAINING pending shops follow, alphabetically.
-    //   • Once a shop is captured (delivered) it moves to the BOTTOM (the
-    //     delivered group), so the queue advances shop by shop.
-    const priorityRank = new Map<number, number>();
-    safeShops.slice(0, 10).forEach((shop: any, idx: number) => {
-      const id = Number(shop.id ?? shop.shopId ?? 0);
-      if (id > 0) priorityRank.set(id, idx);
-    });
-    const rankOf = (value: number) => priorityRank.get(value) ?? null;
+
+    // Delivery queue ordering:
+    //   • PENDING priority shops first, in their listed (mentioned) order.
+    //   • Everything else (remaining pending shops AND already-delivered
+    //     shops) follows in plain alphabetical order — a delivered shop drops
+    //     out of its priority slot and settles alphabetically, never a special
+    //     "last" pile.
+    const isPendingPriority = (o: { value: number; label: string }) => {
+      const id = Number(o.value);
+      const shop = safeShops.find((s: any) => Number(s.id ?? s.shopId ?? 0) === id);
+      if (!shop) return false;
+      return priorityRank.has(id) && !isDeliveredShop(shop);
+    };
     opts.sort(
       (
         a: { value: number; label: string; isDisabled: boolean },
         b: { value: number; label: string; isDisabled: boolean }
       ) => {
-        const aDone = deliveredShopIds.has(Number(a.value)) ? 1 : 0;
-        const bDone = deliveredShopIds.has(Number(b.value)) ? 1 : 0;
-        if (aDone !== bDone) return aDone - bDone;
-        if (!aDone) {
-          const ap = rankOf(Number(a.value));
-          const bp = rankOf(Number(b.value));
-          if (ap != null && bp != null) return ap - bp;
-          if (ap != null) return -1;
-          if (bp != null) return 1;
+        const aPrio = isPendingPriority(a);
+        const bPrio = isPendingPriority(b);
+        if (aPrio && bPrio) {
+          return (priorityRank.get(Number(a.value)) ?? 0) - (priorityRank.get(Number(b.value)) ?? 0);
         }
+        if (aPrio) return -1;
+        if (bPrio) return 1;
         return a.label.localeCompare(b.label);
       }
     );
@@ -853,7 +917,7 @@ export default function UnLoadingTable({
             title={t("ops.trip.shops_pdf_title")}
           >
             <FileText size={15} className="text-blue-600" />
-            <span>{t("ops.trip.shops")} ({safeShops.length})</span>
+            <span>{t("ops.trip.shops")} ({pendingShopsCount})</span>
           </button>
 
           <button
@@ -862,7 +926,7 @@ export default function UnLoadingTable({
             title={t("ops.trip.boxes_pdf_title")}
           >
             <Box size={15} className="text-emerald-600" />
-            <span>{t("ops.trip.boxes")} ({safeBoxDetails.length})</span>
+            <span>{t("ops.trip.boxes")} ({remainingBoxesCount})</span>
           </button>
 
           {!readOnly && !showForm && (
