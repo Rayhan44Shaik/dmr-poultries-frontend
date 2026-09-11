@@ -10,7 +10,6 @@ import { useEffect, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
-  ArrowUpRight,
   Banknote,
   CheckCircle2,
   ReceiptText,
@@ -194,10 +193,6 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
                         {stat.count} {stat.label}
                       </span>
                       <span className="block text-slate-300">{tipLine(stat)}</span>
-                      <span className="mt-1 flex items-center gap-1 text-[10.5px] font-semibold text-slate-400">
-                        Click to open
-                        <ArrowUpRight size={11} />
-                      </span>
                     </span>
                   </span>
                   <span
