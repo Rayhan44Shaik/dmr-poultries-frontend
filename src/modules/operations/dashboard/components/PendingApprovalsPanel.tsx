@@ -97,12 +97,12 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
                 key={stat.key}
                 to={stat.href}
                 title={`${stat.count} ${stat.label} pending approval`}
-                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors sm:px-3 ${stat.hover} ${
+                className={`group/tile flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-all duration-150 active:scale-[0.96] sm:px-3 motion-reduce:transition-none motion-reduce:active:scale-100 ${stat.hover} ${
                   empty ? "opacity-40 hover:bg-transparent" : ""
                 }`}
               >
                 <span
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${stat.chip}`}
+                  className={`flex h-7 w-7 shrink-0 origin-center items-center justify-center rounded-lg transition-transform duration-200 ease-out group-hover/tile:scale-110 group-active/tile:scale-75 group-active/tile:-rotate-12 motion-reduce:transform-none motion-reduce:transition-none ${stat.chip}`}
                 >
                   <Icon size={14} strokeWidth={2.2} />
                 </span>
