@@ -3,12 +3,9 @@ import TripFilters from "../components/TripFilters";
 import TripKPICards from "../components/TripKPICards";
 import TripMasterTable from "../components/TripMasterTable";
 import TripViewModal from "../components/TripViewModal";
-import {
-  paginationBarClass,
-  paginationNavBtnClass,
-  paginationPageBtnClass,
-  shouldShowPagination,
-} from "../../../../shared/ui/paginationStyles";
+import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
+import { Pagination } from "../../../../ui";
+import { PAGINATION_DEFAULT_PAGE_SIZE } from "../../../../shared/ui/uiTokens";
 
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
@@ -28,7 +25,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
 
   const [trips, setTrips] = useState<Trip[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [totalTrips, setTotalTrips] = useState(0);
   const [, setIsLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -38,7 +34,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
-  const pageSize = 15;
+  const [pageSize, setPageSize] = useState(PAGINATION_DEFAULT_PAGE_SIZE);
 
   const refreshTrips = useCallback(async () => {
     setIsLoading(true);
@@ -54,7 +50,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         limit: pageSize,
       });
       setTrips(result.data);
-      setTotalPages(result.meta.totalPages);
       setTotalTrips(result.meta.total);
     } catch {
       showNotification(t("ops.trip.unable_load_trips"), "error");
@@ -126,7 +121,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const totalCompletedWeight = completedTrips.reduce((sum, t) => sum + t.totalWeight, 0);
   const totalCompletedMortality = completedTrips.reduce((sum, t) => sum + t.totalMortality, 0);
 
-  const totalPagesCompleted = totalPages;
   const paginatedTrips = completedTrips;
 
   const startEntry = totalCompletedTrips === 0 ? 0 : (currentPage - 1) * pageSize + 1;
@@ -158,8 +152,8 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     }
   };
 
-  const handleExportPDF = () => {
-    const exportData = completedTrips;
+  const handleExportPDF = async () => {
+    const exportData = await fetchAllFilteredTrips();
     if (!exportData || exportData.length === 0) {
       showNotification(t("ops.trip.no_data_export"), "error");
       return;
@@ -187,12 +181,36 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       t.totalWeight.toFixed(2),
     ]);
     const filename = `Trips_${new Date().toISOString().split("T")[0]}`;
-    exportToPDF(t("ops.trip.trip_list"), headers, rows, filename);
+
+    // Report the filters actually in force, so the PDF is self-describing.
+    const activeFilters = [
+      fromDate || toDate
+        ? { label: t("table.date"), value: `${fromDate || "..."} to ${toDate || "..."}` }
+        : null,
+      vehicle !== "All Vehicles" ? { label: t("common.vehicle"), value: vehicle } : null,
+      supervisor !== "All Supervisors" ? { label: t("common.supervisor"), value: supervisor } : null,
+      farm !== "All Sources" ? { label: t("ops.trip.source_farm"), value: farm } : null,
+      search ? { label: t("common.search"), value: search } : null,
+    ].filter((f): f is { label: string; value: string } => f !== null);
+
+    exportToPDF(t("ops.trip.trip_list"), headers, rows, filename, {
+      filters: activeFilters.length
+        ? activeFilters
+        : [{ label: t("common.filter"), value: t("common.all") }],
+      summary: [
+        { label: t("ops.trip.total_trips"), value: String(exportData.length) },
+        { label: t("ops.trip.total_shops"), value: String(exportData.reduce((n, r) => n + r.totalShops, 0)) },
+        { label: t("common.birds"), value: exportData.reduce((n, r) => n + r.totalBirds, 0).toLocaleString() },
+        { label: t("ops.trip.weight_kg"), value: exportData.reduce((n, r) => n + r.totalWeight, 0).toFixed(2) },
+        { label: t("operations.mortality_count"), value: String(exportData.reduce((n, r) => n + r.totalMortality, 0)) },
+      ],
+      numericColumns: [6, 7, 8],
+    });
     showNotification(t("notification.export_success"), "success");
   };
 
-  const handleExportExcel = () => {
-    const exportData = completedTrips;
+  const handleExportExcel = async () => {
+    const exportData = await fetchAllFilteredTrips();
     if (!exportData || exportData.length === 0) {
       showNotification(t("ops.trip.no_data_export"), "error");
       return;
@@ -224,6 +242,25 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     showNotification(t("notification.export_success"), "success");
   };
 
+  const fetchAllFilteredTrips = useCallback(async (): Promise<Trip[]> => {
+    const result = await listCompletedTrips({
+      fromDate: fromDate || undefined,
+      toDate: toDate || undefined,
+      vehicleId: vehicle !== "All Vehicles" ? Number(vehicle) : undefined,
+      supervisorId: supervisor !== "All Supervisors" ? Number(supervisor) : undefined,
+      farmId: farm !== "All Sources" ? Number(farm) : undefined,
+      search: search || undefined,
+      page: 1,
+      limit: Math.max(totalTrips, 1),
+    });
+    return result.data;
+  }, [fromDate, toDate, vehicle, supervisor, farm, search, totalTrips]);
+
+  const handleRefreshClick = () => {
+    void refreshTrips();
+    showNotification(t("notification.data_refreshed"), "success");
+  };
+
   const handleResetFilters = () => {
     resetFilters();
     showNotification(t("ops.trip.filters_reset"), "info");
@@ -251,8 +288,9 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         vehicles={vehicleOptions}
         supervisors={[]}
         farms={[]}
-        onExportPDF={handleExportPDF}
-        onExportExcel={handleExportExcel}
+        onExportPDF={() => void handleExportPDF()}
+        onExportExcel={() => void handleExportExcel()}
+        onRefresh={handleRefreshClick}
         onViewSelected={handleViewSelected}
         showViewButton={selectedRowId !== null}
         hasFilters={hasFilters}
@@ -277,31 +315,16 @@ function TripListPage({ embedded = false }: TripListPageProps) {
           startIndex={(currentPage - 1) * pageSize}
         />
         {shouldShowPagination(totalCompletedTrips) && (
-        <div className={paginationBarClass}>
-          <button
-            onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
-            disabled={currentPage === 1}
-            className={paginationNavBtnClass}
-          >
-            {t("common.previous")}
-          </button>
-          {Array.from({ length: totalPagesCompleted }, (_, i) => i + 1).map((page) => (
-            <button
-              key={page}
-              onClick={() => setCurrentPage(page)}
-              className={paginationPageBtnClass(currentPage === page)}
-            >
-              {page}
-            </button>
-          ))}
-          <button
-            onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPagesCompleted))}
-            disabled={currentPage === totalPagesCompleted || totalPagesCompleted === 0}
-            className={paginationNavBtnClass}
-          >
-            {t("common.next")}
-          </button>
-        </div>
+          <Pagination
+            page={currentPage}
+            pageSize={pageSize}
+            totalItems={totalCompletedTrips}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setCurrentPage(1);
+            }}
+          />
         )}
       </div>
 

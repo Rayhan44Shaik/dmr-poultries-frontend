@@ -13,6 +13,7 @@ import {
   opsReactSelectStyles,
 } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
+import { BrandRefreshButton } from "../../../../ui";
 
 interface Props {
   fromDate: string;
@@ -33,6 +34,7 @@ interface Props {
   supervisors?: string[];
   farms?: string[];
   onExportPDF?: () => void;
+  onRefresh?: () => void;
   onExportExcel?: () => void;
   onViewSelected?: () => void;
   showViewButton?: boolean;
@@ -65,6 +67,7 @@ function TripFilters({
   supervisors = [],
   farms = [],
   onExportPDF,
+  onRefresh,
   onExportExcel,
   onViewSelected,
   showViewButton = false,
@@ -192,6 +195,7 @@ function TripFilters({
             <RotateCcw size={14} />
             {t("common.reset")}
           </button>
+          {onRefresh && <BrandRefreshButton onClick={onRefresh} />}
           {onExportPDF && (
             <button onClick={onExportPDF} disabled={!hasFilters} className={opsPdfButtonClass}>
               <FileText size={15} />
