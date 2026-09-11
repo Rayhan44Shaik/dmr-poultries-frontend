@@ -292,10 +292,10 @@ function TripRecentTable({
                 const isActive = statusFilter === tab;
                 const activeClass =
                   tab === "Draft"
-                    ? "bg-blue-600 text-white shadow-sm"
+                    ? "bg-emerald-50/80 text-emerald-500 shadow-sm"
                     : tab === "Pending"
-                    ? "bg-orange-500 text-white shadow-sm"
-                    : "bg-red-600 text-white shadow-sm";
+                    ? "bg-orange-50/80 text-orange-500 shadow-sm"
+                    : "bg-rose-50/80 text-rose-500 shadow-sm";
                 const label = (() => {
                   const k = "status." + tab.toLowerCase();
                   const v = t(k);
