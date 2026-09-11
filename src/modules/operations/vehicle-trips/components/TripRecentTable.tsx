@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Eye, Pencil, RefreshCw, History, Trash2, Clock, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
+import { Eye, Pencil, History, Trash2, Clock, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
 import { formatTripRecentDateWithDay } from "../utils/formatTripListDay";
@@ -13,6 +13,7 @@ import { getNextIncompleteTripStep, isTripWizardComplete, isValidTripStatusTrans
 import { useI18n } from "../../../../i18n";
 import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
 import { uniqueTripsById } from "../services/tripHeaderApiService";
+import { BrandRefreshButton } from "../../../../ui";
 import { isOrderContainer } from "../../orders/ordersUtils";
 
 interface Props {
@@ -291,10 +292,10 @@ function TripRecentTable({
                 const isActive = statusFilter === tab;
                 const activeClass =
                   tab === "Draft"
-                    ? "bg-blue-50 text-blue-700 shadow-sm"
+                    ? "bg-blue-600 text-white shadow-sm"
                     : tab === "Pending"
-                    ? "bg-orange-50 text-orange-700 shadow-sm"
-                    : "bg-red-50 text-red-700 shadow-sm";
+                    ? "bg-orange-500 text-white shadow-sm"
+                    : "bg-red-600 text-white shadow-sm";
                 const label = (() => {
                   const k = "status." + tab.toLowerCase();
                   const v = t(k);
@@ -336,9 +337,7 @@ function TripRecentTable({
                 <Trash2 size={13} />
                 <span className="hidden md:inline">{t("common.delete")}</span>
               </button>
-              <button onClick={() => onRefresh()} className="h-8 w-8 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-all shadow-sm active:scale-95 hover:border-slate-300" title={t("common.refresh")}>
-                <RefreshCw size={13} className="text-slate-600 transition-transform active:rotate-180" />
-              </button>
+              <BrandRefreshButton onClick={() => onRefresh()} />
             </div>
           </div>
         </div>
