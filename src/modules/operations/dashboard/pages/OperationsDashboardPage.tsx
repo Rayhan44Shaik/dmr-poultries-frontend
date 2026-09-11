@@ -10,7 +10,7 @@ import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
 import PendingCollectionsByShop from "../components/PendingCollectionsByShop";
 import PendingApprovalsPanel from "../components/PendingApprovalsPanel";
-import { Calendar, CalendarRange, ArrowRightLeft, RefreshCw } from "lucide-react";
+import { Calendar, CalendarRange, ChevronDown, ArrowRightLeft, RefreshCw } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useI18n } from "../../../../i18n";
 import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapshot";
@@ -102,29 +102,51 @@ function RangeDatePicker({
 
   const slateCalendarIcon = <Calendar size={15} className="text-emerald-600" />;
 
+  const rangeLabel =
+    startDate && endDate ? `${formatDate(startDate)} – ${formatDate(endDate)}` : null;
+  const rangeDays =
+    startDate && endDate
+      ? Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1
+      : null;
+
   return (
     <div className={`relative ${className}`} ref={containerRef}>
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={toggleCalendar}
-          aria-label="Select date range"
-          className="group h-11 rounded-xl border border-emerald-200/80 bg-emerald-50/50 py-1.5 pl-2 pr-4 flex items-center gap-2.5 text-[13.5px] font-semibold tracking-tight text-emerald-950/85 shadow-sm hover:border-emerald-300 hover:bg-emerald-50 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all active:scale-[0.98]"
-        >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-600 ring-1 ring-emerald-200/70 transition-transform group-hover:scale-105">
-            <CalendarRange size={17} strokeWidth={2.2} />
+      <button
+        type="button"
+        onClick={toggleCalendar}
+        aria-label="Select date range"
+        aria-expanded={isOpen}
+        className={`group flex h-11 items-center gap-2.5 rounded-xl border bg-white py-1.5 pl-1.5 pr-2.5 shadow-sm transition-all duration-150 active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-emerald-500/10 ${
+          isOpen
+            ? "border-emerald-400 ring-2 ring-emerald-500/15"
+            : "border-slate-200 hover:border-emerald-300 hover:shadow-md"
+        }`}
+      >
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 ring-1 ring-inset ring-emerald-100 transition-transform duration-200 group-hover:scale-105">
+          <CalendarRange size={16} strokeWidth={2.2} />
+        </span>
+        <span className="flex flex-col items-start leading-none">
+          <span className="text-[9.5px] font-bold uppercase tracking-[0.08em] text-slate-400">
+            {t("ops.dashboard.select_range")}
           </span>
-          <span className="whitespace-nowrap tabular-nums">
-            {startDate && endDate
-              ? `${formatDate(startDate)} – ${formatDate(endDate)}`
-              : t("ops.dashboard.select_range")}
+          <span className="mt-1 whitespace-nowrap text-[12.5px] font-bold tabular-nums text-slate-700">
+            {rangeLabel ?? "—"}
           </span>
-        </button>
-      </div>
+        </span>
+        {rangeDays != null && (
+          <span className="ml-0.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold tabular-nums text-emerald-700 ring-1 ring-inset ring-emerald-100">
+            {rangeDays}d
+          </span>
+        )}
+        <ChevronDown
+          size={15}
+          className={`shrink-0 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180 text-emerald-600" : "group-hover:text-emerald-600"}`}
+        />
+      </button>
 
       {isOpen && (
         <div
-          className={`absolute right-0 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-xl shadow-slate-900/5 backdrop-blur-xl border-t-emerald-500 border-t-2 ${dropdownPositionClass}`}
+          className={`absolute right-0 z-50 w-[min(24rem,calc(100vw-2rem))] animate-scale-in rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-xl shadow-slate-900/10 backdrop-blur-xl ring-1 ring-emerald-500/10 ${dropdownPositionClass}`}
         >
           <div className="space-y-4">
             {/* Stacked full-width fields: the shared DatePicker reserves right
@@ -157,17 +179,17 @@ function RangeDatePicker({
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 whitespace-nowrap border-t border-slate-100 pt-4">
+            <div className="flex gap-2 whitespace-nowrap border-t border-slate-100 pt-4">
               <button
                 type="button"
                 onClick={() => {
                   const today = new Date();
                   const weekAgo = new Date(today);
-                  weekAgo.setDate(today.getDate() - 7);
+                  weekAgo.setDate(today.getDate() - 6);
                   onRangeChange(weekAgo, today);
                   setIsOpen(false);
                 }}
-                className="rounded-lg bg-emerald-50 px-4 py-2 text-[13px] font-bold text-emerald-700 transition-colors hover:bg-emerald-100"
+                className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-[13px] font-bold text-white shadow-sm transition-colors hover:bg-emerald-700"
               >
                 {t("ops.dashboard.last_7_days")}
               </button>
@@ -180,7 +202,7 @@ function RangeDatePicker({
                   onRangeChange(monthAgo, today);
                   setIsOpen(false);
                 }}
-                className="rounded-lg bg-slate-50 px-4 py-2 text-[13px] font-bold text-slate-700 transition-colors hover:bg-slate-100"
+                className="flex-1 rounded-lg border border-slate-200 bg-white px-4 py-2 text-[13px] font-bold text-slate-600 transition-colors hover:bg-slate-50"
               >
                 {t("ops.dashboard.last_30_days")}
               </button>

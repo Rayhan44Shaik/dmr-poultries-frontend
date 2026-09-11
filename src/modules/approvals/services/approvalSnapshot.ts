@@ -17,6 +17,7 @@
 import { listTrips } from '../../operations/vehicle-trips/services/tripHeaderApiService';
 import { maintenanceApi, mapMaintenanceToEvent } from '../../fleet-operations/services/maintenanceApi';
 import permitApi from '../../fleet-operations/services/permitApi';
+import { fleetSharedGet } from '../../fleet-operations/services/fleetSessionCache';
 import { listEligibleTrips } from '../../operations/shop-sales/services/rateEntryApiService';
 import { listPayments } from '../../accounts/services/paymentApiService';
 import { createDemoPayments } from '../../accounts/utils/paymentRegisterDemo';
@@ -114,7 +115,7 @@ export function refreshApprovalSnapshot(force = false): Promise<void> {
       maintenanceApi.list({ status: 'Pending', limit: 500 }),
       listEligibleTrips().catch(() => []),
       demoPayments ? Promise.resolve(createDemoPayments()) : listPayments().catch(() => []),
-      permitApi.list().catch(() => []),
+      fleetSharedGet('permits:list', () => permitApi.list()).catch(() => []),
     ]);
 
     const [tripsResult, maintenanceResult, rateResult, paymentsResult, documentsResult] = results;
