@@ -2,6 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { CalendarDays, CheckCircle2, CreditCard, Route, Wrench } from "lucide-react";
 import { Link } from "react-router-dom";
 
+type ApprovalCalendarProps = {
+  startDate?: Date;
+  endDate?: Date;
+};
+
 type ApprovalItem = {
   label: string;
   count: number;
@@ -25,10 +30,20 @@ const isPending = (value: unknown): boolean => {
   return status === "pending" || status === "draft" || status === "submitted";
 };
 
-function getApprovalItems(): ApprovalItem[] {
-  const trips = readRows("vehicleTrips");
-  const maintenance = readRows("dmr-vehicle-maintenance");
-  const payments = readRows("dmr-payments");
+function getApprovalItems(startDate?: Date, endDate?: Date): ApprovalItem[] {
+  const inRange = (row: Record<string, unknown>) => {
+    if (!startDate || !endDate) return true;
+    const raw = row.tripDate ?? row.date ?? row.paymentDate ?? row.createdAt;
+    if (!raw) return true;
+    const date = new Date(String(raw));
+    if (Number.isNaN(date.getTime())) return true;
+    const start = new Date(startDate); start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate); end.setHours(23, 59, 59, 999);
+    return date >= start && date <= end;
+  };
+  const trips = readRows("vehicleTrips").filter(inRange);
+  const maintenance = readRows("dmr-vehicle-maintenance").filter(inRange);
+  const payments = readRows("dmr-payments").filter(inRange);
 
   // Rate Entry is completed from trip details. Only count active trips that
   // still have no usable rate, without changing any persisted data.
@@ -74,9 +89,9 @@ function getApprovalItems(): ApprovalItem[] {
   ];
 }
 
-export default function ApprovalCalendar() {
-  const [items, setItems] = useState<ApprovalItem[]>(() => getApprovalItems());
-  const refresh = useCallback(() => setItems(getApprovalItems()), []);
+export default function ApprovalCalendar({ startDate, endDate }: ApprovalCalendarProps) {
+  const [items, setItems] = useState<ApprovalItem[]>(() => getApprovalItems(startDate, endDate));
+  const refresh = useCallback(() => setItems(getApprovalItems(startDate, endDate)), [startDate, endDate]);
 
   useEffect(() => {
     refresh();
@@ -100,7 +115,9 @@ export default function ApprovalCalendar() {
           <div>
             <h2 className="text-sm font-black text-slate-800">Approval calendar</h2>
             <p className="text-[11px] font-medium text-slate-400">
-              {total > 0 ? `${total} item${total === 1 ? "" : "s"} need attention` : "Everything is up to date"}
+              {startDate && endDate
+                ? `Synced to ${startDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })} – ${endDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}`
+                : "Synced to selected dashboard range"}
             </p>
           </div>
         </div>

@@ -273,7 +273,7 @@ function OperationsDashboardPage() {
 
   return (
     <div className="min-w-0 space-y-5">
-      <ApprovalCalendar />
+      <ApprovalCalendar startDate={startDate} endDate={endDate} />
 
       {/* Date Range Selector Bar */}
       <div className="flex flex-wrap justify-end items-center gap-2">
