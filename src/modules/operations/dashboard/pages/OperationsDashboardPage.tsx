@@ -278,10 +278,9 @@ function OperationsDashboardPage() {
 
   return (
     <div className="min-w-0 space-y-5">
-      {/* Live pending-approval summary (trips · rates · bills · payments). */}
-      <PendingApprovalsPanel />
-
-      <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm">
+      {/* One slim card: live pending-approval KPIs on the left, range picker on the right. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-slate-200/80 bg-white px-4 py-2.5 shadow-sm">
+        <PendingApprovalsPanel bare />
         <RangeDatePicker
           startDate={startDate}
           endDate={endDate}

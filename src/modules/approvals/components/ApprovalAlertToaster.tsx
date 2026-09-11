@@ -55,7 +55,7 @@ export function ApprovalAlertToaster() {
         parts.push(`${state.payments.count} payment${state.payments.count === 1 ? '' : 's'}`);
 
       showNotification(
-        `🔔 ${state.total} item${state.total === 1 ? '' : 's'} pending your approval: ${parts.join(', ')}. Open the bell or Approval Center.`,
+        `🔔 ${state.total} item${state.total === 1 ? '' : 's'} pending approval: ${parts.join(', ')}. See the dashboard KPI strip or open the bell for details.`,
         state.total > 10 ? 'error' : 'warning',
         9000
       );

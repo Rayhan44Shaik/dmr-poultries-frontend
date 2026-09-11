@@ -40,7 +40,6 @@ import {
   UserCheck,
   Settings,
   Database,
-  ClipboardCheck,
   Scale,
 } from "lucide-react";
 
@@ -187,21 +186,6 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: LayoutDashboard,
         tone: "sky",
         keywords: "home kpi charts today overview",
-      },
-    ],
-  },
-  {
-    id: "approvals",
-    label: "Approvals",
-    icon: ClipboardCheck,
-    children: [
-      {
-        label: "Approval Center",
-        path: "/approvals",
-        icon: ClipboardCheck,
-        tone: "amber",
-        keywords:
-          "approve approval queue sign off trip approve pending trip maintenance bill rate approval payment approve draft payments owner",
       },
     ],
   },
@@ -598,12 +582,6 @@ export interface QuickAction {
 }
 
 export const QUICK_ACTIONS: QuickAction[] = [
-  {
-    label: "Review Approvals",
-    description: "Approve pending trips, maintenance bills & payments",
-    path: "/approvals",
-    icon: ClipboardCheck,
-  },
   {
     label: "New Trip Entry",
     labelKey: "quick.new_trip",

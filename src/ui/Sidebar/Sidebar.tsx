@@ -15,8 +15,6 @@ import { usePendingApprovals } from "../../modules/approvals/hooks/usePendingApp
 function navApprovalBadge(path: string, approvals: ReturnType<typeof usePendingApprovals>): number {
   if (!approvals.loaded) return 0;
   switch (path) {
-    case "/approvals":
-      return approvals.total;
     case "/operations?tab=trip-entry":
       return approvals.trips.count;
     case "/fleet?tab=entry":
@@ -139,7 +137,6 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                 const label = child.labelKey ? t(child.labelKey) : child.label;
                 const tone = NAV_TONE_CLASS[child.tone ?? "slate"];
                 const badgeCount = navApprovalBadge(child.path, pendingApprovals);
-                const isApprovalHub = child.path === "/approvals";
 
                 return child.soon ? (
                   <li key={child.label}>
@@ -177,11 +174,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                       {badgeCount > 0 && (
                         <span
                           title={`${badgeCount} pending approval${badgeCount === 1 ? "" : "s"}`}
-                          className={`ml-auto inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums ${
-                            isApprovalHub
-                              ? "bg-amber-500 text-white"
-                              : "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300"
-                          }`}
+                          className="ml-auto inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-amber-100 px-1 text-[10px] font-bold tabular-nums text-amber-800 dark:bg-amber-500/20 dark:text-amber-300"
                         >
                           {badgeCount > 99 ? "99+" : badgeCount}
                         </span>

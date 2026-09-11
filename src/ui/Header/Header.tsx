@@ -15,7 +15,6 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  ClipboardCheck,
   Clock3,
   LogOut,
   Menu,
@@ -470,17 +469,6 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
                 })
               )}
             </div>
-            {pendingApprovals.total > 0 && (
-              <Link
-                to="/approvals"
-                onClick={close}
-                className="flex items-center justify-center gap-1.5 border-t border-amber-100 bg-amber-50 px-4 py-2.5 text-[13px] font-semibold text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20"
-              >
-                <ClipboardCheck size={15} />
-                Review {pendingApprovals.total} pending approval{pendingApprovals.total === 1 ? "" : "s"} in Approval Center
-                <ChevronRight size={14} />
-              </Link>
-            )}
           </div>
         )}
       </Dropdown>

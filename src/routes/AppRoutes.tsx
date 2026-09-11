@@ -39,7 +39,6 @@ function lazyShell(page: () => Promise<PageModule>) {
 
 // Lazy components are created once at module level (stable identity).
 const pages = {
-  approvals: lazyWithRetry(lazyShell(() => import("../modules/approvals/pages/ApprovalsPage"))),
   dashboard: lazyWithRetry(lazyShell(() => import("../modules/operations/dashboard/pages/OperationsDashboardPage"))),
   masters: lazyWithRetry(lazyShell(() => import("../modules/masters/pages/MastersPage"))),
   mastersShops: lazyWithRetry(lazyShell(() => import("../modules/masters/shops/pages/ShopsPage"))),
@@ -104,16 +103,6 @@ function AppRoutes() {
         element={
           <Suspense fallback={<PageLoading />}>
             <pages.supervisorMobile />
-          </Suspense>
-        }
-      />
-
-      {/* ============ APPROVAL CENTER ============ */}
-      <Route
-        path="/approvals"
-        element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.approvals />
           </Suspense>
         }
       />
