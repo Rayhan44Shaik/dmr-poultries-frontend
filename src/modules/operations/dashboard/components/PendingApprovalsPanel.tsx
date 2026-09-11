@@ -6,7 +6,7 @@
 // Live data via the approval snapshot store.
 // -----------------------------------------------------------------------------
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -18,6 +18,32 @@ import {
   Wrench,
 } from "lucide-react";
 import { usePendingApprovals } from "../../../approvals/hooks/usePendingApprovals";
+
+/* Preload the destination route/tab chunk as soon as a tile is hovered or
+   focused, so the click itself never waits on a download. Bundler de-dupes. */
+const preloadOnce = (() => {
+  const done = new Set<string>();
+  return (key: string, load: () => Promise<unknown>) => {
+    if (done.has(key)) return;
+    done.add(key);
+    void load().catch(() => done.delete(key));
+  };
+})();
+
+const preloaders: Record<string, () => void> = {
+  trips: () =>
+    preloadOnce("ops", () => import("../../../operations/pages/OperationsPages")),
+  rates: () =>
+    preloadOnce("ops", () => import("../../../operations/pages/OperationsPages")),
+  maintenance: () => {
+    preloadOnce("fleet", () => import("../../../fleet-operations/pages/FleetPages"));
+    preloadOnce("fleet-entry", () =>
+      import("../../../fleet-operations/pages/MaintenanceEntryPage")
+    );
+  },
+  payments: () =>
+    preloadOnce("accounts", () => import("../../../accounts/pages/AccountsPage")),
+};
 
 interface Stat {
   key: string;
@@ -40,6 +66,15 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
   const q = usePendingApprovals();
   const loading = !q.loaded;
   const allClear = q.loaded && q.total === 0;
+
+  // Warm the maintenance (Fleet) route on idle — it is the one destination
+  // loaded as a separate lazy chunk, so this makes its tile click instant.
+  useEffect(() => {
+    const idle =
+      window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1800));
+    const handle = idle(() => preloaders.maintenance());
+    return () => window.cancelIdleCallback?.(handle as number);
+  }, []);
 
   const stats: Stat[] = [
     {
@@ -102,7 +137,7 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
   return (
     <section
       aria-label="Pending approvals"
-      className="flex flex-wrap items-center gap-x-1 gap-y-1.5 rounded-xl border border-slate-200/70 bg-white px-3 py-2.5 shadow-sm"
+      className="relative z-30 flex flex-wrap items-center gap-x-1 gap-y-1.5 rounded-xl border border-slate-200/70 bg-white px-3 py-2.5 shadow-sm"
     >
       {loading ? (
         <div className="flex items-center gap-4 px-1">
@@ -124,6 +159,9 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
               <Link
                 key={stat.key}
                 to={stat.href}
+                onMouseEnter={() => preloaders[stat.key]()}
+                onFocus={() => preloaders[stat.key]()}
+                onTouchStart={() => preloaders[stat.key]()}
                 aria-label={`${stat.count} ${stat.label} pending — open ${stat.label}`}
                 className={`group/tile relative flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-all duration-150 active:scale-[0.96] sm:px-3 motion-reduce:transition-none motion-reduce:active:scale-100 ${stat.hover} ${
                   empty ? "opacity-40 hover:bg-transparent" : ""
@@ -147,7 +185,7 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
                     sits at page top, where an upward bubble would clip). */}
                 <span
                   role="tooltip"
-                  className={`pointer-events-none absolute top-[calc(100%+6px)] z-50 w-max max-w-[230px] rounded-lg bg-slate-900 px-3 py-2 text-left text-[11.5px] font-medium leading-snug text-white opacity-0 shadow-xl shadow-slate-900/25 transition-opacity duration-75 ease-out delay-0 group-hover/tile:opacity-100 group-focus-visible/tile:opacity-100 motion-reduce:transition-none ${stat.tipClass}`}
+                  className={`pointer-events-none absolute top-[calc(100%+6px)] z-[70] w-max max-w-[230px] rounded-lg bg-slate-900 px-3 py-2 text-left text-[11.5px] font-medium leading-snug text-white opacity-0 shadow-xl shadow-slate-900/25 transition-opacity duration-75 ease-out delay-0 group-hover/tile:opacity-100 group-focus-visible/tile:opacity-100 motion-reduce:transition-none ${stat.tipClass}`}
                 >
                   <span className="flex items-start gap-1.5">
                     <span className={`mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full ${stat.dot}`} />
