@@ -2,33 +2,41 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App";
-import { guardedReload, isChunkLoadError } from "./routes/lazyWithRetry";
+import { ChunkLoadError, diagnoseConnection, guardedReload, isChunkLoadError } from "./routes/lazyWithRetry";
 
 // -----------------------------------------------------------------------------
 // SELF-HEALING LAZY LOADS (global layer)
 // -----------------------------------------------------------------------------
-// Pages also retry their own dynamic imports via lazyWithRetry; these window
-// handlers are the outer safety net for failures Vite surfaces before React
-// (preload polyfill) or outside the lazy boundary. guardedReload performs at
-// most one recovery reload per window and never loops on a genuinely broken
-// module.
+// Pages already retry + diagnose their own imports through lazyWithRetry; these
+// window handlers are the outer net for failures Vite surfaces before React.
+// Before reloading we probe the server so a cold tunnel is waited out instead
+// of triggering a pointless reload loop.
 // -----------------------------------------------------------------------------
+async function recover(error: unknown): Promise<void> {
+  if (!isChunkLoadError(error)) return;
+  try {
+    const verdict = await diagnoseConnection(error);
+    if (verdict === "reload") {
+      guardedReload();
+    }
+    // "unreachable" / "broken": lazyWithRetry's boundary owns the UI; nothing
+    // else to do at the window layer.
+  } catch (diagnosed) {
+    if (diagnosed instanceof ChunkLoadError) return; // boundary shows details
+  }
+}
+
 window.addEventListener("vite:preloadError", (event) => {
-  // We control the recovery reload; don't let the default + ours fire twice.
   event.preventDefault?.();
-  guardedReload();
+  void recover((event as unknown as { payload?: unknown }).payload ?? event);
 });
 
 window.addEventListener("unhandledrejection", (event) => {
   const reason = event.reason;
   const message =
-    typeof reason === "string"
-      ? reason
-      : reason?.message
-        ? String(reason.message)
-        : String(reason);
+    typeof reason === "string" ? reason : reason?.message ? String(reason.message) : String(reason);
   if (isChunkLoadError(message)) {
-    guardedReload();
+    void recover(reason);
   }
 });
 
