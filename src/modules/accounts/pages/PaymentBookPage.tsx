@@ -283,32 +283,34 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
         {demo && <span className={uiBadgeClass('warning')}>Sample data</span>}
         <Button variant="secondary" aria-pressed={demo} disabled={!!pendingItems.length || approving} onClick={toggleDemo}>{demo ? 'Back to real payments' : 'Preview sample data'}</Button>
         {demo && <Button variant="ghost" size="sm" icon={<RotateCcw size={14} />} title="Rebuild the sample rows, discarding preview edits" onClick={resetDemo}>Reset sample rows</Button>}
-        <Button icon={<Plus size={16} />} onClick={() => setIsNewModalOpen(true)}>New Payment</Button>
       </div>
       <section aria-label="Payment filters" className="rounded-xl border border-slate-200 bg-white p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex w-full items-center gap-2 sm:w-[302px] sm:shrink-0">
+        {/* Row one keeps dates and dropdown filters together. Row two keeps
+            search and every register action together for quick scanning. */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex w-full items-center gap-3 sm:w-[460px] sm:shrink-0">
             <div className="min-w-0 flex-1">
               <label htmlFor={`${dateId}-from`} className="sr-only">From Date</label>
-              <DatePicker className="[&_input]:pr-10" id={`${dateId}-from`} placeholder="From date" value={filters.from} onChange={v => changeFilter('from', v)} hideClear />
+              <DatePicker className="[&_input]:h-12 [&_input]:rounded-xl [&_input]:pr-10 [&_input]:text-base" id={`${dateId}-from`} placeholder="From date" openOnFocus={false} value={filters.from} onChange={v => changeFilter('from', v)} hideClear />
             </div>
             <span aria-hidden="true" className="text-slate-400">–</span>
             <div className="min-w-0 flex-1">
               <label htmlFor={`${dateId}-to`} className="sr-only">To Date</label>
-              <DatePicker className="[&_input]:pr-10" id={`${dateId}-to`} placeholder="To date" value={filters.to} onChange={v => changeFilter('to', v)} hideClear />
+              <DatePicker className="[&_input]:h-12 [&_input]:rounded-xl [&_input]:pr-10 [&_input]:text-base" id={`${dateId}-to`} placeholder="To date" openOnFocus={false} value={filters.to} onChange={v => changeFilter('to', v)} hideClear />
             </div>
           </div>
-          <MasterDropdown label="Payment Type" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-44" value={filters.type} options={types} placeholder="All payment types" onChange={v => changeFilter('type', v)} searchable allowClear />
-          <MasterDropdown label="Payment Mode" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-40" value={filters.mode} options={modes} placeholder="All payment modes" onChange={v => changeFilter('mode', v)} searchable allowClear />
-          <SearchInput value={filters.search} onChange={v => changeFilter('search', v)} aria-label="Search payments" placeholder="Payment no, payee, reference…" wrapperClassName="w-full sm:flex-1 sm:min-w-44" />
-          {/* Search and Clear carry their words; Refresh stays icon-only and
-              its arrows turn while the register reloads. */}
-          <div className="flex items-center gap-1.5">
+          <MasterDropdown label="Payment Type" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-56 [&>button]:h-11 [&>button]:text-sm" value={filters.type} options={types} placeholder="All payment types" onChange={v => changeFilter('type', v)} searchable allowClear />
+          <MasterDropdown label="Payment Mode" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-52 [&>button]:h-11 [&>button]:text-sm" value={filters.mode} options={modes} placeholder="All payment modes" onChange={v => changeFilter('mode', v)} searchable allowClear />
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2">
+          <SearchInput value={filters.search} onChange={v => changeFilter('search', v)} aria-label="Search payments" placeholder="Payment no, payee, reference…" wrapperClassName="w-full sm:flex-1 sm:min-w-56" />
+          <div className="flex w-full items-center justify-end gap-1.5 sm:w-auto">
             <Button size="lg" icon={<Search size={16} />} onClick={applyFilters} disabled={invalidRange}>Search</Button>
             <Button variant="secondary" size="lg" icon={<RotateCcw size={15} />} aria-label="Clear filters" title="Clear filters" onClick={clearFilters}>Clear</Button>
             <Button variant="custom" size="lg" iconOnly aria-label="Refresh" title="Refresh records" className={uiActionToneClass.refresh} disabled={spinning} onClick={handleRefresh}>
               <RefreshCw size={16} strokeWidth={2} aria-hidden="true" className={spinning ? 'animate-spin' : undefined} />
             </Button>
+            <Button size="lg" icon={<Plus size={16} />} onClick={() => setIsNewModalOpen(true)}>New Payment</Button>
           </div>
         </div>
         {invalidRange && <p role="alert" className="mt-2 text-xs text-red-600">From Date must be on or before To Date.</p>}

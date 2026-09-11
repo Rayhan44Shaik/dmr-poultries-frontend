@@ -6,11 +6,26 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+const DEMO_USER: AuthenticatedUser = {
+  id: 0,
+  username: 'demo',
+  displayName: 'Demo Owner',
+  role: 'OWNER',
+  employeeId: null,
+};
+
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<AuthenticatedUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Development-only preview bypass. It can be enabled for this server with
+  // VITE_DEMO_MODE=1, or per URL with ?demo=1. Production always uses auth.
+  const demoMode = import.meta.env.DEV && (
+    import.meta.env.VITE_DEMO_MODE === '1' ||
+    new URLSearchParams(window.location.search).get('demo') === '1'
+  );
+  const [user, setUser] = useState<AuthenticatedUser | null>(demoMode ? DEMO_USER : null);
+  const [loading, setLoading] = useState(!demoMode);
 
   useEffect(() => {
+    if (demoMode) return undefined;
     let active = true;
     currentUserRequest().then((value) => { if (active) setUser(value); }).catch(() => undefined)
       .finally(() => { if (active) setLoading(false); });

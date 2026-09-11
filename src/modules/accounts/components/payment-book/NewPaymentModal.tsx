@@ -217,6 +217,7 @@ function PaymentForm({ isOpen, onClose, onSave, persist }: NewPaymentModalProps)
             <div className={cn('rounded-xl border border-transparent p-[1px]', errors.paymentDate && 'border-red-200 bg-red-50/40')}>
               <DatePicker
                 onOpenChange={setCalendarOpen}
+                openOnFocus={false}
                 label="Payment Date"
                 required
                 className="[&_input]:h-9 [&_input]:rounded-xl [&_input]:border-slate-200 [&_input]:text-sm [&_input]:hover:border-slate-300"

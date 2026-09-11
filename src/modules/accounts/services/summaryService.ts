@@ -7,6 +7,7 @@ import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { Collection } from '../../operations/collections/types/collection';
 import type { FarmPayment } from '../types/farmPayment.types';
 import type { WeeklyMetrics, ExpenseBreakdown } from '../types/summary.types';
+import { paymentExpenseSector } from '../utils/paymentRegister';
 
 // ---- Core Data Fetchers ----
 const getCompletedTrips = (): Trip[] => {
@@ -151,14 +152,9 @@ export const summaryService = {
         });
 
         filtered.forEach((p: any) => {
-          const cat = (p.category || '').toLowerCase();
           const amt = Number(p.amount || 0);
-          
-          if (cat.includes('fuel')) total.fuel += amt;
-          else if (cat.includes('trip') || cat.includes('fastag') || cat.includes('vehicle expenses')) total.trip += amt;
-          else if (cat.includes('salary')) total.salary += amt;
-          else if (cat.includes('maintenance') || cat.includes('insurance') || cat.includes('repair')) total.maintenance += amt;
-          else if (!cat.includes('farm')) total.office += amt;
+          const sector = paymentExpenseSector(p.paymentType, p.category);
+          total[sector] += amt;
         });
       }
     } catch {

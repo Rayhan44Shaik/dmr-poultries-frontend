@@ -57,15 +57,15 @@ test('demo fixtures have unique sequential numbers, supported statuses and valid
 
 
 test('payment numbers READ year-first without the stored value being rewritten', () => {
-  assert.equal(paymentNoDisplay('Pay-07092026-001'), 'Pay-20260907-001');
-  assert.equal(paymentNoDisplay('Pay-13092026-001'), 'Pay-20260913-001');  // 13 can only be a day
+  assert.equal(paymentNoDisplay('Pay-07092026-001'), 'PAY-20260907-001');
+  assert.equal(paymentNoDisplay('Pay-13092026-001'), 'PAY-20260913-001');  // 13 can only be a day
   assert.equal(paymentNoDisplay('PAY-20260907-001'), 'PAY-20260907-001');  // already year-first
-  assert.equal(paymentNoDisplay('Pay-99132026-001'), 'Pay-99132026-001');  // impossible month → untouched
+  assert.equal(paymentNoDisplay('Pay-99132026-001'), 'PAY-99132026-001');  // impossible month → date order untouched
   assert.equal(paymentNoDisplay('LEGACY-42'), 'LEGACY-42');                // no date to reorder
   assert.equal(paymentNoDisplay(''), '');
   assert.equal(paymentNoDisplay(undefined), '');
   // Idempotent: a formatter that reshuffled its own output would corrupt numbers.
-  assert.equal(paymentNoDisplay(paymentNoDisplay('Pay-07092026-001')), 'Pay-20260907-001');
+  assert.equal(paymentNoDisplay(paymentNoDisplay('Pay-07092026-001')), 'PAY-20260907-001');
 });
 test('search matches the stored number and the number shown in the table', () => {
   for (const search of ['Pay-10092026-001', 'pay-20260910-001', '20260910']) {
