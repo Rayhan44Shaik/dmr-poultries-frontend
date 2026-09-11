@@ -64,19 +64,17 @@ export interface BrandRefreshButtonProps
  * No rings, halos or orbits — the hen alone carries the motion.
  */
 function BrandGlyph({ loading, compact }: { loading: boolean; compact: boolean }) {
-  const size = compact ? 18 : 22;
-  // The hen walks a track a few times its own width, so the journey is a real
-  // stroll across the button rather than a twitch. Icon-only buttons are tight,
-  // so they get a shorter track.
-  const track = compact ? size + 14 : size + 34;
-  const distance = track - size;
+  const size = compact ? 15 : 16;
+  // A short track: just enough travel to read as a walk, not enough to stretch
+  // the button. The hen stays visually part of the label, not a parade float.
+  const distance = compact ? 5 : 7;
 
   return (
     <span
       className="relative inline-flex shrink-0 items-center"
-      style={{ width: track, height: size }}
+      style={{ width: size + distance, height: size }}
     >
-      {/* Outer: travels left→right and flips to face the direction of travel. */}
+      {/* Outer: travels left→right and flips to face the way it's heading. */}
       <span
         className={cn(
           "absolute left-0 top-0 inline-flex items-center justify-center",
@@ -104,10 +102,7 @@ function BrandGlyph({ loading, compact }: { loading: boolean; compact: boolean }
             alt=""
             aria-hidden="true"
             draggable={false}
-            className={cn(
-              "h-full w-full select-none object-contain",
-              loading && "drop-shadow-[0_1px_2px_rgb(5_150_105_/_0.45)]",
-            )}
+            className="h-full w-full select-none object-contain"
           />
         </span>
       </span>
@@ -137,28 +132,31 @@ export function BrandRefreshButton({
       aria-busy={loading || undefined}
       disabled={rest.disabled || loading}
       variant="custom"
-      size={compact ? "sm" : (size ?? "lg")}
+      // Compact by default: "sm" (h-8) keeps the control small and neat next
+      // to the autosave pill. Callers can still pass an explicit size.
+      size={compact ? "xs" : (size ?? "sm")}
       iconOnly={iconOnly}
       aria-label={iconOnly ? name : ariaLabel}
       title={iconOnly ? name : rest.title}
       className={cn(
-        "group relative overflow-hidden",
+        "group",
         // --- Emerald "light" ------------------------------------------------
-        // A gradient from emerald into teal rather than a flat tint: it gives
-        // the control depth, keeps it clearly secondary to the solid emerald
-        // Save button, and stays legible on both white and slate-50 surfaces.
+        // A soft emerald→teal gradient rather than a flat tint: enough depth to
+        // feel deliberate, while staying clearly secondary to the solid emerald
+        // Save button beside it.
         "border border-emerald-300/80 bg-gradient-to-b from-emerald-50 to-teal-100/80",
-        "font-semibold text-emerald-800 shadow-sm ring-1 ring-emerald-500/10",
-        "transition-all duration-200",
+        "text-emerald-800 shadow-xs",
         "hover:border-emerald-400 hover:from-emerald-100 hover:to-teal-200/80",
-        "hover:text-emerald-900 hover:shadow-md hover:ring-emerald-500/25",
-        "active:from-emerald-200 active:to-teal-200 active:shadow-sm",
+        "hover:text-emerald-900",
+        "active:from-emerald-200 active:to-teal-200",
         "disabled:border-emerald-100 disabled:from-emerald-50/50 disabled:to-emerald-50/50",
         "disabled:text-emerald-400 disabled:shadow-none",
-        // While refreshing the surface itself lights up, so the whole control
-        // — not just the 22px glyph — signals that work is in flight.
-        loading && "border-emerald-400 from-emerald-100 to-teal-200/90 ring-2 ring-emerald-400/30",
-        !compact && "px-3.5",
+        // While refreshing the surface tints a touch deeper, so the whole
+        // control — not just the glyph — reads as busy.
+        loading && "border-emerald-400 from-emerald-100 to-teal-200/90",
+        // Tighter gap than the button default: the hen's walking track already
+        // carries its own trailing space, so the stock gap looks like a gap.
+        !iconOnly && "gap-1 pl-2 pr-2.5",
         className,
       )}
       icon={<BrandGlyph loading={loading} compact={compact} />}
