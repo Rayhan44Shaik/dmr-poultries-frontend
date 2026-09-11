@@ -33,7 +33,8 @@
  * =============================================================================
  */
 
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useRef, useState, type ButtonHTMLAttributes, type ReactNode, type MouseEvent, type FocusEvent } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "../utils/cn";
 import { uiButton, uiIconButton, type ButtonSize, type ButtonVariant } from "../shared/ui/uiTokens";
 
@@ -102,11 +103,30 @@ export function Button({
   type,
   onClick,
   title,
+  onMouseEnter,
+  onMouseLeave,
+  onFocus,
+  onBlur,
   "aria-label": ariaLabel,
   ...rest
 }: ButtonProps) {
   const resolvedVariant: ButtonVariant = VARIANT_ALIAS[variant] ?? variant;
   const isBlocked = Boolean(disabled) || loading;
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0, width: 280 });
+
+  const showTooltip = () => {
+    if (!title || !buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const width = Math.min(280, window.innerWidth - 16);
+    const estimatedHeight = 52;
+    const above = rect.top >= estimatedHeight + 10;
+    const top = above ? rect.top - estimatedHeight - 6 : rect.bottom + 6;
+    const left = Math.max(8, Math.min(rect.left + rect.width / 2 - width / 2, window.innerWidth - width - 8));
+    setTooltipPosition({ top, left, width });
+    setTooltipOpen(true);
+  };
 
   if (import.meta.env?.DEV && iconOnly && !ariaLabel) {
     // Fail loudly in development: an icon-only button with no accessible name
@@ -117,7 +137,9 @@ export function Button({
   }
 
   return (
+    <>
     <button
+      ref={buttonRef}
       type={type ?? "button"}
       className={cn(
         iconOnly ? uiIconButton(resolvedVariant, size) : uiButton(resolvedVariant, size),
@@ -130,6 +152,10 @@ export function Button({
       aria-disabled={isBlocked || undefined}
       aria-busy={loading || undefined}
       aria-label={ariaLabel}
+      onMouseEnter={(event: MouseEvent<HTMLButtonElement>) => { showTooltip(); onMouseEnter?.(event); }}
+      onMouseLeave={(event: MouseEvent<HTMLButtonElement>) => { setTooltipOpen(false); onMouseLeave?.(event); }}
+      onFocus={(event: FocusEvent<HTMLButtonElement>) => { showTooltip(); onFocus?.(event); }}
+      onBlur={(event: FocusEvent<HTMLButtonElement>) => { setTooltipOpen(false); onBlur?.(event); }}
       onClick={(event) => {
         // Single guard for BOTH mouse and keyboard activation. Existing
         // isSaving / inFlight / deletingId guards in callers stay authoritative;
@@ -145,15 +171,18 @@ export function Button({
     >
       {loading ? <Spinner className={SPINNER_SIZE[size]} /> : icon}
       {children}
-      {title && (
-        <span
-          role="tooltip"
-          className="pointer-events-none absolute bottom-[calc(100%+6px)] right-0 z-[120] max-w-[220px] whitespace-normal line-clamp-2 rounded-md border border-slate-700/10 bg-slate-900 px-2.5 py-1.5 text-left text-[11px] font-medium leading-snug text-white opacity-0 shadow-lg transition-[opacity,transform] duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 translate-y-1"
-        >
-          {title}
-        </span>
-      )}
     </button>
+    {title && tooltipOpen && typeof document !== "undefined" && createPortal(
+      <span
+        role="tooltip"
+        className="pointer-events-none fixed z-[9999] rounded-md border border-slate-700/10 bg-slate-900 px-2.5 py-1.5 text-left text-[11px] font-medium leading-snug text-white shadow-lg"
+        style={{ top: tooltipPosition.top, left: tooltipPosition.left, width: tooltipPosition.width, whiteSpace: "normal" }}
+      >
+        {title}
+      </span>,
+      document.body,
+    )}
+    </>
   );
 }
 
