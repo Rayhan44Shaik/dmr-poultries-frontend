@@ -14,6 +14,7 @@ import { Calendar, ArrowRightLeft, RefreshCw } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useI18n } from "../../../../i18n";
 import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapshot";
+import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
 // -------- Helper: get previous Monday–Sunday --------
 const getPreviousWeekRange = () => {
@@ -107,9 +108,9 @@ function RangeDatePicker({
         <button
           type="button"
           onClick={toggleCalendar}
-          className="h-10 px-4 rounded-xl border border-slate-200/80 bg-slate-50/70 flex items-center gap-2 text-[13px] font-bold text-slate-700 hover:border-blue-500/50 hover:bg-slate-100/80 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all active:scale-[0.98]"
+          className="h-11 px-5 rounded-xl border border-slate-200/80 bg-slate-50/70 flex items-center gap-2.5 text-sm font-bold text-slate-700 hover:border-blue-500/50 hover:bg-slate-100/80 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all active:scale-[0.98]"
         >
-          <Calendar size={16} className="text-blue-600" />
+          <Calendar size={18} className="text-blue-600" />
           <span>
             {startDate && endDate
               ? `${formatDate(startDate)} – ${formatDate(endDate)}`
@@ -120,37 +121,37 @@ function RangeDatePicker({
 
       {isOpen && (
         <div
-          className={`absolute right-0 z-50 w-80 rounded-2xl border border-slate-200/70 bg-white/95 backdrop-blur-xl p-4 shadow-xl shadow-slate-900/5 border-t-blue-500 border-t-2 ${dropdownPositionClass}`}
+          className={`absolute right-0 z-50 w-[min(30rem,calc(100vw-2rem))] rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-xl shadow-slate-900/5 backdrop-blur-xl border-t-blue-500 border-t-2 ${dropdownPositionClass}`}
         >
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                <label className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
                   {t("ops.dashboard.start_date")}
                 </label>
                 <DatePicker
                   value={startDateStr}
                   onChange={handleStartChange}
                   placeholder={t("common.from")}
-                  className="w-full text-xs"
+                  className="w-full text-sm"
                   icon={slateCalendarIcon}
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                <label className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
                   {t("ops.dashboard.end_date")}
                 </label>
                 <DatePicker
                   value={endDateStr}
                   onChange={handleEndChange}
                   placeholder={t("common.to")}
-                  className="w-full text-xs"
+                  className="w-full text-sm"
                   icon={slateCalendarIcon}
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => {
@@ -160,8 +161,8 @@ function RangeDatePicker({
                   onRangeChange(weekAgo, today);
                   setIsOpen(false);
                 }}
-                className="px-3 py-2 text-xs font-bold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
->
+                className="rounded-lg bg-blue-50 px-5 py-2.5 text-[13px] font-bold text-blue-700 transition-colors hover:bg-blue-100"
+              >
                 {t("ops.dashboard.last_7_days")}
               </button>
               <button
@@ -173,7 +174,7 @@ function RangeDatePicker({
                   onRangeChange(monthAgo, today);
                   setIsOpen(false);
                 }}
-                className="px-3 py-2 text-xs font-bold rounded-lg bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors"
+                className="rounded-lg bg-slate-50 px-5 py-2.5 text-[13px] font-bold text-slate-700 transition-colors hover:bg-slate-100"
               >
                 {t("ops.dashboard.last_30_days")}
               </button>
@@ -188,6 +189,7 @@ function RangeDatePicker({
 // -------- Main Dashboard View Page --------
 function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const { t } = useI18n();
+  const { showNotification } = useSafeNotification();
   const initialRange = getPreviousWeekRange();
   const [startDate, setStartDate] = useState<Date | undefined>(initialRange.startDate);
   const [endDate, setEndDate] = useState<Date | undefined>(initialRange.endDate);
@@ -216,6 +218,9 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     setRefreshing(true);
     try {
       await Promise.all([refetch(), kickApprovalSnapshot()]);
+      showNotification("Dashboard refreshed — pending counts and charts are up to date", "success", 3200);
+    } catch {
+      showNotification("Could not refresh — please try again", "error", 3200);
     } finally {
       // Keep the spin visible briefly so the tap reads as an action.
       window.setTimeout(() => setRefreshing(false), 450);
@@ -238,9 +243,9 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         disabled={refreshing}
         title="Refresh all data"
         aria-label="Refresh all data"
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50/70 text-slate-600 transition-all hover:border-blue-500/50 hover:bg-slate-100/80 hover:text-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-500/10 active:scale-[0.96] disabled:opacity-60"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50/70 text-slate-600 transition-all hover:border-blue-500/50 hover:bg-slate-100/80 hover:text-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-500/10 active:scale-[0.96] disabled:opacity-60"
       >
-        <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+        <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
       </button>
       {rangePicker}
     </>

@@ -24,7 +24,7 @@ interface Stat {
   icon: LucideIcon;
   count: number;
   chip: string; // coloured icon tile (literal classes so Tailwind keeps them)
-  hover: string;
+  activeTile: string; // tinted highlight while items are pending
 }
 
 export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode }) {
@@ -39,8 +39,8 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
       href: "/operations?tab=trip-entry&status=Pending",
       icon: Truck,
       count: q.trips.count,
-      chip: "bg-sky-100 text-sky-600",
-      hover: "hover:bg-sky-50",
+      chip: "bg-sky-100 text-sky-600 ring-1 ring-sky-200",
+      activeTile: "border-sky-200 bg-sky-50/80 hover:border-sky-300 hover:bg-sky-100/70",
     },
     {
       key: "rates",
@@ -48,8 +48,8 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
       href: "/operations?tab=rate-entry",
       icon: ReceiptText,
       count: q.rateEntries.count,
-      chip: "bg-indigo-100 text-indigo-600",
-      hover: "hover:bg-indigo-50",
+      chip: "bg-indigo-100 text-indigo-600 ring-1 ring-indigo-200",
+      activeTile: "border-indigo-200 bg-indigo-50/80 hover:border-indigo-300 hover:bg-indigo-100/70",
     },
     {
       key: "maintenance",
@@ -57,8 +57,8 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
       href: "/fleet?tab=entry&view=pending",
       icon: Wrench,
       count: q.maintenance.count,
-      chip: "bg-violet-100 text-violet-600",
-      hover: "hover:bg-violet-50",
+      chip: "bg-violet-100 text-violet-600 ring-1 ring-violet-200",
+      activeTile: "border-violet-200 bg-violet-50/80 hover:border-violet-300 hover:bg-violet-100/70",
     },
     {
       key: "payments",
@@ -66,8 +66,8 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
       href: "/accounts?tab=paid-payments",
       icon: Banknote,
       count: q.payments.count,
-      chip: "bg-emerald-100 text-emerald-600",
-      hover: "hover:bg-emerald-50",
+      chip: "bg-emerald-100 text-emerald-600 ring-1 ring-emerald-200",
+      activeTile: "border-emerald-200 bg-emerald-50/80 hover:border-emerald-300 hover:bg-emerald-100/70",
     },
   ];
 
@@ -88,7 +88,7 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
           Nothing pending for approval
         </p>
       ) : (
-        <div className="flex flex-wrap items-center gap-x-1 gap-y-1 sm:divide-x sm:divide-slate-100">
+        <div className="flex flex-wrap items-center gap-1.5">
           {stats.map((stat) => {
             const Icon = stat.icon;
             const empty = stat.count === 0;
@@ -97,8 +97,10 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
                 key={stat.key}
                 to={stat.href}
                 title={`${stat.count} ${stat.label} pending approval`}
-                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors sm:px-3 ${stat.hover} ${
-                  empty ? "opacity-40 hover:bg-transparent" : ""
+                className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 transition-colors sm:px-3 ${
+                  empty
+                    ? "border-transparent opacity-40 hover:bg-slate-50"
+                    : stat.activeTile
                 }`}
               >
                 <span
