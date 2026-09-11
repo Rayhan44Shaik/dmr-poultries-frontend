@@ -1,7 +1,7 @@
 // src/modules/operations/vehicle-trips/components/Step_5/DieselExpensesTable.tsx
 
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { MapPin, AlertTriangle, Plus, Pencil, Trash2, Loader2, Gauge, CheckCircle2, Circle } from "lucide-react";
+import { MapPin, AlertTriangle, Plus, Pencil, Trash2, Loader2, Gauge, CheckCircle2, Circle, Upload } from "lucide-react";
 import {
   submitTripDiesel,
   updateTripDiesel,
@@ -884,8 +884,11 @@ export default function DieselExpensesTable({
 
   const lastRowIndex = rowIndices[rowIndices.length - 1];
   const isLastRowSubmitted = !!sheetData[`dieselSubmitted${lastRowIndex}`];
+  const atMaxDieselRows = rowIndices.length >= 6;
   // Add Diesel only after the current last entry is submitted (and under max 6).
-  const canAddDieselRow = !readOnly && rowIndices.length < 6 && isLastRowSubmitted;
+  // After S.No 06 is submitted the button is hidden — max 6 bills.
+  const canAddDieselRow = !readOnly && !atMaxDieselRows && isLastRowSubmitted;
+  const showAddDieselButton = !readOnly && !atMaxDieselRows;
   const visibleRows = readOnly
     ? rowIndices.filter((num) => sheetData[`dieselSubmitted${num}`])
     : rowIndices;
@@ -921,26 +924,33 @@ export default function DieselExpensesTable({
                 </div>
               ) : null}
             </div>
-            <button
-              type="button"
-              onClick={handleAddRow}
-              disabled={!canAddDieselRow}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg shadow-sm transition-all shrink-0 ${
-                canAddDieselRow
-                  ? "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 cursor-pointer"
-                  : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
-              }`}
-              title={
-                canAddDieselRow
-                  ? t("ops.trip.add_diesel_entry")
-                  : rowIndices.length >= 6
-                    ? t("ops.trip.max_6_diesel")
+            {showAddDieselButton ? (
+              <button
+                type="button"
+                onClick={handleAddRow}
+                disabled={!canAddDieselRow}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg shadow-sm transition-all shrink-0 ${
+                  canAddDieselRow
+                    ? "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 cursor-pointer"
+                    : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+                }`}
+                title={
+                  canAddDieselRow
+                    ? t("ops.trip.add_diesel_entry")
                     : t("ops.trip.submit_diesel_first")
-              }
-            >
-              <Plus size={14} />
-              <span>{t("ops.trip.add_diesel_entry")}</span>
-            </button>
+                }
+              >
+                <Plus size={14} />
+                <span>{t("ops.trip.add_diesel_entry")}</span>
+              </button>
+            ) : atMaxDieselRows && !readOnly ? (
+              <span
+                className="inline-flex items-center px-2.5 py-1 text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg"
+                title={t("ops.trip.max_6_diesel")}
+              >
+                {t("ops.trip.max_6_diesel")}
+              </span>
+            ) : null}
           </div>
         </div>
       )}
@@ -957,17 +967,17 @@ export default function DieselExpensesTable({
           </div>
         )}
 
-        <table className="w-full min-w-[980px] border-collapse text-xs table-fixed">
+        <table className="w-full min-w-[920px] border-collapse text-xs table-fixed">
           <colgroup>
-            {/* Balanced layout — GPS no longer eats all leftover space */}
-            <col style={{ width: "36px" }} />
-            <col style={{ width: "9%" }} />
+            {/* Compact S.No / Ltr / Rate; free space to GPS + bill */}
+            <col style={{ width: "28px" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "8%" }} />
             <col style={{ width: "10%" }} />
             <col style={{ width: "11%" }} />
-            <col style={{ width: "11%" }} />
             <col style={{ width: "12%" }} />
-            <col style={{ width: "22%" }} />
-            <col style={{ width: "9%" }} />
+            <col style={{ width: "24%" }} />
+            <col style={{ width: "11%" }} />
             <col style={{ width: "10%" }} />
           </colgroup>
           <thead>
@@ -1023,9 +1033,9 @@ export default function DieselExpensesTable({
               const gpsLat = getFieldValue(`dieselGpsLat${num}`, num);
               const gpsLon = getFieldValue(`dieselGpsLon${num}`, num);
               const gpsOk = isValidGps(gpsLat, gpsLon);
-              // Numeric inputs: room for value + unit suffix so Rate is never clipped.
+              // Compact numeric inputs (S.No / Ltr / Rate columns are tighter).
               const inputBase =
-                "w-full min-w-0 box-border tabular-nums text-right pl-1.5 py-1.5 rounded-md border text-xs font-semibold outline-none transition-colors disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-default [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+                "w-full min-w-0 box-border tabular-nums text-right pl-1 py-1.5 rounded-md border text-[11px] font-semibold outline-none transition-colors disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-default [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
               const inputOk = "bg-white border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15";
               const inputErr = "bg-red-50 border-red-400 text-red-700 focus:border-red-500 focus:ring-2 focus:ring-red-500/15";
 
@@ -1040,7 +1050,7 @@ export default function DieselExpensesTable({
                       : "hover:bg-slate-50/70"
                   }`}
                 >
-                  <td className="py-2 px-1.5 text-center text-slate-500 font-semibold tabular-nums bg-slate-50/60">
+                  <td className="py-2 px-0.5 text-center text-[10px] text-slate-500 font-semibold tabular-nums bg-slate-50/60">
                     {String(idx + 1).padStart(2, "0")}
                   </td>
 
@@ -1060,10 +1070,10 @@ export default function DieselExpensesTable({
                           handleFieldChange(`dieselLtr${num}`, num, e.target.value === "" ? "" : Number(e.target.value))
                         }
                         placeholder="0.00"
-                        className={`${inputBase} ${inputOk} pr-6`}
+                        className={`${inputBase} ${inputOk} pr-5`}
                         aria-label={t("ops.trip.diesel_ltr")}
                       />
-                      <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                      <span className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400">
                         L
                       </span>
                     </div>
@@ -1085,10 +1095,10 @@ export default function DieselExpensesTable({
                           handleFieldChange(`dieselRate${num}`, num, e.target.value === "" ? "" : Number(e.target.value))
                         }
                         placeholder="0.00"
-                        className={`${inputBase} ${inputOk} pr-7`}
+                        className={`${inputBase} ${inputOk} pr-5`}
                         aria-label={t("ops.trip.diesel_rate")}
                       />
-                      <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                      <span className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400">
                         ₹
                       </span>
                     </div>
@@ -1185,8 +1195,8 @@ export default function DieselExpensesTable({
                     </div>
                   </td>
 
-                  {/* Bill — always offer Upload when editable; auto-edit if row was submitted */}
-                  <td className="py-2 px-1.5 text-center align-middle overflow-visible">
+                  {/* Bill — upload control only while editing (or new draft row) */}
+                  <td className="py-2 px-1 text-center align-middle overflow-visible">
                     <input
                       type="file"
                       accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
@@ -1197,51 +1207,52 @@ export default function DieselExpensesTable({
                       onChange={(e) => handleImageUpload(num, e)}
                     />
                     {hasRealBill(imageVal) ? (
-                      <div className="inline-flex flex-col items-center justify-center gap-1 min-w-0">
+                      <div className="inline-flex flex-col items-center justify-center gap-0.5 min-w-0">
                         <BillPreviewLink href={String(imageVal)} fileName={String(imageNameVal)} />
-                        {!readOnly && (
-                          <div className="flex flex-col items-center gap-0.5">
+                        {/* Replace / remove bill only in edit mode */}
+                        {!readOnly && (isEditingThisRow || (!isSubmitted && !locked)) && (
+                          <div className="flex items-center gap-1">
                             <button
                               type="button"
                               onClick={() => openBillPicker(num)}
-                              className="inline-flex items-center justify-center rounded-md border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-800 shadow-sm whitespace-nowrap"
+                              className="inline-flex items-center justify-center gap-0.5 rounded-md border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800"
                               title={t("ops.trip.upload_bill")}
                             >
-                              {t("ops.trip.upload_bill")}
+                              <Upload size={11} strokeWidth={2.5} />
+                              <span>{t("ops.trip.upload_bill")}</span>
                             </button>
-                            {(isEditingThisRow || !isSubmitted) && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (isEditingThisRow) {
-                                    setDraftField(`dieselImage${num}`, "");
-                                    setDraftField(`dieselImageName${num}`, "");
-                                  } else {
-                                    applyBatchUpdates({
-                                      [`dieselImage${num}`]: "",
-                                      [`dieselImageName${num}`]: "",
-                                    });
-                                    handleChange(`dieselImage${num}`, "");
-                                    handleChange(`dieselImageName${num}`, "");
-                                  }
-                                }}
-                                className="text-[10px] font-medium text-slate-400 hover:text-red-600"
-                                title={t("common.delete")}
-                              >
-                                {t("common.remove")}
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isEditingThisRow) {
+                                  setDraftField(`dieselImage${num}`, "");
+                                  setDraftField(`dieselImageName${num}`, "");
+                                } else {
+                                  applyBatchUpdates({
+                                    [`dieselImage${num}`]: "",
+                                    [`dieselImageName${num}`]: "",
+                                  });
+                                  handleChange(`dieselImage${num}`, "");
+                                  handleChange(`dieselImageName${num}`, "");
+                                }
+                              }}
+                              className="text-[10px] font-medium text-slate-400 hover:text-red-600"
+                              title={t("common.delete")}
+                            >
+                              {t("common.remove")}
+                            </button>
                           </div>
                         )}
                       </div>
-                    ) : !readOnly ? (
+                    ) : !readOnly && (isEditingThisRow || !isSubmitted) ? (
                       <button
                         type="button"
                         onClick={() => openBillPicker(num)}
-                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-emerald-400 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 text-[11px] font-bold text-emerald-800 shadow-sm active:scale-[0.98] whitespace-nowrap"
+                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-emerald-400 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-800 shadow-sm active:scale-[0.98] whitespace-nowrap"
                         title={t("ops.trip.upload_bill")}
                       >
-                        {t("ops.trip.upload_bill")}
+                        <Upload size={12} strokeWidth={2.5} />
+                        <span>{t("ops.trip.upload_bill")}</span>
                       </button>
                     ) : (
                       <span className="text-[11px] text-slate-400">—</span>

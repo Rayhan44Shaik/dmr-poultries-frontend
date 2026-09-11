@@ -180,8 +180,19 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     }
   }, [location.search, loadTripFromApi, trip.id]);
 
-  const handleStatusChange = (trip: Trip, status: TripStatus) => {
-    changeStatus(trip, status);
+  const handleStatusChange = async (trip: Trip, status: TripStatus, approvedBy?: string) => {
+    // Pending tab may list wizard-done trips still marked Draft in storage —
+    // promote Draft→Pending first, then Pending→Completed so the API accepts it.
+    if (
+      status === "Completed" &&
+      trip.status === "Draft" &&
+      (trip.endStepSubmitted || trip.expensesStepSubmitted)
+    ) {
+      await changeStatus(trip, "Pending");
+      await changeStatus({ ...trip, status: "Pending" }, "Completed", approvedBy);
+      return;
+    }
+    await changeStatus(trip, status, approvedBy);
   };
 
   /** Bilingual, human-readable name for a step index (never a raw i18n key). */

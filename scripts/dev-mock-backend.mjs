@@ -2442,15 +2442,20 @@ const server = http.createServer((req, res) => {
         return send(404, { error: "trip_not_found", id: Number(statusMatch[1]), mock: true });
       }
       const next = body.status;
+      const wizardDone = Boolean(trip.endStepSubmitted || trip.expensesStepSubmitted);
+      // Wizard-done Draft is treated as Pending for approve → Completed.
+      const effectiveFrom =
+        trip.status === "Draft" && wizardDone && next === "Completed" ? "Pending" : trip.status;
       const valid =
         (trip.status === "Draft" && next === "Pending") ||
+        (effectiveFrom === "Pending" && next === "Completed") ||
         (trip.status === "Pending" && next === "Completed");
       if (!valid) {
         return send(422, { error: "invalid_status_transition", from: trip.status, to: next, mock: true });
       }
       trip.status = next;
       if (next === "Completed") trip.approvedBy = typeof body.approvedBy === "string" ? body.approvedBy : "Owner";
-      return send(200, trip);
+      return send(200, decorateTrip(trip));
     });
     return;
   }
