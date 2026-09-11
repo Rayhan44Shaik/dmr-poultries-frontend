@@ -49,7 +49,12 @@ function isPositive(v: unknown) {
 }
 
 function hasRealBill(image: unknown) {
-  return typeof image === "string" && image.trim().length >= 80 && !/^(bill|key|true|yes)$/i.test(image.trim());
+  if (typeof image !== "string") return false;
+  const s = image.trim();
+  if (!s || /^(bill|key|true|yes)$/i.test(s)) return false;
+  // data: URLs (JPEG/PNG/SVG) or long base64 — sample SVG bills are ~2–4KB
+  if (s.startsWith("data:image") || s.startsWith("blob:") || s.startsWith("http")) return true;
+  return s.length >= 40;
 }
 
 export default function DieselExpensesTable({
@@ -82,11 +87,9 @@ export default function DieselExpensesTable({
   const dd = String(today.getDate()).padStart(2, "0");
   const fallbackDateStr = `${yyyy}${mm}${dd}`;
 
-  const isInitialized = useRef(false);
-
+  /** Keep visible rows in sync when parent hydrates dieselEntries → sheet slots
+   *  (sample bills / resume). Without this, bills stay empty after first mount. */
   useEffect(() => {
-    if (isInitialized.current) return;
-    isInitialized.current = true;
     const activeIndices: number[] = [];
     for (let i = 1; i <= 6; i++) {
       const submitted = sheetData[`dieselSubmitted${i}`];
@@ -98,8 +101,33 @@ export default function DieselExpensesTable({
       if (submitted || ltr || rate || meter || bunk || img) activeIndices.push(i);
     }
     if (activeIndices.length === 0) activeIndices.push(1);
-    setRowIndices(activeIndices);
-  }, []);
+    setRowIndices((prev) => {
+      const same =
+        prev.length === activeIndices.length && prev.every((v, i) => v === activeIndices[i]);
+      return same ? prev : activeIndices;
+    });
+  }, [
+    // Re-run when any diesel slot appears/changes (hydration from trip.dieselEntries)
+    sheetData.dieselLtr1,
+    sheetData.dieselLtr2,
+    sheetData.dieselLtr3,
+    sheetData.dieselLtr4,
+    sheetData.dieselLtr5,
+    sheetData.dieselLtr6,
+    sheetData.dieselImage1,
+    sheetData.dieselImage2,
+    sheetData.dieselImage3,
+    sheetData.dieselImage4,
+    sheetData.dieselImage5,
+    sheetData.dieselImage6,
+    sheetData.dieselSubmitted1,
+    sheetData.dieselSubmitted2,
+    sheetData.dieselSubmitted3,
+    sheetData.dieselSubmitted4,
+    sheetData.dieselSubmitted5,
+    sheetData.dieselSubmitted6,
+    tripId,
+  ]);
 
   useEffect(() => {
     if (toastMessage) {
@@ -1070,9 +1098,9 @@ export default function DieselExpensesTable({
                       }}
                       onChange={(e) => handleImageUpload(num, e)}
                     />
-                    {imageVal ? (
+                    {hasRealBill(imageVal) ? (
                       <div className="inline-flex flex-col items-center justify-center gap-0.5">
-                        <BillPreviewLink href={imageVal} fileName={String(imageNameVal)} />
+                        <BillPreviewLink href={String(imageVal)} fileName={String(imageNameVal)} />
                         {!locked && (
                           <button
                             type="button"

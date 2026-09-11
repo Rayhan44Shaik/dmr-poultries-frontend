@@ -58,6 +58,16 @@ export default function GeneralExpensesTable({
     return Number(val) === 0 ? "" : val;
   };
 
+  /** Indian grouping: 1,000.00 / 1,00,000.00 */
+  const formatInrAmt = (val: unknown) => {
+    const n = Number(val);
+    if (!Number.isFinite(n) || n === 0) return "—";
+    return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+  const formatInrPlain = (n: number) =>
+    Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+
   // Locked start meter (from trip)
   const actualStartMeter = openingMeter || 0;
   const actualDestMeter = destMeter || 0;
@@ -217,7 +227,7 @@ export default function GeneralExpensesTable({
                   <td colSpan={2} className={`border-r border-slate-200 w-[22%] ${readOnly ? "font-semibold text-slate-900 px-3 tabular-nums" : "p-0"}`}>
                     {left ? (
                       readOnly ? (
-                        Number(left.value) > 0 ? `₹${Number(left.value).toFixed(2)}` : "—"
+                        formatInrAmt(left.value)
                       ) : (
                         <input
                           type="number"
@@ -248,7 +258,7 @@ export default function GeneralExpensesTable({
                   <td colSpan={2} className={`w-[22%] ${readOnly ? "font-semibold text-slate-900 px-3 tabular-nums" : "p-0"}`}>
                     {right ? (
                       readOnly ? (
-                        Number(right.value) > 0 ? `₹${Number(right.value).toFixed(2)}` : "—"
+                        formatInrAmt(right.value)
                       ) : (
                         <input
                           type="number"
@@ -273,22 +283,22 @@ export default function GeneralExpensesTable({
 
           <tr className="bg-slate-100/80 font-bold text-slate-800 text-xs border-b border-slate-200">
             <td className="py-2.5 px-3">{t("common.total")} (₹)</td>
-            <td colSpan={2} className="text-slate-900 px-3 border-r border-slate-200">
-              {totalExpenses1.toFixed(2)}
+            <td colSpan={2} className="text-slate-900 px-3 border-r border-slate-200 tabular-nums">
+              {formatInrPlain(totalExpenses1)}
             </td>
             <td colSpan={2} className="py-2.5 px-3 border-r border-slate-200">
               {t("common.total")} (₹)
             </td>
-            <td colSpan={2} className="text-slate-900 px-3">
-              {totalExpenses2.toFixed(2)}
+            <td colSpan={2} className="text-slate-900 px-3 tabular-nums">
+              {formatInrPlain(totalExpenses2)}
             </td>
           </tr>
           <tr className="bg-emerald-50/80 font-bold text-slate-800 text-xs border-b border-slate-200">
             <td className="py-2.5 px-3" colSpan={5}>
               {t("ops.trip.combined_expense_total")}
             </td>
-            <td colSpan={2} className="text-slate-900 px-3">
-              {(totalExpenses1 + totalExpenses2).toFixed(2)}
+            <td colSpan={2} className="text-slate-900 px-3 tabular-nums">
+              {formatInrPlain(totalExpenses1 + totalExpenses2)}
             </td>
           </tr>
 

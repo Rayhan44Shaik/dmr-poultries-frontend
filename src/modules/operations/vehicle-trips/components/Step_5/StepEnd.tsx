@@ -158,27 +158,31 @@ export default function StepEnd({
       }
     });
     // Hydrate dieselEntries[] → dieselLtr1 / dieselRate1 / … so the diesel
-    // table shows sample fuel bills without a prior submit.
+    // table shows sample fuel bills (incl. bill image) without a prior submit.
     const entries = Array.isArray(tripData.dieselEntries) ? tripData.dieselEntries : [];
     entries.forEach((entry, idx) => {
       const n = Math.min(6, Math.max(1, Number(entry.rowIndex) > 0 ? Number(entry.rowIndex) : idx + 1));
       const d = data as Record<string, unknown>;
-      if (d[`dieselLtr${n}`] == null || d[`dieselLtr${n}`] === "") {
-        d[`dieselLtr${n}`] = entry.litres ?? "";
-        d[`dieselRate${n}`] = entry.rate ?? "";
-        d[`dieselMeter${n}`] = entry.meter ?? "";
-        d[`dieselBunk${n}`] = entry.bunkName ?? "";
-        d[`dieselGpsLat${n}`] = entry.gpsLat ?? "";
-        d[`dieselGpsLon${n}`] = entry.gpsLon ?? "";
-        d[`dieselGpsAccuracy${n}`] = entry.gpsAccuracy ?? "";
-        d[`dieselGpsCapturedAt${n}`] = entry.gpsCapturedAt ?? "";
-        d[`dieselImage${n}`] = entry.imageData ?? "";
-        d[`dieselImageName${n}`] = entry.imageName ?? "";
-        d[`dieselId${n}`] = entry.id ?? "";
-        d[`dieselClientKey${n}`] = entry.clientKey ?? `diesel-${n}`;
-        d[`dieselSubmitted${n}`] = entry.submitted !== false;
-        d[`dieselSubmittedAt${n}`] = entry.submittedAt ?? "";
+      const empty = (v: unknown) => v == null || v === "";
+      if (empty(d[`dieselLtr${n}`])) d[`dieselLtr${n}`] = entry.litres ?? "";
+      if (empty(d[`dieselRate${n}`])) d[`dieselRate${n}`] = entry.rate ?? "";
+      if (empty(d[`dieselMeter${n}`])) d[`dieselMeter${n}`] = entry.meter ?? "";
+      if (empty(d[`dieselBunk${n}`])) d[`dieselBunk${n}`] = entry.bunkName ?? "";
+      if (empty(d[`dieselGpsLat${n}`])) d[`dieselGpsLat${n}`] = entry.gpsLat ?? "";
+      if (empty(d[`dieselGpsLon${n}`])) d[`dieselGpsLon${n}`] = entry.gpsLon ?? "";
+      if (empty(d[`dieselGpsAccuracy${n}`])) d[`dieselGpsAccuracy${n}`] = entry.gpsAccuracy ?? "";
+      if (empty(d[`dieselGpsCapturedAt${n}`])) d[`dieselGpsCapturedAt${n}`] = entry.gpsCapturedAt ?? "";
+      // Always prefer real bill image from the entry when sheet slot is empty.
+      if (empty(d[`dieselImage${n}`]) && entry.imageData) {
+        d[`dieselImage${n}`] = entry.imageData;
+        d[`dieselImageName${n}`] = entry.imageName ?? d[`dieselImageName${n}`] ?? "";
+      } else if (empty(d[`dieselImageName${n}`]) && entry.imageName) {
+        d[`dieselImageName${n}`] = entry.imageName;
       }
+      if (empty(d[`dieselId${n}`])) d[`dieselId${n}`] = entry.id ?? "";
+      if (empty(d[`dieselClientKey${n}`])) d[`dieselClientKey${n}`] = entry.clientKey ?? `diesel-${n}`;
+      if (d[`dieselSubmitted${n}`] == null) d[`dieselSubmitted${n}`] = entry.submitted !== false;
+      if (empty(d[`dieselSubmittedAt${n}`])) d[`dieselSubmittedAt${n}`] = entry.submittedAt ?? "";
     });
     return data;
   };
@@ -188,6 +192,11 @@ export default function StepEnd({
 
   // ─── Reset sheetData when trip changes ──────────────────────────
   const prevTripId = useRef<number>(trip.id);
+  const dieselHydrateKey = Array.isArray(trip.dieselEntries)
+    ? trip.dieselEntries
+        .map((e) => `${e?.id ?? ""}:${String(e?.imageData || "").length}:${e?.litres ?? ""}`)
+        .join("|")
+    : "";
   useEffect(() => {
     if (trip.id !== prevTripId.current) {
       prevTripId.current = trip.id;
@@ -195,8 +204,56 @@ export default function StepEnd({
       setIsSubmittedLocal(false);
       setErrorMsg("");
       setIsLocalEditing(false);
+      return;
     }
-  }, [trip.id, trip]);
+    // Same trip: if dieselEntries arrive/update (API load), merge bill images
+    // without wiping user edits on other fields.
+    if (!dieselHydrateKey) return;
+    setSheetData((prev) => {
+      const next = { ...prev } as SheetData;
+      const entries = Array.isArray(trip.dieselEntries) ? trip.dieselEntries : [];
+      let changed = false;
+      entries.forEach((entry, idx) => {
+        const n = Math.min(6, Math.max(1, Number(entry.rowIndex) > 0 ? Number(entry.rowIndex) : idx + 1));
+        const empty = (v: unknown) => v == null || v === "";
+        if (empty(next[`dieselLtr${n}`]) && entry.litres != null) {
+          next[`dieselLtr${n}`] = entry.litres as any;
+          changed = true;
+        }
+        if (empty(next[`dieselRate${n}`]) && entry.rate != null) {
+          next[`dieselRate${n}`] = entry.rate as any;
+          changed = true;
+        }
+        if (empty(next[`dieselMeter${n}`]) && entry.meter != null) {
+          next[`dieselMeter${n}`] = entry.meter as any;
+          changed = true;
+        }
+        if (empty(next[`dieselBunk${n}`]) && entry.bunkName) {
+          next[`dieselBunk${n}`] = entry.bunkName as any;
+          changed = true;
+        }
+        if (empty(next[`dieselImage${n}`]) && entry.imageData) {
+          next[`dieselImage${n}`] = entry.imageData as any;
+          next[`dieselImageName${n}`] = (entry.imageName || next[`dieselImageName${n}`] || "") as any;
+          changed = true;
+        }
+        if (empty(next[`dieselGpsLat${n}`]) && entry.gpsLat != null) {
+          next[`dieselGpsLat${n}`] = entry.gpsLat as any;
+          next[`dieselGpsLon${n}`] = entry.gpsLon as any;
+          changed = true;
+        }
+        if (next[`dieselSubmitted${n}`] == null && entry.submitted !== false) {
+          next[`dieselSubmitted${n}`] = true as any;
+          changed = true;
+        }
+        if (empty(next[`dieselId${n}`]) && entry.id != null) {
+          next[`dieselId${n}`] = entry.id as any;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [trip.id, trip, dieselHydrateKey]);
 
   // ─── Part K: durable local Step 5 draft + offline Save Progress queue ──
   const userTouchedRef = useRef(false);
@@ -308,6 +365,19 @@ export default function StepEnd({
 
   const remainingBalance =
     Number(trip.advanceAmount || 0) - totalAllExpenses - totalDieselAmount;
+
+  /** Indian grouping: ₹1,000.00 / ₹1,00,000.00 */
+  const formatInr = (n: number) =>
+    `₹${Number(n || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+  const submittedTimeDisplay =
+    sheetData.submittedAtTimestamp ||
+    (trip as any).expensesStepSubmittedAt ||
+    (trip as any).submittedAtTimestamp ||
+    "";
 
   const highestDieselMeter = dieselIndices.reduce((max, idx) => {
     const val = Number(sheetData[`dieselMeter${idx}`] || 0);
@@ -596,47 +666,48 @@ export default function StepEnd({
               </span>
             </div>
           </div>
-          {/* Plain equal fields — not KPI cards: time, vehicle, advance, expenses, diesel, total */}
-          <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-x divide-y divide-slate-100">
-              {[
-                {
-                  label: t("ops.trip.date_time"),
-                  value: sheetData.submittedAtTimestamp || (trip as any).expensesStepSubmittedAt || "—",
-                  tone: "text-slate-900",
-                },
-                {
-                  label: t("operations.vehicle_no"),
-                  value: trip.vehicleNo || "—",
-                  tone: "text-indigo-700",
-                },
-                {
-                  label: t("operations.advance"),
-                  value: `₹${Number(trip.advanceAmount || 0).toFixed(2)}`,
-                  tone: "text-emerald-700",
-                },
-                {
-                  label: t("operations.total_expenses"),
-                  value: `₹${totalAllExpenses.toFixed(2)}`,
-                  tone: "text-red-600",
-                },
-                {
-                  label: t("ops.trip.total_diesel"),
-                  value: `₹${totalDieselAmount.toFixed(2)}`,
-                  tone: "text-blue-600",
-                },
-                {
-                  label: t("common.total"),
-                  value: `₹${(totalAllExpenses + totalDieselAmount).toFixed(2)}`,
-                  tone: "text-slate-900",
-                },
-              ].map((f) => (
-                <div key={f.label} className="px-3 py-2.5 min-w-0 bg-slate-50/40">
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide truncate">{f.label}</p>
-                  <p className={`text-sm font-bold mt-0.5 tabular-nums truncate ${f.tone}`}>{f.value}</p>
-                </div>
-              ))}
-            </div>
+          {/* Equal-size field boxes with clean margins (not KPI tiles) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            {[
+              {
+                label: t("ops.trip.date_time"),
+                value: submittedTimeDisplay || "—",
+                tone: "border-sky-200/80 bg-sky-50/50 text-slate-900",
+              },
+              {
+                label: t("operations.vehicle_no"),
+                value: trip.vehicleNo || "—",
+                tone: "border-indigo-200/80 bg-indigo-50/50 text-indigo-800",
+              },
+              {
+                label: t("ops.trip.field_advance_given"),
+                value: formatInr(Number(trip.advanceAmount || 0)),
+                tone: "border-emerald-200/80 bg-emerald-50/50 text-emerald-800",
+              },
+              {
+                label: t("operations.total_expenses"),
+                value: formatInr(totalAllExpenses),
+                tone: "border-red-200/80 bg-red-50/50 text-red-700",
+              },
+              {
+                label: t("ops.trip.total_diesel"),
+                value: formatInr(totalDieselAmount),
+                tone: "border-blue-200/80 bg-blue-50/50 text-blue-700",
+              },
+              {
+                label: t("ops.trip.field_total_all"),
+                value: formatInr(totalAllExpenses + totalDieselAmount),
+                tone: "border-slate-300 bg-slate-50 text-slate-900",
+              },
+            ].map((f) => (
+              <div
+                key={f.label}
+                className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.tone}`}
+              >
+                <p className="text-[10px] font-semibold text-slate-500 tracking-wide truncate">{f.label}</p>
+                <p className="text-sm font-bold mt-1 tabular-nums truncate leading-snug">{f.value}</p>
+              </div>
+            ))}
           </div>
           <GeneralExpensesTable
             sheetData={sheetData}
@@ -680,47 +751,48 @@ export default function StepEnd({
             </div>
           </div>
 
-          {/* Same equal-size plain fields while editing (live totals). */}
-          <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-x divide-y divide-slate-100">
-              {[
-                {
-                  label: t("ops.trip.date_time"),
-                  value: sheetData.submittedAtTimestamp || t("ops.trip.auto_time_on_submit"),
-                  tone: "text-slate-900",
-                },
-                {
-                  label: t("operations.vehicle_no"),
-                  value: trip.vehicleNo || "—",
-                  tone: "text-indigo-700",
-                },
-                {
-                  label: t("operations.advance"),
-                  value: `₹${Number(trip.advanceAmount || 0).toFixed(2)}`,
-                  tone: "text-emerald-700",
-                },
-                {
-                  label: t("operations.total_expenses"),
-                  value: `₹${totalAllExpenses.toFixed(2)}`,
-                  tone: "text-red-600",
-                },
-                {
-                  label: t("ops.trip.total_diesel"),
-                  value: `₹${totalDieselAmount.toFixed(2)}`,
-                  tone: "text-blue-600",
-                },
-                {
-                  label: t("common.total"),
-                  value: `₹${(totalAllExpenses + totalDieselAmount).toFixed(2)}`,
-                  tone: "text-slate-900",
-                },
-              ].map((f) => (
-                <div key={f.label} className="px-3 py-2.5 min-w-0 bg-slate-50/40">
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide truncate">{f.label}</p>
-                  <p className={`text-sm font-bold mt-0.5 tabular-nums truncate ${f.tone}`}>{f.value}</p>
-                </div>
-              ))}
-            </div>
+          {/* Equal-size field boxes with clean margins (live totals while editing) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            {[
+              {
+                label: t("ops.trip.date_time"),
+                value: submittedTimeDisplay || t("ops.trip.time_pending_short"),
+                tone: "border-sky-200/80 bg-sky-50/50 text-slate-900",
+              },
+              {
+                label: t("operations.vehicle_no"),
+                value: trip.vehicleNo || "—",
+                tone: "border-indigo-200/80 bg-indigo-50/50 text-indigo-800",
+              },
+              {
+                label: t("ops.trip.field_advance_given"),
+                value: formatInr(Number(trip.advanceAmount || 0)),
+                tone: "border-emerald-200/80 bg-emerald-50/50 text-emerald-800",
+              },
+              {
+                label: t("operations.total_expenses"),
+                value: formatInr(totalAllExpenses),
+                tone: "border-red-200/80 bg-red-50/50 text-red-700",
+              },
+              {
+                label: t("ops.trip.total_diesel"),
+                value: formatInr(totalDieselAmount),
+                tone: "border-blue-200/80 bg-blue-50/50 text-blue-700",
+              },
+              {
+                label: t("ops.trip.field_total_all"),
+                value: formatInr(totalAllExpenses + totalDieselAmount),
+                tone: "border-slate-300 bg-slate-50 text-slate-900",
+              },
+            ].map((f) => (
+              <div
+                key={f.label}
+                className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.tone}`}
+              >
+                <p className="text-[10px] font-semibold text-slate-500 tracking-wide truncate">{f.label}</p>
+                <p className="text-sm font-bold mt-1 tabular-nums truncate leading-snug">{f.value}</p>
+              </div>
+            ))}
           </div>
 
           <GeneralExpensesTable
@@ -773,7 +845,7 @@ export default function StepEnd({
 
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between gap-2 font-bold text-xs text-slate-900">
             <span>{t("ops.trip.balance_remaining")}</span>
-            <span className="text-emerald-600 tabular-nums">₹{remainingBalance.toFixed(2)}</span>
+            <span className="text-emerald-600 tabular-nums">{formatInr(remainingBalance)}</span>
           </div>
 
           <WizardStepNotice
