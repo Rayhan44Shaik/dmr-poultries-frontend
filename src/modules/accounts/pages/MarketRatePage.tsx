@@ -6,7 +6,7 @@ import { DatePicker } from "../../../components/common/DatePicker";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { handleApiError } from "../../../api";
 import { useI18n } from "../../../i18n";
-import { BrandRefreshButton, BrandRunOverlay } from "../../../ui";
+import { BrandRefreshButton } from "../../../ui";
 import { shiftMonths, toBusinessDate } from "../../../utils/businessDate";
 import {
   listMarketRates,
@@ -64,8 +64,6 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
   // Drives the branded refresh control's logo animation (and its
   // double-activation guard) while the rates are being re-fetched.
   const [refreshing, setRefreshing] = useState(false);
-  // Bumped on every refresh to launch the full-page hen dash.
-  const [runKey, setRunKey] = useState(0);
 
   // Feedback for Refresh / Clear goes through the ONE global notification
   // system (rendered by <NotificationHost /> in App.tsx). This page previously
@@ -394,10 +392,6 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
   return (
     <div className={`w-full space-y-6 animate-in fade-in duration-500 ${embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'}`}>
 
-      {/* Hen dash: on every refresh the brand hen sprints across the whole
-          viewport. Portalled to <body>, so it is never clipped by the toolbar. */}
-      <BrandRunOverlay runKey={runKey} />
-
       {/* Top Toolbar: search, date range, tabs, refresh, save, status.
          The page-level "Market Rate" title and subtitle live in the
          application's global header, so they are intentionally omitted here. */}
@@ -470,7 +464,6 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
               onClick={() => {
                 if (fromDate && toDate) {
                   setRefreshing(true);
-                  setRunKey((k) => k + 1); // send the hen across the page
                   setAutoSaveStatus("Saving...");
                   void listMarketRates(fromDate, toDate)
                     .then((rows) => {
