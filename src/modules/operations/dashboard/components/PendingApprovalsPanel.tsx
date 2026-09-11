@@ -1,22 +1,21 @@
 // -----------------------------------------------------------------------------
-// PENDING APPROVALS — compact KPI card for the dashboard.
-// A header line plus four clean stat tiles: coloured icon, big number, short
-// label. Nothing else. Each tile deep-links to that module's work page.
-// Live API data via the same snapshot store as the header bell.
+// PENDING APPROVALS — slim KPI strip for the dashboard and trip entry page.
+// Four compact stat tiles: small coloured icon, count + label (same app font)
+// and a one-line detail (the record numbers waiting). Clicking a tile opens
+// that module's work page. Live data via the approval snapshot store.
 // -----------------------------------------------------------------------------
 
 import { Link } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
-  ArrowUpRight,
   Banknote,
   CheckCircle2,
-  ClipboardCheck,
   ReceiptText,
   Truck,
   Wrench,
 } from "lucide-react";
 import { usePendingApprovals } from "../../../approvals/hooks/usePendingApprovals";
+import type { ApprovalQueue, ApprovalQueueItem } from "../../../approvals/services/approvalSnapshot";
 
 interface Stat {
   key: string;
@@ -24,8 +23,28 @@ interface Stat {
   href: string;
   icon: LucideIcon;
   count: number;
+  queue: ApprovalQueue;
   chip: string; // coloured icon tile (literal classes so Tailwind keeps them)
-  hover: string; // hover ring/border tint
+  hover: string;
+}
+
+/** TRP-20260910-01 → 0910-01 (full reference stays in the tile tooltip). */
+function shortRef(ref: string): string {
+  const parts = ref.split("-");
+  if (parts.length >= 3 && /^\d{8}$/.test(parts[parts.length - 2])) {
+    return `${parts[parts.length - 2].slice(4)}-${parts[parts.length - 1]}`;
+  }
+  return ref;
+}
+
+/** One-line detail: two short refs, or the first ref with "+n" when long/many. */
+function detailText(queue: ApprovalQueue): string {
+  const refs = queue.items.map((i: ApprovalQueueItem) => shortRef(i.ref));
+  if (refs.length === 0) return "";
+  const pair = refs.slice(0, 2).join(", ");
+  if (queue.count === 2 && pair.length <= 18) return pair;
+  const extra = queue.count - 1;
+  return extra > 0 ? `${refs[0]} +${extra}` : refs[0];
 }
 
 export default function PendingApprovalsPanel() {
@@ -40,8 +59,9 @@ export default function PendingApprovalsPanel() {
       href: "/operations?tab=trip-entry&status=Pending",
       icon: Truck,
       count: q.trips.count,
-      chip: "bg-sky-100 text-sky-600 ring-sky-200/70",
-      hover: "hover:border-sky-300 hover:shadow-sky-100",
+      queue: q.trips,
+      chip: "bg-sky-100 text-sky-600",
+      hover: "hover:border-sky-300 hover:bg-sky-50/40",
     },
     {
       key: "rates",
@@ -49,8 +69,9 @@ export default function PendingApprovalsPanel() {
       href: "/operations?tab=rate-entry",
       icon: ReceiptText,
       count: q.rateEntries.count,
-      chip: "bg-indigo-100 text-indigo-600 ring-indigo-200/70",
-      hover: "hover:border-indigo-300 hover:shadow-indigo-100",
+      queue: q.rateEntries,
+      chip: "bg-indigo-100 text-indigo-600",
+      hover: "hover:border-indigo-300 hover:bg-indigo-50/40",
     },
     {
       key: "maintenance",
@@ -58,8 +79,9 @@ export default function PendingApprovalsPanel() {
       href: "/fleet?tab=entry",
       icon: Wrench,
       count: q.maintenance.count,
-      chip: "bg-violet-100 text-violet-600 ring-violet-200/70",
-      hover: "hover:border-violet-300 hover:shadow-violet-100",
+      queue: q.maintenance,
+      chip: "bg-violet-100 text-violet-600",
+      hover: "hover:border-violet-300 hover:bg-violet-50/40",
     },
     {
       key: "payments",
@@ -67,85 +89,69 @@ export default function PendingApprovalsPanel() {
       href: "/accounts?tab=paid-payments",
       icon: Banknote,
       count: q.payments.count,
-      chip: "bg-emerald-100 text-emerald-600 ring-emerald-200/70",
-      hover: "hover:border-emerald-300 hover:shadow-emerald-100",
+      queue: q.payments,
+      chip: "bg-emerald-100 text-emerald-600",
+      hover: "hover:border-emerald-300 hover:bg-emerald-50/40",
     },
   ];
 
   return (
     <section
       aria-label="Pending approvals"
-      className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm sm:p-5"
+      className="rounded-xl border border-slate-200/70 bg-white p-2 shadow-sm"
     >
-      {/* Card header */}
-      <div className="mb-3.5 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-600 ring-1 ring-amber-200/70">
-            <ClipboardCheck size={16} strokeWidth={2.3} />
-          </span>
-          <div className="leading-tight">
-            <h2 className="text-sm font-extrabold tracking-tight text-slate-800">
-              Pending approvals
-            </h2>
-            <p className="text-[11px] font-semibold text-slate-400">Items waiting for your review</p>
-          </div>
-        </div>
-
-        {!loading && !allClear && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-extrabold tabular-nums text-amber-700 ring-1 ring-amber-500/20">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-70" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-500" />
-            </span>
-            {q.total} total
-          </span>
-        )}
-      </div>
-
-      {/* Tiles */}
       {loading ? (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-[74px] animate-pulse rounded-xl bg-slate-100" />
+            <div key={i} className="h-[46px] animate-pulse rounded-lg bg-slate-100" />
           ))}
         </div>
       ) : allClear ? (
-        <div className="flex items-center gap-2.5 rounded-xl bg-emerald-50 px-4 py-3.5 text-emerald-700 ring-1 ring-emerald-200/70">
-          <CheckCircle2 size={18} strokeWidth={2.3} className="shrink-0" />
-          <p className="text-[13px] font-bold">All caught up — nothing pending for approval</p>
+        <div className="flex items-center gap-1.5 px-2 py-1.5 text-[12px] font-semibold text-emerald-600">
+          <CheckCircle2 size={14} strokeWidth={2.4} className="shrink-0" />
+          Nothing pending for approval
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           {stats.map((stat) => {
             const Icon = stat.icon;
             const empty = stat.count === 0;
+            const detail = detailText(stat.queue);
             return (
               <Link
                 key={stat.key}
                 to={stat.href}
-                className={`group relative flex items-center gap-3 overflow-hidden rounded-xl border border-slate-200/70 bg-white px-3.5 py-3.5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${stat.hover} ${
-                  empty ? "opacity-40 hover:translate-y-0" : ""
+                title={
+                  detail
+                    ? `${stat.count} ${stat.label} pending — ${stat.queue.items
+                        .map((i) => i.ref)
+                        .join(", ")}`
+                    : `${stat.count} ${stat.label} pending`
+                }
+                className={`flex items-center gap-2.5 rounded-lg border border-slate-200/70 px-2.5 py-2 transition-colors ${stat.hover} ${
+                  empty ? "opacity-40" : ""
                 }`}
               >
                 <span
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ${stat.chip}`}
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${stat.chip}`}
                 >
-                  <Icon size={19} strokeWidth={2.2} />
+                  <Icon size={14} strokeWidth={2.2} />
                 </span>
-                <span className="min-w-0 leading-none">
-                  <span className="block text-[22px] font-black tabular-nums tracking-tight text-slate-900">
-                    {stat.count}
+                <span className="min-w-0 flex-1 leading-tight">
+                  <span className="flex items-baseline gap-1.5">
+                    <span className="text-[15px] font-extrabold tabular-nums text-slate-900">
+                      {stat.count}
+                    </span>
+                    <span className="truncate text-[11.5px] font-semibold text-slate-500">
+                      {stat.label}
+                    </span>
                   </span>
-                  <span className="mt-1 block truncate text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                    {stat.label}
-                  </span>
+                  {detail && (
+                    <span className="mt-0.5 block truncate text-[10.5px] font-medium text-slate-400">
+                      {detail}
+                    </span>
+                  )}
                 </span>
-                {!empty && (
-                  <ArrowUpRight
-                    size={15}
-                    className="absolute right-2.5 top-2.5 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100"
-                  />
-                )}
               </Link>
             );
           })}

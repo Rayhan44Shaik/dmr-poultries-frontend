@@ -185,7 +185,7 @@ function RangeDatePicker({
 }
 
 // -------- Main Dashboard View Page --------
-function OperationsDashboardPage() {
+function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const { t } = useI18n();
   const initialRange = getPreviousWeekRange();
   const [startDate, setStartDate] = useState<Date | undefined>(initialRange.startDate);
@@ -210,7 +210,7 @@ function OperationsDashboardPage() {
 
   if (!isRangeSelected) {
     return (
-      <div className="min-w-0 space-y-4 p-4 sm:p-5 lg:p-6">
+      <div className={`min-w-0 space-y-4 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
         <PendingApprovalsPanel />
         <div className="flex justify-end">
           <RangeDatePicker
@@ -236,7 +236,7 @@ function OperationsDashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="min-w-0 space-y-5 p-4 sm:p-5 lg:p-6">
+      <div className={`min-w-0 space-y-5 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
         <PendingApprovalsPanel />
         <div className="w-full flex flex-col items-center justify-center py-24 space-y-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
         <div className="relative w-12 h-12">
@@ -253,7 +253,7 @@ function OperationsDashboardPage() {
 
   if (error) {
     return (
-      <div className="min-w-0 space-y-4 p-4 sm:p-5 lg:p-6">
+      <div className={`min-w-0 space-y-4 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
         <PendingApprovalsPanel />
         <div className="flex justify-end">
           <RangeDatePicker
@@ -277,7 +277,7 @@ function OperationsDashboardPage() {
   }
 
   return (
-    <div className="min-w-0 space-y-5 p-4 sm:p-5 lg:p-6">
+    <div className={`min-w-0 space-y-5 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
       {/* Live pending-approval KPI tiles. */}
       <PendingApprovalsPanel />
 
