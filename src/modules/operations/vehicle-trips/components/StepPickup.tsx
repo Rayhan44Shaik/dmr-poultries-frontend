@@ -95,8 +95,8 @@ function ConfirmationModal({
   const { t } = useI18n();
   if (!isOpen) return null;
 
-  const iconColor = type === "warning" ? "text-amber-600" : "text-blue-600";
-  const borderColor = type === "warning" ? "border-amber-200" : "border-slate-200";
+  const iconColor = type === "warning" ? "text-amber-500" : "text-blue-500";
+  const borderColor = type === "warning" ? "border-amber-100" : "border-slate-200";
   const bgGradient = type === "warning"
     ? "from-amber-50 to-orange-50"
     : "from-blue-50 to-slate-50";
@@ -126,8 +126,8 @@ function ConfirmationModal({
             onClick={onConfirm}
             className={`h-10 px-5 rounded-lg text-sm font-bold text-white shadow-sm transition-all hover:shadow-md active:scale-[0.98] inline-flex items-center justify-center shrink-0 ${
               type === "warning"
-                ? "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700"
-                : "bg-blue-600 hover:bg-blue-700"
+                ? "bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500"
+                : "bg-blue-500 hover:bg-blue-600"
             }`}
           >
             {t(confirmLabel)}
@@ -698,7 +698,7 @@ export default function StepPickup({
                 onClick={downloadImage}
                 disabled={busyAction !== null}
                 aria-label={t("ops.trip.download_image")}
-                className="flex items-center justify-center p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
+                className="flex items-center justify-center p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
                 title={t("ops.trip.download_image")}
               >
                 <Download size={16} className={busyAction === "image" ? "animate-pulse" : ""} />
@@ -708,7 +708,7 @@ export default function StepPickup({
               onClick={generatePDF}
               disabled={busyAction !== null}
               aria-label={t("ops.trip.download_pdf")}
-              className="flex items-center justify-center p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
+              className="flex items-center justify-center p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
               title={t("ops.trip.download_pdf")}
             >
               <FileText size={16} className={busyAction === "pdf" ? "animate-pulse" : ""} />
@@ -857,7 +857,7 @@ export default function StepPickup({
                   <button
                     type="button"
                     onClick={() => void removeImage(p.key)}
-                    className="absolute -top-1.5 -right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full w-5 h-5 text-[10px] leading-5 shadow-sm transition-all active:scale-90"
+                    className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 text-[10px] leading-5 shadow-sm transition-all active:scale-90"
                     title={t("ops.trip.remove_photo")}
                   >
                     ×
@@ -934,7 +934,7 @@ export default function StepPickup({
                             <button
                               type="button"
                               onClick={addRow}
-                              className="w-full h-8 text-[10px] font-bold uppercase tracking-wide text-blue-600 bg-blue-50 hover:bg-blue-50 border border-blue-200 rounded-lg"
+                              className="w-full h-8 text-[10px] font-bold uppercase tracking-wide text-blue-500 bg-blue-50/70 hover:bg-blue-50/70 border border-blue-100 rounded-lg"
                             >
                               <Plus size={12} className="inline mr-1" /> {t("ops.trip.add_box")}
                             </button>
@@ -1008,10 +1008,10 @@ export default function StepPickup({
           <p className="text-[10px] text-slate-400 mt-1.5">
             {t("ops.trip.use_tab_navigate")}
             {!isLastRowComplete && rows.length > 0 && (
-              <span className="text-amber-600 ml-2">⚠️ {t("ops.trip.fill_current_box_warn")}</span>
+              <span className="text-amber-500 ml-2">⚠️ {t("ops.trip.fill_current_box_warn")}</span>
             )}
             {rows.length >= maxBoxes && (
-              <span className="text-red-600 ml-2 font-bold">🚫 {t("ops.trip.box_limit_reached", { max: maxBoxes })}</span>
+              <span className="text-red-500 ml-2 font-bold">🚫 {t("ops.trip.box_limit_reached", { max: maxBoxes })}</span>
             )}
           </p>
         </div>

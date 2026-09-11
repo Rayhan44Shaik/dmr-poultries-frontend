@@ -182,7 +182,7 @@ export function GpsAddressText({
               }`}
             >
               <div className="flex items-center gap-2.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 px-3 py-2.5 border-b border-emerald-100">
-                <span className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0 shadow-sm">
+                <span className="h-8 w-8 rounded-lg bg-emerald-50/80 text-emerald-500 border border-emerald-100 flex items-center justify-center shrink-0 shadow-sm">
                   {status === "resolving" ? (
                     <Loader2 size={15} className="animate-spin" />
                   ) : (
@@ -190,7 +190,7 @@ export function GpsAddressText({
                   )}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700/90">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-500/90">
                     {t("ops.trip.field.gps_address")}
                   </p>
                   <p className="text-[11px] font-semibold text-slate-600 tabular-nums tracking-tight">
@@ -223,7 +223,7 @@ export function GpsAddressText({
                   className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-100"
                   title={t("ops.trip.copy_address")}
                 >
-                  {copied ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                  {copied ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
                   {copied ? t("ops.trip.copied") : t("ops.trip.copy")}
                 </button>
 
@@ -233,7 +233,7 @@ export function GpsAddressText({
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-emerald-700 active:bg-emerald-800"
+                    className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-emerald-100 bg-emerald-500 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-emerald-600 active:bg-emerald-600"
                   >
                     {t("ops.trip.open_in_maps")}
                     <ExternalLink size={12} />

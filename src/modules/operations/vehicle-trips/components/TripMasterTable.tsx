@@ -109,9 +109,9 @@ function TripMasterTable({ trips, selectedRowId, onRowClick, startIndex = 0 }: P
                     } ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`}
                   >
                     <td className="px-4 py-3 text-center text-xs text-slate-500 font-medium w-10">
-                      {isSelected ? <Check size={15} className="text-blue-600 inline" /> : serialNo}
+                      {isSelected ? <Check size={15} className="text-blue-500 inline" /> : serialNo}
                     </td>
-                    <td className="px-4 py-3 font-bold text-emerald-700 text-xs whitespace-nowrap">
+                    <td className="px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap">
                       {trip.tripNo}
                     </td>
                     <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(trip.tripDate)}</td>
@@ -123,9 +123,9 @@ function TripMasterTable({ trips, selectedRowId, onRowClick, startIndex = 0 }: P
                       {trip.lastShop || (trip.deliveries?.length ? trip.deliveries[trip.deliveries.length - 1].shopName : "--")}
                     </td>
                     <td className="px-4 py-3 text-center text-xs font-bold text-slate-700 whitespace-nowrap">{trip.totalShops}</td>
-                    <td className="px-4 py-3 text-center text-xs font-bold text-blue-700 whitespace-nowrap">{trip.totalBirds.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-center text-xs font-bold text-amber-600 whitespace-nowrap">{trip.totalWeight.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-center text-xs font-bold text-rose-600 whitespace-nowrap">{trip.totalMortality}</td>
+                    <td className="px-4 py-3 text-center text-xs font-bold text-blue-500 whitespace-nowrap">{trip.totalBirds.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-center text-xs font-bold text-amber-500 whitespace-nowrap">{trip.totalWeight.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-center text-xs font-bold text-rose-500 whitespace-nowrap">{trip.totalMortality}</td>
                   </tr>
                 );
               })

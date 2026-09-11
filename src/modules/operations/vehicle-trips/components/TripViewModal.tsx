@@ -258,7 +258,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: P
           {/* Top row: Trip identity + status */}
           <div className="px-6 md:px-8 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-4 min-w-0 flex-1 sm:flex-none">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white shrink-0">
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-400/20 text-white shrink-0">
                 <FileText className="w-6 h-6" />
               </div>
               <div className="min-w-0">
@@ -267,11 +267,11 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: P
                 </h2>
                 <div className="flex items-center gap-2 flex-wrap mt-1.5">
                   {isCompleted ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 text-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 text-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0">
                       <ShieldCheck size={11} /> {t("ops.trip.submitted_locked")}
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50/80 text-amber-500 border border-amber-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0">
                       {trip.status || t("status.pending")}
                     </span>
                   )}
@@ -283,7 +283,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: P
             <div className="flex items-center gap-2 flex-wrap justify-end shrink-0 w-full sm:w-auto">
               {isCompleted && trip.approvedBy && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 border border-slate-200 shadow-sm shrink-0">
-                  <UserCheck size={12} className="text-emerald-600" />
+                  <UserCheck size={12} className="text-emerald-500" />
                   {t("ops.trip.approved_by")}: {trip.approvedBy}
                 </span>
               )}
@@ -295,8 +295,8 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: P
             <div className="px-6 md:px-8 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-100/50">
               <div className="flex items-center gap-3 flex-wrap">
                 {emailCounts.total > 0 && (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-sky-700" role="status" aria-live="polite">
-                    <Mail size={12} className="text-sky-600" />
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-sky-500" role="status" aria-live="polite">
+                    <Mail size={12} className="text-sky-500" />
                     {emailState.isBulkSending ? (
                       <>
                         {t("ops.trip.sending")}... {emailState.bulkProgress?.sent ?? emailCounts.sent} / {emailState.bulkProgress?.total ?? emailCounts.total}
@@ -311,8 +311,8 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: P
                   </span>
                 )}
                 {whatsappCounts.total > 0 && (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700" role="status" aria-live="polite">
-                    <WhatsAppIcon size={12} className="text-green-600" />
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-500" role="status" aria-live="polite">
+                    <WhatsAppIcon size={12} className="text-green-500" />
                     {whatsappState.isBulkSending ? (
                       <>
                         {t("ops.trip.sending")}... {whatsappState.bulkProgress?.sent ?? whatsappCounts.sent} / {whatsappState.bulkProgress?.total ?? whatsappCounts.total}
@@ -334,7 +334,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: P
                     type="button"
                     onClick={() => void emailState.sendAll()}
                     disabled={emailState.isBulkSending}
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-500 hover:to-teal-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-400/20 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                     title={t("ops.trip.send_email_all")}
                   >
                     {emailState.isBulkSending ? (
@@ -350,7 +350,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: P
                     type="button"
                     onClick={() => void whatsappState.sendAll()}
                     disabled={whatsappState.isBulkSending}
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-green-500/20 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-400 to-emerald-400 hover:from-green-500 hover:to-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-green-400/20 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                     title={t("ops.trip.send_whatsapp_all")}
                   >
                     {whatsappState.isBulkSending ? (
@@ -364,7 +364,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: P
                 <button
                   type="button"
                   onClick={() => void downloadTripReport()}
-                  className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 p-2 text-red-700 shadow-sm transition-all active:scale-95"
+                  className="inline-flex items-center justify-center rounded-xl border border-red-100 bg-red-50/70 hover:bg-red-50/80 p-2 text-red-500 shadow-sm transition-all active:scale-95"
                   title={t("ops.trip.create_pdf_title")}
                   aria-label={t("ops.trip.create_pdf")}
                 >
@@ -394,7 +394,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: P
                 <span className="font-medium text-slate-500">{trip.sourceFarm}</span>
               </>
             ) : null}
-            <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-200 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-600">
+            <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-200 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-500">
               {t("ops.trip.step_label", { step: safeViewStepIndex + 1 })} · {t(`ops.trip.step.${TRIP_STEP_KEYS[safeViewStepIndex]}`)}
             </span>
           </div>

@@ -18,7 +18,7 @@ export function TripNoBadge({
 
   return (
     <span
-      className={`inline-flex items-center gap-1 max-w-full rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-800 tabular-nums tracking-tight shadow-sm ${className}`}
+      className={`inline-flex items-center gap-1 max-w-full rounded-full border border-indigo-100 bg-indigo-50/70 px-2.5 py-1 text-[11px] font-bold text-indigo-500 tabular-nums tracking-tight shadow-sm ${className}`}
       title={`${t("operations.trip_no")}: ${value}`}
       aria-label={`${t("operations.trip_no")} ${value}`}
     >

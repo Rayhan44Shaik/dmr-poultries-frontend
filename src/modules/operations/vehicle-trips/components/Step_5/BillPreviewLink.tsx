@@ -214,7 +214,7 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
                   type="button"
                   onClick={openLightbox}
                   onMouseDown={(e) => e.preventDefault()}
-                  className="flex-1 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-sm"
+                  className="flex-1 h-8 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold shadow-sm"
                 >
                   {t("ops.trip.bill_open_full")}
                 </button>
@@ -222,7 +222,7 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
                   type="button"
                   onClick={openInNewTab}
                   onMouseDown={(e) => e.preventDefault()}
-                  className="h-8 px-2.5 rounded-lg border border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-800 text-[11px] font-bold inline-flex items-center gap-1"
+                  className="h-8 px-2.5 rounded-lg border border-emerald-100 bg-white hover:bg-emerald-50/70 text-emerald-500 text-[11px] font-bold inline-flex items-center gap-1"
                   title={t("ops.trip.bill_open_new_tab")}
                 >
                   <ExternalLink size={12} />
@@ -267,7 +267,7 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
                   <button
                     type="button"
                     onClick={openInNewTab}
-                    className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold shadow-sm"
+                    className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-emerald-100 bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 text-xs font-bold shadow-sm"
                     title={t("ops.trip.bill_open_new_tab")}
                   >
                     <ExternalLink size={14} strokeWidth={2.25} />
@@ -303,7 +303,7 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
                 <button
                   type="button"
                   onClick={openInNewTab}
-                  className="text-emerald-700 font-semibold hover:underline"
+                  className="text-emerald-500 font-semibold hover:underline"
                 >
                   {t("ops.trip.bill_open_new_tab")}
                 </button>
@@ -328,7 +328,7 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
         onPointerDown={(e) => e.stopPropagation()}
         className={
           className ||
-          "inline-flex items-center gap-0.5 text-[11px] text-emerald-700 font-semibold underline decoration-emerald-300/70 hover:decoration-emerald-600 leading-tight whitespace-nowrap cursor-pointer bg-transparent border-0 p-0.5 rounded hover:bg-emerald-50"
+          "inline-flex items-center gap-0.5 text-[11px] text-emerald-500 font-semibold underline decoration-emerald-300/70 hover:decoration-emerald-600 leading-tight whitespace-nowrap cursor-pointer bg-transparent border-0 p-0.5 rounded hover:bg-emerald-50/70"
         }
         title={t("ops.trip.bill_open_full")}
       >

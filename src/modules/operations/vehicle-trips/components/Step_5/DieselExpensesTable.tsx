@@ -890,7 +890,7 @@ export default function DieselExpensesTable({
               </span>
               <div
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold border shrink-0 ${
-                  absoluteDestMeter > 0 ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-red-50 border-red-200 text-red-700"
+                  absoluteDestMeter > 0 ? "bg-blue-50/70 border-blue-100 text-blue-500" : "bg-red-50/70 border-red-100 text-red-500"
                 }`}
               >
                 <Gauge size={12} />
@@ -902,10 +902,10 @@ export default function DieselExpensesTable({
               {/* Meter chain error — once only, beside Destination Farm Meter */}
               {chainBannerMessages[0] ? (
                 <div
-                  className="inline-flex items-start gap-1.5 max-w-full sm:max-w-xl rounded-md border border-red-300 bg-red-50 px-2.5 py-1.5 text-[11px] font-semibold text-red-700 leading-snug shadow-sm"
+                  className="inline-flex items-start gap-1.5 max-w-full sm:max-w-xl rounded-md border border-red-100 bg-red-50/70 px-2.5 py-1.5 text-[11px] font-semibold text-red-500 leading-snug shadow-sm"
                   role="alert"
                 >
-                  <AlertTriangle size={13} className="shrink-0 mt-0.5 text-red-600" />
+                  <AlertTriangle size={13} className="shrink-0 mt-0.5 text-red-500" />
                   <span className="min-w-0 break-words">{chainBannerMessages[0]}</span>
                 </div>
               ) : null}
@@ -916,7 +916,7 @@ export default function DieselExpensesTable({
               disabled={!canAddDieselRow}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg shadow-sm transition-all shrink-0 ${
                 canAddDieselRow
-                  ? "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 cursor-pointer"
+                  ? "bg-emerald-500 hover:bg-emerald-600 text-white active:scale-95 cursor-pointer"
                   : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
               }`}
               title={
@@ -936,7 +936,7 @@ export default function DieselExpensesTable({
         {toastMessage && (
           <div
             className={`absolute top-2 right-2 z-50 text-white px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 text-xs font-medium ${
-              toastMessage.type === "error" ? "bg-red-600" : toastMessage.type === "success" ? "bg-emerald-600" : "bg-amber-600"
+              toastMessage.type === "error" ? "bg-red-500" : toastMessage.type === "success" ? "bg-emerald-500" : "bg-amber-500"
             }`}
           >
             <AlertTriangle size={15} className="shrink-0" />
@@ -1013,8 +1013,8 @@ export default function DieselExpensesTable({
               // Compact numeric inputs (S.No / Ltr / Rate columns are tighter).
               const inputBase =
                 "w-full min-w-0 box-border tabular-nums text-right pl-1 py-1.5 rounded-md border text-[11px] font-semibold outline-none transition-colors disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-default [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
-              const inputOk = "bg-white border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15";
-              const inputErr = "bg-red-50 border-red-400 text-red-700 focus:border-red-500 focus:ring-2 focus:ring-red-500/15";
+              const inputOk = "bg-white border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/15";
+              const inputErr = "bg-red-50/70 border-red-400 text-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-400/15";
 
               return (
                 <tr
@@ -1133,7 +1133,7 @@ export default function DieselExpensesTable({
                       title={bunkVal}
                       maxLength={40}
                       onChange={(e) => handleFieldChange(`dieselBunk${num}`, num, e.target.value)}
-                      className="w-full min-w-0 px-1.5 py-1.5 rounded-md border border-slate-200 bg-white text-[11px] font-medium outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15 disabled:bg-slate-100 disabled:text-slate-600 truncate"
+                      className="w-full min-w-0 px-1.5 py-1.5 rounded-md border border-slate-200 bg-white text-[11px] font-medium outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/15 disabled:bg-slate-100 disabled:text-slate-600 truncate"
                     />
                   </td>
 
@@ -1145,7 +1145,7 @@ export default function DieselExpensesTable({
                           <GpsAddressText
                             lat={gpsLat}
                             lon={gpsLon}
-                            className="block text-[11px] text-emerald-600 font-semibold underline decoration-emerald-300/80 hover:decoration-emerald-600 leading-snug cursor-help"
+                            className="block text-[11px] text-emerald-500 font-semibold underline decoration-emerald-300/80 hover:decoration-emerald-600 leading-snug cursor-help"
                             withTooltip
                             maxLines={2}
                           />
@@ -1161,11 +1161,11 @@ export default function DieselExpensesTable({
                           className={`shrink-0 px-1.5 py-1 rounded-md text-[10px] font-semibold inline-flex items-center gap-0.5 border ${
                             gpsOk
                               ? "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                              : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                              : "bg-red-50/70 text-red-500 border-red-100 hover:bg-red-50/80"
                           }`}
                           title={t("ops.trip.gps_must_captured")}
                         >
-                          {isFetching ? <Loader2 size={11} className="animate-spin" /> : <MapPin size={11} className={gpsOk ? "text-emerald-600" : "text-red-500"} />}
+                          {isFetching ? <Loader2 size={11} className="animate-spin" /> : <MapPin size={11} className={gpsOk ? "text-emerald-500" : "text-red-500"} />}
                           GPS
                         </button>
                       )}
@@ -1196,7 +1196,7 @@ export default function DieselExpensesTable({
                             <button
                               type="button"
                               onClick={() => openBillPicker(num)}
-                              className="inline-flex items-center justify-center gap-0.5 rounded-md border border-emerald-300 bg-emerald-50 hover:bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600"
+                              className="inline-flex items-center justify-center gap-0.5 rounded-md border border-emerald-100 bg-emerald-50/70 hover:bg-emerald-50/70 px-1.5 py-0.5 text-[10px] font-bold text-emerald-500"
                               title={t("ops.trip.upload_bill")}
                             >
                               <Upload size={11} strokeWidth={2.5} />
@@ -1217,7 +1217,7 @@ export default function DieselExpensesTable({
                                   handleChange(`dieselImageName${num}`, "");
                                 }
                               }}
-                              className="text-[10px] font-medium text-slate-400 hover:text-red-600"
+                              className="text-[10px] font-medium text-slate-400 hover:text-red-500"
                               title={t("common.delete")}
                             >
                               {t("common.remove")}
@@ -1229,7 +1229,7 @@ export default function DieselExpensesTable({
                       <button
                         type="button"
                         onClick={() => openBillPicker(num)}
-                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-emerald-400 bg-emerald-50 hover:bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-600 shadow-sm active:scale-[0.98] whitespace-nowrap"
+                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-emerald-400 bg-emerald-50/70 hover:bg-emerald-50/70 px-2 py-1 text-[10px] font-bold text-emerald-500 shadow-sm active:scale-[0.98] whitespace-nowrap"
                         title={t("ops.trip.upload_bill")}
                       >
                         <Upload size={12} strokeWidth={2.5} />
@@ -1245,7 +1245,7 @@ export default function DieselExpensesTable({
                     {readOnly || (isSubmitted && !isEditingThisRow) ? (
                       <div className="inline-flex items-center justify-center gap-1">
                         <span
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50/80 text-emerald-500 border border-emerald-200"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50/80 text-emerald-500 border border-emerald-100"
                           title={t("ops.trip.submitted")}
                           aria-label={t("ops.trip.submitted")}
                         >
@@ -1265,7 +1265,7 @@ export default function DieselExpensesTable({
                               type="button"
                               onClick={() => requestDelete(num, { label: t("ops.trip.deleting_diesel_row", { row: num }) })}
                               disabled={busyRow === num}
-                              className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-600"
+                              className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full bg-white hover:bg-rose-50/70 text-slate-500 hover:text-rose-500"
                               title={t("ops.trip.delete_row")}
                             >
                               <Trash2 size={13} />
@@ -1308,7 +1308,7 @@ export default function DieselExpensesTable({
         return (
           <div className="space-y-2">
             {showBottomReason ? (
-              <p className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <p className="text-xs font-semibold text-red-500 bg-red-50/70 border border-red-100 rounded-lg px-3 py-2">
                 {reason}
               </p>
             ) : null}
@@ -1329,7 +1329,7 @@ export default function DieselExpensesTable({
                 disabled={!canSubmit || busyRow === actionRow}
                 className={`h-9 px-4 rounded-lg text-xs font-bold text-white inline-flex items-center justify-center shrink-0 ${
                   canSubmit && busyRow !== actionRow
-                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    ? "bg-emerald-500 hover:bg-emerald-600"
                     : "bg-slate-300 cursor-not-allowed"
                 }`}
               >

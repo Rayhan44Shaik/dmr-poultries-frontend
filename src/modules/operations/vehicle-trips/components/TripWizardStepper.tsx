@@ -67,16 +67,16 @@ export default function TripWizardStepper({
         const pillClasses = `
           inline-flex items-center gap-1.5 rounded-full border px-2.5 md:px-3 py-1.5 text-[11px] font-bold whitespace-nowrap shrink-0
           transition-all duration-300 ease-out
-          focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40
+          focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40
           ${isClickable ? "cursor-pointer active:scale-95" : "cursor-default"}
           ${
             isActive
-              ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-transparent shadow-md shadow-emerald-500/25 scale-105"
+              ? "bg-gradient-to-r from-emerald-400 to-teal-400 text-white border-transparent shadow-md shadow-emerald-400/25 scale-105"
               : isLocked
                 ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-80"
                 : isCompleted
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                  : "bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-700"
+                  ? "bg-emerald-50/70 text-emerald-500 border-emerald-100 hover:bg-emerald-50/80"
+                  : "bg-white text-slate-500 border-slate-200 hover:border-emerald-100 hover:text-emerald-500"
           }
         `.trim();
 
@@ -89,7 +89,7 @@ export default function TripWizardStepper({
               : isLocked
                 ? "bg-slate-200 text-slate-400"
                 : isCompleted
-                  ? "bg-emerald-600 text-white"
+                  ? "bg-emerald-500 text-white"
                   : "bg-slate-100 text-slate-500"
           }
         `;

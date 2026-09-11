@@ -340,7 +340,7 @@ export default function GeneralExpensesTable({
                 {/* Validation sits beside the End Meter heading — neat, readable, single place */}
                 {endMeterErrorMsg ? (
                   <span
-                    className="inline-flex items-center max-w-[min(18rem,55vw)] rounded-md border border-red-300 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700 leading-snug"
+                    className="inline-flex items-center max-w-[min(18rem,55vw)] rounded-md border border-red-100 bg-red-50/70 px-2 py-0.5 text-[10px] font-semibold text-red-500 leading-snug"
                     role="alert"
                     title={endMeterErrorMsg}
                   >
@@ -393,7 +393,7 @@ export default function GeneralExpensesTable({
                   aria-invalid={isEndMeterInvalid}
                   title={endMeterErrorMsg || undefined}
                   className={`w-full max-w-[7.5rem] font-semibold text-xs tabular-nums outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                    isEndMeterInvalid ? "text-red-600" : "text-slate-900"
+                    isEndMeterInvalid ? "text-red-500" : "text-slate-900"
                   }`}
                 />
                 <span className="text-[10px] font-semibold text-slate-400 shrink-0">KM</span>
@@ -402,7 +402,7 @@ export default function GeneralExpensesTable({
             <td colSpan={2} className="font-medium text-slate-700 px-3 py-2 border-r border-slate-200 bg-slate-50/30 align-middle text-xs">
               {t("ops.trip.average_km_ltr")}
             </td>
-            <td colSpan={2} className="font-semibold text-blue-600 px-3 py-2 bg-slate-50/50 align-middle text-xs">
+            <td colSpan={2} className="font-semibold text-blue-500 px-3 py-2 bg-slate-50/50 align-middle text-xs">
               {computedAverage ? computedAverage : t("ops.trip.not_available")}
             </td>
           </tr>
@@ -432,7 +432,7 @@ export default function GeneralExpensesTable({
                   handleChange("destinationTolls", val === "" ? "" : Math.floor(Number(val)));
                 }}
                 onWheel={blockWheelChange}
-                className="font-semibold text-blue-600 text-xs w-full px-3 py-2 outline-none bg-transparent tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="font-semibold text-blue-500 text-xs w-full px-3 py-2 outline-none bg-transparent tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </td>
           </tr>

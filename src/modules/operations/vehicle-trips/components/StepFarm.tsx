@@ -400,7 +400,7 @@ export default function StepFarm({
                 type="button"
                 onClick={fetchCurrentLocation}
                 disabled={isFetchingLocation}
-                className="shrink-0 h-[42px] px-4 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-600 border border-cyan-200 transition-all active:scale-95 flex items-center gap-1.5 text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
+                className="shrink-0 h-[42px] px-4 rounded-xl bg-cyan-50/70 hover:bg-cyan-50/80 text-cyan-500 border border-cyan-100 transition-all active:scale-95 flex items-center gap-1.5 text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isFetchingLocation ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
                 <span className="hidden sm:inline">{t("ops.trip.get_gps")}</span>
@@ -443,7 +443,7 @@ export default function StepFarm({
               type="text"
               value={farmAddress}
               onChange={(e) => updateTrip({ farmAddress: e.target.value })}
-              className="w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-400"
+              className="w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10 outline-none transition-all placeholder:text-slate-400"
               placeholder={t("ops.trip.farm_address_placeholder")}
             />
           </div>
@@ -465,13 +465,13 @@ export default function StepFarm({
               onWheel={(e) => e.currentTarget.blur()}
               className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border ${
                 destMeterError
-                  ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
-                  : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
+                  ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-400/10"
+                  : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10"
               } bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400`}
               placeholder="0.00"
             />
             {destMeterError ? (
-              <div className="mt-1 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700">
+              <div className="mt-1 rounded-lg border border-red-100 bg-red-50/70 px-3 py-2 text-[11px] font-semibold text-red-500">
                 {destMeterError}
               </div>
             ) : (
@@ -494,7 +494,7 @@ export default function StepFarm({
               value={trip.pickupTolls ?? 0}
               onChange={(e) => handleTollsChange(e.target.value)}
               onWheel={(e) => e.currentTarget.blur()}
-              className="hide-spinner w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-400"
+              className="hide-spinner w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10 outline-none transition-all placeholder:text-slate-400"
               placeholder="0"
             />
             <p className="text-[11px] text-slate-400 mt-1">{t("ops.trip.tolls_hint")}</p>
@@ -518,7 +518,7 @@ export default function StepFarm({
                 updateTrip({ avgBirdWeight: val });
               }}
               onWheel={(e) => e.currentTarget.blur()}
-              className="hide-spinner w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-400"
+              className="hide-spinner w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10 outline-none transition-all placeholder:text-slate-400"
               placeholder="e.g., 1.5"
             />
           </div>
@@ -533,7 +533,7 @@ export default function StepFarm({
               type="text"
               value={remarks}
               onChange={(e) => updateTrip({ remarks: e.target.value })}
-              className="w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-400"
+              className="w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10 outline-none transition-all placeholder:text-slate-400"
               placeholder={t("ops.trip.optional")}
             />
           </div>

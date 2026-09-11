@@ -458,13 +458,13 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
         disabled={disabled}
         className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
           invalid
-            ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
-            : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
+            ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-400/10"
+            : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10"
         }`}
         placeholder="0.00"
       />
       {error ? (
-        <p className="mt-1.5 text-xs font-medium text-red-600 flex items-start gap-1">
+        <p className="mt-1.5 text-xs font-medium text-red-500 flex items-start gap-1">
           <span aria-hidden>⚠</span>
           <span>{error}</span>
         </p>
@@ -525,8 +525,8 @@ const AdvanceField = React.memo(function AdvanceField({
         disabled={disabled}
         className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
           invalid
-            ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
-            : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
+            ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-400/10"
+            : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10"
         }`}
         placeholder="0.00"
       />

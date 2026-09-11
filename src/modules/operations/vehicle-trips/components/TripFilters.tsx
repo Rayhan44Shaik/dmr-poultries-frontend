@@ -83,7 +83,7 @@ function TripFilters({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         <div>
           <label className={opsFilterLabelClass}>
-            <Calendar size={13} className="text-emerald-600 flex-shrink-0" />
+            <Calendar size={13} className="text-emerald-500 flex-shrink-0" />
             <span>{t("common.from")}</span>
           </label>
           <DatePicker
@@ -96,7 +96,7 @@ function TripFilters({
 
         <div>
           <label className={opsFilterLabelClass}>
-            <Calendar size={13} className="text-emerald-600 flex-shrink-0" />
+            <Calendar size={13} className="text-emerald-500 flex-shrink-0" />
             <span>{t("common.to")}</span>
           </label>
           <DatePicker
@@ -109,7 +109,7 @@ function TripFilters({
 
         <div>
           <label className={opsFilterLabelClass}>
-            <Truck size={13} className="text-emerald-600 flex-shrink-0" />
+            <Truck size={13} className="text-emerald-500 flex-shrink-0" />
             <span>{t("common.vehicle")}</span>
           </label>
           <Select
@@ -125,7 +125,7 @@ function TripFilters({
 
         <div>
           <label className={opsFilterLabelClass}>
-            <UserCog size={13} className="text-emerald-600 flex-shrink-0" />
+            <UserCog size={13} className="text-emerald-500 flex-shrink-0" />
             <span>{t("common.supervisor")}</span>
           </label>
           <Select
@@ -141,7 +141,7 @@ function TripFilters({
 
         <div>
           <label className={opsFilterLabelClass}>
-            <Warehouse size={13} className="text-emerald-600 flex-shrink-0" />
+            <Warehouse size={13} className="text-emerald-500 flex-shrink-0" />
             <span>{t("ops.trip.source_farm")}</span>
           </label>
           <Select

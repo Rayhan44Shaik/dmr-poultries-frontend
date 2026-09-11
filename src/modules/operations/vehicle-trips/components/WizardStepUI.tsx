@@ -51,10 +51,10 @@ export function WizardStepNotice({
   const { t } = useI18n();
   const shown = notice ?? (dirty ? { type: "info" as const, message: t("ops.trip.unsaved_changes") } : null);
   const styles = shown?.type === "success"
-    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+    ? "border-emerald-100 bg-emerald-50/70 text-emerald-500"
     : shown?.type === "error"
-      ? "border-red-200 bg-red-50 text-red-700"
-      : "border-amber-200 bg-amber-50 text-amber-700";
+      ? "border-red-100 bg-red-50/70 text-red-500"
+      : "border-amber-100 bg-amber-50/70 text-amber-500";
   const Icon = shown?.type === "success" ? Check : shown?.type === "error" ? CircleX : CircleAlert;
 
   return (
@@ -92,7 +92,7 @@ export function WizardActionBar({
 }: WizardActionBarProps) {
   const { t } = useI18n();
   const base =
-    "group w-full sm:w-auto h-10 px-5 rounded-xl text-[13px] font-semibold transition-all duration-200 ease-out active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center justify-center gap-2 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-1";
+    "group w-full sm:w-auto h-10 px-5 rounded-xl text-[13px] font-semibold transition-all duration-200 ease-out active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center justify-center gap-2 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/30 focus-visible:ring-offset-1";
   return (
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5 sm:gap-3 pt-4 border-t border-slate-100">
       <button
@@ -108,7 +108,7 @@ export function WizardActionBar({
           type="button"
           onClick={() => void onSave()}
           disabled={busy || saveDisabled}
-          className={`${base} border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300 hover:shadow-sm`}
+          className={`${base} border border-blue-100 bg-blue-50/70 text-blue-500 hover:bg-blue-50/80 hover:border-blue-100 hover:shadow-sm`}
         >
           {busy ? (
             <Loader2 size={15} className="animate-spin shrink-0" />
@@ -122,7 +122,7 @@ export function WizardActionBar({
         type="button"
         onClick={() => void onSubmit()}
         disabled={busy || submitDisabled}
-        className={`${base} bg-blue-600 text-white shadow-sm shadow-blue-500/25 hover:bg-blue-700 hover:shadow-md hover:shadow-blue-500/30 hover:-translate-y-0.5 disabled:hover:translate-y-0 disabled:hover:shadow-sm`}
+        className={`${base} bg-blue-500 text-white shadow-sm shadow-blue-400/25 hover:bg-blue-600 hover:shadow-md hover:shadow-blue-400/30 hover:-translate-y-0.5 disabled:hover:translate-y-0 disabled:hover:shadow-sm`}
       >
         {busy ? (
           <Loader2 size={15} className="animate-spin shrink-0" />

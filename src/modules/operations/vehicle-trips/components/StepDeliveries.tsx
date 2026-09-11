@@ -170,7 +170,7 @@ export default function StepDeliveries({
               {trip.deliveryStepSubmitted ? (
                 <StepCloseButton onClose={handleExitToLocked} animated />
               ) : null}
-              <span className="text-xs text-blue-600 font-semibold bg-blue-50 px-3 py-1 rounded-full border border-blue-200 whitespace-nowrap">
+              <span className="text-xs text-blue-500 font-semibold bg-blue-50/70 px-3 py-1 rounded-full border border-blue-100 whitespace-nowrap">
                 {editingShopId ? t("ops.trip.editing_shop_details") : t("ops.trip.step_unlocked")}
               </span>
             </div>

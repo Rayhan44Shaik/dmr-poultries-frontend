@@ -47,8 +47,8 @@ export function dropdownTriggerClass(invalid: boolean, disabled: boolean): strin
     disabled
       ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
       : invalid
-        ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
-        : "border-slate-200 hover:border-slate-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10",
+        ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-400/10"
+        : "border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10",
   ].join(" ");
 }
 
@@ -217,7 +217,7 @@ export const SearchDropdown = React.memo(function SearchDropdown({
             type="button"
             onClick={() => pick("")}
             className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left border-b border-slate-100 hover:bg-slate-50 transition ${
-              !value ? "text-emerald-600 bg-emerald-50/70" : "text-slate-600"
+              !value ? "text-emerald-500 bg-emerald-50/70" : "text-slate-600"
             }`}
           >
             <span className="w-3.5 shrink-0">{!value && <Check size={13} className="text-emerald-500" />}</span>
@@ -236,7 +236,7 @@ export const SearchDropdown = React.memo(function SearchDropdown({
                     type="button"
                     onClick={() => pick(option.value)}
                     className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left truncate hover:bg-slate-50 transition ${
-                      isSelected ? "text-emerald-600 bg-emerald-50/70" : "text-slate-700"
+                      isSelected ? "text-emerald-500 bg-emerald-50/70" : "text-slate-700"
                     }`}
                   >
                     <span className="w-3.5 shrink-0">
@@ -325,7 +325,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
           <span className="px-1.5 text-slate-400 font-normal">{placeholder}</span>
         ) : chipSummary ? (
           <span className="inline-flex items-center gap-1.5 px-1.5 text-xs font-semibold text-slate-800">
-            <Check size={13} className="text-emerald-600 shrink-0" />
+            <Check size={13} className="text-emerald-500 shrink-0" />
             {chipSummary(selectedValues.length)}
           </span>
         ) : (
@@ -346,7 +346,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
                       event.stopPropagation();
                       onChange(selectedValues.filter((v) => v !== value));
                     }}
-                    className="rounded-full p-0.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                    className="rounded-full p-0.5 text-slate-400 transition-colors hover:bg-red-50/70 hover:text-red-500"
                     aria-label={`Remove ${label}`}
                     title={`Remove ${label}`}
                   >
@@ -379,7 +379,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
               onClick={() => onChange(options.map((opt) => opt.value))}
               className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-semibold text-left border-b border-slate-100 hover:bg-slate-50 transition ${
                 selectedValues.length === options.length && options.length > 0
-                  ? "text-blue-600 bg-blue-50/70"
+                  ? "text-blue-500 bg-blue-50/70"
                   : "text-slate-700"
               }`}
             >
@@ -397,7 +397,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
             type="button"
             onClick={() => onChange([])}
             className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left border-b border-slate-100 hover:bg-slate-50 transition ${
-              selectedValues.length === 0 ? "text-emerald-600 bg-emerald-50/70" : "text-slate-600"
+              selectedValues.length === 0 ? "text-emerald-500 bg-emerald-50/70" : "text-slate-600"
             }`}
           >
             <span className="w-3.5 shrink-0">
@@ -418,7 +418,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
                     type="button"
                     onClick={() => toggle(option.value)}
                     className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left truncate hover:bg-slate-50 transition ${
-                      isSelected ? "text-emerald-600 bg-emerald-50/70" : "text-slate-700"
+                      isSelected ? "text-emerald-500 bg-emerald-50/70" : "text-slate-700"
                     }`}
                   >
                     <span className="w-3.5 shrink-0">

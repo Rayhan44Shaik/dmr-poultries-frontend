@@ -29,8 +29,8 @@ function ConfirmationModal({ isOpen, title, message, confirmLabel = "ops.trip.ye
 }) {
   const { t } = useI18n();
   if (!isOpen) return null;
-  const iconColor = type === "warning" ? "text-amber-600" : "text-emerald-600";
-  const borderColor = type === "warning" ? "border-amber-200" : "border-emerald-200";
+  const iconColor = type === "warning" ? "text-amber-500" : "text-emerald-500";
+  const borderColor = type === "warning" ? "border-amber-100" : "border-emerald-100";
   const bgGradient = type === "warning" ? "from-amber-50 to-orange-50" : "from-emerald-50 to-teal-50";
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
@@ -48,7 +48,7 @@ function ConfirmationModal({ isOpen, title, message, confirmLabel = "ops.trip.ye
         </div>
         <div className="flex justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
           <button onClick={onCancel} className="h-10 px-5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-xs inline-flex items-center justify-center shrink-0">{t(cancelLabel)}</button>
-          <button onClick={onConfirm} className={`h-10 px-5 rounded-lg text-sm font-bold text-white shadow-xs transition-all active:scale-[0.98] inline-flex items-center justify-center shrink-0 ${type === "warning" ? "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700" : "bg-emerald-600 hover:bg-emerald-700"}`}>
+          <button onClick={onConfirm} className={`h-10 px-5 rounded-lg text-sm font-bold text-white shadow-xs transition-all active:scale-[0.98] inline-flex items-center justify-center shrink-0 ${type === "warning" ? "bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500" : "bg-emerald-500 hover:bg-emerald-600"}`}>
             {t(confirmLabel)}
           </button>
         </div>
@@ -693,22 +693,22 @@ export default function StepEnd({
               {
                 label: t("operations.vehicle_no"),
                 value: trip.vehicleNo || "—",
-                tone: "border-indigo-100 bg-indigo-50/40 text-indigo-600",
+                tone: "border-indigo-100 bg-indigo-50/40 text-indigo-500",
               },
               {
                 label: t("ops.trip.field_advance_given"),
                 value: formatInr(Number(trip.advanceAmount || 0)),
-                tone: "border-emerald-100 bg-emerald-50/40 text-emerald-600",
+                tone: "border-emerald-100 bg-emerald-50/40 text-emerald-500",
               },
               {
                 label: t("operations.total_expenses"),
                 value: formatInr(totalAllExpenses),
-                tone: "border-rose-100 bg-rose-50/40 text-rose-600",
+                tone: "border-rose-100 bg-rose-50/40 text-rose-500",
               },
               {
                 label: t("ops.trip.total_diesel"),
                 value: formatInr(totalDieselAmount),
-                tone: "border-blue-100 bg-blue-50/40 text-blue-600",
+                tone: "border-blue-100 bg-blue-50/40 text-blue-500",
               },
               {
                 label: t("ops.trip.field_total_all"),
@@ -784,22 +784,22 @@ export default function StepEnd({
               {
                 label: t("operations.vehicle_no"),
                 value: trip.vehicleNo || "—",
-                tone: "border-indigo-100 bg-indigo-50/40 text-indigo-600",
+                tone: "border-indigo-100 bg-indigo-50/40 text-indigo-500",
               },
               {
                 label: t("ops.trip.field_advance_given"),
                 value: formatInr(Number(trip.advanceAmount || 0)),
-                tone: "border-emerald-100 bg-emerald-50/40 text-emerald-600",
+                tone: "border-emerald-100 bg-emerald-50/40 text-emerald-500",
               },
               {
                 label: t("operations.total_expenses"),
                 value: formatInr(totalAllExpenses),
-                tone: "border-rose-100 bg-rose-50/40 text-rose-600",
+                tone: "border-rose-100 bg-rose-50/40 text-rose-500",
               },
               {
                 label: t("ops.trip.total_diesel"),
                 value: formatInr(totalDieselAmount),
-                tone: "border-blue-100 bg-blue-50/40 text-blue-600",
+                tone: "border-blue-100 bg-blue-50/40 text-blue-500",
               },
               {
                 label: t("ops.trip.field_total_all"),
@@ -845,7 +845,7 @@ export default function StepEnd({
           />
 
           {errorMsg ? (
-            <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg">
+            <div className="p-2.5 bg-red-50/70 border border-red-100 text-red-500 text-xs font-semibold rounded-lg">
               {errorMsg}
             </div>
           ) : null}
@@ -867,7 +867,7 @@ export default function StepEnd({
 
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between gap-2 font-bold text-xs text-slate-900">
             <span>{t("ops.trip.balance_remaining")}</span>
-            <span className="text-emerald-600 tabular-nums">{formatInr(remainingBalance)}</span>
+            <span className="text-emerald-500 tabular-nums">{formatInr(remainingBalance)}</span>
           </div>
 
           <WizardStepNotice

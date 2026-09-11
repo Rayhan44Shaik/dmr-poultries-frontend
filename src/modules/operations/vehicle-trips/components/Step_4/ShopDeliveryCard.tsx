@@ -13,10 +13,10 @@ interface Props {
 /** Soft, low-eye-strain tints for box-number chips in the card. */
 const BOX_CHIP_PALETTE = [
   "bg-slate-100 text-slate-700 border-slate-200",
-  "bg-sky-50 text-sky-600 border-sky-100",
-  "bg-indigo-50 text-indigo-600 border-indigo-100",
-  "bg-teal-50 text-teal-600 border-teal-100",
-  "bg-amber-50 text-amber-600 border-amber-100",
+  "bg-sky-50/70 text-sky-500 border-sky-100",
+  "bg-indigo-50/70 text-indigo-500 border-indigo-100",
+  "bg-teal-50/70 text-teal-500 border-teal-100",
+  "bg-amber-50/70 text-amber-500 border-amber-100",
   "bg-rose-50/70 text-rose-500 border-rose-100",
 ];
 
@@ -57,7 +57,7 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
             {!readOnly && (
               <button
                 onClick={() => onEdit(row)}
-                className="p-1.5 rounded-lg bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 border border-slate-200/60 transition-colors flex items-center justify-center"
+                className="p-1.5 rounded-lg bg-slate-50 hover:bg-blue-50/70 text-slate-500 hover:text-blue-500 border border-slate-200/60 transition-colors flex items-center justify-center"
                 title={t("ops.trip.edit_shop_delivery")}
               >
                 <Pencil size={13} className="stroke-[2]" />
@@ -65,7 +65,7 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
             )}
             <button
               onClick={() => onPDF(row)}
-              className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200/60 transition-colors flex items-center justify-center"
+              className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50/70 text-slate-500 hover:text-rose-500 border border-slate-200/60 transition-colors flex items-center justify-center"
               title={t("ops.trip.download_pdf")}
             >
               <FileText size={13} className="stroke-[2]" />
@@ -151,7 +151,7 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
               </span>
             )}
             {row.birdType ? (
-              <span className="px-1.5 py-px rounded bg-blue-50 text-blue-600 font-semibold text-[10px] border border-blue-100 shrink-0">
+              <span className="px-1.5 py-px rounded bg-blue-50/70 text-blue-500 font-semibold text-[10px] border border-blue-100 shrink-0">
                 {row.birdType}
               </span>
             ) : null}

@@ -662,7 +662,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/80 shadow-xl shadow-slate-100/70 space-y-6">
         {entryScreen === "prompt" ? (
           <div className="flex flex-col items-center justify-center text-center py-16 space-y-6">
-            <div className="h-20 w-20 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shadow-inner">
+            <div className="h-20 w-20 rounded-full bg-blue-50/70 flex items-center justify-center text-blue-500 shadow-inner">
               <FileText size={36} />
             </div>
             <div className="space-y-2">
@@ -673,7 +673,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
             </div>
             <button
               onClick={createNewTrip}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-400 to-indigo-400 hover:from-blue-500 hover:to-indigo-500 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-100 transition-all active:scale-95"
             >
               <Plus size={18} />
               {t("ops.trip.create_new_trip")}

@@ -194,15 +194,15 @@ function TripRecentTable({
   const getStepBadge = (trip: Trip) => {
     // Completed may still exist on older sample rows — show label only (no status change option).
     if (trip.status === "Completed") {
-      return { label: t("status.completed"), color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={12} />, resume: false };
+      return { label: t("status.completed"), color: "bg-emerald-50/70 text-emerald-500 border-emerald-100", icon: <CheckCircle size={12} />, resume: false };
     }
     if (trip.status === "Pending") {
-      return { label: t("status.pending"), color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, resume: false };
+      return { label: t("status.pending"), color: "bg-amber-50/70 text-amber-500 border-amber-100", icon: <Clock size={12} />, resume: false };
     }
     // Defensive: wizard fully submitted but status still Draft → treat as Pending
     // (Step 5 submit should have moved it; never show Completed from Draft).
     if (isTripWizardComplete(trip)) {
-      return { label: t("status.pending"), color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, resume: false };
+      return { label: t("status.pending"), color: "bg-amber-50/70 text-amber-500 border-amber-100", icon: <Clock size={12} />, resume: false };
     }
     // A Draft trip always has Step 1 submitted (trips are created on Step 1
     // submit), so it is always mid-workflow: show ONLY which step is pending
@@ -210,7 +210,7 @@ function TripRecentTable({
     const nextStep = getNextIncompleteTripStep(trip);
     return {
       label: t("ops.trip.step_label", { step: nextStep + 1 }),
-      color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      color: "bg-emerald-50/70 text-emerald-500 border-emerald-100",
       icon: <FileText size={12} />,
       resume: true,
     };
@@ -247,7 +247,7 @@ function TripRecentTable({
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-inner">
+              <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center text-blue-500 shadow-inner">
                 <History className="w-5 h-5" />
               </div>
               <h3 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.recent_trip_activity")}</h3>
@@ -267,10 +267,10 @@ function TripRecentTable({
                 const isActive = statusFilter === tab;
                 const activeClass =
                   tab === "Draft"
-                    ? "bg-emerald-100 text-emerald-700 shadow-sm"
+                    ? "bg-emerald-50/80 text-emerald-500 shadow-sm"
                     : tab === "Pending"
-                    ? "bg-orange-100 text-orange-700 shadow-sm"
-                    : "bg-rose-100 text-rose-700 shadow-sm";
+                    ? "bg-orange-50/80 text-orange-500 shadow-sm"
+                    : "bg-rose-50/80 text-rose-500 shadow-sm";
                 const label = (() => {
                   const k = "status." + tab.toLowerCase();
                   const v = t(k);
@@ -298,17 +298,17 @@ function TripRecentTable({
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
             <div className="relative flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input type="text" placeholder={t("ops.trip.search_trips_short")} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full sm:w-64 pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" />
+              <input type="text" placeholder={t("ops.trip.search_trips_short")} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full sm:w-64 pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-400/20 outline-none transition-all" />
             </div>
 
             <div className="h-5 w-px bg-slate-200 hidden sm:block" />
 
             <div className="flex items-center gap-1">
-              <button onClick={handleEditClick} disabled={!canEdit} className={`h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canEdit ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title={t("ops.trip.edit_selected_trip")}>
+              <button onClick={handleEditClick} disabled={!canEdit} className={`h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canEdit ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title={t("ops.trip.edit_selected_trip")}>
                 <Pencil size={13} />
                 <span className="hidden md:inline">{t("common.edit")}</span>
               </button>
-              <button onClick={openDeleteModal} disabled={!canDelete} className={`h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canDelete ? "bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title={t("ops.trip.delete_selected_trip")}>
+              <button onClick={openDeleteModal} disabled={!canDelete} className={`h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canDelete ? "bg-rose-50/70 hover:bg-rose-50/80 text-rose-500 border border-rose-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title={t("ops.trip.delete_selected_trip")}>
                 <Trash2 size={13} />
                 <span className="hidden md:inline">{t("common.delete")}</span>
               </button>
@@ -348,8 +348,8 @@ function TripRecentTable({
 
                   return (
                     <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
-                      <td className="px-4 py-3 font-bold text-emerald-700 text-xs">
-                        <span className={`bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100/80 ${isDeleted ? "opacity-60 line-through" : ""}`}>{trip.tripNo}</span>
+                      <td className="px-4 py-3 font-bold text-emerald-500 text-xs">
+                        <span className={`bg-emerald-50/70 px-2 py-1 rounded-md border border-emerald-100/80 ${isDeleted ? "opacity-60 line-through" : ""}`}>{trip.tripNo}</span>
                       </td>
                       <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripRecentDateWithDay(trip.tripDate)}</td>
                       <td className="px-4 py-3 text-xs font-medium text-slate-700">{trip.vehicleNo}</td>
@@ -357,12 +357,12 @@ function TripRecentTable({
                       <td className="px-4 py-3 text-xs text-slate-600">{trip.supervisorName}</td>
                       <td className="px-4 py-3 text-xs text-slate-600 font-medium">{trip.sourceFarm}</td>
                       <td className="px-4 py-3 text-center text-xs font-bold text-slate-700">{trip.totalShops}</td>
-                      <td className="px-4 py-3 text-center text-xs font-bold text-blue-700">{trip.totalBirds.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-center text-xs font-bold text-amber-600">{trip.totalWeight.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-center text-xs font-bold text-rose-600">{trip.totalMortality}</td>
+                      <td className="px-4 py-3 text-center text-xs font-bold text-blue-500">{trip.totalBirds.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-center text-xs font-bold text-amber-500">{trip.totalWeight.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-center text-xs font-bold text-rose-500">{trip.totalMortality}</td>
                       <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                         {isDeleted ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-rose-100 text-rose-700 border border-rose-200/80"><AlertCircle size={12} /> {t("status.deleted")}</span>
+                          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-rose-50/80 text-rose-500 border border-rose-200/80"><AlertCircle size={12} /> {t("status.deleted")}</span>
                         ) : (() => {
                           // Draft: resume badge. Pending: dropdown to move → Completed
                           // (then leaves Pending tab). Deletion = Delete + 10s undo.
@@ -384,13 +384,13 @@ function TripRecentTable({
                                 <select
                                   value="Pending"
                                   onChange={(e) => handleStatusChange(trip, e.target.value as TripStatus)}
-                                  className="w-full appearance-none rounded-xl px-3 py-1.5 text-xs font-bold border transition-all shadow-sm cursor-pointer pr-8 focus:outline-none focus:ring-2 focus:ring-offset-1 text-amber-700 border-amber-300 bg-amber-50/80 focus:ring-amber-500"
+                                  className="w-full appearance-none rounded-xl px-3 py-1.5 text-xs font-bold border transition-all shadow-sm cursor-pointer pr-8 focus:outline-none focus:ring-2 focus:ring-offset-1 text-amber-500 border-amber-100 bg-amber-50/80 focus:ring-amber-500"
                                   title={tSafe("ops.trip.move_to_completed") || "Move to Completed"}
                                 >
-                                  <option value="Pending" className="font-semibold bg-white text-amber-700">
+                                  <option value="Pending" className="font-semibold bg-white text-amber-500">
                                     ⏳ {tSafe("status.pending") || "Pending"}
                                   </option>
-                                  <option value="Completed" className="font-semibold bg-white text-emerald-700">
+                                  <option value="Completed" className="font-semibold bg-white text-emerald-500">
                                     ✅ {tSafe("status.completed") || "Completed"}
                                   </option>
                                 </select>
@@ -420,7 +420,7 @@ function TripRecentTable({
                         })()}
                       </td>
                       <td className="text-center px-4 py-3">
-                        <button onClick={(e) => { e.stopPropagation(); onView(trip); }} className="h-8 w-8 rounded-xl bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95 group-hover:border-blue-200" title={t("ops.trip.view_trip_details")}><Eye size={14} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); onView(trip); }} className="h-8 w-8 rounded-xl bg-blue-50/70 hover:bg-blue-500 text-blue-500 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95 group-hover:border-blue-100" title={t("ops.trip.view_trip_details")}><Eye size={14} /></button>
                       </td>
                     </tr>
                   );
@@ -452,17 +452,17 @@ function TripRecentTable({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm transition-opacity">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 max-w-md w-full mx-4 p-6">
             <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600"><Trash2 size={20} /></div>
+              <div className="h-10 w-10 rounded-xl bg-rose-50/70 border border-rose-100 flex items-center justify-center text-rose-500"><Trash2 size={20} /></div>
               <div className="flex-1"><h3 className="text-lg font-bold text-slate-800">{t("ops.trip.delete_trip")}</h3><p className="text-sm text-slate-500 mt-1">{t("ops.trip.delete_trip_about", { no: tripToDelete?.tripNo ?? "" })}</p></div>
               <button onClick={cancelDelete} className="h-8 w-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400"><svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
             </div>
             <div className="mt-4">
               <label htmlFor="deleteReason" className="block text-sm font-medium text-slate-700">{t("ops.trip.reason")} <span className="text-rose-500">*</span></label>
-              <textarea id="deleteReason" rows={3} value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} placeholder={t("ops.trip.delete_reason_placeholder")} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2 text-sm text-slate-700 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 outline-none" />
+              <textarea id="deleteReason" rows={3} value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} placeholder={t("ops.trip.delete_reason_placeholder")} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2 text-sm text-slate-700 focus:border-rose-500 focus:ring-2 focus:ring-rose-400/20 outline-none" />
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <button onClick={cancelDelete} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">{t("common.cancel")}</button>
-              <button onClick={confirmDelete} className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-sm font-medium text-white transition-all shadow-sm active:scale-95">{t("ops.trip.confirm_delete")}</button>
+              <button onClick={confirmDelete} className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-sm font-medium text-white transition-all shadow-sm active:scale-95">{t("ops.trip.confirm_delete")}</button>
             </div>
           </div>
         </div>
