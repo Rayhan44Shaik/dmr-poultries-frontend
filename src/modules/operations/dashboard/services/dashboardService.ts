@@ -136,9 +136,9 @@ function demoDashboard(): DashboardData {
     mortality: [42, 38, 51, 35, 46, 31, 28][index],
   }));
   const recentTrips = [
-    { tripNo: 'TRP-2601', vehicleNumber: 'AP-16-XY-4821', driverName: 'Ravi Kumar', tripDate: date(0), status: 'Completed', totalWeight: 7600 },
-    { tripNo: 'TRP-2600', vehicleNumber: 'AP-16-AB-7314', driverName: 'Srinivas G', tripDate: date(1), status: 'Completed', totalWeight: 8100 },
-    { tripNo: 'TRP-2599', vehicleNumber: 'AP-16-CD-1908', driverName: 'Mohan Rao', tripDate: date(2), status: 'Pending', totalWeight: 6500 },
+    { id: 2601, tripNo: 'TRP-2601', vehicleNo: 'AP-16-XY-4821', shopName: 'Sri Balaji Poultry Traders', weight: 7600, status: 'Completed' },
+    { id: 2600, tripNo: 'TRP-2600', vehicleNo: 'AP-16-AB-7314', shopName: 'Venkatadri Egg Suppliers', weight: 8100, status: 'Completed' },
+    { id: 2599, tripNo: 'TRP-2599', vehicleNo: 'AP-16-CD-1908', shopName: 'Annapurna Farms Outlet', weight: 6500, status: 'Pending' },
   ];
   return {
     totalTrips: 56,
