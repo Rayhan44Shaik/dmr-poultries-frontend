@@ -311,18 +311,18 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
           </div>
           <MasterDropdown label="Payment Type" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-56 [&>button]:h-11 [&>button]:text-sm" value={filters.type} options={types} placeholder="All payment types" onChange={v => changeFilter('type', v)} searchable allowClear />
           <MasterDropdown label="Payment Mode" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-52 [&>button]:h-11 [&>button]:text-sm" value={filters.mode} options={modes} placeholder="All payment modes" onChange={v => changeFilter('mode', v)} searchable allowClear />
-          <div className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto sm:flex-1 sm:min-w-[300px]">
-            <SearchInput value={filters.search} onChange={v => changeFilter('search', v)} onSearch={() => applyFilters()} aria-label="Search payments" placeholder="Payment no, payee, reference…" wrapperClassName="min-w-0 flex-1" />
-            <Button size="lg" icon={<Search size={16} className={`transition-transform duration-300 hover:-translate-y-1 ${filterAction === 'search' ? 'animate-[bounce_0.6s_ease-in-out_1]' : ''}`} />} onClick={applyFilters} disabled={invalidRange}>Search</Button>
-          </div>
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5 border-t border-slate-100 pt-2">
+            <Button size="lg" icon={<Plus size={16} className="transition-transform duration-200 hover:scale-125 active:scale-90" />} onClick={() => setIsNewModalOpen(true)}>New Payment</Button>
+            <div className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto sm:min-w-[300px]">
+              <SearchInput value={filters.search} onChange={v => changeFilter('search', v)} onSearch={() => applyFilters()} aria-label="Search payments" placeholder="Payment no, payee, reference…" wrapperClassName="min-w-0 flex-1" />
+              <Button size="lg" icon={<Search size={16} className={`transition-transform duration-300 hover:-translate-y-1 ${filterAction === 'search' ? 'animate-[bounce_0.6s_ease-in-out_1]' : ''}`} />} onClick={applyFilters} disabled={invalidRange}>Search</Button>
+            </div>
             <Button variant="secondary" size="lg" icon={<RotateCcw size={15} className={`transition-transform duration-500 hover:rotate-180 ${filterAction === 'clear' ? 'animate-[spin_0.6s_ease-in-out_1]' : ''}`} />} aria-label="Clear filters" onClick={clearFilters}>Clear</Button>
             <Button variant="custom" size="lg" iconOnly aria-label="Refresh" title="Refresh records" className={uiActionToneClass.refresh} disabled={spinning} onClick={handleRefresh}>
               <RefreshCw size={16} strokeWidth={2} aria-hidden="true" className={`transition-transform duration-500 hover:rotate-180 ${spinning ? 'animate-[spin_0.6s_ease-in-out_1]' : ''}`} />
             </Button>
-            <Button size="lg" icon={<Plus size={16} className="transition-transform duration-200 hover:scale-125 active:scale-90" />} onClick={() => setIsNewModalOpen(true)}>New Payment</Button>
-        </div>
+</div>
         {invalidRange && <p role="alert" className="mt-2 text-xs text-red-600">From Date must be on or before To Date.</p>}
       </section>
       <section ref={tableRef} aria-label="Payment records" aria-busy={loading} className="rounded-xl border border-slate-200/80 bg-white shadow-2xs overflow-hidden">
