@@ -319,6 +319,10 @@
   --animate-brand-step: brand-step 0.34s cubic-bezier(0.3, 0, 0.4, 1) infinite;
   --animate-brand-peck: brand-peck 3s ease-in-out infinite;
   --animate-brand-dance: brand-dance 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+  /* Full-page dash: the hen sprints across the whole viewport on refresh. */
+  --animate-brand-run: brand-run 1.6s cubic-bezier(0.3, 0, 0.5, 1) forwards;
+  --animate-brand-gallop: brand-gallop 0.22s ease-in-out infinite;
+  --animate-brand-dust: brand-dust 0.4s ease-out infinite;
 
   @keyframes fade-in {
     from { opacity: 0; }
@@ -388,6 +392,24 @@
     0%, 24%, 36%, 68%, 80%, 100% { transform: translateY(0) rotate(0deg); }
     30%  { transform: translateY(2.5px) rotate(-16deg); }
     74%  { transform: translateY(2.5px) rotate(16deg); }
+  }
+  /* Full-page run: the hen sprints in from off-screen left, all the way across
+   * the viewport, and exits right. Travel only — the gallop bob is a separate
+   * layer. Distance is driven by --run-distance so it spans any viewport. */
+  @keyframes brand-run {
+    from { transform: translateX(0); }
+    to   { transform: translateX(var(--run-distance, 100vw)); }
+  }
+  /* Fast gallop bob while sprinting: bigger and quicker than a walking step. */
+  @keyframes brand-gallop {
+    0%, 100% { transform: translateY(0) rotate(-4deg) scale(1, 1); }
+    30%      { transform: translateY(-7px) rotate(-9deg) scale(0.93, 1.09); }
+    60%      { transform: translateY(1px) rotate(-2deg) scale(1.08, 0.92); }
+  }
+  /* Dust puffs kicked up behind the running hen. */
+  @keyframes brand-dust {
+    0%   { opacity: 0.5; transform: translate(0, 0) scale(0.5); }
+    100% { opacity: 0;   transform: translate(14px, -6px) scale(1.5); }
   }
   /* Hen "dance": a bouncy, springy shimmy for the hover tease — bigger tilt
    * and a squash-and-stretch so it genuinely looks like dancing. */

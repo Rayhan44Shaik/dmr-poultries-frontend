@@ -42,6 +42,8 @@ export {
   BrandRefreshButton,
   type BrandRefreshButtonProps,
 } from "./BrandRefreshButton";
+/** Full-page hen dash played on refresh. */
+export { BrandRunOverlay, type BrandRunOverlayProps } from "./BrandRunOverlay";
 
 /* --- forms --------------------------------------------------------------- */
 export { Field, type FieldProps, type FieldIds } from "./Field";
