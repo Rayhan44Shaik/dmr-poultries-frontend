@@ -451,7 +451,6 @@ export default function DieselExpensesTable({
 
   // Flag bad chains on load / when dest meter or rows change (e.g. 36981 after 36985).
   useEffect(() => {
-    if (!isInitialized.current) return;
     const errs = scanMeterChainErrors();
     setMeterErrors((old) => {
       const oldKeys = Object.keys(old);
