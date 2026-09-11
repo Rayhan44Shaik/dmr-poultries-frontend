@@ -210,7 +210,7 @@ function OperationsDashboardPage() {
 
   if (!isRangeSelected) {
     return (
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-4 p-4 sm:p-5 lg:p-6">
         <PendingApprovalsPanel />
         <div className="flex justify-end">
           <RangeDatePicker
@@ -236,7 +236,7 @@ function OperationsDashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="min-w-0 space-y-5">
+      <div className="min-w-0 space-y-5 p-4 sm:p-5 lg:p-6">
         <PendingApprovalsPanel />
         <div className="w-full flex flex-col items-center justify-center py-24 space-y-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
         <div className="relative w-12 h-12">
@@ -253,7 +253,7 @@ function OperationsDashboardPage() {
 
   if (error) {
     return (
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-4 p-4 sm:p-5 lg:p-6">
         <PendingApprovalsPanel />
         <div className="flex justify-end">
           <RangeDatePicker
@@ -277,10 +277,12 @@ function OperationsDashboardPage() {
   }
 
   return (
-    <div className="min-w-0 space-y-5">
-      {/* One slim card: live pending-approval KPIs on the left, range picker on the right. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-slate-200/80 bg-white px-4 py-2.5 shadow-sm">
-        <PendingApprovalsPanel bare />
+    <div className="min-w-0 space-y-5 p-4 sm:p-5 lg:p-6">
+      {/* Live pending-approval KPI tiles. */}
+      <PendingApprovalsPanel />
+
+      {/* Date-range filter, in its own bar. */}
+      <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm">
         <RangeDatePicker
           startDate={startDate}
           endDate={endDate}
