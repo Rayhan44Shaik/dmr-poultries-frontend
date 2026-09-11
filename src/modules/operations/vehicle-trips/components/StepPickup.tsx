@@ -7,6 +7,7 @@ import type { Trip, BoxDetail } from "../types/trip";
 import { getVehicles } from "../../../masters/vehicles/services/vehicleService";
 import { generatePickupReportPDF } from "../utils/generatePickupPDF";
 import { StepCloseButton, WizardActionBar, WizardStepNotice } from "./WizardStepUI";
+import { TripNoBadge } from "./TripNoBadge";
 import { calculatePickupTotals, calculateBoxAvgWeight } from "../../../../shared/trip/calculations";
 import {
   TRIP_FIELD_DEFINITIONS,
@@ -552,11 +553,12 @@ export default function StepPickup({
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
-          <div className="flex items-center gap-2.5">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <Package size={15} className="text-amber-600" />
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+              <Package size={18} className="text-amber-600" />
               {t("ops.trip.title.pickup")}
             </h3>
+            <TripNoBadge tripNo={trip.tripNo} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
 
@@ -786,17 +788,17 @@ export default function StepPickup({
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
-          <div className="flex items-center gap-2.5">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <Package size={15} className="text-amber-600" />
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+              <Package size={18} className="text-amber-600" />
               {t("ops.trip.title.pickup")}
             </h3>
+            <TripNoBadge tripNo={trip.tripNo} />
           </div>
           <div className="flex items-center gap-3">
-
             {(isEditMode || isLocalEditing) && trip.pickupStepSubmitted && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
-                {t("ops.trip.editing_trip", { no: trip.tripNo })}
+                {t("ops.trip.editable_view")}
               </span>
             )}
           </div>

@@ -1121,20 +1121,20 @@ function buildScenarioTrips({ stamp, today, yesterday }) {
         }),
       ],
       dieselEntries: [
-        dieselRow(1, 0, {
+        dieselRow(1, 1, {
           litres: 42,
           rate: 95.5,
           meter: 70700,
-          bunk: "HP Petrol Bunk — Bhongir",
+          bunk: "Bhongir",
           gps: [17.5101, 78.6512],
           date: on(-3),
           withBill: true,
         }),
-        dieselRow(2, 1, {
+        dieselRow(2, 2, {
           litres: 20,
           rate: 96,
           meter: 71180,
-          bunk: "IOC Bunk — Keesara",
+          bunk: "Keesara",
           gps: [17.6231, 78.5905],
           date: on(-3),
           withBill: false,
@@ -1432,14 +1432,22 @@ function buildVolumeTestTrips({ stamp }) {
   let id = 9501;
 
   // Shared Step-1 crew + vehicle rotation (ids cycle 1–12).
-  const step1Base = (i, date, daySeq) => {
+  // Per-date serial so numbers look like TRP-20260911-003 (never …-V93).
+  const dateSeq = new Map();
+  const nextTripNo = (date) => {
+    const n = (dateSeq.get(date) || 0) + 1;
+    dateSeq.set(date, n);
+    return `TRP-${stamp(date)}-${String(n).padStart(3, "0")}`;
+  };
+
+  const step1Base = (i, date, _daySeq) => {
     const vehicleId = (i % 12) + 1;
     const driver = pick(DRIVERS, i);
     const supervisor = pick(SUPERVISORS, i + 1);
     const bird = pick(BIRD_POOL, i);
     return {
       id: id++,
-      tripNo: `TRP-${stamp(date)}-V${String(daySeq).padStart(2, "0")}`,
+      tripNo: nextTripNo(date),
       tripDate: date,
       status: "Draft",
       vehicleId,
@@ -1469,7 +1477,7 @@ function buildVolumeTestTrips({ stamp }) {
     trips.push(
       baseTrip({
         ...step1Base(i, date, 11 + i),
-        remarks: `Volume S1 #${i + 1} — resume Farm Details (Step 2)`,
+        remarks: `Sample · resume Step 2 (Farm)`,
       })
     );
   }
@@ -1494,7 +1502,7 @@ function buildVolumeTestTrips({ stamp }) {
         farmGpsTime: `${date}T06:${String(20 + (i % 30)).padStart(2, "0")}:00`,
         vehicleBoxCapacity: 30 + (i % 5) * 4,
         farmStepSubmitted: true,
-        remarks: `Volume S2 #${i + 1} — resume Pickup Details (Step 3)`,
+        remarks: `Sample · resume Step 3 (Pickup)`,
       })
     );
   }
@@ -1543,7 +1551,7 @@ function buildVolumeTestTrips({ stamp }) {
           boxCount: 2 + (i % 3),
         }),
         deliveries,
-        remarks: `Volume S3 #${i + 1} — resume Deliveries (Step 4)`,
+        remarks: `Sample · resume Step 4 (Deliveries)`,
       })
     );
   }
@@ -1603,7 +1611,7 @@ function buildVolumeTestTrips({ stamp }) {
             autoCaptureTime: `${date}T10:${String(10 + (i % 40)).padStart(2, "0")}:00`,
           }),
         ],
-        remarks: `Volume S4 #${i + 1} — resume End Trip / Expenses (Step 5)`,
+        remarks: `Sample · resume Step 5 (Expenses)`,
       })
     );
   }
@@ -1642,15 +1650,16 @@ function buildVolumeTestTrips({ stamp }) {
     });
     // Every unsubmitted Step-5 draft carries 6 fuel-bill rows (UI max) with
     // bill images so diesel matching can be reviewed before Submit.
+    // Short bunk city labels (Kodad / Vijayawada style) — address comes from GPS.
     const BUNKS = [
-      "HP Petrol Bunk — Bhongir",
-      "IOC Bunk — Keesara",
-      "Bharat Petroleum — Medchal",
-      "Nayara Energy — Guntur",
-      "Reliance Smart Fuel — Yadadri",
-      "Essar Oil — Shamshabad",
-      "Shell Fuel Station — Uppal",
-      "Indian Oil — LB Nagar",
+      "Bhongir",
+      "Keesara",
+      "Medchal",
+      "Guntur",
+      "Yadadri",
+      "Shamshabad",
+      "Kodad",
+      "Vijayawada",
     ];
     const billCount = 6; // 5–10 range; UI diesel table max is 6
     const dieselEntries = Array.from({ length: billCount }, (_, di) => {
@@ -1719,7 +1728,7 @@ function buildVolumeTestTrips({ stamp }) {
         others1Amt: 200 + (i % 6) * 50,
         others2Amt: 150 + (i % 5) * 40,
         others3Amt: i % 2 === 0 ? 120 : 0,
-        remarks: `Volume S5 #${i + 1}/50 — End Trip / Expenses focus (NOT submitted · ${billCount} fuel bills)`,
+        remarks: `Sample · Step 5 focus · ${billCount} diesel bills`,
       })
     );
   }
@@ -2210,17 +2219,76 @@ function applyExpensesStep(trip, body) {
   return trip;
 }
 
+/**
+ * Diesel meter chain: each reading must be strictly greater than the previous
+ * (farm destMeter for row 1, prior diesel meter for later rows).
+ * Returns an error message string or null when OK.
+ */
+function dieselMeterChainError(trip, candidateMeter, rowIndex, excludeEntryId) {
+  const meter = numOrNull(candidateMeter);
+  if (meter == null) return null;
+  const dest = numOrNull(trip.destMeter) || 0;
+  const others = (trip.dieselEntries || [])
+    .filter((e) => Number(e.id) !== Number(excludeEntryId))
+    .map((e) => ({
+      row: Number(e.rowIndex) > 0 ? Number(e.rowIndex) : 0,
+      meter: numOrNull(e.meter),
+      id: Number(e.id),
+    }))
+    .filter((e) => e.meter != null && e.meter > 0);
+
+  // Immediate previous diesel row (highest rowIndex < candidate), else farm dest meter.
+  let prev = dest > 0 ? dest : 0;
+  let prevRow = 0;
+  for (const e of others) {
+    if (rowIndex > 0 && e.row > 0) {
+      if (e.row < rowIndex && e.row >= prevRow) {
+        prevRow = e.row;
+        prev = e.meter;
+      }
+    } else if (e.meter > prev) {
+      // Unknown rowIndex — fall back to max of other meters as a lower bar.
+      prev = e.meter;
+    }
+  }
+  // Next diesel row (lowest rowIndex > candidate) — candidate must stay below it.
+  let nextMin = null;
+  for (const e of others) {
+    if (rowIndex > 0 && e.row > rowIndex) {
+      if (nextMin == null || e.meter < nextMin) nextMin = e.meter;
+    }
+  }
+  if (prev > 0 && meter <= prev) {
+    return `Meter reading must be greater than ${prev}.`;
+  }
+  if (nextMin != null && meter >= nextMin) {
+    return `Meter reading must be less than next bill reading (${nextMin}).`;
+  }
+  return null;
+}
+
 /** Step 5 diesel ledger (POST /api/trips/:id/diesel). */
 function applyDieselCreate(trip, body) {
   const litres = numOrNull(body.litres);
   const rate = numOrNull(body.rate);
+  const existing = trip.dieselEntries || [];
+  // Prefer client 1-based rowIndex so edits map back to dieselLtrN correctly.
+  const requested = numOrNull(body.rowIndex);
+  const rowIndex =
+    requested != null && requested >= 1 && requested <= 6
+      ? requested
+      : existing.length + 1;
+  const meter = numOrNull(body.meter);
+  const chainErr = dieselMeterChainError(trip, meter, rowIndex, null);
+  if (chainErr) return { error: chainErr };
+
   const entry = {
-    id: (trip.dieselEntries || []).reduce((m, e) => Math.max(m, Number(e.id) || 0), 0) + 1,
-    rowIndex: (trip.dieselEntries || []).length,
+    id: existing.reduce((m, e) => Math.max(m, Number(e.id) || 0), 0) + 1,
+    rowIndex,
     litres,
     rate,
     amount: litres != null && rate != null ? Math.round(litres * rate * 100) / 100 : null,
-    meter: numOrNull(body.meter),
+    meter,
     bunkName: body.bunkName || null,
     gpsLat: numOrNull(body.gpsLat),
     gpsLon: numOrNull(body.gpsLon),
@@ -2232,8 +2300,49 @@ function applyDieselCreate(trip, body) {
     submittedAt: new Date().toISOString(),
     clientKey: body.clientKey || null,
   };
-  trip.dieselEntries = [...(trip.dieselEntries || []), entry];
+  trip.dieselEntries = [...existing, entry];
   return trip;
+}
+
+/** PATCH merge for a diesel entry — recompute amount; never drop id/rowIndex. */
+function applyDieselUpdate(trip, existing, body) {
+  const litres = body.litres != null && body.litres !== "" ? numOrNull(body.litres) : existing.litres;
+  const rate = body.rate != null && body.rate !== "" ? numOrNull(body.rate) : existing.rate;
+  const meter = body.meter != null && body.meter !== "" ? numOrNull(body.meter) : existing.meter;
+  const rowIndexRaw = numOrNull(body.rowIndex);
+  const rowIndex =
+    rowIndexRaw != null && rowIndexRaw >= 1 && rowIndexRaw <= 6
+      ? rowIndexRaw
+      : existing.rowIndex != null
+        ? existing.rowIndex
+        : 1;
+  const chainErr = dieselMeterChainError(trip, meter, rowIndex, existing.id);
+  if (chainErr) return { error: chainErr };
+
+  Object.assign(existing, {
+    litres,
+    rate,
+    amount: litres != null && rate != null ? Math.round(Number(litres) * Number(rate) * 100) / 100 : existing.amount,
+    meter,
+    bunkName: body.bunkName != null ? body.bunkName || null : existing.bunkName,
+    gpsLat: body.gpsLat != null && body.gpsLat !== "" ? numOrNull(body.gpsLat) : existing.gpsLat,
+    gpsLon: body.gpsLon != null && body.gpsLon !== "" ? numOrNull(body.gpsLon) : existing.gpsLon,
+    gpsAccuracy:
+      body.gpsAccuracy !== undefined
+        ? body.gpsAccuracy === null || body.gpsAccuracy === ""
+          ? null
+          : numOrNull(body.gpsAccuracy)
+        : existing.gpsAccuracy,
+    gpsCapturedAt: body.gpsCapturedAt !== undefined ? body.gpsCapturedAt || null : existing.gpsCapturedAt,
+    imageData: body.imageData != null && body.imageData !== "" ? body.imageData : existing.imageData,
+    imageName: body.imageName !== undefined ? body.imageName || null : existing.imageName,
+    clientKey: body.clientKey || existing.clientKey,
+    rowIndex,
+    submitted: true,
+    submittedAt: existing.submittedAt || new Date().toISOString(),
+    id: existing.id,
+  });
+  return existing;
 }
 
 /** Fill the derived summary columns the ERP backend computes on read. Never
@@ -2363,7 +2472,10 @@ const server = http.createServer((req, res) => {
     readJsonBody(req).then((body) => {
       const trip = TRIPS.find((t) => t.id === Number(dieselMatch[1]));
       if (!trip) return send(404, { error: "trip_not_found", id: Number(dieselMatch[1]), mock: true });
-      applyDieselCreate(trip, body);
+      const result = applyDieselCreate(trip, body);
+      if (result && result.error) {
+        return send(422, { error: "diesel_meter_invalid", message: result.error, mock: true });
+      }
       trip.updatedAt = new Date().toISOString();
       return send(200, decorateTrip(trip));
     });
@@ -2381,7 +2493,10 @@ const server = http.createServer((req, res) => {
       if (req.method === "DELETE") {
         trip.dieselEntries = entries.filter((e) => Number(e.id) !== entryId);
       } else {
-        Object.assign(existing, body, { id: existing.id });
+        const result = applyDieselUpdate(trip, existing, body);
+        if (result && result.error) {
+          return send(422, { error: "diesel_meter_invalid", message: result.error, mock: true });
+        }
       }
       trip.updatedAt = new Date().toISOString();
       return send(200, decorateTrip(trip));

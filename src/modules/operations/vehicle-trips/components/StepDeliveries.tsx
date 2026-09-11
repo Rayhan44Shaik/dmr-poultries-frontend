@@ -8,6 +8,7 @@ import UnLoadingTable from "./Step_4";
 import type { ShopDelivery, Trip, BoxDetail } from "../types/trip";
 import { getDeliveriesBalanceError } from "../../../../shared/trip/validation";
 import { StepCloseButton } from "./WizardStepUI";
+import { TripNoBadge } from "./TripNoBadge";
 import { useI18n } from "../../../../i18n";
 
 interface Props {
@@ -117,11 +118,12 @@ export default function StepDeliveries({
     <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3">
-        <div className="flex items-center gap-2.5">
-          <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-            <Package size={15} className="text-emerald-600" />
+        <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+          <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+            <Package size={18} className="text-emerald-600" />
             {t("ops.trip.title.deliveries")}
           </h3>
+          <TripNoBadge tripNo={trip.tripNo} />
         </div>
 
         <div className="flex items-center gap-2 flex-wrap shrink-0">

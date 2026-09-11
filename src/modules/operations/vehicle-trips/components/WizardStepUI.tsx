@@ -1,5 +1,6 @@
 import { Check, CircleAlert, CircleX, Loader2, Save, Send, X } from "lucide-react";
 import { useI18n } from "../../../../i18n";
+export { TripNoBadge } from "./TripNoBadge";
 
 /**
  * Header "Close" control for a submitted / locked step.

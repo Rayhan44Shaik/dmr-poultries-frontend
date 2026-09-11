@@ -420,6 +420,8 @@ export type DieselSubmitPayload = {
   gpsCapturedAt: string | null;
   imageData: string;
   imageName?: string | null;
+  /** 1-based diesel table row slot (dieselLtr1…dieselLtr6). */
+  rowIndex?: number;
 };
 
 export async function submitTripDiesel(tripId: number, payload: DieselSubmitPayload): Promise<Trip> {

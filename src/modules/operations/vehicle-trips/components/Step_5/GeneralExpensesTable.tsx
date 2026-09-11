@@ -3,7 +3,6 @@
 import React, { useRef } from "react";
 import { Clock, Lock, Truck, Wallet, UtensilsCrossed, Package, Coffee, Wrench, User, UserCheck, Users, MoreHorizontal } from "lucide-react";
 import { TRIP_FIELD_DEFINITIONS } from "../../../../../shared/trip/definitions";
-import { meterMustBeGreaterThan } from "../../utils/meterValidation";
 import { useI18n } from "../../../../../i18n";
 
 interface GeneralExpensesTableProps {
@@ -44,6 +43,15 @@ export default function GeneralExpensesTable({
       e.preventDefault();
     }
   };
+  /** Block mouse-wheel from changing focused number values. */
+  const blockWheelChange = (e: React.WheelEvent<HTMLInputElement>) => {
+    e.currentTarget.blur();
+    e.preventDefault();
+  };
+
+  /** Shared number-input class: no spinners, no accidental scroll edits. */
+  const numInputClass =
+    "font-medium w-full p-2.5 outline-none bg-transparent tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
   const formatZero = (val: any) => {
     if (val === undefined || val === null || val === "") return "";
@@ -78,7 +86,15 @@ export default function GeneralExpensesTable({
 
   const currentEndMeter = Number(sheetData.endMeter);
   const hasEndMeter = sheetData.endMeter !== undefined && sheetData.endMeter !== null && sheetData.endMeter !== "";
-  const isEndMeterInvalid = hasEndMeter && actualStartMeter > 0 && currentEndMeter <= requiredMinMeter;
+  // End meter must be STRICTLY greater than the highest of: start / farm dest / any diesel reading.
+  const isEndMeterInvalid =
+    hasEndMeter &&
+    requiredMinMeter > 0 &&
+    Number.isFinite(currentEndMeter) &&
+    currentEndMeter <= requiredMinMeter;
+  const endMeterErrorMsg = isEndMeterInvalid
+    ? t("ops.trip.meter_must_gt", { min: requiredMinMeter })
+    : null;
 
   // Distance & average
   const computedDistance =
@@ -237,7 +253,8 @@ export default function GeneralExpensesTable({
                 onChange={(e) =>
                   handleChange("meals", e.target.value === "" ? "" : Number(e.target.value))
                 }
-                className="font-medium w-full p-2.5 outline-none bg-transparent"
+                onWheel={blockWheelChange}
+                className={numInputClass}
               />
             </td>
             <td colSpan={2} className="font-medium text-slate-700 py-2.5 px-3 border-r border-slate-200 bg-indigo-50/40">
@@ -256,7 +273,8 @@ export default function GeneralExpensesTable({
                 onChange={(e) =>
                   handleChange("others1Amt", e.target.value === "" ? "" : Number(e.target.value))
                 }
-                className="font-medium w-full p-2.5 outline-none bg-transparent"
+                onWheel={blockWheelChange}
+                className={numInputClass}
               />
             </td>
           </tr>
@@ -278,7 +296,8 @@ export default function GeneralExpensesTable({
                 onChange={(e) =>
                   handleChange("loading", e.target.value === "" ? "" : Number(e.target.value))
                 }
-                className="font-medium w-full p-2.5 outline-none bg-transparent"
+                onWheel={blockWheelChange}
+                className={numInputClass}
               />
             </td>
             <td colSpan={2} className="font-medium text-slate-700 py-2.5 px-3 border-r border-slate-200 bg-violet-50/40">
@@ -297,7 +316,8 @@ export default function GeneralExpensesTable({
                 onChange={(e) =>
                   handleChange("others2Amt", e.target.value === "" ? "" : Number(e.target.value))
                 }
-                className="font-medium w-full p-2.5 outline-none bg-transparent"
+                onWheel={blockWheelChange}
+                className={numInputClass}
               />
             </td>
           </tr>
@@ -319,7 +339,8 @@ export default function GeneralExpensesTable({
                 onChange={(e) =>
                   handleChange("mealsTiffin", e.target.value === "" ? "" : Number(e.target.value))
                 }
-                className="font-medium w-full p-2.5 outline-none bg-transparent"
+                onWheel={blockWheelChange}
+                className={numInputClass}
               />
             </td>
             <td colSpan={2} className="font-medium text-slate-700 py-2.5 px-3 border-r border-slate-200 bg-teal-50/40">
@@ -338,7 +359,8 @@ export default function GeneralExpensesTable({
                 onChange={(e) =>
                   handleChange("others3Amt", e.target.value === "" ? "" : Number(e.target.value))
                 }
-                className="font-medium w-full p-2.5 outline-none bg-transparent"
+                onWheel={blockWheelChange}
+                className={numInputClass}
               />
             </td>
           </tr>
@@ -360,7 +382,8 @@ export default function GeneralExpensesTable({
                 onChange={(e) =>
                   handleChange("vehicleMaintenance", e.target.value === "" ? "" : Number(e.target.value))
                 }
-                className="font-medium w-full p-2.5 outline-none bg-transparent"
+                onWheel={blockWheelChange}
+                className={numInputClass}
               />
             </td>
             <td colSpan={2} className="font-medium text-slate-700 py-2.5 px-3 border-r border-slate-200 bg-slate-50/50">
@@ -379,7 +402,8 @@ export default function GeneralExpensesTable({
                 onChange={(e) =>
                   handleChange("others4Amt", e.target.value === "" ? "" : Number(e.target.value))
                 }
-                className="font-medium w-full p-2.5 outline-none bg-transparent"
+                onWheel={blockWheelChange}
+                className={numInputClass}
               />
             </td>
           </tr>
@@ -401,7 +425,8 @@ export default function GeneralExpensesTable({
                 onChange={(e) =>
                   handleChange("othersRC", e.target.value === "" ? "" : Number(e.target.value))
                 }
-                className="font-medium w-full p-2.5 outline-none bg-transparent"
+                onWheel={blockWheelChange}
+                className={numInputClass}
               />
             </td>
             <td colSpan={2} className="font-medium text-slate-700 py-2.5 px-3 border-r border-slate-200 bg-slate-50/50">
@@ -420,7 +445,8 @@ export default function GeneralExpensesTable({
                 onChange={(e) =>
                   handleChange("others5Amt", e.target.value === "" ? "" : Number(e.target.value))
                 }
-                className="font-medium w-full p-2.5 outline-none bg-transparent"
+                onWheel={blockWheelChange}
+                className={numInputClass}
               />
             </td>
           </tr>
@@ -448,37 +474,68 @@ export default function GeneralExpensesTable({
             </td>
           </tr>
 
-          {/* ODOMETER SECTION */}
+          {/* ODOMETER — compact single-line rows (same height as Total Pickup Tolls) */}
           <tr className="border-b border-slate-100">
-            <td className="font-medium text-slate-700 py-3 px-3 flex items-center gap-1.5">
-              <span>{t("ops.trip.start_meter_reading")}</span>
-              <span title={t("ops.trip.locked_from_step1")} className="inline-flex items-center cursor-help">
-                <Lock size={12} className="text-slate-400" />
+            <td className="font-medium text-slate-700 py-2 px-3 align-middle text-xs">
+              <span className="inline-flex items-center gap-1">
+                {t("ops.trip.start_meter_reading")}
+                <span title={t("ops.trip.locked_from_step1")} className="inline-flex items-center cursor-help">
+                  <Lock size={11} className="text-slate-400" />
+                </span>
               </span>
             </td>
-            <td colSpan={2} className="font-bold text-slate-900 px-3 bg-slate-100/60 border-r border-slate-200 select-none">
+            <td
+              colSpan={2}
+              className="font-semibold text-slate-900 px-3 py-2 bg-slate-100/60 border-r border-slate-200 select-none align-middle text-xs tabular-nums"
+            >
               {actualStartMeter > 0 ? `${actualStartMeter} KM` : "---"}
             </td>
-            <td colSpan={2} className="font-medium text-slate-700 px-3 border-r border-slate-200 bg-slate-50/30">
+            <td colSpan={2} className="font-medium text-slate-700 px-3 py-2 border-r border-slate-200 bg-slate-50/30 align-middle text-xs">
               {t("ops.trip.total_distance_km")}
             </td>
-            <td colSpan={2} className="font-bold text-slate-900 px-3 bg-slate-50/50">
+            <td colSpan={2} className="font-semibold text-slate-900 px-3 py-2 bg-slate-50/50 align-middle text-xs tabular-nums">
               {computedDistance > 0 ? computedDistance : "---"}
             </td>
           </tr>
 
           <tr className="border-b border-slate-200">
-            <td className="font-medium text-slate-700 py-3 px-3">
-              {t("ops.trip.field.end_meter")} {TRIP_FIELD_DEFINITIONS.closingMeter.required && <span className="text-red-500">*</span>}
+            <td className="font-medium text-slate-700 py-2 px-3 align-middle text-xs">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="inline-flex items-center gap-1 shrink-0">
+                  {t("ops.trip.field.end_meter")}
+                  {TRIP_FIELD_DEFINITIONS.closingMeter.required && <span className="text-red-500">*</span>}
+                </span>
+                {/* Validation sits beside the End Meter heading — neat, readable, single place */}
+                {endMeterErrorMsg ? (
+                  <span
+                    className="inline-flex items-center max-w-[min(18rem,55vw)] rounded-md border border-red-300 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700 leading-snug"
+                    role="alert"
+                    title={endMeterErrorMsg}
+                  >
+                    {endMeterErrorMsg}
+                  </span>
+                ) : requiredMinMeter > 0 ? (
+                  <span className="text-[10px] font-medium text-slate-400 tabular-nums">
+                    &gt; {requiredMinMeter} KM
+                  </span>
+                ) : null}
+              </div>
             </td>
-            <td colSpan={2} className="p-0 relative border-r border-slate-200">
-              <div className="flex flex-col justify-center h-full px-2 py-1">
+            <td
+              colSpan={2}
+              className={`px-3 py-2 border-r border-slate-200 align-middle ${
+                isEndMeterInvalid ? "bg-red-50/60" : "bg-white"
+              }`}
+            >
+              <div className="flex items-center gap-1">
                 <input
                   type="number"
                   required
-                  placeholder="0.00"
+                  inputMode="numeric"
+                  placeholder="0"
                   value={formatZero(sheetData.endMeter)}
                   onKeyDown={blockInvalidChar}
+                  onWheel={blockWheelChange}
                   onChange={(e) => {
                     const val = e.target.value;
                     handleChange("endMeter", val);
@@ -486,7 +543,7 @@ export default function GeneralExpensesTable({
                     const invalid =
                       val !== "" && requiredMinMeter > 0 && Number.isFinite(n) && n <= requiredMinMeter;
                     if (invalid) {
-                      const msg = meterMustBeGreaterThan(requiredMinMeter);
+                      const msg = t("ops.trip.meter_must_gt", { min: requiredMinMeter });
                       if (!meterInvalidRef.current) {
                         meterInvalidRef.current = true;
                         onMeterNotice?.(msg);
@@ -495,36 +552,41 @@ export default function GeneralExpensesTable({
                       meterInvalidRef.current = false;
                     }
                   }}
-                  className={`w-full font-bold outline-none bg-transparent transition-colors ${
-                    isEndMeterInvalid ? "text-red-600 border border-red-500 rounded bg-red-50 px-1" : "text-blue-600"
+                  onBlur={() => {
+                    if (isEndMeterInvalid && endMeterErrorMsg) {
+                      meterInvalidRef.current = true;
+                      onMeterNotice?.(endMeterErrorMsg);
+                    }
+                  }}
+                  aria-invalid={isEndMeterInvalid}
+                  title={endMeterErrorMsg || undefined}
+                  className={`w-full max-w-[7.5rem] font-semibold text-xs tabular-nums outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                    isEndMeterInvalid ? "text-red-600" : "text-slate-900"
                   }`}
                 />
-                {isEndMeterInvalid ? (
-                  <div className="mt-1 rounded border border-red-300 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700">
-                    {meterMustBeGreaterThan(requiredMinMeter)}
-                  </div>
-                ) : null}
+                <span className="text-[10px] font-semibold text-slate-400 shrink-0">KM</span>
               </div>
             </td>
-            <td colSpan={2} className="font-medium text-slate-700 px-3 border-r border-slate-200 bg-slate-50/30">
+            <td colSpan={2} className="font-medium text-slate-700 px-3 py-2 border-r border-slate-200 bg-slate-50/30 align-middle text-xs">
               {t("ops.trip.average_km_ltr")}
             </td>
-            <td colSpan={2} className="font-bold text-blue-600 px-3 bg-slate-50/50">
+            <td colSpan={2} className="font-semibold text-blue-600 px-3 py-2 bg-slate-50/50 align-middle text-xs">
               {computedAverage ? computedAverage : t("ops.trip.not_available")}
             </td>
           </tr>
 
-          <tr className="bg-slate-50/50">
-            <td className="font-medium text-slate-700 py-3 px-3">
+          <tr className="bg-slate-50/50 border-b border-slate-100">
+            <td className="font-medium text-slate-700 py-2 px-3 align-middle text-xs">
               {t("ops.trip.total_toll_pickup")} <span className="text-red-500">*</span>
             </td>
-            <td colSpan={2} className="font-semibold text-slate-900 px-3 select-none border-r border-slate-200">
+            <td colSpan={2} className="font-semibold text-slate-900 px-3 py-2 select-none border-r border-slate-200 align-middle text-xs tabular-nums">
               {pickupTolls}
             </td>
-            <td colSpan={2} className="font-medium text-slate-700 px-3 border-r border-slate-200 bg-slate-50/30">
-              {t("ops.trip.field.delivery_tolls")} {TRIP_FIELD_DEFINITIONS.deliveryTolls.required && <span className="text-red-500">*</span>}
+            <td colSpan={2} className="font-medium text-slate-700 px-3 py-2 border-r border-slate-200 bg-slate-50/30 align-middle text-xs">
+              {t("ops.trip.field.delivery_tolls")}{" "}
+              {TRIP_FIELD_DEFINITIONS.deliveryTolls.required && <span className="text-red-500">*</span>}
             </td>
-            <td colSpan={2} className="p-0">
+            <td colSpan={2} className="p-0 align-middle">
               <input
                 type="number"
                 step="1"
@@ -537,8 +599,8 @@ export default function GeneralExpensesTable({
                   const val = e.target.value;
                   handleChange("destinationTolls", val === "" ? "" : Math.floor(Number(val)));
                 }}
-                onWheel={(e) => e.currentTarget.blur()}
-                className="font-bold text-blue-600 w-full p-2.5 outline-none bg-transparent"
+                onWheel={blockWheelChange}
+                className="font-semibold text-blue-600 text-xs w-full px-3 py-2 outline-none bg-transparent tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </td>
           </tr>

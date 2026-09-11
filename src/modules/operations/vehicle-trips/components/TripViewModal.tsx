@@ -67,8 +67,8 @@ function Step1View({ trip }: { trip: Trip }) {
   const { t } = useI18n();
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
-      <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-        <Clock size={15} className="text-indigo-600" />
+      <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+        <Clock size={18} className="text-indigo-600" />
         {t("ops.trip.title.start")}
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -168,8 +168,8 @@ function Step5View({ trip }: { trip: Trip }) {
 
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
-      <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-        <Receipt size={15} className="text-orange-600" />
+      <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+        <Receipt size={18} className="text-orange-600" />
         {t("ops.trip.title.expenses")}
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

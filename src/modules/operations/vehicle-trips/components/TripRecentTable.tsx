@@ -36,8 +36,6 @@ function TripRecentTable({
 }: Props) {
   const { t } = useI18n();
   const safeTrips = uniqueTripsById(Array.isArray(trips) ? trips : []);
-  /** Total record count — kept for header context; per-tab counts drive the toggle. */
-  const totalRecords = safeTrips.length;
 
   /** Translate, but never surface a raw i18n key: returns "" when the key is missing. */
   const tSafe = (key: string, params?: Record<string, string | number>) => {
@@ -114,6 +112,10 @@ function TripRecentTable({
   const allDraft = sortedTrips.filter((t) => !t.deleted && t.status === "Draft");
   const allPending = sortedTrips.filter((t) => !t.deleted && t.status === "Pending");
   const allDeleted = sortedTrips.filter((t) => t.deleted === true || t.status === "Deleted");
+
+  /** Count beside “Recent Trip Activity” follows the selected tab (Draft/Pending/Deleted). */
+  const selectedTabCount =
+    statusFilter === "Draft" ? allDraft.length : statusFilter === "Pending" ? allPending.length : allDeleted.length;
 
   let filteredTrips: Trip[] = [];
   if (statusFilter === "Draft") filteredTrips = allDraft;
@@ -237,21 +239,18 @@ function TripRecentTable({
               <h3 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.recent_trip_activity")}</h3>
             </div>
 
-            {/* Total record count — its own badge, before the status toggle */}
-            <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-full shadow-sm">
-              {totalRecords}
+            {/* Selected-tab count beside the title (updates when Draft/Pending/Deleted is clicked) */}
+            <span
+              className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-full shadow-sm tabular-nums"
+              title={statusFilter}
+            >
+              {selectedTabCount}
             </span>
 
-            {/* Status toggle — same height as before, only wider; live per-tab counts */}
+            {/* Status toggle — labels only (no per-tab counts); height unchanged, still wide */}
             <div className="flex items-center p-0.5 ml-2 border border-slate-200/80 rounded-lg overflow-hidden bg-slate-50 shadow-sm">
               {(["Draft", "Pending", "Deleted"] as const).map((tab) => {
                 const isActive = statusFilter === tab;
-                const count =
-                  tab === "Draft"
-                    ? allDraft.length
-                    : tab === "Pending"
-                    ? allPending.length
-                    : allDeleted.length;
                 const activeClass =
                   tab === "Draft"
                     ? "bg-emerald-100 text-emerald-700 shadow-sm"
@@ -269,22 +268,13 @@ function TripRecentTable({
                     type="button"
                     onClick={() => setStatusFilter(tab)}
                     aria-pressed={isActive}
-                    className={`inline-flex items-center gap-1.5 px-5 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                    className={`inline-flex items-center px-5 py-1.5 text-xs font-semibold rounded-md transition-all ${
                       isActive
                         ? activeClass
                         : "bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"
                     }`}
                   >
-                    <span>{label}</span>
-                    <span
-                      className={`inline-flex items-center justify-center min-w-[1.25rem] h-4 px-1 rounded text-[10px] font-bold tabular-nums ${
-                        isActive
-                          ? "bg-white/70 text-inherit"
-                          : "bg-slate-200/80 text-slate-600"
-                      }`}
-                    >
-                      {count}
-                    </span>
+                    {label}
                   </button>
                 );
               })}

@@ -26,6 +26,7 @@ import {
   formatIstStamp,
 } from "../services/tripHeaderApiService";
 import { StepCloseButton, WizardActionBar, WizardStepNotice, type WizardNoticeState } from "./WizardStepUI";
+import { TripNoBadge } from "./TripNoBadge";
 import { FieldLabel, SearchDropdown, MultiSearchDropdown, StepKpiCard, type DropdownOption } from "./WizardControls";
 import { translateValidationMessage } from "../utils/translateValidation";
 import {
@@ -815,11 +816,12 @@ function StepStart({
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
-          <div className="flex items-center gap-2.5">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <Clock size={15} className="text-indigo-600" />
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+              <Clock size={18} className="text-indigo-600" />
               {t("ops.trip.title.start")}
             </h3>
+            <TripNoBadge tripNo={loadSnapshot.tripNo || tripNo} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {canEdit && (
@@ -844,7 +846,7 @@ function StepStart({
             icon={ClipboardList}
             tone="bg-slate-100 text-slate-500"
             label={t("operations.trip_no")}
-            value={loadSnapshot.tripNo || "--"}
+            value={loadSnapshot.tripNo || tripNo || "--"}
           />
           <StepKpiCard
             icon={Calendar}
@@ -930,18 +932,19 @@ function StepStart({
       >
         {headerLoading && <p className="text-xs text-slate-500">{t("ops.trip.loading_trip_header")}</p>}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
-          <div className="flex items-center gap-2.5">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <Clock size={15} className="text-indigo-600" />
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+              <Clock size={18} className="text-indigo-600" />
               {t("ops.trip.title.start")}
             </h3>
+            <TripNoBadge tripNo={tripNo || loadSnapshot.tripNo} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {/* Part E: no top-right X in first-submit / Edit mode — the bottom
                 action bar Cancel is the only cancel affordance. */}
             {((editable && startStepSubmitted) || isLocalEditing) && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
-                {tripNo ? t("ops.trip.editing_trip", { no: tripNo }) : t("ops.trip.editable_view")}
+                {t("ops.trip.editable_view")}
               </span>
             )}
           </div>

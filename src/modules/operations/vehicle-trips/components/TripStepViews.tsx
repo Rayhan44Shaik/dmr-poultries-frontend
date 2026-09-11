@@ -66,8 +66,8 @@ export function FarmStepView({ trip }: { trip: Trip }) {
       : `${Number(trip.avgBirdWeight).toFixed(2)} kg`;
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
-      <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-        <MapPin size={15} className="text-indigo-600" />
+      <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+        <MapPin size={18} className="text-indigo-600" />
         {t("ops.trip.title.farm")}
       </h3>
 
@@ -127,8 +127,8 @@ export function PickupStepView({ trip }: { trip: Trip }) {
   const pickupBoxes = Array.isArray(trip.boxDetails) ? trip.boxDetails : [];
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
-      <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-        <Package size={15} className="text-amber-600" />
+      <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+        <Package size={18} className="text-amber-600" />
         {t("ops.trip.title.pickup")}
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

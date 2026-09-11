@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Loader2, Scale, Pencil, Layers } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { StepCloseButton, WizardActionBar, WizardStepNotice } from "./WizardStepUI";
+import { TripNoBadge } from "./TripNoBadge";
 import { FieldLabel, SearchDropdown, StepKpiCard, type DropdownOption } from "./WizardControls";
 import { GpsAddressText } from "./GpsAddressText";
 import { formatIstStamp } from "../services/tripHeaderApiService";
@@ -225,11 +226,12 @@ export default function StepFarm({
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
-          <div className="flex items-center gap-2.5">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <MapPin size={15} className="text-indigo-600" />
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+              <MapPin size={18} className="text-indigo-600" />
               {t("ops.trip.title.farm")}
             </h3>
+            <TripNoBadge tripNo={trip.tripNo} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
 
@@ -334,11 +336,12 @@ export default function StepFarm({
       `}</style>
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
-          <div className="flex items-center gap-2.5">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <MapPin size={15} className="text-indigo-600" />
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+              <MapPin size={18} className="text-indigo-600" />
               {t("ops.trip.title.farm")}
             </h3>
+            <TripNoBadge tripNo={trip.tripNo} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
 

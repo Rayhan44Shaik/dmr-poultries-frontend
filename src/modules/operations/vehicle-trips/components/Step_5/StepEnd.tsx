@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { Trip } from "../../types/trip";
 import { StepCloseButton, WizardActionBar, WizardStepNotice } from "../WizardStepUI";
+import { TripNoBadge } from "../TripNoBadge";
 import GeneralExpensesTable from "./GeneralExpensesTable";
 import DieselExpensesTable from "./DieselExpensesTable";
 import { useI18n } from "../../../../../i18n";
@@ -566,11 +567,12 @@ export default function StepEnd({
         // ─── Locked View ──────────────────────────────────────────────
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-3">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Receipt size={15} className="text-orange-600" />
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+                <Receipt size={18} className="text-orange-600" />
                 {t("ops.trip.title.expenses")}
               </h3>
+              <TripNoBadge tripNo={trip.tripNo} />
             </div>
             <div className="flex items-center gap-2 shrink-0">
 
@@ -645,14 +647,14 @@ export default function StepEnd({
         // ─── Editable View ────────────────────────────────────────────
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Receipt size={15} className="text-orange-600" />
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+                <Receipt size={18} className="text-orange-600" />
                 {t("ops.trip.title.expenses")}
               </h3>
+              <TripNoBadge tripNo={trip.tripNo} />
             </div>
             <div className="flex items-center gap-2">
-
               <span className="text-[11px] text-slate-700 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 whitespace-nowrap">{t("ops.trip.editable_view")}</span>
             </div>
           </div>
