@@ -69,6 +69,7 @@ function CommunicationIcon({
   onRetry?: () => void;
   className?: string;
 }) {
+  const { t } = useI18n();
   const isFailed = status === "failed" && !sending;
   const isSent = status === "sent";
   const isSending = status === "sending" || sending;
@@ -81,28 +82,28 @@ function CommunicationIcon({
   let iconColor = pendingIconColor;
   let bgColor = pendingBgColor;
   let borderColor = pendingBorderColor;
-  let tooltip = channel === "mail" ? "Send email" : "Send WhatsApp";
-  let ariaLabel = channel === "mail" ? "Send email" : "Send WhatsApp";
+  let tooltip = channel === "mail" ? t("ops.trip.send_email") : t("ops.trip.send_whatsapp");
+  let ariaLabel = tooltip;
 
   if (isSending) {
     iconColor = "text-sky-600";
     bgColor = "bg-sky-50 hover:bg-sky-100";
     borderColor = "border-sky-200";
-    tooltip = channel === "mail" ? "Sending email..." : "Sending WhatsApp...";
+    tooltip = channel === "mail" ? t("ops.trip.sending_email") : t("ops.trip.sending_whatsapp");
     ariaLabel = tooltip;
   } else if (isSent) {
     iconColor = "text-emerald-600";
     bgColor = "bg-emerald-50 hover:bg-emerald-100";
     borderColor = "border-emerald-200";
     tooltip = channel === "mail"
-      ? `Email sent ${sendCount > 0 ? `${sendCount} time${sendCount > 1 ? "s" : ""}` : ""}`
-      : `WhatsApp sent ${sendCount > 0 ? `${sendCount} time${sendCount > 1 ? "s" : ""}` : ""}`;
+      ? t("ops.trip.email_sent_times", { count: sendCount })
+      : t("ops.trip.whatsapp_sent_times", { count: sendCount });
     ariaLabel = tooltip;
   } else if (isFailed) {
     iconColor = "text-red-600";
     bgColor = "bg-red-50 hover:bg-red-100";
     borderColor = "border-red-200";
-    tooltip = channel === "mail" ? "Email failed — click to retry" : "WhatsApp failed — click to retry";
+    tooltip = channel === "mail" ? t("ops.trip.email_failed_retry") : t("ops.trip.whatsapp_failed_retry");
     ariaLabel = tooltip;
   }
 
@@ -135,8 +136,8 @@ function CommunicationIcon({
           onClick={onRetry}
           disabled={disabled}
           className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Retry"
-          aria-label="Retry"
+          title={t("ops.trip.retry")}
+          aria-label={t("ops.trip.retry")}
         >
           <RotateCw size={12} />
         </button>

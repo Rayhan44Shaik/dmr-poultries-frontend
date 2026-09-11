@@ -221,10 +221,10 @@ export function GpsAddressText({
                     void copyAddress();
                   }}
                   className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-100"
-                  title="Copy address"
+                  title={t("ops.trip.copy_address")}
                 >
                   {copied ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
-                  {copied ? "Copied" : "Copy"}
+                  {copied ? t("ops.trip.copied") : t("ops.trip.copy")}
                 </button>
 
                 {mapsUrl ? (
