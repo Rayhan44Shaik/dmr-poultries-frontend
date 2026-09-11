@@ -520,6 +520,14 @@ export const NAV_SECTIONS: NavSection[] = [
         tone: "emerald",
         keywords: "collection report register",
       },
+      {
+        label: "Vehicle Analytics",
+        labelKey: "nav.analytics",
+        path: "/fleet?tab=analytics",
+        icon: BarChart3,
+        tone: "violet",
+        keywords: "vehicle analytics performance fleet",
+      },
     ],
   },
   {
