@@ -115,7 +115,6 @@ const FastagDashboardPage = ({ embedded = false }: FastagDashboardPageProps) => 
               <div className="h-full w-2/5 rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-indigo-500 animate-[pulse_2s_ease-in-out_infinite]" />
             </div>
           </div>
-          <p className="relative mt-6 text-xs font-semibold text-slate-400">{t('coming_soon')}</p>
         </div>
       </div>
     </ErrorBoundary>
