@@ -653,7 +653,6 @@ export default function StepEnd({
               <TripNoBadge tripNo={trip.tripNo} />
             </div>
             <div className="flex items-center gap-2 shrink-0">
-
               {canEdit && (
                 <button
                   type="button"
@@ -665,7 +664,8 @@ export default function StepEnd({
                   <span>{t("common.edit")}</span>
                 </button>
               )}
-              <StepCloseButton onClose={clearForm} />
+              {/* Close only when used as the Trip Entry wizard (not Recent view embed). */}
+              {canEdit && clearForm ? <StepCloseButton onClose={clearForm} /> : null}
               <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap">
                 {t("ops.trip.submitted_locked")}
               </span>
