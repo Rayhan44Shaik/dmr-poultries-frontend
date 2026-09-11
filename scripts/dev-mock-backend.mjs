@@ -433,7 +433,113 @@ const MAINTENANCE = [
     createdAt: `${daysAgo(90)}T10:20:00`, approvedAt: `${daysAgo(89)}T09:00:00`, approvedBy: "Owner",
     deletedAt: `${daysAgo(80)}T09:00:00`, documents: [],
   },
+
+  // ── Additional PENDING bills so the Approval Center has a working queue ──
+  {
+    id: 1011, vehicleId: 3, vehicleNo: VEHICLE_BY_ID.get(3).vehicleNumber,
+    date: `${daysAgo(1)}T16:20:00`, billNo: "MNT-20260909-003", currentKM: 46100,
+    maintenanceType: "Headlight Replacement, Wiring Repair",
+    serviceType: "Corrective", garage: "Annapurna Garage", mechanic: "Lakshmi",
+    driverId: 21, driverName: "Imran S",
+    nextServiceKM: 0, nextServiceByType: {},
+    totalCost: 2480,
+    parts: [PART("LED Headlight Unit", 2, 850, "12V OEM"), PART("Wiring Harness Clip Set", 1, 280), PART("Labour", 1, 500)],
+    remarks: "Both headlights failed during night route", paymentStatus: "pending",
+    createdAt: `${daysAgo(1)}T16:40:00`, documents: [],
+  },
+  {
+    id: 1012, vehicleId: 10, vehicleNo: VEHICLE_BY_ID.get(10).vehicleNumber,
+    date: `${daysAgo(5)}T11:30:00`, billNo: "MNT-20260905-001", currentKM: 21400,
+    maintenanceType: "General Service, Air Filter Replacement",
+    serviceType: "Preventive", garage: "Sai Ram Motors", mechanic: "Mahesh",
+    driverId: 23, driverName: "Srinivas R",
+    nextServiceKM: 31400, nextServiceByType: { "General Service": 31400 },
+    totalCost: 5650,
+    parts: [PART("Air Filter", 1, 950, "OEM"), PART("Coolant 1L", 2, 350), PART("Engine Oil 15W40", 1, 2200, "OEM 15W40"), PART("Labour", 1, 1800)],
+    remarks: "10,000 km scheduled service — verify part rates", paymentStatus: "pending",
+    createdAt: `${daysAgo(5)}T12:00:00`, documents: [],
+  },
+  {
+    id: 1013, vehicleId: 5, vehicleNo: VEHICLE_BY_ID.get(5).vehicleNumber,
+    date: `${daysAgo(8)}T09:50:00`, billNo: "MNT-20260902-002", currentKM: 38200,
+    maintenanceType: "Gearbox Repair, Clutch Cable Replacement",
+    serviceType: "Breakdown", garage: "Durga Highway Service", mechanic: "Venkat",
+    driverId: 22, driverName: "Kiran P",
+    nextServiceKM: 0, nextServiceByType: {},
+    totalCost: 14800,
+    parts: [PART("Clutch Cable Assembly", 1, 3200, "OEM"), PART("Gearbox Bearing Kit", 1, 6800), PART("Gear Oil 5L", 5, 320), PART("Breakdown Labour", 1, 3200)],
+    remarks: "Breakdown on NH-65, awaiting owner approval — high value", paymentStatus: "pending",
+    createdAt: `${daysAgo(8)}T10:15:00`, documents: [],
+  },
 ];
+
+// ── Sample Fleet Permits / Documents (RC, insurance, fitness, permit, PUC) ───
+// Reached at /api/fleet/permits (the Permits & Documents tab). Every vehicle
+// gets one of each document with deterministic validity; a few are seeded
+// expired / expiring soon so the dashboard "Documents" KPI and the matrix show
+// actionable rows. In-memory: edits survive until the stub restarts.
+const DOC_TYPES = ["insurance", "fitness", "permit", "puc", "rc"];
+// Base validity (days from today) per type, staggered slightly per vehicle.
+const DOC_BASE_DAYS = { insurance: 250, fitness: 400, permit: 330, puc: 90, rc: 600 };
+// Explicit overrides keyed `${vehicleId}:${docType}` → days-from-today.
+const DOC_OVERRIDE_DAYS = {
+  "3:rc": -42,          // RC expired
+  "5:insurance": -12,  // Insurance expired
+  "8:puc": -6,         // PUC expired
+  "2:fitness": 15,     // Fitness expiring within 30 days
+  "6:permit": 25,      // Permit expiring within 30 days
+};
+
+const PERMITS = [];
+{
+  let permitId = 5000;
+  for (const vehicle of VEHICLES) {
+    for (const docType of DOC_TYPES) {
+      const key = `${vehicle.id}:${docType}`;
+      const days = Object.prototype.hasOwnProperty.call(DOC_OVERRIDE_DAYS, key)
+        ? DOC_OVERRIDE_DAYS[key]
+        : DOC_BASE_DAYS[docType] + ((vehicle.id * 17) % 120);
+      const expiry = iso(addDays(new Date(), days));
+      const validityYears = docType === "rc" ? 15 : docType === "fitness" ? 8 : docType === "permit" ? 5 : 1;
+      const validFrom = iso(addDays(new Date(), days - validityYears * 365));
+      const vn = String(vehicle.vehicleNumber).replace(/\s+/g, "").slice(-4);
+      PERMITS.push({
+        id: permitId++,
+        vehicleId: vehicle.id,
+        vehicleNo: vehicle.vehicleNumber,
+        docType,
+        documentNumber: `${docType.toUpperCase()}-${vn}-${String(vehicle.id).padStart(3, "0")}`,
+        validFrom,
+        expiryDate: expiry,
+        remarks: days < 0 ? "Expired — renew immediately" : days <= 30 ? "Renewal due soon" : null,
+        hasDocument: true,
+        fileName: null,
+        mimeType: null,
+        fileSize: null,
+        createdBy: "owner",
+        createdAt: `${validFrom}T09:00:00.000Z`,
+        updatedAt: null,
+        _mock: true,
+      });
+    }
+  }
+}
+let nextPermitId = 6000;
+
+function permitSummary() {
+  const byType = {};
+  for (const docType of DOC_TYPES) byType[docType] = { total: 0, expired: 0, expiring: 0, safe: 0 };
+  const todayIso = iso(new Date());
+  for (const p of PERMITS) {
+    const bucket = byType[p.docType];
+    if (!bucket) continue;
+    bucket.total += 1;
+    if (p.expiryDate < todayIso) bucket.expired += 1;
+    else if (p.expiryDate <= iso(addDays(new Date(), 30))) bucket.expiring += 1;
+    else bucket.safe += 1;
+  }
+  return { total: PERMITS.length, byType, _mock: true };
+}
 
 // Authoritative "current odometer" per vehicle (what /meter-summary serves).
 // Chosen so the Upcoming Service panel shows due-soon, overdue and safe rows.
@@ -443,6 +549,11 @@ const VEHICLE_METERS = {
 };
 
 let nextMaintenanceId = 2000;
+
+// Rate Entry in-memory state (sample): locked trips leave the Rate Entry
+// queue; draft rate maps survive PUT saves until the lock POST.
+const RATE_LOCKED = new Map();   // tripId -> { lockedAt, lockedBy }
+const RATE_DRAFTS = new Map();   // tripId -> { deliveryId: rate }
 
 function listMaintenance(query) {
   let rows = MAINTENANCE.slice();
@@ -2219,6 +2330,11 @@ function applyExpensesStep(trip, body) {
     if (trip.status !== "Completed" && trip.status !== "Deleted") {
       trip.status = "Pending";
     }
+    // Resubmission after a reviewer's "send back" clears the change request.
+    trip.changesRequestedAt = null;
+    trip.rejectedAt = null;
+    trip.rejectedBy = null;
+    trip.rejectionReason = null;
   } else if (body.status === "Pending" && trip.status === "Draft") {
     trip.status = "Pending";
   }
@@ -2372,7 +2488,9 @@ function decorateTrip(trip) {
   // Completed stays Completed for older approved samples only.
   const wizardDone = Boolean(trip.endStepSubmitted || trip.expensesStepSubmitted);
   let status = trip.status || "Draft";
-  if (wizardDone && status === "Draft") status = "Pending";
+  // A wizard-complete Draft reads as Pending — UNLESS a reviewer sent it back
+  // for changes; then it stays a Draft until the supervisor resubmits Step 5.
+  if (wizardDone && status === "Draft" && !trip.changesRequestedAt) status = "Pending";
   return {
     ...trip,
     status,
@@ -2450,12 +2568,29 @@ const server = http.createServer((req, res) => {
       const valid =
         (trip.status === "Draft" && next === "Pending") ||
         (effectiveFrom === "Pending" && next === "Completed") ||
-        (trip.status === "Pending" && next === "Completed");
+        (trip.status === "Pending" && next === "Completed") ||
+        // Approval Center: a reviewer can send a Pending trip back to Draft
+        // (reject / request changes) with a mandatory reason.
+        (trip.status === "Pending" && next === "Draft");
       if (!valid) {
         return send(422, { error: "invalid_status_transition", from: trip.status, to: next, mock: true });
       }
       trip.status = next;
-      if (next === "Completed") trip.approvedBy = typeof body.approvedBy === "string" ? body.approvedBy : "Owner";
+      if (next === "Completed") {
+        trip.approvedBy = typeof body.approvedBy === "string" ? body.approvedBy : "Owner";
+        trip.approvedAt = new Date().toISOString();
+        trip.rejectionReason = null;
+        trip.rejectedBy = null;
+        trip.rejectedAt = null;
+        trip.changesRequestedAt = null;
+      }
+      if (next === "Draft" && effectiveFrom === "Pending") {
+        trip.rejectedBy = typeof body.approvedBy === "string" ? body.approvedBy : "Owner";
+        trip.rejectedAt = new Date().toISOString();
+        trip.changesRequestedAt = trip.rejectedAt;
+        trip.rejectionReason = typeof body.reason === "string" ? body.reason.slice(0, 500) : "Sent back for changes";
+        trip.approvedBy = null;
+      }
       return send(200, decorateTrip(trip));
     });
     return;
@@ -2603,10 +2738,15 @@ const server = http.createServer((req, res) => {
   if (approveMatch && req.method === "POST") {
     const record = MAINTENANCE.find((r) => r.id === Number(approveMatch[1]));
     if (!record) return send(404, { error: "not_found", mock: true });
-    record.paymentStatus = "approved";
-    record.approvedAt = new Date().toISOString();
-    record.approvedBy = "system";
-    return send(200, { ...record, _mock: true });
+    readJsonBody(req).then((body) => {
+      record.paymentStatus = "approved";
+      record.approvedAt = new Date().toISOString();
+      record.approvedBy = typeof body?.approvedBy === "string" && body.approvedBy.trim()
+        ? body.approvedBy.trim()
+        : "Owner";
+      send(200, { ...record, _mock: true });
+    });
+    return;
   }
 
   // DELETE /api/fleet/maintenance/:id — soft delete.
@@ -2616,6 +2756,162 @@ const server = http.createServer((req, res) => {
     if (!record) return send(404, { error: "not_found", mock: true });
     record.deletedAt = new Date().toISOString();
     return send(200, { ...record, _mock: true });
+  }
+
+  // ── Fleet Permits & Documents (sample) ───────────────────────────────────
+  // GET /api/fleet/permits/summary — per-type expired/expiring/safe buckets.
+  if (url.pathname === "/api/fleet/permits/summary" && req.method === "GET") {
+    return send(200, permitSummary());
+  }
+
+  // GET /api/fleet/permits — every permit document across all vehicles.
+  if (url.pathname === "/api/fleet/permits" && req.method === "GET") {
+    return send(200, PERMITS.map((p) => ({ ...p })));
+  }
+
+  // PUT /api/fleet/permits/:vehicleId/:docType — create or update one record.
+  const permitUpsertMatch = url.pathname.match(
+    /^\/api\/fleet\/permits\/(\d+)\/(insurance|fitness|permit|puc|rc)$/
+  );
+  if (permitUpsertMatch && req.method === "PUT") {
+    readJsonBody(req).then((body) => {
+      const vehicleId = Number(permitUpsertMatch[1]);
+      const docType = permitUpsertMatch[2];
+      const vehicle = VEHICLE_BY_ID.get(vehicleId);
+      const existing = PERMITS.find((p) => p.vehicleId === vehicleId && p.docType === docType);
+      const expiryDate = body?.expiryDate || existing?.expiryDate || iso(addDays(new Date(), 365));
+      const payload = {
+        vehicleId,
+        vehicleNo: vehicle?.vehicleNumber || existing?.vehicleNo || `VH-${vehicleId}`,
+        docType,
+        documentNumber: body?.documentNumber ?? existing?.documentNumber ?? "",
+        validFrom: body?.validFrom ?? existing?.validFrom ?? null,
+        expiryDate,
+        remarks: body?.remarks ?? null,
+        hasDocument: true,
+        fileName: body?.fileName ?? existing?.fileName ?? null,
+        mimeType: body?.mimeType ?? existing?.mimeType ?? null,
+        fileSize: body?.fileSize ?? existing?.fileSize ?? null,
+        createdBy: body?.createdBy ?? existing?.createdBy ?? "owner",
+        updatedAt: new Date().toISOString(),
+      };
+      if (existing) Object.assign(existing, payload);
+      else PERMITS.push({ id: nextPermitId++, ...payload, createdAt: new Date().toISOString(), _mock: true });
+      send(200, { ...(existing ?? PERMITS[PERMITS.length - 1]), _mock: true });
+    });
+    return;
+  }
+
+  // DELETE /api/fleet/permits/:vehicleId/:docType — remove one record.
+  const permitDeleteMatch = url.pathname.match(
+    /^\/api\/fleet\/permits\/(\d+)\/(insurance|fitness|permit|puc|rc)$/
+  );
+  if (permitDeleteMatch && req.method === "DELETE") {
+    const vehicleId = Number(permitDeleteMatch[1]);
+    const docType = permitDeleteMatch[2];
+    const index = PERMITS.findIndex((p) => p.vehicleId === vehicleId && p.docType === docType);
+    if (index === -1) return send(404, { error: "not_found", mock: true });
+    const [removed] = PERMITS.splice(index, 1);
+    return send(200, { ...removed, _mock: true });
+  }
+
+  // ── Rate Entry (sample) ─────────────────────────────────────────────────
+  // GET  /api/operations/rate-entry        — Completed trips awaiting rates
+  // GET  /api/operations/rate-entry/:id    — detail with shop deliveries
+  // PUT  /api/operations/rate-entry/:id    — draft rates (not locked)
+  // POST  /api/operations/rate-entry/:id/lock — lock rates (leaves the queue)
+  const rateEntryEligible = () =>
+    TRIPS
+      .map(decorateTrip)
+      .filter((t) => t.status === "Completed" && !String(t.tripNo).startsWith("[ORDER]"))
+      .filter((t) => !RATE_LOCKED.has(t.id));
+  const rateEntryRow = (t, mode) => {
+    const deliveries = (Array.isArray(t.deliveries) ? t.deliveries : [])
+      .filter((d) => d.autoCaptureTime)
+      .map((d, idx) => {
+        const draftRate = RATE_DRAFTS.get(t.id)?.[d.id ?? idx] ?? null;
+        return {
+          id: d.id ?? idx + 1,
+          serialNo: idx + 1,
+          boxNo: d.boxNo ?? null,
+          shopId: d.shopId ?? null,
+          shopName: d.shopName || `Shop ${d.shopId ?? idx + 1}`,
+          birdTypeId: d.birdTypeId ?? null,
+          birdType: d.birdType || "Broiler",
+          birds: Number(d.birds) || 0,
+          weight: Number(d.weight) || 0,
+          mortality: Number(d.mortality) || 0,
+          mortKg: d.mortKg ?? null,
+          rate: d.rate ?? draftRate,
+          amount: Number(d.amount) || 0,
+          remarks: d.remarks || "",
+          deliveryMode: d.deliveryMode || "box",
+          marketRate: null,
+        };
+      });
+    return {
+      id: t.id,
+      tripNo: t.tripNo,
+      tripDate: (t.tripDate || "").slice(0, 10),
+      status: t.status,
+      vehicleNo: t.vehicleNo || null,
+      driverName: t.driverName || null,
+      supervisorName: t.supervisorName || null,
+      sourceFarm: t.sourceFarm || null,
+      totalBirds: Number(t.totalBirds) || 0,
+      totalWeight: Number(t.totalWeight) || Number(t.dcWeight) || 0,
+      totalShops: Number(t.totalShops) || deliveries.length,
+      rateLocked: RATE_LOCKED.has(t.id),
+      rateLockedAt: RATE_LOCKED.get(t.id)?.lockedAt ?? null,
+      rateLockedBy: RATE_LOCKED.get(t.id)?.lockedBy ?? null,
+      ratesEntered: RATE_DRAFTS.get(t.id) ? Object.keys(RATE_DRAFTS.get(t.id)).length : 0,
+      deliveriesCount: deliveries.length,
+      totalAmount: deliveries.reduce((s, d) => s + (Number(d.amount) || 0), 0),
+      ...(mode === "detail" ? { deliveries } : {}),
+      _mock: true,
+    };
+  };
+  // POST /api/operations/rate-entry/:id/lock
+  const rateLockMatch = url.pathname.match(/^\/api\/operations\/rate-entry\/(\d+)\/lock$/);
+  if (rateLockMatch && req.method === "POST") {
+    const trip = TRIPS.find((t) => t.id === Number(rateLockMatch[1]));
+    if (!trip) return send(404, { error: "trip_not_found", mock: true });
+    readJsonBody(req).then((body) => {
+      RATE_LOCKED.set(trip.id, { lockedAt: new Date().toISOString(), lockedBy: body?.lockedBy || "web-user" });
+      if (Array.isArray(body?.rates)) {
+        const map = {};
+        for (const line of body.rates) map[line.deliveryId] = Number(line.rate);
+        RATE_DRAFTS.set(trip.id, map);
+      }
+      send(200, { id: trip.id, rateLocked: true, _mock: true });
+    });
+    return;
+  }
+  // PUT /api/operations/rate-entry/:id — draft save
+  const ratePutMatch = url.pathname.match(/^\/api\/operations\/rate-entry\/(\d+)$/);
+  if (ratePutMatch && req.method === "PUT") {
+    const trip = TRIPS.find((t) => t.id === Number(ratePutMatch[1]));
+    if (!trip) return send(404, { error: "trip_not_found", mock: true });
+    readJsonBody(req).then((body) => {
+      if (Array.isArray(body?.rates)) {
+        const map = RATE_DRAFTS.get(trip.id) || {};
+        for (const line of body.rates) map[line.deliveryId] = Number(line.rate);
+        RATE_DRAFTS.set(trip.id, map);
+      }
+      send(200, { id: trip.id, saved: true, _mock: true });
+    });
+    return;
+  }
+  if (req.method === "GET") {
+    const rateDetailMatch = url.pathname.match(/^\/api\/operations\/rate-entry\/(\d+)$/);
+    if (rateDetailMatch) {
+      const trip = TRIPS.find((t) => t.id === Number(rateDetailMatch[1]));
+      if (!trip) return send(404, { error: "trip_not_found", mock: true });
+      return send(200, rateEntryRow(decorateTrip(trip), "detail"));
+    }
+    if (url.pathname === "/api/operations/rate-entry") {
+      return send(200, rateEntryEligible().map((t) => rateEntryRow(t)));
+    }
   }
 
   // GET /api/fleet/vehicles/meter-summary — authoritative odometer per vehicle.

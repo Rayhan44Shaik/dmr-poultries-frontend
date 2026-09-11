@@ -1,22 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import TripFilters from "../components/TripFilters";
 import TripKPICards from "../components/TripKPICards";
-<<<<<<< HEAD
-import TripMasterTable from "../components/TripMasterTable";
-import { TripHistoryViewModal } from "../components/TripViewModal";
-import {
-  paginationBarClass,
-  paginationNavBtnClass,
-  paginationPageBtnClass,
-  shouldShowPagination,
-} from "../../../../shared/ui/paginationStyles";
-=======
 import TripMasterTable, { type TripSortKey } from "../components/TripMasterTable";
 import TripViewModal from "../components/TripViewModal";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { Pagination } from "../../../../ui";
 import { PAGINATION_DEFAULT_PAGE_SIZE } from "../../../../shared/ui/uiTokens";
->>>>>>> 7f2979f92ebf0943fe9b337d1f20b7bf6e3022c7
 
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
@@ -194,6 +183,20 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     }
   };
 
+  const fetchAllFilteredTrips = useCallback(async (): Promise<Trip[]> => {
+    const result = await listCompletedTrips({
+      fromDate: fromDate || undefined,
+      toDate: toDate || undefined,
+      vehicleId: vehicle !== "All Vehicles" ? Number(vehicle) : undefined,
+      supervisorId: supervisor !== "All Supervisors" ? Number(supervisor) : undefined,
+      farmId: farm !== "All Sources" ? Number(farm) : undefined,
+      search: search || undefined,
+      page: 1,
+      limit: Math.max(totalTrips, 1),
+    });
+    return result.data;
+  }, [fromDate, toDate, vehicle, supervisor, farm, search, totalTrips]);
+
   const handleExportPDF = async () => {
     const exportData = await fetchAllFilteredTrips();
     if (!exportData || exportData.length === 0) {
@@ -284,20 +287,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     showNotification(t("notification.export_success"), "success");
   };
 
-  const fetchAllFilteredTrips = useCallback(async (): Promise<Trip[]> => {
-    const result = await listCompletedTrips({
-      fromDate: fromDate || undefined,
-      toDate: toDate || undefined,
-      vehicleId: vehicle !== "All Vehicles" ? Number(vehicle) : undefined,
-      supervisorId: supervisor !== "All Supervisors" ? Number(supervisor) : undefined,
-      farmId: farm !== "All Sources" ? Number(farm) : undefined,
-      search: search || undefined,
-      page: 1,
-      limit: Math.max(totalTrips, 1),
-    });
-    return result.data;
-  }, [fromDate, toDate, vehicle, supervisor, farm, search, totalTrips]);
-
   const handleRefreshClick = () => {
     void refreshTrips();
     showNotification(t("notification.data_refreshed"), "success");
@@ -373,18 +362,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         )}
       </div>
 
-<<<<<<< HEAD
-      <TripHistoryViewModal
-        open={viewOpen}
-        trip={selectedTrip}
-        shops={shops}
-        birdTypes={birdTypes}
-        onClose={() => {
-          setViewOpen(false);
-          setSelectedTrip(null);
-        }}
-      />
-=======
       {viewOpen && (
         <TripViewModalWithMasters
           trip={selectedTrip}
@@ -394,7 +371,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
           }}
         />
       )}
->>>>>>> 7f2979f92ebf0943fe9b337d1f20b7bf6e3022c7
     </div>
   );
 

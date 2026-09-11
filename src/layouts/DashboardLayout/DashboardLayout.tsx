@@ -7,6 +7,7 @@ import { useLocation } from "react-router-dom";
 import Sidebar from "../../ui/Sidebar/Sidebar";
 import Header from "../../ui/Header/Header";
 import CommandPalette from "../../ui/CommandPalette/CommandPalette";
+import { ApprovalAlertToaster } from "../../modules/approvals/components/ApprovalAlertToaster";
 
 type DashboardLayoutProps = {
   children: ReactNode;
@@ -47,6 +48,9 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
       />
 
       <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
+
+      {/* One-time sign-in alert when work is waiting for approval. */}
+      <ApprovalAlertToaster />
     </div>
   );
 }

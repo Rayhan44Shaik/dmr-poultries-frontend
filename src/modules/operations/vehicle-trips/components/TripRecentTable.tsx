@@ -100,8 +100,7 @@ function TripRecentTable({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-<<<<<<< HEAD
-=======
+
   /** Effective list status: Step 5 fully submitted must never stay under Draft. */
   const listStatus = (t: Trip): "Draft" | "Pending" | "Completed" | "Deleted" => {
     if (t.deleted === true || t.status === "Deleted") return "Deleted";
@@ -162,7 +161,6 @@ function TripRecentTable({
     });
   };
 
->>>>>>> 7f2979f92ebf0943fe9b337d1f20b7bf6e3022c7
   const sortedTrips = useMemo(() => {
     const lower = searchTerm.trim().toLowerCase();
     const filtered = lower ? safeTrips.filter((trip) =>
