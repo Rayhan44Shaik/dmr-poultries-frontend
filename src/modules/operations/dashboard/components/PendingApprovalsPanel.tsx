@@ -1,14 +1,16 @@
 // -----------------------------------------------------------------------------
 // PENDING APPROVALS — slim inline KPI strip for the dashboard / trip entry.
 // Just a small coloured logo, the count and a short label per queue — nothing
-// else. `actions` (e.g. the date-range filter) sits on the same row, right
-// side. Live data via the approval snapshot store.
+// else. Each tile has a readable custom tooltip. `actions` (e.g. the
+// date-range filter) sits on the same row, right side.
+// Live data via the approval snapshot store.
 // -----------------------------------------------------------------------------
 
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
+  ArrowUpRight,
   Banknote,
   CheckCircle2,
   ReceiptText,
@@ -23,8 +25,15 @@ interface Stat {
   href: string;
   icon: LucideIcon;
   count: number;
+  /** Readable hover tooltip line. */
+  tip: string;
+  /** Tooltip bubble anchoring (responsive — tiles are 2-up on mobile, 4-up on sm+). */
+  tipClass: string;
+  /** Matching arrow position. */
+  arrowClass: string;
   chip: string; // coloured icon tile (literal classes so Tailwind keeps them)
   hover: string;
+  dot: string; // small coloured dot in the tooltip
 }
 
 export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode }) {
@@ -39,8 +48,12 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
       href: "/operations?tab=trip-entry&status=Pending",
       icon: Truck,
       count: q.trips.count,
+      tip: "Trips completed and waiting for your approval",
+      tipClass: "left-0",
+      arrowClass: "left-4",
       chip: "bg-sky-100 text-sky-600",
       hover: "hover:bg-sky-50",
+      dot: "bg-sky-500",
     },
     {
       key: "rates",
@@ -48,8 +61,12 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
       href: "/operations?tab=rate-entry",
       icon: ReceiptText,
       count: q.rateEntries.count,
+      tip: "Completed trips that still need shop sale rates",
+      tipClass: "right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2",
+      arrowClass: "right-4 sm:right-auto sm:left-1/2 sm:-translate-x-1/2",
       chip: "bg-indigo-100 text-indigo-600",
       hover: "hover:bg-indigo-50",
+      dot: "bg-indigo-500",
     },
     {
       key: "maintenance",
@@ -57,8 +74,12 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
       href: "/fleet?tab=entry&view=pending",
       icon: Wrench,
       count: q.maintenance.count,
+      tip: "Maintenance bills waiting to be verified",
+      tipClass: "left-0 sm:left-1/2 sm:-translate-x-1/2",
+      arrowClass: "left-4 sm:left-1/2 sm:-translate-x-1/2",
       chip: "bg-violet-100 text-violet-600",
       hover: "hover:bg-violet-50",
+      dot: "bg-violet-500",
     },
     {
       key: "payments",
@@ -66,10 +87,17 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
       href: "/accounts?tab=paid-payments",
       icon: Banknote,
       count: q.payments.count,
+      tip: "Draft payment requests waiting for approval",
+      tipClass: "right-0",
+      arrowClass: "right-4",
       chip: "bg-emerald-100 text-emerald-600",
       hover: "hover:bg-emerald-50",
+      dot: "bg-emerald-500",
     },
   ];
+
+  const tipLine = (stat: Stat): string =>
+    stat.count === 0 ? `No ${stat.label.toLowerCase()} pending right now` : stat.tip;
 
   return (
     <section
@@ -96,8 +124,8 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
               <Link
                 key={stat.key}
                 to={stat.href}
-                title={`${stat.count} ${stat.label} pending approval`}
-                className={`group/tile flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-all duration-150 active:scale-[0.96] sm:px-3 motion-reduce:transition-none motion-reduce:active:scale-100 ${stat.hover} ${
+                aria-label={`${stat.count} ${stat.label} pending — open ${stat.label}`}
+                className={`group/tile relative flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-all duration-150 active:scale-[0.96] sm:px-3 motion-reduce:transition-none motion-reduce:active:scale-100 ${stat.hover} ${
                   empty ? "opacity-40 hover:bg-transparent" : ""
                 }`}
               >
@@ -113,6 +141,30 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
                   <span className="text-[12px] font-semibold text-slate-500">
                     {stat.label}
                   </span>
+                </span>
+
+                {/* Readable custom tooltip — opens BELOW the tile (the strip
+                    sits at page top, where an upward bubble would clip). */}
+                <span
+                  role="tooltip"
+                  className={`pointer-events-none absolute top-[calc(100%+6px)] z-50 w-max max-w-[230px] rounded-lg bg-slate-900 px-3 py-2 text-left text-[11.5px] font-medium leading-snug text-white opacity-0 shadow-xl shadow-slate-900/25 transition-all duration-150 group-hover/tile:opacity-100 group-focus-visible/tile:opacity-100 motion-reduce:transition-none ${stat.tipClass}`}
+                >
+                  <span className="flex items-start gap-1.5">
+                    <span className={`mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full ${stat.dot}`} />
+                    <span>
+                      <span className="block text-[12px] font-bold text-white">
+                        {stat.count} {stat.label}
+                      </span>
+                      <span className="block text-slate-300">{tipLine(stat)}</span>
+                      <span className="mt-1 flex items-center gap-1 text-[10.5px] font-semibold text-slate-400">
+                        Click to open
+                        <ArrowUpRight size={11} />
+                      </span>
+                    </span>
+                  </span>
+                  <span
+                    className={`absolute -top-1 h-2 w-2 rotate-45 rounded-[2px] bg-slate-900 ${stat.arrowClass}`}
+                  />
                 </span>
               </Link>
             );
