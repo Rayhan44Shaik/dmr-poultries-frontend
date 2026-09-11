@@ -1,6 +1,7 @@
 // src/modules/operations/dashboard/pages/OperationsDashboardPage.tsx
 
 import { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useDashboardData } from "../hooks/useDashboardData";
 import KPICards from "../components/KPICards";
 import TrendChart from "../components/TrendChart";
@@ -8,6 +9,7 @@ import CollectionsPie from "../components/CollectionsPie";
 import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
 import PendingCollectionsByShop from "../components/PendingCollectionsByShop";
+import ApprovalCalendar from "../components/ApprovalCalendar";
 import { Calendar, ArrowRightLeft } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useI18n } from "../../../../i18n";
@@ -270,9 +272,10 @@ function OperationsDashboardPage() {
   }
 
   return (
-    <div className="space-y-5">
-      {/* Date Range Selector Bar */}
-      <div className="flex justify-end items-center">
+    <div className="min-w-0 space-y-5">
+      {/* Calendar and approval summary stay together on one simple line. */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm">
+        <ApprovalCalendar startDate={startDate} endDate={endDate} />
         <RangeDatePicker
           startDate={startDate}
           endDate={endDate}
@@ -286,9 +289,12 @@ function OperationsDashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.time_series")}</span>
-            <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.operational_trends")}</h3>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.time_series")}</span>
+              <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.operational_trends")}</h3>
+            </div>
+            <Link to="/operations?tab=vehicle-trips" className="shrink-0 text-[11px] font-bold text-blue-600 hover:underline">View details →</Link>
           </div>
           <div className="w-full overflow-hidden">
             <TrendChart data={data?.trendData || []} />
@@ -308,9 +314,12 @@ function OperationsDashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.payment_breakdown")}</span>
-            <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.collection_streams")}</h3>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.payment_breakdown")}</span>
+              <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.collection_streams")}</h3>
+            </div>
+            <Link to="/operations?tab=collections" className="shrink-0 text-[11px] font-bold text-blue-600 hover:underline">View details →</Link>
           </div>
           <div className="w-full flex justify-center items-center py-2 overflow-hidden">
             <CollectionsPie data={data?.collectionsByMode || []} />

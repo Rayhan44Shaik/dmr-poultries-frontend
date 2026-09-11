@@ -1,6 +1,7 @@
 // src/modules/operations/vehicle-trips/components/TripRecentTable.tsx
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Eye, Pencil, RefreshCw, History, Trash2, Clock, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
@@ -43,9 +44,12 @@ function TripRecentTable({
     return value === key ? "" : value;
   };
 
+  const [searchParams] = useSearchParams();
+  const requestedStatus = searchParams.get("status");
+  const initialStatus: "Draft" | "Pending" | "Deleted" = requestedStatus === "Pending" || requestedStatus === "Deleted" ? requestedStatus : "Draft";
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTripId, setSelectedTripId] = useState<number | null>(null);
-  const [statusFilter, setStatusFilter] = useState<"Draft" | "Pending" | "Deleted">("Draft");
+  const [statusFilter, setStatusFilter] = useState<"Draft" | "Pending" | "Deleted">(initialStatus);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 

@@ -1,36 +1,42 @@
 import { useRef, useState, type FormEvent } from 'react';
+import { IndianRupee, ScrollText, UserRound } from 'lucide-react';
 import { parseBusinessDate, toBusinessDate } from '../../../../utils/businessDate';
 import type { Payment, PaymentWritePayload } from '../../types/payment.types';
 import { createPayment, updatePayment } from '../../services/paymentApiService';
 import { canEditItem } from '../../../../utils/dateUtils';
 import { Button } from '../../../../ui/Button';
 import { Modal } from '../../../../ui/Modal';
-import { Input } from '../../../../ui/Input';
-import { Field } from '../../../../ui/Field';
-import { uiTextareaClass } from '../../../../shared/ui/uiTokens';
-import { DatePicker } from '../../../../components/common/DatePicker';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
-import { PAYMENT_TYPES, PAYMENT_MODES, paymentNoDisplay, paymentStatusLabel } from '../../utils/paymentRegister';
+import { MasterSectionHeading } from '../../../masters/components/MasterForm';
+import { masterIconClass, masterInputClass, masterLabelClass } from '../../../masters/components/masterFormStyles';
+import '../../../masters/styles/masters.css';
+import { DatePicker } from '../../../../components/common/DatePicker';
+import { PAYMENT_TYPES, PAYMENT_MODES, paymentNoDisplay } from '../../utils/paymentRegister';
+import { PaymentGlyphChip } from './PaymentGlyphMarks';
+import { paymentModeGlyph, paymentTypeGlyph } from '../../utils/paymentRegisterGlyphs';
+import { cn } from '../../../../utils/cn';
 
 interface PaymentEditModalProps {
   isOpen: boolean;
   payment: Payment | null;
   onClose: () => void;
   onSave: (payment: Payment) => void;
-  /**
-   * Replaces the API write. The sample preview mutates its own rows in memory,
-   * so a preview edit can never reach a payment endpoint. Omitted = the server.
-   */
   persist?: (payload: PaymentWritePayload, target: Payment | null) => Promise<Payment>;
 }
-const CATEGORIES = ['Farmer', 'Fuel', 'Maintenance', 'Salary', 'Loan', 'Office', 'Tax', 'Other'];
-const STATUSES = (['Draft', 'Approved', 'Paid', 'Cancelled'] as const).map(value => ({ value, label: paymentStatusLabel(value) }));
 
+const CATEGORIES = ['Farmer', 'Fuel', 'Maintenance', 'Salary', 'Loan', 'Office', 'Tax', 'Other'];
+// The register workflow exposes only these three choices. The API keeps its
+// existing status values: Pending is stored as Draft and Deleted as Cancelled.
+const STATUSES = [
+  { value: 'Draft', label: 'Pending' },
+  { value: 'Approved', label: 'Approved' },
+  { value: 'Cancelled', label: 'Deleted' },
+] as const satisfies readonly { value: Payment['status']; label: string }[];
 export function PaymentEditModal(props: PaymentEditModalProps) {
   return props.isOpen ? <EditForm key={props.payment?.id ?? 'new'} {...props} /> : null;
 }
 
-function EditForm({ payment, onClose, onSave, persist }: PaymentEditModalProps) {
+function EditForm({ isOpen, payment, onClose, onSave, persist }: PaymentEditModalProps) {
   const [form, setForm] = useState(() => ({
     paymentDate: payment?.paymentDate ?? toBusinessDate(new Date()),
     paymentType: payment?.paymentType ?? PAYMENT_TYPES[0],
@@ -55,15 +61,15 @@ function EditForm({ payment, onClose, onSave, persist }: PaymentEditModalProps) 
   };
 
   const validate = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    if (!parseBusinessDate(form.paymentDate)) newErrors.paymentDate = 'Payment Date is required';
-    if (!form.paymentType) newErrors.paymentType = 'Payment Type is required';
-    if (!form.paymentMode) newErrors.paymentMode = 'Payment Mode is required';
-    if (!form.paidTo.trim()) newErrors.paidTo = 'Paid To is required';
-    if (!Number.isFinite(form.amount) || form.amount <= 0) newErrors.amount = 'Amount must be greater than 0';
-    if (!form.referenceNo.trim()) newErrors.referenceNo = 'Reference No is required';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const next: Record<string, string> = {};
+    if (!parseBusinessDate(form.paymentDate)) next.paymentDate = 'Payment Date is required';
+    if (!form.paymentType) next.paymentType = 'Payment Type is required';
+    if (!form.paymentMode) next.paymentMode = 'Payment Mode is required';
+    if (!form.paidTo.trim()) next.paidTo = 'Paid To is required';
+    if (!Number.isFinite(form.amount) || form.amount <= 0) next.amount = 'Amount must be greater than 0';
+    if (!form.referenceNo.trim()) next.referenceNo = 'Reference No is required';
+    setErrors(next);
+    return Object.keys(next).length === 0;
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -71,19 +77,11 @@ function EditForm({ payment, onClose, onSave, persist }: PaymentEditModalProps) 
     if (savingRef.current || !isEditable || !validate()) return;
     savingRef.current = true;
     setSaving(true);
-
-    const paymentData = {
-      ...form,
-      amount: Number(form.amount),
-      createdBy: 'admin',
-    };
-
+    const paymentData = { ...form, amount: Number(form.amount), createdBy: 'admin' };
     try {
       const saved: Payment = persist
         ? await persist(paymentData, payment ?? null)
-        : isEditMode && payment
-          ? await updatePayment(payment.id, paymentData)
-          : await createPayment(paymentData);
+        : isEditMode && payment ? await updatePayment(payment.id, paymentData) : await createPayment(paymentData);
       onSave(saved);
       onClose();
     } catch (error) {
@@ -94,30 +92,54 @@ function EditForm({ payment, onClose, onSave, persist }: PaymentEditModalProps) 
     }
   };
 
-
   if (isEditMode && !isEditable) {
     return <Modal isOpen onClose={onClose} title="Edit Not Allowed" footer={<Button variant="secondary" onClick={onClose}>Close</Button>}>
       <p className="text-sm text-slate-600">This payment is older than 10 days and cannot be edited.</p>
     </Modal>;
   }
+
   const valid = Boolean(parseBusinessDate(form.paymentDate) && form.paymentType && form.paymentMode && form.paidTo.trim() && form.referenceNo.trim() && Number.isFinite(form.amount) && form.amount > 0);
+  const typeOptions = PAYMENT_TYPES.map(value => ({ value, label: value, icon: <PaymentGlyphChip glyph={paymentTypeGlyph(value)} size={16} icon={10} /> }));
+  const modeOptions = PAYMENT_MODES.map(value => ({ value, label: value, icon: <PaymentGlyphChip glyph={paymentModeGlyph(value)} size={16} icon={10} /> }));
+  const fieldId = (name: string) => `edit-payment-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  const label = (name: string, required = false) => <label htmlFor={fieldId(name)} className={masterLabelClass}>{name}{required && <span className="ml-0.5 text-red-500"> *</span>}</label>;
+  const error = (message?: string) => message ? <p className="mt-0.5 text-[11px] text-red-600">{message}</p> : null;
+  const selectedClass = (field: keyof typeof form, errorKey: string) => cn(form[field] && !errors[errorKey] && '[&>button]:border-sky-200 [&>button]:bg-sky-50/70');
+
   return (
-    <Modal isOpen onClose={close} title={isEditMode ? 'Edit Payment' : 'New Payment'} description={paymentNoDisplay(payment?.paymentNo)} size="lg"
-      closeOnOverlay={false} closeOnEscape={!saving && !calendarOpen} showCloseButton={!saving}
+    <Modal isOpen={isOpen} onClose={close} aria-label="Edit Payment" size="xl" overlayClassName="backdrop-blur-none bg-slate-900/25"
+      closeOnOverlay={false} closeOnEscape={!saving && !calendarOpen} showCloseButton={false}
       footer={<><Button variant="secondary" onClick={close} disabled={saving}>Cancel</Button><Button type="submit" form="edit-payment-form" disabled={!valid || saving} loading={saving}>{saving ? 'Saving…' : isEditMode ? 'Update Payment' : 'Create Payment'}</Button></>}>
-      <form id="edit-payment-form" onSubmit={handleSubmit} noValidate>
-        {errors.form && <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errors.form}</p>}
-        <fieldset disabled={saving} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <DatePicker onOpenChange={setCalendarOpen} label="Payment Date" required value={form.paymentDate} onChange={v => handleChange('paymentDate', v)} error={errors.paymentDate} disabled={saving} />
-          <MasterDropdown label="Payment Type" labelStyle="field" required value={form.paymentType} options={[...new Set([...PAYMENT_TYPES, form.paymentType])]} onChange={v => handleChange('paymentType', v)} searchable disabled={saving} error={errors.paymentType} />
-          <MasterDropdown label="Payment Mode" labelStyle="field" required value={form.paymentMode} options={[...new Set([...PAYMENT_MODES, form.paymentMode])]} onChange={v => handleChange('paymentMode', v)} searchable disabled={saving} error={errors.paymentMode} />
-          <Input label="Paid To" required value={form.paidTo} onChange={e => handleChange('paidTo', e.target.value)} error={errors.paidTo} />
-          <Input label="Amount (₹)" required type="number" min="1" step="1" value={form.amount || ''} onChange={e => handleChange('amount', e.target.valueAsNumber || 0)} error={errors.amount} />
-          <Input label="Reference / Bill No" required value={form.referenceNo} onChange={e => handleChange('referenceNo', e.target.value)} error={errors.referenceNo} />
-          <MasterDropdown label="Category" labelStyle="field" value={form.category} options={[...new Set([...CATEGORIES, form.category])]} onChange={v => handleChange('category', v)} searchable disabled={saving} />
-          {isEditMode && <MasterDropdown label="Status" labelStyle="field" value={form.status} options={STATUSES} onChange={v => handleChange('status', v as Payment['status'])} disabled={saving} />}
-          <Field label="Remarks" className="sm:col-span-2">{({ id }) => <textarea id={id} className={uiTextareaClass} value={form.remarks} onChange={e => handleChange('remarks', e.target.value)} rows={2} placeholder="Optional remarks" />}</Field>
-        </fieldset>
+      <form id="edit-payment-form" onSubmit={handleSubmit} noValidate className={cn('master-form space-y-4', saving && 'opacity-95')}>
+        {errors.form && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errors.form}</p>}
+        <section className="space-y-3">
+          <MasterSectionHeading>
+            <span>Payment</span>
+            {isEditMode && payment && <span className="ml-2 rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold normal-case tracking-normal text-slate-600">PAYMENT NO: {paymentNoDisplay(payment.paymentNo) || 'Not assigned'}</span>}
+          </MasterSectionHeading>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <DatePicker onOpenChange={setCalendarOpen} openOnFocus={false} label="Payment Date" required className="[&_input]:h-9 [&_input]:rounded-xl [&_input]:border-slate-200 [&_input]:text-sm [&_input]:hover:border-slate-300" value={form.paymentDate} onChange={v => handleChange('paymentDate', v)} error={errors.paymentDate} disabled={saving} />
+            <MasterDropdown label="Payment Type" labelStyle="field" required className={selectedClass('paymentType', 'paymentType')} value={form.paymentType} options={typeOptions} onChange={v => handleChange('paymentType', v)} searchable disabled={saving} error={errors.paymentType} />
+            <MasterDropdown label="Payment Mode" labelStyle="field" required className={selectedClass('paymentMode', 'paymentMode')} value={form.paymentMode} options={modeOptions} onChange={v => handleChange('paymentMode', v)} searchable disabled={saving} error={errors.paymentMode} />
+            <p className="hidden self-center text-[11px] leading-snug text-slate-400 xl:block">{form.paymentMode && form.paymentMode !== 'Cash' ? 'Bank payment details are retained with this record.' : 'Cash needs no transaction method.'}</p>
+          </div>
+        </section>
+        <section className="space-y-3">
+          <MasterSectionHeading>Payee &amp; amount</MasterSectionHeading>
+          <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-12">
+            <div className="md:col-span-5">{label('Paid To', true)}<div className="relative"><span className={masterIconClass}><UserRound size={15} /></span><input id={fieldId('Paid To')} value={form.paidTo} onChange={e => handleChange('paidTo', e.target.value)} placeholder="Vendor, farmer or employee name" disabled={saving} className={masterInputClass(Boolean(errors.paidTo))} /></div>{error(errors.paidTo)}</div>
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3 md:col-span-7">{label('Amount (₹)', true)}<div className="relative"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500"><IndianRupee size={16} /></span><input id={fieldId('Amount')} inputMode="decimal" value={form.amount || ''} onChange={e => handleChange('amount', e.target.valueAsNumber || 0)} placeholder="0.00" disabled={saving} className={cn('h-11 w-full rounded-xl border bg-white pl-9 pr-3 text-lg font-semibold tabular-nums text-slate-900 outline-none transition', errors.amount ? 'border-red-400' : 'border-emerald-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/25')} /></div>{error(errors.amount)}</div>
+          </div>
+        </section>
+        <section className="space-y-3">
+          <MasterSectionHeading>Reference &amp; note</MasterSectionHeading>
+          <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-12">
+            <div className="md:col-span-5">{label('Reference / Bill No', true)}<div className="relative"><span className={masterIconClass}><ScrollText size={15} /></span><input id={fieldId('Reference')} value={form.referenceNo} onChange={e => handleChange('referenceNo', e.target.value)} placeholder="Invoice, bill or UTR number" disabled={saving} className={cn(masterInputClass(Boolean(errors.referenceNo)), 'font-medium tracking-tight uppercase')} /></div>{error(errors.referenceNo)}</div>
+            <div className="md:col-span-3"><MasterDropdown label="Category" labelStyle="field" value={form.category} options={[...new Set([...CATEGORIES, form.category])]} onChange={v => handleChange('category', v)} searchable disabled={saving} /></div>
+            {isEditMode && <div className="md:col-span-4"><MasterDropdown label="Status" labelStyle="field" value={form.status} options={STATUSES} onChange={v => handleChange('status', v as Payment['status'])} disabled={saving} /></div>}
+            <div className={cn(isEditMode ? 'md:col-span-12' : 'md:col-span-7')}><label htmlFor={fieldId('Remarks')} className={masterLabelClass}>Remarks / Notes</label><textarea id={fieldId('Remarks')} value={form.remarks} onChange={e => handleChange('remarks', e.target.value)} rows={2} placeholder="Purpose of payment or additional details (optional)" disabled={saving} className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:bg-slate-50" /></div>
+          </div>
+        </section>
       </form>
     </Modal>
   );

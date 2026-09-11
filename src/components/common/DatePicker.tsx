@@ -159,6 +159,8 @@ export interface DatePickerProps {
   autoFocus?: boolean;
   /** Read-only text input (calendar still opens via icon). */
   readOnly?: boolean;
+  /** Open the calendar when focus arrives programmatically (default true). */
+  openOnFocus?: boolean;
   /** Test id for automation. */
   "data-testid"?: string;
 }
@@ -447,6 +449,7 @@ export function DatePicker({
   onOpenChange,
   autoFocus = false,
   readOnly = false,
+  openOnFocus = true,
   "data-testid": testId,
 }: DatePickerProps) {
   const copy = CALENDAR_COPY[language];
@@ -723,7 +726,7 @@ export function DatePicker({
           onBlur={handleInputBlur}
           onKeyDown={handleInputKeyDown}
           onFocus={() => {
-            if (!disabled) setOpen(true);
+            if (!disabled && openOnFocus) setOpen(true);
           }}
           placeholder={placeholder}
           disabled={disabled}

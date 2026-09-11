@@ -43,6 +43,7 @@ export default {
   'nav.attendance': 'Attendance',
   'nav.deductions': 'Deductions',
   'nav.accountsDashboard': 'Accounts Dashboard',
+  'nav.analysis': 'Analysis',
   'nav.collectionRegister': 'Payment Register',
   'nav.farmerPayments': 'Farm Payment',
   'nav.newPaymentEntry': 'New Payment Entry',

@@ -6,7 +6,6 @@ import { BarChart3 } from 'lucide-react';
 
 import { PaymentBookPage } from './PaymentBookPage';
 import { FarmerPaymentPage } from './FarmPaymentPage';
-import { NewPaymentPage } from './NewPaymentPage';
 import MarketRatePage from './MarketRatePage';
 import SummaryPage from './SummaryPage';
 
@@ -33,7 +32,6 @@ const tabComponents: Record<string, React.ComponentType<{ embedded?: boolean }>>
   'market-rate': MarketRatePage,
   'summary': SummaryPage,
   'farm-payment': FarmerPaymentPage,
-  'new-payments': NewPaymentPage,
   'fuel-payment': FuelPaymentPage,
   'vehicle-payment': VehiclePaymentPage,
 };

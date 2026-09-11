@@ -101,7 +101,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   }, [open, pathname, search]);
 
   const navContent = (
-    <nav className="max-h-[min(60vh,460px)] overflow-y-auto px-3 py-4 scrollbar-none lg:max-h-none">
+    <nav className="max-h-[calc(100vh-5rem)] overflow-y-auto px-3 py-4 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent lg:max-h-none">
       {NAV_SECTIONS.map((section) => {
         const SectionIcon = section.icon;
         return (
